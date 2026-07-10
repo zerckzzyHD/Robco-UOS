@@ -104,6 +104,69 @@ function _recordFeatureFailure(key, msg) {
 }
 window._recordFeatureFailure = _recordFeatureFailure;
 
+// ── Diagnostic Shell U5 seam — LOCAL feature-flag overrides ─────────────────
+// A staging-only, per-DEVICE override layer sitting ABOVE the remote/LKG
+// _featureFlags value in isFeatureEnabled() below — lets the Diagnostic
+// Shell's RESILIENCE & INFRA tools (js/test-console.js) exercise each
+// feature's disabled/fallback behavior without touching the real Firebase
+// /config/flags doc (Protocol 32/33: the override never reaches the remote
+// config, it only shadows the local read). Persisted via the SAME MetaStore
+// choke point every other device pref uses (robco_dsh_flag_overrides,
+// META_MANIFEST, state.js) so the override (and any test-in-progress state)
+// survives a reload — "clearing returns to remote/default" per the plan.
+// Loaded synchronously at module load, mirroring the LKG merge above, so the
+// very first isFeatureEnabled() call already reflects a prior session's
+// override.
+let _localFlagOverrides = {};
+try {
+  const _ovrRaw = window.MetaStore && window.MetaStore.get('robco_dsh_flag_overrides');
+  if (_ovrRaw) {
+    const _ovr = JSON.parse(_ovrRaw);
+    if (_ovr && typeof _ovr === 'object') _localFlagOverrides = _ovr;
+  }
+} catch (_) {
+  _localFlagOverrides = {}; // a malformed cache must never break flag reads
+}
+
+// Read-only accessor for the shell's live toggle-state readout — returns
+// true/false when an override is set, or null when the flag is following
+// its normal remote/default value (Protocol 33 — "no override" is a real,
+// distinct third state, never conflated with "override: off").
+window._getFeatureFlagOverride = function (key) {
+  return Object.prototype.hasOwnProperty.call(_localFlagOverrides, key)
+    ? _localFlagOverrides[key] !== false
+    : null;
+};
+
+// window._setFeatureFlagOverride(key, valOrNull) — the ONE write path for
+// this shadow layer. valOrNull === null/undefined clears the override for
+// that key (reverts to whatever the remote/LKG/default value already is);
+// any other value is coerced to a boolean override. Defense-in-depth
+// staging-only guard (Protocol 33 fail-safe direction, mirroring
+// _devConsoleUnlocked()'s own "default to hidden"): even though the ONLY
+// caller is a tier:'staging' Diagnostic Shell tool (already gated by the
+// two-signal render filter, so a production player never sees a control
+// that could call this), this function re-checks the staging signal itself
+// so it can never silently do anything on a production build even if
+// invoked directly. A persistence failure (quota/private-mode) never
+// throws — the in-memory override still applies for the rest of the
+// session, it just won't survive a reload.
+window._setFeatureFlagOverride = function (key, valOrNull) {
+  try {
+    if (typeof window._isStagingEnv !== 'function' || !window._isStagingEnv()) return;
+    if (valOrNull === null || valOrNull === undefined) {
+      delete _localFlagOverrides[key];
+    } else {
+      _localFlagOverrides[key] = !!valOrNull;
+    }
+    if (window.MetaStore && typeof window.MetaStore.set === 'function') {
+      window.MetaStore.set('robco_dsh_flag_overrides', JSON.stringify(_localFlagOverrides));
+    }
+  } catch (_) {
+    /* an override write failure must never break the app */
+  }
+};
+
 async function loadRemoteConfig() {
   try {
     const _timeoutP = new Promise((_, reject) =>
@@ -135,6 +198,14 @@ async function loadRemoteConfig() {
 }
 
 window.isFeatureEnabled = function (key) {
+  // U5: a local override (see window._setFeatureFlagOverride above) wins
+  // over both the auto-disable trip and the remote/LKG value — it is the
+  // whole point of the shadow layer (test the DISABLED path on demand).
+  // Absent (the normal case for every real player) falls straight through
+  // to the existing auto-disable + remote/LKG logic, byte-identical.
+  if (Object.prototype.hasOwnProperty.call(_localFlagOverrides, key)) {
+    return _localFlagOverrides[key] !== false;
+  }
   if (_autoDisabled[key]) return false;
   return _featureFlags[key] !== false;
 };

@@ -4355,6 +4355,27 @@
           });
         }
 
+        // Diagnostic Shell U5 seam: force the SAME real update modal on
+        // demand (js/test-console.js RESILIENCE & INFRA), reusing
+        // _triggerUpdate() verbatim (Protocol 22 — never a second modal
+        // implementation) instead of duplicating its focus-trap/keydown
+        // wiring. A REAL waiting worker (a genuine deploy is staged) is
+        // used when present; otherwise a synthetic no-op "worker" drives
+        // the identical modal UI for pure presentation testing — its
+        // postMessage is a no-op, so REBOOT still reloads the page but
+        // never sends a bogus SKIP_WAITING to a real service worker.
+        // _updatePromptShown is reset first so this can re-fire even after
+        // a real update already showed (and was dismissed) once this
+        // session.
+        window._dshForceUpdatePrompt = function () {
+          _updatePromptShown = false;
+          if (_reg && _reg.waiting) {
+            _triggerUpdate(_reg.waiting);
+          } else {
+            _triggerUpdate({ postMessage: function () {} });
+          }
+        };
+
         // Watch a pending worker to its 'installed' state, then prompt — but only
         // when an old SW already controls this page (fresh first-install has no
         // prior version to update FROM, so it must stay silent). Shared by the

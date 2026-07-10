@@ -4061,6 +4061,7 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
       const sb = {
         _featureFlags: { aiChat: false, cloudSync: true },
         _autoDisabled: { keySync: true },
+        _localFlagOverrides: {}, // U5 seam — no override active in this legacy scenario
       };
       vm.createContext(sb);
       vm.runInContext(`var isFeatureEnabled = function ${f.params} ${f.body};`, sb);
@@ -18004,16 +18005,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        several re-derived checks) and today REUSES ui-core.js's
   //        _isStagingEnv() verbatim — no re-implementation of the
   //        env-detection logic — failing OPEN (false = hidden) on any throw
-  //        or missing function. The minigame-unlock seam is documented right
-  //        on the function so a future unlock check has one obvious home.
+  //        or missing function. U5 landed the documented MINIGAME-UNLOCK SEAM
+  //        itself: an ADDITIONAL, independent check of the persisted
+  //        robco_dsh_minigame_unlocked flag — never a re-derivation of the
+  //        staging/env-detection signal itself (no meta[name="robco-env"]/
+  //        pages.dev literal anywhere in this file, still delegated
+  //        entirely to _isStagingEnv()).
   assert(
-    /typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false/.test(
+    /typeof window\._isStagingEnv === 'function' && window\._isStagingEnv\(\)\) return true/.test(
       isStagingBody149
     ) &&
+      /robco_dsh_minigame_unlocked/.test(isStagingBody149) &&
       /catch \(_\) \{\s*return false;/.test(isStagingBody149) &&
       !/meta\[name="robco-env"\]/.test(testConsole149) &&
       !/pages\.dev/.test(testConsole149),
-    '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+    '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic), ADDITIONALLY checks the persisted robco_dsh_minigame_unlocked flag (the U5 MINIGAME-UNLOCK SEAM — existence-only, never a re-derived environment signal), and fails open to false (hidden) on any uncertainty'
   );
 
   // 149.8  BEHAVIORAL (both sides): _devConsoleUnlocked() returns false when
@@ -34243,6 +34249,7 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
         _featureFlags: { visualOcr: true },
         _autoDisabled: {},
         _failCounts: {},
+        _localFlagOverrides: {}, // U5 seam — no override active in this legacy scenario
         appendToChat: () => {},
       };
       vm207b.createContext(sb);
@@ -36073,7 +36080,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 141 &&
+        tools212.length === 159 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -36082,7 +36089,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 141 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 159 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -37124,9 +37131,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         'inspect-copy',
       ];
       ok214 =
-        // U4b (Suite 215) added 80 more tools after this unit shipped, so
-        // the registry now totals 141 (61 at this unit's own ship time + 80).
-        tools214.length === 141 &&
+        // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
+        // more after this unit shipped, so the registry now totals 159
+        // (61 at this unit's own ship time + 80 U4b + 18 U5).
+        tools214.length === 159 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -37139,7 +37147,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (141 tools, after U4b) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (159 tools, after U4b+U5) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -37433,7 +37441,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 215.1  every one of the 80 new U4b tool ids is registered exactly once,
-  //        and the full registry now totals 141 (61 from U1/U3/U4a + 80).
+  //        and the full registry now totals 159 (61 from U1/U3/U4a + 80 U4b + 18 U5).
   {
     let ok215 = false;
     let err215 = null;
@@ -37524,7 +37532,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 141 &&
+        tools215.length === 159 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -37532,7 +37540,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 141 with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 (after this unit + U5) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -37550,7 +37558,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const tools215 = _evalRealTools215();
       const u4bTools215 = tools215.filter(
         t =>
-          ['state', 'resets', 'fixtures'].includes(t.category) ||
+          (['state', 'resets', 'fixtures'].includes(t.category) &&
+            t.id !== 'reset-changelog-seen') || // U5's own RESETS addition, not part of this unit's 80
           (t.category === 'inline' && t.id.startsWith('inline-'))
       );
       ok215 =
@@ -37884,7 +37893,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 215.8  RESETS: 13 ids, split across VIEW-ONCE / DEV FLAGS (7) and
+  // 215.8  RESETS: 14 ids (13 shipped by this unit + 1 added by U5's
+  //        reset-changelog-seen), split across VIEW-ONCE / DEV FLAGS (8) and
   //        CAMPAIGN DATA (6), every one tier:'staging' + destructive:true.
   {
     let ok215 = false;
@@ -37895,8 +37905,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const flagGroup215 = resetTools215.filter(t => t.group === 'VIEW-ONCE / DEV FLAGS');
       const dataGroup215 = resetTools215.filter(t => t.group === 'CAMPAIGN DATA');
       ok215 =
-        resetTools215.length === 13 &&
-        flagGroup215.length === 7 &&
+        resetTools215.length === 14 &&
+        flagGroup215.length === 8 &&
         dataGroup215.length === 6 &&
         resetTools215.every(t => t.tier === 'staging' && t.destructive === true);
     } catch (e) {
@@ -37904,7 +37914,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      "215.8: RESETS registers exactly 13 tools split across VIEW-ONCE / DEV FLAGS (7) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true" +
+      "215.8: RESETS registers exactly 14 tools (13 from this unit + U5's reset-changelog-seen) split across VIEW-ONCE / DEV FLAGS (8) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true" +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -38452,6 +38462,824 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         /#dshSections details\.sub-panel details\.sub-panel/.test(terminalCss215) === true && // sanity: terminalCss215 loaded
         /body\.dsh-modal-elevate #sysModal/.test(terminalCss215),
       "215.16: [regression, Protocol 42] _invoke() adds body.dsh-modal-elevate before calling confirmAction() and removes it once the promise settles, and terminal.css's body.dsh-modal-elevate #sysModal rule elevates the shared confirm modal above the shell for exactly that window — so a destructive tool's own confirm dialog can never render unreachable behind the shell that triggered it"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock
+//  ceremony + FINAL leak-proof audit (planning/DIAGNOSTIC_SHELL_PLAN.md
+//  §4/§7/§11 U5, Protocol 8 Sonnet stage) (22 tests)
+// ──────────────────────────────────────────────────────────────
+//  18 new registry entries: 8 tier:'staging' feature-flag override toggles
+//  (control:'toggle', a new synthesis path in _renderShell()) routing
+//  through a new cloud.js seam (window._setFeatureFlagOverride/
+//  _getFeatureFlagOverride, a staging-only local shadow layer over
+//  isFeatureEnabled()); 2 auto-disable TRIP tools driving the REAL
+//  window._recordFeatureFailure() to FAIL_THRESHOLD; 1 non-destructive AI
+//  failure-response chat-line preview; 3 cache/SW controls
+//  (sw-force-update-prompt reuses the REAL _triggerUpdate() modal via a new
+//  index.html seam, window._dshForceUpdatePrompt; sw-clear-caches/
+//  sw-unregister are genuinely destructive); 1 new RESETS entry
+//  (reset-changelog-seen, the one view-once flag U4b didn't already cover);
+//  and 3 ENVIRONMENT & UNLOCK entries landing the MINIGAME-UNLOCK SEAM
+//  itself — _devConsoleUnlocked() now ALSO returns true when the persisted
+//  robco_dsh_minigame_unlocked flag (META_MANIFEST) is set, with
+//  _shellTier() completely unchanged (still staging-signal-only), so an
+//  unlocked production build shows the shell but renders ONLY tier:'prod'
+//  tools — leak-proof by construction, proved exhaustively below over the
+//  FULL, now-159-tool registry. _fireUnlockCeremony() is the short
+//  in-fiction "RESTRICTED ACCESS GRANTED" flourish (a plain animation:,
+//  Protocol UI-9, auto-neutralized by the existing global reduced-motion
+//  block).
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremony + FINAL leak-proof audit'
+  );
+  const testConsole216 = readFile('js/test-console.js');
+  const cloudSrc216 = readFile('js/cloud.js');
+  const stateSrc216 = readFile('js/state.js');
+  const index216 = readFile('index.html');
+  const terminalCss216 = readFile('css/terminal.css');
+
+  function _evalRealTools216() {
+    const toolsStart = testConsole216.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+    const toolsEnd = testConsole216.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+    const toolsSrc = testConsole216.slice(toolsStart, toolsEnd);
+    const replayHatchBody = extractFunctionBody(testConsole216, '_replayHatch');
+    const src = `(function () {
+      function _replayHatch() ${replayHatchBody}
+      ${toolsSrc}
+      return DIAGNOSTIC_SHELL_TOOLS;
+    })()`;
+    return eval(src);
+  }
+
+  // 216.1  every one of the 18 new U5 tool ids is registered exactly once,
+  //        and the full registry now totals 159 (141 from U1-U4b + 18).
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      const ids216 = tools216.map(t => t.id);
+      const newIds216 = [
+        'flag-cloudSync',
+        'flag-googleSignIn',
+        'flag-aiChat',
+        'flag-keySync',
+        'flag-saveMigration',
+        'flag-offlineQueue',
+        'flag-visualOcr',
+        'flag-visualAiVision',
+        'sim-fail-aichat-trip',
+        'sim-fail-visualocr-trip',
+        'sim-ai-response-preview',
+        'sw-force-update-prompt',
+        'sw-clear-caches',
+        'sw-unregister',
+        'reset-changelog-seen',
+        'minigame-unlock-test',
+        'minigame-lock-test',
+        'unlock-ceremony-replay',
+      ];
+      ok216 =
+        newIds216.length === 18 &&
+        tools216.length === 159 &&
+        newIds216.every(id => ids216.includes(id)) &&
+        new Set(ids216).size === ids216.length;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 with no duplicate id' +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.2  every new flag/sim/sw/reset tool is tier:'staging' (RESILIENCE &
+  //        INFRA is entirely a staging toolbench); the two minigame TEST
+  //        triggers are tier:'staging' + non-destructive (trivially
+  //        reversible); unlock-ceremony-replay is tier:'prod' +
+  //        non-destructive (never mutates the persisted flag).
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      const byId = id => tools216.find(t => t.id === id);
+      const stagingIds = [
+        'flag-cloudSync',
+        'flag-googleSignIn',
+        'flag-aiChat',
+        'flag-keySync',
+        'flag-saveMigration',
+        'flag-offlineQueue',
+        'flag-visualOcr',
+        'flag-visualAiVision',
+        'sim-ai-response-preview',
+        'sw-force-update-prompt',
+        'minigame-unlock-test',
+        'minigame-lock-test',
+      ];
+      const destructiveStagingIds = [
+        'sim-fail-aichat-trip',
+        'sim-fail-visualocr-trip',
+        'sw-clear-caches',
+        'sw-unregister',
+        'reset-changelog-seen',
+      ];
+      ok216 =
+        stagingIds.every(id => byId(id) && byId(id).tier === 'staging' && !byId(id).destructive) &&
+        destructiveStagingIds.every(
+          id => byId(id) && byId(id).tier === 'staging' && byId(id).destructive === true
+        ) &&
+        byId('unlock-ceremony-replay').tier === 'prod' &&
+        byId('unlock-ceremony-replay').destructive === false;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.2: every new flag-override/response-preview/update-prompt/minigame-test tool is tier:'staging' + non-destructive; sim-fail-*-trip, sw-clear-caches/sw-unregister, and reset-changelog-seen are additionally destructive:true (still tier:'staging'); unlock-ceremony-replay is the sole tier:'prod' new entry, non-destructive" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.3  all 8 flag-* tools carry control:'toggle' with a read() and
+  //        readOverride() function, and each action forwards to
+  //        _dshSetFlagOverride with the correct flag key.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      const flagIds = [
+        ['flag-cloudSync', 'cloudSync'],
+        ['flag-googleSignIn', 'googleSignIn'],
+        ['flag-aiChat', 'aiChat'],
+        ['flag-keySync', 'keySync'],
+        ['flag-saveMigration', 'saveMigration'],
+        ['flag-offlineQueue', 'offlineQueue'],
+        ['flag-visualOcr', 'visualOcr'],
+        ['flag-visualAiVision', 'visualAiVision'],
+      ];
+      ok216 = flagIds.every(([id, key]) => {
+        const t = tools216.find(x => x.id === id);
+        return (
+          t &&
+          t.control === 'toggle' &&
+          typeof t.read === 'function' &&
+          typeof t.readOverride === 'function' &&
+          typeof t.action === 'function' &&
+          t.action.toString().indexOf(key) !== -1
+        );
+      });
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.3: all 8 flag-* tools carry control:'toggle' with read()/readOverride() functions, and each action() forwards its own flag key to _dshSetFlagOverride" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.4  BEHAVIORAL — _devConsoleUnlocked() MINIGAME-UNLOCK SEAM: true on
+  //        staging regardless of the flag; false on non-staging with the
+  //        flag unset; true on non-staging when the flag reads 'true'; and
+  //        fails safe to false when MetaStore itself throws.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const body216 = extractFunctionBody(testConsole216, '_devConsoleUnlocked');
+      function run216(isStagingEnv, metaGetResult, metaThrows) {
+        const src = `(function () {
+          function _devConsoleUnlocked() ${body216}
+          return _devConsoleUnlocked();
+        })()`;
+        const window = { _isStagingEnv: isStagingEnv };
+        const MetaStore = {
+          get: k => {
+            if (metaThrows) throw new Error('boom');
+            return k === 'robco_dsh_minigame_unlocked' ? metaGetResult : null;
+          },
+        };
+        void window;
+        void MetaStore;
+        return eval(src);
+      }
+      ok216 =
+        run216(() => true, null, false) === true && // staging true, flag irrelevant
+        run216(() => true, 'true', false) === true && // staging true, flag also true
+        run216(() => false, null, false) === false && // non-staging, flag unset
+        run216(() => false, 'false', false) === false && // non-staging, flag explicitly false
+        run216(() => false, 'true', false) === true && // non-staging, flag genuinely set — the seam
+        run216(undefined, 'true', false) === true && // _isStagingEnv missing, flag set
+        run216(() => false, 'true', true) === false; // MetaStore.get throws — fail-safe
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.4: BEHAVIORAL — _devConsoleUnlocked() returns true on staging regardless of the minigame flag, false off-staging with the flag unset/false, true off-staging ONLY when robco_dsh_minigame_unlocked reads 'true' (the MINIGAME-UNLOCK SEAM), and fails safe to false when MetaStore.get() throws" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.5  BEHAVIORAL — _shellTier() is completely UNAFFECTED by the
+  //        minigame-unlock flag: it stays 'prod' whenever the staging
+  //        signal itself is false, even though _devConsoleUnlocked() (216.4)
+  //        now returns true in that same scenario. This is the load-bearing
+  //        leak-proof invariant this whole unit depends on — EXISTENCE and
+  //        TIER are governed by two completely independent checks.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tierBody216 = extractFunctionBody(testConsole216, '_shellTier');
+      const src = `(function () {
+        function _shellTier() ${tierBody216}
+        return _shellTier();
+      })()`;
+      const window = { _isStagingEnv: () => false };
+      void window;
+      // Even though a real MetaStore might report the shell "unlocked" for
+      // _devConsoleUnlocked()'s purposes, _shellTier() never reads
+      // MetaStore or the unlock flag at all — proven by omitting MetaStore
+      // from this sandbox entirely and confirming no ReferenceError occurs.
+      ok216 = eval(src) === 'prod';
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.5: BEHAVIORAL — _shellTier() returns 'prod' purely off the staging signal and never references MetaStore/the minigame-unlock flag at all (proven by a sandbox with no MetaStore defined) — a minigame-unlocked production build renders ONLY tier:'prod' tools, leak-proof by construction" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.6  FINAL LEAK-PROOF AUDIT, part 1 — BEHAVIORAL re-proof of the
+  //        Suite 210.6/212.5 leak-proof invariant against the FULL, final
+  //        159-tool registry (all 5 units): every tier:'staging' tool is
+  //        invisible under a stubbed 'prod' tier and visible under
+  //        'staging'; every tier:'prod' tool is visible under both.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const toolVisBody216 = extractFunctionBody(testConsole216, '_toolVisible');
+      const replayHatchBody216 = extractFunctionBody(testConsole216, '_replayHatch');
+      const toolsStart216 = testConsole216.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+      const toolsEnd216 = testConsole216.indexOf('\n  ];', toolsStart216) + '\n  ];'.length;
+      const toolsSrc216 = testConsole216.slice(toolsStart216, toolsEnd216);
+      const src216 = `(function () {
+        function _toolVisible(tool, tier) ${toolVisBody216}
+        function _replayHatch() ${replayHatchBody216}
+        ${toolsSrc216}
+        return { _toolVisible: _toolVisible, DIAGNOSTIC_SHELL_TOOLS: DIAGNOSTIC_SHELL_TOOLS };
+      })()`;
+      const sandbox216 = eval(src216);
+      const tools216 = sandbox216.DIAGNOSTIC_SHELL_TOOLS;
+      const stagingTools216 = tools216.filter(t => t.tier === 'staging');
+      const prodTools216 = tools216.filter(t => t.tier === 'prod');
+      ok216 =
+        tools216.length === 159 &&
+        stagingTools216.length > 0 &&
+        prodTools216.length > 0 &&
+        stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
+        stagingTools216.every(t => sandbox216._toolVisible(t, 'staging') === true) &&
+        prodTools216.every(
+          t =>
+            sandbox216._toolVisible(t, 'prod') === true &&
+            sandbox216._toolVisible(t, 'staging') === true
+        );
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 159-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.7  FINAL LEAK-PROOF AUDIT, part 2 (planning §8.6, newly enforced) —
+  //        no tier:'prod' tool's OWN inline action ever contains a direct
+  //        campaign-state write (saveState(/state.<field>/robco_v8/
+  //        pushToCloud) — every prod tool only ever delegates to a named
+  //        helper/global setter (Protocol 22), so a minigame-unlocked
+  //        production build can never mutate campaign state from a tool
+  //        the shell itself renders.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      const prodActionTools216 = tools216.filter(
+        t => t.tier === 'prod' && typeof t.action === 'function'
+      );
+      const forbidden216 = /\bsaveState\s*\(|\bstate\.[a-zA-Z_]|robco_v8|pushToCloud/;
+      ok216 =
+        prodActionTools216.length > 10 &&
+        prodActionTools216.every(t => !forbidden216.test(t.action.toString()));
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.7: FINAL LEAK-PROOF AUDIT (2/2) — every tier:'prod' tool with an inline action() contains no direct campaign-state write pattern (saveState(/state.<field>/robco_v8/pushToCloud) in its own source text; every prod tool only ever delegates to a named helper" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.8  BEHAVIORAL — window._setFeatureFlagOverride (cloud.js) is
+  //        staging-only, fail-safe: it never mutates the override map (and
+  //        never calls MetaStore.set) when _isStagingEnv is false/missing/
+  //        throws; it sets and clears correctly when genuinely staging.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const vm216 = require('vm');
+      const setFn216 = extractAssignedFunction(cloudSrc216, '_setFeatureFlagOverride');
+      function run216(isStagingFn, ...calls) {
+        const sandbox = {
+          console,
+          window: { _isStagingEnv: isStagingFn },
+          _localFlagOverrides: {},
+          __sets: [],
+        };
+        vm216.createContext(sandbox);
+        vm216.runInContext(
+          `window.MetaStore = { set: function (k, v) { __sets.push([k, v]); } };\n` +
+            `var _setFeatureFlagOverride = function ${setFn216.params} ${setFn216.body};\n` +
+            calls
+              .map(
+                c => `_setFeatureFlagOverride(${JSON.stringify(c[0])}, ${JSON.stringify(c[1])});`
+              )
+              .join('\n'),
+          sandbox
+        );
+        return sandbox;
+      }
+      const offSandbox216 = run216(() => false, ['aiChat', true]);
+      const missingSandbox216 = run216(undefined, ['aiChat', true]);
+      const setOnlySandbox216 = run216(() => true, ['aiChat', true]);
+      const onSandbox216 = run216(() => true, ['aiChat', true], ['aiChat', null]);
+      ok216 =
+        Object.keys(offSandbox216._localFlagOverrides).length === 0 &&
+        offSandbox216.__sets.length === 0 &&
+        Object.keys(missingSandbox216._localFlagOverrides).length === 0 &&
+        missingSandbox216.__sets.length === 0 &&
+        setOnlySandbox216._localFlagOverrides.aiChat === true &&
+        setOnlySandbox216.__sets.length >= 1 &&
+        !Object.prototype.hasOwnProperty.call(onSandbox216._localFlagOverrides, 'aiChat') && // set then cleared
+        onSandbox216.__sets.length >= 1;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      '216.8: BEHAVIORAL — window._setFeatureFlagOverride() never mutates _localFlagOverrides or calls MetaStore.set() when _isStagingEnv is false or missing (fail-safe, Protocol 33); when genuinely staging it sets the override, persists it via MetaStore.set(), and a subsequent null clears it back out' +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.9  BEHAVIORAL — window.isFeatureEnabled(): a local override wins
+  //        over BOTH the session auto-disable and the remote/LKG value;
+  //        clearing the override (absent from the map) falls straight
+  //        through to the pre-existing logic, byte-identical.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const vm = require('vm');
+      const f216 = extractAssignedFunction(cloudSrc216, 'isFeatureEnabled');
+      const sb216 = {
+        _featureFlags: { aiChat: true, cloudSync: false },
+        _autoDisabled: { keySync: true },
+        _localFlagOverrides: { aiChat: false, cloudSync: true },
+      };
+      vm.createContext(sb216);
+      vm.runInContext(`var isFeatureEnabled = function ${f216.params} ${f216.body};`, sb216);
+      const fn216 = sb216.isFeatureEnabled;
+      ok216 =
+        fn216('aiChat') === false && // overridden OFF despite _featureFlags.aiChat = true
+        fn216('cloudSync') === true && // overridden ON despite _featureFlags.cloudSync = false
+        fn216('keySync') === false && // no override — falls through to _autoDisabled
+        fn216('totallyUnknownFeature') === true; // no override, no flag entry — fail-open
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      '216.9: BEHAVIORAL — isFeatureEnabled() lets a local override win over both _featureFlags and _autoDisabled in either direction (forcing ON or OFF), and a key with no override falls straight through to the pre-existing auto-disable/remote-flag/fail-open logic unchanged' +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.10  BEHAVIORAL — _renderShell()'s new control:'toggle' synthesis
+  //         path: a synthetic flag-toggle tool renders a live state
+  //         readout plus ON/OFF/DEFAULT buttons, and clicking each invokes
+  //         _invoke(tool, mode) with the correct mode string and repaints
+  //         the readout from the tool's own read()/readOverride().
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const vm216 = require('vm');
+      function makeEl216(tag) {
+        const listeners = {};
+        const el = {
+          tagName: tag,
+          children: [],
+          className: '',
+          textContent: '',
+          title: '',
+          style: {},
+          attrs: {},
+          setAttribute(k, v) {
+            this.attrs[k] = v;
+          },
+          getAttribute(k) {
+            return this.attrs[k];
+          },
+          appendChild(child) {
+            this.children.push(child);
+            return child;
+          },
+          insertBefore(child, ref) {
+            const idx = this.children.indexOf(ref);
+            this.children.splice(idx === -1 ? 0 : idx, 0, child);
+            return child;
+          },
+          querySelector(sel) {
+            return (this.__map && this.__map[sel]) || null;
+          },
+          addEventListener(type, fn) {
+            (listeners[type] = listeners[type] || []).push(fn);
+          },
+          _fire(type) {
+            (listeners[type] || []).forEach(fn => fn());
+          },
+        };
+        return el;
+      }
+      const sectionsHost216 = makeEl216('div');
+      const envBanner216 = makeEl216('span');
+      const panel216 = makeEl216('div');
+      panel216.__map = { '#dshSections': sectionsHost216, '#dshEnvBanner': envBanner216 };
+      const bodySrc216 = extractFunctionBody(testConsole216, '_renderShell');
+      let invokedTool216 = null;
+      let invokedArg216 = null;
+      let overrideState216 = null; // null=default, true/false=override
+      const src216 = `
+        var DEV_MARKER = '⚙';
+        var CATEGORY_ORDER = ['infra'];
+        var CATEGORY_META = { infra: { stagingTitle: 'RESILIENCE & INFRA', prodTitle: 'RESILIENCE & INFRA', icon: '⚒' } };
+        function _invoke(tool, arg) { __invoked(tool, arg); }
+        function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }
+        function _shellTier() { return 'staging'; }
+        function _paintEnvBanner() {}
+        function _wireDynamicSubPanel() {}
+        function _dshGroupDefaultOpen() { return true; }
+        function _buildGroupDetails(cat, headingText) {
+          var gd = document.createElement('details');
+          gd.className = 'sub-panel';
+          gd.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + String(headingText).toLowerCase());
+          return gd;
+        }
+        var DIAGNOSTIC_SHELL_TOOLS = [
+          { id: 'synth-toggle', label: 'SYNTH TOGGLE', subLabel: 's', icon: '⚑', category: 'infra', group: 'G', tier: 'staging', destructive: false, control: 'toggle', read: function () { return __readLive(); }, readOverride: function () { return __readOverride(); }, tooltip: 't', triggers: [], action: function () {} },
+        ];
+        function _renderShell(panel) ${bodySrc216}
+      `;
+      const document216 = {
+        createElement: tag => makeEl216(tag),
+        createTextNode: text => ({ nodeType: 3, textContent: text }),
+      };
+      const sandbox216 = {
+        console,
+        document: document216,
+        __invoked: (tool, arg) => {
+          invokedTool216 = tool.id;
+          invokedArg216 = arg;
+          if (arg === 'on') overrideState216 = true;
+          else if (arg === 'off') overrideState216 = false;
+          else if (arg === 'clear') overrideState216 = null;
+        },
+        __readOverride: () => overrideState216,
+        __readLive: () => (overrideState216 === null ? true : overrideState216),
+      };
+      vm216.createContext(sandbox216);
+      vm216.runInContext(src216 + '\nthis._renderShellRef = _renderShell;', sandbox216);
+      sandbox216._renderShellRef(panel216);
+      const details216 = sectionsHost216.children[0];
+      const groupWrapper216 = details216.children.find(c => c.className === 'sub-panel');
+      const gridNode216 = groupWrapper216.children.find(c => c.className === 'dsh-tool-grid');
+      const toggleRow216 = gridNode216.children.find(c => c.className === 'dsh-tool-row');
+      const stateSpan216 = toggleRow216.children.find(c => c.className === 'dsh-toggle-state');
+      const buttons216 = toggleRow216.children.filter(c => c.tagName === 'button');
+      const onBtn216 = buttons216.find(b => b.textContent === 'ON');
+      const offBtn216 = buttons216.find(b => b.textContent === 'OFF');
+      const clearBtn216 = buttons216.find(b => b.textContent === 'DEFAULT');
+      const initialText216 = stateSpan216.textContent;
+      onBtn216._fire('click');
+      const afterOnTool216 = invokedTool216;
+      const afterOnArg216 = invokedArg216;
+      const afterOnText216 = stateSpan216.textContent;
+      offBtn216._fire('click');
+      const afterOffArg216 = invokedArg216;
+      clearBtn216._fire('click');
+      const afterClearArg216 = invokedArg216;
+      const afterClearText216 = stateSpan216.textContent;
+      ok216 =
+        buttons216.length === 3 &&
+        !!stateSpan216 &&
+        initialText216.indexOf('DEFAULT') !== -1 &&
+        afterOnTool216 === 'synth-toggle' &&
+        afterOnArg216 === 'on' &&
+        afterOnText216.indexOf('OVERRIDE: ON') !== -1 &&
+        afterOffArg216 === 'off' &&
+        afterClearArg216 === 'clear' &&
+        afterClearText216.indexOf('DEFAULT') !== -1;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.10: BEHAVIORAL — _renderShell()'s control:'toggle' synthesis builds a live state readout plus ON/OFF/DEFAULT buttons for a flag-override tool; clicking each button invokes _invoke(tool,'on'|'off'|'clear') and immediately repaints the readout from the tool's own read()/readOverride()" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.11  static + BEHAVIORAL — _dshTripAutoDisable(key) calls the REAL
+  //         window._recordFeatureFailure(key, …) exactly FAIL_THRESHOLD (3)
+  //         times — the genuine kill-switch auto-disable trip, never a
+  //         synthetic imitation of it.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const body216 = extractFunctionBody(testConsole216, '_dshTripAutoDisable');
+      const calls216 = [];
+      const src = `(function () {
+        function _dshTripAutoDisable(key) ${body216}
+        _dshTripAutoDisable('aiChat');
+      })()`;
+      const window = { _recordFeatureFailure: (key, msg) => calls216.push([key, msg]) };
+      void window;
+      eval(src);
+      ok216 =
+        calls216.length === 3 &&
+        calls216.every(c => c[0] === 'aiChat') &&
+        calls216[0][1] !== null &&
+        calls216[0][1] !== undefined &&
+        calls216[1][1] === null &&
+        calls216[2][1] === null;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.11: BEHAVIORAL — _dshTripAutoDisable('aiChat') calls the REAL window._recordFeatureFailure('aiChat', …) exactly 3 times (FAIL_THRESHOLD), the same auto-disable trip a genuine repeated-failure player would hit" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.12  static — sw-clear-caches / sw-unregister actions call
+  //         caches.keys()/caches.delete and
+  //         navigator.serviceWorker.getRegistrations()/unregister()
+  //         respectively; sw-force-update-prompt's action calls
+  //         window._dshForceUpdatePrompt().
+  {
+    const clearBody216 = extractFunctionBody(testConsole216, '_dshClearCaches');
+    const unregBody216 = extractFunctionBody(testConsole216, '_dshUnregisterSw');
+    const tools216 = _evalRealTools216();
+    const forceUpdateTool216 = tools216.find(t => t.id === 'sw-force-update-prompt');
+    assert(
+      /caches\s*\.\s*keys\s*\(/.test(clearBody216) &&
+        /caches\.delete\s*\(/.test(clearBody216) &&
+        /getRegistrations\s*\(/.test(unregBody216) &&
+        /\.unregister\s*\(/.test(unregBody216) &&
+        forceUpdateTool216 &&
+        typeof forceUpdateTool216.action === 'function' &&
+        /_dshForceUpdatePrompt/.test(forceUpdateTool216.action.toString()),
+      '216.12: _dshClearCaches() calls caches.keys()/caches.delete() for every entry, _dshUnregisterSw() calls navigator.serviceWorker.getRegistrations()/.unregister() for every registration, and the sw-force-update-prompt tool routes through window._dshForceUpdatePrompt()'
+    );
+  }
+
+  // 216.13  index.html defines window._dshForceUpdatePrompt reusing the
+  //         REAL _triggerUpdate() modal (Protocol 22) — never a duplicate
+  //         implementation — and BEHAVIORAL: it calls _triggerUpdate with
+  //         the genuine waiting worker when one exists, and a synthetic
+  //         no-op worker otherwise.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      assert(
+        /window\._dshForceUpdatePrompt\s*=\s*function/.test(index216),
+        '216.13a: index.html defines window._dshForceUpdatePrompt'
+      );
+      const seamFn216 = extractAssignedFunction(index216, '_dshForceUpdatePrompt');
+      assert(
+        /_triggerUpdate\s*\(/.test(seamFn216.body),
+        '216.13b: window._dshForceUpdatePrompt routes through the real _triggerUpdate() (Protocol 22, never a duplicate modal)'
+      );
+      const vm216 = require('vm');
+      function run216(regWaiting) {
+        const calls = [];
+        const sb = {
+          _reg: regWaiting ? { waiting: { postMessage: () => {} } } : null,
+          _updatePromptShown: true,
+          _triggerUpdate: w => calls.push(w),
+        };
+        vm216.createContext(sb);
+        vm216.runInContext(
+          `var _dshForceUpdatePrompt = function ${seamFn216.params} ${seamFn216.body};\n_dshForceUpdatePrompt();`,
+          sb
+        );
+        return { calls, promptShownReset: sb._updatePromptShown === false };
+      }
+      const withReal216 = run216(true);
+      const withoutReal216 = run216(false);
+      ok216 =
+        withReal216.calls.length === 1 &&
+        typeof withReal216.calls[0] === 'object' &&
+        withReal216.promptShownReset &&
+        withoutReal216.calls.length === 1 &&
+        typeof withoutReal216.calls[0].postMessage === 'function' &&
+        withoutReal216.promptShownReset;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      '216.13: BEHAVIORAL — window._dshForceUpdatePrompt() resets _updatePromptShown then calls the real _triggerUpdate() with the genuine waiting worker when _reg.waiting exists, or a synthetic no-op-postMessage worker otherwise — always the SAME modal code path' +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.14  static — the two minigame TEST triggers declare
+  //         triggers:['robco_dsh_minigame_unlocked'] (Protocol 44
+  //         metadata), and reset-changelog-seen declares
+  //         triggers:['robco_version'] — distinct from every U4b RESETS
+  //         flag (no accidental duplication of first-run/hatch/greet/
+  //         firmware-seen).
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      const unlockTest = tools216.find(t => t.id === 'minigame-unlock-test');
+      const lockTest = tools216.find(t => t.id === 'minigame-lock-test');
+      const changelogReset = tools216.find(t => t.id === 'reset-changelog-seen');
+      const resetIds = tools216.filter(t => t.category === 'resets').map(t => t.id);
+      ok216 =
+        unlockTest.triggers.indexOf('robco_dsh_minigame_unlocked') !== -1 &&
+        lockTest.triggers.indexOf('robco_dsh_minigame_unlocked') !== -1 &&
+        changelogReset.triggers.indexOf('robco_version') !== -1 &&
+        resetIds.filter(id => id === 'reset-changelog-seen').length === 1 &&
+        resetIds.indexOf('reset-first-run') !== -1 && // U4b's flag resets are untouched, not re-added
+        resetIds.indexOf('reset-hatch-flag') !== -1;
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.14: both minigame TEST triggers declare triggers:['robco_dsh_minigame_unlocked'] (Protocol 44), reset-changelog-seen declares triggers:['robco_version'] (the one view-once flag U4b's RESETS didn't already cover), and every pre-existing U4b flag reset (first-run/hatch-flag/etc.) is untouched, not duplicated" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.15  Protocol 4/UI-6 + U6 boundary — robco_dsh_flag_overrides and
+  //         robco_dsh_minigame_unlocked are registered in state.js's
+  //         META_MANIFEST (device prefs, never campaign keys) with the
+  //         correct owner/type.
+  {
+    assert(
+      /robco_dsh_flag_overrides:\s*\{\s*type:\s*'json',\s*default:\s*'\{\}',\s*owner:\s*'cloud\.js'\s*\}/.test(
+        stateSrc216
+      ) &&
+        /robco_dsh_minigame_unlocked:\s*\{\s*type:\s*'bool',\s*default:\s*false,\s*owner:\s*'test-console\.js'\s*\}/.test(
+          stateSrc216
+        ),
+      '216.15: state.js META_MANIFEST registers robco_dsh_flag_overrides (json, cloud.js) and robco_dsh_minigame_unlocked (bool, test-console.js) as device preferences, per Protocol 4/UI-6'
+    );
+  }
+
+  // 216.16  CSS — .dsh-unlock-ceremony / dshUnlockGlow and .dsh-toggle-state
+  //         exist in terminal.css; the ceremony flash is a plain
+  //         `animation:` (not transition-only) so the existing global
+  //         prefers-reduced-motion block neutralizes it automatically
+  //         (Protocol UI-9 — no bespoke carve-out).
+  {
+    assert(
+      /\.dsh-unlock-ceremony\s*\{[^}]*animation:\s*dshUnlockGlow/.test(terminalCss216) &&
+        /@keyframes\s+dshUnlockGlow/.test(terminalCss216) &&
+        /\.dsh-toggle-state\s*\{/.test(terminalCss216),
+      '216.16: terminal.css defines .dsh-unlock-ceremony (a plain `animation: dshUnlockGlow`, auto-neutralized by the existing global reduced-motion block) and .dsh-toggle-state (the flag-toggle row live-state readout)'
+    );
+  }
+
+  // 216.17  _renderShell() structurally recognizes control:'toggle' as its
+  //         own synthesis branch (a real ON/OFF/DEFAULT button row), sitting
+  //         alongside the pre-existing input/select/select-input branch —
+  //         never folded into it (each control kind has its own, verified
+  //         shape rather than a partial-overlap conditional).
+  {
+    const renderShellBody216 = extractFunctionBody(testConsole216, '_renderShell');
+    assert(
+      /tool\.control === 'toggle'/.test(renderShellBody216) &&
+        /paintToggleState/.test(renderShellBody216) &&
+        /tool\.control === 'input'/.test(renderShellBody216),
+      "216.17: _renderShell() recognizes control:'toggle' as its own synthesis branch (with a self-repainting live state readout), distinct from and sitting alongside the pre-existing input/select/select-input branch"
+    );
+  }
+
+  // 216.18  static leak-proof invariant (planning §8, re-derived against the
+  //         FULL current registry): every destructive:true tool is
+  //         tier:'staging', and every tool in a staging-only category
+  //         (state/resets/infra/fixtures/inline) is tier:'staging' — this
+  //         automatically covers every U5 tool too, since the check
+  //         re-reads and re-evaluates the CURRENT registry at test time.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const tools216 = _evalRealTools216();
+      ok216 =
+        tools216.length === 159 &&
+        tools216.every(t => !t.destructive || t.tier === 'staging') &&
+        tools216.every(
+          t =>
+            !['state', 'resets', 'infra', 'fixtures', 'inline'].includes(t.category) ||
+            t.tier === 'staging'
+        );
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.18: static leak-proof invariant re-derived against the FULL, final 159-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.19  Protocol 44 guard (re-derived, Suite 212.11's technique) still
+  //         holds with the new robco_dsh_minigame_unlocked/robco_version
+  //         triggers added to the union — every RobcoEvents.emit literal
+  //         and every known view-once MetaStore flag remains covered.
+  {
+    let ok216 = false;
+    let err216 = null;
+    try {
+      const jsFiles216 = fs
+        .readdirSync(path.join(ROOT, 'js'))
+        .filter(f => f.endsWith('.js') && f !== 'test-console.js');
+      const allJsSrc216 = jsFiles216.map(f => readFile('js/' + f)).join('\n');
+      const emitNames216 = new Set(
+        [...allJsSrc216.matchAll(/RobcoEvents\.emit\(\s*'([^']+)'/g)].map(m => m[1])
+      );
+      emitNames216.delete('runtime.state'); // curated allowlist (deliberately internal)
+      const knownFlags216 = ['robco_bay_opened', 'robco_last_seen_version', 'robco_booted_before'];
+      const tools216 = _evalRealTools216();
+      const triggerUnion216 = new Set();
+      tools216.forEach(t => (t.triggers || []).forEach(x => triggerUnion216.add(x)));
+      ok216 =
+        [...emitNames216].every(n => triggerUnion216.has(n)) &&
+        knownFlags216.every(f => triggerUnion216.has(f));
+    } catch (e) {
+      err216 = e;
+    }
+    assert(
+      ok216,
+      "216.19: [Protocol 44 guard, re-derived] every real RobcoEvents.emit('<name>') string literal in js/*.js (excluding the allowlisted runtime.state) and all 3 known view-once MetaStore flags remain covered by the union of every DIAGNOSTIC_SHELL_TOOLS triggers[] array, including this unit's new entries" +
+        (err216 ? ' — ' + err216.message : '')
+    );
+  }
+
+  // 216.20  _fireUnlockCeremony() opens the drawer, sets the in-fiction
+  //         "RESTRICTED ACCESS GRANTED" text, and settles back to the
+  //         tier-appropriate banner via the EXISTING _paintEnvBanner()
+  //         (Protocol 22 — never a second banner-painting path); writes
+  //         nothing durable (no MetaStore/state/saveState reference
+  //         anywhere in its own body).
+  {
+    const ceremonyBody216 = extractFunctionBody(testConsole216, '_fireUnlockCeremony');
+    assert(
+      /RESTRICTED ACCESS GRANTED/.test(ceremonyBody216) &&
+        /_paintEnvBanner\s*\(/.test(ceremonyBody216) &&
+        /_openShell\s*\(/.test(ceremonyBody216) &&
+        !/saveState\s*\(/.test(ceremonyBody216) &&
+        !/MetaStore\./.test(ceremonyBody216) &&
+        !/\bstate\./.test(ceremonyBody216),
+      '216.20: _fireUnlockCeremony() opens the drawer, flashes the in-fiction "RESTRICTED ACCESS GRANTED" line, and settles back via the existing _paintEnvBanner() — with no MetaStore/state/saveState reference anywhere in its own body (writes nothing durable)'
     );
   }
 }

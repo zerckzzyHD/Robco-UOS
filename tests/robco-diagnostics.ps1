@@ -2356,11 +2356,19 @@ Check (([bool]($rulesSrc48 -match 'match\s*/config/\{')) -and ([bool]($rulesSrc4
     'firestore.rules has /config/{doc} rule: allow read if true, allow write if false (public read, console-only write)'
 
 # 48.12  WU-B6 / TS-GAP-8 -- isFeatureEnabled fail-open (JS runner evals it behaviorally;
-#        PS runner does the structural check on the function body).
+#        PS runner does the structural check on the function body). U5 added a
+#        LOCAL override layer (window._setFeatureFlagOverride) ahead of the
+#        pre-existing auto-disable/remote-flag logic -- the window is widened
+#        to still reach past the new override branch to the unchanged tail.
 $ifeIdx48 = $cloudSrc.IndexOf('window.isFeatureEnabled')
-$ifeBody48 = if ($ifeIdx48 -ge 0) { $cloudSrc.Substring($ifeIdx48, [Math]::Min(180, $cloudSrc.Length - $ifeIdx48)) } else { '' }
-Check (($ifeBody48 -match '_autoDisabled\[key\]') -and ($ifeBody48 -match '_featureFlags\[key\]\s*!==\s*false')) `
-    "isFeatureEnabled() behavioral: unknown key fail-opens to true; explicit false + auto-disabled both disable (TS-GAP-8)"
+$ifeBody48 = if ($ifeIdx48 -ge 0) { $cloudSrc.Substring($ifeIdx48, [Math]::Min(650, $cloudSrc.Length - $ifeIdx48)) } else { '' }
+Check (
+    ($ifeBody48 -match '_autoDisabled\[key\]') -and
+    ($ifeBody48 -match '_featureFlags\[key\]\s*!==\s*false') -and
+    ($ifeBody48 -match '_localFlagOverrides') -and
+    ($ifeBody48 -match 'hasOwnProperty')
+) `
+    "isFeatureEnabled() behavioral: unknown key fail-opens to true; explicit false + auto-disabled both disable (TS-GAP-8); U5's local override layer (_localFlagOverrides) sits ahead of that unchanged logic"
 
 # 48.13  WU-B6 / TS-GAP-1 (Protocol 33) -- loadRemoteConfig fail-open: try/catch wraps the
 #        fetch and flags are mutated ONLY in the success branch (k in _featureFlags), never in
@@ -10636,21 +10644,26 @@ Check (
 #        several re-derived checks) and today REUSES ui-core.js's
 #        _isStagingEnv() verbatim -- no re-implementation of the
 #        env-detection logic -- failing OPEN (false = hidden) on any throw or
-#        missing function. The minigame-unlock seam is documented right on
-#        the function so a future unlock check has one obvious home.
+#        missing function. U5 landed the documented MINIGAME-UNLOCK SEAM
+#        itself: an ADDITIONAL, independent check of the persisted
+#        robco_dsh_minigame_unlocked flag -- never a re-derivation of the
+#        staging/env-detection signal itself.
 Check (
-    ($isStagingBody149 -match "typeof window\._isStagingEnv === 'function' \? window\._isStagingEnv\(\) : false") -and
+    ($isStagingBody149 -match "typeof window\._isStagingEnv === 'function' && window\._isStagingEnv\(\)\) return true") -and
+    ($isStagingBody149 -match 'robco_dsh_minigame_unlocked') -and
     ($isStagingBody149 -match '(?s)catch \(_\) \{\s*return false;') -and
     (-not ($testConsole149 -match 'meta\[name="robco-env"\]')) -and
     (-not ($testConsole149 -match 'pages\.dev'))
-) '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic) and fails open to false (hidden) on any uncertainty'
+) '149.7: _devConsoleUnlocked() calls window._isStagingEnv() verbatim (no re-implemented env-detection logic), ADDITIONALLY checks the persisted robco_dsh_minigame_unlocked flag (the U5 MINIGAME-UNLOCK SEAM), and fails open to false (hidden) on any uncertainty'
 
 # 149.8  BOTH-SIDES (structural mirror of the JS eval-based behavioral proof --
-#        PowerShell has no JS eval, same convention as Suite 62.5): the ternary
-#        guarantees true only propagates when _isStagingEnv() itself returns
-#        true, and the catch guarantees any throw resolves to false (hidden).
+#        PowerShell has no JS eval, same convention as Suite 62.5): the
+#        guarded `if` guarantees true only propagates when _isStagingEnv()
+#        itself genuinely returns true, and the catch guarantees any throw
+#        (from _isStagingEnv() OR the U5 MetaStore seam) resolves to false
+#        (hidden).
 Check (
-    ($isStagingBody149 -match "\? window\._isStagingEnv\(\) : false") -and
+    ($isStagingBody149 -match "if \(typeof window\._isStagingEnv === 'function' && window\._isStagingEnv\(\)\) return true;") -and
     ($isStagingBody149 -match '(?s)try \{.*catch \(_\) \{\s*return false;')
 ) 'env-aware Developer Console: hidden (false) when the staging signal is missing/throws/false, shown (true) only when it is genuinely true (both-sides structural mirror)'
 
@@ -22534,7 +22547,7 @@ try {
   var thresholdMatch = cloudSrc.match(/const FAIL_THRESHOLD = (\d+);/);
   var recordSrc = 'const FAIL_THRESHOLD = ' + thresholdMatch[1] + ';\n' + declareFn(cloudSrc, '_recordFeatureFailure');
   var isEnabledMatch = cloudSrc.match(/window\.isFeatureEnabled\s*=\s*function\s*\(([^)]*)\)\s*\{/);
-  var sbB = { _featureFlags: { visualOcr: true }, _autoDisabled: {}, _failCounts: {}, appendToChat: function () {} };
+  var sbB = { _featureFlags: { visualOcr: true }, _autoDisabled: {}, _failCounts: {}, _localFlagOverrides: {}, appendToChat: function () {} };
   vm.createContext(sbB);
   // isFeatureEnabled is a window.X = function(){} assignment, not a plain declaration --
   // extract it directly by brace-matching from the 'window.isFeatureEnabled = function' index.
@@ -24088,7 +24101,7 @@ $claude212 = Read-Src "CLAUDE.md"
 # transport -- a temp file, never piped stdin -- mirrors the Suite 210/211
 # pattern).
 $labels212 = @(
-    "212.1: [behavioral] DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 141 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools)",
+    "212.1: [behavioral] DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 159 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools)",
     "212.2: [behavioral] every new U3 tool (scoped to category:'triggers', so U4b's 80 tools never leak into this count) carries no ``anchor``, and _renderShell()'s synthesis path builds a real .dsh-tool-btn button (wired through _invoke(tool)) inside a .dsh-tool-grid nested in its own collapsible group",
     "212.3: [behavioral] _renderShell(), run against a synthetic DOM with two anchor-less tools sharing a `group`, builds ONE collapsible group wrapper (via _buildGroupDetails()) holding ONE .dsh-tool-grid with both synthesized buttons, and clicking the first fires _invoke() with that exact tool",
     "212.4: [Protocol 42] exactly the 7 fire-anim-<event> tools whose bus event has a reactive campaign-event-log-writing subscriber are tier:'staging'+destructive:true; every other one of the 22 fire-anim-<event> tools is tier:'prod'+destructive:false",
@@ -24162,7 +24175,7 @@ try {
     'fire-pending-quest-filed','fire-pending-perk-seat','fire-pending-effect-warmup',
   ];
   results.push(
-    tools1.length === 141 &&
+    tools1.length === 159 &&
       expected1.length === 45 &&
       expected1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
       new Set(ids1).size === ids1.length
@@ -24659,7 +24672,7 @@ $labels214 = @(
     "214.4: [behavioral] _buildGroupDetails('triggers','FIRE ANIMATION') produces NO open attribute (collapsed by default) while _buildGroupDetails('triggers','LIVING CORE') DOES (open by default); both route through _wireDynamicSubPanel()",
     "214.5: [behavioral] against the real registry, all 3 FIRE ANIMATION tier-split groups (~28 buttons total) collapse by default via _dshGroupDefaultOpen() -- the shell-opens-compact guarantee",
     "214.6: every one of the 9 migrated U1 anchor tools carries an explicit, non-empty `group` field -- never silently falling through to the tool.label fallback",
-    "214.8: the 7 new U4a INSPECT tools exist under category:'inspect', the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (141 tools, after U4b) carries no duplicate id",
+    "214.8: the 7 new U4a INSPECT tools exist under category:'inspect', the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (159 tools, after U4b+U5) carries no duplicate id",
     "214.9: INSPECT's 7 readable-summary tools are tier:'prod'; the 2 genuinely dev-only internals (sw-internal/flags-internal) are tier:'staging' -- and every one of the 9 inspect-* tools is destructive:false (read-only)",
     "214.13: [behavioral] _inspectVitalsHtml(), run against a synthetic state/GAME_DEFS, renders labeled readable lines with the correct active-quest count -- never a JSON-shaped blob",
     "214.14: [behavioral] _inspectConnectionHtml() renders readable CARRIER/AI CHAT/NETWORK words and _inspectFlagsHtml() renders a readable ENABLED/DISABLED line per flag -- both from synthetic globals, never raw booleans or JSON"
@@ -24801,7 +24814,7 @@ try {
   tools8.forEach(function (t) { idSet8[t.id] = (idSet8[t.id] || 0) + 1; });
   var dupFree8 = Object.keys(idSet8).every(function (k) { return idSet8[k] === 1; });
   results.push(
-    tools8.length === 141 &&
+    tools8.length === 159 &&
       newIds8.every(function (id) {
         var t = tools8.filter(function (x) { return x.id === id; })[0];
         return t && t.category === 'inspect';
@@ -25037,14 +25050,14 @@ $terminalCss215 = Read-Src "css/terminal.css"
 # 215.1-215.13, 215.15 -- BEHAVIORAL, via a spawned node process against the
 # ACTUAL source (Protocol 42 stdin-corruption-safe transport -- a temp file).
 $labels215 = @(
-    "215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 141 with no duplicate id",
+    "215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 (after this unit + U5) with no duplicate id",
     "215.2: [behavioral] leak-proof re-proof -- every one of the 80 U4b tools is tier:'staging' + destructive:true and is invisible under a stubbed 'prod' tier / visible under 'staging'",
     "215.3: _renderShell()'s synthesis path recognizes control:'input'/'select'/'select-input', builds a .dsh-tool-row with a select and/or input plus a GO button, and routes the click through _invoke(tool, <captured value(s)>)",
     "215.4: [behavioral] _renderShell(), run against a synthetic DOM, builds a real select/input/GO row for both control:'input' and control:'select-input' tools, and clicking GO invokes _invoke() with the exact live typed/selected value(s)",
     "215.5: [behavioral] _invoke(tool, arg) forwards a payload unchanged into tool.action(arg) on both the immediate non-destructive path and the confirmed destructive path, and never fires on cancel",
     "215.6: a representative sample of STATE SETUP cheats route through the expected existing native setter/mutator, never a parallel unclamped write path",
     "215.7: all 16 STATE SETUP groups exist with at least one tool (63 total), and MEGA PRESETS carries all 7 owner-named presets",
-    "215.8: RESETS registers exactly 13 tools split across VIEW-ONCE / DEV FLAGS (7) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true",
+    "215.8: RESETS registers exactly 14 tools (13 from this unit + U5's reset-changelog-seen) split across VIEW-ONCE / DEV FLAGS (8) and CAMPAIGN DATA (6), every one tier:'staging' + destructive:true",
     "215.9: _mountInlineResets() re-checks _shellTier()==='staging' before mounting anything, filters to category:'inline' tools, is idempotent via a data-dsh-inline guard, and routes every click through _invoke(tool)",
     "215.10: all 3 inline dev-reset tools carry a real anchor (WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels' own STATIC .bay-part-no line) and all 3 target panel ids genuinely exist in index.html",
     "215.11: [behavioral] _mountInlineResets(), run against a synthetic document exposing the 3 real anchor selectors, mounts exactly 3 DEV-MARKER buttons on the first pass and mounts NOTHING new on a second pass",
@@ -25118,7 +25131,7 @@ try {
   var noDupes1 = Object.keys(idCounts1).every(function (k) { return idCounts1[k] === 1; });
   results.push(
     newIds1.length === 80 &&
-      tools1.length === 141 &&
+      tools1.length === 159 &&
       newIds1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
       noDupes1
   );
@@ -25130,7 +25143,7 @@ try {
   var fn2 = new Function('tool', 'tier', toolVisBody2.slice(1, -1));
   var tools2 = evalRealTools();
   var u4bTools2 = tools2.filter(function (t) {
-    return ['state', 'resets', 'fixtures'].indexOf(t.category) !== -1 ||
+    return (['state', 'resets', 'fixtures'].indexOf(t.category) !== -1 && t.id !== 'reset-changelog-seen') ||
       (t.category === 'inline' && t.id.indexOf('inline-') === 0);
   });
   results.push(
@@ -25307,7 +25320,7 @@ try {
   var flagGroup8 = resetTools8.filter(function (t) { return t.group === 'VIEW-ONCE / DEV FLAGS'; });
   var dataGroup8 = resetTools8.filter(function (t) { return t.group === 'CAMPAIGN DATA'; });
   results.push(
-    resetTools8.length === 13 && flagGroup8.length === 7 && dataGroup8.length === 6 &&
+    resetTools8.length === 14 && flagGroup8.length === 8 && dataGroup8.length === 6 &&
       resetTools8.every(function (t) { return t.tier === 'staging' && t.destructive === true; })
   );
 } catch (e) { results.push(false); }
@@ -25612,6 +25625,515 @@ Check (
     ($invokeBody215b -match "document\.body\.classList\.remove\('dsh-modal-elevate'\)") -and
     ($terminalCss215 -match 'body\.dsh-modal-elevate #sysModal')
 ) "215.16: [regression, Protocol 42] _invoke() adds body.dsh-modal-elevate before calling confirmAction() and removes it once the promise settles, and terminal.css's body.dsh-modal-elevate #sysModal rule elevates the shared confirm modal above the shell for exactly that window"
+
+# ===========================================================
+# Suite 216 -- Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock
+# ceremony + FINAL leak-proof audit (planning/DIAGNOSTIC_SHELL_PLAN.md
+# Sec4/Sec7/Sec11 U5, Protocol 8 Sonnet stage). Mirrors JS Suite 216. 18 new
+# registry entries: 8 tier:'staging' feature-flag override toggles
+# (control:'toggle') routing through a new cloud.js seam
+# (window._setFeatureFlagOverride/_getFeatureFlagOverride, a staging-only
+# local shadow layer over isFeatureEnabled()); 2 auto-disable TRIP tools
+# driving the REAL window._recordFeatureFailure() to FAIL_THRESHOLD; 1
+# non-destructive AI failure-response preview; 3 cache/SW controls
+# (sw-force-update-prompt reuses the REAL _triggerUpdate() modal via a new
+# index.html seam); 1 new RESETS entry (reset-changelog-seen); and 3
+# ENVIRONMENT & UNLOCK entries landing the MINIGAME-UNLOCK SEAM itself --
+# _devConsoleUnlocked() now ALSO returns true when the persisted
+# robco_dsh_minigame_unlocked flag is set, with _shellTier() completely
+# unchanged (still staging-signal-only), so an unlocked production build
+# shows the shell but renders ONLY tier:'prod' tools -- leak-proof by
+# construction, proved exhaustively over the FULL, now-159-tool registry.
+# 22 tests.
+# ===========================================================
+Sep "Suite 216 -- Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremony + FINAL leak-proof audit"
+$testConsole216 = Read-Src "js/test-console.js"
+$stateSrc216 = Read-Src "js/state.js"
+$index216 = Read-Src "index.html"
+$terminalCss216 = Read-Src "css/terminal.css"
+
+# 216.1-216.14, 216.18, 216.19 -- BEHAVIORAL, via a spawned node process
+# against the ACTUAL source (Protocol 42 stdin-corruption-safe transport --
+# a temp file). 216.13 expands into 3 result bits (13, 13a, 13b), so this
+# array carries 18 labels for 18 bits.
+$labels216 = @(
+    "216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 with no duplicate id",
+    "216.2: every new flag-override/response-preview/update-prompt/minigame-test tool is tier:'staging' + non-destructive; sim-fail-*-trip, sw-clear-caches/sw-unregister, and reset-changelog-seen are additionally destructive:true; unlock-ceremony-replay is the sole tier:'prod' new entry, non-destructive",
+    "216.3: all 8 flag-* tools carry control:'toggle' with read()/readOverride() functions, and each action() forwards its own flag key to _dshSetFlagOverride",
+    "216.4: [behavioral] _devConsoleUnlocked() returns true on staging regardless of the minigame flag, false off-staging with the flag unset/false, true off-staging ONLY when robco_dsh_minigame_unlocked reads 'true', and fails safe to false when MetaStore.get() throws",
+    "216.5: [behavioral] _shellTier() returns 'prod' purely off the staging signal and never references MetaStore/the minigame-unlock flag at all -- a minigame-unlocked production build renders ONLY tier:'prod' tools, leak-proof by construction",
+    "216.6: FINAL LEAK-PROOF AUDIT (1/2) -- [behavioral] re-proof over the COMPLETE, final 159-tool registry: every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both",
+    "216.7: FINAL LEAK-PROOF AUDIT (2/2) -- every tier:'prod' tool with an inline action() contains no direct campaign-state write pattern (saveState(/state.<field>/robco_v8/pushToCloud) in its own source text",
+    "216.8: [behavioral] window._setFeatureFlagOverride() never mutates _localFlagOverrides or calls MetaStore.set() when _isStagingEnv is false or missing (fail-safe); when genuinely staging it sets the override, persists it via MetaStore.set(), and a subsequent null clears it back out",
+    "216.9: [behavioral] isFeatureEnabled() lets a local override win over both _featureFlags and _autoDisabled in either direction, and a key with no override falls straight through to the pre-existing logic unchanged",
+    "216.10: [behavioral] _renderShell()'s control:'toggle' synthesis builds a live state readout plus ON/OFF/DEFAULT buttons for a flag-override tool; clicking each button invokes _invoke(tool,'on'|'off'|'clear') and immediately repaints the readout",
+    "216.11: [behavioral] _dshTripAutoDisable('aiChat') calls the REAL window._recordFeatureFailure('aiChat', ...) exactly 3 times (FAIL_THRESHOLD)",
+    "216.12: _dshClearCaches() calls caches.keys()/caches.delete() for every entry, _dshUnregisterSw() calls navigator.serviceWorker.getRegistrations()/.unregister() for every registration, and the sw-force-update-prompt tool routes through window._dshForceUpdatePrompt()",
+    "216.13: index.html defines window._dshForceUpdatePrompt reusing the REAL _triggerUpdate() modal",
+    "216.13a: [behavioral] window._dshForceUpdatePrompt() calls _triggerUpdate() with the genuine waiting worker when _reg.waiting exists",
+    "216.13b: [behavioral] window._dshForceUpdatePrompt() calls _triggerUpdate() with a synthetic no-op-postMessage worker when no waiting worker exists, and resets _updatePromptShown either way",
+    "216.14: both minigame TEST triggers declare triggers:['robco_dsh_minigame_unlocked'], reset-changelog-seen declares triggers:['robco_version'], and every pre-existing U4b flag reset is untouched, not duplicated",
+    "216.18: static leak-proof invariant re-derived against the FULL, final 159-tool registry -- every destructive:true tool is tier:'staging', and every tool in a staging-only category is tier:'staging'",
+    "216.19: [Protocol 44 guard, re-derived] every real RobcoEvents.emit('<name>') string literal in js/*.js (excluding the allowlisted runtime.state) and all 3 known view-once MetaStore flags remain covered by the union of every DIAGNOSTIC_SHELL_TOOLS triggers[] array"
+)
+try {
+    $nodeCheck216 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck216) {
+        $repoRootNode216 = $Root.Replace('\', '/')
+        $testScript216 = @"
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = '$repoRootNode216';
+function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function extractBody(src, name) {
+  var idx = src.indexOf('function ' + name);
+  if (idx === -1) throw new Error('missing ' + name);
+  var i = src.indexOf('{', idx);
+  var depth = 0, start = i;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    i++;
+  }
+  throw new Error('unclosed ' + name);
+}
+function extractAssignedFn(src, name) {
+  var m = src.match(new RegExp('window\\.' + name + '\\s*=\\s*(async\\s+)?function'));
+  if (!m) throw new Error('missing window.' + name);
+  var openParen = src.indexOf('(', m.index);
+  var openBrace = src.indexOf('{', openParen);
+  var depth = 0, i = openBrace;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+  }
+  return { params: src.slice(openParen, openBrace).trim(), body: src.slice(openBrace, i) };
+}
+
+const testConsoleSrc = rd('js/test-console.js');
+const cloudSrc = rd('js/cloud.js');
+const indexSrc = rd('index.html');
+var results = [];
+
+function evalRealTools() {
+  var toolsStart = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd = testConsoleSrc.indexOf('\n  ];', toolsStart) + '\n  ];'.length;
+  var toolsSrc = testConsoleSrc.slice(toolsStart, toolsEnd);
+  var replayHatchBody = extractBody(testConsoleSrc, '_replayHatch');
+  var src = '(function () {\n function _replayHatch() ' + replayHatchBody + '\n' + toolsSrc + '\n return DIAGNOSTIC_SHELL_TOOLS; })()';
+  return eval(src);
+}
+
+// 216.1
+try {
+  var tools1 = evalRealTools();
+  var ids1 = tools1.map(function (t) { return t.id; });
+  var newIds1 = [
+    'flag-cloudSync','flag-googleSignIn','flag-aiChat','flag-keySync','flag-saveMigration','flag-offlineQueue','flag-visualOcr','flag-visualAiVision',
+    'sim-fail-aichat-trip','sim-fail-visualocr-trip','sim-ai-response-preview',
+    'sw-force-update-prompt','sw-clear-caches','sw-unregister',
+    'reset-changelog-seen',
+    'minigame-unlock-test','minigame-lock-test','unlock-ceremony-replay',
+  ];
+  var idCounts1 = {};
+  ids1.forEach(function (id) { idCounts1[id] = (idCounts1[id] || 0) + 1; });
+  var noDupes1 = Object.keys(idCounts1).every(function (k) { return idCounts1[k] === 1; });
+  results.push(
+    newIds1.length === 18 && tools1.length === 159 &&
+      newIds1.every(function (id) { return ids1.indexOf(id) !== -1; }) &&
+      noDupes1
+  );
+} catch (e) { results.push(false); }
+
+// 216.2
+try {
+  var tools2 = evalRealTools();
+  var byId2 = function (id) { return tools2.filter(function (t) { return t.id === id; })[0]; };
+  var stagingIds2 = [
+    'flag-cloudSync','flag-googleSignIn','flag-aiChat','flag-keySync','flag-saveMigration','flag-offlineQueue','flag-visualOcr','flag-visualAiVision',
+    'sim-ai-response-preview','sw-force-update-prompt','minigame-unlock-test','minigame-lock-test',
+  ];
+  var destructiveStagingIds2 = ['sim-fail-aichat-trip','sim-fail-visualocr-trip','sw-clear-caches','sw-unregister','reset-changelog-seen'];
+  results.push(
+    stagingIds2.every(function (id) { var t = byId2(id); return t && t.tier === 'staging' && !t.destructive; }) &&
+      destructiveStagingIds2.every(function (id) { var t = byId2(id); return t && t.tier === 'staging' && t.destructive === true; }) &&
+      byId2('unlock-ceremony-replay').tier === 'prod' &&
+      byId2('unlock-ceremony-replay').destructive === false
+  );
+} catch (e) { results.push(false); }
+
+// 216.3
+try {
+  var tools3 = evalRealTools();
+  var flagIds3 = [
+    ['flag-cloudSync','cloudSync'],['flag-googleSignIn','googleSignIn'],['flag-aiChat','aiChat'],['flag-keySync','keySync'],
+    ['flag-saveMigration','saveMigration'],['flag-offlineQueue','offlineQueue'],['flag-visualOcr','visualOcr'],['flag-visualAiVision','visualAiVision'],
+  ];
+  results.push(
+    flagIds3.every(function (pair) {
+      var t = tools3.filter(function (x) { return x.id === pair[0]; })[0];
+      return t && t.control === 'toggle' && typeof t.read === 'function' && typeof t.readOverride === 'function' &&
+        typeof t.action === 'function' && t.action.toString().indexOf(pair[1]) !== -1;
+    })
+  );
+} catch (e) { results.push(false); }
+
+// 216.4
+try {
+  var body4 = extractBody(testConsoleSrc, '_devConsoleUnlocked');
+  function run4(isStagingEnv, metaGetResult, metaThrows) {
+    var src = '(function () {\n function _devConsoleUnlocked() ' + body4 + '\n return _devConsoleUnlocked();\n})()';
+    var window = { _isStagingEnv: isStagingEnv };
+    var MetaStore = { get: function (k) {
+      if (metaThrows) throw new Error('boom');
+      return k === 'robco_dsh_minigame_unlocked' ? metaGetResult : null;
+    } };
+    void window; void MetaStore;
+    return eval(src);
+  }
+  results.push(
+    run4(function () { return true; }, null, false) === true &&
+      run4(function () { return true; }, 'true', false) === true &&
+      run4(function () { return false; }, null, false) === false &&
+      run4(function () { return false; }, 'false', false) === false &&
+      run4(function () { return false; }, 'true', false) === true &&
+      run4(undefined, 'true', false) === true &&
+      run4(function () { return false; }, 'true', true) === false
+  );
+} catch (e) { results.push(false); }
+
+// 216.5
+try {
+  var tierBody5 = extractBody(testConsoleSrc, '_shellTier');
+  var src5 = '(function () {\n function _shellTier() ' + tierBody5 + '\n return _shellTier();\n})()';
+  var window = { _isStagingEnv: function () { return false; } };
+  void window;
+  results.push(eval(src5) === 'prod');
+} catch (e) { results.push(false); }
+
+// 216.6
+try {
+  var toolVisBody6 = extractBody(testConsoleSrc, '_toolVisible');
+  var replayHatchBody6b = extractBody(testConsoleSrc, '_replayHatch');
+  var toolsStart6 = testConsoleSrc.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
+  var toolsEnd6 = testConsoleSrc.indexOf('\n  ];', toolsStart6) + '\n  ];'.length;
+  var toolsSrc6 = testConsoleSrc.slice(toolsStart6, toolsEnd6);
+  var src6 = '(function () {\n function _toolVisible(tool, tier) ' + toolVisBody6 + '\n function _replayHatch() ' + replayHatchBody6b + '\n ' + toolsSrc6 + '\n return { _toolVisible: _toolVisible, DIAGNOSTIC_SHELL_TOOLS: DIAGNOSTIC_SHELL_TOOLS }; })()';
+  var sandbox6 = eval(src6);
+  var tools6 = sandbox6.DIAGNOSTIC_SHELL_TOOLS;
+  var stagingTools6 = tools6.filter(function (t) { return t.tier === 'staging'; });
+  var prodTools6 = tools6.filter(function (t) { return t.tier === 'prod'; });
+  results.push(
+    tools6.length === 159 && stagingTools6.length > 0 && prodTools6.length > 0 &&
+      stagingTools6.every(function (t) { return sandbox6._toolVisible(t, 'prod') === false; }) &&
+      stagingTools6.every(function (t) { return sandbox6._toolVisible(t, 'staging') === true; }) &&
+      prodTools6.every(function (t) { return sandbox6._toolVisible(t, 'prod') === true && sandbox6._toolVisible(t, 'staging') === true; })
+  );
+} catch (e) { results.push(false); }
+
+// 216.7
+try {
+  var tools7 = evalRealTools();
+  var prodActionTools7 = tools7.filter(function (t) { return t.tier === 'prod' && typeof t.action === 'function'; });
+  var forbidden7 = /\bsaveState\s*\(|\bstate\.[a-zA-Z_]|robco_v8|pushToCloud/;
+  results.push(
+    prodActionTools7.length > 10 &&
+      prodActionTools7.every(function (t) { return !forbidden7.test(t.action.toString()); })
+  );
+} catch (e) { results.push(false); }
+
+// 216.8
+try {
+  var setFn8 = extractAssignedFn(cloudSrc, '_setFeatureFlagOverride');
+  function run8(isStagingFn) {
+    var calls = Array.prototype.slice.call(arguments, 1);
+    var sandbox = { console: console, window: { _isStagingEnv: isStagingFn }, _localFlagOverrides: {}, __sets: [] };
+    vm.createContext(sandbox);
+    var callsSrc = calls.map(function (c) { return '_setFeatureFlagOverride(' + JSON.stringify(c[0]) + ', ' + JSON.stringify(c[1]) + ');'; }).join('\n');
+    vm.runInContext(
+      'window.MetaStore = { set: function (k, v) { __sets.push([k, v]); } };\n' +
+      'var _setFeatureFlagOverride = function ' + setFn8.params + ' ' + setFn8.body + ';\n' + callsSrc,
+      sandbox
+    );
+    return sandbox;
+  }
+  var off8 = run8(function () { return false; }, ['aiChat', true]);
+  var missing8 = run8(undefined, ['aiChat', true]);
+  var setOnly8 = run8(function () { return true; }, ['aiChat', true]);
+  var on8 = run8(function () { return true; }, ['aiChat', true], ['aiChat', null]);
+  results.push(
+    Object.keys(off8._localFlagOverrides).length === 0 && off8.__sets.length === 0 &&
+      Object.keys(missing8._localFlagOverrides).length === 0 && missing8.__sets.length === 0 &&
+      setOnly8._localFlagOverrides.aiChat === true && setOnly8.__sets.length >= 1 &&
+      !Object.prototype.hasOwnProperty.call(on8._localFlagOverrides, 'aiChat') && on8.__sets.length >= 1
+  );
+} catch (e) { results.push(false); }
+
+// 216.9
+try {
+  var f9 = extractAssignedFn(cloudSrc, 'isFeatureEnabled');
+  var sb9 = { _featureFlags: { aiChat: true, cloudSync: false }, _autoDisabled: { keySync: true }, _localFlagOverrides: { aiChat: false, cloudSync: true } };
+  vm.createContext(sb9);
+  vm.runInContext('var isFeatureEnabled = function ' + f9.params + ' ' + f9.body + ';', sb9);
+  var fn9 = sb9.isFeatureEnabled;
+  results.push(
+    fn9('aiChat') === false && fn9('cloudSync') === true && fn9('keySync') === false && fn9('totallyUnknownFeature') === true
+  );
+} catch (e) { results.push(false); }
+
+// 216.10
+try {
+  function makeEl10(tag) {
+    var listeners = {};
+    return {
+      tagName: tag, children: [], className: '', textContent: '', title: '', style: {}, attrs: {},
+      setAttribute: function (k, v) { this.attrs[k] = v; },
+      getAttribute: function (k) { return this.attrs[k]; },
+      appendChild: function (child) { this.children.push(child); return child; },
+      insertBefore: function (child, ref) {
+        var idx = this.children.indexOf(ref);
+        this.children.splice(idx === -1 ? 0 : idx, 0, child);
+        return child;
+      },
+      querySelector: function (sel) { return (this.__map && this.__map[sel]) || null; },
+      addEventListener: function (type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
+      _fire: function (type) { (listeners[type] || []).forEach(function (fn) { fn(); }); },
+    };
+  }
+  var sectionsHost10 = makeEl10('div');
+  var envBanner10 = makeEl10('span');
+  var panel10 = makeEl10('div');
+  panel10.__map = { '#dshSections': sectionsHost10, '#dshEnvBanner': envBanner10 };
+  var bodySrc10 = extractBody(testConsoleSrc, '_renderShell');
+  var invokedTool10 = null, invokedArg10 = null, overrideState10 = null;
+  var src10 =
+    "var DEV_MARKER = '⚙';\n" +
+    "var CATEGORY_ORDER = ['infra'];\n" +
+    "var CATEGORY_META = { infra: { stagingTitle: 'RESILIENCE & INFRA', prodTitle: 'RESILIENCE & INFRA', icon: '⚒' } };\n" +
+    'function _invoke(tool, arg) { __invoked(tool, arg); }\n' +
+    "function _toolVisible(tool, tier) { if (tool.tier === 'prod') return true; return tier === 'staging'; }\n" +
+    "function _shellTier() { return 'staging'; }\n" +
+    'function _paintEnvBanner() {}\n' +
+    'function _wireDynamicSubPanel() {}\n' +
+    'function _dshGroupDefaultOpen() { return true; }\n' +
+    'function _buildGroupDetails(cat, headingText) {\n' +
+    "  var gd = document.createElement('details');\n" +
+    "  gd.className = 'sub-panel';\n" +
+    "  gd.setAttribute('data-sub-id', 'dsh_group_' + cat + '_' + String(headingText).toLowerCase());\n" +
+    '  return gd;\n' +
+    '}\n' +
+    'var DIAGNOSTIC_SHELL_TOOLS = [\n' +
+    "  { id: 'synth-toggle', label: 'SYNTH TOGGLE', subLabel: 's', icon: '⚑', category: 'infra', group: 'G', tier: 'staging', destructive: false, control: 'toggle', read: function () { return __readLive(); }, readOverride: function () { return __readOverride(); }, tooltip: 't', triggers: [], action: function () {} },\n" +
+    '];\n' +
+    'function _renderShell(panel) ' + bodySrc10;
+  var document10 = {
+    createElement: function (tag) { return makeEl10(tag); },
+    createTextNode: function (text) { return { nodeType: 3, textContent: text }; },
+  };
+  var sandbox10 = {
+    console: console,
+    document: document10,
+    __invoked: function (tool, arg) {
+      invokedTool10 = tool.id; invokedArg10 = arg;
+      if (arg === 'on') overrideState10 = true;
+      else if (arg === 'off') overrideState10 = false;
+      else if (arg === 'clear') overrideState10 = null;
+    },
+    __readOverride: function () { return overrideState10; },
+    __readLive: function () { return overrideState10 === null ? true : overrideState10; },
+  };
+  vm.createContext(sandbox10);
+  vm.runInContext(src10 + '\nthis._renderShellRef = _renderShell;', sandbox10);
+  sandbox10._renderShellRef(panel10);
+  var details10 = sectionsHost10.children[0];
+  var groupWrapper10 = details10.children.filter(function (c) { return c.className === 'sub-panel'; })[0];
+  var gridNode10 = groupWrapper10.children.filter(function (c) { return c.className === 'dsh-tool-grid'; })[0];
+  var toggleRow10 = gridNode10.children.filter(function (c) { return c.className === 'dsh-tool-row'; })[0];
+  var stateSpan10 = toggleRow10.children.filter(function (c) { return c.className === 'dsh-toggle-state'; })[0];
+  var buttons10 = toggleRow10.children.filter(function (c) { return c.tagName === 'button'; });
+  var onBtn10 = buttons10.filter(function (b) { return b.textContent === 'ON'; })[0];
+  var offBtn10 = buttons10.filter(function (b) { return b.textContent === 'OFF'; })[0];
+  var clearBtn10 = buttons10.filter(function (b) { return b.textContent === 'DEFAULT'; })[0];
+  var initialText10 = stateSpan10.textContent;
+  onBtn10._fire('click');
+  var afterOnTool10 = invokedTool10, afterOnArg10 = invokedArg10, afterOnText10 = stateSpan10.textContent;
+  offBtn10._fire('click');
+  var afterOffArg10 = invokedArg10;
+  clearBtn10._fire('click');
+  var afterClearArg10 = invokedArg10, afterClearText10 = stateSpan10.textContent;
+  results.push(
+    buttons10.length === 3 && !!stateSpan10 && initialText10.indexOf('DEFAULT') !== -1 &&
+      afterOnTool10 === 'synth-toggle' && afterOnArg10 === 'on' && afterOnText10.indexOf('OVERRIDE: ON') !== -1 &&
+      afterOffArg10 === 'off' && afterClearArg10 === 'clear' && afterClearText10.indexOf('DEFAULT') !== -1
+  );
+} catch (e) { results.push(false); }
+
+// 216.11
+try {
+  var body11 = extractBody(testConsoleSrc, '_dshTripAutoDisable');
+  var calls11 = [];
+  var src11 = '(function () {\n function _dshTripAutoDisable(key) ' + body11 + '\n _dshTripAutoDisable("aiChat");\n})()';
+  var window = { _recordFeatureFailure: function (key, msg) { calls11.push([key, msg]); } };
+  void window;
+  eval(src11);
+  results.push(
+    calls11.length === 3 && calls11.every(function (c) { return c[0] === 'aiChat'; }) &&
+      calls11[0][1] !== null && calls11[0][1] !== undefined && calls11[1][1] === null && calls11[2][1] === null
+  );
+} catch (e) { results.push(false); }
+
+// 216.12
+try {
+  var clearBody12 = extractBody(testConsoleSrc, '_dshClearCaches');
+  var unregBody12 = extractBody(testConsoleSrc, '_dshUnregisterSw');
+  var tools12 = evalRealTools();
+  var forceUpdateTool12 = tools12.filter(function (t) { return t.id === 'sw-force-update-prompt'; })[0];
+  results.push(
+    /caches\s*\.\s*keys\s*\(/.test(clearBody12) && /caches\.delete\s*\(/.test(clearBody12) &&
+      /getRegistrations\s*\(/.test(unregBody12) && /\.unregister\s*\(/.test(unregBody12) &&
+      !!forceUpdateTool12 && typeof forceUpdateTool12.action === 'function' &&
+      /_dshForceUpdatePrompt/.test(forceUpdateTool12.action.toString())
+  );
+} catch (e) { results.push(false); }
+
+// 216.13 / 216.13a / 216.13b
+try {
+  var staticOk13 = /window\._dshForceUpdatePrompt\s*=\s*function/.test(indexSrc);
+  var seamFn13 = extractAssignedFn(indexSrc, '_dshForceUpdatePrompt');
+  var routesThrough13 = /_triggerUpdate\s*\(/.test(seamFn13.body);
+  results.push(staticOk13 && routesThrough13);
+
+  function run13(regWaiting) {
+    var calls = [];
+    var sb = {
+      _reg: regWaiting ? { waiting: { postMessage: function () {} } } : null,
+      _updatePromptShown: true,
+      _triggerUpdate: function (w) { calls.push(w); },
+    };
+    vm.createContext(sb);
+    vm.runInContext('var _dshForceUpdatePrompt = function ' + seamFn13.params + ' ' + seamFn13.body + ';\n_dshForceUpdatePrompt();', sb);
+    return { calls: calls, promptShownReset: sb._updatePromptShown === false };
+  }
+  var withReal13 = run13(true);
+  var withoutReal13 = run13(false);
+  results.push(
+    withReal13.calls.length === 1 && typeof withReal13.calls[0] === 'object' && withReal13.promptShownReset
+  );
+  results.push(
+    withoutReal13.calls.length === 1 && typeof withoutReal13.calls[0].postMessage === 'function' && withoutReal13.promptShownReset
+  );
+} catch (e) { results.push(false); results.push(false); results.push(false); }
+
+// 216.14
+try {
+  var tools14 = evalRealTools();
+  var unlockTest14 = tools14.filter(function (t) { return t.id === 'minigame-unlock-test'; })[0];
+  var lockTest14 = tools14.filter(function (t) { return t.id === 'minigame-lock-test'; })[0];
+  var changelogReset14 = tools14.filter(function (t) { return t.id === 'reset-changelog-seen'; })[0];
+  var resetIds14 = tools14.filter(function (t) { return t.category === 'resets'; }).map(function (t) { return t.id; });
+  results.push(
+    unlockTest14.triggers.indexOf('robco_dsh_minigame_unlocked') !== -1 &&
+      lockTest14.triggers.indexOf('robco_dsh_minigame_unlocked') !== -1 &&
+      changelogReset14.triggers.indexOf('robco_version') !== -1 &&
+      resetIds14.filter(function (id) { return id === 'reset-changelog-seen'; }).length === 1 &&
+      resetIds14.indexOf('reset-first-run') !== -1 && resetIds14.indexOf('reset-hatch-flag') !== -1
+  );
+} catch (e) { results.push(false); }
+
+// 216.18
+try {
+  var tools18 = evalRealTools();
+  results.push(
+    tools18.length === 159 &&
+      tools18.every(function (t) { return !t.destructive || t.tier === 'staging'; }) &&
+      tools18.every(function (t) { return ['state', 'resets', 'infra', 'fixtures', 'inline'].indexOf(t.category) === -1 || t.tier === 'staging'; })
+  );
+} catch (e) { results.push(false); }
+
+// 216.19
+try {
+  var jsFiles19 = fs.readdirSync(path.join(ROOT, 'js')).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; });
+  var allJsSrc19 = jsFiles19.map(function (f) { return rd('js/' + f); }).join('\n');
+  var emitNames19 = {};
+  var re19 = /RobcoEvents\.emit\(\s*'([^']+)'/g, mm19;
+  while ((mm19 = re19.exec(allJsSrc19)) !== null) { emitNames19[mm19[1]] = true; }
+  delete emitNames19['runtime.state'];
+  var knownFlags19 = ['robco_bay_opened', 'robco_last_seen_version', 'robco_booted_before'];
+  var tools19 = evalRealTools();
+  var triggerUnion19 = {};
+  tools19.forEach(function (t) { (t.triggers || []).forEach(function (x) { triggerUnion19[x] = true; }); });
+  results.push(
+    Object.keys(emitNames19).every(function (n) { return triggerUnion19[n]; }) &&
+      knownFlags19.every(function (f) { return triggerUnion19[f]; })
+  );
+} catch (e) { results.push(false); }
+
+console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
+"@
+        $tmpScript216 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript216, $testScript216, [System.Text.Encoding]::UTF8)
+        try {
+            $out216 = (node $tmpScript216 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript216 -Force -ErrorAction SilentlyContinue
+        }
+        $rm216 = [regex]::Match($out216, 'RESULT:([01]{18})')
+        if ($rm216.Success) {
+            $bits216 = $rm216.Groups[1].Value
+            for ($bi216 = 0; $bi216 -lt $labels216.Count; $bi216++) {
+                Check ($bits216.Substring($bi216, 1) -eq '1') $labels216[$bi216]
+            }
+        } else {
+            $err216 = if ([string]::IsNullOrWhiteSpace($out216)) { "No output from node" } else { $out216.Trim() }
+            foreach ($lbl in $labels216) { Fail "$lbl  (runtime error: $err216)" }
+        }
+    } else {
+        foreach ($lbl in $labels216) { Fail "$lbl  (node.exe not found on PATH -- cannot run behavioral proof)" }
+    }
+} catch {
+    foreach ($lbl in $labels216) { Fail "$lbl  (harness error: $($_.Exception.Message))" }
+}
+
+# 216.15 Protocol 4/UI-6 + U6 boundary -- robco_dsh_flag_overrides and
+#        robco_dsh_minigame_unlocked are registered in state.js's
+#        META_MANIFEST with the correct owner/type.
+Check (
+    ($stateSrc216 -match "robco_dsh_flag_overrides:\s*\{\s*type:\s*'json',\s*default:\s*'\{\}',\s*owner:\s*'cloud\.js'\s*\}") -and
+    ($stateSrc216 -match "robco_dsh_minigame_unlocked:\s*\{\s*type:\s*'bool',\s*default:\s*false,\s*owner:\s*'test-console\.js'\s*\}")
+) '216.15: state.js META_MANIFEST registers robco_dsh_flag_overrides (json, cloud.js) and robco_dsh_minigame_unlocked (bool, test-console.js) as device preferences, per Protocol 4/UI-6'
+
+# 216.16 CSS -- .dsh-unlock-ceremony/dshUnlockGlow and .dsh-toggle-state
+#        exist in terminal.css; the ceremony flash is a plain `animation:`
+#        so the existing global prefers-reduced-motion block neutralizes it.
+Check (
+    ($terminalCss216 -match '\.dsh-unlock-ceremony\s*\{[^}]*animation:\s*dshUnlockGlow') -and
+    ($terminalCss216 -match '@keyframes\s+dshUnlockGlow') -and
+    ($terminalCss216 -match '\.dsh-toggle-state\s*\{')
+) '216.16: terminal.css defines .dsh-unlock-ceremony (a plain animation: dshUnlockGlow, auto-neutralized by the existing global reduced-motion block) and .dsh-toggle-state (the flag-toggle row live-state readout)'
+
+# 216.17 _renderShell() structurally recognizes control:'toggle' as its own
+#        synthesis branch, sitting alongside the pre-existing input/select/
+#        select-input branch.
+$renderShellBody216 = Get-FunctionBody $testConsole216 '_renderShell'
+Check (
+    ($renderShellBody216 -match "tool\.control === 'toggle'") -and
+    ($renderShellBody216 -match 'paintToggleState') -and
+    ($renderShellBody216 -match "tool\.control === 'input'")
+) "216.17: _renderShell() recognizes control:'toggle' as its own synthesis branch (with a self-repainting live state readout), distinct from and sitting alongside the pre-existing input/select/select-input branch"
+
+# 216.20 _fireUnlockCeremony() opens the drawer, sets the in-fiction
+#        "RESTRICTED ACCESS GRANTED" text, and settles back via the
+#        EXISTING _paintEnvBanner() -- writes nothing durable.
+$ceremonyBody216 = Get-FunctionBody $testConsole216 '_fireUnlockCeremony'
+Check (
+    ($ceremonyBody216 -match 'RESTRICTED ACCESS GRANTED') -and
+    ($ceremonyBody216 -match '_paintEnvBanner\s*\(') -and
+    ($ceremonyBody216 -match '_openShell\s*\(') -and
+    (-not ($ceremonyBody216 -match 'saveState\s*\(')) -and
+    (-not ($ceremonyBody216 -match 'MetaStore\.')) -and
+    (-not ($ceremonyBody216 -match '\bstate\.'))
+) '216.20: _fireUnlockCeremony() opens the drawer, flashes the in-fiction "RESTRICTED ACCESS GRANTED" line, and settles back via the existing _paintEnvBanner() -- with no MetaStore/state/saveState reference anywhere in its own body'
 
 # ===========================================================
 # Results

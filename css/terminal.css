@@ -1776,6 +1776,36 @@ details.panel:not([open]) summary h2 {
   color: var(--robco-green);
 }
 
+/* U5: the MINIGAME UNLOCK CEREMONY banner flash (_fireUnlockCeremony(),
+   js/test-console.js) — a plain `animation:` (Protocol UI-9), so the
+   existing global prefers-reduced-motion block above neutralizes it to an
+   instant, fully-lit static frame with no bespoke carve-out. */
+#dshEnvBanner.dsh-unlock-ceremony {
+  color: var(--bezel-wire, var(--robco-green));
+  animation: dshUnlockGlow 1.2s ease-in-out 2;
+}
+@keyframes dshUnlockGlow {
+  0%,
+  100% {
+    opacity: 0.6;
+    text-shadow: none;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 8px var(--bezel-wire, var(--robco-green));
+  }
+}
+
+/* U5: the RESILIENCE & INFRA feature-flag toggle row's live state readout
+   (control:'toggle', _renderShell()) — a compact "OVERRIDE: ON (ENABLED)"
+   style line sitting between the label and its ON/OFF/DEFAULT buttons. */
+.dsh-toggle-state {
+  font-size: 9px;
+  opacity: 0.75;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    DIAGNOSTIC SHELL — mobile overlay (U2, planning/DIAGNOSTIC_SHELL_PLAN.md
    §6). Replaces the U1 document-flow <details class="panel"> (which shoved

@@ -162,19 +162,29 @@
 
   // _devConsoleUnlocked — THE canonical, single gate for this console's
   // visibility (Protocol 22 — one gate, not several re-derived checks).
-  //   TODAY: true only on a dev/staging build (delegates verbatim to
-  //   ui-core.js's _isStagingEnv(), never re-implemented) — dev builds skip
-  //   the hack entirely.
-  //   MINIGAME-UNLOCK SEAM: this exact function is what the future in-game
-  //   hacking minigame will also flip to true on a production build once the
-  //   player solves it (e.g. by additionally checking a persisted unlock
-  //   flag this function reads) — the console it unlocks IS this one, not a
-  //   separate panel. When that lands, add the unlock-flag check here and
-  //   nowhere else.
+  //   True on a dev/staging build (delegates verbatim to ui-core.js's
+  //   _isStagingEnv(), never re-implemented) — dev builds skip the hack
+  //   entirely.
+  //   MINIGAME-UNLOCK SEAM (U5, planning/DIAGNOSTIC_SHELL_PLAN.md §11 U5):
+  //   ALSO true on a production build once the persisted
+  //   robco_dsh_minigame_unlocked flag (META_MANIFEST, state.js) is set —
+  //   the console it unlocks IS this one, not a separate panel. That flag
+  //   is set ONLY by (a) a future in-game hacking minigame once built, or
+  //   (b) the staging-only UNLOCK/LOCK TEST triggers below (env category),
+  //   which flip the exact same flag purely to rehearse the unlock without
+  //   waiting on the real minigame. CRITICAL: this seam only widens
+  //   EXISTENCE (whether the shell mounts at all) — it never touches
+  //   _shellTier() (below), which is unconditionally staging-signal-only.
+  //   A production player who unlocks the shell this way still sees ONLY
+  //   tier:'prod' tools; every cheat/reset/raw-internal tool stays
+  //   unreachable exactly as before (leak-proof by construction, §2.2).
   // Fails OPEN to false (hidden) on any uncertainty — never leak to production.
   function _devConsoleUnlocked() {
     try {
-      return typeof window._isStagingEnv === 'function' ? window._isStagingEnv() : false;
+      if (typeof window._isStagingEnv === 'function' && window._isStagingEnv()) return true;
+      return (
+        typeof MetaStore !== 'undefined' && MetaStore.get('robco_dsh_minigame_unlocked') === 'true'
+      );
     } catch (_) {
       return false;
     }
@@ -2071,6 +2081,19 @@
       action: () => _dshResetFirmwareSeen(),
     },
     {
+      id: 'reset-changelog-seen',
+      label: 'RESET SEEN-CHANGELOG FLAG',
+      subLabel: "MetaStore.remove('robco_version')",
+      icon: '⌦',
+      category: 'resets',
+      group: 'VIEW-ONCE / DEV FLAGS',
+      tier: 'staging',
+      destructive: true,
+      tooltip: 'Clear the seen-changelog flag so the first-visit patch-notes popup replays.',
+      triggers: ['robco_version'],
+      action: () => _dshResetChangelogSeen(),
+    },
+    {
       id: 'reset-hatch-flag',
       label: 'RESET HATCH FLAG',
       subLabel: "MetaStore.remove('robco_bay_opened') (flag only, no DOM re-show)",
@@ -2228,6 +2251,337 @@
         'Loads a fully-populated New Vegas test campaign (inventory/quests/perks/traits/skills/SPECIAL/factions/collectibles/karma/locations/status effects/caps/level/companions/notes). Overwrites the current campaign. Requires the New Vegas cartridge to already be active.',
       triggers: [],
       action: () => _dshLoadNvTestCampaign(),
+    },
+
+    // ── U5: RESILIENCE & INFRA — feature-flag overrides (planning §4/§11 U5).
+    // control:'toggle' (see _renderShell()) synthesizes an ON/OFF/DEFAULT
+    // row per flag; the action receives the clicked mode ('on'/'off'/
+    // 'clear') and routes it to window._setFeatureFlagOverride (the U5
+    // cloud.js seam) via _dshSetFlagOverride(). Non-destructive — the
+    // override is trivially reversible (CLEAR reverts to remote/default)
+    // and never touches Firebase, so no confirm gate.
+    {
+      id: 'flag-cloudSync',
+      label: 'CLOUD SYNC',
+      subLabel: "local override of isFeatureEnabled('cloudSync')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('cloudSync'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('cloudSync')
+          : null,
+      tooltip:
+        'Local override for the cloudSync kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('cloudSync', mode),
+    },
+    {
+      id: 'flag-googleSignIn',
+      label: 'GOOGLE SIGN-IN',
+      subLabel: "local override of isFeatureEnabled('googleSignIn')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('googleSignIn'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('googleSignIn')
+          : null,
+      tooltip:
+        'Local override for the googleSignIn kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('googleSignIn', mode),
+    },
+    {
+      id: 'flag-aiChat',
+      label: 'AI CHAT',
+      subLabel: "local override of isFeatureEnabled('aiChat')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('aiChat'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('aiChat')
+          : null,
+      tooltip:
+        'Local override for the aiChat kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('aiChat', mode),
+    },
+    {
+      id: 'flag-keySync',
+      label: 'KEY SYNC',
+      subLabel: "local override of isFeatureEnabled('keySync')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('keySync'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('keySync')
+          : null,
+      tooltip:
+        'Local override for the keySync kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('keySync', mode),
+    },
+    {
+      id: 'flag-saveMigration',
+      label: 'SAVE MIGRATION',
+      subLabel: "local override of isFeatureEnabled('saveMigration')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('saveMigration'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('saveMigration')
+          : null,
+      tooltip:
+        'Local override for the saveMigration kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('saveMigration', mode),
+    },
+    {
+      id: 'flag-offlineQueue',
+      label: 'OFFLINE QUEUE',
+      subLabel: "local override of isFeatureEnabled('offlineQueue')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('offlineQueue'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('offlineQueue')
+          : null,
+      tooltip:
+        'Local override for the offlineQueue kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('offlineQueue', mode),
+    },
+    {
+      id: 'flag-visualOcr',
+      label: 'VISUAL OCR',
+      subLabel: "local override of isFeatureEnabled('visualOcr')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('visualOcr'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('visualOcr')
+          : null,
+      tooltip:
+        'Local override for the visualOcr kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('visualOcr', mode),
+    },
+    {
+      id: 'flag-visualAiVision',
+      label: 'VISUAL AI VISION',
+      subLabel: "local override of isFeatureEnabled('visualAiVision')",
+      icon: '⚑',
+      category: 'infra',
+      group: 'FEATURE FLAG OVERRIDES',
+      tier: 'staging',
+      destructive: false,
+      control: 'toggle',
+      read: () => window.isFeatureEnabled && window.isFeatureEnabled('visualAiVision'),
+      readOverride: () =>
+        typeof window._getFeatureFlagOverride === 'function'
+          ? window._getFeatureFlagOverride('visualAiVision')
+          : null,
+      tooltip:
+        'Local override for the visualAiVision kill-switch flag — testing only, never touches Firebase.',
+      triggers: [],
+      action: mode => _dshSetFlagOverride('visualAiVision', mode),
+    },
+
+    // ── U5: RESILIENCE & INFRA — simulate AI/OCR failure (planning §4/§11 U5).
+    // The two TRIP tools drive the REAL window._recordFeatureFailure()
+    // auto-disable machinery (Protocol 22) to FAIL_THRESHOLD — a genuine,
+    // session-scoped, hard-to-undo-short-of-reload effect, hence
+    // destructive:true (confirm-gated). The RESPONSE PREVIEW select posts a
+    // clearly dev-labeled chat line describing what each failure kind's
+    // real fallback looks like — never destructive (no state change).
+    {
+      id: 'sim-fail-aichat-trip',
+      label: 'TRIP AI CHAT AUTO-DISABLE',
+      subLabel: "_recordFeatureFailure('aiChat', …) × FAIL_THRESHOLD",
+      icon: '⚠',
+      category: 'infra',
+      group: 'SIMULATE AI / OCR FAILURE',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Drives the REAL auto-disable trip for aiChat to FAIL_THRESHOLD (3), exactly as repeated live failures would — requires a reload to undo, exactly like the real fallback.',
+      triggers: [],
+      action: () => _dshTripAutoDisable('aiChat'),
+    },
+    {
+      id: 'sim-fail-visualocr-trip',
+      label: 'TRIP VISUAL OCR AUTO-DISABLE',
+      subLabel: "_recordFeatureFailure('visualOcr', …) × FAIL_THRESHOLD",
+      icon: '⚠',
+      category: 'infra',
+      group: 'SIMULATE AI / OCR FAILURE',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Drives the REAL auto-disable trip for visualOcr to FAIL_THRESHOLD (3) — the Visual Upload pipeline falls back to the AI-vision path (or the plain-text dead-end), exactly as repeated live OCR failures would. Requires a reload to undo.',
+      triggers: [],
+      action: () => _dshTripAutoDisable('visualOcr'),
+    },
+    {
+      id: 'sim-ai-response-preview',
+      label: 'PREVIEW AI FAILURE RESPONSE',
+      subLabel:
+        '401 / 403 / 429 / TIMEOUT / MALFORMED — a labeled chat-line preview, no state change',
+      icon: '⚠',
+      category: 'infra',
+      group: 'SIMULATE AI / OCR FAILURE',
+      tier: 'staging',
+      destructive: false,
+      control: 'select',
+      selectOptions: [
+        { value: '401', label: '401 KEY REJECTED' },
+        { value: '403', label: '403 KEY REJECTED' },
+        { value: '429', label: '429 RATE LIMIT' },
+        { value: 'timeout', label: 'TIMEOUT / ABORT' },
+        { value: 'malformed', label: 'MALFORMED RESPONSE' },
+      ],
+      tooltip:
+        'Posts a labeled diagnostic chat line describing what each AI failure kind’s real fallback message looks like — a preview only, never a real retry/auto-disable.',
+      triggers: [],
+      action: kind => _dshSimulateAiResponse(kind),
+    },
+
+    // ── U5: RESILIENCE & INFRA — cache / SW controls (planning §4/§11 U5).
+    // sw-force-update-prompt reuses the REAL _triggerUpdate() modal
+    // (index.html seam, Protocol 22) — never a second implementation.
+    // sw-clear-caches / sw-unregister are genuinely destructive (the next
+    // load re-fetches everything from the network) — confirm-gated. Cache
+    // revision + SW registration detail are ALREADY covered by the U4a
+    // INSPECT tools (inspect-device-detail / inspect-sw-internal) — no
+    // duplicate readout added here (Protocol 22).
+    {
+      id: 'sw-force-update-prompt',
+      label: 'FORCE UPDATE PROMPT',
+      subLabel: '_triggerUpdate() — the real blocking update modal (index.html seam)',
+      icon: '⚒',
+      category: 'infra',
+      group: 'CACHE / SERVICE WORKER',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Shows the real REBOOT-REQUIRED update modal — uses a genuine waiting worker if one exists, else a synthetic no-op stand-in for pure UI testing.',
+      triggers: [],
+      action: () => {
+        if (typeof window._dshForceUpdatePrompt === 'function') window._dshForceUpdatePrompt();
+      },
+    },
+    {
+      id: 'sw-clear-caches',
+      label: 'CLEAR CACHE STORAGE',
+      subLabel: 'caches.keys() → caches.delete(k) × every entry',
+      icon: '⚒',
+      category: 'infra',
+      group: 'CACHE / SERVICE WORKER',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Delete every Cache Storage entry — the next load re-fetches everything from the network.',
+      triggers: [],
+      action: () => _dshClearCaches(),
+    },
+    {
+      id: 'sw-unregister',
+      label: 'UNREGISTER SERVICE WORKER',
+      subLabel: 'navigator.serviceWorker.getRegistrations() → unregister() × every entry',
+      icon: '⚒',
+      category: 'infra',
+      group: 'CACHE / SERVICE WORKER',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Unregister every Service Worker registration for this origin — offline support is lost until the next load re-installs it.',
+      triggers: [],
+      action: () => _dshUnregisterSw(),
+    },
+
+    // ── U5: ENVIRONMENT & UNLOCK — the minigame unlock ceremony (planning
+    // §4/§11 U5). The two TEST triggers flip the SAME persisted
+    // robco_dsh_minigame_unlocked flag a real future minigame solve will
+    // one day flip (Protocol 44) — staging-only, non-destructive (trivially
+    // reversible via the paired LOCK trigger). unlock-ceremony-replay is
+    // tier:'prod' — a non-destructive replay (no flag mutation) available
+    // to a genuinely-unlocked production player, mirroring the M1-M5
+    // ceremony-replay pattern (planning §4: "never clears the real
+    // persisted view-once flag").
+    {
+      id: 'minigame-unlock-test',
+      label: 'TEST: UNLOCK MINIGAME FLAG',
+      subLabel: "MetaStore.set('robco_dsh_minigame_unlocked','true') + fire the ceremony",
+      icon: '■',
+      category: 'env',
+      group: 'MINIGAME UNLOCK',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Flip the persisted minigame-unlock flag on and fire the RESTRICTED ACCESS GRANTED ceremony — rehearses a real production unlock without leaving staging.',
+      triggers: ['robco_dsh_minigame_unlocked'],
+      action: () => _dshMinigameUnlockTest(),
+    },
+    {
+      id: 'minigame-lock-test',
+      label: 'TEST: LOCK MINIGAME FLAG',
+      subLabel: "MetaStore.remove('robco_dsh_minigame_unlocked')",
+      icon: '■',
+      category: 'env',
+      group: 'MINIGAME UNLOCK',
+      tier: 'staging',
+      destructive: false,
+      tooltip: 'Clear the persisted minigame-unlock flag — reverts a preview back to locked.',
+      triggers: ['robco_dsh_minigame_unlocked'],
+      action: () => _dshMinigameLockTest(),
+    },
+    {
+      id: 'unlock-ceremony-replay',
+      label: 'REPLAY UNLOCK CEREMONY',
+      subLabel: '_fireUnlockCeremony() — no flag mutation',
+      icon: '■',
+      category: 'env',
+      group: 'MINIGAME UNLOCK',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Replay the RESTRICTED ACCESS GRANTED flourish — never touches the persisted unlock flag.',
+      triggers: [],
+      action: () => _fireUnlockCeremony(),
     },
 
     // ── U4b: INLINE DEV-RESET BUTTONS (planning §5) — category:'inline',
@@ -2435,6 +2789,64 @@
             grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px';
             wrapper.appendChild(grid);
             groupGrids[groupKey] = grid;
+          }
+          // U5: a 3-state flag override (control:'toggle') synthesizes a
+          // labeled row with a live state readout + ON/OFF/DEFAULT buttons,
+          // sharing the SAME group grid/wrapper machinery (Protocol 22).
+          // Unlike the input/select/GO pattern below, each button acts
+          // immediately on click (no separate GO step — an override flip is
+          // cheap and reversible) and repaints its own state readout in
+          // place, since the next full shell re-render only happens on
+          // drawer reopen.
+          if (tool.control === 'toggle') {
+            var trow = document.createElement('div');
+            trow.className = 'dsh-tool-row';
+            trow.style.cssText =
+              'display:flex;flex-wrap:wrap;gap:6px;align-items:center;width:100%;margin-bottom:6px';
+            trow.setAttribute(
+              'data-dsh-search',
+              (tool.label + ' ' + (tool.subLabel || '')).toLowerCase()
+            );
+            if (tool.tooltip) trow.title = tool.tooltip;
+            var tLbl = document.createElement('span');
+            tLbl.style.cssText = 'font-size:10px;opacity:0.85;flex:1 1 110px';
+            var tIcon = document.createElement('span');
+            tIcon.className = 'dsh-tool-icon';
+            tIcon.setAttribute('aria-hidden', 'true');
+            tIcon.textContent = (tool.icon || DEV_MARKER) + ' ';
+            tLbl.appendChild(tIcon);
+            tLbl.appendChild(document.createTextNode(tool.label));
+            trow.appendChild(tLbl);
+            var stateSpan = document.createElement('span');
+            stateSpan.className = 'dsh-toggle-state';
+            stateSpan.setAttribute('aria-live', 'polite');
+            var paintToggleState = function () {
+              var ov = typeof tool.readOverride === 'function' ? tool.readOverride() : null;
+              var live = typeof tool.read === 'function' ? !!tool.read() : null;
+              stateSpan.textContent =
+                (ov === true ? 'OVERRIDE: ON' : ov === false ? 'OVERRIDE: OFF' : 'DEFAULT') +
+                (live === null ? '' : ' (' + (live ? 'ENABLED' : 'DISABLED') + ')');
+            };
+            paintToggleState();
+            trow.appendChild(stateSpan);
+            [
+              ['on', 'ON'],
+              ['off', 'OFF'],
+              ['clear', 'DEFAULT'],
+            ].forEach(function (pair) {
+              var tBtn = document.createElement('button');
+              tBtn.type = 'button';
+              tBtn.className = 'btn-sm dsh-tool-btn';
+              tBtn.textContent = pair[1];
+              tBtn.setAttribute('aria-label', tool.label + ' — ' + pair[1]);
+              tBtn.addEventListener('click', function () {
+                _invoke(tool, pair[0]);
+                paintToggleState();
+              });
+              trow.appendChild(tBtn);
+            });
+            grid.appendChild(trow);
+            return;
           }
           // U4b: a parameterized cheat (control:'input'|'select'|'select-input')
           // synthesizes a labeled row — a select and/or a text/number input plus
@@ -3382,6 +3794,178 @@
   // real CSS hook rather than inventing a new persistent field.
   function _toggleDayNight() {
     document.body.classList.toggle('time-night');
+  }
+
+  // ── U5: MINIGAME UNLOCK CEREMONY (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§11
+  // U5) ────────────────────────────────────────────────────────────────────
+  // A short in-fiction "RESTRICTED ACCESS GRANTED" flourish — the earned-
+  // reward moment for a production player who has just unlocked the shell
+  // (or, on staging, a rehearsal of that same moment). Opens the drawer if
+  // closed, flashes the env banner to the unlock line for ~2.4s (a plain
+  // CSS `animation:` — Protocol UI-9 — auto-neutralized to an instant flash
+  // by the existing global prefers-reduced-motion block), then settles
+  // back to the tier-appropriate banner text via the existing
+  // _paintEnvBanner() (Protocol 22 — never a second banner-painting path).
+  // Writes nothing durable to the campaign or device beyond opening the
+  // drawer (a transient UI state, not a MetaStore/state write).
+  function _fireUnlockCeremony() {
+    try {
+      if (typeof _openShell === 'function') _openShell();
+      var panel = document.getElementById('testConsolePanel');
+      var banner = panel && panel.querySelector('#dshEnvBanner');
+      if (!banner) return;
+      if (typeof window.playBoardThunk === 'function') window.playBoardThunk();
+      banner.textContent = '> RESTRICTED ACCESS GRANTED — DIAGNOSTIC SHELL ONLINE';
+      banner.classList.remove('dsh-banner-staging', 'dsh-banner-prod');
+      banner.classList.add('dsh-unlock-ceremony');
+      setTimeout(function () {
+        banner.classList.remove('dsh-unlock-ceremony');
+        _paintEnvBanner(panel, _shellTier());
+      }, 2400);
+    } catch (_) {
+      /* a ceremony failure must never break the shell */
+    }
+  }
+  // TEST triggers (staging-only, category:'env') — flip the SAME persisted
+  // flag a real minigame solve will one day flip, purely to rehearse the
+  // unlock/lock flow without leaving staging (Protocol 44 — every hard-to-
+  // trigger feature ships a Diagnostic Shell trigger, and "unlock a
+  // production build" is about as hard-to-trigger as it gets pre-minigame).
+  function _dshMinigameUnlockTest() {
+    try {
+      MetaStore.set('robco_dsh_minigame_unlocked', 'true');
+    } catch (_) {
+      /* fail-safe: a persistence failure leaves the flag unset — the shell stays locked */
+    }
+    _fireUnlockCeremony();
+  }
+  function _dshMinigameLockTest() {
+    try {
+      MetaStore.remove('robco_dsh_minigame_unlocked');
+    } catch (_) {
+      /* a removal failure is the safe direction anyway — MetaStore.get()
+         treats a malformed/missing key as absent (locked) */
+    }
+    if (typeof appendToChat === 'function') {
+      appendToChat('> [DIAGNOSTIC SHELL] MINIGAME UNLOCK FLAG CLEARED — LOCKED.', 'sys');
+    }
+  }
+
+  // ── U5: RESILIENCE / INFRA (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§11 U5) ──
+  // Feature-flag overrides, AI/OCR auto-disable simulation, and cache/SW
+  // controls — every action below is staging-tier (RESILIENCE & INFRA is
+  // entirely a staging toolbench, planning §3.1) and reuses a REAL
+  // production choke point rather than duplicating its logic: the flag
+  // toggles drive window._setFeatureFlagOverride (cloud.js, U5 seam), the
+  // AI-sim trips drive the REAL window._recordFeatureFailure() auto-disable
+  // machinery, and the update-prompt tool drives the REAL _triggerUpdate()
+  // modal (index.html, U5 seam) — never a second implementation of any of
+  // the three (Protocol 22).
+
+  // Toggle a LOCAL flag override on/off/back-to-default. `mode` is the
+  // captured 'on'/'off'/'clear' arg _invoke() forwards from the synthesized
+  // toggle row's three buttons (see _renderShell()).
+  function _dshSetFlagOverride(key, mode) {
+    if (typeof window._setFeatureFlagOverride !== 'function') return;
+    if (mode === 'clear') window._setFeatureFlagOverride(key, null);
+    else window._setFeatureFlagOverride(key, mode === 'on');
+  }
+  // Drives the REAL auto-disable trip (cloud.js _recordFeatureFailure,
+  // exported on window since Suite 48) to FAIL_THRESHOLD (3) in one click —
+  // exercising the genuine fallback path a real repeated-failure user would
+  // hit, never a synthetic imitation of it. There is no reset for this
+  // short of a reload (the real _autoDisabled/_failCounts are private,
+  // session-scoped module vars in cloud.js with no reset export by design —
+  // the same "REBOOT TO RETRY" recovery a real player faces) — the tool's
+  // own tooltip below says so; destructive:true (confirm-gated) reflects
+  // that a session-scoped, hard-to-undo effect is a real cost to trigger.
+  function _dshTripAutoDisable(key) {
+    if (typeof window._recordFeatureFailure !== 'function') return;
+    var msg =
+      '>> [DIAGNOSTIC SHELL] ' +
+      key +
+      ' AUTO-DISABLED (simulated repeated failure) — REBOOT TO RETRY. <<';
+    window._recordFeatureFailure(key, msg);
+    window._recordFeatureFailure(key, null);
+    window._recordFeatureFailure(key, null);
+  }
+  // A clearly-labeled diagnostic preview of what each AI failure response
+  // kind would look like in the transcript — posts through the real
+  // appendToChat() (Protocol 22) but with dev-labeled copy (never a
+  // byte-for-byte duplicate of transmitMessage()'s own production strings,
+  // which would silently drift if either ever changes independently).
+  var _SIM_AI_KIND_TEXT = {
+    401: 'HTTP 401 — invalid/unauthorized key. The real path never retries; it prompts RE-ENTER ACCESS KEY.',
+    403: 'HTTP 403 — key rejected. The real path never retries; it prompts RE-ENTER ACCESS KEY.',
+    429: 'HTTP 429 — rate limit / quota. The real path retries with bounded exponential backoff, then auto-disables aiChat at FAIL_THRESHOLD.',
+    timeout: 'Request aborted (45s timeout). The real path shows TRANSMISSION CANCELLED.',
+    malformed:
+      'Response failed Tri-Node schema validation. The real path shows MALFORMED TELEMETRY — NOTHING APPLIED.',
+  };
+  function _dshSimulateAiResponse(kind) {
+    var text = _SIM_AI_KIND_TEXT[kind];
+    if (!text || typeof appendToChat !== 'function') return;
+    appendToChat('> [DIAGNOSTIC SHELL] SIMULATED AI RESPONSE (' + kind + '): ' + text, 'sys');
+  }
+  function _dshClearCaches() {
+    if (typeof caches === 'undefined' || typeof caches.keys !== 'function') return;
+    caches
+      .keys()
+      .then(function (keys) {
+        return Promise.all(
+          keys.map(function (k) {
+            return caches.delete(k);
+          })
+        );
+      })
+      .then(function () {
+        if (typeof appendToChat === 'function') {
+          appendToChat('> [DIAGNOSTIC SHELL] ALL CACHE STORAGE ENTRIES CLEARED.', 'sys');
+        }
+      })
+      .catch(function () {
+        if (typeof appendToChat === 'function') {
+          appendToChat('> [DIAGNOSTIC SHELL] CACHE CLEAR FAILED.', 'sys');
+        }
+      });
+  }
+  function _dshUnregisterSw() {
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.serviceWorker ||
+      typeof navigator.serviceWorker.getRegistrations !== 'function'
+    )
+      return;
+    navigator.serviceWorker
+      .getRegistrations()
+      .then(function (regs) {
+        return Promise.all(
+          regs.map(function (r) {
+            return r.unregister();
+          })
+        );
+      })
+      .then(function () {
+        if (typeof appendToChat === 'function') {
+          appendToChat(
+            '> [DIAGNOSTIC SHELL] SERVICE WORKER UNREGISTERED — reload to re-install.',
+            'sys'
+          );
+        }
+      })
+      .catch(function () {
+        if (typeof appendToChat === 'function') {
+          appendToChat('> [DIAGNOSTIC SHELL] SERVICE WORKER UNREGISTER FAILED.', 'sys');
+        }
+      });
+  }
+  // First-run / view-once flag — the ONE new reset this unit adds; every
+  // other view-once flag (first-boot/hatch/greet/firmware-seen) was already
+  // covered by U4b's RESETS tools (Protocol 22 — no duplication). Clears
+  // the "seen changelog at this APP_VERSION" flag (_runBootSequenceAndBriefing,
+  // ui-core.js) so the first-visit patch-notes popup replays on next boot.
+  function _dshResetChangelogSeen() {
+    MetaStore.remove('robco_version');
   }
 
   // ── U4b: STATE SETUP CHEATS + RESETS + FIXTURES ───────────────────────────

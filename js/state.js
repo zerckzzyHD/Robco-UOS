@@ -94,6 +94,20 @@ const META_MANIFEST = {
   // just a picked mode/value). Absent/unset falls back to the CSS default
   // resting spot (bottom-left, above the mobile bezel dock).
   robco_dsh_fab_pos: { type: 'json', default: '{}', owner: 'test-console.js' },
+  // Diagnostic Shell U5: a per-DEVICE shadow layer of feature-flag overrides
+  // (window._setFeatureFlagOverride, cloud.js) — staging-only, never touches
+  // the remote /config/flags doc, "clearing returns to remote/default."
+  robco_dsh_flag_overrides: { type: 'json', default: '{}', owner: 'cloud.js' },
+  // Diagnostic Shell U5 — the MINIGAME-UNLOCK SEAM: on a production build,
+  // _devConsoleUnlocked() (test-console.js) now ALSO reads this persisted
+  // flag as an alternate "the shell exists" signal alongside the staging
+  // check. Set ONLY by (a) a future in-game hacking minigame once built, or
+  // (b) the staging-only UNLOCK/LOCK TEST triggers, which flip the exact
+  // same flag a real minigame solve will one day flip — never anything
+  // else. _shellTier() is UNCHANGED by this flag (still staging-signal-only),
+  // so an unlocked production build shows the shell but only ever renders
+  // tier:'prod' tools — leak-proof by construction.
+  robco_dsh_minigame_unlocked: { type: 'bool', default: false, owner: 'test-console.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
