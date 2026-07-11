@@ -39871,10 +39871,22 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  unambiguous reference forms are checked.
 //
 //  SCANNED: CLAUDE.md, ARCHITECTURE.md, README.md (all committed).
-//  NOT scanned: library/BRAIN_DUMP.md — gitignored (absent on a clean CI
-//  checkout) and its "Known documentation drift" ledger deliberately quotes
-//  retired/wrong names to warn sessions off them.
-//  6 tests.
+//  NOT scanned for PROSE content: library/BRAIN_DUMP.md — gitignored (absent
+//  on a clean CI checkout) and its "Known documentation drift" ledger
+//  deliberately quotes retired/wrong names to warn sessions off them.
+//
+//  220.7/220.8 (Protocol 46, 2.8.5 U-B2) extend this to library/…  POINTER
+//  PATHS themselves — the Reference Pointer Index names library/CODE_MAP.md,
+//  library/BRAIN_DUMP.md, library/TEST_CATALOG.md, but library/ is gitignored
+//  so a naive fs.existsSync() would either false-positive-fail on every clean
+//  CI checkout (files never exist there) or silently pass forever if skipped
+//  outright (a guard that can never fail is worse than none). The fix:
+//  library/MANIFEST.txt is a small COMMITTED exception to the library/
+//  gitignore (a filename-only list) — 220.7 checks every doc-referenced
+//  library/<file> against it (real on CI AND locally); 220.8 checks the
+//  manifest against library/'s ACTUAL contents when present (real only
+//  locally, where the drift it catches is actually visible).
+//  8 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
@@ -40018,6 +40030,76 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       canonicalOrder220.includes('api'),
     '220.6: the canonical boot order derived from index.html is non-trivial (starts idb, ends cloud, includes state + api) — prevents 220.3/220.4 passing on an empty parse'
   );
+
+  // ── shared setup for 220.7/220.8: read library/MANIFEST.txt if present ──
+  const libDir220 = path.join(ROOT, 'library');
+  const manifestPath220 = path.join(libDir220, 'MANIFEST.txt');
+  const manifestExists220 = fs.existsSync(manifestPath220);
+  const manifestNames220 = manifestExists220
+    ? new Set(
+        fs
+          .readFileSync(manifestPath220, 'utf8')
+          .split(/\r?\n/)
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#'))
+      )
+    : new Set();
+
+  // ── 220.7  every library/<file> pointer in the docs resolves against the
+  //           committed manifest — the guard that is REAL on CI ──
+  {
+    const libRe220 = /(?<![.\w/])library\/([A-Za-z0-9_-]+\.(?:md|txt))\b/g;
+    const missingLib220 = new Set();
+    let m;
+    while ((m = libRe220.exec(docBlob220))) {
+      const name = m[1];
+      if (name === 'MANIFEST.txt') continue; // naming the manifest itself isn't drift
+      if (!manifestNames220.has(name)) missingLib220.add(name);
+    }
+    assert(
+      manifestExists220 && missingLib220.size === 0,
+      '220.7: every library/<file> pointer named in CLAUDE/ARCHITECTURE/README resolves against the committed library/MANIFEST.txt (real on CI too — library/ itself is gitignored and absent there, but the manifest is not)' +
+        (missingLib220.size ? ' — DRIFT: ' + [...missingLib220].join(', ') : '') +
+        (!manifestExists220 ? ' — library/MANIFEST.txt is missing' : '')
+    );
+  }
+
+  // ── 220.8  LOCAL-ONLY: the manifest matches library/'s actual contents ──
+  // No-ops (passes trivially) on a clean CI checkout — but library/ ITSELF
+  // always exists there too, because library/MANIFEST.txt is committed and
+  // git checks out its parent dir. A bare fs.existsSync(libDir220) is NOT
+  // the right CI-vs-local signal (verified this the hard way: it fails the
+  // build on a simulated clean checkout, since none of the real gitignored
+  // docs are present to match the manifest). The real signal is whether any
+  // NON-manifest file is present — that only happens on the owner's machine.
+  // This is the only check that can catch the manifest itself going stale
+  // (a file added to/removed from library/ without updating MANIFEST.txt);
+  // 220.7 treats the manifest as ground truth and cannot.
+  {
+    const nonManifestFiles220 = fs.existsSync(libDir220)
+      ? fs.readdirSync(libDir220).filter(f => f !== 'MANIFEST.txt')
+      : [];
+    if (nonManifestFiles220.length > 0) {
+      const actual220 = new Set(nonManifestFiles220.filter(f => /\.(?:md|txt)$/.test(f)));
+      const undocumented220 = [...actual220].filter(f => !manifestNames220.has(f));
+      const stale220 = [...manifestNames220].filter(f => !actual220.has(f));
+      assert(
+        undocumented220.length === 0 && stale220.length === 0,
+        "220.8 (local-only — no-op on a clean CI checkout): library/MANIFEST.txt exactly matches library/'s real file list" +
+          (undocumented220.length
+            ? ' — UNDOCUMENTED in manifest: ' + undocumented220.join(', ')
+            : '') +
+          (stale220.length
+            ? ' — STALE in manifest (no longer on disk): ' + stale220.join(', ')
+            : '')
+      );
+    } else {
+      assert(
+        true,
+        "220.8 (local-only): skipped — no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

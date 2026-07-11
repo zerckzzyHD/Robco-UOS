@@ -26480,9 +26480,19 @@ Check (
 # (Protocol 36b), a defect class that escapes every layer gets a GATE GUARD
 # at that layer. This suite FAILS THE BUILD when a load-bearing doc names code
 # that does not exist. Deliberately NARROW (precision over recall). Mirrors JS
-# Suite 220 exactly. library/BRAIN_DUMP.md is NOT scanned (gitignored / absent
-# on CI, and its drift ledger deliberately quotes retired names).
-# 6 tests
+# Suite 220 exactly. library/BRAIN_DUMP.md is NOT scanned for PROSE content
+# (gitignored / absent on CI, and its drift ledger deliberately quotes retired
+# names).
+#
+# 220.7/220.8 (Protocol 46, 2.8.5 U-B2) extend this to library/... POINTER
+# PATHS themselves. library/ is gitignored, so a naive Test-Path would either
+# false-positive-fail on every clean CI checkout or silently pass forever if
+# skipped outright. Fix: library/MANIFEST.txt is a small COMMITTED exception
+# to the gitignore (filename-only list) -- 220.7 checks every doc-referenced
+# library/<file> against it (real on CI AND locally); 220.8 checks the
+# manifest against library/'s ACTUAL contents when present (real only
+# locally, where that drift is actually visible).
+# 8 tests
 # ===========================================================
 Sep "Suite 220 -- Documentation reference integrity (doc-drift guard)"
 
@@ -26566,6 +26576,56 @@ Check (-not ($docBlob220 -match 'window\.(pushToCloud|pullFromCloud)\b')) '220.5
 
 # 220.6  self-integrity: canonical order is real, not an empty parse
 Check (($canonOrder220.Count -ge 8) -and ($canonOrder220[0] -eq 'idb') -and ($canonOrder220[-1] -eq 'cloud') -and ($canonOrder220 -contains 'state') -and ($canonOrder220 -contains 'api')) '220.6: the canonical boot order derived from index.html is non-trivial (starts idb, ends cloud, includes state + api) -- prevents 220.3/220.4 passing on an empty parse'
+
+# shared setup for 220.7/220.8: read library/MANIFEST.txt if present
+$libDir220 = Join-Path $Root 'library'
+$manifestPath220 = Join-Path $libDir220 'MANIFEST.txt'
+$manifestExists220 = Test-Path $manifestPath220
+$manifestNames220 = @{}
+if ($manifestExists220) {
+    foreach ($line in (Get-Content $manifestPath220)) {
+        $t = $line.Trim()
+        if ($t -and (-not $t.StartsWith('#'))) { $manifestNames220[$t] = $true }
+    }
+}
+
+# 220.7  every library/<file> pointer in the docs resolves against the
+#        committed manifest -- the guard that is REAL on CI
+$missingLib220 = @{}
+foreach ($mm in [regex]::Matches($docBlob220, '(?<![.\w/])library/([A-Za-z0-9_-]+\.(?:md|txt))\b')) {
+    $name = $mm.Groups[1].Value
+    if ($name -eq 'MANIFEST.txt') { continue }  # naming the manifest itself isn't drift
+    if (-not $manifestNames220.ContainsKey($name)) { $missingLib220[$name] = $true }
+}
+Check (
+    $manifestExists220 -and ($missingLib220.Count -eq 0)
+) ('220.7: every library/<file> pointer named in CLAUDE/ARCHITECTURE/README resolves against the committed library/MANIFEST.txt (real on CI too -- library/ itself is gitignored and absent there, but the manifest is not)' + $(if ($missingLib220.Count) { ' -- DRIFT: ' + (($missingLib220.Keys | Sort-Object) -join ', ') } else { '' }) + $(if (-not $manifestExists220) { ' -- library/MANIFEST.txt is missing' } else { '' }))
+
+# 220.8  LOCAL-ONLY: the manifest matches library/'s actual contents.
+# No-ops (passes trivially) on a clean CI checkout -- but library/ ITSELF
+# always exists there too, because library/MANIFEST.txt is committed and git
+# checks out its parent dir. A bare Test-Path on the DIRECTORY is NOT the
+# right CI-vs-local signal (verified this the hard way: it fails the build on
+# a simulated clean checkout, since none of the real gitignored docs are
+# present to match the manifest). The real signal is whether any NON-manifest
+# file is present -- that only happens on the owner's machine. Only check
+# that can catch the manifest itself going stale; 220.7 treats the manifest
+# as ground truth and cannot.
+$nonManifestFiles220 = @()
+if (Test-Path $libDir220) {
+    $nonManifestFiles220 = @(Get-ChildItem $libDir220 -File | Where-Object { $_.Name -ne 'MANIFEST.txt' })
+}
+if ($nonManifestFiles220.Count -gt 0) {
+    $actual220 = @{}
+    foreach ($f in ($nonManifestFiles220 | Where-Object { $_.Name -match '\.(md|txt)$' })) { $actual220[$f.Name] = $true }
+    $undocumented220 = @($actual220.Keys | Where-Object { -not $manifestNames220.ContainsKey($_) })
+    $stale220 = @($manifestNames220.Keys | Where-Object { -not $actual220.ContainsKey($_) })
+    Check (
+        ($undocumented220.Count -eq 0) -and ($stale220.Count -eq 0)
+    ) ("220.8 (local-only -- no-op on a clean CI checkout): library/MANIFEST.txt exactly matches library/'s real file list" + $(if ($undocumented220.Count) { ' -- UNDOCUMENTED in manifest: ' + (($undocumented220 | Sort-Object) -join ', ') } else { '' }) + $(if ($stale220.Count) { ' -- STALE in manifest (no longer on disk): ' + (($stale220 | Sort-Object) -join ', ') } else { '' }))
+} else {
+    Check ($true) "220.8 (local-only): skipped -- no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
+}
 
 # ===========================================================
 # Results

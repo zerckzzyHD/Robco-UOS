@@ -14,15 +14,26 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Full project reconstruction** — what the app IS, the architecture, the state shape, every subsystem, the protocols and WHY each exists, the recurring gotchas, the owner's hard rules, the workflow, the roadmap | `library/BRAIN_DUMP.md` (gitignored, local-only, Claude-facing — read it from disk) |
 | **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) |
 | **Canonical protocol & gate rules** | this file (`CLAUDE.md`) |
+| **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
+| **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/api.js`) — design rationale in `ARCHITECTURE.md` |
+| **Boot lifecycle** — `window.onload`'s call order, the boot-phase functions, the event-bus subscriber wiring order | `library/CODE_MAP.md` § Boot Lifecycle (`js/ui-core.js`) |
+| **State shape** — `let state = {…}`, `GAME_DEFS`, `migrateState()`, the save envelope | `library/CODE_MAP.md` § State (`js/state.js`) |
+| **Event bus** — `RobcoEvents`, every emitted event name, every subscriber-wiring function and which file owns it | `library/CODE_MAP.md` § Event Bus |
+| **Native command router** — `NATIVE_COMMAND_ROUTER`, the quick-log grammar, the native stat-token setters | `library/CODE_MAP.md` § Native Command Router (`js/api.js`) |
+| **Audio model** — the `AudioSettings` cache, `ensureAudioCtx()`, every sound-trigger function, the mute-guard pattern | `library/CODE_MAP.md` § Audio (`js/ui-audio.js`) |
+| **Two-store boundary** — campaign state (`state` / `robco_v8`) vs. device prefs (`MetaStore` / `META_MANIFEST`) | `library/CODE_MAP.md` § Two-Store Boundary; the rule itself is Protocol 23 below |
+| **Render pipeline** — `loadUI()`, every `render*()` function and its panel, the CRUD helpers | `library/CODE_MAP.md` § Render Pipeline (`js/ui-render.js`) |
+| **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/test-console.js`) |
+| **Test system** — how the gate runs, both runners, suite numbering, parity | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
 | **Full per-suite test catalog** — every suite's coverage, every work-unit's build narration (large; read only when suite-level detail is actually needed) | `library/TEST_CATALOG.md` (gitignored, local-only — see the 3-class model below) |
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
 | **Plain-English release history** | `CHANGELOG.md` |
 
-> Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `CLAUDE.md`'s own "Architecture Quick Reference" narration has drifted in places (it self-flags this) — the brain dump's "Known documentation drift" section records the specific gaps.
+> Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `CLAUDE.md`'s own "Architecture Quick Reference" narration has drifted in places (it self-flags this) — the brain dump's "Known documentation drift" section records the specific gaps. `library/CODE_MAP.md` is derived directly from source (Protocol 46) and is a snapshot too — a session that finds it disagreeing with the code trusts the code and should flag the drift.
 
 **The 3-class library maintenance model (2.8.5 U-B1):** every doc under `library/` and `planning/` falls into exactly one of three classes, and the class dictates how it's kept current:
 
-- **LIVE** — actively maintained, gate-guarded where possible: `library/BRAIN_DUMP.md`, `library/TEST_CATALOG.md` (today — see GENERATED below), `QUEUE.md`, this Reference Pointer Index. A stale LIVE doc is worse than no doc at all — it makes a session confidently wrong. Update in the same commit whenever something it describes stops being true.
+- **LIVE** — actively maintained, gate-guarded where possible: `library/BRAIN_DUMP.md`, `library/TEST_CATALOG.md` (today — see GENERATED below), `library/CODE_MAP.md`, `QUEUE.md`, this Reference Pointer Index. A stale LIVE doc is worse than no doc at all — it makes a session confidently wrong. Update in the same commit whenever something it describes stops being true.
 - **GENERATED** — never hand-maintained; produced from source by a script and diffed against the committed copy in the gate (Protocol 47). `library/TEST_CATALOG.md` is GENERATED-class **in intent** but is still hand-maintained **today** — 2.8.5 U-B1 only relocated its content out of `CLAUDE.md`'s tail; the generator itself is a separate, later unit and is explicitly out of scope here. Until that unit lands, sync it by hand exactly like a LIVE doc (Protocol 2a).
 - **ARCHIVE** — frozen point-in-time snapshots: the audits, plans, mockups, and slates under `planning/`. These carry a "snapshot as of DATE — not current truth" framing and are never updated to track current code; their reasoning is reused as historical input, never trusted as current fact. The pre-2.8.0 audits (`planning/CODE_QUALITY_AUDIT.md`, `planning/PERFORMANCE_AUDIT.md`, `planning/ACCESSIBILITY_AUDIT.md`, `planning/TEST_STRENGTH_AUDIT.md`, `planning/TOKEN_USAGE_AUDIT.md`, `planning/UI_CONSISTENCY_AUDIT.md`, `planning/CLOUD_AUDIT.md`, `planning/FILE_AUDIT.md`) are ARCHIVE-class — they audited a codebase roughly 30% smaller than today's; do not trust their measurements or reuse their proposals without re-verifying against current code.
 
@@ -30,6 +41,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 
 - `library/BRAIN_DUMP.md` is the canonical reconstruction doc and future sessions trust it — **a stale brain dump is worse than no brain dump** (it makes sessions confidently wrong). Update it in the same commit whenever something in it stops being true: an architecture change, a new/changed protocol, a shipped roadmap item, a newly-learned recurring gotcha. **★ Hard exit condition:** the 2.8.5 code + test health phase restructures the whole file layout and invalidates large parts of the dump — that phase is **not complete** until the brain dump has been re-baselined against the restructured codebase.
 - `QUEUE.md` is updated in the same commit as any change that actually moves the roadmap.
+- `library/CODE_MAP.md` (new, 2.8.5 U-B2) is updated in the same commit whenever a file is split/added/moved/removed or a major function relocates — see Protocol 46.
 - A **portable brief for an external model** (Gemini/GPT) is NOT a standing doc — it is regenerated fresh from the current brain dump on request, so it is always accurate because it is always new. Never keep a second standing copy of the truth. The generation spec lives in the brain dump ("Generating a portable brief for an external model").
 
 ---
@@ -41,11 +53,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2951 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2953 tests via gate:fast)
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **2951 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **2953 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` when served files change.** Required when any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). Doc-, config-, and test-only commits skip the check entirely.
 - **Cache-bump guard runs at commit time** — the hook first detects whether any staged file is in the served/precached set. If so, it requires a strict monotonic increase in `CACHE_NAME`. Non-served commits (doc-only, CI, tests) bypass the cache check entirely.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -140,7 +152,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 2951 tests must pass
+- [ ] Run `git commit` — 2953 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -154,7 +166,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (2951 tests) → Protocol 2
+- [ ] Lint, format, commit (2953 tests) → Protocol 2
 
 ---
 
@@ -590,12 +602,30 @@ Protocol 2/2a already require the docs to stay current — but they are **honor-
 1. **`window.<name>` references** in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` → `<name>` must appear in some `js/*.js` file or `index.html`. Catches documented-but-removed globals.
 2. **Explicit repo file paths** (`js/…`, `css/…`, `tests/…`, `scripts/…`, single-segment `name.ext`) → the file must exist on disk. A negative lookbehind rejects a path whose leading directory is really a file-extension tail (so a slash-joined prose list of several chained `.js` filenames never yields a phantom path); nested (`js/vendor/…`) and multi-dot filenames are intentionally out of scope to stay false-positive-free.
 3. **The load-order list** inside the `<!-- LOAD-ORDER-GUARD:BEGIN … END -->` markers in `CLAUDE.md` and `ARCHITECTURE.md` → the numbered `js/….js` items (the subject before each `→`) must equal the **real boot order derived mechanically from `index.html`**: `idb.js` (first static tag) + the `GAME_FILES` manifest + the remaining static `<script>` tags, with per-game `db_*` / `reg_*` pairs normalized to one slot.
+4. **Every `library/<file>` pointer** in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` → `<file>` must appear in the committed `library/MANIFEST.txt` (2.8.5 U-B2, Protocol 46 — see below for why this can't just be `fs.existsSync`).
 
 **Allowlists (small, explicit, commented WHY):** a doc that _correctly_ names something that must NOT exist is not drift. The window/path allowlists cover exactly that — platform globals (`window.innerWidth`, `window.location`, …) and the guarded MUST-NOT-EXIST file `js/ui.js` (retired in the ui-\* split, guarded by Suite 56). Keep these lists tiny; every entry needs a one-line reason.
 
-**Scope decision — `library/BRAIN_DUMP.md` is NOT scanned.** It is gitignored (absent on a clean CI checkout, so the guard would have nothing to read there — and CI is the environment that matters most), and its own "Known documentation drift" ledger deliberately quotes retired/wrong names to warn sessions off them — scanning it would false-positive on its most valuable section. It stays governed by its own maintenance rule instead.
+**Scope decision — `library/BRAIN_DUMP.md` is NOT scanned for PROSE content.** It is gitignored (absent on a clean CI checkout, so the guard would have nothing to read there — and CI is the environment that matters most), and its own "Known documentation drift" ledger deliberately quotes retired/wrong names to warn sessions off them — scanning its prose would false-positive on its most valuable section. It stays governed by its own maintenance rule instead. (Its existence *as a pointer target* — the fact that `CLAUDE.md` names `library/BRAIN_DUMP.md` — IS checked, via check 4 above / Protocol 46.)
 
 **Ratchet intent:** start narrow and earn trust; tighten later. A greedy scanner that flags ordinary prose is worse than no scanner — it gets ignored, then weakened, then it is dead. Only add a new reference form (e.g. backticked architecture entry-point names) once it can be extracted with **zero false positives**; until then, leave it out and say so. This is the enforcement arm of Protocol 2/2a, **not** a replacement — the honor-system rules still stand; this guard just catches the class of drift they could not.
+
+---
+
+## Protocol 46 — Keep the Code Map + Pointer Index Current (the enforcement arm of the library model)
+
+The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if they track the code — the same honor-system risk Protocol 45 was written to catch for `window.*`/file-path/load-order drift applies here too. **When a file is split, added, moved, or removed, or a major function relocates, update `library/CODE_MAP.md` and this file's Reference Pointer Index in the SAME commit.** This is the doc-maintenance obligation the 2.8.5 file restructure (strand A) exists under — a code map that goes stale exactly when the restructure it was built for lands would defeat the point.
+
+**The gitignored-library problem, and how it's solved:** `library/` is gitignored (local-only Claude reference docs — see the 3-class model above), so on a clean CI checkout `library/CODE_MAP.md` and `library/BRAIN_DUMP.md` simply don't exist. A guard that does `fs.existsSync('library/CODE_MAP.md')` would either fail every CI run forever (if it requires existence) or never run at all (if skipped whenever the directory is absent) — the latter is a guard that can never fail, which is worse than no guard because it creates false confidence.
+
+The fix is `library/MANIFEST.txt` — a small, filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 checks two things (tests 220.7/220.8, both runners at parity):
+
+- **220.7 (real everywhere, including CI):** every `library/<file>` pointer path named in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` must appear in `library/MANIFEST.txt`. This catches a pointer added for a file that was never added to the manifest — a typo, or a doc edit that outran the manifest update. It runs identically on CI and locally because the manifest is committed.
+- **220.8 (real only locally — honestly weaker, stated plainly):** when at least one *non-manifest* file exists under `library/` (the owner's machine — `library/MANIFEST.txt` alone is always present, even on CI, since it's committed and git checks out its parent directory; the real "am I on the owner's machine" signal is a second file next to it), the manifest's file list must exactly match `library/`'s real contents. This is the only check that can catch the manifest itself drifting from reality (a file quietly deleted from `library/`, or added without updating the manifest) — it is a no-op on a clean CI checkout, because that drift is invisible there by construction. (This distinction was not obvious at first — a naive "does `library/` exist" check looked CI-safe but actually fails the build on a clean checkout, since `MANIFEST.txt` alone makes the directory exist; caught by directly simulating a clean checkout, not assumed.) **What Suite 220 cannot catch on CI:** whether `library/CODE_MAP.md` (or `BRAIN_DUMP.md`) has gone stale in its own *content* — only that the *filename* a pointer names is a real, manifested one. Content staleness is caught by 220.8 locally, or not at all until the owner's next local gate run.
+
+**How to apply:** whenever `library/` gains or loses a file, update `library/MANIFEST.txt` in the same commit (add/remove one line). Whenever `CLAUDE.md`'s pointer index gains a row naming a new `library/<file>`, that file must already be in the manifest — order matters: manifest first, pointer second, or 220.7 fails the build.
+
+**Why:** this mirrors Protocol 45's own reasoning exactly — an honor-system "keep it current" rule drifted once already (the `pushToCloud`/`pullFromCloud` incident), so the class of defect gets a gate guard at the layer it would escape from. `library/CODE_MAP.md` and the pointer index are new, high-trust surfaces (a session is meant to navigate by them instead of reading whole files) — letting them drift silently would be strictly worse than not having them, because a session would trust a stale map with no signal that it's wrong.
 
 ---
 
@@ -727,4 +757,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 2951 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2951 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 2953 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2953 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
