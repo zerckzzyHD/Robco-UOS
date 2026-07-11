@@ -22,6 +22,15 @@
 - An INCIDENT LOG — a "big moments" view of your campaign showing just the milestones (level-ups, faction shifts, quest outcomes), separate from the fuller CROSSROADS RECORD that lists every recorded event.
 - Smaller additions: THREAT warns you outright when a fight would burn more ammo than you're actually carrying; you can nudge a companion's rapport with you up or down right from their squad card; a level cap (50) and a scaling XP cap hold typed-in values to what's actually possible; your radiation reading can be dragged to set it directly, like your HP and XP bars; and a live one-line status preview shows on every board even while it's collapsed.
 
+### Fixed
+
+- Closed a data-safety gap where an unusual or corrupted response from the AI could silently turn one of your character's core stats into an invalid value — it's now safely ignored instead, so your character sheet can't be corrupted this way.
+- Faction reputation alerts now fire in Fallout 3 as well. Crossing into Vilified or Idolized standing with any faction reliably shows the on-screen alert in both games; previously the alert only recognized New Vegas faction names, so Fallout 3 campaigns silently never triggered it.
+- The inventory filter no longer offers a "Mods" filter in Fallout 3, where weapon mods don't exist and it could never show anything.
+- Your radiation reading is now capped at the level where radiation actually becomes fatal, whether you type it in yourself or the AI reports it — previously it had no upper limit and could be pushed past that point.
+- Confirmation dialogs no longer show two separate "cancel" buttons that did the same thing — every one is now a clear CONTINUE and a clear CANCEL. And wiping the terminal while Complete RNG is armed now warns you up front that doing so locks it on permanently, instead of finding out afterward.
+- Cleared a burst of harmless "audio blocked" warnings from the browser console right after opening the terminal — the background hum and warning tones now wait for your first tap, exactly like the boot sound already did.
+
 ### Changed
 
 - The terminal now looks and feels like a physical RobCo device. A casing with brand plating and status lamps frames the screen, and the plain tab bar is replaced by a row of illuminated hardware buttons — OPERATOR (your stats), OPERATIONS (inventory and crafting), DATABANK (quests, the map, and records), UPLINK (the AI comm-link), and CHASSIS (device status). Number keys 1–5 jump between sections exactly as before, a new DIRECTORY button (or the 0 key) opens a plain list for anyone who prefers it, and each section now remembers exactly where you'd scrolled to. The casing's PWR, UPLINK, and FAULT lamps are functional — powering the terminal off, jumping to your AI settings when the link is live, and opening the error log. On a desktop the casing has real framed depth; on a phone it stays a clean, compact edge with the hardware buttons docked at the bottom.
@@ -39,15 +48,6 @@
 - Your saves list now only shows saves for the game you're currently playing, keeping New Vegas and Fallout 3 saves apart. An older save that predates this change is still shown, since there's no way to tell which game it belongs to.
 - Smaller changes: the four separate transcript-export buttons became one EJECT HOLOTAPE control with a TXT/MD/HTML format picker, and the always-visible quick-command row and D-Pad below the message box are gone, replaced by the Tool Deck.
 - Removed three unused or redundant features: the Projected Timeline (which never generated anything), the TERMLINK console (the Tool Deck already reaches everything it launched), and the typed CROSSROADS command (its panel is always open anyway). Everything they reached still works exactly as before.
-
-### Fixed
-
-- Closed a data-safety gap where an unusual or corrupted response from the AI could silently turn one of your character's core stats into an invalid value — it's now safely ignored instead, so your character sheet can't be corrupted this way.
-- Faction reputation alerts now fire in Fallout 3 as well. Crossing into Vilified or Idolized standing with any faction reliably shows the on-screen alert in both games; previously the alert only recognized New Vegas faction names, so Fallout 3 campaigns silently never triggered it.
-- The inventory filter no longer offers a "Mods" filter in Fallout 3, where weapon mods don't exist and it could never show anything.
-- Your radiation reading is now capped at the level where radiation actually becomes fatal, whether you type it in yourself or the AI reports it — previously it had no upper limit and could be pushed past that point.
-- Confirmation dialogs no longer show two separate "cancel" buttons that did the same thing — every one is now a clear CONTINUE and a clear CANCEL. And wiping the terminal while Complete RNG is armed now warns you up front that doing so locks it on permanently, instead of finding out afterward.
-- Cleared a burst of harmless "audio blocked" warnings from the browser console right after opening the terminal — the background hum and warning tones now wait for your first tap, exactly like the boot sound already did.
 
 ### Improved
 
