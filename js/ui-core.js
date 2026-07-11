@@ -3507,7 +3507,7 @@ async function _confirmGameContextChange(ctx) {
     if (sel) sel.value = ctx;
     return;
   }
-  const label = ctx === 'FNV' ? 'Fallout: New Vegas' : 'Fallout 3';
+  const label = (GAME_DEFS[ctx] && GAME_DEFS[ctx].label) || ctx;
   const ok = await confirmAction({
     title: '> SWAP PROGRAM CARTRIDGE',
     warning:
@@ -3673,7 +3673,7 @@ function _syncCampaignProfileUI() {
 
   const sum = document.getElementById('sum-profile');
   if (sum) {
-    const gameLabel = ctx === 'FNV' ? 'NEW VEGAS' : 'FALLOUT 3';
+    const gameLabel = String((GAME_DEFS[ctx] && GAME_DEFS[ctx].label) || ctx).toUpperCase();
     const doctrineLabel = isMelee ? 'MELEE ONLY' : 'ANY WEAPON';
     sum.textContent =
       gameLabel +

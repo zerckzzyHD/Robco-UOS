@@ -39431,6 +39431,110 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 218 — NV_OVERHAUL_DESIGN_AUDIT must-fixes: MF-1 mobile subsystem
+//  gating hardened, MF-3a dead AI GPS modal retired, MF-3b game-agnostic
+//  literals. Live verification (local static server + the deployed Cloudflare
+//  staging site) found the base mobile gate already correctly hid every
+//  inactive-subsystem panel — no override was actually winning — so MF-1's
+//  fix here is an explicit, un-overridable hardening of the existing
+//  invariant rather than a repair of a reproduced break. MF-3 are real fixes.
+//  8 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 218 — NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired'
+  );
+  const cssSource218 = readFile('css/terminal.css');
+  const apiSrc218 = readFile('js/api.js');
+  const uiCoreSrc218 = readFile('js/ui-core.js');
+
+  // 218.1  MF-1 — the base subsystem-content gate still exists, unconditional.
+  assert(
+    /\.panel\[data-tab\]\s*\{\s*display:\s*none;\s*\}/.test(cssSource218) &&
+      /\.panel\[data-tab\]\.tab-visible\s*\{\s*display:\s*block;\s*\}/.test(cssSource218),
+    '218.1: the base subsystem-content gate (.panel[data-tab]{display:none} / .panel[data-tab].tab-visible{display:block}) is present and unconditional'
+  );
+
+  // 218.2  MF-1 hardening — an explicit @media(max-width:999.98px) rule
+  //        reinforces the gate at the exact breakpoint the bezel subsystem
+  //        nav (DO-N) targets, so a future higher-specificity/later-source
+  //        rule can never silently re-widen mobile into a stacked scroll.
+  {
+    const mqBlock218 = (cssSource218.match(
+      /@media \(max-width: 999\.98px\) \{[^}]*\.panel\[data-tab\][^}]*\}/
+    ) || [''])[0];
+    assert(
+      /\.panel\[data-tab\]:not\(\.tab-visible\)\s*\{\s*display:\s*none\s*!important;/.test(
+        mqBlock218
+      ),
+      '218.2: MF-1 hardening — @media(max-width:999.98px) .panel[data-tab]:not(.tab-visible){display:none!important} reinforces the base gate on mobile'
+    );
+  }
+
+  // 218.3  MF-1 — always-visible surfaces (no data-tab) are untouched by the
+  //        hardening — the new selector only ever targets [data-tab] elements.
+  assert(
+    /\.panel:not\(\[data-tab\]\)\s*\{\s*display:\s*block;\s*\}/.test(cssSource218),
+    '218.3: panels with no data-tab (always-visible surfaces, e.g. the chat panel) keep their unconditional display:block rule — MF-1 hardening never matches a no-data-tab element'
+  );
+
+  // 218.4  MF-3a — the dead, unreachable-by-contract AI GPS modal branch is
+  //        fully retired from api.js (GPS/MAP is native-only — routed via
+  //        NATIVE_COMMAND_ROUTER -> _nativeOpenMap() before any network call).
+  assert(
+    !/mType\s*===\s*'GPS'/.test(apiSrc218) &&
+      !/let mType = parsedNode\.modal\.type/.test(apiSrc218) &&
+      /'\[GPS\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)/.test(apiSrc218),
+    "218.4: the dead AI GPS modal render branch (mType === 'GPS') is removed from api.js, matching the retired AI TRADE modal precedent (Suite 106.13) — NATIVE_COMMAND_ROUTER still wires [GPS] -> _nativeOpenMap()"
+  );
+
+  // 218.5  MF-3a — the now-orphaned .modal-grid-map/.grid-row/.grid-cell CSS
+  //        (which only ever supported the dead GPS modal's clickable grid) is
+  //        removed too — no dead-code CSS left behind.
+  assert(
+    !/\.modal-grid-map\s*\{/.test(cssSource218) &&
+      !/^\.grid-row\s*\{/m.test(cssSource218) &&
+      !/^\.grid-cell\s*\{/m.test(cssSource218),
+    '218.5: the orphaned .modal-grid-map/.grid-row/.grid-cell CSS (only ever used by the retired GPS modal) is removed'
+  );
+
+  // 218.6  MF-3b — the two Protocol-38 game literals that hard-labeled any
+  //        non-FNV game as "Fallout 3" are gone.
+  assert(
+    !/ctx === 'FNV' \? 'Fallout: New Vegas' : 'Fallout 3'/.test(uiCoreSrc218) &&
+      !/ctx === 'FNV' \? 'NEW VEGAS' : 'FALLOUT 3'/.test(uiCoreSrc218),
+    "218.6: the two ctx==='FNV'?...:'Fallout 3' game literals are removed from ui-core.js (Protocol 38 — would mislabel FO4/any future game as \"Fallout 3\")"
+  );
+
+  // 218.7  MF-3b — both sites now read the game-agnostic GAME_DEFS[ctx].label
+  //        (already used two functions away by renderCartDeck(), Protocol 22),
+  //        fail-safe to the raw ctx code if a future game entry omits it.
+  assert(
+    /const label = \(GAME_DEFS\[ctx\] && GAME_DEFS\[ctx\]\.label\) \|\| ctx;/.test(uiCoreSrc218) &&
+      /const gameLabel = String\(\(GAME_DEFS\[ctx\] && GAME_DEFS\[ctx\]\.label\) \|\| ctx\)\.toUpperCase\(\);/.test(
+        uiCoreSrc218
+      ),
+    '218.7: both sites read GAME_DEFS[ctx].label instead of a hardcoded FNV/FO3 ternary, fail-safe to the raw ctx code'
+  );
+
+  // 218.8  MF-3b behavioral proof — GAME_DEFS carries a distinct, non-"Fallout 3"
+  //        label for the design-only third game (FO4, DO-K), proving the fix
+  //        actually generalizes past the two shipped games rather than merely
+  //        renaming the same two-way ternary.
+  {
+    const stateSrc218 = readFile('js/state.js');
+    const fo4Idx218 = stateSrc218.indexOf('FO4:');
+    const fo4Slice218 = stateSrc218.slice(fo4Idx218, fo4Idx218 + 400);
+    assert(
+      fo4Idx218 !== -1 &&
+        /label:\s*'Fallout 4'/.test(fo4Slice218) &&
+        !/label:\s*'Fallout 3'/.test(fo4Slice218),
+      "218.8: GAME_DEFS.FO4 carries its own distinct label ('Fallout 4', not 'Fallout 3') — the GAME_DEFS[ctx].label fix genuinely generalizes past FNV/FO3"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

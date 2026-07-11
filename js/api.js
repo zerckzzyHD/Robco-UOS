@@ -2254,48 +2254,13 @@ async function transmitMessage(overrideText) {
         if (parsedNode.modal && parsedNode.modal.title) {
           document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
           let mContent = document.getElementById('modalContent');
-          let mType = parsedNode.modal.type || 'TEXT';
-
-          if (mType === 'GPS') {
-            mContent.innerHTML = '<div class="modal-grid-map"></div>';
-            let gridMap = mContent.querySelector('.modal-grid-map');
-            let rows = Array.isArray(parsedNode.modal.content) ? parsedNode.modal.content : [];
-            rows.forEach(row => {
-              let rowDiv = document.createElement('div');
-              rowDiv.className = 'grid-row';
-              let cells = Array.isArray(row) ? row : [row];
-              cells.forEach(cell => {
-                let cellDiv = document.createElement('div');
-                cellDiv.className = 'grid-cell';
-                cellDiv.innerText = cell;
-                let cleanCell = cell.replace(/\[|\]/g, '').trim();
-                if (
-                  cleanCell !== '' &&
-                  cleanCell !== 'X' &&
-                  cleanCell !== '█' &&
-                  cleanCell !== '@' &&
-                  cleanCell !== 'O' &&
-                  cleanCell.length > 0
-                ) {
-                  cellDiv.style.cursor = 'pointer';
-                  cellDiv.onclick = () => {
-                    document.getElementById('chatInput').value = `> MOVE TO ${cleanCell}`;
-                    closeModal();
-                    transmitMessage();
-                  };
-                }
-                rowDiv.appendChild(cellDiv);
-              });
-              gridMap.appendChild(rowDiv);
-            });
-            // WU-N2: the AI TRADE modal was retired — barter is now a native offline
-            // terminal (BARTER UPLINK panel, INV tab). Any stray TRADE modal falls through
-            // to the default TEXT render below.
-          } else {
-            mContent.innerText = Array.isArray(parsedNode.modal.content)
-              ? parsedNode.modal.content.join('\n')
-              : parsedNode.modal.content;
-          }
+          // WU-N2 retired the AI TRADE modal (barter is a native offline terminal) and
+          // the AI->native survey Part C.1 retired the AI GPS modal (cartography is a
+          // native offline view, Suite 202) — every remaining AI modal renders as plain
+          // TEXT; the directive (above) forbids the AI from ever emitting anything else.
+          mContent.innerText = Array.isArray(parsedNode.modal.content)
+            ? parsedNode.modal.content.join('\n')
+            : parsedNode.modal.content;
           document.getElementById('sysModal').style.display = 'flex';
         }
 

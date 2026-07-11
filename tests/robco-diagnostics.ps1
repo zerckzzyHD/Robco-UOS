@@ -26232,6 +26232,83 @@ Check (
 ) '217.9: the RNG interlock #rngModeBanner/#rngLockedBanner visibility stays a direct ternary of rngState (persistent status), never converted to a timed auto-dismiss toast'
 
 # ===========================================================
+# Suite 218 -- NV_OVERHAUL_DESIGN_AUDIT must-fixes: MF-1 mobile subsystem
+# gating hardened, MF-3a dead AI GPS modal retired, MF-3b game-agnostic
+# literals. Live verification (local static server + the deployed Cloudflare
+# staging site) found the base mobile gate already correctly hid every
+# inactive-subsystem panel -- no override was actually winning -- so MF-1's
+# fix here is an explicit, un-overridable hardening of the existing
+# invariant rather than a repair of a reproduced break. MF-3 are real fixes.
+# Mirrors JS Suite 218.
+# 8 tests
+# ===========================================================
+Sep "Suite 218 -- NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired"
+$cssSrc218 = Read-Src "css/terminal.css"
+$apiSrc218 = Read-Src "js/api.js"
+$uiCoreSrc218 = Read-Src "js/ui-core.js"
+
+# 218.1  MF-1 -- the base subsystem-content gate still exists, unconditional.
+Check (
+    ($cssSrc218 -match '\.panel\[data-tab\]\s*\{\s*display:\s*none;\s*\}') -and
+    ($cssSrc218 -match '\.panel\[data-tab\]\.tab-visible\s*\{\s*display:\s*block;\s*\}')
+) '218.1: the base subsystem-content gate (.panel[data-tab]{display:none} / .panel[data-tab].tab-visible{display:block}) is present and unconditional'
+
+# 218.2  MF-1 hardening -- an explicit @media(max-width:999.98px) rule
+#        reinforces the gate at the exact breakpoint the bezel subsystem nav
+#        (DO-N) targets.
+$mqMatch218 = [regex]::Match($cssSrc218, '@media \(max-width: 999\.98px\) \{[^}]*\.panel\[data-tab\][^}]*\}')
+$mqBlock218 = if ($mqMatch218.Success) { $mqMatch218.Value } else { '' }
+Check (
+    $mqBlock218 -match '\.panel\[data-tab\]:not\(\.tab-visible\)\s*\{\s*display:\s*none\s*!important;'
+) '218.2: MF-1 hardening -- @media(max-width:999.98px) .panel[data-tab]:not(.tab-visible){display:none!important} reinforces the base gate on mobile'
+
+# 218.3  MF-1 -- always-visible surfaces (no data-tab) are untouched by the
+#        hardening.
+Check (
+    $cssSrc218 -match '\.panel:not\(\[data-tab\]\)\s*\{\s*display:\s*block;\s*\}'
+) '218.3: panels with no data-tab (always-visible surfaces, e.g. the chat panel) keep their unconditional display:block rule -- MF-1 hardening never matches a no-data-tab element'
+
+# 218.4  MF-3a -- the dead, unreachable-by-contract AI GPS modal branch is
+#        fully retired from api.js.
+Check (
+    (-not ($apiSrc218 -match "mType\s*===\s*'GPS'")) -and
+    (-not ($apiSrc218 -match "let mType = parsedNode\.modal\.type")) -and
+    ($apiSrc218 -match "'\[GPS\]':\s*\(\)\s*=>\s*_nativeOpenMap\(\)")
+) "218.4: the dead AI GPS modal render branch (mType === 'GPS') is removed from api.js, matching the retired AI TRADE modal precedent (Suite 106.13) -- NATIVE_COMMAND_ROUTER still wires [GPS] -> _nativeOpenMap()"
+
+# 218.5  MF-3a -- the now-orphaned .modal-grid-map/.grid-row/.grid-cell CSS is
+#        removed too.
+Check (
+    (-not ($cssSrc218 -match '\.modal-grid-map\s*\{')) -and
+    (-not ($cssSrc218 -match '(?m)^\.grid-row\s*\{')) -and
+    (-not ($cssSrc218 -match '(?m)^\.grid-cell\s*\{'))
+) '218.5: the orphaned .modal-grid-map/.grid-row/.grid-cell CSS (only ever used by the retired GPS modal) is removed'
+
+# 218.6  MF-3b -- the two Protocol-38 game literals that hard-labeled any
+#        non-FNV game as "Fallout 3" are gone.
+Check (
+    (-not ($uiCoreSrc218 -match "ctx === 'FNV' \? 'Fallout: New Vegas' : 'Fallout 3'")) -and
+    (-not ($uiCoreSrc218 -match "ctx === 'FNV' \? 'NEW VEGAS' : 'FALLOUT 3'"))
+) '218.6: the two ctx===FNV?...:Fallout-3 game literals are removed from ui-core.js (Protocol 38 -- would mislabel FO4/any future game as Fallout 3)'
+
+# 218.7  MF-3b -- both sites now read the game-agnostic GAME_DEFS[ctx].label.
+Check (
+    ($uiCoreSrc218 -match "const label = \(GAME_DEFS\[ctx\] && GAME_DEFS\[ctx\]\.label\) \|\| ctx;") -and
+    ($uiCoreSrc218 -match "const gameLabel = String\(\(GAME_DEFS\[ctx\] && GAME_DEFS\[ctx\]\.label\) \|\| ctx\)\.toUpperCase\(\);")
+) '218.7: both sites read GAME_DEFS[ctx].label instead of a hardcoded FNV/FO3 ternary, fail-safe to the raw ctx code'
+
+# 218.8  MF-3b behavioral proof -- GAME_DEFS carries a distinct, non-"Fallout 3"
+#        label for the design-only third game (FO4, DO-K).
+$stateSrc218 = Read-Src "js/state.js"
+$fo4Idx218 = $stateSrc218.IndexOf('FO4:')
+$fo4Slice218 = if ($fo4Idx218 -ge 0) { $stateSrc218.Substring($fo4Idx218, [Math]::Min(400, $stateSrc218.Length - $fo4Idx218)) } else { '' }
+Check (
+    ($fo4Idx218 -ge 0) -and
+    ($fo4Slice218 -match "label:\s*'Fallout 4'") -and
+    (-not ($fo4Slice218 -match "label:\s*'Fallout 3'"))
+) "218.8: GAME_DEFS.FO4 carries its own distinct label ('Fallout 4', not 'Fallout 3') -- the GAME_DEFS[ctx].label fix genuinely generalizes past FNV/FO3"
+
+# ===========================================================
 # Results
 # ===========================================================
 Write-Host "`n============================================================`n"

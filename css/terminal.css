@@ -1664,6 +1664,19 @@ button.lamp {
 .panel:not([data-tab]) {
   display: block;
 }
+/* NV_OVERHAUL_DESIGN_AUDIT MF-1 hardening: an explicit, !important, mobile-scoped
+   restatement of the gate above. Live verification (local static build + the
+   deployed Cloudflare staging site) found the base gate already correctly hides
+   every inactive-subsystem panel at <=999.98px — no override was actually
+   winning — but this makes the invariant explicit and un-overridable at the
+   exact breakpoint the bezel subsystem nav (DO-N) targets, so a future rule
+   added at higher specificity/later source order can never silently re-widen
+   mobile back into the stacked/interleaved 6-subsystems-at-once layout. */
+@media (max-width: 999.98px) {
+  .panel[data-tab]:not(.tab-visible) {
+    display: none !important;
+  }
+}
 
 /* C3: FO3 warning banner — shown when gameContext = FO3 */
 .fo3-warning-banner {
@@ -2901,27 +2914,6 @@ details.sub-panel[open] > summary h3::after {
   display: none;
 }
 
-/* Phase 6 & 9 Modals and VATS */
-.modal-grid-map {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: monospace;
-  align-items: center;
-  margin-top: 10px;
-}
-.grid-row {
-  display: flex;
-  gap: 2px;
-}
-.grid-cell {
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--robco-green);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 /* WU-N2: native BARTER UPLINK rows. flex + min-width:0 on the name keeps long item
    names from forcing horizontal overflow at 360px (Protocol 17/mobile baseline). */
 .trade-row {
