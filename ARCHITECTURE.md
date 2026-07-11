@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2945-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2945-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2951-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2951-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -94,6 +94,7 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
+   ── LOAD-ORDER-GUARD:BEGIN (Suite 220 / Protocol 45 — the numbered `js/….js` items below are machine-checked against index.html; keep them + their order in sync) ──
    ── Static durability engine (index.html, before the boot manifest) ──
 0. js/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
                        'meta' + 'campaign' so the two-store boundary is structural in IndexedDB).
@@ -272,7 +273,10 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        see Developer Console below)
 12. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
 13. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
-                       attaches: window.pushToCloud, window.pullFromCloud
+                       attaches: window.saveCurrentToCloud, window.loadCloudSave (plus the auth /
+                       feature-flag / save-version helpers) — the manual cloud push/pull entry
+                       points; the old pushToCloud/pullFromCloud names were never real, and are retired
+   ── LOAD-ORDER-GUARD:END ──
 ```
 
 **Visual Upload OCR (`js/ocr.js` + `js/ui-render.js` + `js/cloud.js`, complete — Units 1–3,
@@ -2159,7 +2163,7 @@ FileReader → JSON.parse
   → Restore playstyle
 ```
 
-### Cloud Push (pushToCloud in cloud.js)
+### Cloud Push (saveCurrentToCloud in cloud.js)
 
 ```
 setDoc(firestore, {
@@ -2171,7 +2175,7 @@ setDoc(firestore, {
 })
 ```
 
-### Cloud Pull (pullFromCloud in cloud.js)
+### Cloud Pull (loadCloudSave in cloud.js)
 
 ```
 getDoc(firestore)
@@ -2859,9 +2863,9 @@ graph TD
     D -->|handleFileUpload| C
     D -->|restoreChatHistory| A
 
-    H[cloud.js] -->|pushToCloud| I[Firebase]
-    H -->|pullFromCloud| C
-    H -->|pullFromCloud| D
+    H[cloud.js] -->|saveCurrentToCloud| I[Firebase]
+    H -->|loadCloudSave| C
+    H -->|loadCloudSave| D
 
     J[sw.js] -->|cache-first| A
 
@@ -2883,7 +2887,7 @@ graph TD
    faction, inventory item, and audio system flows through here.
 
 3. **Save envelope format** — shared between `exportSaveFile()`, `handleFileUpload()`,
-   `pushToCloud()`, `pullFromCloud()`, `saveToSlot()`, `loadFromSlot()`. Changing the
+   `saveCurrentToCloud()`, `loadCloudSave()`, `saveToSlot()`, `loadFromSlot()`. Changing the
    format requires updating all six.
 
 4. **AudioSettings cache** — 8 audio functions read from this object. `toggleAudio()`
@@ -3052,7 +3056,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2945-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2951-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -53,7 +53,7 @@ The app grew organically into a few enormous single files (the main UI logic and
 The rules doc currently carries a giant suite-by-suite test history inside it. That block is loaded into every single session's context — it burns tokens and it has drifted out of sync with reality. This strand moves that catalog OUT into the local library, and wires an automatic pointer index so a session is auto-directed to the right reference instead of loading everything blindly. (The small pointer index added with the brain dump is the seed of this.)
 
 **c) Test-health pass.**
-The suite grew to ~2945 tests organically. This strand audits their strength and gaps, consolidates redundant tests without losing coverage, strengthens weak/vacuous assertions, rebalances static checks toward behavioral ones, prepares tests to survive the refactor above, hardens any flaky ones, profiles and speeds up the gate, and reconciles the test catalog with what actually runs.
+The suite grew to ~2951 tests organically. This strand audits their strength and gaps, consolidates redundant tests without losing coverage, strengthens weak/vacuous assertions, rebalances static checks toward behavioral ones, prepares tests to survive the refactor above, hardens any flaky ones, profiles and speeds up the gate, and reconciles the test catalog with what actually runs.
 
 **Folded in here** (these were separate parked audits — they belong in this phase): the expanded token-usage audit, the performance audit, the accessibility audit, the code-quality audit, the test-strength audit, and the leftover half of the offline audit — a final sweep confirming nothing in the app still quietly reaches out to the network when it shouldn't.
 

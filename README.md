@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 2945-test gate at parity + boot-smoke / render / a11y checks                |
+| **Testing**     | Node + PowerShell + Playwright                   | 2951-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -182,7 +182,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2945 tests, 220 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2951 tests, 221 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -206,10 +206,12 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 6. ui-render.js          →  render*() functions, CRUD helpers, map/faction/time
 7. ui-saves.js           →  save slots, file import/export, autocomplete
 8. ui-account.js         →  renderAccount, renderSavesList, undoLastSync
-9. runtime.js            →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
-10. ui-core.js           →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
-11. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
-12. cloud.js             →  window.pushToCloud / pullFromCloud (ES module)
+9. ocr.js                →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
+10. runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
+11. ui-core.js           →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
+12. test-console.js      →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
+13. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
+14. cloud.js             →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
@@ -272,7 +274,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2945-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2951-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -336,7 +338,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2945 tests across 220 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2951 tests across 221 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

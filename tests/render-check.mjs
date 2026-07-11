@@ -5,8 +5,8 @@
  *   1. No horizontal page overflow (scrollWidth <= innerWidth)
  *   2. Focus does not trigger auto-zoom (visualViewport.scale stays at 1)
  *
- * NOT part of the 243-test pre-commit gate — run manually after map or mobile
- * layout changes to catch real pixel/overflow regressions:
+ * NOT part of the fast pre-commit gate — run manually (or in the full gate) after
+ * map or mobile layout changes to catch real pixel/overflow regressions:
  *
  *   node --experimental-vm-modules tests/render-check.mjs
  *

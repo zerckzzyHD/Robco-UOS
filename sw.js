@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.8.0-r3';
+const CACHE_NAME = 'robco-terminal-v2.8.0-r4';
 const ASSETS = [
   './',
   './index.html',
@@ -67,7 +67,8 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   // Clean up old caches. Note: clients.claim() is intentionally omitted.
-  // skipWaiting() in install already activates the new SW immediately.
+  // The install handler intentionally does NOT call skipWaiting() (see above),
+  // so this SW enters the "waiting" state and only takes over on the next load.
   // clients.claim() would force mid-load pages to switch SW, causing
   // interrupted fetches, black screens, and controllerchange reload loops.
   // The new SW will naturally control the next page load.

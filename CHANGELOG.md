@@ -2,13 +2,14 @@
 
 ---
 
-## [v2.8.0] — The Physical Machine<!-- Date: 2026-07-10 | Tests: 2945/2945 | Cache: robco-terminal-v2.8.0-r3 -->
+## [v2.8.0] — The Physical Machine<!-- Date: 2026-07-10 | Tests: 2951/2951 | Cache: robco-terminal-v2.8.0-r4 -->
 
 ### Hotfix
 
 - Fixed the LEVEL UP button unexpectedly jumping the screen down when tapped. Leveling up now stays exactly where you were on the page — you'll still see how many skill points you've earned and that they're waiting for you in SKILL MATRIX.
 - Fixed the site's automatic publishing step so it no longer stalls before reaching the live site. Infrastructure only — nothing you can see changed.
 - Fixed the CHASSIS system status screen showing only 6 of your 8 feature switches. All 8 now show up with their correct on/off state, including the two for the on-device screenshot scanner.
+- Internal only: corrected several stale references in the developer documentation (a couple of renamed behind-the-scenes functions and the startup script list) and added an automated check that fails the build if the docs ever again name a file or function that no longer exists. Nothing you can see changed.
 
 ### Added
 

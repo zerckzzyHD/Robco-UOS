@@ -5,8 +5,8 @@
  * AUTO-DISCOVERS every field in state.js and verifies it is handled by:
  *   - autoImportState() in api.js  (AI sync, file import, cloud pull)
  *   - exportSaveFile()  in state.js (export envelope)
- *   - pushToCloud()     in cloud.js (cloud push)
- *   - handleFileUpload() in ui.js   (file import)
+ *   - saveCurrentToCloud() in cloud.js   (cloud push)
+ *   - handleFileUpload()   in ui-saves.js (file import)
  *
  * If a new field is added to `state` but NOT wired into autoImportState(),
  * this script will exit with code 1 and name the missing field.
@@ -39852,6 +39852,172 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       '219.7: PROTOCOL 42 — Suite 28\'s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2944, the current value, not 2938, the first/stale match) — the bug this hotfix\'s own net test-count change exposed'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 220 — Documentation reference integrity (doc-drift guard)
+// ══════════════════════════════════════════════════════════════
+//  WHY (Protocol 45): Protocol 2/2a already say "keep the docs current,"
+//  but they are honor-system rules and drift happened anyway —
+//  window.pushToCloud / window.pullFromCloud were documented for months
+//  yet never existed (the real names are saveCurrentToCloud / loadCloudSave),
+//  and the script load-order list silently omitted idb/ocr/runtime/
+//  test-console. Per the escape-ratchet (Protocol 36b), a defect class that
+//  escapes every layer gets a GATE GUARD at that layer. This suite FAILS
+//  THE BUILD when a load-bearing doc names code that does not exist.
+//
+//  DELIBERATELY NARROW — precision over recall. A scanner that flags
+//  ordinary prose gets ignored, then weakened, then it is dead. Only exact,
+//  unambiguous reference forms are checked.
+//
+//  SCANNED: CLAUDE.md, ARCHITECTURE.md, README.md (all committed).
+//  NOT scanned: library/BRAIN_DUMP.md — gitignored (absent on a clean CI
+//  checkout) and its "Known documentation drift" ledger deliberately quotes
+//  retired/wrong names to warn sessions off them.
+//  6 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 220 — Documentation reference integrity (doc-drift guard)');
+
+  const DOC_FILES_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md'];
+  const docText220 = {};
+  for (const d of DOC_FILES_220) docText220[d] = readFile(d);
+  const docBlob220 = DOC_FILES_220.map(d => docText220[d]).join('\n');
+
+  // Existence corpus: every js/*.js plus index.html (window.* may be assigned
+  // in the index.html pre-paint head scripts, not only in js/).
+  const jsDir220 = path.join(ROOT, 'js');
+  const srcCorpus220 =
+    fs
+      .readdirSync(jsDir220)
+      .filter(f => f.endsWith('.js'))
+      .map(f => fs.readFileSync(path.join(jsDir220, f), 'utf8'))
+      .join('\n') +
+    '\n' +
+    readFile('index.html');
+
+  const normOrder220 = s => s.replace(/^db_(?:nv|fo3)$/, 'db').replace(/^reg_(?:nv|fo3)$/, 'reg');
+  const dedupeConsec220 = a => a.filter((x, i) => i === 0 || x !== a[i - 1]);
+
+  // ── 220.1  every window.<name> in the docs resolves to a real assignment ──
+  // Allowlist: platform globals the docs legitimately reference but the app
+  // never assigns. Kept tiny — every app-owned window.* the docs mention DOES
+  // appear in js/ or index.html.
+  const WIN_ALLOW_220 = new Set([
+    'innerWidth', // browser layout global (Protocol 17 mobile checks)
+    'location', // browser navigation global
+    'onload', // boot entry point, assigned inline in index.html
+    'matchMedia', // browser media-query global
+    'navigator', // browser global
+  ]);
+  {
+    const winRe = /window\.([A-Za-z_$][A-Za-z0-9_$]*)/g;
+    const winExists = new Set();
+    let m;
+    while ((m = winRe.exec(srcCorpus220))) winExists.add(m[1]);
+    const missingWin = new Set();
+    winRe.lastIndex = 0;
+    while ((m = winRe.exec(docBlob220))) {
+      const n = m[1];
+      if (!winExists.has(n) && !WIN_ALLOW_220.has(n)) missingWin.add(n);
+    }
+    assert(
+      missingWin.size === 0,
+      '220.1: every window.<name> named in CLAUDE/ARCHITECTURE/README resolves to a real assignment in js/*.js or index.html' +
+        (missingWin.size ? ' — DRIFT: ' + [...missingWin].join(', ') : '')
+    );
+  }
+
+  // ── 220.2  every explicit repo file path in the docs exists on disk ──
+  // Single-segment paths only (topdir/name.ext) so slash-joined prose lists
+  // and multi-dot vendored names can never produce a phantom path. The
+  // negative lookbehind rejects a "topdir" that is really a file-extension
+  // tail (e.g. "...account.js/index.html" must not yield "js/index.html").
+  const PATH_ALLOW_220 = new Set([
+    // MUST-NOT-EXIST: retired in the ui-* split, guarded by Suite 56; the docs
+    // name it precisely to warn it off, which is correct, not drift.
+    'js/ui.js',
+  ]);
+  {
+    const pathRe =
+      /(?<![.\w/])(?:js|css|tests|scripts)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html)\b/g;
+    const missingPath = new Set();
+    let m;
+    while ((m = pathRe.exec(docBlob220))) {
+      const p = m[0];
+      if (!PATH_ALLOW_220.has(p) && !fs.existsSync(path.join(ROOT, p))) missingPath.add(p);
+    }
+    assert(
+      missingPath.size === 0,
+      '220.2: every explicit js/ css/ tests/ scripts/ file path in the docs exists on disk (allowlist: js/ui.js — guarded MUST-NOT-EXIST, Suite 56)' +
+        (missingPath.size ? ' — DRIFT: ' + [...missingPath].join(', ') : '')
+    );
+  }
+
+  // ── Canonical boot order, derived mechanically from index.html ──
+  // (shared by 220.3–220.6): the first static <script src="js/…"> tag (idb.js),
+  // then the GAME_FILES manifest arrays, then the remaining static tags.
+  const canonicalOrder220 = (() => {
+    const html = readFile('index.html');
+    const statics = [];
+    let m;
+    const sr = /<script[^>]*\ssrc=["']js\/([A-Za-z0-9_-]+)\.js["']/g;
+    while ((m = sr.exec(html))) statics.push(m[1]);
+    const gf = /FNV:\s*\[([^\]]+)\]/.exec(html);
+    const game = gf ? [...gf[1].matchAll(/js\/([A-Za-z0-9_-]+)\.js/g)].map(x => x[1]) : [];
+    return dedupeConsec220([statics[0], ...game, ...statics.slice(1)].map(normOrder220));
+  })();
+
+  // Extract the ordered js modules from a doc's LOAD-ORDER-GUARD block: on each
+  // numbered list line, take only the SUBJECT before the first "→"/"->" arrow.
+  const extractDocOrder220 = text => {
+    const b = /LOAD-ORDER-GUARD:BEGIN([\s\S]*?)LOAD-ORDER-GUARD:END/.exec(text);
+    if (!b) return null;
+    const out = [];
+    for (const line of b[1].split(/\r?\n/)) {
+      if (!/^\s*\d+\./.test(line)) continue;
+      const subj = line.split(/→|->/)[0];
+      let mm;
+      const fr = /js\/([A-Za-z0-9_-]+)\.js/g;
+      while ((mm = fr.exec(subj))) out.push(normOrder220(mm[1]));
+    }
+    return dedupeConsec220(out);
+  };
+
+  // ── 220.3  CLAUDE.md load-order block == the real boot order ──
+  {
+    const o = extractDocOrder220(docText220['CLAUDE.md']);
+    assert(
+      o !== null && JSON.stringify(o) === JSON.stringify(canonicalOrder220),
+      '220.3: CLAUDE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order (idb → GAME_FILES → static tags)'
+    );
+  }
+
+  // ── 220.4  ARCHITECTURE.md load-order block == the real boot order ──
+  {
+    const o = extractDocOrder220(docText220['ARCHITECTURE.md']);
+    assert(
+      o !== null && JSON.stringify(o) === JSON.stringify(canonicalOrder220),
+      '220.4: ARCHITECTURE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order'
+    );
+  }
+
+  // ── 220.5  regression: the exact drift this unit fixed stays fixed ──
+  assert(
+    !/window\.(?:pushToCloud|pullFromCloud)\b/.test(docBlob220),
+    '220.5: no doc names window.pushToCloud / window.pullFromCloud (retired; real names are window.saveCurrentToCloud / window.loadCloudSave) — regression guard'
+  );
+
+  // ── 220.6  self-integrity: canonical order is real, not an empty parse ──
+  // Guards against 220.3/220.4 passing on a silently-empty parse ([] === []).
+  assert(
+    canonicalOrder220.length >= 8 &&
+      canonicalOrder220[0] === 'idb' &&
+      canonicalOrder220[canonicalOrder220.length - 1] === 'cloud' &&
+      canonicalOrder220.includes('state') &&
+      canonicalOrder220.includes('api'),
+    '220.6: the canonical boot order derived from index.html is non-trivial (starts idb, ends cloud, includes state + api) — prevents 220.3/220.4 passing on an empty parse'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

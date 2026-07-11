@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Auto-discovers every field in state.js and verifies it is handled by
-    autoImportState(), exportSaveFile(), pushToCloud(), and handleFileUpload().
+    autoImportState(), exportSaveFile(), saveCurrentToCloud(), and handleFileUpload().
 
 .NOTES
     Run from project root:
@@ -26468,6 +26468,104 @@ Check (
     ($suite28Src219 -match [regex]::Escape('[regex]::Matches($changelogSrc28, ''Tests:\s*(\d+)/\d+'')')) -and
     ($suite28Src219 -match [regex]::Escape('Measure-Object -Maximum'))
 ) '219.7: PROTOCOL 42 -- Suite 28''s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2945, the current value, not 2938, the first/stale match) -- the bug this hotfix''s own net test-count change exposed'
+
+# ===========================================================
+# Suite 220 -- Documentation reference integrity (doc-drift guard)
+# ===========================================================
+# WHY (Protocol 45): Protocol 2/2a already say "keep the docs current," but
+# they are honor-system rules and drift happened anyway -- pushToCloud /
+# pullFromCloud were documented for months yet never existed under those names
+# (real: saveCurrentToCloud / loadCloudSave), and the script load-order list
+# silently omitted idb/ocr/runtime/test-console. Per the escape-ratchet
+# (Protocol 36b), a defect class that escapes every layer gets a GATE GUARD
+# at that layer. This suite FAILS THE BUILD when a load-bearing doc names code
+# that does not exist. Deliberately NARROW (precision over recall). Mirrors JS
+# Suite 220 exactly. library/BRAIN_DUMP.md is NOT scanned (gitignored / absent
+# on CI, and its drift ledger deliberately quotes retired names).
+# 6 tests
+# ===========================================================
+Sep "Suite 220 -- Documentation reference integrity (doc-drift guard)"
+
+$docFiles220 = @('CLAUDE.md', 'ARCHITECTURE.md', 'README.md')
+$docText220 = @{}
+foreach ($d in $docFiles220) { $docText220[$d] = Read-Src $d }
+$docBlob220 = ($docFiles220 | ForEach-Object { $docText220[$_] }) -join "`n"
+
+# Existence corpus: every js/*.js (top-level only) + index.html
+$srcParts220 = @()
+foreach ($f in (Get-ChildItem (Join-Path $Root 'js') -Filter *.js)) { $srcParts220 += [IO.File]::ReadAllText($f.FullName) }
+$srcCorpus220 = ($srcParts220 -join "`n") + "`n" + (Read-Src 'index.html')
+
+function Norm-Order220($s) { ($s -replace '^db_(nv|fo3)$', 'db') -replace '^reg_(nv|fo3)$', 'reg' }
+function Dedupe-Consec220($arr) {
+    $out = @()
+    foreach ($x in $arr) { if ($out.Count -eq 0 -or $out[-1] -ne $x) { $out += $x } }
+    # return plainly (NOT ", $out") — callers wrap with @(...) which re-collects
+    # the unrolled pipeline into a flat array; ", $out" would nest it one level.
+    $out
+}
+
+# 220.1  every window.<name> in the docs resolves to a real assignment
+$winAllow220 = @('innerWidth', 'location', 'onload', 'matchMedia', 'navigator')
+$winExists220 = @{}
+foreach ($mm in [regex]::Matches($srcCorpus220, 'window\.([A-Za-z_$][A-Za-z0-9_$]*)')) { $winExists220[$mm.Groups[1].Value] = $true }
+$missingWin220 = @{}
+foreach ($mm in [regex]::Matches($docBlob220, 'window\.([A-Za-z_$][A-Za-z0-9_$]*)')) {
+    $n = $mm.Groups[1].Value
+    if ((-not $winExists220.ContainsKey($n)) -and ($winAllow220 -notcontains $n)) { $missingWin220[$n] = $true }
+}
+Check ($missingWin220.Count -eq 0) ('220.1: every window.<name> named in CLAUDE/ARCHITECTURE/README resolves to a real assignment in js/*.js or index.html' + $(if ($missingWin220.Count) { ' -- DRIFT: ' + (($missingWin220.Keys | Sort-Object) -join ', ') } else { '' }))
+
+# 220.2  every explicit repo file path in the docs exists on disk
+$pathAllow220 = @('js/ui.js')
+$missingPath220 = @{}
+foreach ($mm in [regex]::Matches($docBlob220, '(?<![.\w/])(?:js|css|tests|scripts)/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html)\b')) {
+    $p = $mm.Value
+    if (($pathAllow220 -notcontains $p) -and (-not (Test-Path (Join-Path $Root $p)))) { $missingPath220[$p] = $true }
+}
+Check ($missingPath220.Count -eq 0) ('220.2: every explicit js/ css/ tests/ scripts/ file path in the docs exists on disk (allowlist: js/ui.js -- guarded MUST-NOT-EXIST, Suite 56)' + $(if ($missingPath220.Count) { ' -- DRIFT: ' + (($missingPath220.Keys | Sort-Object) -join ', ') } else { '' }))
+
+# Canonical boot order, derived mechanically from index.html
+$html220 = Read-Src 'index.html'
+$statics220 = @()
+foreach ($mm in [regex]::Matches($html220, '<script[^>]*\s+src=["'']js/([A-Za-z0-9_-]+)\.js["'']')) { $statics220 += $mm.Groups[1].Value }
+$game220 = @()
+$gf220 = [regex]::Match($html220, 'FNV:\s*\[([^\]]+)\]')
+if ($gf220.Success) { foreach ($mm in [regex]::Matches($gf220.Groups[1].Value, 'js/([A-Za-z0-9_-]+)\.js')) { $game220 += $mm.Groups[1].Value } }
+$seq220 = @()
+$seq220 += $statics220[0]
+$seq220 += $game220
+if ($statics220.Count -gt 1) { $seq220 += $statics220[1..($statics220.Count - 1)] }
+$canonRaw220 = @()
+foreach ($t in $seq220) { $canonRaw220 += (Norm-Order220 $t) }
+$canonOrder220 = @(Dedupe-Consec220 $canonRaw220)
+$canonStr220 = ($canonOrder220 -join ',')
+
+function Extract-DocOrder220($text) {
+    $bm = [regex]::Match($text, '(?s)LOAD-ORDER-GUARD:BEGIN(.*?)LOAD-ORDER-GUARD:END')
+    if (-not $bm.Success) { return $null }
+    $out = @()
+    foreach ($line in ($bm.Groups[1].Value -split "`r?`n")) {
+        if ($line -notmatch '^\s*\d+\.') { continue }
+        $subj = ([regex]::Split($line, '→|->'))[0]
+        foreach ($mm in [regex]::Matches($subj, 'js/([A-Za-z0-9_-]+)\.js')) { $out += (Norm-Order220 $mm.Groups[1].Value) }
+    }
+    return @(Dedupe-Consec220 $out)
+}
+
+# 220.3  CLAUDE.md load-order block == the real boot order
+$claudeOrder220 = Extract-DocOrder220 $docText220['CLAUDE.md']
+Check (($null -ne $claudeOrder220) -and ((($claudeOrder220) -join ',') -eq $canonStr220)) '220.3: CLAUDE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order (idb -> GAME_FILES -> static tags)'
+
+# 220.4  ARCHITECTURE.md load-order block == the real boot order
+$archOrder220 = Extract-DocOrder220 $docText220['ARCHITECTURE.md']
+Check (($null -ne $archOrder220) -and ((($archOrder220) -join ',') -eq $canonStr220)) '220.4: ARCHITECTURE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order'
+
+# 220.5  regression: the exact drift this unit fixed stays fixed
+Check (-not ($docBlob220 -match 'window\.(pushToCloud|pullFromCloud)\b')) '220.5: no doc names window.pushToCloud / window.pullFromCloud (retired; real names are window.saveCurrentToCloud / window.loadCloudSave) -- regression guard'
+
+# 220.6  self-integrity: canonical order is real, not an empty parse
+Check (($canonOrder220.Count -ge 8) -and ($canonOrder220[0] -eq 'idb') -and ($canonOrder220[-1] -eq 'cloud') -and ($canonOrder220 -contains 'state') -and ($canonOrder220 -contains 'api')) '220.6: the canonical boot order derived from index.html is non-trivial (starts idb, ends cloud, includes state + api) -- prevents 220.3/220.4 passing on an empty parse'
 
 # ===========================================================
 # Results
