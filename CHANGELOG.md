@@ -2,7 +2,12 @@
 
 ---
 
-## [v2.8.0] — The Physical Machine<!-- Date: 2026-07-10 | Tests: 2938/2938 | Cache: robco-terminal-v2.8.0-r1 -->
+## [v2.8.0] — The Physical Machine<!-- Date: 2026-07-10 | Tests: 2938/2938 | Cache: robco-terminal-v2.8.0-r2 -->
+
+### Hotfix
+
+- Fixed the LEVEL UP button unexpectedly jumping the screen down when tapped. Leveling up now stays exactly where you were on the page — you'll still see how many skill points you've earned and that they're waiting for you in SKILL MATRIX.
+- Fixed the site's automatic publishing step so it no longer stalls before reaching the live site. Infrastructure only — nothing you can see changed.
 
 ### Added
 
