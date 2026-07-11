@@ -2060,7 +2060,10 @@ Check (($firstAwait45 -ge 0) -and ($awaitPopup45 -eq $firstAwait45)) `
 # confirm-gated load/delete, picker UI wired. Plus WU-B5: the cloud
 # push->sanitize->migrate->apply round-trip (Phase-6 fields survive) and
 # the setDoc permanence guards (no blind save overwrite; settings merge).
-# 19 tests
+# Plus the prod-2.7.0 -> 2.8.0 save-migration pre-flight (46.20-46.22): a
+# released-2.7.0 save is missing eventLog + padBindings; both must default
+# cleanly with no pre-2.8.0 data loss (Protocol 4/16/34, data-safety-critical).
+# 22 tests
 # ===========================================================
 Sep "Suite 46 -- Phase 5c-iii: Cloud Save Picker + Local Migration"
 
@@ -2213,6 +2216,32 @@ Check (-not ($cloudSrc -match 'setDoc\s*\([\s\S]{0,80}[''"]saves[''"]')) `
 # 46.19  WU-B5 setDoc permanence: the mutable settings/preferences write uses { merge: true }.
 Check ([bool]($cloudSrc -match 'doc\([^)]*[''"]settings[''"][\s\S]{0,200}merge:\s*true')) `
     "cloud.js: settings/preferences setDoc uses { merge: true } (no clobber of sibling prefs -- Protocol 34)"
+
+# 46.20-46.22  RELEASE PRE-FLIGHT: prod-2.7.0 -> 2.8.0 save-migration safety (Protocol 4/16/34,
+#   data-safety-critical). A released-2.7.0 save is MISSING the two top-level fields 2.8.0 added --
+#   eventLog + padBindings. migrateState() + sanitizeImportedContainer() must default them without
+#   dropping any pre-2.8.0 data. (JS runner runs the full VM-sandbox behavioral round-trip against a
+#   populated 2.7.0-schema save; PS runner does the structural mirror.)
+$migBody46b = ''
+try { $migBody46b = Get-FunctionBody $stateSrc 'migrateState' } catch {}
+
+# 46.20  migrateState defaults BOTH 2.8.0-added fields: eventLog -> [] and padBindings -> 4-key null map
+$evtDefault46 = [bool]($migBody46b -match '!Array\.isArray\(\s*s\.eventLog\s*\)')
+$padDefault46 = ([bool]($migBody46b -match 'padBindings')) -and ([bool]($migBody46b -match "up:\s*null")) -and `
+                ([bool]($migBody46b -match "down:\s*null")) -and ([bool]($migBody46b -match "left:\s*null")) -and `
+                ([bool]($migBody46b -match "right:\s*null"))
+Check ($evtDefault46 -and $padDefault46) `
+    "prod-2.7.0->2.8.0: migrateState defaults the 2.8.0-added eventLog (array) + padBindings (4-key null map) a released-2.7.0 save is missing"
+
+# 46.21  migrateState fills pre-2.8.0 collections only when ABSENT (conditional guards) -> existing
+#        campaign data is preserved, never blindly reassigned (no data loss on migration).
+Check (([bool]($migBody46b -match 'if\s*\(!s\.perks\)')) -and ([bool]($migBody46b -match 'if\s*\(!s\.quests\)'))) `
+    "prod-2.7.0->2.8.0: migrateState fills collections only when absent (guarded defaults) -- existing campaign data survives intact"
+
+# 46.22  sanitizeImportedContainer (api.js, cloud/file import path) coerces BOTH new fields so a
+#        2.7.0 save pulled from cloud is normalized the same way as one migrated from localStorage.
+Check (([bool]($apiSrc -match 'o\.eventLog')) -and ([bool]($apiSrc -match 'o\.padBindings'))) `
+    "prod-2.7.0->2.8.0: sanitizeImportedContainer coerces both 2.8.0-added fields (eventLog + padBindings) on the cloud/file import path"
 
 # ===========================================================
 # Suite 47 -- Gemini Key Sync + AI Studio Link (Phase 5c-iv)

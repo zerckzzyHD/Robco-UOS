@@ -1,4 +1,4 @@
-﻿## [Unreleased]<!-- Tests: 2935/2935 | Cache: robco-terminal-v2.7.0-r138 -->
+﻿## [Unreleased]<!-- Tests: 2938/2938 | Cache: robco-terminal-v2.7.0-r138 -->
 
 ### Added
 
@@ -218,6 +218,7 @@
 - Reviewed every pop-up and banner in the terminal to check that quick, temporary notices use the same compact top-right style as the location-arrival notice rather than a larger banner. The review found nothing else needed changing — CARGO SEIZED and the other ongoing status banners are meant to stay visible until you act, so they were correctly left as they are — and added automated checks locking that decision in for the future.
 - Reviewed the phone subsystem buttons (OPERATOR, OPERATIONS, DATABANK, and so on) to confirm switching between them only ever shows that one screen's content — testing on a real device and the live staging site found it already working correctly, but an explicit safeguard was added anyway so a future style change can never accidentally show more than one screen's panels stacked together.
 - Removed a leftover piece of the AI system that would have drawn an old-style tap-to-move grid — navigating the map has used the on-device CARTOGRAPHY TABLE for some time now, with no AI involved, so this was simply unused code left behind from before that change.
+- Verified — as a release safety check — that an existing save from the current live version upgrades cleanly to the new one: an older save is missing a couple of fields the new version added, and the upgrade fills them in with sensible defaults while keeping every bit of your campaign (level, caps, inventory, quests, factions, and the rest) exactly as it was, with no crash or lost progress. Confirmed on real New Vegas and Fallout 3 saves through every load path (normal startup, file import, and cloud restore), then locked in with automated checks so this can never quietly break in a future update.
 
 ---
 

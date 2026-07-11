@@ -3429,7 +3429,10 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 //  confirm-gated load/delete, picker UI wired. Plus WU-B5: the cloud
 //  push→sanitize→migrate→apply round-trip (Phase-6 fields survive) and
 //  the setDoc permanence guards (no blind save overwrite; settings merge).
-//  19 tests
+//  Plus the prod-2.7.0 → 2.8.0 save-migration pre-flight (46.20–46.22): a
+//  released-2.7.0 save is missing eventLog + padBindings; both must default
+//  cleanly with no pre-2.8.0 data loss (Protocol 4/16/34, data-safety-critical).
+//  22 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 
@@ -3810,6 +3813,118 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     /doc\([^)]*['"]settings['"][\s\S]{0,200}merge:\s*true/.test(cloudSource),
     'cloud.js: settings/preferences setDoc uses { merge: true } (no clobber of sibling prefs — Protocol 34)'
   );
+
+  // 46.20–46.22  RELEASE PRE-FLIGHT: prod-2.7.0 → 2.8.0 save-migration safety
+  //   (Protocol 4/16/34, data-safety-critical). A genuine prod-2.7.0 save is MISSING the two
+  //   top-level fields 2.8.0 added — eventLog + padBindings — because they were introduced during
+  //   the [Unreleased] 2.8.0 cycle. migrateState() + sanitizeImportedContainer() must default those
+  //   fields WITHOUT dropping any pre-2.8.0 campaign data. 46.17 proves the general round-trip but
+  //   never asserts these two new fields are defaulted, so a dropped default line would slip past it.
+  //   Runs the REAL functions in a VM sandbox against a populated 2.7.0-schema save.
+  {
+    const vm = require('vm');
+    let out = null;
+    let rtErr = null;
+    try {
+      const _decl = (src, name) => {
+        const body = extractFunctionBody(src, name);
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + body;
+      };
+      const sandbox = { GAME_DEFS: { FNV: {}, FO3: {} }, _buildFactions: () => ({}), console };
+      vm.createContext(sandbox);
+      vm.runInContext(
+        'var EVENTLOG_CAP = 1000;\n' +
+          _decl(apiSource, 'sanitizeImportedContainer') +
+          '\n' +
+          _decl(stateSource, '_inferEventType') +
+          '\n' +
+          _decl(stateSource, '_migrateEventLog') +
+          '\n' +
+          _decl(stateSource, 'migrateState'),
+        sandbox
+      );
+      // A realistic prod-2.7.0 FNV campaign — every field a released-2.7.0 save carries, and
+      // deliberately NO eventLog and NO padBindings (the two fields 2.8.0 added).
+      sandbox._prod270 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            lvl: 24,
+            caps: 4830,
+            hpMax: 260,
+            loc: 'The Strip',
+            ra: 'CRIPPLED',
+            gameContext: 'FNV',
+            skills: { guns: 85, speech: 72 },
+            inventory: [{ name: 'This Machine', type: 'weapon', qty: 1 }],
+            quests: [{ name: 'Wild Card', status: 'active' }],
+            perks: [{ name: 'Rapid Reload', rank: 1, level_taken: 6 }],
+            factions: { ncr: { fame: 50, infamy: 3 }, legion: { fame: 0, infamy: 45 } },
+            collectibles: ['Vault 21 Snow Globe'],
+            locationHistory: ['Goodsprings', 'The Strip'],
+            traits: ['Built to Destroy'],
+            skillBooks: ['Duck and Cover!'],
+            campaign_notes: ['[T12] Arrived at The Strip', 'Deal with Mr House pending'],
+          },
+        },
+      };
+      out = vm.runInContext(
+        '(function () { var c = sanitizeImportedContainer(_prod270); return migrateState("2.7.0", c.campaigns.FNV); })()',
+        sandbox
+      );
+    } catch (e) {
+      rtErr = e;
+    }
+
+    // 46.20  the two 2.8.0-added fields a prod-2.7.0 save lacks are defaulted to valid values
+    assert(
+      out &&
+        Array.isArray(out.eventLog) &&
+        out.padBindings &&
+        typeof out.padBindings === 'object' &&
+        !Array.isArray(out.padBindings) &&
+        ['up', 'down', 'left', 'right'].every(
+          d => d in out.padBindings && out.padBindings[d] === null
+        ),
+      'prod-2.7.0→2.8.0: migrateState defaults the 2.8.0-added eventLog (array) + padBindings (4-key null map) that a released-2.7.0 save is missing' +
+        (rtErr ? ' — ' + rtErr.message : '')
+    );
+
+    // 46.21  every pre-2.8.0 campaign field survives migration intact (no data loss)
+    assert(
+      out &&
+        out.lvl === 24 &&
+        out.caps === 4830 &&
+        out.hpMax === 260 &&
+        out.loc === 'The Strip' &&
+        out.ra === 'CRIPPLED' &&
+        out.inventory.length === 1 &&
+        out.inventory[0].name === 'This Machine' &&
+        out.quests[0].status === 'active' &&
+        out.perks[0].name === 'Rapid Reload' &&
+        out.factions.ncr.fame === 50 &&
+        out.factions.legion.infamy === 45 &&
+        out.skills.guns === 85 &&
+        out.collectibles[0] === 'Vault 21 Snow Globe' &&
+        out.traits[0] === 'Built to Destroy' &&
+        out.skillBooks[0] === 'Duck and Cover!' &&
+        JSON.stringify(out.locationHistory) === JSON.stringify(['Goodsprings', 'The Strip']),
+      'prod-2.7.0→2.8.0: all pre-2.8.0 campaign data (level/caps/hp/inventory/quests/perks/factions/skills/collectibles/traits/skillBooks/locationHistory) survives migration intact — no drop or corruption'
+    );
+
+    // 46.22  the legacy [T#] campaign_notes are folded into the new eventLog while the
+    //        purely-manual notes are preserved (the eventLog migration runs, not just a bare default)
+    assert(
+      out &&
+        Array.isArray(out.eventLog) &&
+        out.eventLog.some(e => e && typeof e === 'object') &&
+        Array.isArray(out.campaign_notes) &&
+        out.campaign_notes.some(n => /Deal with Mr House/.test(n)),
+      'prod-2.7.0→2.8.0: legacy [T#] notes migrate into eventLog while purely-manual campaign_notes are preserved (no note lost)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
