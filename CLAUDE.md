@@ -17,7 +17,13 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
 | **Plain-English release history** | `CHANGELOG.md` |
 
-> Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree, and it is expected to be re-baselined after the 2.8.5 code-health phase. `CLAUDE.md`'s own "Architecture Quick Reference" narration has drifted in places (it self-flags this) — the brain dump's "Known documentation drift" section records the specific gaps.
+> Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `CLAUDE.md`'s own "Architecture Quick Reference" narration has drifted in places (it self-flags this) — the brain dump's "Known documentation drift" section records the specific gaps.
+
+**Doc-maintenance rule (both docs are MAINTAINED):**
+
+- `library/BRAIN_DUMP.md` is the canonical reconstruction doc and future sessions trust it — **a stale brain dump is worse than no brain dump** (it makes sessions confidently wrong). Update it in the same commit whenever something in it stops being true: an architecture change, a new/changed protocol, a shipped roadmap item, a newly-learned recurring gotcha. **★ Hard exit condition:** the 2.8.5 code + test health phase restructures the whole file layout and invalidates large parts of the dump — that phase is **not complete** until the brain dump has been re-baselined against the restructured codebase.
+- `QUEUE.md` is updated in the same commit as any change that actually moves the roadmap.
+- A **portable brief for an external model** (Gemini/GPT) is NOT a standing doc — it is regenerated fresh from the current brain dump on request, so it is always accurate because it is always new. Never keep a second standing copy of the truth. The generation spec lives in the brain dump ("Generating a portable brief for an external model").
 
 ---
 
@@ -170,7 +176,9 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 ## Protocol 8 — Dispatch Multi-Model Workflow
 
-Non-trivial work run via Dispatch uses a three-stage model hand-off. Dispatch auto-selects the model per stage; the sessions work hand-in-hand, never in isolation.
+Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a **THREE-model workflow — Fable / Opus / Sonnet — not a rigid two-model track.** Dispatch auto-selects the model per stage; the sessions work hand-in-hand, never in isolation.
+
+- **Fable — Design & Creative.** The design and creative model. Reach for Fable when the work is generative or aesthetic rather than analytical or mechanical: visual/UI design and mockups; diegetic in-fiction writing (POST lines, flavor text, persona/greeting copy, ceremony beats, board names, the house voice); the plain-English changelog prose (Protocol 21); and open "what would the coolest RobCo-native version of this be?" exploration. Fable authored the approved mockups this entire overhaul was built from (the NV machine, the tempo dial, the records bay, the operator boards) — it is a real, standing part of this workflow, not an afterthought. The typical shape is **Fable designs → Opus audits/plans → Sonnet implements → Opus audits the diff.** Fable can also slot in **mid-run**, not only at the front — it plugs in wherever design/creative judgment is the bottleneck (this is consistent with the adaptive-escalation clause below: Dispatch picks the model per stage and may switch).
 
 1. **Opus — Diagnose & Plan.** Opus investigates the actual code and git history, identifies the root cause, and writes a concrete plan: exact files, selectors, and line numbers; the change and its rationale; desktop/regression safety; and explicit verification steps. No edits in this stage.
 
@@ -184,7 +192,7 @@ Non-trivial work run via Dispatch uses a three-stage model hand-off. Dispatch au
 
 **Spec lock — no mid-run changes.** Lock the full specification before a Dispatch session starts. Do not send new requirements or tweaks to a session that is already running — it may commit and push before incorporating them, producing partial or inconsistent results that need cleanup passes. If the spec must change, wait until the session is idle and issue one complete follow-up; never stack instructions onto an in-flight push.
 
-**Why:** Opus reasons deeper at higher cost; Sonnet implements efficiently at lower cost. The review stage catches plan drift before it lands; the audit stage catches incomplete fixes and false "verified" passes (which previously caused repeated "still broken" cycles) before they reach the user.
+**Why:** Fable generates the design/creative direction and the in-fiction voice; Opus reasons deeper at higher cost; Sonnet implements efficiently at lower cost. Naming all three keeps the design stage visible — a session reading a two-model protocol would wrongly believe the mockups and house voice appear from nowhere. The review stage catches plan drift before it lands; the audit stage catches incomplete fixes and false "verified" passes (which previously caused repeated "still broken" cycles) before they reach the user.
 
 ---
 
