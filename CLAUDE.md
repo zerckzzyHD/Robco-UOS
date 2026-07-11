@@ -5,6 +5,22 @@
 
 ---
 
+## Reference Pointer Index
+
+Small map of where the deeper reference lives, so a session is auto-directed rather than loading everything blindly. (This is the seed of the automatic-pointer mechanism the 2.8.5 library/token split will build out fully.)
+
+| Need | Where to look |
+| ---- | ------------- |
+| **Full project reconstruction** — what the app IS, the architecture, the state shape, every subsystem, the protocols and WHY each exists, the recurring gotchas, the owner's hard rules, the workflow, the roadmap | `library/BRAIN_DUMP.md` (gitignored, local-only, Claude-facing — read it from disk) |
+| **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) |
+| **Canonical protocol & gate rules; the full test-suite reference** | this file (`CLAUDE.md`) |
+| **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
+| **Plain-English release history** | `CHANGELOG.md` |
+
+> Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree, and it is expected to be re-baselined after the 2.8.5 code-health phase. `CLAUDE.md`'s own "Architecture Quick Reference" narration has drifted in places (it self-flags this) — the brain dump's "Known documentation drift" section records the specific gaps.
+
+---
+
 ## Pre-Commit / Pre-Push Gate
 
 ```powershell

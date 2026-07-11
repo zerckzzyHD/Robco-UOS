@@ -3,6 +3,12 @@
 # (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
 
+# Claude-facing local reference library (BRAIN_DUMP.md et al.) — local-only, never
+# committed. It reconstructs a session's understanding from disk on the owner's PC;
+# it is NOT for the phone (that is QUEUE.md, which IS committed). See CLAUDE.md's
+# pointer index.
+library/
+
 # Dependencies
 node_modules/
 
