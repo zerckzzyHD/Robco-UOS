@@ -1,5 +1,9 @@
 ## [Unreleased]<!-- Tests: 2938/2938 | Cache: robco-terminal-v2.8.0-r1 -->
 
+### Under the Hood
+
+- Reorganized the internal developer documentation so a working session no longer has to load a large chunk of historical build notes it usually doesn't need — those notes now live in a separate reference file, read only when actually wanted. Nothing you can see changed.
+
 ---
 
 ## [v2.8.0] — The Physical Machine<!-- Date: 2026-07-10 | Tests: 2951/2951 | Cache: robco-terminal-v2.8.0-r4 -->
