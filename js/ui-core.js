@@ -3387,9 +3387,15 @@ function nativeLevelUp() {
   // computed offline) and the player allocates it themselves through the
   // EXISTING skill setters — the SKILL MATRIX VU meters (_skillVuSet) or the
   // TERMINAL "<skill> +N" grammar (Part B) — never auto-assigned here
-  // (Protocol 24, player-driven, deterministic). Native LEVEL UP jumps the
-  // view to SKILL MATRIX the same way [GPS]/[MAP] jumps to the map
-  // (Protocol 22 — expandPanelForCategory is the one panel-opening path).
+  // (Protocol 24, player-driven, deterministic).
+  // Hotfix (v2.8.0-r2): this used to also call expandPanelForCategory('skills')
+  // to jump the view to SKILL MATRIX. expandPanelForCategory() unconditionally
+  // scrollIntoView({block:'center'})s the target panel's summary even when it
+  // is already open/visible (WU-HF1's off-screen-panel reveal, correct for its
+  // other callers — AI category jumps, [GPS]/[MAP], TRADE taps — but wrong
+  // here), which read as the whole screen yanking down on every LEVEL UP tap.
+  // The chat line below already tells the player where to go, so the auto-jump
+  // is dropped rather than reworked — LEVEL UP no longer touches scroll at all.
   const intScore = parseInt(state.i, 10) || 5;
   const skillPoints = 10 + Math.floor(intScore / 2);
   if (typeof appendToChat === 'function') {
@@ -3398,7 +3404,6 @@ function nativeLevelUp() {
       'sys'
     );
   }
-  if (typeof expandPanelForCategory === 'function') expandPanelForCategory('skills');
 }
 
 // C5: Playthrough type handler — writes state field (Protocol 4).

@@ -32748,10 +32748,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 202.6  BEHAVIORAL (vm sandbox, the Suite 173.9 idiom) — nativeLevelUp()
   //        still does everything Suite 173 already locks (exactly +1 per
   //        press, level.up emit, MAX_PLAYER_LEVEL clamp — unchanged, not
-  //        re-asserted here) AND now additionally reports a native skill-point
-  //        pool (10 + floor(INT/2)) via appendToChat and jumps the view to
-  //        SKILL MATRIX via expandPanelForCategory('skills') — reusing the
-  //        existing panel-nav mechanism, no AI, no invented allocation.
+  //        re-asserted here) AND reports a native skill-point pool
+  //        (10 + floor(INT/2)) via appendToChat.
+  //        REGRESSION (Protocol 13/42, hotfix v2.8.0-r2, owner-reported):
+  //        nativeLevelUp() used to also call expandPanelForCategory('skills')
+  //        to jump the view to SKILL MATRIX. expandPanelForCategory()
+  //        unconditionally scrollIntoView({block:'center'})s the target panel
+  //        even when it is already open/visible, which read as the whole
+  //        screen yanking down on every LEVEL UP tap (confirmed live: a
+  //        scroll position 2000+px away from SKILL MATRIX jumped straight to
+  //        it). Fixed by dropping the auto-jump entirely — the chat line
+  //        already tells the player where to go — so nativeLevelUp() must
+  //        NEVER call expandPanelForCategory (or touch scroll) at all.
   {
     let out202b = null;
     let err202b = null;
@@ -32797,9 +32805,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         out202b.lvl === 5 &&
         /13 skill points available/.test(out202b.lastChat) &&
         /10 \+ INT\/2/.test(out202b.lastChat) &&
-        out202b.expandCalls.length === 1 &&
-        out202b.expandCalls[0] === 'skills',
-      '202.6: [behavioral] nativeLevelUp() at INT 7, level 4→5, reports "13 skill points available (10 + INT/2)" via appendToChat and jumps the view to SKILL MATRIX via expandPanelForCategory(\'skills\') — deterministic, no AI, allocation itself left to the existing skill setters' +
+        out202b.expandCalls.length === 0,
+      '202.6: [behavioral] nativeLevelUp() at INT 7, level 4→5, reports "13 skill points available (10 + INT/2)" via appendToChat and NEVER calls expandPanelForCategory (hotfix v2.8.0-r2 — the auto-jump-to-SKILL-MATRIX used to fire here and its unconditional scrollIntoView yanked the screen down on every tap) — deterministic, no AI, allocation itself left to the existing skill setters' +
         (err202b ? ' — ' + err202b.message : '')
     );
   }

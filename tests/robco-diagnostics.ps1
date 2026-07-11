@@ -21064,7 +21064,7 @@ Check (
 # REAL source files (Protocol 42 stdin-corruption-safe transport).
 $labels202 = @(
     '202.5: [behavioral] _computeEligiblePerks() at level 5 with "Intense Training" already owned returns exactly [Comprehension, Educated] -- excludes the owned perk, the level-6 perk, and the level:0 special perk',
-    '202.6: [behavioral] nativeLevelUp() at INT 7, level 4->5, reports "13 skill points available (10 + INT/2)" via appendToChat and jumps the view to SKILL MATRIX via expandPanelForCategory(''skills'') -- deterministic, no AI'
+    '202.6: [behavioral] nativeLevelUp() at INT 7, level 4->5, reports "13 skill points available (10 + INT/2)" via appendToChat and NEVER calls expandPanelForCategory (hotfix v2.8.0-r2 -- the auto-jump-to-SKILL-MATRIX used to fire here and its unconditional scrollIntoView yanked the screen down on every tap) -- deterministic, no AI'
 )
 try {
     $nodeCheck202 = Get-Command node -ErrorAction SilentlyContinue
@@ -21137,7 +21137,7 @@ try {
     sb2.state.lvl === 5 &&
     /13 skill points available/.test(lastChat) &&
     /10 \+ INT\/2/.test(lastChat) &&
-    expandCalls.length === 1 && expandCalls[0] === 'skills'
+    expandCalls.length === 0
   );
 } catch (e) { results.push(false); }
 console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join(''));
