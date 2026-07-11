@@ -1,6 +1,6 @@
 ﻿# RobCo U.O.S. — System Architecture
 
-> **Version:** 2.7.0
+> **Version:** 2.8.0
 > **Last Updated:** 2026-07-10
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
@@ -707,8 +707,8 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 `identity.persona.blipBank`) are the first real consumers — see their own sections below. DO-C
 (cartridge-swap ceremony), DO-M (per-game machines), and DO-Q2–Q6 (remaining motion/cursor/audio/
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
-write exists anywhere in the identity block itself. `APP_VERSION` stays 2.7.0 under `[Unreleased]`
-(cache-rev bump only, current rev `-r47`). Guarded end-to-end by
+write exists anywhere in the identity block itself. DO-K itself landed under `[Unreleased]` as a
+cache-rev-only change; `APP_VERSION` bumped to 2.8.0 at the v2.8.0 release cut. Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
 `js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`

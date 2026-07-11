@@ -396,7 +396,7 @@ async function _uploadSaveDoc(payload) {
   const now = Date.now();
   await addDoc(col, {
     schema: 2,
-    version: window.APP_VERSION || '2.7.0',
+    version: window.APP_VERSION || '2.8.0',
     savedAt: now,
     updatedAt: now,
     label: payload.label,
@@ -697,7 +697,7 @@ window.syncLocalSavesToCloud = async function () {
     try {
       await addDoc(col, {
         schema: 2,
-        version: window.APP_VERSION || '2.7.0',
+        version: window.APP_VERSION || '2.8.0',
         savedAt: now,
         updatedAt: now,
         label: ls.label,
@@ -997,7 +997,7 @@ window.overwriteCloudSave = async function (docId) {
   try {
     const versionCount = await _pushCloudSaveVersion(docId, existingData);
     await updateDoc(doc(db, 'users', _currentUid, 'saves', docId), {
-      version: window.APP_VERSION || '2.7.0',
+      version: window.APP_VERSION || '2.8.0',
       savedAt: Date.now(),
       updatedAt: Date.now(),
       label: payload.label,

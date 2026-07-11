@@ -22,11 +22,11 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 ![Gemini](https://img.shields.io/badge/gemini-AI_engine-14fdce?style=flat-square&logo=google&logoColor=14fdce&labelColor=010a07)
 
 **A full CRT terminal emulation that turns a browser tab into a living Pip-Boy companion —**
-**now with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
+**a physical RobCo device that reacts to your character's condition, with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
 
 [Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
-**Current version: 2.7.0 — "Native Systems & Two Wastelands"**
+**Current version: 2.8.0 — "The Physical Machine"**
 
 ---
 
@@ -272,7 +272,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2773-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2938-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -304,9 +304,13 @@ Procedural audio, CRT visual effects, the 14-faction network, the save envelope 
 
 The browser-native era: a second game (**Fallout 3**) added as a first-class, fully data-driven context; the six heavy tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) converted to **offline native calculators**; nine device capabilities; per-game theming + identity; a comprehensive accessibility pass; cloud auth + a remote kill-switch; a hardened PWA auto-update flow; and a self-improving test gate.
 
+### Phase 5 — The Physical Machine (v2.8)
+
+The device made physical: the whole UI reframed as a reactive RobCo terminal — an illuminated bezel subsystem selector in place of the tab bar, hardware-styled OPERATOR / OPERATIONS / DATABANK / CHASSIS screens, a living Director Uplink, and a reactive power core with tactile feedback animations across the terminal. Deeper offline self-reliance (native item **USE**, TERMINAL-mode stat edits, native GPS/PERKS/level-up, travel-here), on-device **Visual Upload OCR** with an AI-vision fallback, ceremony moments, tighter mobile density, and a staging-only Diagnostic Shell.
+
 </details>
 
-### Current State (v2.7.0)
+### Current State (v2.8.0)
 
 A **production-quality, two-game browser application** with:
 
@@ -314,12 +318,12 @@ A **production-quality, two-game browser application** with:
 - **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a self-checked command registry
 - **Eight device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics)
 - **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
-- **Device bezel chrome** _(Design Overhaul, dev-only)_ — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS/SETTINGS + a flat DIRECTORY fallback) that routes through the same underlying tab router; CHASSIS hosts device telemetry + firmware/carrier/feature-flag status, and SETTINGS is the one home for Account, the Module Bay, Save Archive, and Campaign Configs
-- **Director Uplink — the living Overseer** _(Design Overhaul, dev-only)_ — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
-- **Tool Deck + Quick-Draw Holster** _(Design Overhaul, dev-only)_ — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
-- **OPERATIONS — the quartermaster's freight console** _(Design Overhaul, dev-only)_ — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
-- **OPERATOR — SKILL MATRIX / STATUS EFFECTS / FACTION STANDING reskins** _(Design Overhaul, dev-only)_ — your skills show as a 13-channel drag-to-set VU meter array, active status effects light up as color-coded compound lamps (buff/debuff/neutral) with a tick countdown and purge key, and faction standing is one shared INFAMY◂▸FAME reputation console with a per-faction channel selector and an all-faction mini-pin strip so nothing is hidden
-- **DATABANK — The Records Bay** _(Design Overhaul, dev-only)_ — your world map is a real spatial "Phosphor Cartography" chart: surveyed locations glow as connected nodes tracing a known-route trail, a radar sweep and a blinking "YOU ARE HERE" marker bring it to life, and uncollected snow globes/bobbleheads/Lincoln memorabilia show as distinct signal-return glyphs; your quest log is a numbered directive rack with status lamps, a filterable status drawer bank, and a native CYCLE key to advance a quest's status yourself; the databank search, campaign record, campaign notes, and session stats all match with an amber query terminal, a tape-spool chronicle, a filterable field-notes ledger, and a mechanical odometer counter bank
+- **Device bezel chrome** — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS/SETTINGS + a flat DIRECTORY fallback) that routes through the same underlying tab router; CHASSIS hosts device telemetry + firmware/carrier/feature-flag status, and SETTINGS is the one home for Account, the Module Bay, Save Archive, and Campaign Configs
+- **Director Uplink — the living Overseer** — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
+- **Tool Deck + Quick-Draw Holster** — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
+- **OPERATIONS — the quartermaster's freight console** — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
+- **OPERATOR — SKILL MATRIX / STATUS EFFECTS / FACTION STANDING reskins** — your skills show as a 13-channel drag-to-set VU meter array, active status effects light up as color-coded compound lamps (buff/debuff/neutral) with a tick countdown and purge key, and faction standing is one shared INFAMY◂▸FAME reputation console with a per-faction channel selector and an all-faction mini-pin strip so nothing is hidden
+- **DATABANK — The Records Bay** — your world map is a real spatial "Phosphor Cartography" chart: surveyed locations glow as connected nodes tracing a known-route trail, a radar sweep and a blinking "YOU ARE HERE" marker bring it to life, and uncollected snow globes/bobbleheads/Lincoln memorabilia show as distinct signal-return glyphs; your quest log is a numbered directive rack with status lamps, a filterable status drawer bank, and a native CYCLE key to advance a quest's status yourself; the databank search, campaign record, campaign notes, and session stats all match with an amber query terminal, a tape-spool chronicle, a filterable field-notes ledger, and a mechanical odometer counter bank
 - **Full character/world systems** — SPECIAL, per-game skills, limbs, perks, quests, factions, world-grid map with mark-visited, and trackers (collectibles, Lincoln memorabilia, traits, skill books, magazines) + a crafting panel
 - **Native USE + TERMINAL stat edits** — using an aid item now applies its real effect (heal, rads, limb repair, a timed buff, clearing an addiction or poison) instantly and offline, with no AI round-trip; typing straight into the TERMINAL command line can set or nudge any stat, SPECIAL attribute, or skill, or grant a level, all deterministic and fully offline
 - **[GPS]/[MAP] and eligible-perks lookup — native, no AI** — the compass-grid command now jumps straight to the CARTOGRAPHY TABLE instead of round-tripping to the AI; leveling up reports your real skill-point pool (10 + INT/2) and jumps to SKILL MATRIX so you allocate it yourself; and a new `[PERKS]`/`[PK]` command lists every perk you already qualify for at your current level, straight from the registry

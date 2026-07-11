@@ -14861,77 +14861,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'e92b2945f9bff31f3a3db11467880d9d452faa125a6517e6234ef50ffac46a3a',
+        sha256: '2fab15de30815451a041e71a48cfb2c5c10830c93302c76f791433fca32b0b13',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: 'e5352c15f4e3de08af348cc692b9825dad15c9f01f8d90db5913d3fd6578dcba',
+        sha256: '4fe38b6130cb6a5aa53b9eaad79d8f0dea044369f5fab4a55ac3f36d275357f3',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '39394b3dc5bc8e2c638bccb30bb270d1dbe47f9268332d155bd398bc0a54b1f6',
+        sha256: 'c08152e192bc3ca88a8c2cee734c0ffb4e684865e7cc75643012e03820a14a3e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'c7a7520d07101c123567dc5d02e82642339bbc84f3c6e75241f781a50a3c95d5',
+        sha256: 'f43a208c6c6e1cdb794d530c5c22353f921176ba22f38ce8025d70bdcc61a498',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '97a4add09688c9436a8a64eb3998b03655a9b0c502eb411e4bc086389f7a2f13',
+        sha256: '5634c2b2c85ad0f848fc269fef7da318f2b9661692d05fb1ea367ae273b5bfe7',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: '996649468f82f2ea43a097ba309322841f29940322284da2fd3ceed00c5e7f14',
+        sha256: 'dda36c2be2bb76069e5e55ca900229a9063b64bc13ba195ec4039250299a9508',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '6f83cc4cbfbbd4278d85cb68c1a57261844e41e924ccfe201764e49911c2161b',
+        sha256: '82ba297d3821af528667f684918a99914311e2ffbac27e2a09a1366250e3a05f',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '1d2198aab4462c1a3974c74d765483799622171cc60d947e07f837f7a217f5af',
+        sha256: '86e2affd92e0fab06d2b16fbb73a1bee6c770d42903211611dd6cf19e0a83fd1',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: 'c7c87793f9fc241ab84044b6bf00f8761623ea1bc2611209424223e92fe3d5e7',
+        sha256: '09a4b018aa2345ee2c22b5f0e7a133b707a6a2b29d270017b51e1d1d9047588f',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'dcf88fbb28078817e0f993394412e219c63bd1e34dc442184531de220a7e373f',
+        sha256: '670c553882eea505a3e2783a132a3f9afeb87416284db02d48daad3b1b226203',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '07b3c98f687417f2360455351491a6086117a14bcb5ac4f276a3a8ee20df5be4',
+        sha256: 'dd225f948525b08999b6713a3fb28b76dad344b1007f84aa5d750afbdf93d721',
       },
     ];
 
@@ -18866,8 +18866,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         duplicated/hardcoded here too, which would go stale on every
   //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -19316,8 +19316,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        there per the rotation pattern documented at 151.18; kept generic
   //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -20531,10 +20531,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 157.19  APP_VERSION stays 2.7.0 under [Unreleased] — DO-K is cache-rev-only (Protocol 2)
+  // 157.19  APP_VERSION is the released version (bumped at the v2.8.0 dev→release cut; Protocol 2)
   assert(
-    /APP_VERSION\s*=\s*'2\.7\.0'/.test(stateSource),
-    '157.19: APP_VERSION remains 2.7.0 — DO-K ships under [Unreleased] with a cache-rev bump only'
+    /APP_VERSION\s*=\s*'2\.8\.0'/.test(stateSource),
+    '157.19: APP_VERSION is 2.8.0 (released this version)'
   );
 }
 
@@ -20710,8 +20710,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.7\.0-r\d+'/.test(swSource),
-    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.7.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 
   // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
