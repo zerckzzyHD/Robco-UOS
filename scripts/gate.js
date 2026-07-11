@@ -13,16 +13,17 @@
  *                        (gate:fast) or the push gate (gate): it is never run by
  *                        a git hook or CI, so it cannot satisfy either boundary.
  *
- * Steps (full; --fast skips steps 5-9; --iter takes the separate fast path):
+ * Steps (full; --fast skips steps 6-10; --iter takes the separate fast path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
- *   3. Persistence audit — Node runner
- *   4. Persistence audit — PowerShell runner (+ parity check)
- *   5. Playwright Chromium availability check     ← skipped by --fast
- *   6. Boot smoke test (HTTP)                     ← skipped by --fast
- *   7. Render check (360px & 412px)               ← skipped by --fast
- *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
- *   9. Runtime audit — test.html headless         ← skipped by --fast
+ *   3. Boot-chain preflight (index.html/sw.js/disk/docs/test.html consistency)
+ *   4. Persistence audit — Node runner
+ *   5. Persistence audit — PowerShell runner (+ parity check)
+ *   6. Playwright Chromium availability check     ← skipped by --fast
+ *   7. Boot smoke test (HTTP)                     ← skipped by --fast
+ *   8. Render check (360px & 412px)               ← skipped by --fast
+ *   9. A11y check (axe serious/critical baseline) ← skipped by --fast
+ *   10. Runtime audit — test.html headless        ← skipped by --fast
  */
 'use strict';
 
@@ -299,6 +300,7 @@ if (iter) {
   }
 
   run('Prettier (format check)', 'npx prettier --check .');
+  run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
   run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
   console.log(
@@ -313,10 +315,16 @@ run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
 // ── 2. Prettier ───────────────────────────────────────────────────────────────
 run('Prettier (format check)', 'npx prettier --check .');
 
-// ── 3. Node persistence audit ─────────────────────────────────────────────────
+// ── 3. Boot-chain preflight ──────────────────────────────────────────────────
+// (U-A0, CODE_HEALTH_PLAN.md §3/§5) index.html/sw.js/disk/docs/test.html
+// consistency — cheap, static, no browser needed, so it runs on both
+// gate:fast (commit) and gate (push), same as lint/prettier.
+run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
+
+// ── 4. Node persistence audit ─────────────────────────────────────────────────
 const nodeAuditOut = runCapture('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
-// ── 4. PowerShell persistence audit + parity ─────────────────────────────────
+// ── 5. PowerShell persistence audit + parity ─────────────────────────────────
 // Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
 // Only warn-skip when neither is found (e.g. bare Linux dev box without pwsh installed).
 const pwshProbe = spawnSync('pwsh --version', { shell: true, stdio: 'pipe' });
@@ -371,7 +379,7 @@ if (psBin) {
 }
 
 if (!fast) {
-  // ── 5. Playwright Chromium check ──────────────────────────────────────────────
+  // ── 6. Playwright Chromium check ──────────────────────────────────────────────
   console.log('\n[gate] Playwright Chromium availability');
   const chromiumScript =
     "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
@@ -400,16 +408,16 @@ if (!fast) {
       : '\n[gate] Shared Chromium unavailable — each browser check launches its own (fallback).'
   );
 
-  // ── 6. Boot smoke ─────────────────────────────────────────────────────────────
+  // ── 7. Boot smoke ─────────────────────────────────────────────────────────────
   run('Boot smoke (HTTP)', 'node tests/boot-smoke.mjs');
 
-  // ── 7. Render check ───────────────────────────────────────────────────────────
+  // ── 8. Render check ───────────────────────────────────────────────────────────
   run('Render check (360px & 412px)', 'node tests/render-check.mjs');
 
-  // ── 8. A11y check ─────────────────────────────────────────────────────────────
+  // ── 9. A11y check ─────────────────────────────────────────────────────────────
   run('A11y (axe serious/critical)', 'node tests/a11y-check.mjs');
 
-  // ── 9. Browser-side persistence audit (test.html) ─────────────────────────────
+  // ── 10. Browser-side persistence audit (test.html) ─────────────────────────────
   // Executes tests/test.html headless and asserts every suite passes + the
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');

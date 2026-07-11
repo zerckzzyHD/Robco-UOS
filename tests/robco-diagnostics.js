@@ -74,6 +74,43 @@ function readFile(rel) {
   return fs.readFileSync(abs, 'utf8');
 }
 
+// ── Logical-bundle read helper (2.8.5 U-A0) ─────────────────────
+// A content-location test asserts "literal L lives somewhere in the ui-core
+// FAMILY", not "literal L lives in this one exact file". readGroup(stem)
+// concatenates every js/<stem>.js + js/<stem>-*.js file on disk into one
+// string, so a future split (ui-core.js -> ui-core.js + ui-core-nav.js + ...)
+// keeps every existing readGroup('ui-core').includes(L) assertion green
+// without editing a single test — the split file just joins the group glob.
+// For a stem that hasn't split yet, the family is exactly one file, so this
+// returns byte-identical output to the old readFile(`js/${stem}.js`) call
+// (Array.prototype.join never inserts a separator for a single-element
+// array) — this migration is provably coverage-identical today.
+//
+// GROUP_OVERRIDES exists for the one case the plain glob can't handle: a
+// split whose sibling files intentionally don't share a `<stem>-*.js`
+// filename prefix (see planning/CODE_HEALTH_PLAN.md §2.3 — the proposed
+// api.js split into ai-directive.js / ai-import.js / native-router.js does
+// NOT follow the stem-prefix convention §2 states as governing). Empty
+// today because no file has split yet; a future split unit adds one entry
+// here if it ships non-prefixed sibling names instead of renaming them to
+// fit the glob.
+const GROUP_OVERRIDES = {};
+function readGroup(stem) {
+  if (GROUP_OVERRIDES[stem]) {
+    return GROUP_OVERRIDES[stem].map(f => readFile(`js/${f}`)).join('\n');
+  }
+  const jsDir = path.join(ROOT, 'js');
+  const files = fs
+    .readdirSync(jsDir)
+    .filter(f => f === `${stem}.js` || (f.startsWith(`${stem}-`) && f.endsWith('.js')))
+    .sort();
+  if (files.length === 0) {
+    fail(`Source file family not found: js/${stem}.js (or js/${stem}-*.js)`);
+    process.exit(1);
+  }
+  return files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n');
+}
+
 // ── AST-lite helpers ───────────────────────────────────────────
 
 /**
@@ -205,9 +242,9 @@ function extractSkillKeys(source) {
 // ══════════════════════════════════════════════════════════════
 //  LOAD SOURCES
 // ══════════════════════════════════════════════════════════════
-const stateSource = readFile('js/state.js');
-const apiSource = readFile('js/api.js');
-const cloudSource = readFile('js/cloud.js');
+const stateSource = readGroup('state');
+const apiSource = readGroup('api');
+const cloudSource = readGroup('cloud');
 const uiSource = [
   'js/ui-audio.js',
   'js/ui-render.js',
@@ -608,13 +645,13 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 8 — Fallout Data Registry structural integrity
-//  Validates js/registry.js file structure without requiring
-//  a browser environment. Uses regex against the raw source.
+//  Validates js/reg_nv.js + js/registry-core.js file structure without
+//  requiring a browser environment. Uses regex against the raw source.
 // ══════════════════════════════════════════════════════════════
 header('Registry structural integrity');
 
-const registrySource = readFile('js/reg_nv.js');
-const registryCoreSource = readFile('js/registry-core.js');
+const registrySource = readGroup('reg_nv');
+const registryCoreSource = readGroup('registry-core');
 
 // 8.1 FALLOUT_REGISTRY global declaration must exist
 assert(/const\s+FALLOUT_REGISTRY\s*=/.test(registrySource), 'FALLOUT_REGISTRY global is declared');
@@ -658,7 +695,7 @@ assert(
   'FALLOUT_REGISTRY.version is declared with semver string'
 );
 
-// 8.8 registry.js must NOT reference state, localStorage, or chatHistory
+// 8.8 reg_nv.js must NOT reference state, localStorage, or chatHistory
 //     (enforces the "read-only reference data, not state data" contract)
 // Strip single-line and block comments before checking, handling CRLF on Windows.
 const registryCode = registrySource
@@ -669,12 +706,12 @@ assert(!/localStorage/.test(registryCode), 'reg_nv.js does not reference localSt
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 9 — Database structural integrity
-//  Validates js/database.js: all CSV tables, trigger coverage,
-//  invKeywords, systemInstruction placement, and purity contract.
+//  Validates js/db_nv.js (and js/db_fo3.js): all CSV tables, trigger
+//  coverage, invKeywords, systemInstruction placement, purity contract.
 // ══════════════════════════════════════════════════════════════
 header('Database structural integrity');
 
-const dbSource = readFile('js/db_nv.js');
+const dbSource = readGroup('db_nv');
 
 // 9.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
@@ -698,7 +735,7 @@ for (const tbl of REQUIRED_TABLES) {
   assert(dbSource.includes(tbl), `db_nv.js contains ${tbl} section`);
 }
 
-// 9.4 lookupItemInDb must be referenced in database.js (item weight/value cache integrity)
+// 9.4 lookupItemInDb must be referenced in db_nv.js (item weight/value cache integrity)
 assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in db_nv.js");
 
 // 9.5 BESTIARY must have ≥ 30 data rows (guards against data regression)
@@ -723,7 +760,7 @@ assert(
   'databaseCSVs is injected via systemInstruction in api.js'
 );
 
-// 9.8 database.js must NOT reference state, localStorage, or chatHistory
+// 9.8 db_nv.js must NOT reference state, localStorage, or chatHistory
 const dbCode = dbSource
   .replace(/\/\*[\s\S]*?\*\//g, '') // strip block comments
   .replace(/\/\/[^\r\n]*/g, ''); // strip line comments
@@ -1149,7 +1186,7 @@ try {
 //  16 tests
 // ══════════════════════════════════════════════════════════════
 header('FO3 Database structural integrity');
-const dbFo3Source = readFile('js/db_fo3.js');
+const dbFo3Source = readGroup('db_fo3');
 
 // 19.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbFo3Source), 'db_fo3.js: databaseCSVs global is declared');
@@ -1276,7 +1313,7 @@ assert(
 // runner — was removed under Protocol 42). Item names are escaped and routed via a data
 // attribute, never interpolated raw into the onclick. Complements 21.4 (the buy list).
 {
-  const renSrc213 = readFile('js/ui-render.js');
+  const renSrc213 = readGroup('ui-render');
   let sellBody213 = '';
   try {
     sellBody213 = extractFunctionBody(renSrc213, 'renderTradeSellList');
@@ -1292,7 +1329,7 @@ assert(
 // 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
 // escaped and routed via a data attribute, never interpolated raw into the onclick.
 {
-  const renSrc214 = readFile('js/ui-render.js');
+  const renSrc214 = readGroup('ui-render');
   let buyBody214 = '';
   try {
     buyBody214 = extractFunctionBody(renSrc214, 'renderTradeBuyList');
@@ -1686,7 +1723,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Architectural Boundaries — reg_fo3.js purity');
 {
-  const regFo3Source = readFile('js/reg_fo3.js');
+  const regFo3Source = readGroup('reg_fo3');
   const regFo3Code = regFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
   guards(regFo3Code, [
     [/\bstate\b/, 'reg_fo3.js does not reference state (pure reference data)', NEG],
@@ -2201,7 +2238,7 @@ assert(
 
 // 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
 {
-  const uiCoreSrc32 = readFile('js/ui-core.js');
+  const uiCoreSrc32 = readGroup('ui-core');
   // Phase 3 OPERATOR batch 2: each row now also carries .vu-row (the BUS-05
   // VU meter skin) alongside .skill-row — prefix match tolerates either.
   assert(
@@ -2263,8 +2300,8 @@ header('Phase 2b Guards');
 //      replaced by "the THEMES table covers ≥6 colours AND changeOpticsColor delegates to the
 //      single table-driven applier" (P1-1, repointed for the WU-T1 refactor).
 {
-  const state33d = readFile('js/state.js');
-  const audio33d = readFile('js/ui-audio.js');
+  const state33d = readGroup('state');
+  const audio33d = readGroup('ui-audio');
   const themesBlock33d = (state33d.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
   const colourCount = (themesBlock33d.match(/rgb:\s*'/g) || []).length;
   assert(
@@ -2422,12 +2459,12 @@ header('Phase 2c Guards');
 //  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 3a Performance Guards');
-const apiSrc35 = readFile('js/api.js');
-const stateSrc35 = readFile('js/state.js');
-const uiSrc35 = readFile('js/ui-core.js');
+const apiSrc35 = readGroup('api');
+const stateSrc35 = readGroup('state');
+const uiSrc35 = readGroup('ui-core');
 const cssSrc35 = readFile('css/terminal.css');
-const regNvSrc35 = readFile('js/reg_nv.js');
-const regCoreSrc35 = readFile('js/registry-core.js');
+const regNvSrc35 = readGroup('reg_nv');
+const regCoreSrc35 = readGroup('registry-core');
 
 // 35.1 P4: the Terminal Record eventLog is capped via the single _logEvent()
 //      writer (state.js); api.js auto-log sites (faction/quest/AI-notes) route
@@ -2486,7 +2523,7 @@ assert(
 // ══════════════════════════════════════════════════════════════
 header('Keyboard Shortcuts Group');
 {
-  const uiSrc36 = readFile('js/ui-core.js'); // COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
+  const uiSrc36 = readGroup('ui-core'); // COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
 
   // 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
   const cmdRegM36 = uiSrc36.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
@@ -2636,8 +2673,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.1 FNV: every registry weapon exists in WEAPONS.CSV
   {
-    const dbNv = readFile('js/db_nv.js');
-    const regNv = readFile('js/reg_nv.js');
+    const dbNv = readGroup('db_nv');
+    const regNv = readGroup('reg_nv');
     const dbW = getDbWeaponNames(dbNv);
     const regW = getRegWeaponNames(regNv);
     const missing = [...regW].filter(n => !dbW.has(n));
@@ -2649,8 +2686,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.2 FNV: every WEAPONS.CSV row exists in registry
   {
-    const dbNv = readFile('js/db_nv.js');
-    const regNv = readFile('js/reg_nv.js');
+    const dbNv = readGroup('db_nv');
+    const regNv = readGroup('reg_nv');
     const dbW = getDbWeaponNames(dbNv);
     const regW = getRegWeaponNames(regNv);
     const missing = [...dbW].filter(n => !regW.has(n));
@@ -2662,8 +2699,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.3 FO3: every registry weapon exists in WEAPONS.CSV
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     const dbW = getDbWeaponNames(dbFo3);
     const regW = getRegWeaponNames(regFo3);
     const missing = [...regW].filter(n => !dbW.has(n));
@@ -2675,8 +2712,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.4 FO3: every WEAPONS.CSV row exists in registry
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     const dbW = getDbWeaponNames(dbFo3);
     const regW = getRegWeaponNames(regFo3);
     const missing = [...dbW].filter(n => !regW.has(n));
@@ -2691,8 +2728,8 @@ header('DB↔Registry Weapon Parity');
   //      WEAPONS.CSV and the FO3 registry. Removing it from only one file would break the
   //      38.3/38.4 parity guards; this pins it gone in both. fallout.wiki-verified (Protocol 3).
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     assert(
       !/cta Brain/.test(dbFo3) && !/cta Brain/.test(regFo3),
       'FO3: fabricated weapon "O\'cta Brain" stays removed from WEAPONS.CSV + registry (WU-D6)'
@@ -2741,7 +2778,7 @@ header('Ammo Token Split (EC→3)');
     return types;
   }
 
-  const nvSrc39 = readFile('js/db_nv.js');
+  const nvSrc39 = readGroup('db_nv');
   const nvCals39 = getAmmoCalibers39(nvSrc39);
   // 39.1 FNV AMMO.CSV contains Energy Cell
   assert(nvCals39.has('Energy Cell'), 'FNV AMMO.CSV contains Energy Cell caliber');
@@ -2758,7 +2795,7 @@ header('Ammo Token Split (EC→3)');
   const nvTypes39 = getWeaponAmmoTypes39(nvSrc39);
   assert(!nvTypes39.has('EC'), 'FNV WEAPONS.CSV: no weapon has Ammo_Type EC');
 
-  const fo3Src39 = readFile('js/db_fo3.js');
+  const fo3Src39 = readGroup('db_fo3');
   const fo3Cals39 = getAmmoCalibers39(fo3Src39);
   // 39.6 FO3 AMMO.CSV contains Energy Cell
   assert(fo3Cals39.has('Energy Cell'), 'FO3 AMMO.CSV contains Energy Cell caliber');
@@ -2841,8 +2878,8 @@ guards(htmlSource, [
 // ══════════════════════════════════════════════════════════════
 header('Weapon Mods CSV + Registry Parity');
 {
-  const dbNv41 = readFile('js/db_nv.js');
-  const regNv41 = readFile('js/reg_nv.js');
+  const dbNv41 = readGroup('db_nv');
+  const regNv41 = readGroup('reg_nv');
 
   // 41.1  [WEAPON_MODS.CSV] section exists in db_nv.js
   assert(dbNv41.includes('[WEAPON_MODS.CSV]'), 'db_nv.js contains [WEAPON_MODS.CSV] section');
@@ -2940,7 +2977,7 @@ header('Weapon Mods CSV + Registry Parity');
 // ══════════════════════════════════════════════════════════════
 header('Native Command Router (Phase 5a)');
 {
-  const apiSrc42 = readFile('js/api.js');
+  const apiSrc42 = readGroup('api');
 
   // 42.1  NATIVE_COMMAND_ROUTER object is defined in api.js
   guards(apiSrc42, [
@@ -3048,7 +3085,7 @@ header('Native Command Router (Phase 5a)');
 // ══════════════════════════════════════════════════════════════
 header('GAME_DEFS Structural Integrity (Phase 5b)');
 {
-  const stateSrc43 = readFile('js/state.js');
+  const stateSrc43 = readGroup('state');
 
   // 43.1  state.js declares const GAME_DEFS = {
   guards(stateSrc43, [
@@ -4081,8 +4118,8 @@ header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 // ══════════════════════════════════════════════════════════════
 header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 {
-  const cloudSrc48 = readFile('js/cloud.js');
-  const apiSrc48 = readFile('js/api.js');
+  const cloudSrc48 = readGroup('cloud');
+  const apiSrc48 = readGroup('api');
   const rulesSrc48 = fs.existsSync(path.join(ROOT, 'firestore.rules'))
     ? fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8')
     : '';
@@ -4396,9 +4433,9 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
-  const stateSrc51 = readFile('js/state.js');
+  const stateSrc51 = readGroup('state');
   const uiSrc51 = uiSource; // concatenated — save functions now in ui-saves.js
-  const cloudSrc51 = readFile('js/cloud.js');
+  const cloudSrc51 = readGroup('cloud');
   const indexSrc51 = readFile('index.html');
 
   // 51.1  computeSaveChecksum exists in state.js (FNV-1a global helper)
@@ -5168,7 +5205,7 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 53 — AI + Gemini-Key Resilience Guards');
 {
-  const apiSrc53 = readFile('js/api.js');
+  const apiSrc53 = readGroup('api');
 
   // 53.1  _AI_RETRY_MAX constant defined
   assert(/_AI_RETRY_MAX\s*=\s*\d+/.test(apiSrc53), '_AI_RETRY_MAX constant defined in api.js');
@@ -5392,8 +5429,8 @@ header('Suite 53 — AI + Gemini-Key Resilience Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 {
-  const apiSrc54 = readFile('js/api.js');
-  const stateSrc54 = readFile('js/state.js');
+  const apiSrc54 = readGroup('api');
+  const stateSrc54 = readGroup('state');
   const htmlSource54 = readFile('index.html');
   // U1: the injection-resistance copy lives in _directiveInjectionBoundary() now —
   // check the full composed directive body, not getSystemDirective()'s own short body.
@@ -5504,7 +5541,7 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
   const htmlSource55 = readFile('index.html');
-  const cloudSrc55 = readFile('js/cloud.js');
+  const cloudSrc55 = readGroup('cloud');
 
   // 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
   guards(htmlSource55, [
@@ -5862,7 +5899,7 @@ header('Suite 57 — PWA App Shortcuts Guards');
 {
   const manifestSrc57 = readFile('manifest.json');
   const manifest57 = JSON.parse(manifestSrc57);
-  const uiCoreSrc57 = readFile('js/ui-core.js');
+  const uiCoreSrc57 = readGroup('ui-core');
 
   // 57.1  manifest.shortcuts is an array of exactly 4 entries
   assert(
@@ -6007,8 +6044,8 @@ header('Suite 57 — PWA App Shortcuts Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 58 — Client Error Ring-Buffer Guards');
 {
-  const uiCoreSrc58 = readFile('js/ui-core.js');
-  const apiSrc58 = readFile('js/api.js');
+  const uiCoreSrc58 = readGroup('ui-core');
+  const apiSrc58 = readGroup('api');
 
   // 58.1  ERROR_LOG_KEY, ERROR_LOG_CAP, _recordError all defined in ui-core.js
   assert(
@@ -6311,7 +6348,7 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
-  const uiCoreSrc62 = readFile('js/ui-core.js');
+  const uiCoreSrc62 = readGroup('ui-core');
 
   // 62.1 Both changelog viewers route through the structured renderer
   //      (_showChangelogModal) — the boot-time PATCH NOTES viewer no longer dumps
@@ -6647,7 +6684,7 @@ header('Suite 62 — Changelog viewer guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 63 — Save/Cloud UI consolidation guards');
 {
-  const cloudSrc63 = readFile('js/cloud.js');
+  const cloudSrc63 = readGroup('cloud');
 
   // 63.1  cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)
   assert(
@@ -6731,7 +6768,7 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
-  const uiCoreSrc64 = readFile('js/ui-core.js');
+  const uiCoreSrc64 = readGroup('ui-core');
   const specialIds = ['s_s', 's_p', 's_e', 's_c', 's_i', 's_a', 's_l'];
 
   // 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)" (commit-on-blur)
@@ -6881,7 +6918,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 64.13  syncStateFromDom clamps SPECIAL reads to 1–10 (defense-in-depth)
   {
-    const stateSrc64 = readFile('js/state.js');
+    const stateSrc64 = readGroup('state');
     let syncBody = '';
     try {
       syncBody = extractFunctionBody(stateSrc64, 'syncStateFromDom');
@@ -6902,7 +6939,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
-  const uiCoreSrc65 = readFile('js/ui-core.js');
+  const uiCoreSrc65 = readGroup('ui-core');
 
   // 65.1  #updateModal exists in index.html (replaced #updateBanner)
   guards(htmlSource, [
@@ -7058,12 +7095,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 Lincoln Memorabilia Tracker');
-  const stateSrc66 = readFile('js/state.js');
-  const apiSrc66 = readFile('js/api.js');
-  const uiRenderSrc66 = readFile('js/ui-render.js');
-  const uiCoreSrc66 = readFile('js/ui-core.js');
-  const fo3RegSrc66 = readFile('js/reg_fo3.js');
-  const nvRegSrc66 = readFile('js/reg_nv.js');
+  const stateSrc66 = readGroup('state');
+  const apiSrc66 = readGroup('api');
+  const uiRenderSrc66 = readGroup('ui-render');
+  const uiCoreSrc66 = readGroup('ui-core');
+  const fo3RegSrc66 = readGroup('reg_fo3');
+  const nvRegSrc66 = readGroup('reg_nv');
 
   // 66.1  state.lincolnItems default {} in state.js
   assert(
@@ -7260,12 +7297,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Traits Tracker');
-  const stateSrc67 = readFile('js/state.js');
-  const apiSrc67 = readFile('js/api.js');
-  const uiRenderSrc67 = readFile('js/ui-render.js');
-  const uiCoreSrc67 = readFile('js/ui-core.js');
-  const nvRegSrc67 = readFile('js/reg_nv.js');
-  const fo3RegSrc67 = readFile('js/reg_fo3.js');
+  const stateSrc67 = readGroup('state');
+  const apiSrc67 = readGroup('api');
+  const uiRenderSrc67 = readGroup('ui-render');
+  const uiCoreSrc67 = readGroup('ui-core');
+  const nvRegSrc67 = readGroup('reg_nv');
+  const fo3RegSrc67 = readGroup('reg_fo3');
 
   // 67.1  state.traits default [] in state object
   assert(
@@ -7288,7 +7325,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 67.3  autoImportState() validates traits as array before importing
   {
-    const importBody67 = readFile('js/api.js');
+    const importBody67 = readGroup('api');
     assert(
       /Array\.isArray\(raw\)/.test(importBody67) && /traits/.test(importBody67),
       'autoImportState() validates traits as array before importing'
@@ -7454,7 +7491,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Location Database Expansion');
-  const nvRegSrc68 = readFile('js/reg_nv.js');
+  const nvRegSrc68 = readGroup('reg_nv');
 
   // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
   const locsSectionMatch = nvRegSrc68.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
@@ -7567,8 +7604,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 game-switch regression guard');
-  const uiCoreSrc69 = readFile('js/ui-core.js');
-  const stateSrc69 = readFile('js/state.js');
+  const uiCoreSrc69 = readGroup('ui-core');
+  const stateSrc69 = readGroup('state');
 
   // Extract the body of onGameContextChange for targeted checks
   let gcBody69 = '';
@@ -7627,9 +7664,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
-  const dbNv70 = readFile('js/db_nv.js');
-  const regNv70 = readFile('js/reg_nv.js');
-  const uiCore70 = readFile('js/ui-core.js');
+  const dbNv70 = readGroup('db_nv');
+  const regNv70 = readGroup('reg_nv');
+  const uiCore70 = readGroup('ui-core');
 
   // Helper: extract ARMOR.CSV data rows (excluding header)
   function getArmorRows70(src) {
@@ -7848,8 +7885,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 71 — Phase 6 UI Consistency');
   const htmlSrc71 = readFile('index.html');
-  const uiRenderSrc71 = readFile('js/ui-render.js');
-  const uiCoreSrc71 = readFile('js/ui-core.js');
+  const uiRenderSrc71 = readGroup('ui-render');
+  const uiCoreSrc71 = readGroup('ui-core');
   const cssSrc71 = readFile('css/terminal.css');
 
   // 71.1  #traitsSection is a <details> element (collapsible sub-panel)
@@ -8064,8 +8101,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 72 — Location datalist bleed fix + update-modal whitespace');
   const htmlSrc72 = readFile('index.html');
-  const uiSavesSrc72 = readFile('js/ui-saves.js');
-  const uiCoreSrc72 = readFile('js/ui-core.js');
+  const uiSavesSrc72 = readGroup('ui-saves');
+  const uiCoreSrc72 = readGroup('ui-core');
   const cssSrc72 = readFile('css/terminal.css');
 
   // 72.1  Static nv_locations datalist is gone from index.html
@@ -8130,8 +8167,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)');
   const htmlSrc73 = readFile('index.html');
-  const uiCoreSrc73 = readFile('js/ui-core.js');
-  const stateSrc73 = readFile('js/state.js');
+  const uiCoreSrc73 = readGroup('ui-core');
+  const stateSrc73 = readGroup('state');
 
   // 73.1  #skillsGrid container exists in index.html
   guards(htmlSrc73, [
@@ -8242,9 +8279,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
-  const nvRegSrc74 = readFile('js/reg_nv.js');
-  const fo3RegSrc74 = readFile('js/reg_fo3.js');
-  const uiRenderSrc74 = readFile('js/ui-render.js');
+  const nvRegSrc74 = readGroup('reg_nv');
+  const fo3RegSrc74 = readGroup('reg_fo3');
+  const uiRenderSrc74 = readGroup('ui-render');
 
   // 74.1  All FNV collectibles have gridRow and gridCol (both numbers in 1..6)
   {
@@ -8454,8 +8491,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 75 — Registry items[] No-Duplicate-Names Guard');
-  const nvSrc75 = readFile('js/reg_nv.js');
-  const fo3Src75 = readFile('js/reg_fo3.js');
+  const nvSrc75 = readGroup('reg_nv');
+  const fo3Src75 = readGroup('reg_fo3');
 
   function extractItemsSection75(src) {
     const start = src.indexOf('items:');
@@ -8535,7 +8572,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3)');
-  const apiSrc76 = readFile('js/api.js');
+  const apiSrc76 = readGroup('api');
   let importBody76 = '';
   try {
     importBody76 = extractFunctionBody(apiSrc76, 'autoImportState');
@@ -8624,7 +8661,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment');
-  const uiSrc77 = readFile('js/ui-render.js');
+  const uiSrc77 = readGroup('ui-render');
 
   // Reuse vm sandbox to run getFactionStanding with new canonical thresholds
   let gfs77 = null;
@@ -8744,7 +8781,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 78 — VENDORS.CSV structural integrity');
-  const nvSrc78 = readFile('js/db_nv.js');
+  const nvSrc78 = readGroup('db_nv');
   // Extract the VENDORS.CSV block
   const vStart = nvSrc78.indexOf('[VENDORS.CSV]');
   const vEnd = nvSrc78.indexOf('\n[', vStart + 1);
@@ -8776,7 +8813,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 79 — FO3 location database expansion (57 → 90)');
-  const fo3RegSrc79 = readFile('js/reg_fo3.js');
+  const fo3RegSrc79 = readGroup('reg_fo3');
 
   // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
   const locsSectionMatch79 = fo3RegSrc79.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
@@ -8835,7 +8872,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)');
-  const nvSrc80 = readFile('js/db_nv.js');
+  const nvSrc80 = readGroup('db_nv');
   const cStart80 = nvSrc80.indexOf('[CHEMS.CSV]');
   const cEnd80 = nvSrc80.indexOf('\n[', cStart80 + 1);
   const cBlock80 = nvSrc80.slice(cStart80, cEnd80 === -1 ? undefined : cEnd80);
@@ -8893,7 +8930,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)');
-  const fo3Src81 = readFile('js/db_fo3.js');
+  const fo3Src81 = readGroup('db_fo3');
   const aStart81 = fo3Src81.indexOf('[ARMOR.CSV]');
   const aEnd81 = fo3Src81.indexOf('\n[', aStart81 + 1);
   const aBlock81 = fo3Src81.slice(aStart81, aEnd81 === -1 ? undefined : aEnd81);
@@ -8960,7 +8997,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 82 — FO3 quests (64) + quest items (15→25)');
-  const fo3Src82 = readFile('js/reg_fo3.js');
+  const fo3Src82 = readGroup('reg_fo3');
 
   // Extract quests array block
   const qStart82 = fo3Src82.indexOf('  quests: [');
@@ -9042,7 +9079,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 82.f  QUEST_ITEMS.CSV: exactly 25 data rows
-  const fo3Db82 = readFile('js/db_fo3.js');
+  const fo3Db82 = readGroup('db_fo3');
   const qiStart82 = fo3Db82.indexOf('[QUEST_ITEMS.CSV]');
   const qiEnd82 = fo3Db82.indexOf('\n[', qiStart82 + 1);
   const qiBlock82 = fo3Db82.slice(qiStart82, qiEnd82 === -1 ? undefined : qiEnd82);
@@ -9090,13 +9127,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 83 — Crafting recipe + breakdown registry (NV + FO3)');
 
-  const nvSrc83 = readFile('js/reg_nv.js');
+  const nvSrc83 = readGroup('reg_nv');
   const nvRecStart83 = nvSrc83.indexOf('\n  recipes: [');
   const nvBdStart83 = nvSrc83.indexOf('\n  breakdowns: [', nvRecStart83);
   const nvRecBlock83 = nvSrc83.slice(nvRecStart83, nvBdStart83);
   const nvBdBlock83 = nvSrc83.slice(nvBdStart83);
 
-  const fo3Src83 = readFile('js/reg_fo3.js');
+  const fo3Src83 = readGroup('reg_fo3');
   const fo3RecStart83 = fo3Src83.indexOf('\n  recipes: [');
   const fo3BdStart83 = fo3Src83.indexOf('\n  breakdowns:', fo3RecStart83);
   const fo3RecBlock83 = fo3Src83.slice(fo3RecStart83, fo3BdStart83);
@@ -9220,8 +9257,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)');
 
-  const uiRSrc84 = readFile('js/ui-render.js');
-  const uiCSrc84 = readFile('js/ui-core.js');
+  const uiRSrc84 = readGroup('ui-render');
+  const uiCSrc84 = readGroup('ui-core');
   const idxSrc84 = readFile('index.html');
 
   // ── Structural ───────────────────────────────────────────────────────────
@@ -9579,12 +9616,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
-  const stateSrc85 = readFile('js/state.js');
-  const apiSrc85 = readFile('js/api.js');
-  const uiRenderSrc85 = readFile('js/ui-render.js');
-  const uiCoreSrc85 = readFile('js/ui-core.js');
-  const nvRegSrc85 = readFile('js/reg_nv.js');
-  const fo3RegSrc85 = readFile('js/reg_fo3.js');
+  const stateSrc85 = readGroup('state');
+  const apiSrc85 = readGroup('api');
+  const uiRenderSrc85 = readGroup('ui-render');
+  const uiCoreSrc85 = readGroup('ui-core');
+  const nvRegSrc85 = readGroup('reg_nv');
+  const fo3RegSrc85 = readGroup('reg_fo3');
 
   const FNV_SKILL_KEYS = [
     'barter',
@@ -9953,11 +9990,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
   header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
 
-  const nvRegSrc87 = readFile('js/reg_nv.js');
-  const fo3RegSrc87 = readFile('js/reg_fo3.js');
-  const stateSrc87 = readFile('js/state.js');
-  const apiSrc87 = readFile('js/api.js');
-  const uiRenderSrc87 = readFile('js/ui-render.js');
+  const nvRegSrc87 = readGroup('reg_nv');
+  const fo3RegSrc87 = readGroup('reg_fo3');
+  const stateSrc87 = readGroup('state');
+  const apiSrc87 = readGroup('api');
+  const uiRenderSrc87 = readGroup('ui-render');
   const idxSrc87 = readFile('index.html');
 
   const fnvSkillKeys87 = [
@@ -10179,7 +10216,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        a nested sub-panel — the generic top-level details.open handling
   //        already reveals it (Phase 3 OPERATOR batch 3 promotion).
   {
-    const uiCoreSrc87 = readFile('js/ui-core.js');
+    const uiCoreSrc87 = readGroup('ui-core');
     let expandBody87 = '';
     try {
       expandBody87 = extractFunctionBody(uiCoreSrc87, 'expandPanelForCategory');
@@ -10197,8 +10234,8 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 88 — GATE-UI: UI consistency structural guards');
-  const uiRenderSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
-  const uiCoreSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiRenderSrc88 = readGroup('ui-render');
+  const uiCoreSrc88 = readGroup('ui-core');
   const idxSrc88 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const cssSrc88 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
 
@@ -10308,9 +10345,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards');
-  const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
-  const uiCore89 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
-  const stateSrc89 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
+  const apiSrc89 = readGroup('api');
+  const uiCore89 = readGroup('ui-core');
+  const stateSrc89 = readGroup('state');
   const htmlSrc89 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const rulesSrc89 = fs.readFileSync(path.join(__dirname, '../RULES.md'), 'utf8');
 
@@ -10506,7 +10543,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   header('Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS');
   // Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
   // Static assertions — no DOM required.
-  const uiCore91 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiCore91 = readGroup('ui-core');
 
   // 91.1  _renderSig module-level cache exists
   guards(uiCore91, [
@@ -10572,7 +10609,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
   // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
   const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
-  const uiRender92 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
+  const uiRender92 = readGroup('ui-render');
   const html92 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
   // 92.1  .tag class carries white-space: nowrap in terminal.css
@@ -10639,10 +10676,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 93 — FO3 Autocomplete Guard');
 {
-  const rc93 = readFile('js/registry-core.js');
+  const rc93 = readGroup('registry-core');
   const swSrc93 = readFile('sw.js');
   const indexSrc93 = readFile('index.html');
-  const nvSrc93 = readFile('js/reg_nv.js');
+  const nvSrc93 = readGroup('reg_nv');
 
   // 93.1  registry-core.js file exists (readFile exits if absent)
   assert(rc93.length > 0, 'registry-core.js file exists on disk');
@@ -10690,7 +10727,7 @@ header('Suite 93 — FO3 Autocomplete Guard');
   // 93.8  Behavioral: registrySearch executed against FO3 registry returns FO3 quests.
   //       Verifies the extracted function reads FALLOUT_REGISTRY dynamically (game-agnostic).
   {
-    const fo3Src93 = readFile('js/reg_fo3.js');
+    const fo3Src93 = readGroup('reg_fo3');
     let fo3SearchResult = [];
     try {
       const FR93 = new Function(fo3Src93 + '\nreturn FALLOUT_REGISTRY;')();
@@ -10718,7 +10755,7 @@ header('Suite 94 — Accessibility Guards');
 {
   const css94 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
   const idx94 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const uiCore94 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiCore94 = readGroup('ui-core');
 
   // 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7 — keyboard focus ring)
   guards(css94, [
@@ -10796,11 +10833,11 @@ header('Suite 94 — Accessibility Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
 {
-  const uiCore95 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
-  const state95 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
-  const saves95 = fs.readFileSync(path.join(__dirname, '../js/ui-saves.js'), 'utf8');
-  const cloud95 = fs.readFileSync(path.join(__dirname, '../js/cloud.js'), 'utf8');
-  const api95 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
+  const uiCore95 = readGroup('ui-core');
+  const state95 = readGroup('state');
+  const saves95 = readGroup('ui-saves');
+  const cloud95 = readGroup('cloud');
+  const api95 = readGroup('api');
 
   // 95.1  beforeunload flush is guarded by _loadingSave (not an unconditional robco_v8 write)
   assert(
@@ -11139,12 +11176,12 @@ header('Suite 98 — Project-root cleanliness (Protocol 41)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
 {
-  const audio99 = readFile('js/ui-audio.js');
-  const render99 = readFile('js/ui-render.js');
-  const api99 = readFile('js/api.js');
-  const core99 = readFile('js/ui-core.js');
-  const saves99 = readFile('js/ui-saves.js');
-  const account99 = readFile('js/ui-account.js');
+  const audio99 = readGroup('ui-audio');
+  const render99 = readGroup('ui-render');
+  const api99 = readGroup('api');
+  const core99 = readGroup('ui-core');
+  const saves99 = readGroup('ui-saves');
+  const account99 = readGroup('ui-account');
   const eslint99 = readFile('eslint.config.mjs');
 
   // ── Dead-code purge (must stay absent) ──
@@ -11277,8 +11314,8 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 {
-  const state101 = readFile('js/state.js');
-  const cloud101 = readFile('js/cloud.js');
+  const state101 = readGroup('state');
+  const cloud101 = readGroup('cloud');
 
   // ── state.js sanctioned accessors exist + are exposed for the module boundary ──
   assert(
@@ -11343,7 +11380,7 @@ header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 // ══════════════════════════════════════════════════════════════
 header('Suite 102 — WU-B10 boot-drone autoplay timing');
 {
-  const audio102 = readFile('js/ui-audio.js');
+  const audio102 = readGroup('ui-audio');
   let bootSeq102 = '';
   let firstInteract102 = '';
   let bootDrone102 = '';
@@ -11431,7 +11468,7 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
 // ══════════════════════════════════════════════════════════════
 header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 {
-  const uiCore103 = readFile('js/ui-core.js');
+  const uiCore103 = readGroup('ui-core');
   // The save-menu "?" button tag (attributes span lines; [^>] matches newlines).
   const btnTag103 = (htmlSource.match(/<button\b[^>]*showSaveHelpModal[^>]*>/) || [''])[0];
   let helpBody103 = '';
@@ -11533,7 +11570,7 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 // ══════════════════════════════════════════════════════════════
 header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified)');
 {
-  const stateSrc104 = readFile('js/state.js');
+  const stateSrc104 = readGroup('state');
   // Slice GAME_DEFS into per-game regions (both games define barter/vats/ammoPerAttack).
   const fo3At104 = stateSrc104.indexOf('FO3: {');
   const fnvSlice104 =
@@ -11674,10 +11711,10 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 // ══════════════════════════════════════════════════════════════
 header('Suite 105 — WU-N1 VATS native calculator');
 {
-  const st105 = readFile('js/state.js');
-  const ui105 = readFile('js/ui-core.js');
-  const dbnv105 = readFile('js/db_nv.js');
-  const dbfo3105 = readFile('js/db_fo3.js');
+  const st105 = readGroup('state');
+  const ui105 = readGroup('ui-core');
+  const dbnv105 = readGroup('db_nv');
+  const dbfo3105 = readGroup('db_fo3');
   const fo3At = st105.indexOf('FO3: {');
   const fnv105 = fo3At > 0 ? st105.slice(st105.indexOf('FNV: {'), fo3At) : '';
   const fo3105 = fo3At > 0 ? st105.slice(fo3At) : '';
@@ -11813,7 +11850,7 @@ header('Suite 105 — WU-N1 VATS native calculator');
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
   );
   // ── VATS-still-AI retirement (Protocol 42) ───────────────────────────────────
-  const api105 = readFile('js/api.js');
+  const api105 = readGroup('api');
   const routerBody105 = (api105.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
   ])[0];
@@ -11853,14 +11890,14 @@ header('Suite 105 — WU-N1 VATS native calculator');
 // ══════════════════════════════════════════════════════════════
 header('Suite 106 — WU-N2 TRADE native barter terminal');
 {
-  const ren106 = readFile('js/ui-render.js');
-  const dbnv106 = readFile('js/db_nv.js');
-  const dbfo3106 = readFile('js/db_fo3.js');
-  const api106 = readFile('js/api.js');
-  const core106 = readFile('js/ui-core.js');
+  const ren106 = readGroup('ui-render');
+  const dbnv106 = readGroup('db_nv');
+  const dbfo3106 = readGroup('db_fo3');
+  const api106 = readGroup('api');
+  const core106 = readGroup('ui-core');
   const html106 = htmlSource;
   const css106 = readFile('css/terminal.css');
-  const st106 = readFile('js/state.js');
+  const st106 = readGroup('state');
   let doBuyBody = '';
   let doSellBody = '';
   try {
@@ -12077,7 +12114,7 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
 // ══════════════════════════════════════════════════════════════
 header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 {
-  const renSrc107 = readFile('js/ui-render.js');
+  const renSrc107 = readGroup('ui-render');
 
   // 107.1 / 107.2  lookupBestiaryEntry mirrored in both game db runners (Protocol 38)
   assert(
@@ -12206,9 +12243,9 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 // ══════════════════════════════════════════════════════════════
 header('Suite 108 — WU-N4 CONSULT native databank lookup');
 {
-  const ren108 = readFile('js/ui-render.js');
-  const api108 = readFile('js/api.js');
-  const core108 = readFile('js/ui-core.js');
+  const ren108 = readGroup('ui-render');
+  const api108 = readGroup('api');
+  const core108 = readGroup('ui-core');
   const css108 = readFile('css/terminal.css');
   // The CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML
   // core (WU-N4b option C, Protocol 22). Concatenate so the engine-level checks (108.4–108.9,
@@ -12413,13 +12450,13 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
 // ══════════════════════════════════════════════════════════════
 header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 {
-  const ren109 = readFile('js/ui-render.js');
-  const api109 = readFile('js/api.js');
-  const core109 = readFile('js/ui-core.js');
+  const ren109 = readGroup('ui-render');
+  const api109 = readGroup('api');
+  const core109 = readGroup('ui-core');
   const css109 = readFile('css/terminal.css');
   const html109 = readFile('index.html');
-  const dbnv109 = readFile('js/db_nv.js');
-  const dbfo3109 = readFile('js/db_fo3.js');
+  const dbnv109 = readGroup('db_nv');
+  const dbfo3109 = readGroup('db_fo3');
   const routerBlock109 = (api109.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
   ])[0];
@@ -12580,9 +12617,9 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 // ══════════════════════════════════════════════════════════════
 header('Suite 110 — WU-N6 LOOT native add/value terminal');
 {
-  const ren110 = readFile('js/ui-render.js');
-  const api110 = readFile('js/api.js');
-  const core110 = readFile('js/ui-core.js');
+  const ren110 = readGroup('ui-render');
+  const api110 = readGroup('api');
+  const core110 = readGroup('ui-core');
   const css110 = readFile('css/terminal.css');
   const html110 = readFile('index.html');
   const routerBlock110 = (api110.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
@@ -12740,8 +12777,8 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
 header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   const html111 = readFile('index.html');
-  const api111 = readFile('js/api.js');
-  const acct111 = readFile('js/ui-account.js');
+  const api111 = readGroup('api');
+  const acct111 = readGroup('ui-account');
   const manifest111 = JSON.parse(readFile('manifest.json'));
 
   // 111.1 every content-input placeholder is ALL-CAPS (no lowercase letters) — MN-6
@@ -12911,8 +12948,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 113 — WU-E3 FEATURES / command-reference consistency');
-  const uiCore113 = readFile('js/ui-core.js');
-  const api113 = readFile('js/api.js');
+  const uiCore113 = readGroup('ui-core');
+  const api113 = readGroup('api');
   const registry113 = (uiCore113.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
     '',
     '',
@@ -13010,10 +13047,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 114 — Map location discovery persistence');
-  const stateSrc114 = readFile('js/state.js');
-  const apiSrc114 = readFile('js/api.js');
-  const uiCoreSrc114 = readFile('js/ui-core.js');
-  const uiRenderSrc114 = readFile('js/ui-render.js');
+  const stateSrc114 = readGroup('state');
+  const apiSrc114 = readGroup('api');
+  const uiCoreSrc114 = readGroup('ui-core');
+  const uiRenderSrc114 = readGroup('ui-render');
   const recordBody114 = (stateSrc114.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [
     '',
   ])[0];
@@ -13110,7 +13147,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 115 — WU-F1 Sustained Power Cell (Wake Lock)');
-  const uiCore115 = readFile('js/ui-core.js');
+  const uiCore115 = readGroup('ui-core');
   const html115 = htmlSource;
 
   // 115.1  preference constant + getter (localStorage-backed device setting, not state)
@@ -13217,9 +13254,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 116 — WU-F2 Haptic Solenoid (Vibration)');
-  const uiAudio116 = readFile('js/ui-audio.js');
-  const uiCore116 = readFile('js/ui-core.js');
-  const api116 = readFile('js/api.js');
+  const uiAudio116 = readGroup('ui-audio');
+  const uiCore116 = readGroup('ui-core');
+  const api116 = readGroup('api');
   const html116 = htmlSource;
 
   // 116.1  preference constant + getter (localStorage-backed device setting, not state)
@@ -13318,7 +13355,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 117 — WU-F3 Eject Holotape (Web Share)');
-  const saves117 = readFile('js/ui-saves.js');
+  const saves117 = readGroup('ui-saves');
   const html117 = htmlSource;
   let eject117 = '';
   try {
@@ -13401,7 +13438,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 118 — WU-F4 Pending-Directives Tally (Badge)');
-  const uiCore118 = readFile('js/ui-core.js');
+  const uiCore118 = readGroup('ui-core');
   const manifest118 = readFile('manifest.json');
   let badgeFn = '';
   try {
@@ -13479,7 +13516,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header("Suite 119 — WU-F7 Overseer's Maintenance Log");
-  const uiCore119 = readFile('js/ui-core.js');
+  const uiCore119 = readGroup('ui-core');
   const html119 = htmlSource;
 
   // 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
@@ -13616,7 +13653,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 120 — WU-F8 High-Lumen Optics (high-contrast)');
   const css120 = readFile('css/terminal.css');
-  const uiCore120 = readFile('js/ui-core.js');
+  const uiCore120 = readGroup('ui-core');
   const html120 = htmlSource;
   // Slice each activation path so we can assert the boosts live in BOTH.
   const manualBlock120 = css120.slice(
@@ -13735,8 +13772,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 121 — WU-F5 Pip-Boy Radio (synthesized)');
-  const uiAudio121 = readFile('js/ui-audio.js');
-  const uiCore121 = readFile('js/ui-core.js');
+  const uiAudio121 = readGroup('ui-audio');
+  const uiCore121 = readGroup('ui-core');
   const html121 = htmlSource;
   let start121 = '';
   let toggle121 = '';
@@ -13839,7 +13876,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 122 — WU-F6 Cold-Start / Degraded-Tube Boot');
-  const uiAudio122 = readFile('js/ui-audio.js');
+  const uiAudio122 = readGroup('ui-audio');
   const css122 = readFile('css/terminal.css');
   let pick122 = '';
   let bootLines122 = '';
@@ -13943,8 +13980,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 123 — WU-HF2/HF3 precise-pointer refocus + native panel navigation');
-  const api123 = readFile('js/api.js');
-  const uiCore123 = readFile('js/ui-core.js');
+  const api123 = readGroup('api');
+  const uiCore123 = readGroup('ui-core');
   const html123 = readFile('index.html');
   const aliasBlock123 = (api123.match(/const PANEL_NAV_ALIASES = \{([\s\S]*?)\n\};/) || [
     '',
@@ -14107,10 +14144,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 124 — WU-T1 per-game theming + AA contrast');
-  const state124 = readFile('js/state.js');
-  const audio124 = readFile('js/ui-audio.js');
-  const saves124 = readFile('js/ui-saves.js');
-  const core124 = readFile('js/ui-core.js');
+  const state124 = readGroup('state');
+  const audio124 = readGroup('ui-audio');
+  const saves124 = readGroup('ui-saves');
+  const core124 = readGroup('ui-core');
   const html124 = readFile('index.html');
 
   // Real WCAG 2.x relative-luminance + contrast-ratio (sRGB). Self-improving guard: a new
@@ -14296,9 +14333,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 125 — WU-F10 session stats merged into OVERSEER LOG');
   const html125 = readFile('index.html');
-  const render125 = readFile('js/ui-render.js');
-  const core125 = readFile('js/ui-core.js');
-  const saves125 = readFile('js/ui-saves.js');
+  const render125 = readGroup('ui-render');
+  const core125 = readGroup('ui-core');
+  const saves125 = readGroup('ui-saves');
   const statusPanel125 = (html125.match(/id="unitPowerPlantPanel"[\s\S]*?<\/details>/) || [''])[0];
   const logPanel125 = (html125.match(/id="campaignLogPanel"[\s\S]*?<\/details>/) || [''])[0];
   const sessFn125 = (render125.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
@@ -14392,8 +14429,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 126 — WU-F11 native mark-visited map control');
-  const render126 = readFile('js/ui-render.js');
-  const state126 = readFile('js/state.js');
+  const render126 = readGroup('ui-render');
+  const state126 = readGroup('state');
   const css126 = readFile('css/terminal.css');
   const markFn126 = (render126.match(/function markLocationVisited\(loc\)[\s\S]*?\n\}/) || [''])[0];
   const recFn126 = (state126.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [''])[0];
@@ -14478,9 +14515,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 127 — WU-T3 per-game identity strings + save header');
-  const state127 = readFile('js/state.js');
-  const audio127 = readFile('js/ui-audio.js');
-  const account127 = readFile('js/ui-account.js');
+  const state127 = readGroup('state');
+  const audio127 = readGroup('ui-audio');
+  const account127 = readGroup('ui-account');
   const css127 = readFile('css/terminal.css');
   const fnvTheme127 = (state127.match(/FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
   const fo3Theme127 = (state127.match(/FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
@@ -14660,7 +14697,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 129 — first-load desktop-layout pointer/hover gate');
   const css129 = readFile('css/terminal.css');
-  const core129 = readFile('js/ui-core.js');
+  const core129 = readGroup('ui-core');
   const GATE = '(min-width: 1000px) and (hover: hover) and (pointer: fine)';
 
   // 129.1  the desktop app-shell media query carries the pointer/hover gate
@@ -14706,10 +14743,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 130 — per-game optics + dynamic (Default) label');
-  const audio130 = readFile('js/ui-audio.js');
-  const core130 = readFile('js/ui-core.js');
+  const audio130 = readGroup('ui-audio');
+  const core130 = readGroup('ui-core');
   const html130 = readFile('index.html');
-  const saves130 = readFile('js/ui-saves.js');
+  const saves130 = readGroup('ui-saves');
   const keyFn130 = (audio130.match(/function _opticStorageKey\([\s\S]*?\n\}/) || [''])[0];
   const resolveOpticFn130 = (audio130.match(/function _resolveOptic\(\)[\s\S]*?\n\}/) || [''])[0];
   const changeFn130 = (audio130.match(/function changeOpticsColor\([\s\S]*?\n\}/) || [''])[0];
@@ -15015,7 +15052,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 132 — U2 window.onload boot decomposition');
-  const uiCoreSrc132 = readFile('js/ui-core.js');
+  const uiCoreSrc132 = readGroup('ui-core');
 
   const bootPhaseFns132 = [
     '_hydrateStateFromStorage',
@@ -15195,7 +15232,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     };
     vm.createContext(sandbox);
     vm.runInContext(stateSource, sandbox);
-    vm.runInContext(readFile('js/reg_nv.js'), sandbox);
+    vm.runInContext(readGroup('reg_nv'), sandbox);
     const autoImportBody133 =
       'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
     vm.runInContext(autoImportBody133 + '\nthis.autoImportState = autoImportState;', sandbox);
@@ -15742,8 +15779,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 135 — U7/U8 OS event bus + faction-agnostic fix + auto-log');
 
-  const uiRenderSrc135 = readFile('js/ui-render.js');
-  const uiCoreSrc135 = readFile('js/ui-core.js');
+  const uiRenderSrc135 = readGroup('ui-render');
+  const uiCoreSrc135 = readGroup('ui-core');
 
   // 135.1  structural: state.js declares the bus (on/emit) and exposes it globally
   assert(
@@ -15998,7 +16035,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // by wrapping each cross-file subscriber registration in a named
   // _wire*EventBusSubscribers() function called from window.onload, once
   // state.js is guaranteed to have run.
-  const uiAudioSrc135 = readFile('js/ui-audio.js');
+  const uiAudioSrc135 = readGroup('ui-audio');
 
   // 135.15  structural: each cross-file subscriber registration is wrapped in a
   //         named wiring function, and window.onload calls all three
@@ -16090,12 +16127,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 136 — Step 2 Phase 0 U9/U10 connector sweep + affinity fix');
   const html136 = readFile('index.html');
-  const api136 = readFile('js/api.js');
-  const uiCore136 = readFile('js/ui-core.js');
-  const uiRender136 = readFile('js/ui-render.js');
+  const api136 = readGroup('api');
+  const uiCore136 = readGroup('ui-core');
+  const uiRender136 = readGroup('ui-render');
   const css136 = readFile('css/terminal.css');
-  const dbNv136 = readFile('js/db_nv.js');
-  const dbFo3136 = readFile('js/db_fo3.js');
+  const dbNv136 = readGroup('db_nv');
+  const dbFo3136 = readGroup('db_fo3');
 
   // 136.1  U9-1: the Projected Timeline stub is fully retired — no shell, no
   //        command, no directive references, no stray modal-consumer branch.
@@ -16279,14 +16316,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
   const arch137 = readFile('ARCHITECTURE.md');
-  const dbNv137 = readFile('js/db_nv.js');
-  const dbFo3137 = readFile('js/db_fo3.js');
-  const uiCore137 = readFile('js/ui-core.js');
-  const uiRender137 = readFile('js/ui-render.js');
-  const uiSaves137 = readFile('js/ui-saves.js');
-  const cloud137 = readFile('js/cloud.js');
-  const api137 = readFile('js/api.js');
-  const state137 = readFile('js/state.js');
+  const dbNv137 = readGroup('db_nv');
+  const dbFo3137 = readGroup('db_fo3');
+  const uiCore137 = readGroup('ui-core');
+  const uiRender137 = readGroup('ui-render');
+  const uiSaves137 = readGroup('ui-saves');
+  const cloud137 = readGroup('cloud');
+  const api137 = readGroup('api');
+  const state137 = readGroup('state');
 
   // 137.1  U11: the per-game data parity ledger is committed in ARCHITECTURE.md,
   //        with every row labeled GENUINE or GAP (never left ambiguous)
@@ -16650,8 +16687,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 138 — P1 IndexedDB durability shadow + write-through');
-  const idb138 = readFile('js/idb.js');
-  const state138 = readFile('js/state.js');
+  const idb138 = readGroup('idb');
+  const state138 = readGroup('state');
   const sw138 = readFile('sw.js');
   const html138 = readFile('index.html');
 
@@ -16778,8 +16815,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 139 — P2 device-pref boot hydration + reconciliation');
-  const uiCore139 = readFile('js/ui-core.js');
-  const idb139 = readFile('js/idb.js');
+  const uiCore139 = readGroup('ui-core');
+  const idb139 = readGroup('idb');
   const reconcile139 = extractFunctionBody(uiCore139, '_reconcileMetaFromIdb');
   const hydrate139 = extractFunctionBody(uiCore139, '_hydrateMetaFromIdb');
   // window.onload body (brace-matched from the async declaration)
@@ -16924,11 +16961,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 140 — P3 cold-store IDB-primary (save slots + rolling backups)');
-  const state140 = readFile('js/state.js');
-  const uiSaves140 = readFile('js/ui-saves.js');
-  const uiAcct140 = readFile('js/ui-account.js');
-  const cloud140 = readFile('js/cloud.js');
-  const uiCore140 = readFile('js/ui-core.js');
+  const state140 = readGroup('state');
+  const uiSaves140 = readGroup('ui-saves');
+  const uiAcct140 = readGroup('ui-account');
+  const cloud140 = readGroup('cloud');
+  const uiCore140 = readGroup('ui-core');
   const coldRead140 = extractFunctionBody(state140, '_coldReadObj');
   const coldWrite140 = extractFunctionBody(state140, '_coldWriteObj');
   const migrate140 = extractFunctionBody(state140, '_migrateColdStoreToIdb');
@@ -17046,10 +17083,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 141 — P4 Terminal Record (structured eventLog + [T#] migration)');
-  const state141 = readFile('js/state.js');
-  const api141 = readFile('js/api.js');
-  const uiCore141 = readFile('js/ui-core.js');
-  const uiRender141 = readFile('js/ui-render.js');
+  const state141 = readGroup('state');
+  const api141 = readGroup('api');
+  const uiCore141 = readGroup('ui-core');
+  const uiRender141 = readGroup('ui-render');
   const html141 = readFile('index.html');
   const logEventBody = extractFunctionBody(state141, '_logEvent');
   const migrateEvBody = extractFunctionBody(state141, '_migrateEventLog');
@@ -17165,9 +17202,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 142 — P5 save version history (per-slot revision ring)');
-  const state142 = readFile('js/state.js');
-  const uiSaves142 = readFile('js/ui-saves.js');
-  const uiAcct142 = readFile('js/ui-account.js');
+  const state142 = readGroup('state');
+  const uiSaves142 = readGroup('ui-saves');
+  const uiAcct142 = readGroup('ui-account');
   const readVers142 = extractFunctionBody(state142, 'readSlotVersions');
   const pushVers142 = extractFunctionBody(state142, 'pushSlotVersion');
   const saveBody142 = extractFunctionBody(uiSaves142, 'saveToSlot');
@@ -17294,8 +17331,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 143 — P6 full backup bundle (export/import whole history)');
-  const state143 = readFile('js/state.js');
-  const uiSaves143 = readFile('js/ui-saves.js');
+  const state143 = readGroup('state');
+  const uiSaves143 = readGroup('ui-saves');
   const indexHtml143 = readFile('index.html');
   const buildBody143 = extractFunctionBody(state143, 'buildFullBundle');
   const verifyCkBody143 = extractFunctionBody(state143, 'verifyBundleChecksum');
@@ -17445,8 +17482,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 144 — P7 offline cloud-push queue (manual-push resilience)');
-  const state144 = readFile('js/state.js');
-  const cloud144 = readFile('js/cloud.js');
+  const state144 = readGroup('state');
+  const cloud144 = readGroup('cloud');
   const readQ144 = extractFunctionBody(state144, 'readCloudQueue');
   const enqQ144 = extractFunctionBody(state144, 'enqueueCloudPush');
   const writeQ144 = extractFunctionBody(state144, 'writeCloudQueue');
@@ -17466,8 +17503,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     return '';
   };
   const saveCloudBody144 = _winFn144(cloud144, 'saveCurrentToCloud');
-  const uiSource144 = readFile('js/ui-core.js');
-  const apiSource144 = readFile('js/api.js');
+  const uiSource144 = readGroup('ui-core');
+  const apiSource144 = readGroup('api');
 
   // 144.1  the queue data-layer API is defined + exposed on window
   assert(
@@ -17600,8 +17637,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 145 — P8 global immersion dial (Full/Balanced/Minimal)');
-  const state145 = readFile('js/state.js');
-  const uiCore145 = readFile('js/ui-core.js');
+  const state145 = readGroup('state');
+  const uiCore145 = readGroup('ui-core');
   const indexHtml145 = readFile('index.html');
   const getTierBody145 = extractFunctionBody(state145, 'getImmersionTier');
   const allowsBody145 = extractFunctionBody(state145, 'immersionAllows');
@@ -17711,10 +17748,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 146 — A1 Ambient Runtime core (state machine + scheduler + observer registry)');
-  const runtime146 = readFile('js/runtime.js');
+  const runtime146 = readGroup('runtime');
   const sw146 = readFile('sw.js');
   const index146 = readFile('index.html');
-  const uiCore146 = readFile('js/ui-core.js');
+  const uiCore146 = readGroup('ui-core');
   const transitionBody146 = extractFunctionBody(runtime146, 'transition');
   const beatBody146 = extractFunctionBody(runtime146, '_beat');
   const initRt146 = extractFunctionBody(runtime146, 'initAmbientRuntime');
@@ -17885,7 +17922,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 147 — A2.1 standby machine migrated onto the Ambient Runtime (STANDBY observer)');
-  const uiCore147 = readFile('js/ui-core.js');
+  const uiCore147 = readGroup('ui-core');
   const wireStandbyBody147 = extractFunctionBody(uiCore147, '_wireStandby');
   const enterBody147 = extractFunctionBody(uiCore147, 'enterStandby');
   const exitBody147 = extractFunctionBody(uiCore147, 'exitStandby');
@@ -17971,8 +18008,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header(
     'Suite 148 — A2.2 uptime clock + memory cycle + overseer flush migrated to runtime observers'
   );
-  const runtime148 = readFile('js/runtime.js');
-  const uiCore148 = readFile('js/ui-core.js');
+  const runtime148 = readGroup('runtime');
+  const uiCore148 = readGroup('ui-core');
   const registerBody148 = extractFunctionBody(runtime148, 'register');
   const transitionBody148 = extractFunctionBody(runtime148, 'transition');
   const startAmbient148 = extractFunctionBody(uiCore148, '_startAmbientTimers');
@@ -18057,7 +18094,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 149 — Developer Console: the ONE canonical dev/debug console');
-  const testConsole149 = readFile('js/test-console.js');
+  const testConsole149 = readGroup('test-console');
   // U4b (Suite 215) deliberately, documentedly widened the Hard Boundary:
   // the STATE SETUP/RESETS/FIXTURES/INLINE apparatus (~80 registry entries +
   // their _dsh*-prefixed helper functions) explicitly reads/writes campaign
@@ -18075,8 +18112,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
   const sw149 = readFile('sw.js');
   const index149 = readFile('index.html');
-  const uiCore149 = readFile('js/ui-core.js');
-  const runtime149 = readFile('js/runtime.js');
+  const uiCore149 = readGroup('ui-core');
+  const runtime149 = readGroup('runtime');
   const initTestConsoleBody149 = extractFunctionBody(testConsole149, 'initTestConsole');
   const isStagingBody149 = extractFunctionBody(testConsole149, '_devConsoleUnlocked');
 
@@ -18336,7 +18373,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 150 — A3 IDLE/STANDBY/SHUTDOWN ambient experiences');
-  const uiCore150 = readFile('js/ui-core.js');
+  const uiCore150 = readGroup('ui-core');
   const css150 = readFile('css/terminal.css');
   const wireAmbient150 = extractFunctionBody(uiCore150, '_wireAmbientExperiences');
   const exitStandbyBody150 = extractFunctionBody(uiCore150, 'exitStandby');
@@ -18591,10 +18628,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 151 — Step 2 Phase 2 B1: Command-Line MODE system');
-  const stateSrc151 = readFile('js/state.js');
-  const apiSrc151 = readFile('js/api.js');
-  const uiCoreSrc151 = readFile('js/ui-core.js');
-  const uiSavesSrc151 = readFile('js/ui-saves.js');
+  const stateSrc151 = readGroup('state');
+  const apiSrc151 = readGroup('api');
+  const uiCoreSrc151 = readGroup('ui-core');
+  const uiSavesSrc151 = readGroup('ui-saves');
   const htmlSrc151 = readFile('index.html');
   const cssSrc151 = readFile('css/terminal.css');
 
@@ -18898,7 +18935,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)');
   const htmlSrc152 = readFile('index.html');
   const cssSrc152 = readFile('css/terminal.css');
-  const uiCoreSrc152 = readFile('js/ui-core.js');
+  const uiCoreSrc152 = readGroup('ui-core');
   const powerOnBody152 = extractFunctionBody(uiCoreSrc152, '_powerOnFromShutdown');
 
   // 152.1  #powerOnBtn is a real <button> (Protocol UI-5) with a diegetic
@@ -19056,9 +19093,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header(
     'Suite 153 — Command-Line MODE upgrades: inline @, comma multi-action, content autocomplete'
   );
-  const apiSrc153 = readFile('js/api.js');
-  const dbNvSrc153 = readFile('js/db_nv.js');
-  const dbFo3Src153 = readFile('js/db_fo3.js');
+  const apiSrc153 = readGroup('api');
+  const dbNvSrc153 = readGroup('db_nv');
+  const dbFo3Src153 = readGroup('db_fo3');
 
   // 153.1  _routeQuickLogMulti(): splits on commas, trims + drops empty
   //        segments, routes EACH through the unchanged single-segment
@@ -19351,9 +19388,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
   const html154 = readFile('index.html');
-  const core154 = readFile('js/ui-core.js');
-  const audio154 = readFile('js/ui-audio.js');
-  const state154 = readFile('js/state.js');
+  const core154 = readGroup('ui-core');
+  const audio154 = readGroup('ui-audio');
+  const state154 = readGroup('state');
   const css154 = readFile('css/terminal.css');
   const claude154 = readFile('CLAUDE.md');
 
@@ -19699,7 +19736,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const uplinkStatusFn154 = (audio154.match(
     /function _updateUplinkBoardStatus\(\)[\s\S]*?\n\}/
   ) || [''])[0];
-  const apiSrc154 = readFile('js/api.js');
+  const apiSrc154 = readGroup('api');
   assert(
     /<p class="board-status alert" id="uplinkStatus">/.test(html154) &&
       /robco_gemini_validated_key/.test(state154) &&
@@ -19895,8 +19932,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 155 — Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes');
   const html155 = readFile('index.html');
-  const core155 = readFile('js/ui-core.js');
-  const state155 = readFile('js/state.js');
+  const core155 = readGroup('ui-core');
+  const state155 = readGroup('state');
   const css155 = readFile('css/terminal.css');
   const claude155 = readFile('CLAUDE.md');
   const rules155 = readFile('RULES.md');
@@ -20113,9 +20150,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 156 — Step 2 Phase 2 B2c: Module Bay refinements + hardware SFX');
   const html156 = readFile('index.html');
-  const core156 = readFile('js/ui-core.js');
-  const audio156 = readFile('js/ui-audio.js');
-  const state156 = readFile('js/state.js');
+  const core156 = readGroup('ui-core');
+  const audio156 = readGroup('ui-audio');
+  const state156 = readGroup('state');
   const css156 = readFile('css/terminal.css');
   const arch156 = readFile('ARCHITECTURE.md');
 
@@ -20327,7 +20364,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 157 — DO-K: identity keystone (GAME_DEFS.identity + data-game)');
 
   const html157 = readFile('index.html');
-  const core157 = readFile('js/ui-core.js');
+  const core157 = readGroup('ui-core');
 
   const vm157 = require('vm');
   let h157 = null;
@@ -21075,12 +21112,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 161 — Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay');
-  const uiAcct161 = readFile('js/ui-account.js');
-  const uiSaves161 = readFile('js/ui-saves.js');
-  const cloud161 = readFile('js/cloud.js');
-  const uiCore161 = readFile('js/ui-core.js');
+  const uiAcct161 = readGroup('ui-account');
+  const uiSaves161 = readGroup('ui-saves');
+  const cloud161 = readGroup('cloud');
+  const uiCore161 = readGroup('ui-core');
   const html161 = readFile('index.html');
-  const testConsole161 = readFile('js/test-console.js');
+  const testConsole161 = readGroup('test-console');
 
   // Assignment-form extractor (`window.X = async function (...) { ... }`) —
   // extractFunctionBody()'s `function <name>` search can't find these (Suite 137
@@ -21858,9 +21895,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header(
     'Suite 163 — Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter'
   );
-  const uiSaves163 = readFile('js/ui-saves.js');
-  const uiAcct163 = readFile('js/ui-account.js');
-  const cloud163 = readFile('js/cloud.js');
+  const uiSaves163 = readGroup('ui-saves');
+  const uiAcct163 = readGroup('ui-account');
+  const cloud163 = readGroup('cloud');
 
   // Assignment-form extractor (`window.X = async function (...) { ... }`) —
   // re-declared locally per the Suite 137/161 block-scoped precedent.
@@ -22257,7 +22294,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       };
       vm164.createContext(sandbox164b);
       vm164.runInContext(stateSource, sandbox164b);
-      vm164.runInContext(readFile('js/reg_nv.js'), sandbox164b);
+      vm164.runInContext(readGroup('reg_nv'), sandbox164b);
       const autoImportBody164 =
         'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
       vm164.runInContext(
@@ -23126,8 +23163,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 167 — [CROSSROADS] command retirement + OVERSEER transcript tag');
-  const api167 = readFile('js/api.js');
-  const uiCore167 = readFile('js/ui-core.js');
+  const api167 = readGroup('api');
+  const uiCore167 = readGroup('ui-core');
   const html167 = readFile('index.html');
   const css167 = readFile('css/terminal.css');
   const registry167 = (uiCore167.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
@@ -23221,9 +23258,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 168 — TERMLINK Command Console fully retired');
-  const api168 = readFile('js/api.js');
-  const uiCore168 = readFile('js/ui-core.js');
-  const uiRender168 = readFile('js/ui-render.js');
+  const api168 = readGroup('api');
+  const uiCore168 = readGroup('ui-core');
+  const uiRender168 = readGroup('ui-render');
   const html168 = readFile('index.html');
   const css168 = readFile('css/terminal.css');
   const router168 = (api168.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
@@ -23327,8 +23364,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 169 — transcript cleanup + composer autocomplete drop-up + scope pulse');
-  const uiCore169 = readFile('js/ui-core.js');
-  const uiSaves169 = readFile('js/ui-saves.js');
+  const uiCore169 = readGroup('ui-core');
+  const uiSaves169 = readGroup('ui-saves');
   const css169 = readFile('css/terminal.css');
   const appendBody169 = extractFunctionBody(uiCore169, 'appendToChat');
 
@@ -23479,8 +23516,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 170 — Owner batch: CRT hum follows power state + scanline contained in screen');
-  const uiAudio170 = readFile('js/ui-audio.js');
-  const uiCore170 = readFile('js/ui-core.js');
+  const uiAudio170 = readGroup('ui-audio');
+  const uiCore170 = readGroup('ui-core');
   const css170 = readFile('css/terminal.css');
   const html170 = readFile('index.html');
 
@@ -23589,7 +23626,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 171 — WIPE TERMINAL dialog: one cancel + Complete RNG lock warning');
-  const uiCore171 = readFile('js/ui-core.js');
+  const uiCore171 = readGroup('ui-core');
   const css171 = readFile('css/terminal.css');
 
   // 171.1  openModal() supports hideCloseBtn, toggling a .confirm-mode class
@@ -23709,7 +23746,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 172 — Boot-restore must never re-trigger the Module Bay hatch');
-  const uiCore172 = readFile('js/ui-core.js');
+  const uiCore172 = readGroup('ui-core');
   const wirePanelBody172 = extractFunctionBody(uiCore172, '_wirePanelPersistence');
 
   // 172.1  Structural guard: the flag is declared before the restore loop,
@@ -23913,8 +23950,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 173 — Owner batch: native LEVEL UP control + readable event-log timestamps');
-  const uiCore173 = readFile('js/ui-core.js');
-  const uiRender173 = readFile('js/ui-render.js');
+  const uiCore173 = readGroup('ui-core');
+  const uiRender173 = readGroup('ui-render');
 
   // 173.1  index.html: #btnLevelUp is a real <button> (Protocol UI-5), starts
   //        disabled (no XP banked yet on a fresh campaign), and carries a
@@ -24173,8 +24210,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 174 — SVC tray EJECT HOLOTAPE export consolidation');
   const html174 = readFile('index.html');
-  const uiCore174 = readFile('js/ui-core.js');
-  const uiSaves174 = readFile('js/ui-saves.js');
+  const uiCore174 = readGroup('ui-core');
+  const uiSaves174 = readGroup('ui-saves');
   const css174 = readFile('css/terminal.css');
   const eslintCfg174 = readFile('eslint.config.mjs');
 
@@ -24287,8 +24324,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'Suite 175 — Owner batch: dead meta frame-ancestors removed + ambient audio first-gesture arm'
   );
   const html175 = readFile('index.html');
-  const uiAudio175 = readFile('js/ui-audio.js');
-  const uiCore175 = readFile('js/ui-core.js');
+  const uiAudio175 = readGroup('ui-audio');
+  const uiCore175 = readGroup('ui-core');
 
   // 175.1  frame-ancestors is gone from the meta CSP entirely (not just
   //        silently ignored) — a real regression guard against it creeping back.
@@ -24412,7 +24449,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 176 — SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)');
   const html176 = htmlSource;
-  const core176 = readFile('js/ui-core.js');
+  const core176 = readGroup('ui-core');
 
   // 176.1  the 4 SETTINGS panels exist with the exact ids the plan specifies,
   //        each data-tab="settings", and are absent from every other tab
@@ -24590,8 +24627,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 177 — SU-4: dynamic ACCOUNT (REG PORT) status words');
   const html177 = htmlSource;
-  const acctSrc177 = readFile('js/ui-account.js');
-  const core177 = readFile('js/ui-core.js');
+  const acctSrc177 = readGroup('ui-account');
+  const core177 = readGroup('ui-core');
   const css177 = readFile('css/terminal.css');
 
   // 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
@@ -24758,7 +24795,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        3 sites), and connectivity (refreshOverseerCarrier, asserted at 177.3) all
   //        end up calling renderAccount() — no path can leave it stale.
   {
-    const cloud177 = readFile('js/cloud.js');
+    const cloud177 = readGroup('cloud');
     const loadUIBody177 = extractFunctionBody(core177, 'loadUI');
     assert(
       /renderAccount\(\);/.test(loadUIBody177) &&
@@ -24793,7 +24830,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 178 — SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)');
   const html178 = htmlSource;
-  const core178 = readFile('js/ui-core.js');
+  const core178 = readGroup('ui-core');
   const css178 = readFile('css/terminal.css');
   const configBlock178 = (html178.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
@@ -25063,8 +25100,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
   const html179 = readFile('index.html');
-  const core179 = readFile('js/ui-core.js');
-  const state179 = readFile('js/state.js');
+  const core179 = readGroup('ui-core');
+  const state179 = readGroup('state');
   const css179 = readFile('css/terminal.css');
 
   // 179.1  every GAME_DEFS entry (FNV/FO3/FO4) declares theme.cartridgeTape —
@@ -25344,7 +25381,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
   const html180 = readFile('index.html');
-  const core180 = readFile('js/ui-core.js');
+  const core180 = readGroup('ui-core');
   const css180 = readFile('css/terminal.css');
   const configBlock180 = (html180.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
@@ -25609,7 +25646,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 181 — PHASE 3 OPERATOR hero-three reskin (id-preservation contract)');
   const html181 = readFile('index.html');
-  const uiCore181 = readFile('js/ui-core.js');
+  const uiCore181 = readGroup('ui-core');
   const css181 = readFile('css/terminal.css');
 
   // 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md §3
@@ -25704,7 +25741,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '181.2: every shipped handler (commitStat/capStatMax/toggleLimb/nativeLevelUp/onLvlInputChanged/onTimeInputChanged/onLocationChange/updateKarmaUI/renderBioScan) is still called from index.html — missing: ' +
       missingHandlers181.join(', ')
   );
-  const uiRender181 = readFile('js/ui-render.js');
+  const uiRender181 = readGroup('ui-render');
   assert(
     /function renderSkills\(\)/.test(uiCore181) &&
       /function renderFactionRep\(\)/.test(uiRender181) &&
@@ -25925,7 +25962,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 181.20  no campaign-state field was added or removed by this reskin —
   //         the plan's "no state field touched" constraint, checked against
   //         the state.js default-state declaration.
-  const stateSrc181 = readFile('js/state.js');
+  const stateSrc181 = readGroup('state');
   assert(
     !/opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(stateSrc181),
     '181.20: js/state.js declares no new state field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data'
@@ -25939,9 +25976,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 182 — OPERATOR follow-up: drag controls + RAD max clamp');
-  const uiCore182 = readFile('js/ui-core.js');
-  const stateSrc182 = readFile('js/state.js');
-  const apiSrc182 = readFile('js/api.js');
+  const uiCore182 = readGroup('ui-core');
+  const stateSrc182 = readGroup('state');
+  const apiSrc182 = readGroup('api');
 
   // Reconstructs a full, standalone "function name(params) { body }" text for
   // redeclaration in a vm sandbox (mirrors Suite 137.6's declareFn137 pattern —
@@ -26467,9 +26504,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
   const html184 = readFile('index.html');
   const css184 = readFile('css/terminal.css');
-  const core184 = readFile('js/ui-core.js');
-  const audio184 = readFile('js/ui-audio.js');
-  const acct184 = readFile('js/ui-account.js');
+  const core184 = readGroup('ui-core');
+  const audio184 = readGroup('ui-audio');
+  const acct184 = readGroup('ui-account');
   // Reconstructs a full, standalone "function name(params) { body }" text for
   // redeclaration in a vm sandbox (mirrors Suite 182's declareFn182 pattern —
   // extractFunctionBody() alone only returns the brace-matched body).
@@ -26898,10 +26935,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
   const html185 = readFile('index.html');
   const css185 = readFile('css/terminal.css');
-  const core185 = readFile('js/ui-core.js');
-  const render185 = readFile('js/ui-render.js');
-  const api185 = readFile('js/api.js');
-  const stateSrc185 = readFile('js/state.js');
+  const core185 = readGroup('ui-core');
+  const render185 = readGroup('ui-render');
+  const api185 = readGroup('api');
+  const stateSrc185 = readGroup('state');
 
   // 185.1  BOTTLE CAPS + WEIGHT tiles are gone from the OPERATOR readback
   //        strip (only MAX AP + GRADE ADVANCE remain); #c_caps/#display_weight
@@ -27279,10 +27316,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
-  const core186 = readFile('js/ui-core.js');
-  const render186 = readFile('js/ui-render.js');
+  const core186 = readGroup('ui-core');
+  const render186 = readGroup('ui-render');
   const css186 = readFile('css/terminal.css');
-  const stateSrc186 = readFile('js/state.js');
+  const stateSrc186 = readGroup('state');
   const skillsBody186 = extractFunctionBody(core186, 'renderSkills');
   const statusBody186 = extractFunctionBody(render186, 'renderStatus');
   const factionBody186 = extractFunctionBody(render186, 'renderFactionRep');
@@ -27503,8 +27540,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
-  const core187 = readFile('js/ui-core.js');
-  const render187 = readFile('js/ui-render.js');
+  const core187 = readGroup('ui-core');
+  const render187 = readGroup('ui-render');
   const css187 = readFile('css/terminal.css');
   const html187 = readFile('index.html');
   const perksBody187 = extractFunctionBody(render187, 'renderPerks');
@@ -27877,7 +27914,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        renderInventory() row template (data-use/data-idx delegation,
   //        .hole/.use-btn/.tag/.m-id/.m-ctrl element order) is byte-identical
   //        to before this fix.
-  const render188 = readFile('js/ui-render.js');
+  const render188 = readGroup('ui-render');
   const invBody188 = (render188.match(/function renderInventory\(\)[\s\S]*?\n\}/) || [''])[0];
   assert(
     /data-use="\$\{it\._origIdx\}"/.test(invBody188) &&
@@ -27904,8 +27941,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 189 — Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)');
   const html189 = readFile('index.html');
-  const render189 = readFile('js/ui-render.js');
-  const state189src = readFile('js/state.js');
+  const render189 = readGroup('ui-render');
+  const state189src = readGroup('state');
   const css189 = readFile('css/terminal.css');
   const mapBody189 = (() => {
     try {
@@ -28037,7 +28074,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 189.9  the CYCLE key is additive — autoImportState()'s own AI-write quest
   //        status path is untouched (Protocol 14/24 — a second entry point,
   //        never a fork of the AI path)
-  const apiSrc189 = readFile('js/api.js');
+  const apiSrc189 = readGroup('api');
   assert(
     /status/.test(apiSrc189) &&
       /quests/i.test(apiSrc189) &&
@@ -28220,8 +28257,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header(
     'Suite 190 — owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip'
   );
-  const core190 = readFile('js/ui-core.js');
-  const render190 = readFile('js/ui-render.js');
+  const core190 = readGroup('ui-core');
+  const render190 = readGroup('ui-render');
   const css190 = readFile('css/terminal.css');
 
   function declareFn190(src, name) {
@@ -28579,9 +28616,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
-  const state191 = readFile('js/state.js');
-  const render191 = readFile('js/ui-render.js');
-  const reg191 = readFile('js/reg_fo3.js');
+  const state191 = readGroup('state');
+  const render191 = readGroup('ui-render');
+  const reg191 = readGroup('reg_fo3');
   const html191 = readFile('index.html');
   const css191 = readFile('css/terminal.css');
 
@@ -28935,10 +28972,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 192 — Design Overhaul CHASSIS unit: THE LIVING CORE');
   const html192 = readFile('index.html');
-  const core192 = readFile('js/ui-core.js');
-  const audio192 = readFile('js/ui-audio.js');
-  const saves192 = readFile('js/ui-saves.js');
-  const cloud192 = readFile('js/cloud.js');
+  const core192 = readGroup('ui-core');
+  const audio192 = readGroup('ui-audio');
+  const saves192 = readGroup('ui-saves');
+  const cloud192 = readGroup('cloud');
   const css192 = readFile('css/terminal.css');
 
   // 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
@@ -29818,9 +29855,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html194 = readFile('index.html');
   const css194 = readFile('css/terminal.css');
   const cssStripped194 = css194.replace(/\/\*[\s\S]*?\*\//g, '');
-  const core194 = readFile('js/ui-core.js');
-  const audio194 = readFile('js/ui-audio.js');
-  const state194 = readFile('js/state.js');
+  const core194 = readGroup('ui-core');
+  const audio194 = readGroup('ui-audio');
+  const state194 = readGroup('state');
 
   // 194.1  #1 thermal glow: a real activity-derived accumulator (_coreTemp),
   //        mutated ONLY by _coreThermalTick() (never by _coreRefresh(),
@@ -30430,10 +30467,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
-  const stateSrc196 = readFile('js/state.js');
-  const coreSrc196 = readFile('js/ui-core.js');
-  const renderSrc196 = readFile('js/ui-render.js');
-  const apiSrc196 = readFile('js/api.js');
+  const stateSrc196 = readGroup('state');
+  const coreSrc196 = readGroup('ui-core');
+  const renderSrc196 = readGroup('ui-render');
+  const apiSrc196 = readGroup('api');
   const htmlSrc196 = readFile('index.html');
   const css196 = readFile('css/terminal.css');
   const cssStripped196 = css196.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -31048,9 +31085,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 197 — FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations');
-  const coreSrc197 = readFile('js/ui-core.js');
-  const renderSrc197 = readFile('js/ui-render.js');
-  const apiSrc197 = readFile('js/api.js');
+  const coreSrc197 = readGroup('ui-core');
+  const renderSrc197 = readGroup('ui-render');
+  const apiSrc197 = readGroup('api');
   const css197 = readFile('css/terminal.css');
   const cssStripped197 = css197.replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -31292,7 +31329,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 198 — DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin');
-  const renderSrc198 = readFile('js/ui-render.js');
+  const renderSrc198 = readGroup('ui-render');
   const css198 = readFile('css/terminal.css');
   const cssStripped198 = css198.replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -31507,11 +31544,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 199 — FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations');
-  const coreSrc199 = readFile('js/ui-core.js');
-  const renderSrc199 = readFile('js/ui-render.js');
-  const savesSrc199 = readFile('js/ui-saves.js');
-  const apiSrc199 = readFile('js/api.js');
-  const stateSrc199 = readFile('js/state.js');
+  const coreSrc199 = readGroup('ui-core');
+  const renderSrc199 = readGroup('ui-render');
+  const savesSrc199 = readGroup('ui-saves');
+  const apiSrc199 = readGroup('api');
+  const stateSrc199 = readGroup('state');
   const css199 = readFile('css/terminal.css');
   const cssStripped199 = css199.replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -31864,9 +31901,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 200 — Native USE (deterministic item consumption, no AI)');
-  const renderSrc200 = readFile('js/ui-render.js');
-  const dbNvSrc200 = readFile('js/db_nv.js');
-  const dbFo3Src200 = readFile('js/db_fo3.js');
+  const renderSrc200 = readGroup('ui-render');
+  const dbNvSrc200 = readGroup('db_nv');
+  const dbFo3Src200 = readGroup('db_fo3');
 
   function declareFn200(src, name) {
     const nameIdx = src.indexOf('function ' + name);
@@ -32103,7 +32140,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         together in one sandbox (the Suite 133/182 real-function idiom).
   {
     const vm200d = require('vm');
-    const coreSrc200d = readFile('js/ui-core.js');
+    const coreSrc200d = readGroup('ui-core');
     function declareFnCore200d(name) {
       const nameIdx = coreSrc200d.indexOf('function ' + name);
       const parenIdx = coreSrc200d.indexOf('(', nameIdx);
@@ -32275,8 +32312,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 201 — TERMINAL stat edits (deterministic, no AI)');
-  const apiSrc201 = readFile('js/api.js');
-  const coreSrc201 = readFile('js/ui-core.js');
+  const apiSrc201 = readGroup('api');
+  const coreSrc201 = readGroup('ui-core');
 
   function declareFnApi201(name) {
     const nameIdx = apiSrc201.indexOf('function ' + name);
@@ -32641,9 +32678,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 202 — AI→native: GPS/MAP, level-up skill points, eligible perks');
-  const apiSrc202 = readFile('js/api.js');
-  const uiCoreSrc202 = readFile('js/ui-core.js');
-  const uiRenderSrc202 = readFile('js/ui-render.js');
+  const apiSrc202 = readGroup('api');
+  const uiCoreSrc202 = readGroup('ui-core');
+  const uiRenderSrc202 = readGroup('ui-render');
 
   // 202.1  static — the native router carries [GPS]/[MAP] → _nativeOpenMap()
   //        and [PERKS]/[PK] → renderEligiblePerks(); all four functions exist.
@@ -32911,7 +32948,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 203 — native TRAVEL HERE map control');
-  const render203 = readFile('js/ui-render.js');
+  const render203 = readGroup('ui-render');
   const travelFn203 = extractFunctionBody(render203, 'travelToLocation');
   const travelBtnSrc203 = (render203.match(/const travelBtn = isYou[\s\S]*?<\/button>`;/) || [
     '',
@@ -33061,7 +33098,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 204 — LOCATION CONFIRMATION CARD (top-right arrival toast)');
-  const coreSrc204 = readFile('js/ui-core.js');
+  const coreSrc204 = readGroup('ui-core');
   const htmlSrc204 = readFile('index.html');
   const css204 = readFile('css/terminal.css');
   const cssStripped204 = css204.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -33318,10 +33355,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 {
-  const ocrSrc205 = readFile('js/ocr.js');
+  const ocrSrc205 = readGroup('ocr');
   const htmlSrc205 = readFile('index.html');
   const swSrc205 = readFile('sw.js');
-  const consoleSrc205 = readFile('js/test-console.js');
+  const consoleSrc205 = readGroup('test-console');
   const repomix205 = readFile('repomix.config.json');
 
   // 205.1 js/ocr.js exists on disk
@@ -33544,8 +33581,8 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   //        handleImageSelection() and transmitMessage()'s inlineData branch
   //        still exist unmodified (Unit 1 is additive-only).
   {
-    const savesSrc205 = readFile('js/ui-saves.js');
-    const apiSrc205 = readFile('js/api.js');
+    const savesSrc205 = readGroup('ui-saves');
+    const apiSrc205 = readGroup('api');
     assert(
       /function handleImageSelection\(event\)/.test(savesSrc205) &&
         /attachedImageData = e\.target\.result;/.test(savesSrc205) &&
@@ -33582,11 +33619,11 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)');
 {
-  const ocrSrc206 = readFile('js/ocr.js');
-  const renderSrc206 = readFile('js/ui-render.js');
-  const apiSrc206 = readFile('js/api.js');
-  const coreSrc206 = readFile('js/ui-core.js');
-  const consoleSrc206 = readFile('js/test-console.js');
+  const ocrSrc206 = readGroup('ocr');
+  const renderSrc206 = readGroup('ui-render');
+  const apiSrc206 = readGroup('api');
+  const coreSrc206 = readGroup('ui-core');
+  const consoleSrc206 = readGroup('test-console');
   const htmlSrc206 = readFile('index.html');
 
   // 206.1 static — _parseOcrText is defined in js/ocr.js and exposed on window
@@ -34101,12 +34138,12 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
 // ══════════════════════════════════════════════════════════════
 header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 {
-  const ocrSrc207 = readFile('js/ocr.js');
-  const savesSrc207 = readFile('js/ui-saves.js');
-  const apiSrc207 = readFile('js/api.js');
-  const renderSrc207 = readFile('js/ui-render.js');
-  const coreSrc207 = readFile('js/ui-core.js');
-  const cloudSrc207 = readFile('js/cloud.js');
+  const ocrSrc207 = readGroup('ocr');
+  const savesSrc207 = readGroup('ui-saves');
+  const apiSrc207 = readGroup('api');
+  const renderSrc207 = readGroup('ui-render');
+  const coreSrc207 = readGroup('ui-core');
+  const cloudSrc207 = readGroup('cloud');
 
   // 207.1 static — cloud.js registers both fail-open flags (Protocol 32/33)
   assert(
@@ -34588,9 +34625,9 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 {
-  const coreSrc208 = readFile('js/ui-core.js');
-  const audioSrc208 = readFile('js/ui-audio.js');
-  const stateSrc208 = readFile('js/state.js');
+  const coreSrc208 = readGroup('ui-core');
+  const audioSrc208 = readGroup('ui-audio');
+  const stateSrc208 = readGroup('state');
   const css208 = readFile('css/terminal.css');
   const cssStripped208 = css208.replace(/\/\*[\s\S]*?\*\//g, '');
   const claudeSrc208 = readFile('CLAUDE.md');
@@ -35336,7 +35373,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate');
-  const testConsole210 = readFile('js/test-console.js');
+  const testConsole210 = readGroup('test-console');
   const index210 = readFile('index.html');
 
   // 210.1  DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
@@ -35743,7 +35780,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons');
-  const testConsole211 = readFile('js/test-console.js');
+  const testConsole211 = readGroup('test-console');
   const index211 = readFile('index.html');
   const css211 = readFile('css/terminal.css');
   const tplStart211 = index211.indexOf('<template id="testConsoleTemplate">');
@@ -36107,7 +36144,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44');
-  const testConsole212 = readFile('js/test-console.js');
+  const testConsole212 = readGroup('test-console');
   const claude212 = readFile('CLAUDE.md');
 
   // Live-evaluate the REAL DIAGNOSTIC_SHELL_TOOLS array (the eval-sandbox
@@ -36806,7 +36843,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)');
-  const testConsole213 = readFile('js/test-console.js');
+  const testConsole213 = readGroup('test-console');
   const index213 = readFile('index.html');
   const css213 = readFile('css/terminal.css');
   // Pulls every top-level @media(max-width:999.98px){...} block's body and
@@ -37000,7 +37037,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out');
-  const testConsole214 = readFile('js/test-console.js');
+  const testConsole214 = readGroup('test-console');
   const index214 = readFile('index.html');
   const tplStart214 = index214.indexOf('<template id="testConsoleTemplate">');
   const tplEnd214 = index214.indexOf('</template>', tplStart214);
@@ -37559,7 +37596,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy');
-  const testConsole215 = readFile('js/test-console.js');
+  const testConsole215 = readGroup('test-console');
   const index215 = readFile('index.html');
   const terminalCss215 = readFile('css/terminal.css');
 
@@ -38633,9 +38670,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header(
     'Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremony + FINAL leak-proof audit'
   );
-  const testConsole216 = readFile('js/test-console.js');
-  const cloudSrc216 = readFile('js/cloud.js');
-  const stateSrc216 = readFile('js/state.js');
+  const testConsole216 = readGroup('test-console');
+  const cloudSrc216 = readGroup('cloud');
+  const stateSrc216 = readGroup('state');
   const index216 = readFile('index.html');
   const terminalCss216 = readFile('css/terminal.css');
 
@@ -39444,8 +39481,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
   header('Suite 217 — Mobile UX polish: cloud-save prominence + toast audit');
   const htmlSource217 = readFile('index.html');
-  const uiCore217 = readFile('js/ui-core.js');
-  const uiAccount217 = readFile('js/ui-account.js');
+  const uiCore217 = readGroup('ui-core');
+  const uiAccount217 = readGroup('ui-account');
   const cssSource217 = readFile('css/terminal.css');
 
   // 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button —
@@ -39581,8 +39618,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'Suite 218 — NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired'
   );
   const cssSource218 = readFile('css/terminal.css');
-  const apiSrc218 = readFile('js/api.js');
-  const uiCoreSrc218 = readFile('js/ui-core.js');
+  const apiSrc218 = readGroup('api');
+  const uiCoreSrc218 = readGroup('ui-core');
 
   // 218.1  MF-1 — the base subsystem-content gate still exists, unconditional.
   assert(
@@ -39658,7 +39695,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //        actually generalizes past the two shipped games rather than merely
   //        renaming the same two-way ternary.
   {
-    const stateSrc218 = readFile('js/state.js');
+    const stateSrc218 = readGroup('state');
     const fo4Idx218 = stateSrc218.indexOf('FO4:');
     const fo4Slice218 = stateSrc218.slice(fo4Idx218, fo4Idx218 + 400);
     assert(
@@ -39689,8 +39726,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 219 — v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced');
-  const cloudSrc219 = readFile('js/cloud.js');
-  const uiCoreSrc219 = readFile('js/ui-core.js');
+  const cloudSrc219 = readGroup('cloud');
+  const uiCoreSrc219 = readGroup('ui-core');
 
   // 219.1  cloud.js exports window.getFeatureFlagKeys() as the single source
   //        of every real flag key (Object.keys(_featureFlags) — never a

@@ -31,6 +31,34 @@ function Read-Src($rel) {
     return [IO.File]::ReadAllText($p)
 }
 
+# Logical-bundle read helper (2.8.5 U-A0) -- mirrors readGroup() in
+# tests/robco-diagnostics.js (Protocol 15 parity). Concatenates every
+# js/<stem>.js + js/<stem>-*.js file on disk into one string, so a future
+# split keeps every existing Read-Group "ui-core" content assertion green
+# without editing a test. For a stem that hasn't split yet, the family is
+# exactly one file, so this is byte-identical to the old Read-Src "js/<stem>.js"
+# call (-join never inserts a separator for a single-element array).
+#
+# $GROUP_OVERRIDES exists for a split whose sibling files intentionally don't
+# share a `<stem>-*.js` filename prefix (see planning/CODE_HEALTH_PLAN.md
+# §2.3 -- the proposed api.js split does not follow the stem-prefix
+# convention §2 states as governing). Empty today; a future split unit adds
+# an entry here only if it ships non-prefixed sibling names.
+$GROUP_OVERRIDES = @{}
+function Read-Group($stem) {
+    if ($GROUP_OVERRIDES.ContainsKey($stem)) {
+        $parts = $GROUP_OVERRIDES[$stem] | ForEach-Object { Read-Src "js/$_" }
+        return ($parts -join "`n")
+    }
+    $jsDir = Join-Path $Root 'js'
+    $files = Get-ChildItem -Path $jsDir -Filter '*.js' | Where-Object {
+        $_.Name -eq "$stem.js" -or $_.Name -like "$stem-*.js"
+    } | Sort-Object Name
+    if ($files.Count -eq 0) { Fail "Source file family not found: js/$stem.js (or js/$stem-*.js)"; exit 1 }
+    $parts = $files | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }
+    return ($parts -join "`n")
+}
+
 function Get-FunctionBody($source, $fnName) {
     $idx = $source.IndexOf("function $fnName")
     if ($idx -lt 0) { throw "Cannot find function '$fnName'" }
@@ -108,9 +136,9 @@ function Get-SkillKeys($source) {
 }
 
 # ---- Load sources ----
-$stateSrc  = Read-Src "js\state.js"
-$apiSrc    = Read-Src "js\api.js"
-$cloudSrc  = Read-Src "js\cloud.js"
+$stateSrc  = Read-Group "state"
+$apiSrc    = Read-Group "api"
+$cloudSrc  = Read-Group "cloud"
 $uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js','js\ui-core.js')
 $uiSrc     = ($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) }) -join "`n"
 
@@ -325,8 +353,8 @@ Check ($apiSrc -imatch 'legacy.*flat.*key|flat.*key.*fallback') "autoImportState
 # Suite 8 -- Registry structural integrity
 # ===========================================================
 Sep "Suite 8 -- Registry structural integrity"
-$regSrc = Read-Src "js/reg_nv.js"
-$regCoreSrc = Read-Src "js/registry-core.js"
+$regSrc = Read-Group "reg_nv"
+$regCoreSrc = Read-Group "registry-core"
 
 Check ($regSrc -match 'const FALLOUT_REGISTRY')           "FALLOUT_REGISTRY global is declared"
 Check ($regCoreSrc -match 'function registrySearch')       "registrySearch() function is declared in registry-core.js"
@@ -346,11 +374,11 @@ Check ($regCode -cnotmatch '\bstate\b')                    "reg_nv.js does not r
 Check ($regCode -notmatch 'localStorage')                  "reg_nv.js does not reference localStorage (in code)"
 # ===========================================================
 # Suite 9 -- Database structural integrity
-# Validates js/database.js: all CSV tables, trigger coverage,
-# invKeywords, systemInstruction placement, and purity contract.
+# Validates js/db_nv.js (and js/db_fo3.js): all CSV tables, trigger
+# coverage, invKeywords, systemInstruction placement, purity contract.
 # ===========================================================
 Sep "Suite 9 -- Database structural integrity"
-$dbSrc = Read-Src "js/db_nv.js"
+$dbSrc = Read-Group "db_nv"
 
 # 9.1 databaseCSVs global must be declared
 Check ($dbSrc -match 'const databaseCSVs')                          "databaseCSVs global is declared"
@@ -362,7 +390,7 @@ Check ($dbSrc -match 'function lookupItemInDb')                      "lookupItem
 $REQUIRED_TABLES = @('[WEAPONS.CSV]','[AMMO.CSV]','[ARMOR.CSV]','[BESTIARY.CSV]',
                      '[CHEMS.CSV]','[MISC.CSV]','[RECIPES.CSV]','[QUEST_ITEMS.CSV]','[VENDORS.CSV]')
 foreach ($tbl in $REQUIRED_TABLES) {
-    Check ($dbSrc.Contains($tbl)) "database.js contains $tbl section"
+    Check ($dbSrc.Contains($tbl)) "db_nv.js contains $tbl section"
 }
 
 # 9.4 [TH] shorthand must be in api.js invKeywords (triggerWords removed in v1.6.7)
@@ -393,11 +421,11 @@ $hasSysInst = ($apiSrc.Contains('{ text: databaseCSVs }') -or
 Check $hasSysInst                                                    "databaseCSVs is injected via systemInstruction in api.js"
 
 
-# 9.8 database.js must NOT reference state, localStorage, or chatHistory
+# 9.8 db_nv.js must NOT reference state, localStorage, or chatHistory
 $dbCode = ($dbSrc -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
-Check ($dbCode -notmatch '\bstate\b')                                "database.js does not reference state (pure reference data)"
-Check ($dbCode -notmatch 'localStorage')                             "database.js does not reference localStorage"
-Check ($dbCode -notmatch 'chatHistory')                              "database.js does not reference chatHistory"
+Check ($dbCode -notmatch '\bstate\b')                                "db_nv.js does not reference state (pure reference data)"
+Check ($dbCode -notmatch 'localStorage')                             "db_nv.js does not reference localStorage"
+Check ($dbCode -notmatch 'chatHistory')                              "db_nv.js does not reference chatHistory"
 
 # ===========================================================
 # Suite 10 -- DOM ID Binding (syncStateFromDom)
@@ -708,7 +736,7 @@ console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
 # 16 tests
 # ===========================================================
 Sep "Suite 19 -- FO3 Database structural integrity"
-$dbFo3Src = Read-Src "js/db_fo3.js"
+$dbFo3Src = Read-Group "db_fo3"
 
 # 19.1 databaseCSVs global must be declared
 Check ($dbFo3Src -match 'const databaseCSVs')                          "db_fo3.js: databaseCSVs global is declared"
@@ -797,7 +825,7 @@ Check ($renderSquadBody -match 'parseInt\s*\(\s*member\.hp\s*\)' -and
 # `mType === 'TRADE'` source dependency that made this guard vacuous -- and threw an
 # IndexOf(-1) exception here -- was removed under Protocol 42). Item names are escaped and
 # routed via a data attribute, never interpolated raw into the onclick. Complements 21.4.
-$renSrc213 = Read-Src "js/ui-render.js"
+$renSrc213 = Read-Group "ui-render"
 $sellBody213 = ''
 try { $sellBody213 = Get-FunctionBody $renSrc213 'renderTradeSellList' } catch {}
 Check (($sellBody213 -match 'escapeHtml\(it\.name\)') -and ($sellBody213 -match 'data-tname=') -and ($sellBody213 -match 'this\.dataset\.tname')) `
@@ -805,7 +833,7 @@ Check (($sellBody213 -match 'escapeHtml\(it\.name\)') -and ($sellBody213 -match 
 
 # 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
 # escaped and routed via a data attribute, never interpolated raw into the onclick.
-$renSrc214 = Read-Src "js/ui-render.js"
+$renSrc214 = Read-Group "ui-render"
 $buyBody214 = ''
 try { $buyBody214 = Get-FunctionBody $renSrc214 'renderTradeBuyList' } catch {}
 Check (($buyBody214 -match 'escapeHtml\(it\.name\)') -and ($buyBody214 -match 'data-tname=') -and ($buyBody214 -match 'this\.dataset\.tname')) `
@@ -1027,7 +1055,7 @@ Check ([bool]($fullDirBody25 -match "'modal'|`"modal`""))         "getSystemDire
 # 3 tests
 # ===========================================================
 Sep "Suite 26 -- Architectural Boundaries -- reg_fo3.js purity"
-$regFo3Src = Read-Src "js/reg_fo3.js"
+$regFo3Src = Read-Group "reg_fo3"
 $regFo3Code = ($regFo3Src -replace '(?s)/\*.*?\*/', '') -replace '//[^\r\n]*', ''
 Check ($regFo3Code -cnotmatch '\bstate\b')     "reg_fo3.js does not reference state (pure reference data)"
 Check ($regFo3Code -notmatch 'localStorage')   "reg_fo3.js does not reference localStorage (in code)"
@@ -1148,7 +1176,7 @@ if (Test-Path (Join-Path $Root '.git/hooks/pre-commit')) {
 Check ([bool]($hookSrc30 -match 'LOCAL_N.*-gt.*ORIGIN_N')) `
     'pre-commit hook enforces strict monotonic rev increase (LOCAL_N -gt ORIGIN_N)'
 # 30.4 saveState() contains proactive quota warning
-$stateSrc30 = Read-Src 'js/state.js'
+$stateSrc30 = Read-Group "state"
 Check ([bool]($stateSrc30 -match '_quotaWarnShown')) `
     'saveState() contains proactive localStorage quota warning (once-per-session guard)'
 
@@ -1250,7 +1278,7 @@ Check $removed32api 'Removed legacy commands absent from api.js canonical comman
 # 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
 # Phase 3 OPERATOR batch 2: each row now also carries .vu-row (the BUS-05 VU
 # meter skin) alongside .skill-row -- prefix match tolerates either.
-$uiCoreSrc32 = Read-Src 'js/ui-core.js'
+$uiCoreSrc32 = Read-Group "ui-core"
 Check ([bool]($uiCoreSrc32 -match 'class="skill-row')) `
     'ui-core.js: renderSkills() generates .skill-row elements dynamically (static index.html rows replaced)'
 
@@ -1282,8 +1310,8 @@ Check ($rgbHtml33 -ge 5) "index.html optics script sets --robco-green-rgb in >=5
 
 # 33.4 WU-T1: optics palette is now table-driven (P1-1, repointed) -- THEMES table covers
 #      >=6 colours AND changeOpticsColor delegates to the single table-driven applier.
-$state33d = Read-Src "js/state.js"
-$audio33d = Read-Src "js/ui-audio.js"
+$state33d = Read-Group "state"
+$audio33d = Read-Group "ui-audio"
 $themesBlock33d = [regex]::Match($state33d, '(?s)const THEMES = \{[\s\S]*?\n\};').Value
 $colourCount33 = ([regex]::Matches($themesBlock33d, "rgb:\s*'")).Count
 Check (($colourCount33 -ge 6) -and ($audio33d -match '_applyThemeVars\(color\)') -and ($audio33d -match 'THEMES\[key\]')) "THEMES table covers >=6 optic colours (found $colourCount33); changeOpticsColor is table-driven via _applyThemeVars (P1-1, WU-T1)"
@@ -1317,7 +1345,7 @@ Check $noPlus33 'No hardcoded [+] text in index.html summary elements (P1-4)'
 Sep "Suite 34 -- Phase 2c Guards"
 $cssSrc34 = Read-Src 'css/terminal.css'
 $htmlSrc34 = Read-Src 'index.html'
-$uiSrc34   = Read-Src 'js/ui-core.js'
+$uiSrc34   = Read-Group "ui-core"
 
 # 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
 Check (-not [bool]($cssSrc34 -match '\.faction-item\s*\{')) '.faction-item rule deleted from terminal.css (P2-1)'
@@ -1364,12 +1392,12 @@ Check (-not [bool]($htmlSrc34 -match '\[NO COLLECTIBLES LOADED\]')) 'index.html 
 # 6 tests
 # ===========================================================
 Sep "Suite 35 -- Phase 3a Performance Guards"
-$apiSrc35    = Read-Src 'js/api.js'
-$stateSrc35  = Read-Src 'js/state.js'
-$uiSrc35     = Read-Src 'js/ui-core.js'
+$apiSrc35    = Read-Group "api"
+$stateSrc35  = Read-Group "state"
+$uiSrc35     = Read-Group "ui-core"
 $cssSrc35    = Read-Src 'css/terminal.css'
-$regNvSrc35  = Read-Src 'js/reg_nv.js'
-$regCoreSrc35 = Read-Src 'js/registry-core.js'
+$regNvSrc35  = Read-Group "reg_nv"
+$regCoreSrc35 = Read-Group "registry-core"
 
 # 35.1 P4: the Terminal Record eventLog is capped via the single _logEvent()
 #      writer (state.js); api.js auto-log sites route through it. campaign_notes
@@ -1407,7 +1435,7 @@ Check ([bool]($regCoreSrc35 -match '_registrySearchCache')) 'registrySearch has 
 # 4 tests
 # ===========================================================
 Sep "Suite 36 -- Keyboard Shortcuts Group"
-$uiSrc36 = Read-Src 'js/ui-core.js'  # COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
+$uiSrc36 = Read-Group "ui-core"  # COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
 
 # 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
 $cmdRegM36 = [regex]::Match($uiSrc36, 'const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];')
@@ -1529,8 +1557,8 @@ function Get-RegWeaponNames($src) {
     return $names
 }
 
-$dbNv38  = Read-Src 'js/db_nv.js'
-$regNv38 = Read-Src 'js/reg_nv.js'
+$dbNv38  = Read-Group "db_nv"
+$regNv38 = Read-Group "reg_nv"
 $dbW38   = Get-DbWeaponNames $dbNv38
 $regW38  = Get-RegWeaponNames $regNv38
 
@@ -1542,8 +1570,8 @@ Check ([string]::IsNullOrEmpty($miss381)) "FNV: all registry weapons exist in WE
 $miss382 = ($dbW38 | Where-Object { -not $regW38.Contains($_) }) -join ', '
 Check ([string]::IsNullOrEmpty($miss382)) "FNV: all WEAPONS.CSV rows exist in registry (missing: $(if ($miss382) { $miss382 } else { 'none' }))"
 
-$dbFo3_38  = Read-Src 'js/db_fo3.js'
-$regFo3_38 = Read-Src 'js/reg_fo3.js'
+$dbFo3_38  = Read-Group "db_fo3"
+$regFo3_38 = Read-Group "reg_fo3"
 $dbW383    = Get-DbWeaponNames $dbFo3_38
 $regW383   = Get-RegWeaponNames $regFo3_38
 
@@ -1601,8 +1629,8 @@ function Get-WeaponAmmoTypes39($src) {
     return $types
 }
 
-$nvSrc39  = Read-Src 'js/db_nv.js'
-$fo3Src39 = Read-Src 'js/db_fo3.js'
+$nvSrc39  = Read-Group "db_nv"
+$fo3Src39 = Read-Group "db_fo3"
 $nvCals39  = Get-AmmoCalibers39 $nvSrc39
 $fo3Cals39 = Get-AmmoCalibers39 $fo3Src39
 # 39.1 FNV AMMO.CSV contains Energy Cell
@@ -1635,9 +1663,9 @@ Check (-not $fo3Types39.Contains('EC')) 'FO3 WEAPONS.CSV: no weapon has Ammo_Typ
 # 6 tests
 # ===========================================================
 Sep "Suite 40 -- Inventory Category Filter + Mod Type"
-$apiSrc40  = Read-Src 'js/api.js'
+$apiSrc40  = Read-Group "api"
 $htmlSrc40 = Read-Src 'index.html'
-$uiSrc40   = Read-Src 'js/ui-core.js'
+$uiSrc40   = Read-Group "ui-core"
 
 # 40.1  'mod' in inventory type enum in api.js
 Check ([bool]($apiSrc40 -match '"mod"')) `
@@ -1675,8 +1703,8 @@ Check ([bool]($renderBody40 -match '_invFilter')) `
 # 5 tests
 # ===========================================================
 Sep "Suite 41 -- Weapon Mods CSV + Registry Parity"
-$dbNv41  = Read-Src 'js/db_nv.js'
-$regNv41 = Read-Src 'js/reg_nv.js'
+$dbNv41  = Read-Group "db_nv"
+$regNv41 = Read-Group "reg_nv"
 
 # 41.1  [WEAPON_MODS.CSV] section exists in db_nv.js
 Check ([bool]($dbNv41 -match '\[WEAPON_MODS\.CSV\]')) `
@@ -1752,7 +1780,7 @@ Check ($missing41b.Count -eq 0) "FNV: all WEAPON_MODS.CSV rows exist in registry
 # ===========================================================
 Sep "Suite 42 -- Native Command Router (Phase 5a)"
 
-$apiSrc42 = Read-Src 'js/api.js'
+$apiSrc42 = Read-Group "api"
 
 # 42.1  NATIVE_COMMAND_ROUTER object defined in api.js
 Check ([bool]($apiSrc42 -match 'const NATIVE_COMMAND_ROUTER')) `
@@ -1827,7 +1855,7 @@ Check ($waitLoadIdx -ge 0 -and $waitSaveIdx -ge 0 -and $waitLoadIdx -lt $waitSav
 # 11 tests
 # ===========================================================
 Sep "Suite 43 -- GAME_DEFS Structural Integrity (Phase 5b)"
-$stateSrc43 = Read-Src 'js/state.js'
+$stateSrc43 = Read-Group "state"
 
 # 43.1  state.js declares const GAME_DEFS = {
 Check ([bool]($stateSrc43 -match 'const GAME_DEFS\s*=\s*\{')) `
@@ -2523,9 +2551,9 @@ Check ($installHooksSrc50 -match 'pre-push') `
 # ===========================================================
 Sep "Suite 51 -- Save Integrity + Rolling Backups"
 
-$stateSrc51 = Read-Src "js/state.js"
+$stateSrc51 = Read-Group "state"
 $uiSrc51    = $uiSrc  # concatenated -- save functions now in ui-saves.js
-$cloudSrc51 = Read-Src "js/cloud.js"
+$cloudSrc51 = Read-Group "cloud"
 $indexSrc51 = Read-Src "index.html"
 
 # 51.1  computeSaveChecksum and _fnv1a32 exist in state.js
@@ -2879,7 +2907,7 @@ Check ($readmeSrc52 -match "ci\.yml" -and $readmeSrc52 -match "badge") `
 # 25 tests
 # ===========================================================
 Sep "Suite 53 -- AI + Gemini-Key Resilience Guards"
-$apiSrc53 = Read-Src "js/api.js"
+$apiSrc53 = Read-Group "api"
 
 # 53.1  _AI_RETRY_MAX constant defined
 Check ($apiSrc53 -match '_AI_RETRY_MAX\s*=\s*\d+') `
@@ -3020,8 +3048,8 @@ Check ($bangParsedIdx53 -ge 0 -and $firstRetFalseIdx53 -ge 0 -and $bangParsedIdx
 # 14 tests
 # ===========================================================
 Sep "Suite 54 -- Prompt-Injection Hardening, Input Caps, Quota Warning"
-$apiSrc54  = Read-Src "js/api.js"
-$stateSrc54 = Read-Src "js/state.js"
+$apiSrc54  = Read-Group "api"
+$stateSrc54 = Read-Group "state"
 $htmlSrc54 = Read-Src "index.html"
 # U1: the injection-resistance copy lives in _directiveInjectionBoundary() now --
 # check the full composed directive body, not getSystemDirective()'s own short body.
@@ -3100,7 +3128,7 @@ Check ($saveStateFn54 -match 'QuotaExceededError[\s\S]{0,400}appendToChat') `
 # ===========================================================
 Sep "Suite 55 -- CSP Stage 1 Origin Guards + Firebase Pin"
 $htmlSrc55 = Read-Src "index.html"
-$cloudSrc55 = Read-Src "js/cloud.js"
+$cloudSrc55 = Read-Group "cloud"
 
 # 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
 Check ([bool]($htmlSrc55 -match 'generativelanguage\.googleapis\.com')) `
@@ -3345,7 +3373,7 @@ Check ([bool](($htmlSrc56 -match 'GAME_FILES\s*=\s*\{') -and ($htmlSrc56 -match 
 Sep "Suite 57 -- PWA App Shortcuts Guards"
 $manifestSrc57 = Read-Src "manifest.json"
 $manifest57    = $manifestSrc57 | ConvertFrom-Json
-$uiCoreSrc57   = Read-Src "js/ui-core.js"
+$uiCoreSrc57   = Read-Group "ui-core"
 
 # 57.1 manifest.shortcuts is an array of exactly 4 entries
 Check ([bool]($manifest57.shortcuts -is [array]) -and $manifest57.shortcuts.Count -eq 4) `
@@ -3454,8 +3482,8 @@ Check (Test-Path (Join-Path $Root 'assets/icon.png')) `
 # 5 tests
 # ===========================================================
 Sep "Suite 58 -- Client Error Ring-Buffer Guards"
-$uiCoreSrc58 = Read-Src "js/ui-core.js"
-$apiSrc58    = Read-Src "js/api.js"
+$uiCoreSrc58 = Read-Group "ui-core"
+$apiSrc58    = Read-Group "api"
 
 # 58.1 ERROR_LOG_KEY, ERROR_LOG_CAP, _recordError all defined in ui-core.js
 Check ([bool]($uiCoreSrc58 -match 'ERROR_LOG_KEY\s*=') `
@@ -3624,7 +3652,7 @@ Check ([bool]($mobileSlice61 -match 'overflow-x\s*:\s*clip')) `
 # 25 tests
 # ===========================================================
 Sep "Suite 62 -- Changelog viewer guards"
-$uiCoreSrc62 = Read-Src "js/ui-core.js"
+$uiCoreSrc62 = Read-Group "ui-core"
 
 # 62.1 Both changelog viewers route through the structured renderer
 #      (_showChangelogModal) -- the boot-time PATCH NOTES viewer no longer dumps
@@ -3799,7 +3827,7 @@ Check (($hotfixTag62.Length -gt 0) -and ($hotfixTag62 -ne '[>] HOTFIX')) `
 # 8 tests
 # ===========================================================
 Sep "Suite 63 -- Save/Cloud UI consolidation guards"
-$cloudSrc63 = Read-Src "js/cloud.js"
+$cloudSrc63 = Read-Group "cloud"
 
 # 63.1  cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)
 Check ([bool]($cloudSrc63 -match 'window\.saveCurrentToCloud\s*=')) `
@@ -3847,7 +3875,7 @@ Check ([bool]($htmlSrc -match 'id="btnSaveToCloud"')) `
 # 13 tests
 # ===========================================================
 Sep "Suite 64 -- SPECIAL stats editable (commit-on-blur) guards"
-$uiCoreSrc64 = Read-Src "js\ui-core.js"
+$uiCoreSrc64 = Read-Group "ui-core"
 $specialIds64 = @('s_s','s_p','s_e','s_c','s_i','s_a','s_l')
 
 # 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)"
@@ -3948,7 +3976,7 @@ Check ($missing6412.Count -eq 0) `
     ("All 7 SPECIAL inputs oninput contains capStatMax (live upper-cap guard)" + $(if ($missing6412.Count) { " -- missing: $($missing6412 -join ', ')" } else { "" }))
 
 # 64.13  syncStateFromDom clamps SPECIAL reads to 1-10 (defense-in-depth)
-$stateSrc64 = Read-Src "js\state.js"
+$stateSrc64 = Read-Group "state"
 $syncBody64 = ''
 try { $syncBody64 = Get-FunctionBody $stateSrc64 'syncStateFromDom' } catch {}
 Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -or $syncBody64 -match 'Math\.Max\s*\(\s*1,\s*Math\.Min\s*\(\s*10,')) `
@@ -3962,7 +3990,7 @@ Check ([bool]($syncBody64 -match 'Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,' -o
 # 18 tests
 # ===========================================================
 Sep "Suite 65 -- Blocking Update Modal"
-$uiCoreSrc65 = Read-Src "js\ui-core.js"
+$uiCoreSrc65 = Read-Group "ui-core"
 
 # 65.1  #updateModal exists in index.html (replaced #updateBanner)
 Check ([bool]($htmlSrc -match 'id="updateModal"')) `
@@ -4057,12 +4085,12 @@ Check ([bool]($htmlSrc -match '(?s)function _surfaceWaiting\(\)[\s\S]*?_reg\.wai
 # 20 tests
 # ===========================================================
 Sep "Suite 66 -- FO3 Lincoln Memorabilia Tracker"
-$stateSrc66  = Read-Src "js\state.js"
-$apiSrc66    = Read-Src "js\api.js"
-$uiRenderSrc66 = Read-Src "js\ui-render.js"
-$uiCoreSrc66   = Read-Src "js\ui-core.js"
-$fo3RegSrc66   = Read-Src "js\reg_fo3.js"
-$nvRegSrc66    = Read-Src "js\reg_nv.js"
+$stateSrc66  = Read-Group "state"
+$apiSrc66    = Read-Group "api"
+$uiRenderSrc66 = Read-Group "ui-render"
+$uiCoreSrc66   = Read-Group "ui-core"
+$fo3RegSrc66   = Read-Group "reg_fo3"
+$nvRegSrc66    = Read-Group "reg_nv"
 
 # 66.1  state.lincolnItems default {} in state.js
 Check ([bool]($stateSrc66 -match 'lincolnItems\s*:\s*\{\}')) `
@@ -4172,12 +4200,12 @@ Check ([bool]($importBody66b -match 'other.*found|coerced')) `
 # 19 tests
 # ===========================================================
 Sep "Suite 67 -- FNV Traits Tracker"
-$stateSrc67  = Read-Src "js\state.js"
-$apiSrc67    = Read-Src "js\api.js"
-$uiRenderSrc67 = Read-Src "js\ui-render.js"
-$uiCoreSrc67 = Read-Src "js\ui-core.js"
-$nvRegSrc67  = Read-Src "js\reg_nv.js"
-$fo3RegSrc67 = Read-Src "js\reg_fo3.js"
+$stateSrc67  = Read-Group "state"
+$apiSrc67    = Read-Group "api"
+$uiRenderSrc67 = Read-Group "ui-render"
+$uiCoreSrc67 = Read-Group "ui-core"
+$nvRegSrc67  = Read-Group "reg_nv"
+$fo3RegSrc67 = Read-Group "reg_fo3"
 
 # 67.1  state.traits default [] in state object
 Check ([bool]($stateSrc67 -match 'traits\s*:\s*\[\s*\]')) `
@@ -4284,7 +4312,7 @@ Check (([bool]($renderBody67b -match 'traitFilter')) -and ([bool]($renderBody67b
 # 10 tests
 # ===========================================================
 Sep "Suite 68 -- FNV Location Database Expansion"
-$nvRegSrc68 = Read-Src "js\reg_nv.js"
+$nvRegSrc68 = Read-Group "reg_nv"
 
 # Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
 $locsSectionMatch68 = [regex]::Match($nvRegSrc68, '(?s)// -- LOCATIONS.*?// -- COMPANIONS')
@@ -4349,8 +4377,8 @@ Check ([bool]($nvRegSrc68 -match '(?s)gridRow:\s*4.{0,200}gridCol:\s*1.{0,500}Po
 # 4 tests
 # ===========================================================
 Sep "Suite 69 -- FO3 game-switch regression guard"
-$uiCoreSrc69 = Read-Src "js\ui-core.js"
-$stateSrc69  = Read-Src "js\state.js"
+$uiCoreSrc69 = Read-Group "ui-core"
+$stateSrc69  = Read-Group "state"
 
 # Extract onGameContextChange function body
 $gcMatch69 = [regex]::Match($uiCoreSrc69, '(?s)function onGameContextChange\s*\([^)]*\)\s*\{(.*?)\n\}')
@@ -4387,9 +4415,9 @@ Check ($ssBody69 -match '_contextSwitching' -and $ssBody69 -match '\breturn\b') 
 # 16 tests
 # ===========================================================
 Sep "Suite 70 -- FNV unique apparel + Vault 13 Canteen"
-$dbNv70      = Read-Src "js\db_nv.js"
-$regNv70     = Read-Src "js\reg_nv.js"
-$uiCore70    = Read-Src "js\ui-core.js"
+$dbNv70      = Read-Group "db_nv"
+$regNv70     = Read-Group "reg_nv"
+$uiCore70    = Read-Group "ui-core"
 
 # Helper: extract ARMOR.CSV data rows
 function Get-ArmorRows70 {
@@ -4530,8 +4558,8 @@ Check (($assaultDT70 -eq '15') -and ($survivalDT70 -eq '15')) ("1st Recon Assaul
 # ===========================================================
 Sep "Suite 71 -- Phase 6 UI Consistency"
 $htmlSrc71     = Read-Src 'index.html'
-$uiRenderSrc71 = Read-Src 'js\ui-render.js'
-$uiCoreSrc71   = Read-Src 'js\ui-core.js'
+$uiRenderSrc71 = Read-Group "ui-render"
+$uiCoreSrc71   = Read-Group "ui-core"
 $cssSrc71      = Read-Src 'css\terminal.css'
 
 # 71.1  #traitsSection is a <details> element
@@ -4666,8 +4694,8 @@ Check (-not ($traitsBody71 -match 'min-height:28px;display:inline-flex')) `
 # 8 tests
 # ===========================================================
 $htmlSrc72  = Get-Content "$ROOT\index.html"      -Raw
-$uiSavesSrc72 = Get-Content "$ROOT\js\ui-saves.js" -Raw
-$uiCoreSrc72  = Get-Content "$ROOT\js\ui-core.js"  -Raw
+$uiSavesSrc72 = Read-Group "ui-saves"
+$uiCoreSrc72  = Read-Group "ui-core"
 $cssSrc72     = Get-Content "$ROOT\css\terminal.css" -Raw
 
 Sep "Suite 72 -- Location datalist bleed fix + update-modal whitespace"
@@ -4713,8 +4741,8 @@ Check ([bool]($htmlSrc72 -match 'id="updateModalMsg">[A-Z]')) `
 # 12 tests
 # ===========================================================
 $htmlSrc73   = Get-Content "$ROOT\index.html" -Raw
-$uiCoreSrc73 = Get-Content "$ROOT\js\ui-core.js" -Raw
-$stateSrc73  = Get-Content "$ROOT\js\state.js" -Raw
+$uiCoreSrc73 = Read-Group "ui-core"
+$stateSrc73  = Read-Group "state"
 
 Sep "Suite 73 -- Skills panel game-aware render (FNV/FO3 bleed fix)"
 
@@ -4783,9 +4811,9 @@ Check ([bool]($stateSrc73 -match 'getSkillKeys\s*\(\s*\)')) `
 # 13 tests
 # ===========================================================
 Sep "Suite 74 -- Collectibles Map Coord Guards"
-$nvRegSrc74   = Read-Src "js\reg_nv.js"
-$fo3RegSrc74  = Read-Src "js\reg_fo3.js"
-$uiRenderSrc74 = Read-Src "js\ui-render.js"
+$nvRegSrc74   = Read-Group "reg_nv"
+$fo3RegSrc74  = Read-Group "reg_fo3"
+$uiRenderSrc74 = Read-Group "ui-render"
 
 # 74.1  All FNV collectibles have gridRow and gridCol in 1..6
 $nvCollectBlock74 = ''
@@ -4875,8 +4903,8 @@ Check ((-not ($fo3RegSrc74 -match 'Vault 92 South')) -and ($fo3RegSrc74 -match "
 # 3 tests
 # ===========================================================
 Sep "Suite 75 -- Registry items[] No-Duplicate-Names Guard"
-$nvSrc75  = Read-Src "js\reg_nv.js"
-$fo3Src75 = Read-Src "js\reg_fo3.js"
+$nvSrc75  = Read-Group "reg_nv"
+$fo3Src75 = Read-Group "reg_fo3"
 
 function Get-ItemsSection75 {
     param([string]$src)
@@ -4929,7 +4957,7 @@ Check ($reboundCount75 -eq 1) "reg_nv.js: Rebound weapon entry appears exactly o
 # 14 tests
 # ===========================================================
 Sep "Suite 77 -- Faction Rep Regression: Canon Thresholds + +-5 Increment"
-$uiSrc77 = Read-Src "js\ui-render.js"
+$uiSrc77 = Read-Group "ui-render"
 
 # -- Behavioral tests via Node subprocess (tests 77.1-77.13) --
 $rep77Labels = @(
@@ -5008,7 +5036,7 @@ Check (([bool]($uiSrc77 -match 'adjustFaction\(.*,5\)')) -and (-not ($uiSrc77 -m
 # 9 tests
 # ===========================================================
 Sep "Suite 76 -- autoImportState Hardening Guards (F1/F2/F3)"
-$apiSrc76    = Read-Src "js\api.js"
+$apiSrc76    = Read-Group "api"
 $importBody76 = ''
 try { $importBody76 = Get-FunctionBody $apiSrc76 'autoImportState' } catch {}
 
@@ -5065,7 +5093,7 @@ Check (-not ($stBlock76 -match "type\s*:\s*item\.type\s*\|\|\s*'BUFF'")) `
 # 7 tests
 # ===========================================================
 Sep "Suite 78 -- VENDORS.CSV structural integrity"
-$nvSrc78 = Read-Src "js\db_nv.js"
+$nvSrc78 = Read-Group "db_nv"
 
 # Extract VENDORS.CSV block
 $vStart78 = $nvSrc78.IndexOf('[VENDORS.CSV]')
@@ -5094,7 +5122,7 @@ Check ($vNames78 -contains 'Street Vendor') "VENDORS.CSV contains 'Street Vendor
 # 10 tests
 # ===========================================================
 Sep "Suite 79 -- FO3 location database expansion (57 -> 90)"
-$fo3RegSrc79 = Read-Src "js\reg_fo3.js"
+$fo3RegSrc79 = Read-Group "reg_fo3"
 
 # Extract main locations block: find '  locations: [' (2-space root indent, unique to main array)
 $lsMarker79 = "  locations: ["
@@ -5140,7 +5168,7 @@ Check ([bool]($locBlock79 -match "name:\s*'Georgetown West'")) "FO3 locations co
 # 9 tests
 # ===========================================================
 Sep "Suite 80 -- [CHEMS.CSV] consumables expansion (40 -> 76)"
-$nvSrc80 = Read-Src "js\db_nv.js"
+$nvSrc80 = Read-Group "db_nv"
 $cStart80 = $nvSrc80.IndexOf('[CHEMS.CSV]')
 $cEnd80 = $nvSrc80.IndexOf("`n[", $cStart80 + 1)
 $cBlock80 = if ($cEnd80 -ge 0) { $nvSrc80.Substring($cStart80, $cEnd80 - $cStart80) } else { $nvSrc80.Substring($cStart80) }
@@ -5183,7 +5211,7 @@ Check $mreSatisfied "lookupItemInDb('MRE') -> wgt=0.2/val=50/type='aid'"
 # 10 tests
 # ===========================================================
 Sep "Suite 81 -- FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)"
-$fo3Src81 = Read-Src "js\db_fo3.js"
+$fo3Src81 = Read-Group "db_fo3"
 $aStart81 = $fo3Src81.IndexOf('[ARMOR.CSV]')
 $aEnd81 = $fo3Src81.IndexOf("`n[", $aStart81 + 1)
 $aBlock81 = if ($aEnd81 -ge 0) { $fo3Src81.Substring($aStart81, $aEnd81 - $aStart81) } else { $fo3Src81.Substring($aStart81) }
@@ -5228,7 +5256,7 @@ Check ($ncrBleed81.Count -eq 0) ("FO3 ARMOR has no NCR-faction armor (NCR does n
 # 15 tests
 # ===========================================================
 Sep "Suite 82 -- FO3 quests (64) + quest items (15->25)"
-$fo3Src82 = Read-Src "js\reg_fo3.js"
+$fo3Src82 = Read-Group "reg_fo3"
 $qStart82 = $fo3Src82.IndexOf("  quests: [")
 $qEnd82 = $fo3Src82.IndexOf("`n  ],", $qStart82)
 $qBlock82 = if ($qEnd82 -ge 0) { $fo3Src82.Substring($qStart82, $qEnd82 - $qStart82) } else { $fo3Src82.Substring($qStart82) }
@@ -5276,7 +5304,7 @@ $badTypes82 = @($typeVals82 | Where-Object { $validTypes82 -notcontains $_ })
 Check ($badTypes82.Count -eq 0) ("All FO3 quest types are valid -- bad: " + ($badTypes82 -join ', '))
 
 # QUEST_ITEMS.CSV tests
-$fo3Db82 = Read-Src "js\db_fo3.js"
+$fo3Db82 = Read-Group "db_fo3"
 $qiStart82 = $fo3Db82.IndexOf('[QUEST_ITEMS.CSV]')
 $qiEnd82 = $fo3Db82.IndexOf("`n[", $qiStart82 + 1)
 $qiBlock82 = if ($qiEnd82 -ge 0) { $fo3Db82.Substring($qiStart82, $qiEnd82 - $qiStart82) } else { $fo3Db82.Substring($qiStart82) }
@@ -5308,13 +5336,13 @@ Check $siSatisfied "lookupItemInDb('Steel Ingot') -> wgt=1/type='misc'"
 # 15 tests
 # ===========================================================
 Sep "Suite 83 -- Crafting recipe + breakdown registry (NV + FO3)"
-$nvSrc83 = Read-Src "js\reg_nv.js"
+$nvSrc83 = Read-Group "reg_nv"
 $nvRecStart83 = $nvSrc83.IndexOf("`n  recipes: [")
 $nvBdStart83 = $nvSrc83.IndexOf("`n  breakdowns: [", $nvRecStart83)
 $nvRecBlock83 = $nvSrc83.Substring($nvRecStart83, $nvBdStart83 - $nvRecStart83)
 $nvBdBlock83 = $nvSrc83.Substring($nvBdStart83)
 
-$fo3Src83 = Read-Src "js\reg_fo3.js"
+$fo3Src83 = Read-Group "reg_fo3"
 $fo3RecStart83 = $fo3Src83.IndexOf("`n  recipes: [")
 $fo3BdStart83 = $fo3Src83.IndexOf("`n  breakdowns:", $fo3RecStart83)
 $fo3RecBlock83 = $fo3Src83.Substring($fo3RecStart83, $fo3BdStart83 - $fo3RecStart83)
@@ -5393,8 +5421,8 @@ Check ($fo3RecBlock83.Contains("name: 'Deathclaw Gauntlet'") -and $fo3RecBlock83
 # ===========================================================
 Sep "Suite 84 -- Craft panel UI + mechanics (behavioral + data-safety)"
 
-$uiRSrc84 = Read-Src "js\ui-render.js"
-$uiCSrc84 = Read-Src "js\ui-core.js"
+$uiRSrc84 = Read-Group "ui-render"
+$uiCSrc84 = Read-Group "ui-core"
 $idxSrc84 = Read-Src "index.html"
 
 function Get-FnBody84($src, $fnName) {
@@ -5504,12 +5532,12 @@ Check ($uiRSrc84.Contains('function _craftGetHave(')) "_craftGetHave() helper de
 # 27 tests
 # ===========================================================
 Sep "Suite 85 -- Skill Books Tracker (FNV+FO3, Protocol 4)"
-$nvRegSrc85 = Get-Content 'js/reg_nv.js' -Raw
-$fo3RegSrc85 = Get-Content 'js/reg_fo3.js' -Raw
-$stateSrc85 = Get-Content 'js/state.js' -Raw
-$apiSrc85 = Get-Content 'js/api.js' -Raw
-$uiRenderSrc85 = Get-Content 'js/ui-render.js' -Raw
-$uiCoreSrc85 = Get-Content 'js/ui-core.js' -Raw
+$nvRegSrc85 = Read-Group "reg_nv"
+$fo3RegSrc85 = Read-Group "reg_fo3"
+$stateSrc85 = Read-Group "state"
+$apiSrc85 = Read-Group "api"
+$uiRenderSrc85 = Read-Group "ui-render"
+$uiCoreSrc85 = Read-Group "ui-core"
 $idxSrc85 = Get-Content 'index.html' -Raw
 
 $fnvSkillKeys = @('barter','energy_weapons','explosives','guns','lockpick','medicine','melee_weapons','repair','science','sneak','speech','survival','unarmed')
@@ -5686,11 +5714,11 @@ Check (($idxSrc86 -match 'id="opticsColorInput"') -and ($idxSrc86 -match 'class=
 # ===========================================================
 Sep "Suite 87 -- NV Skill Magazines tracker (FNV-only, Protocol 4)"
 
-$nvRegSrc87    = Read-Src "js/reg_nv.js"
-$fo3RegSrc87   = Read-Src "js/reg_fo3.js"
-$stateSrc87    = Read-Src "js/state.js"
-$apiSrc87      = Read-Src "js/api.js"
-$uiRenderSrc87 = Read-Src "js/ui-render.js"
+$nvRegSrc87    = Read-Group "reg_nv"
+$fo3RegSrc87   = Read-Group "reg_fo3"
+$stateSrc87    = Read-Group "state"
+$apiSrc87      = Read-Group "api"
+$uiRenderSrc87 = Read-Group "ui-render"
 $idxSrc87      = Read-Src "index.html"
 
 $magBlockMatch87 = [regex]::Match($nvRegSrc87, '(?s)magazines\s*:\s*\[(.*?)\n  \],')
@@ -5812,7 +5840,7 @@ Check (($magPanelTail87 -match '(?s)SKILL MAGAZINES.{0,60}</h2>') -and ($idxSrc8
 # 87.28  expandPanelForCategory() no longer special-cases #magazinesPanel as a
 #        nested sub-panel -- the generic top-level details.open handling
 #        already reveals it (Phase 3 OPERATOR batch 3 promotion).
-$uiCoreSrc87b = Read-Src "js/ui-core.js"
+$uiCoreSrc87b = Read-Group "ui-core"
 $expandBody87 = ''
 try { $expandBody87 = Get-FunctionBody $uiCoreSrc87b 'expandPanelForCategory' } catch {}
 Check ((-not ($expandBody87 -match "getElementById\('magazinesPanel'\)")) -and ($expandBody87 -match "'> SKILL MAGAZINES'")) `
@@ -5823,8 +5851,8 @@ Check ((-not ($expandBody87 -match "getElementById\('magazinesPanel'\)")) -and (
 # ===========================================================
 Sep "Suite 88 -- GATE-UI: UI consistency structural guards"
 
-$uiRenderSrc88 = Read-Src "js/ui-render.js"
-$uiCoreSrc88   = Read-Src "js/ui-core.js"
+$uiRenderSrc88 = Read-Group "ui-render"
+$uiCoreSrc88   = Read-Group "ui-core"
 $idxSrc88      = Read-Src "index.html"
 $cssSrc88      = Read-Src "css/terminal.css"
 
@@ -5904,9 +5932,9 @@ Check ([bool]($cssSrc88 -match 'button\.tracker-toggle')) "GATE-UI-8: terminal.c
 # ===========================================================
 Sep "Suite 89 -- GATE-AGNOSTIC: game-agnostic refactor guards"
 
-$apiSrc89    = Read-Src "js/api.js"
-$uiCore89    = Read-Src "js/ui-core.js"
-$stateSrc89  = Read-Src "js/state.js"
+$apiSrc89    = Read-Group "api"
+$uiCore89    = Read-Group "ui-core"
+$stateSrc89  = Read-Group "state"
 $htmlSrc89   = Read-Src "index.html"
 $rulesSrc89  = Read-Src "RULES.md"
 
@@ -6441,12 +6469,12 @@ Check ($junkDirs98.Count -eq 0) `
 # helper / one slot-schema source.
 # ===========================================================
 Sep "Suite 99 -- WU-B7 dead-code purge + duplication consolidation"
-$audio99   = Get-Content "$Root\js\ui-audio.js"    -Raw
-$render99  = Get-Content "$Root\js\ui-render.js"   -Raw
-$api99     = Get-Content "$Root\js\api.js"         -Raw
-$core99    = Get-Content "$Root\js\ui-core.js"     -Raw
-$saves99   = Get-Content "$Root\js\ui-saves.js"    -Raw
-$account99 = Get-Content "$Root\js\ui-account.js"  -Raw
+$audio99   = Read-Group "ui-audio"
+$render99  = Read-Group "ui-render"
+$api99     = Read-Group "api"
+$core99    = Read-Group "ui-core"
+$saves99   = Read-Group "ui-saves"
+$account99 = Read-Group "ui-account"
 $eslint99  = Get-Content "$Root\eslint.config.mjs" -Raw
 
 # -- Dead-code purge (must stay absent) --
@@ -6523,8 +6551,8 @@ Check ([bool]($cfSrc100 -match "FILES\s*=\s*\[[^\]]*'sw\.js'")) `
 # or a JSON.stringify(state) whole-state read.
 # ===========================================================
 Sep "Suite 101 -- WU-B9 cloud.js -> state.js boundary fix"
-$state101 = Read-Src "js/state.js"
-$cloud101 = Read-Src "js/cloud.js"
+$state101 = Read-Group "state"
+$cloud101 = Read-Group "cloud"
 
 # state.js sanctioned accessors exist + are exposed for the module boundary
 Check ([bool]($state101 -match 'function\s+getGameContext\s*\(')) `
@@ -6561,7 +6589,7 @@ Check ([bool]((-not ($cloud101 -match 'JSON\.stringify\(\s*state\s*\)')) -and ($
 # drone is suppressed. These guards lock the gate against the detached-drone bug.
 # ===========================================================
 Sep "Suite 102 -- WU-B10 boot-drone autoplay timing"
-$audio102 = Read-Src "js/ui-audio.js"
+$audio102 = Read-Group "ui-audio"
 $bootSeq102 = ''
 $firstInteract102 = ''
 $bootDrone102 = ''
@@ -6614,7 +6642,7 @@ Check ([bool](($firstInteract102 -match '!_bootActive') -and $guardIdx102 -ge 0 
 # help-button styling).
 # ===========================================================
 Sep "Suite 103 -- WU-C13 SAVE MENU `"?`" help affordance"
-$uiCore103 = Read-Src "js/ui-core.js"
+$uiCore103 = Read-Group "ui-core"
 $btnTag103 = [regex]::Match($htmlSrc, '<button\b[^>]*showSaveHelpModal[^>]*>').Value
 $helpBody103 = ''
 try { $helpBody103 = Get-FunctionBody $uiCore103 'showSaveHelpModal' } catch {}
@@ -6674,7 +6702,7 @@ Check (([bool]($btnTag103 -match '--icon-btn-color: var\(--robco-blue\)')) -and 
 # (WU-D4a-RANGED-GAP) -- guarded as a Protocol-3 flag, never fabricated.
 # ===========================================================
 Sep "Suite 104 -- WU-D4 deterministic-feature coefficients (fallout.wiki-verified)"
-$stateSrc104 = Read-Src "js/state.js"
+$stateSrc104 = Read-Group "state"
 $fnvAt104 = $stateSrc104.IndexOf('FNV: {')
 $fo3At104 = $stateSrc104.IndexOf('FO3: {')
 $fnvSlice104 = if ($fo3At104 -gt 0) { $stateSrc104.Substring($fnvAt104, $fo3At104 - $fnvAt104) } else { '' }
@@ -6779,10 +6807,10 @@ Check (($fnvSlice104.Contains('WU-D4a-RANGED-GAP')) -and ($fo3Slice104.Contains(
 # targetDT input, read-only-ness, and Protocol-38 agnosticism.
 # ===========================================================
 Sep "Suite 105 -- WU-N1 VATS native calculator"
-$st105 = Read-Src "js/state.js"
-$ui105 = Read-Src "js/ui-core.js"
-$dbnv105 = Read-Src "js/db_nv.js"
-$dbfo3105 = Read-Src "js/db_fo3.js"
+$st105 = Read-Group "state"
+$ui105 = Read-Group "ui-core"
+$dbnv105 = Read-Group "db_nv"
+$dbfo3105 = Read-Group "db_fo3"
 $fo3At105 = $st105.IndexOf('FO3: {')
 $fnv105 = if ($fo3At105 -gt 0) { $st105.Substring($st105.IndexOf('FNV: {'), $fo3At105 - $st105.IndexOf('FNV: {')) } else { '' }
 $fo3105 = if ($fo3At105 -gt 0) { $st105.Substring($fo3At105) } else { '' }
@@ -6869,7 +6897,7 @@ Check ((-not ($vatsBody105 -match 'saveState\s*\(')) -and (-not ($vatsBody105 -m
     '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
 
 # ── VATS-still-AI retirement (Protocol 42) ──────────────────────────────────
-$api105 = Read-Src "js/api.js"
+$api105 = Read-Group "api"
 $routerBody105 = [regex]::Match($api105, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\};').Value
 # 105.19 [VATS SIM]/[VS]/[VATS] route to the native overlay, NOT the AI
 Check (($routerBody105 -match "'\[VATS SIM\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)") -and ($routerBody105 -match "'\[VS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)") -and ($routerBody105 -match "'\[VATS\]':\s*\(\)\s*=>\s*showVATSOverlay\(\)")) `
@@ -6891,13 +6919,13 @@ Check ($missingNat105.Count -eq 0) `
 # regression fix (#c_caps mirror -- Protocol 42), the retired AI TRADE modal, and panel wiring.
 # ===========================================================
 Sep "Suite 106 -- WU-N2 TRADE native barter terminal"
-$ren106 = Read-Src "js/ui-render.js"
-$dbnv106 = Read-Src "js/db_nv.js"
-$dbfo3106 = Read-Src "js/db_fo3.js"
-$api106 = Read-Src "js/api.js"
-$core106 = Read-Src "js/ui-core.js"
+$ren106 = Read-Group "ui-render"
+$dbnv106 = Read-Group "db_nv"
+$dbfo3106 = Read-Group "db_fo3"
+$api106 = Read-Group "api"
+$core106 = Read-Group "ui-core"
 $css106 = Read-Src "css/terminal.css"
-$st106 = Read-Src "js/state.js"
+$st106 = Read-Group "state"
 $doBuyBody = ''
 $doSellBody = ''
 try { $doBuyBody = Get-FunctionBody $ren106 'doBuy' } catch {}
@@ -7010,10 +7038,10 @@ Check (($core106 -match "case 'TRADE':\s*expandPanelForCategory\('trade'\)") -an
 # the melee-scope rule (_vatsIsMelee) labels strikes vs rounds.
 # ===========================================================
 Sep "Suite 107 -- WU-N3 THREAT native bestiary + TTK"
-$ren107 = Read-Src "js/ui-render.js"
-$dbnv107 = Read-Src "js/db_nv.js"
-$dbfo3107 = Read-Src "js/db_fo3.js"
-$api107 = Read-Src "js/api.js"
+$ren107 = Read-Group "ui-render"
+$dbnv107 = Read-Group "db_nv"
+$dbfo3107 = Read-Group "db_fo3"
+$api107 = Read-Group "api"
 $threatBody107 = ''
 try { $threatBody107 = Get-FunctionBody $ren107 'renderThreat' } catch {}
 
@@ -7085,9 +7113,9 @@ Check ((-not $r4_107.hasWeapon) -and ($null -eq $r4_107.ttk)) `
 # Protocol-38 agnosticism, discoverability + CSS overflow guard.
 # ===========================================================
 Sep "Suite 108 -- WU-N4 CONSULT native databank lookup"
-$ren108 = Read-Src "js/ui-render.js"
-$api108 = Read-Src "js/api.js"
-$core108 = Read-Src "js/ui-core.js"
+$ren108 = Read-Group "ui-render"
+$api108 = Read-Group "api"
+$core108 = Read-Group "ui-core"
 $css108 = Read-Src "css/terminal.css"
 # CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML core
 # (WU-N4b option C, Protocol 22) -- concatenate so engine-level checks find the behavior wherever it lives.
@@ -7182,13 +7210,13 @@ Check (($renderDbBody -match 'databankSearch') -and ($renderDbBody -match 'datab
 # to avoid the template-literal over-capture + case-fold pitfalls (WU-N4 Protocol-42).
 # ===========================================================
 Sep "Suite 109 -- WU-N5 BIO-SCAN native medical advisory"
-$ren109 = Read-Src "js/ui-render.js"
-$api109 = Read-Src "js/api.js"
-$core109 = Read-Src "js/ui-core.js"
+$ren109 = Read-Group "ui-render"
+$api109 = Read-Group "api"
+$core109 = Read-Group "ui-core"
 $css109 = Read-Src "css/terminal.css"
 $html109 = Read-Src "index.html"
-$dbnv109 = Read-Src "js/db_nv.js"
-$dbfo3109 = Read-Src "js/db_fo3.js"
+$dbnv109 = Read-Group "db_nv"
+$dbfo3109 = Read-Group "db_fo3"
 $routerBlock109 = [regex]::Match($api109, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
 $rs109 = $ren109.IndexOf('const _BIO_LIMBS')
 $re109 = $ren109.IndexOf('function renderBioScan')
@@ -7250,9 +7278,9 @@ Check (($html109 -match 'onclick="renderBioScan\(\)"') -and ($bioBtn109 -match '
 # to avoid the template-literal over-capture + case-fold pitfalls (Protocol-42).
 # ===========================================================
 Sep "Suite 110 -- WU-N6 LOOT native add/value terminal"
-$ren110 = Read-Src "js/ui-render.js"
-$api110 = Read-Src "js/api.js"
-$core110 = Read-Src "js/ui-core.js"
+$ren110 = Read-Group "ui-render"
+$api110 = Read-Group "api"
+$core110 = Read-Group "ui-core"
 $css110 = Read-Src "css/terminal.css"
 $html110 = Read-Src "index.html"
 $routerBlock110 = [regex]::Match($api110, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
@@ -7313,8 +7341,8 @@ Check (($html110 -match 'data-tool="LOOT"') -and ($core110 -match "case 'LOOT':\
 # ===========================================================
 Sep "Suite 111 -- WU-E1 diegetic terminology / voice standards"
 $html111 = Read-Src "index.html"
-$api111  = Read-Src "js/api.js"
-$acct111 = Read-Src "js/ui-account.js"
+$api111  = Read-Group "api"
+$acct111 = Read-Group "ui-account"
 $mani111 = (Read-Src "manifest.json" | ConvertFrom-Json)
 
 # 111.1 every content-input placeholder is ALL-CAPS (no lowercase) -- MN-6 (case-sensitive)
@@ -7413,8 +7441,8 @@ Check (($ubCount -eq 1) -and ($fo3Count -eq 1) -and $ubInTpl) `
 # is advertised, retired AI macros stay gone. (PS mirror of JS Suite 113.)
 # ===========================================================
 Sep "Suite 113 -- WU-E3 FEATURES / command-reference consistency"
-$uiCore113 = Read-Src "js/ui-core.js"
-$api113    = Read-Src "js/api.js"
+$uiCore113 = Read-Group "ui-core"
+$api113    = Read-Group "api"
 $registry113 = [regex]::Match($uiCore113, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];').Groups[1].Value
 $router113   = [regex]::Match($api113, 'const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};').Groups[1].Value
 
@@ -7465,10 +7493,10 @@ Check ($registry113.Contains('[TRADE]') -and (-not $router113.Contains("'[TRADE]
 # (Protocol 42 map fix. PS mirror of JS Suite 114.)
 # ===========================================================
 Sep "Suite 114 -- Map location discovery persistence"
-$stateSrc114  = Read-Src "js/state.js"
-$apiSrc114    = Read-Src "js/api.js"
-$uiCoreSrc114 = Read-Src "js/ui-core.js"
-$uiRender114  = Read-Src "js/ui-render.js"
+$stateSrc114  = Read-Group "state"
+$apiSrc114    = Read-Group "api"
+$uiCoreSrc114 = Read-Group "ui-core"
+$uiRender114  = Read-Group "ui-render"
 $recordBody114 = [regex]::Match($stateSrc114, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
 # (?s)function onLocationChange\([^)]*\) -- signature-agnostic (owner fix adds an
 # optional overrideLoc param), mirroring the JS runner's extractFunctionBody() helper.
@@ -7516,7 +7544,7 @@ Check (($uiCoreSrc114 -match 'function onLocationChange\(overrideLoc\)') -and ($
 # device preference. Game-agnostic, offline, no AI. (PS mirror of JS Suite 115.)
 # ===========================================================
 Sep "Suite 115 -- WU-F1 Sustained Power Cell (Wake Lock)"
-$uiCore115 = Read-Src "js/ui-core.js"
+$uiCore115 = Read-Group "ui-core"
 $html115   = Read-Src "index.html"
 $acq115 = [regex]::Match($uiCore115, '(?s)async function _acquireWakeLock\([\s\S]*?\n\}').Value
 $tog115 = [regex]::Match($uiCore115, '(?s)async function toggleWakeLock\([\s\S]*?\n\}').Value
@@ -7565,9 +7593,9 @@ Check (($html115 -match 'data-sub-id="power_systems"') -and ($html115 -match 'PO
 # (PS mirror of JS Suite 116.)
 # ===========================================================
 Sep "Suite 116 -- WU-F2 Haptic Solenoid (Vibration)"
-$uiAudio116 = Read-Src "js/ui-audio.js"
-$uiCore116  = Read-Src "js/ui-core.js"
-$api116     = Read-Src "js/api.js"
+$uiAudio116 = Read-Group "ui-audio"
+$uiCore116  = Read-Group "ui-core"
+$api116     = Read-Group "api"
 $html116    = Read-Src "index.html"
 $trg116 = [regex]::Match($uiAudio116, '(?s)function triggerHaptic\([\s\S]*?\n\}').Value
 $tog116 = [regex]::Match($uiAudio116, '(?s)function toggleHaptic\([\s\S]*?\n\}').Value
@@ -7615,7 +7643,7 @@ Check (($html116 -match 'data-sub-id="power_systems"') -and ($html116 -match 'id
 # (PS mirror of JS Suite 117.)
 # ===========================================================
 Sep "Suite 117 -- WU-F3 Eject Holotape (Web Share)"
-$saves117 = Read-Src "js/ui-saves.js"
+$saves117 = Read-Group "ui-saves"
 $html117  = Read-Src "index.html"
 $eject117 = [regex]::Match($saves117, '(?s)async function ejectHolotape\([\s\S]*?\n\}').Value
 
@@ -7662,7 +7690,7 @@ Check (($html117 -match 'id="ejectHolotapeBtn"') -and ($html117 -match 'onclick=
 # (PS mirror of JS Suite 118.)
 # ===========================================================
 Sep "Suite 118 -- WU-F4 Pending-Directives Tally (Badge)"
-$uiCore118   = Read-Src "js/ui-core.js"
+$uiCore118   = Read-Group "ui-core"
 $manifest118 = Read-Src "manifest.json"
 $badgeFn118 = [regex]::Match($uiCore118, '(?s)function _updateAppBadge\([\s\S]*?\n\}').Value
 
@@ -7707,7 +7735,7 @@ Check ($manifest118 -match '"display":\s*"standalone"') `
 # AI, no network, game-agnostic. (PS mirror of JS Suite 119.)
 # ===========================================================
 Sep "Suite 119 -- WU-F7 Overseer's Maintenance Log"
-$uiCore119 = Read-Src "js/ui-core.js"
+$uiCore119 = Read-Group "ui-core"
 $html119   = Read-Src "index.html"
 $rd119  = [regex]::Match($uiCore119, '(?s)function _readOverseerLog\([\s\S]*?\n\}').Value
 $wr119  = [regex]::Match($uiCore119, '(?s)function _writeOverseerLog\([\s\S]*?\n\}').Value
@@ -7767,7 +7795,7 @@ Check (($html119 -match 'id="unitPowerPlantPanel"') -and ($html119 -match '<deta
 # ===========================================================
 Sep "Suite 120 -- WU-F8 High-Lumen Optics (high-contrast)"
 $css120    = Read-Src "css/terminal.css"
-$uiCore120 = Read-Src "js/ui-core.js"
+$uiCore120 = Read-Group "ui-core"
 $html120   = Read-Src "index.html"
 $mStart120 = $css120.IndexOf('html.high-lumen body')
 $pStart120 = $css120.IndexOf('@media (prefers-contrast: more) {', [Math]::Max(0, $mStart120))
@@ -7820,8 +7848,8 @@ Check (($html120 -match 'id="highLumenToggle"') -and ($html120 -match 'for="high
 # Game-agnostic, offline, no AI. (PS mirror of JS Suite 121.)
 # ===========================================================
 Sep "Suite 121 -- WU-F5 Pip-Boy Radio (synthesized)"
-$uiAudio121 = Read-Src "js/ui-audio.js"
-$uiCore121  = Read-Src "js/ui-core.js"
+$uiAudio121 = Read-Group "ui-audio"
+$uiCore121  = Read-Group "ui-core"
 $html121    = Read-Src "index.html"
 $start121  = [regex]::Match($uiAudio121, '(?s)function startRadio\([\s\S]*?\n\}').Value
 $toggle121 = [regex]::Match($uiAudio121, '(?s)function toggleRadio\([\s\S]*?\n\}').Value
@@ -7871,7 +7899,7 @@ Check (($html121 -match 'id="radioToggle"') -and ($html121 -match 'for="radioTog
 # the normal boot unchanged. Game-agnostic, offline, no AI. (PS mirror of JS 122.)
 # ===========================================================
 Sep "Suite 122 -- WU-F6 Cold-Start / Degraded-Tube Boot"
-$uiAudio122 = Read-Src "js/ui-audio.js"
+$uiAudio122 = Read-Group "ui-audio"
 $css122     = Read-Src "css/terminal.css"
 $pick122      = [regex]::Match($uiAudio122, '(?s)function _pickBootFlavor\([\s\S]*?\n\}').Value
 $bootLines122 = [regex]::Match($uiAudio122, '(?s)function _bootLinesFor\([\s\S]*?\n\}').Value
@@ -7921,8 +7949,8 @@ Check (($bootLines122 -match 'APP_VERSION') -and (($pick122 + $bootLines122) -no
 # than renumbered in place. (PS mirror of JS 123.)
 # ===========================================================
 Sep "Suite 123 -- WU-HF2/HF3 precise-pointer refocus + native panel navigation"
-$api123  = Read-Src "js/api.js"
-$core123 = Read-Src "js/ui-core.js"
+$api123  = Read-Group "api"
+$core123 = Read-Group "ui-core"
 $html123 = Read-Src "index.html"
 $aliasBlock123 = [regex]::Match($api123, "(?s)const PANEL_NAV_ALIASES = \{[\s\S]*?\n\};").Value
 $aliasMap123 = @{}
@@ -8009,10 +8037,10 @@ function Get-Contrast124([string]$h1, [string]$h2) {
     return ($hi + 0.05) / ($lo + 0.05)
 }
 Sep "Suite 124 -- WU-T1 per-game theming + AA contrast"
-$state124 = Read-Src "js/state.js"
-$audio124 = Read-Src "js/ui-audio.js"
-$saves124 = Read-Src "js/ui-saves.js"
-$core124  = Read-Src "js/ui-core.js"
+$state124 = Read-Group "state"
+$audio124 = Read-Group "ui-audio"
+$saves124 = Read-Group "ui-saves"
+$core124  = Read-Group "ui-core"
 $html124  = Read-Src "index.html"
 $themesBlock124 = [regex]::Match($state124, '(?s)const THEMES = \{[\s\S]*?\n\};').Value
 $themeMatches124 = [regex]::Matches($themesBlock124, "(\w+):\s*\{\s*rgb:\s*'([^']+)',\s*hex:\s*'(#[0-9a-fA-F]{6})',\s*dark:\s*'(#[0-9a-fA-F]{6})',\s*label:\s*'[^']+',\s*contrastSafe:\s*(true|false),?\s*(?:family:\s*'\w+',?\s*)?\}")
@@ -8109,9 +8137,9 @@ Check (
 # ===========================================================
 Sep "Suite 125 -- WU-F10 session stats merged into OVERSEER LOG"
 $html125   = Read-Src "index.html"
-$render125 = Read-Src "js/ui-render.js"
-$core125   = Read-Src "js/ui-core.js"
-$saves125  = Read-Src "js/ui-saves.js"
+$render125 = Read-Group "ui-render"
+$core125   = Read-Group "ui-core"
+$saves125  = Read-Group "ui-saves"
 $statusPanel125 = [regex]::Match($html125, '(?s)id="unitPowerPlantPanel"[\s\S]*?</details>').Value
 $logPanel125 = [regex]::Match($html125, '(?s)id="campaignLogPanel"[\s\S]*?</details>').Value
 $sessFn125 = [regex]::Match($render125, '(?s)function renderSessionStats\(\)[\s\S]*?\n\}').Value
@@ -8166,8 +8194,8 @@ Check (-not (($sessFn125 + $logPanel125 + $statusPanel125) -match 'New Vegas|Moj
 # Accessible (<button>, aria-label, >=28px tap target), game-agnostic. (PS mirror of JS 126.)
 # ===========================================================
 Sep "Suite 126 -- WU-F11 native mark-visited map control"
-$render126 = Read-Src "js/ui-render.js"
-$state126  = Read-Src "js/state.js"
+$render126 = Read-Group "ui-render"
+$state126  = Read-Group "state"
 $css126    = Read-Src "css/terminal.css"
 $markFn126 = [regex]::Match($render126, '(?s)function markLocationVisited\(loc\)[\s\S]*?\n\}').Value
 $recFn126  = [regex]::Match($state126, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
@@ -8222,9 +8250,9 @@ function Grab127($block, $k) {
     if ($m.Success) { $m.Groups[1].Value } else { '' }
 }
 Sep "Suite 127 -- WU-T3 per-game identity strings + save header"
-$state127   = Read-Src "js/state.js"
-$audio127   = Read-Src "js/ui-audio.js"
-$account127 = Read-Src "js/ui-account.js"
+$state127   = Read-Group "state"
+$audio127   = Read-Group "ui-audio"
+$account127 = Read-Group "ui-account"
 $css127     = Read-Src "css/terminal.css"
 $fnvTheme127 = [regex]::Match($state127, '(?s)FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
 $fo3Theme127 = [regex]::Match($state127, '(?s)FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
@@ -8309,7 +8337,7 @@ Check (($gate128 -match 'robco-diagnostics\.js') -and ($gate128 -match 'robco-di
 # ===========================================================
 Sep "Suite 129 -- first-load desktop-layout pointer/hover gate"
 $css129 = Read-Src "css/terminal.css"
-$core129 = Read-Src "js/ui-core.js"
+$core129 = Read-Group "ui-core"
 
 # 129.1  the desktop app-shell media query carries the pointer/hover gate
 Check ($css129.Contains('@media (min-width: 1000px) and (hover: hover) and (pointer: fine)')) `
@@ -8335,10 +8363,10 @@ Check (($desktopBlock129 -match 'grid-template-columns:\s*380px 1fr') -and ($des
 # default -> green. Game-agnostic / N-game scalable. (PS mirror of JS 130.)
 # ===========================================================
 Sep "Suite 130 -- per-game optics + dynamic (Default) label"
-$audio130 = Read-Src "js/ui-audio.js"
-$core130  = Read-Src "js/ui-core.js"
+$audio130 = Read-Group "ui-audio"
+$core130  = Read-Group "ui-core"
 $html130  = Read-Src "index.html"
-$saves130 = Read-Src "js/ui-saves.js"
+$saves130 = Read-Group "ui-saves"
 $keyFn130 = [regex]::Match($audio130, '(?s)function _opticStorageKey\([\s\S]*?\n\}').Value
 $resolveOpticFn130 = [regex]::Match($audio130, '(?s)function _resolveOptic\(\)[\s\S]*?\n\}').Value
 $changeFn130 = [regex]::Match($audio130, '(?s)function changeOpticsColor\([\s\S]*?\n\}').Value
@@ -8391,7 +8419,7 @@ Check (($saves130 -match '_resolveOptic\(\)') -and (-not ($saves130 -match "getI
 # 15 tests
 # ===========================================================
 Sep "Suite 131 -- U1 directive decomposition + GA-5 retirement (golden-master)"
-$apiSrc131 = Read-Src "js/api.js"
+$apiSrc131 = Read-Group "api"
 $builderNames131 = @(
     '_directiveConstraints', '_directivePersonaAndContract', '_directiveCoreTracking',
     '_directiveSkills', '_directiveFactions', '_directiveSystems',
@@ -8540,7 +8568,7 @@ console.log('RESULT:' + bits.join(''));
 # 10 tests
 # ===========================================================
 Sep "Suite 132 -- U2 window.onload boot decomposition"
-$uiCoreSrc132 = Read-Src "js/ui-core.js"
+$uiCoreSrc132 = Read-Group "ui-core"
 
 $bootPhaseFns132 = @(
     '_hydrateStateFromStorage', '_restoreApiKeyAndChatHistory', '_wireRotaryDialClick',
@@ -8937,9 +8965,9 @@ Check ($offenders134.Count -eq 0) `
 # ===========================================================
 Sep "Suite 135 -- U7/U8 OS event bus + faction-agnostic fix + auto-log"
 
-$uiRenderSrc135 = Read-Src "js\ui-render.js"
-$uiCoreSrc135   = Read-Src "js\ui-core.js"
-$uiAudioSrc135  = Read-Src "js\ui-audio.js"
+$uiRenderSrc135 = Read-Group "ui-render"
+$uiCoreSrc135   = Read-Group "ui-core"
+$uiAudioSrc135  = Read-Group "ui-audio"
 
 # 135.1  structural: state.js declares the bus (on/emit) and exposes it globally
 Check (($stateSrc -match 'const RobcoEvents\s*=\s*\(\(\)\s*=>\s*\{') -and ($stateSrc -match 'function on\(event, fn\)') -and ($stateSrc -match 'function emit\(event, payload\)') -and ($stateSrc -match 'window\.RobcoEvents\s*=\s*RobcoEvents')) `
@@ -9172,12 +9200,12 @@ Check (
 # ===========================================================
 Sep "Suite 136 -- Step 2 Phase 0 U9/U10 connector sweep + affinity fix"
 $html136   = Read-Src "index.html"
-$api136    = Read-Src "js/api.js"
-$core136   = Read-Src "js/ui-core.js"
-$render136 = Read-Src "js/ui-render.js"
+$api136    = Read-Group "api"
+$core136   = Read-Group "ui-core"
+$render136 = Read-Group "ui-render"
 $css136    = Read-Src "css/terminal.css"
-$dbNv136   = Read-Src "js/db_nv.js"
-$dbFo3136  = Read-Src "js/db_fo3.js"
+$dbNv136   = Read-Group "db_nv"
+$dbFo3136  = Read-Group "db_fo3"
 
 # 136.1  U9-1: the Projected Timeline stub is fully retired
 Check (
@@ -9300,14 +9328,14 @@ Check (
 # ===========================================================
 Sep "Suite 137 -- Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation"
 $arch137     = Read-Src "ARCHITECTURE.md"
-$dbNv137     = Read-Src "js/db_nv.js"
-$dbFo3137    = Read-Src "js/db_fo3.js"
-$core137     = Read-Src "js/ui-core.js"
-$render137   = Read-Src "js/ui-render.js"
-$saves137    = Read-Src "js/ui-saves.js"
-$cloud137    = Read-Src "js/cloud.js"
-$api137      = Read-Src "js/api.js"
-$state137    = Read-Src "js/state.js"
+$dbNv137     = Read-Group "db_nv"
+$dbFo3137    = Read-Group "db_fo3"
+$core137     = Read-Group "ui-core"
+$render137   = Read-Group "ui-render"
+$saves137    = Read-Group "ui-saves"
+$cloud137    = Read-Group "cloud"
+$api137      = Read-Group "api"
+$state137    = Read-Group "state"
 
 # 137.1  U11: per-game data parity ledger, every row GENUINE or GAP
 Check (
@@ -9478,8 +9506,8 @@ Check (
 # (Protocol 40 -- the browser is the only runner with a native IndexedDB).
 # ===========================================================
 Sep "Suite 138 -- P1 IndexedDB durability shadow + write-through"
-$idb138   = Read-Src "js/idb.js"
-$state138 = Read-Src "js/state.js"
+$idb138   = Read-Group "idb"
+$state138 = Read-Group "state"
 $sw138    = Read-Src "sw.js"
 $html138  = Read-Src "index.html"
 
@@ -9574,8 +9602,8 @@ Check (
 # (Protocol 40 -- the browser is the only runner with a native IndexedDB).
 # ===========================================================
 Sep "Suite 139 -- P2 device-pref boot hydration + reconciliation"
-$uiCore139   = Read-Src "js/ui-core.js"
-$idb139      = Read-Src "js/idb.js"
+$uiCore139   = Read-Group "ui-core"
+$idb139      = Read-Group "idb"
 $reconcile139 = Get-FunctionBody $uiCore139 '_reconcileMetaFromIdb'
 $hydrate139   = Get-FunctionBody $uiCore139 '_hydrateMetaFromIdb'
 
@@ -9684,11 +9712,11 @@ Check (
 # REAL IndexedDB migration/round-trip/fallback proof runs in tests/test.html.
 # ===========================================================
 Sep "Suite 140 -- P3 cold-store IDB-primary (save slots + rolling backups)"
-$state140    = Read-Src "js/state.js"
-$uiSaves140  = Read-Src "js/ui-saves.js"
-$uiAcct140   = Read-Src "js/ui-account.js"
-$cloud140    = Read-Src "js/cloud.js"
-$uiCore140   = Read-Src "js/ui-core.js"
+$state140    = Read-Group "state"
+$uiSaves140  = Read-Group "ui-saves"
+$uiAcct140   = Read-Group "ui-account"
+$cloud140    = Read-Group "cloud"
+$uiCore140   = Read-Group "ui-core"
 $coldRead140    = Get-FunctionBody $state140 '_coldReadObj'
 $coldWrite140   = Get-FunctionBody $state140 '_coldWriteObj'
 $migrate140     = Get-FunctionBody $state140 '_migrateColdStoreToIdb'
@@ -9782,10 +9810,10 @@ Check (
 # author eventLog directly. Crossroads + Incident are views over the Record.
 # ===========================================================
 Sep "Suite 141 -- P4 Terminal Record (structured eventLog + [T#] migration)"
-$state141     = Read-Src "js/state.js"
-$api141       = Read-Src "js/api.js"
-$uiCore141    = Read-Src "js/ui-core.js"
-$uiRender141  = Read-Src "js/ui-render.js"
+$state141     = Read-Group "state"
+$api141       = Read-Group "api"
+$uiCore141    = Read-Group "ui-core"
+$uiRender141  = Read-Group "ui-render"
 $html141      = Read-Src "index.html"
 $logEventBody = Get-FunctionBody $state141 '_logEvent'
 $migrateEvBody = Get-FunctionBody $state141 '_migrateEventLog'
@@ -9885,9 +9913,9 @@ Check (
 # proof lives in tests/test.html (Suite 14 -- PowerShell has no IndexedDB).
 # ===========================================================
 Sep "Suite 142 -- P5 save version history (per-slot revision ring)"
-$state142    = Read-Src "js/state.js"
-$uiSaves142  = Read-Src "js/ui-saves.js"
-$uiAcct142   = Read-Src "js/ui-account.js"
+$state142    = Read-Group "state"
+$uiSaves142  = Read-Group "ui-saves"
+$uiAcct142   = Read-Group "ui-account"
 $readVers142     = Get-FunctionBody $state142 'readSlotVersions'
 $pushVers142     = Get-FunctionBody $state142 'pushSlotVersion'
 $saveBody142     = Get-FunctionBody $uiSaves142 'saveToSlot'
@@ -9995,8 +10023,8 @@ Check (
 # The real-IndexedDB round-trip is proven in tests/test.html (Suite 15).
 # ===========================================================
 Sep "Suite 143 -- P6 full backup bundle (export/import whole history)"
-$state143     = Read-Src "js/state.js"
-$uiSaves143   = Read-Src "js/ui-saves.js"
+$state143     = Read-Group "state"
+$uiSaves143   = Read-Group "ui-saves"
 $indexHtml143 = Read-Src "index.html"
 $buildBody143     = Get-FunctionBody $state143 'buildFullBundle'
 $verifyCkBody143  = Get-FunctionBody $state143 'verifyBundleChecksum'
@@ -10118,10 +10146,10 @@ Check (
 # The storage round-trip is proven live in tests/test.html (Suite 16).
 # ===========================================================
 Sep "Suite 144 -- P7 offline cloud-push queue (manual-push resilience)"
-$state144 = Read-Src "js/state.js"
-$cloud144 = Read-Src "js/cloud.js"
-$uiCore144 = Read-Src "js/ui-core.js"
-$api144 = Read-Src "js/api.js"
+$state144 = Read-Group "state"
+$cloud144 = Read-Group "cloud"
+$uiCore144 = Read-Group "ui-core"
+$api144 = Read-Group "api"
 $readQ144 = Get-FunctionBody $state144 'readCloudQueue'
 $enqQ144 = Get-FunctionBody $state144 'enqueueCloudPush'
 $writeQ144 = Get-FunctionBody $state144 'writeCloudQueue'
@@ -10242,8 +10270,8 @@ Check (
 # pref round-trip + thresholds are proven live in tests/test.html (Suite 17).
 # ===========================================================
 Sep "Suite 145 -- P8 global immersion dial (Full/Balanced/Minimal)"
-$state145 = Read-Src "js/state.js"
-$uiCore145 = Read-Src "js/ui-core.js"
+$state145 = Read-Group "state"
+$uiCore145 = Read-Group "ui-core"
 $indexHtml145 = Read-Src "index.html"
 $getTierBody145 = Get-FunctionBody $state145 'getImmersionTier'
 $allowsBody145 = Get-FunctionBody $state145 'immersionAllows'
@@ -10337,10 +10365,10 @@ Check (
 # nothing durable).
 # ===========================================================
 Sep "Suite 146 -- A1 Ambient Runtime core (state machine + scheduler + observer registry)"
-$runtime146 = Read-Src "js/runtime.js"
+$runtime146 = Read-Group "runtime"
 $sw146 = Read-Src "sw.js"
 $index146 = Read-Src "index.html"
-$uiCore146 = Read-Src "js/ui-core.js"
+$uiCore146 = Read-Group "ui-core"
 $transitionBody146 = Get-FunctionBody $runtime146 'transition'
 $beatBody146 = Get-FunctionBody $runtime146 '_beat'
 $initRt146 = Get-FunctionBody $runtime146 'initAmbientRuntime'
@@ -10475,7 +10503,7 @@ Check (
 # identical at every tier (standby is essential feedback -> tier 'minimal').
 # ===========================================================
 Sep "Suite 147 -- A2.1 standby machine migrated onto the Ambient Runtime (STANDBY observer)"
-$uiCore147 = Read-Src "js/ui-core.js"
+$uiCore147 = Read-Group "ui-core"
 $wireStandbyBody147 = Get-FunctionBody $uiCore147 '_wireStandby'
 $enterBody147 = Get-FunctionBody $uiCore147 'enterStandby'
 $exitBody147 = Get-FunctionBody $uiCore147 'exitStandby'
@@ -10543,8 +10571,8 @@ Check (
 # (silent at Minimal). The migrated bodies write nothing durable to the campaign.
 # ===========================================================
 Sep "Suite 148 -- A2.2 uptime clock + memory cycle + overseer flush migrated to runtime observers"
-$runtime148 = Read-Src "js/runtime.js"
-$uiCore148 = Read-Src "js/ui-core.js"
+$runtime148 = Read-Group "runtime"
+$uiCore148 = Read-Group "ui-core"
 $registerBody148 = Get-FunctionBody $runtime148 'register'
 $transitionBody148 = Get-FunctionBody $runtime148 'transition'
 $startAmbient148 = Get-FunctionBody $uiCore148 '_startAmbientTimers'
@@ -10622,7 +10650,7 @@ Check (
 # JS eval) -- same convention as Suite 62.5.
 # ===========================================================
 Sep "Suite 149 -- Developer Console: the ONE canonical dev/debug console"
-$testConsole149 = Read-Src "js/test-console.js"
+$testConsole149 = Read-Group "test-console"
 # U4b (Suite 215) deliberately, documentedly widened the Hard Boundary: the
 # STATE SETUP/RESETS/FIXTURES/INLINE apparatus explicitly reads/writes
 # campaign state and calls saveState() -- that is the entire point of a
@@ -10632,8 +10660,8 @@ $testConsole149 = Read-Src "js/test-console.js"
 $testConsole149PreU4b = $testConsole149.Substring(0, $testConsole149.IndexOf('U4b: STATE SETUP'))
 $sw149 = Read-Src "sw.js"
 $index149 = Read-Src "index.html"
-$uiCore149 = Read-Src "js/ui-core.js"
-$runtime149 = Read-Src "js/runtime.js"
+$uiCore149 = Read-Group "ui-core"
+$runtime149 = Read-Group "runtime"
 $initTestConsoleBody149 = Get-FunctionBody $testConsole149 'initTestConsole'
 $isStagingBody149 = Get-FunctionBody $testConsole149 '_devConsoleUnlocked'
 
@@ -10810,7 +10838,7 @@ Check (
 # save boundary and Protocol 38 (game-agnostic) are gate-guarded below.
 # ===========================================================
 Sep "Suite 150 -- A3 IDLE/STANDBY/SHUTDOWN ambient experiences"
-$uiCore150 = Read-Src "js/ui-core.js"
+$uiCore150 = Read-Group "ui-core"
 $css150 = Read-Src "css/terminal.css"
 $wireAmbient150 = Get-FunctionBody $uiCore150 '_wireAmbientExperiences'
 $exitStandbyBody150 = Get-FunctionBody $uiCore150 'exitStandby'
@@ -10940,10 +10968,10 @@ Check (
 # shared registry-autocomplete singleton.
 # ===========================================================
 Sep "Suite 151 -- Step 2 Phase 2 B1: Command-Line MODE system"
-$stateSrc151 = Read-Src "js/state.js"
-$apiSrc151 = Read-Src "js/api.js"
-$uiCoreSrc151 = Read-Src "js/ui-core.js"
-$uiSavesSrc151 = Read-Src "js/ui-saves.js"
+$stateSrc151 = Read-Group "state"
+$apiSrc151 = Read-Group "api"
+$uiCoreSrc151 = Read-Group "ui-core"
+$uiSavesSrc151 = Read-Group "ui-saves"
 $htmlSrc151 = Read-Src "index.html"
 $cssSrc151 = Read-Src "css/terminal.css"
 
@@ -11152,7 +11180,7 @@ Check (
 Sep "Suite 152 -- Shutdown/OFF power-on affordance (Protocol 42 fix)"
 $htmlSrc152 = Read-Src "index.html"
 $cssSrc152 = Read-Src "css/terminal.css"
-$uiCoreSrc152 = Read-Src "js/ui-core.js"
+$uiCoreSrc152 = Read-Group "ui-core"
 $powerOnBody152 = Get-FunctionBody $uiCoreSrc152 '_powerOnFromShutdown'
 
 # 152.1  #powerOnBtn is a real <button> (Protocol UI-5) with a diegetic
@@ -11245,9 +11273,9 @@ Check (
 # Mirrors JS Suite 153. Step 2 Phase 2 B1 follow-up.
 # ===========================================================
 Sep "Suite 153 -- Command-Line MODE upgrades: inline @, comma multi-action, content autocomplete"
-$apiSrc153 = Read-Src "js/api.js"
-$dbNvSrc153 = Read-Src "js/db_nv.js"
-$dbFo3Src153 = Read-Src "js/db_fo3.js"
+$apiSrc153 = Read-Group "api"
+$dbNvSrc153 = Read-Group "db_nv"
+$dbFo3Src153 = Read-Group "db_fo3"
 
 # 153.1  _routeQuickLogMulti(): splits on commas, trims + drops empty
 #        segments, routes EACH through the unchanged single-segment
@@ -11367,9 +11395,9 @@ Check (
 # ===========================================================
 Sep "Suite 154 -- Step 2 Phase 2 B2a: Module Bay core reframe"
 $html154   = Read-Src "index.html"
-$core154   = Read-Src "js/ui-core.js"
-$audio154  = Read-Src "js/ui-audio.js"
-$state154  = Read-Src "js/state.js"
+$core154   = Read-Group "ui-core"
+$audio154  = Read-Group "ui-audio"
+$state154  = Read-Group "state"
 $css154    = Read-Src "css/terminal.css"
 $claude154 = Read-Src "CLAUDE.md"
 
@@ -11643,7 +11671,7 @@ Check (
 #         200-response success path) rather than a bare "a key string exists" check,
 #         wired live into renderModuleBay() and refreshed on every key edit.
 $uplinkStatusFn154 = Get-FunctionBody $audio154 '_updateUplinkBoardStatus'
-$apiSrc154 = Read-Src "js/api.js"
+$apiSrc154 = Read-Group "api"
 Check (
     ($html154 -match '<p class="board-status alert" id="uplinkStatus">') -and
     ($state154 -match 'robco_gemini_validated_key') -and
@@ -11813,8 +11841,8 @@ Check (
 # ===========================================================
 Sep "Suite 155 -- Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes"
 $html155   = Read-Src "index.html"
-$core155   = Read-Src "js/ui-core.js"
-$state155  = Read-Src "js/state.js"
+$core155   = Read-Group "ui-core"
+$state155  = Read-Group "state"
 $css155    = Read-Src "css/terminal.css"
 $claude155 = Read-Src "CLAUDE.md"
 $rules155  = Read-Src "RULES.md"
@@ -11990,9 +12018,9 @@ Check (
 # ===========================================================
 Sep "Suite 156 -- Step 2 Phase 2 B2c: Module Bay refinements + hardware SFX"
 $html156  = Read-Src "index.html"
-$core156  = Read-Src "js/ui-core.js"
-$audio156 = Read-Src "js/ui-audio.js"
-$state156 = Read-Src "js/state.js"
+$core156  = Read-Group "ui-core"
+$audio156 = Read-Group "ui-audio"
+$state156 = Read-Group "state"
 $css156   = Read-Src "css/terminal.css"
 $arch156  = Read-Src "ARCHITECTURE.md"
 
@@ -12162,8 +12190,8 @@ Check (-not ($html156 -match '<span[^>]*onclick=')) "156.16: no <span onclick> p
 # ===========================================================
 Sep "Suite 157 -- DO-K: identity keystone (GAME_DEFS.identity + data-game)"
 $html157   = Read-Src "index.html"
-$core157   = Read-Src "js/ui-core.js"
-$state157  = Read-Src "js/state.js"
+$core157   = Read-Group "ui-core"
+$state157  = Read-Group "state"
 $eslint157 = Read-Src "eslint.config.mjs"
 
 $labels157 = @(
@@ -12333,8 +12361,8 @@ Check (
 # ===========================================================
 Sep "Suite 158 -- DO-N: bezel chrome + subsystem nav"
 $html158 = Read-Src "index.html"
-$core158 = Read-Src "js/ui-core.js"
-$state158 = Read-Src "js/state.js"
+$core158 = Read-Group "ui-core"
+$state158 = Read-Group "state"
 $sw158 = Read-Src "sw.js"
 $css158 = Read-Src "css/terminal.css"
 
@@ -12619,7 +12647,7 @@ Check (
 # treatment. Mirrors JS Suite 159.
 # ===========================================================
 Sep "Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule"
-$stateSrc159 = Read-Src "js/state.js"
+$stateSrc159 = Read-Group "state"
 $htmlSrc159 = Read-Src "index.html"
 $cssSrc159 = Read-Src "css/terminal.css"
 $logEventFn159 = Get-FunctionBody $stateSrc159 '_logEvent'
@@ -12727,12 +12755,12 @@ Check (
 # releaseBayHatch() sets. Mirrors JS Suite 161.
 # ===========================================================
 Sep "Suite 161 -- Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay"
-$uiAcct161 = Read-Src "js/ui-account.js"
-$uiSaves161 = Read-Src "js/ui-saves.js"
-$cloud161 = Read-Src "js/cloud.js"
-$uiCore161 = Read-Src "js/ui-core.js"
+$uiAcct161 = Read-Group "ui-account"
+$uiSaves161 = Read-Group "ui-saves"
+$cloud161 = Read-Group "cloud"
+$uiCore161 = Read-Group "ui-core"
 $html161 = Read-Src "index.html"
-$testConsole161 = Read-Src "js/test-console.js"
+$testConsole161 = Read-Group "test-console"
 
 # Assignment-form extractor (`window.X = async function (...) { ... }`) --
 # Get-FunctionBody's `function <name>` search can't find these.
@@ -12890,10 +12918,10 @@ Check (
 # ===========================================================
 Sep "Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)"
 $html162  = Read-Src "index.html"
-$core162  = Read-Src "js/ui-core.js"
-$api162   = Read-Src "js/api.js"
+$core162  = Read-Group "ui-core"
+$api162   = Read-Group "api"
 $css162   = Read-Src "css/terminal.css"
-$state162 = Read-Src "js/state.js"
+$state162 = Read-Group "state"
 
 $ovsStart162 = $core162.IndexOf('DO-O START')
 $ovsEnd162 = $core162.IndexOf('DO-O END')
@@ -13357,9 +13385,9 @@ Check (
 # buttons wrap onto their own line instead of overflowing. Mirrors JS Suite 163.
 # ===========================================================
 Sep "Suite 163 -- Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter"
-$uiSaves163 = Read-Src "js/ui-saves.js"
-$uiAcct163 = Read-Src "js/ui-account.js"
-$cloud163 = Read-Src "js/cloud.js"
+$uiSaves163 = Read-Group "ui-saves"
+$uiAcct163 = Read-Group "ui-account"
+$cloud163 = Read-Group "cloud"
 $css163 = Read-Src "css/terminal.css"
 
 # Assignment-form extractor (`window.X = async function (...) { ... }`) --
@@ -14269,8 +14297,8 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 # existing [TERM] quick-log text tag. (PS mirror of JS Suite 167.)
 # ===========================================================
 Sep "Suite 167 -- [CROSSROADS] command retirement + OVERSEER transcript tag"
-$api167    = Read-Src "js/api.js"
-$uiCore167 = Read-Src "js/ui-core.js"
+$api167    = Read-Group "api"
+$uiCore167 = Read-Group "ui-core"
 $html167   = Read-Src "index.html"
 $css167    = Read-Src "css/terminal.css"
 $registry167 = [regex]::Match($uiCore167, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];').Groups[1].Value
@@ -14323,9 +14351,9 @@ Check (($css167 -match '\.msg-tag\s*\{') -and ($css167 -match '\.msg-tag--overse
 # (PS mirror of JS Suite 168.)
 # ===========================================================
 Sep "Suite 168 -- TERMLINK Command Console fully retired"
-$api168      = Read-Src "js/api.js"
-$uiCore168   = Read-Src "js/ui-core.js"
-$uiRender168 = Read-Src "js/ui-render.js"
+$api168      = Read-Group "api"
+$uiCore168   = Read-Group "ui-core"
+$uiRender168 = Read-Group "ui-render"
 $html168     = Read-Src "index.html"
 $css168      = Read-Src "css/terminal.css"
 $router168   = [regex]::Match($api168, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
@@ -14387,8 +14415,8 @@ Check (($uiRender168 -match 'function renderHolster\(') -and ($uiCore168 -match 
 # (PS mirror of JS Suite 169.)
 # ===========================================================
 Sep "Suite 169 -- transcript cleanup + composer autocomplete drop-up + scope pulse"
-$uiCore169 = Read-Src "js/ui-core.js"
-$uiSaves169 = Read-Src "js/ui-saves.js"
+$uiCore169 = Read-Group "ui-core"
+$uiSaves169 = Read-Group "ui-saves"
 $css169 = Read-Src "css/terminal.css"
 $appendBody169 = Get-FunctionBody $uiCore169 "appendToChat"
 
@@ -14510,8 +14538,8 @@ Check (($setStateBody169 -match 'tap to pulse the scope') -and ($setStateBody169
 # its box. (PS mirror of JS Suite 170.)
 # ===========================================================
 Sep "Suite 170 -- Owner batch: CRT hum follows power state + scanline contained in screen"
-$uiAudio170 = Read-Src "js/ui-audio.js"
-$uiCore170 = Read-Src "js/ui-core.js"
+$uiAudio170 = Read-Group "ui-audio"
+$uiCore170 = Read-Group "ui-core"
 $css170 = Read-Src "css/terminal.css"
 $html170 = Read-Src "index.html"
 
@@ -14603,7 +14631,7 @@ Check (
 # (PS mirror of JS Suite 171.)
 # ===========================================================
 Sep "Suite 171 -- WIPE TERMINAL dialog: one cancel + Complete RNG lock warning"
-$uiCore171 = Read-Src "js/ui-core.js"
+$uiCore171 = Read-Group "ui-core"
 $css171 = Read-Src "css/terminal.css"
 
 # 171.1  openModal() supports hideCloseBtn -> .confirm-mode class toggle
@@ -14670,7 +14698,7 @@ Check (
 # 2 tests
 # ===========================================================
 Sep "Suite 172 -- Boot-restore must never re-trigger the Module Bay hatch"
-$core172 = Read-Src "js/ui-core.js"
+$core172 = Read-Group "ui-core"
 $wirePanelBody172 = Get-FunctionBody $core172 '_wirePanelPersistence'
 
 # 172.1  Structural guard: the flag is declared before the restore loop,
@@ -14718,8 +14746,8 @@ Check (
 # 8 tests
 # ===========================================================
 Sep "Suite 173 -- Owner batch: native LEVEL UP control + readable event-log timestamps"
-$uiCore173 = Read-Src "js/ui-core.js"
-$uiRender173 = Read-Src "js/ui-render.js"
+$uiCore173 = Read-Group "ui-core"
+$uiRender173 = Read-Group "ui-render"
 $idxSrc173 = Read-Src "index.html"
 
 # 173.1  index.html: #btnLevelUp is a real <button> (Protocol UI-5), starts
@@ -14826,8 +14854,8 @@ Check (
 # ===========================================================
 Sep "Suite 174 -- SVC tray EJECT HOLOTAPE export consolidation"
 $html174 = Read-Src "index.html"
-$uiCore174 = Read-Src "js/ui-core.js"
-$uiSaves174 = Read-Src "js/ui-saves.js"
+$uiCore174 = Read-Group "ui-core"
+$uiSaves174 = Read-Group "ui-saves"
 $css174 = Read-Src "css/terminal.css"
 $eslintCfg174 = Read-Src "eslint.config.mjs"
 
@@ -14919,8 +14947,8 @@ Check (
 # ══════════════════════════════════════════════════════════════
 Sep "Suite 175 -- Owner batch: dead meta frame-ancestors removed + ambient audio first-gesture arm"
 $html175 = Read-Src "index.html"
-$uiAudio175 = Read-Src "js/ui-audio.js"
-$uiCore175 = Read-Src "js/ui-core.js"
+$uiAudio175 = Read-Group "ui-audio"
+$uiCore175 = Read-Group "ui-core"
 
 # 175.1  frame-ancestors is gone from the meta CSP entirely (not just
 #        silently ignored) -- a real regression guard against it creeping back.
@@ -15032,7 +15060,7 @@ Check (
 # ===========================================================
 Sep "Suite 176 -- SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)"
 $html176 = Read-Src "index.html"
-$core176 = Read-Src "js/ui-core.js"
+$core176 = Read-Group "ui-core"
 
 # 176.1  the 4 SETTINGS panels exist with the exact ids the plan specifies,
 #        each data-tab="settings", and are absent from every other tab
@@ -15164,8 +15192,8 @@ Check (
 # ===========================================================
 Sep "Suite 177 -- SU-4: dynamic ACCOUNT (REG PORT) status words"
 $html177 = Read-Src "index.html"
-$acctSrc177 = Read-Src "js/ui-account.js"
-$core177 = Read-Src "js/ui-core.js"
+$acctSrc177 = Read-Group "ui-account"
+$core177 = Read-Group "ui-core"
 $css177 = Read-Src "css/terminal.css"
 
 # 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
@@ -15282,7 +15310,7 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 
 # 177.8  live-update trigger points: boot (loadUI) + sign-in/out/collision (cloud.js,
 #        3 sites) + connectivity (refreshOverseerCarrier, asserted at 177.3)
-$cloud177 = Read-Src "js/cloud.js"
+$cloud177 = Read-Group "cloud"
 $loadUIBody177 = Get-FunctionBody $core177 "loadUI"
 $renderAcctCount177 = ([regex]::Matches($cloud177, [regex]::Escape('window.renderAccount();'))).Count
 Check (
@@ -15308,7 +15336,7 @@ Check (
 # ===========================================================
 Sep "Suite 178 -- SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)"
 $html178 = Read-Src "index.html"
-$core178 = Read-Src "js/ui-core.js"
+$core178 = Read-Group "ui-core"
 $css178 = Read-Src "css/terminal.css"
 $cfgStart178 = $html178.IndexOf('id="campaignConfigPanel"')
 $cfgEnd178 = $html178.IndexOf('<div class="col-right">', $cfgStart178)
@@ -15515,8 +15543,8 @@ Check (
 # ══════════════════════════════════════════════════════════════
 Sep "Suite 179 -- Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)"
 $html179 = Read-Src "index.html"
-$core179 = Read-Src "js/ui-core.js"
-$state179 = Read-Src "js/state.js"
+$core179 = Read-Group "ui-core"
+$state179 = Read-Group "state"
 $css179 = Read-Src "css/terminal.css"
 
 # 179.1  every GAME_DEFS entry (FNV/FO3/FO4) declares theme.cartridgeTape --
@@ -15739,7 +15767,7 @@ Check (
 # ===========================================================
 Sep "Suite 180 -- OPERATIONAL TEMPO centered rotary dial (SU-3 rework)"
 $html180 = Read-Src "index.html"
-$core180 = Read-Src "js/ui-core.js"
+$core180 = Read-Group "ui-core"
 $css180 = Read-Src "css/terminal.css"
 $cfgStart180 = $html180.IndexOf('id="campaignConfigPanel"')
 $cfgEnd180 = $html180.IndexOf('<div class="col-right">', $cfgStart180)
@@ -15964,8 +15992,8 @@ Check (
 # ===========================================================
 Sep "Suite 181 -- PHASE 3 OPERATOR hero-three reskin (id-preservation contract)"
 $html181 = Read-Src "index.html"
-$uiCore181 = Read-Src "js/ui-core.js"
-$uiRender181 = Read-Src "js/ui-render.js"
+$uiCore181 = Read-Group "ui-core"
+$uiRender181 = Read-Group "ui-render"
 $css181 = Read-Src "css/terminal.css"
 
 # 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md sec3
@@ -16126,7 +16154,7 @@ Check (-not ($html181 -match 'PN RBC-SKL-13')) `
     "181.19: the SKILL MATRIX board's decorative part number does not hardcode FNV's real skill count as a literal (Protocol 38 -- flavor text is not a game-agnostic guarantee, but a stray count-shaped literal was caught and fixed during this build)"
 
 # 181.20  no new campaign-state field was added by this reskin
-$stateSrc181 = Read-Src "js/state.js"
+$stateSrc181 = Read-Group "state"
 Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($stateSrc181, '(?i)opVital|opSpecial|opHarness|fdLadder|zonePlate')) `
     '181.20: js/state.js declares no new state field for this reskin -- every new id is a transient DOM/display concern, never persisted campaign data'
 
@@ -16136,9 +16164,9 @@ Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($stateSrc181, '(?i)o
 # (owner interactivity fold-in). 12 tests. Mirrors JS Suite 182.
 # ===========================================================
 Write-Host "`n-- Suite 182 -- OPERATOR follow-up: drag controls + RAD max clamp $('-' * 5)"
-$uiCore182 = Read-Src "js/ui-core.js"
-$stateSrc182 = Read-Src "js/state.js"
-$apiSrc182 = Read-Src "js/api.js"
+$uiCore182 = Read-Group "ui-core"
+$stateSrc182 = Read-Group "state"
+$apiSrc182 = Read-Group "api"
 $css182 = Read-Src "css/terminal.css"
 $index182 = Read-Src "index.html"
 
@@ -16435,9 +16463,9 @@ Check (
 Write-Host "`n-- Suite 184 -- owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries $('-' * 5)"
 $html184 = Read-Src "index.html"
 $css184 = Read-Src "css/terminal.css"
-$core184 = Read-Src "js/ui-core.js"
-$audio184 = Read-Src "js/ui-audio.js"
-$acct184 = Read-Src "js/ui-account.js"
+$core184 = Read-Group "ui-core"
+$audio184 = Read-Group "ui-audio"
+$acct184 = Read-Group "ui-account"
 
 # 184.1  the tempo dial's mobile-base .detent2 rule drops to 7px/letter-spacing:0
 #        (from 8px/0.5px) -- fits STANDARD/MIN-MAXED/CASUAL/SPEEDRUN on one line,
@@ -16708,10 +16736,10 @@ Check (
 Write-Host "`n-- Suite 185 -- Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15) $('-' * 5)"
 $html185 = Read-Src "index.html"
 $css185 = Read-Src "css/terminal.css"
-$core185 = Read-Src "js/ui-core.js"
-$render185 = Read-Src "js/ui-render.js"
-$api185 = Read-Src "js/api.js"
-$stateSrc185 = Read-Src "js/state.js"
+$core185 = Read-Group "ui-core"
+$render185 = Read-Group "ui-render"
+$api185 = Read-Group "api"
+$stateSrc185 = Read-Group "state"
 
 # 185.1  BOTTLE CAPS + WEIGHT tiles gone from OPERATOR; #c_caps/#display_weight
 #        exist exactly once, now inside the OPERATIONS BUS-10 weigh bridge.
@@ -16935,10 +16963,10 @@ Check (
 # Mirrors JS Suite 186.
 # ===========================================================
 Write-Host "`n-- Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin $('-' * 5)"
-$core186 = Read-Src 'js/ui-core.js'
-$render186 = Read-Src 'js/ui-render.js'
+$core186 = Read-Group "ui-core"
+$render186 = Read-Group "ui-render"
 $css186 = Read-Src 'css/terminal.css'
-$stateSrc186 = Read-Src 'js/state.js'
+$stateSrc186 = Read-Group "state"
 $skillsBody186 = Get-FunctionBody $core186 'renderSkills'
 $statusBody186 = Get-FunctionBody $render186 'renderStatus'
 $factionBody186 = Get-FunctionBody $render186 'renderFactionRep'
@@ -17107,8 +17135,8 @@ Check (
 # guards. Mirrors JS Suite 187. (20 tests)
 # ===========================================================
 Write-Host "`n-- Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin $('-' * 5)"
-$core187 = Read-Src "js/ui-core.js"
-$render187 = Read-Src "js/ui-render.js"
+$core187 = Read-Group "ui-core"
+$render187 = Read-Group "ui-render"
 $css187 = Read-Src "css/terminal.css"
 $html187 = Read-Src "index.html"
 $perksBody187 = Get-FunctionBody $render187 'renderPerks'
@@ -17329,7 +17357,7 @@ Check $titlesOk187 `
 # ===========================================================
 Write-Host "`n-- Suite 188 -- CARGO TAG row fix: USE button clipping (owner report) $('-' * 5)"
 $css188 = Read-Src "css/terminal.css"
-$render188 = Read-Src "js/ui-render.js"
+$render188 = Read-Group "ui-render"
 
 # 188.1  Root cause (Protocol 27): the pre-existing .inventory-list li rule
 #        (element+class, specificity 0-1-1) beats .mrow's bare class (0-1-0)
@@ -17381,8 +17409,8 @@ Check (
 # ===========================================================
 Sep "Suite 189 -- Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)"
 $html189 = Read-Src "index.html"
-$render189 = Read-Src "js/ui-render.js"
-$state189src = Read-Src "js/state.js"
+$render189 = Read-Group "ui-render"
+$state189src = Read-Group "state"
 $css189 = Read-Src "css/terminal.css"
 $mapBody189 = ''
 try { $mapBody189 = Get-FunctionBody $render189 'renderWorldMap' } catch {}
@@ -17510,7 +17538,7 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 }
 
 # 189.9
-$apiSrc189 = Read-Src "js/api.js"
+$apiSrc189 = Read-Group "api"
 Check (
     ($apiSrc189 -match 'status') -and ($apiSrc189 -match '(?i)quests') -and ($apiSrc189 -match 'function autoImportState')
 ) '189.9: autoImportState() still handles AI-write quest status -- cycleQuestStatus is additive, not a fork'
@@ -17587,8 +17615,8 @@ Check (
 # Mirrors JS Suite 190. 17 tests.
 # ===========================================================
 Sep "Suite 190 -- owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip"
-$core190 = Read-Src "js/ui-core.js"
-$render190 = Read-Src "js/ui-render.js"
+$core190 = Read-Group "ui-core"
+$render190 = Read-Group "ui-render"
 $css190 = Read-Src "css/terminal.css"
 $html190 = Read-Src "index.html"
 
@@ -17846,9 +17874,9 @@ Check (
 # Mirrors JS Suite 191. 25 tests.
 # ===========================================================
 Sep "Suite 191 -- CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects"
-$state191 = Read-Src "js/state.js"
-$render191 = Read-Src "js/ui-render.js"
-$reg191 = Read-Src "js/reg_fo3.js"
+$state191 = Read-Group "state"
+$render191 = Read-Group "ui-render"
+$reg191 = Read-Group "reg_fo3"
 $html191 = Read-Src "index.html"
 $css191 = Read-Src "css/terminal.css"
 
@@ -18139,10 +18167,10 @@ Check (
 # ===========================================================
 Sep "Suite 192 -- Design Overhaul CHASSIS unit: THE LIVING CORE"
 $html192 = Read-Src "index.html"
-$core192 = Read-Src "js/ui-core.js"
-$audio192 = Read-Src "js/ui-audio.js"
-$saves192 = Read-Src "js/ui-saves.js"
-$cloud192 = Read-Src "js/cloud.js"
+$core192 = Read-Group "ui-core"
+$audio192 = Read-Group "ui-audio"
+$saves192 = Read-Group "ui-saves"
+$cloud192 = Read-Group "cloud"
 $css192 = Read-Src "css/terminal.css"
 
 # 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
@@ -18852,9 +18880,9 @@ Sep "Suite 194 -- CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)
 $html194 = Read-Src "index.html"
 $css194 = Read-Src "css/terminal.css"
 $cssStripped194 = [regex]::Replace($css194, '/\*[\s\S]*?\*/', '')
-$core194 = Read-Src "js/ui-core.js"
-$audio194 = Read-Src "js/ui-audio.js"
-$state194 = Read-Src "js/state.js"
+$core194 = Read-Group "ui-core"
+$audio194 = Read-Group "ui-audio"
+$state194 = Read-Group "state"
 
 # 194.1  #1 thermal glow: a real activity-derived accumulator (_coreTemp),
 #        mutated ONLY by _coreThermalTick() (never by _coreRefresh(),
@@ -19266,10 +19294,10 @@ Check (
 # 50 tests
 # ===========================================================
 Sep "Suite 196 -- FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships"
-$stateSrc196 = Read-Src "js/state.js"
-$coreSrc196 = Read-Src "js/ui-core.js"
-$renderSrc196 = Read-Src "js/ui-render.js"
-$apiSrc196 = Read-Src "js/api.js"
+$stateSrc196 = Read-Group "state"
+$coreSrc196 = Read-Group "ui-core"
+$renderSrc196 = Read-Group "ui-render"
+$apiSrc196 = Read-Group "api"
 $htmlSrc196 = Read-Src "index.html"
 $css196 = Read-Src "css/terminal.css"
 $cssStripped196 = [regex]::Replace($css196, '/\*[\s\S]*?\*/', '')
@@ -19759,9 +19787,9 @@ Check (
 # 26 tests
 # ===========================================================
 Sep "Suite 197 -- FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations"
-$coreSrc197 = Read-Src "js/ui-core.js"
-$renderSrc197 = Read-Src "js/ui-render.js"
-$apiSrc197 = Read-Src "js/api.js"
+$coreSrc197 = Read-Group "ui-core"
+$renderSrc197 = Read-Group "ui-render"
+$apiSrc197 = Read-Group "api"
 $css197 = Read-Src "css/terminal.css"
 $cssStripped197 = [regex]::Replace($css197, '/\*[\s\S]*?\*/', '')
 
@@ -19988,7 +20016,7 @@ Check (
 # 11 tests
 # ===========================================================
 Sep "Suite 198 -- DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin"
-$renderSrc198 = Read-Src "js/ui-render.js"
+$renderSrc198 = Read-Group "ui-render"
 $css198 = Read-Src "css/terminal.css"
 $cssStripped198 = [regex]::Replace($css198, '/\*[\s\S]*?\*/', '')
 
@@ -20160,11 +20188,11 @@ Check (
 # 31 tests
 # ===========================================================
 Sep "Suite 199 -- FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations"
-$coreSrc199 = Read-Src "js/ui-core.js"
-$renderSrc199 = Read-Src "js/ui-render.js"
-$savesSrc199 = Read-Src "js/ui-saves.js"
-$apiSrc199 = Read-Src "js/api.js"
-$stateSrc199 = Read-Src "js/state.js"
+$coreSrc199 = Read-Group "ui-core"
+$renderSrc199 = Read-Group "ui-render"
+$savesSrc199 = Read-Group "ui-saves"
+$apiSrc199 = Read-Group "api"
+$stateSrc199 = Read-Group "state"
 $css199 = Read-Src "css/terminal.css"
 $cssStripped199 = [regex]::Replace($css199, '/\*[\s\S]*?\*/', '')
 
@@ -20468,10 +20496,10 @@ Check (
 # 14 tests
 # ===========================================================
 Sep "Suite 200 -- Native USE (deterministic item consumption, no AI)"
-$renderSrc200 = Read-Src "js/ui-render.js"
-$coreSrc200 = Read-Src "js/ui-core.js"
-$dbNvSrc200 = Read-Src "js/db_nv.js"
-$dbFo3Src200 = Read-Src "js/db_fo3.js"
+$renderSrc200 = Read-Group "ui-render"
+$coreSrc200 = Read-Group "ui-core"
+$dbNvSrc200 = Read-Group "db_nv"
+$dbFo3Src200 = Read-Group "db_fo3"
 
 # 200.1  nativeUseItem() defined; the CARGO MANIFEST click handler calls it
 #        (not transmitMessage()) -- the no-AI guard on the USE path.
@@ -20749,8 +20777,8 @@ Check (
 # 6 tests
 # ===========================================================
 Sep "Suite 201 -- TERMINAL stat edits (deterministic, no AI)"
-$apiSrc201 = Read-Src "js/api.js"
-$coreSrc201 = Read-Src "js/ui-core.js"
+$apiSrc201 = Read-Group "api"
+$coreSrc201 = Read-Group "ui-core"
 
 # 201.1  the 4 new QUICK_LOG_PATTERNS entries + _resolveStatToken exist.
 Check (
@@ -21009,9 +21037,9 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 # 7 tests
 # ===========================================================
 Sep "Suite 202 -- AI->native: GPS/MAP, level-up skill points, eligible perks"
-$apiSrc202 = Read-Src "js/api.js"
-$uiCoreSrc202 = Read-Src "js/ui-core.js"
-$uiRenderSrc202 = Read-Src "js/ui-render.js"
+$apiSrc202 = Read-Group "api"
+$uiCoreSrc202 = Read-Group "ui-core"
+$uiRenderSrc202 = Read-Group "ui-render"
 
 # 202.1  the native router carries [GPS]/[MAP] -> _nativeOpenMap() and
 #        [PERKS]/[PK] -> renderEligiblePerks(); all three functions exist.
@@ -21278,7 +21306,7 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 # 8 tests
 # ===========================================================
 Sep "Suite 203 -- native TRAVEL HERE map control"
-$render203 = Read-Src "js/ui-render.js"
+$render203 = Read-Group "ui-render"
 $travelFn203 = Get-FunctionBody $render203 'travelToLocation'
 $travelBtnSrc203 = [regex]::Match($render203, 'const travelBtn = isYou[\s\S]*?</button>`;').Value
 
@@ -21439,7 +21467,7 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 # 10 tests
 # ===========================================================
 Sep "Suite 204 -- LOCATION CONFIRMATION CARD (top-right arrival toast)"
-$coreSrc204 = Read-Src "js/ui-core.js"
+$coreSrc204 = Read-Group "ui-core"
 $htmlSrc204 = Read-Src "index.html"
 $css204 = Read-Src "css/terminal.css"
 $cssStripped204 = [regex]::Replace($css204, '/\*[\s\S]*?\*/', '')
@@ -21730,10 +21758,10 @@ Check (
 # 20 tests
 # ===========================================================
 Sep "Suite 205 -- VISUAL UPLOAD OCR Unit 1 (infra proof)"
-$ocrSrc205 = Read-Src "js/ocr.js"
+$ocrSrc205 = Read-Group "ocr"
 $htmlSrc205 = Read-Src "index.html"
 $swSrc205 = Read-Src "sw.js"
-$consoleSrc205 = Read-Src "js/test-console.js"
+$consoleSrc205 = Read-Group "test-console"
 $repomixSrc205 = Read-Src "repomix.config.json"
 
 # 205.1 js/ocr.js exists on disk
@@ -21955,8 +21983,8 @@ Check (
 # 205.19 the pre-existing AI-vision Visual Upload path is untouched:
 #        handleImageSelection() and transmitMessage()'s inlineData branch
 #        still exist unmodified (Unit 1 is additive-only).
-$savesSrc205 = Read-Src "js/ui-saves.js"
-$apiSrc205 = Read-Src "js/api.js"
+$savesSrc205 = Read-Group "ui-saves"
+$apiSrc205 = Read-Group "api"
 Check (
     ($savesSrc205 -match 'function handleImageSelection\(event\)') -and
     ($savesSrc205 -match 'attachedImageData = e\.target\.result;') -and
@@ -21986,11 +22014,11 @@ Check (
 # 16 tests
 # ===========================================================
 Sep "Suite 206 -- VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)"
-$ocrSrc206 = Read-Src "js/ocr.js"
-$renderSrc206 = Read-Src "js/ui-render.js"
-$apiSrc206 = Read-Src "js/api.js"
-$coreSrc206 = Read-Src "js/ui-core.js"
-$consoleSrc206 = Read-Src "js/test-console.js"
+$ocrSrc206 = Read-Group "ocr"
+$renderSrc206 = Read-Group "ui-render"
+$apiSrc206 = Read-Group "api"
+$coreSrc206 = Read-Group "ui-core"
+$consoleSrc206 = Read-Group "test-console"
 $htmlSrc206 = Read-Src "index.html"
 
 # 206.1 static -- _parseOcrText is defined in js/ocr.js and exposed on window
@@ -22364,12 +22392,12 @@ Check (
 # 17 tests
 # ===========================================================
 Sep "Suite 207 -- VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)"
-$ocrSrc207 = Read-Src "js/ocr.js"
-$savesSrc207 = Read-Src "js/ui-saves.js"
-$apiSrc207 = Read-Src "js/api.js"
-$renderSrc207 = Read-Src "js/ui-render.js"
-$coreSrc207 = Read-Src "js/ui-core.js"
-$cloudSrc207 = Read-Src "js/cloud.js"
+$ocrSrc207 = Read-Group "ocr"
+$savesSrc207 = Read-Group "ui-saves"
+$apiSrc207 = Read-Group "api"
+$renderSrc207 = Read-Group "ui-render"
+$coreSrc207 = Read-Group "ui-core"
+$cloudSrc207 = Read-Group "cloud"
 
 # 207.1 static -- cloud.js registers both fail-open flags (Protocol 32/33)
 Check (
@@ -22720,9 +22748,9 @@ Check (
 # 30 tests
 # ===========================================================
 Sep "Suite 208 -- CEREMONY MOMENTS WAVE 1 (M1-M5)"
-$coreSrc208 = Read-Src "js/ui-core.js"
-$audioSrc208 = Read-Src "js/ui-audio.js"
-$stateSrc208 = Read-Src "js/state.js"
+$coreSrc208 = Read-Group "ui-core"
+$audioSrc208 = Read-Group "ui-audio"
+$stateSrc208 = Read-Group "state"
 $css208 = Read-Src "css/terminal.css"
 $cssStripped208 = [regex]::Replace($css208, '/\*[\s\S]*?\*/', '')
 $claudeSrc208 = Read-Src "CLAUDE.md"
@@ -23515,7 +23543,7 @@ Check (
 # field, which made _invoke() silently no-op the button).
 # ===========================================================
 Sep "Suite 210 -- Diagnostic Shell U1: registry spine + two-signal gate"
-$testConsole210 = Read-Src "js/test-console.js"
+$testConsole210 = Read-Group "test-console"
 $index210 = Read-Src "index.html"
 
 # 210.1 DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
@@ -23837,7 +23865,7 @@ try {
 # tests.
 # ===========================================================
 Sep "Suite 211 -- Diagnostic Shell U2: mobile overlay + identity + icons"
-$testConsole211 = Read-Src "js/test-console.js"
+$testConsole211 = Read-Group "test-console"
 $index211 = Read-Src "index.html"
 $css211 = Read-Src "css/terminal.css"
 $tplStart211 = $index211.IndexOf('<template id="testConsoleTemplate">')
@@ -24129,7 +24157,7 @@ Check (
 # destructive:true rather than the plan's literal 'prod'. 16 tests.
 # ===========================================================
 Sep "Suite 212 -- Diagnostic Shell U3: TRIGGERS catalog + Protocol 44"
-$testConsole212 = Read-Src "js/test-console.js"
+$testConsole212 = Read-Group "test-console"
 $claude212 = Read-Src "CLAUDE.md"
 
 # 212.1, 212.2, 212.3, 212.4, 212.5, 212.9, 212.10, 212.11, 212.12, 212.16
@@ -24551,10 +24579,10 @@ Check (
 # desktop gate) -- desktop stays byte-identical to what U2 shipped. See the
 # JS runner's Suite 213 header comment for the full fix-by-fix rundown.
 Sep "Suite 213 -- Diagnostic Shell mobile chrome fixes (owner report)"
-$testConsole213 = Read-Src "js/test-console.js"
+$testConsole213 = Read-Group "test-console"
 $index213 = Read-Src "index.html"
 $css213 = Read-Src "css/terminal.css"
-$stateSrc213 = Read-Src "js/state.js"
+$stateSrc213 = Read-Group "state"
 
 function Get-MobileBlocks213($src) {
     $out = ''
@@ -24695,7 +24723,7 @@ Check (
 # read-only -- nothing in it ever writes. 16 tests.
 # ===========================================================
 Sep "Suite 214 -- Diagnostic Shell U4a: collapsible groups + INSPECT build-out"
-$testConsole214 = Read-Src "js/test-console.js"
+$testConsole214 = Read-Group "test-console"
 $index214 = Read-Src "index.html"
 $tplStart214 = $index214.IndexOf('<template id="testConsoleTemplate">')
 $tplEnd214 = $index214.IndexOf('</template>', $tplStart214)
@@ -25081,7 +25109,7 @@ Check (
 # Playwright verification).
 # ===========================================================
 Sep "Suite 215 -- Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy"
-$testConsole215 = Read-Src "js/test-console.js"
+$testConsole215 = Read-Group "test-console"
 $index215 = Read-Src "index.html"
 $terminalCss215 = Read-Src "css/terminal.css"
 
@@ -25685,8 +25713,8 @@ Check (
 # 22 tests.
 # ===========================================================
 Sep "Suite 216 -- Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremony + FINAL leak-proof audit"
-$testConsole216 = Read-Src "js/test-console.js"
-$stateSrc216 = Read-Src "js/state.js"
+$testConsole216 = Read-Group "test-console"
+$stateSrc216 = Read-Group "state"
 $index216 = Read-Src "index.html"
 $terminalCss216 = Read-Src "css/terminal.css"
 
@@ -26193,8 +26221,8 @@ Check (
 # ===========================================================
 Sep "Suite 217 -- Mobile UX polish: cloud-save prominence + toast audit"
 $htmlSrc217 = Read-Src "index.html"
-$uiCore217 = Read-Src "js/ui-core.js"
-$uiAccount217 = Read-Src "js/ui-account.js"
+$uiCore217 = Read-Group "ui-core"
+$uiAccount217 = Read-Group "ui-account"
 $cssSrc217 = Read-Src "css/terminal.css"
 
 # 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button.
@@ -26282,8 +26310,8 @@ Check (
 # ===========================================================
 Sep "Suite 218 -- NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired"
 $cssSrc218 = Read-Src "css/terminal.css"
-$apiSrc218 = Read-Src "js/api.js"
-$uiCoreSrc218 = Read-Src "js/ui-core.js"
+$apiSrc218 = Read-Group "api"
+$uiCoreSrc218 = Read-Group "ui-core"
 
 # 218.1  MF-1 -- the base subsystem-content gate still exists, unconditional.
 Check (
@@ -26337,7 +26365,7 @@ Check (
 
 # 218.8  MF-3b behavioral proof -- GAME_DEFS carries a distinct, non-"Fallout 3"
 #        label for the design-only third game (FO4, DO-K).
-$stateSrc218 = Read-Src "js/state.js"
+$stateSrc218 = Read-Group "state"
 $fo4Idx218 = $stateSrc218.IndexOf('FO4:')
 $fo4Slice218 = if ($fo4Idx218 -ge 0) { $stateSrc218.Substring($fo4Idx218, [Math]::Min(400, $stateSrc218.Length - $fo4Idx218)) } else { '' }
 Check (
@@ -26368,8 +26396,8 @@ Check (
 # 7 tests
 # ===========================================================
 Sep "Suite 219 -- v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced"
-$cloudSrc219 = Read-Src "js/cloud.js"
-$uiCoreSrc219 = Read-Src "js/ui-core.js"
+$cloudSrc219 = Read-Group "cloud"
+$uiCoreSrc219 = Read-Group "ui-core"
 
 # 219.1  cloud.js exports window.getFeatureFlagKeys() as the single source of
 #        every real flag key (Object.keys(_featureFlags) -- never a second,

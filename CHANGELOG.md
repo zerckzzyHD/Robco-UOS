@@ -5,6 +5,7 @@
 - Reorganized the internal developer documentation so a working session no longer has to load a large chunk of historical build notes it usually doesn't need — those notes now live in a separate reference file, read only when actually wanted. Nothing you can see changed.
 - Added a "where does this feature live in the code" navigation guide and expanded the developer documentation's quick-reference index so a working session can find any subsystem without guessing. Added an automated check that fails the build if that guide's file references ever go stale. Nothing you can see changed.
 - Clarified the internal naming-convention guidance: in-world flavor names for features only ship when they're immediately understandable at a glance — clarity always wins over theme. Nothing you can see changed.
+- Hardened the test suite against an upcoming internal file reorganization: tests that check where a piece of code lives now check the whole feature area instead of one exact file, so splitting a large file into smaller ones later can't accidentally weaken the safety net. Also added an automated pre-flight check that catches a startup-file inconsistency (a script forgotten from the app's load list, the offline-caching list, or the developer documentation) before it ever reaches the live site, and cleaned up a few stale file names in the internal test descriptions. Nothing you can see changed.
 
 ---
 
