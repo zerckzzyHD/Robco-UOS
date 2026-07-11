@@ -1075,9 +1075,18 @@ $jsMissing28 = $GATE_SUITES | Where-Object { -not $jsRunnerSrc28.Contains($_) }
 $psMissing28 = $GATE_SUITES | Where-Object { -not $psRunnerSrc28.Contains($_) }
 Check ($jsMissing28.Count -eq 0) ("JS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($jsMissing28.Count) { " -- missing: " + ($jsMissing28 -join ", ") } else { "" }))
 Check ($psMissing28.Count -eq 0) ("PS runner contains all gate-guard suites (22-41, 49-99)" + $(if ($psMissing28.Count) { " -- missing: " + ($psMissing28 -join ", ") } else { "" }))
+# Protocol 42 fix (v2.8.0-r3 hotfix): was the FIRST "Tests: N/N" match (always the
+# [Unreleased] header) -- correct only by coincidence until a hotfix (Protocol 2a's
+# documented exception, which freezes Unreleased while updating the ALREADY-RELEASED
+# block's header instead) legitimately changes the total test count, diverging the
+# two. Fixed to take the MAXIMUM across every header -- the count only ever grows
+# within a release cycle, so the max is always the genuinely-current one. Mirrors
+# the JS runner's matchAll()-based fix (Protocol 15 parity).
 $changelogSrc28 = Read-Src "CHANGELOG.md"
-$countM28 = [regex]::Match($changelogSrc28, 'Tests:\s*(\d+)/\d+')
-$canon28 = if ($countM28.Success) { $countM28.Groups[1].Value } else { '' }
+$countMatches28 = [regex]::Matches($changelogSrc28, 'Tests:\s*(\d+)/\d+')
+$canon28 = if ($countMatches28.Count -gt 0) {
+    ($countMatches28 | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Maximum).Maximum.ToString()
+} else { '' }
 Check ($canon28 -ne '') "CHANGELOG.md contains Tests: N/N header (Protocol 2a)"
 $readmeSrc28 = Read-Src "README.md"
 Check ($canon28 -ne '' -and ($readmeSrc28 -match $canon28)) "README.md contains CHANGELOG.md canonical test count ($canon28)"
@@ -26336,6 +26345,129 @@ Check (
     ($fo4Slice218 -match "label:\s*'Fallout 4'") -and
     (-not ($fo4Slice218 -match "label:\s*'Fallout 3'"))
 ) "218.8: GAME_DEFS.FO4 carries its own distinct label ('Fallout 4', not 'Fallout 3') -- the GAME_DEFS[ctx].label fix genuinely generalizes past FNV/FO3"
+
+# ===========================================================
+# Suite 219 -- v2.8.0 Hotfix: CHASSIS SYSTEM STATUS breaker readout
+# single-sourced against the real kill-switch flags (Protocol 22).
+#
+# THE BUG (r2 -> r3): the SYSTEM STATUS / IDENTITY PLATE & BREAKERS board's
+# breaker-rack readout (renderSystemStatus(), js/ui-core.js) drove itself
+# off a separately-hardcoded array (_SYSTEM_STATUS_FLAGS) that was never
+# updated when the Visual Upload OCR unit added visualOcr/visualAiVision to
+# the real flag set (js/cloud.js, _featureFlags) -- the board silently
+# showed 6 of the 8 real flags. THE FIX: js/cloud.js now exports
+# window.getFeatureFlagKeys() (Object.keys(_featureFlags), the one real
+# source), and js/ui-core.js's _systemStatusFlagKeys() reads it first,
+# falling back to a literal array (_SYSTEM_STATUS_FLAGS_FALLBACK) only when
+# that accessor isn't available (a reduced test harness). Mirrors JS Suite
+# 219 -- 219.5 is a structural mirror (PowerShell has no JS eval available,
+# same convention as Suite 149.8/62.5) of the JS runner's vm-based
+# behavioral proof. Also fixes a Protocol 42 gate defect this hotfix's own
+# net test-count change exposed (Suite 28's canonical-count reader picked a
+# stale, frozen count) -- see 219.7.
+# 7 tests
+# ===========================================================
+Sep "Suite 219 -- v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced"
+$cloudSrc219 = Read-Src "js/cloud.js"
+$uiCoreSrc219 = Read-Src "js/ui-core.js"
+
+# 219.1  cloud.js exports window.getFeatureFlagKeys() as the single source of
+#        every real flag key (Object.keys(_featureFlags) -- never a second,
+#        independently-maintained list).
+Check (
+    $cloudSrc219 -match "window\.getFeatureFlagKeys\s*=\s*function\s*\(\s*\)\s*\{\s*return Object\.keys\(_featureFlags\);\s*\}"
+) '219.1: cloud.js exports window.getFeatureFlagKeys() = Object.keys(_featureFlags) -- the single source of every registered kill-switch flag key'
+
+# 219.2  ui-core.js's _systemStatusFlagKeys() prefers window.getFeatureFlagKeys()
+#        when available, and only falls back to the literal array otherwise.
+$flagKeysFnBody219 = Get-FunctionBody $uiCoreSrc219 '_systemStatusFlagKeys'
+Check (
+    ($flagKeysFnBody219 -match "typeof window\.getFeatureFlagKeys === 'function'") -and
+    ($flagKeysFnBody219 -match "window\.getFeatureFlagKeys\(\)") -and
+    ($flagKeysFnBody219 -match "_SYSTEM_STATUS_FLAGS_FALLBACK")
+) '219.2: _systemStatusFlagKeys() reads window.getFeatureFlagKeys() when available, falling back to the literal array only when it is not'
+
+# 219.3  renderSystemStatus() reads the breaker-rack flag list through
+#        _systemStatusFlagKeys() -- regression guard against reintroducing
+#        the old bare hardcoded-array reference this hotfix retired.
+$renderBody219 = Get-FunctionBody $uiCoreSrc219 'renderSystemStatus'
+Check (
+    ($renderBody219 -match "_systemStatusFlagKeys\(\)\.map") -and
+    (-not ($renderBody219 -match "_SYSTEM_STATUS_FLAGS\.map"))
+) '219.3: renderSystemStatus() maps over _systemStatusFlagKeys() (never the retired bare _SYSTEM_STATUS_FLAGS array)'
+
+# 219.4  DRIFT GUARD -- the exact class of bug that shipped in r2: the
+#        fallback array's key SET must always equal the real _featureFlags
+#        key SET in cloud.js. This is the check that would have caught the
+#        original bug, and prevents the fallback itself from silently
+#        drifting stale again in the future.
+$ffBlockMatch219 = [regex]::Match($cloudSrc219, "let _featureFlags = \{([\s\S]*?)\r?\n\};")
+$realFlagKeys219 = if ($ffBlockMatch219.Success) {
+    [regex]::Matches($ffBlockMatch219.Groups[1].Value, "(?m)^\s*([a-zA-Z][a-zA-Z0-9]*):\s*true,?\s*$") | ForEach-Object { $_.Groups[1].Value }
+} else { @() }
+$realKeySet219 = @($realFlagKeys219 | Select-Object -Unique)
+
+$fallbackBlockMatch219 = [regex]::Match($uiCoreSrc219, "_SYSTEM_STATUS_FLAGS_FALLBACK = \[([\s\S]*?)\];")
+$fallbackKeys219 = if ($fallbackBlockMatch219.Success) {
+    [regex]::Matches($fallbackBlockMatch219.Groups[1].Value, "'([a-zA-Z][a-zA-Z0-9]*)'") | ForEach-Object { $_.Groups[1].Value }
+} else { @() }
+$fallbackKeySet219 = @($fallbackKeys219 | Select-Object -Unique)
+
+$missingFromFallback219 = @($realKeySet219 | Where-Object { $fallbackKeySet219 -notcontains $_ })
+$extraInFallback219 = @($fallbackKeySet219 | Where-Object { $realKeySet219 -notcontains $_ })
+Check (
+    $ffBlockMatch219.Success -and
+    $fallbackBlockMatch219.Success -and
+    ($realKeySet219.Count -gt 0) -and
+    ($missingFromFallback219.Count -eq 0) -and
+    ($extraInFallback219.Count -eq 0)
+) ('219.4: DRIFT GUARD -- _SYSTEM_STATUS_FLAGS_FALLBACK carries the exact same key set as the real _featureFlags in cloud.js' + $(if ($missingFromFallback219.Count) { " -- MISSING from fallback: " + ($missingFromFallback219 -join ', ') } else { '' }) + $(if ($extraInFallback219.Count) { " -- STALE in fallback: " + ($extraInFallback219 -join ', ') } else { '' }))
+
+# 219.5  BEHAVIORAL (structural mirror -- PowerShell has no JS eval available,
+#        same convention as Suite 149.8/62.5) -- the exact reported bug:
+#        visualOcr and visualAiVision are present in the fallback array, AND
+#        the function's FIRST branch (the `? :` check) returns the live
+#        window.getFeatureFlagKeys() result BEFORE ever touching the
+#        fallback -- proving the fallback only ever backstops a missing
+#        accessor, it never wins over a real one.
+Check (
+    ($fallbackBlockMatch219.Value -match "'visualOcr'") -and
+    ($fallbackBlockMatch219.Value -match "'visualAiVision'") -and
+    ($flagKeysFnBody219 -match "(?s)return typeof window\.getFeatureFlagKeys === 'function'\s*\?\s*window\.getFeatureFlagKeys\(\)\s*:\s*_SYSTEM_STATUS_FLAGS_FALLBACK;")
+) '219.5: BEHAVIORAL (structural mirror) -- the fallback array includes visualOcr/visualAiVision, and the ternary returns the live window.getFeatureFlagKeys() result first, only falling through to the fallback when that accessor is absent (proving real single-sourcing, not just an updated fallback list)'
+
+# 219.6  the breaker-rack markup itself renders every flag returned by
+#        _systemStatusFlagKeys() as its own labeled breaker (structural --
+#        the map() -> _chassisBreaker() wiring is unchanged by this fix).
+Check (
+    $renderBody219 -match "flags\s*[\r\n]?\s*\.map\(f => _chassisBreaker\(f\.key\.toUpperCase\(\), f\.on, false, 'ENABLED', 'DISABLED'\)\)"
+) '219.6: every key _systemStatusFlagKeys() returns is rendered as its own ENABLED/DISABLED breaker in the rack -- no silent per-flag drop'
+
+# 219.7  PROTOCOL 42 -- while shipping this very hotfix (a net test-count
+#        change), Suite 28's "canonical test count" reader was found to read
+#        only the FIRST "Tests: N/N" header in CHANGELOG.md (always the
+#        [Unreleased] header) -- correct only by coincidence, since every
+#        prior push happened to leave Unreleased's count equal to the latest
+#        released block's count. The Hotfix model (Protocol 2a) explicitly
+#        freezes Unreleased while a hotfix updates the ALREADY-RELEASED
+#        block's header instead, so a hotfix that changes the total test
+#        count (this one) legitimately diverges the two, and the old
+#        first-match read picked the stale, frozen number. REAL shipped-code
+#        defect (the gate runs on every commit) -- fixed in the SAME commit
+#        (both runners) to take the MAXIMUM across every header, and locked
+#        here with a behavioral proof against a synthetic frozen-Unreleased /
+#        hotfixed-released pair. Mirrors JS Suite 219.7.
+$synthetic219 = "## [Unreleased]<!-- Tests: 2938/2938 | Cache: x -->`n`n## [v2.8.0]<!-- Tests: 2945/2945 | Cache: y -->`n"
+$syntheticMatches219 = [regex]::Matches($synthetic219, 'Tests:\s*(\d+)/\d+')
+$max219 = if ($syntheticMatches219.Count -gt 0) {
+    ($syntheticMatches219 | ForEach-Object { [int]$_.Groups[1].Value } | Measure-Object -Maximum).Maximum.ToString()
+} else { '' }
+$suite28Src219 = Read-Src "tests/robco-diagnostics.ps1"
+Check (
+    ($max219 -eq '2945') -and
+    ($suite28Src219 -match [regex]::Escape('[regex]::Matches($changelogSrc28, ''Tests:\s*(\d+)/\d+'')')) -and
+    ($suite28Src219 -match [regex]::Escape('Measure-Object -Maximum'))
+) '219.7: PROTOCOL 42 -- Suite 28''s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2945, the current value, not 2938, the first/stale match) -- the bug this hotfix''s own net test-count change exposed'
 
 # ===========================================================
 # Results
