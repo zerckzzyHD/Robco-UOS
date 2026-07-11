@@ -14,7 +14,7 @@
          unsafe-inline per CSP Level 2+, breaking all inline handlers (tripwire guards 55.10–55.11).
          'wasm-unsafe-eval' (Visual Upload OCR Unit 1) is a standard, narrowly-scoped keyword source —
          it permits WebAssembly.instantiate/compile (needed by the self-hosted Tesseract.js OCR engine,
-         js/ocr.js) and nothing else; it does NOT enable plain JS eval()/Function() and does NOT trip
+         js/services/ocr.js) and nothing else; it does NOT enable plain JS eval()/Function() and does NOT trip
          the unsafe-inline tripwire above (Suite 55). -->
     <!-- frame-ancestors is intentionally OMITTED here: it is only enforceable via an HTTP
          response header, never via a <meta> tag — browsers silently ignore it in meta and
@@ -24,7 +24,24 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com; connect-src 'self' https://generativelanguage.googleapis.com https://firestore.googleapis.com https://firebase.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://nv-overlord.firebaseapp.com https://content-firebaseappcheck.googleapis.com https://firebaseappcheck.googleapis.com https://www.google.com https://www.gstatic.com; img-src 'self' data: blob: https://www.gstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src https://nv-overlord.firebaseapp.com https://www.google.com https://accounts.google.com; worker-src 'self'; form-action 'self'"
     />
-    <link rel="stylesheet" href="css/terminal.css" />
+    <!-- css/terminal-*.css (2.8.5 U-A2): terminal.css split by section, as a pure
+         ordered cut. CSS cascade resolves equal-specificity ties by source
+         order, so this link order is NOT reorderable — in particular
+         terminal-12-mobile.css must always load last (see its own header
+         comment). scripts/check-boot-chain.js + Suite 220 both guard this
+         order against index.html drifting out of sync with the canonical list. -->
+    <link rel="stylesheet" href="css/terminal-01-base.css" />
+    <link rel="stylesheet" href="css/terminal-02-chrome.css" />
+    <link rel="stylesheet" href="css/terminal-03-overseer.css" />
+    <link rel="stylesheet" href="css/terminal-04-diagnostic-shell.css" />
+    <link rel="stylesheet" href="css/terminal-05-toolbar.css" />
+    <link rel="stylesheet" href="css/terminal-06-modulebay.css" />
+    <link rel="stylesheet" href="css/terminal-07-operator-boards.css" />
+    <link rel="stylesheet" href="css/terminal-08-curio-operations.css" />
+    <link rel="stylesheet" href="css/terminal-09-databank.css" />
+    <link rel="stylesheet" href="css/terminal-10-chassis.css" />
+    <link rel="stylesheet" href="css/terminal-11-feedback-animations.css" />
+    <link rel="stylesheet" href="css/terminal-12-mobile.css" />
     <script>
       // Pre-paint optic apply (flash-free) — read THIS game's per-game pick (robco_optic_<ctx>,
       // ctx from robco_v8.activeContext) with a fallback to the legacy site-wide key. Runs before
@@ -146,7 +163,7 @@
          DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay
          + identity + icons) — STAGING/DEV ONLY, NEVER ON PRODUCTION.
          Lives inert inside a <template> (WU-E2 pattern, same as the banners
-         above) so it can never render even by accident. js/test-console.js
+         above) so it can never render even by accident. js/dev/test-console.js
          clones it into #testConsoleMount ONLY when _isStagingEnv() (ui-core.js,
          Protocol 43/WU-C11) returns true — the same fail-safe-to-hidden env
          gate the changelog viewer uses to hide [Unreleased] on production.
@@ -159,13 +176,13 @@
          pinned through the ambient-runtime filter/transform states (idle/
          night/shutdown degrade the FIXED BEZEL DOCK the same way; a body-level
          sibling of .container is never subject to that trade-off at all).
-         A live inspector + trigger panel for the Ambient Runtime (js/runtime.js):
+         A live inspector + trigger panel for the Ambient Runtime (js/core/runtime.js):
          current state, forced state transitions, the Immersion dial, and the
          registered-observer list — so Phase-2 ambient features are testable
          without waiting on real idle/standby timers. Reads/writes NOTHING
          durable to the campaign (runtime state is in-memory; the Immersion
          tier is the existing device pref, same as the real dial). See
-         js/test-console.js for the extension point where a future ambient
+         js/dev/test-console.js for the extension point where a future ambient
          feature (broadcasts, weather, boot flavors, etc.) adds its own trigger.
          Also hosts one-off infra-proof harnesses for not-yet-live features
          (e.g. the Visual Upload OCR Unit-1 board below) — this IS the one
@@ -227,8 +244,8 @@
           <div id="dshEnvBanner" class="panel-substatus" aria-live="polite">&mdash;</div>
           <p style="font-size: 10px">
             Staging/dev environments only &mdash; never shown on the live site. Renders from the
-            DIAGNOSTIC_SHELL_TOOLS registry (js/test-console.js); triggers in-memory runtime states
-            and the device Immersion tier only, no campaign data is read or written here.
+            DIAGNOSTIC_SHELL_TOOLS registry (js/dev/test-console.js); triggers in-memory runtime
+            states and the device Immersion tier only, no campaign data is read or written here.
           </p>
           <div class="input-group" style="flex-direction: column; align-items: stretch">
             <label class="optics-label" for="dshSearch">FILTER TOOLS</label>
@@ -376,7 +393,7 @@
           </div>
           <!-- U4a: INSPECT build-out (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4)
                — a read-only "system diagnostics" readout, NEVER a raw JSON blob.
-               js/test-console.js's _inspectXxxHtml() builders fill each container
+               js/dev/test-console.js's _inspectXxxHtml() builders fill each container
                below with labeled, human-readable lines only (reusing the CHASSIS
                SYSTEM STATUS board's own _chassisIdRow()/_chassisBreaker() row
                helpers, Protocol 22). The INSPECT category itself renders LAST
@@ -455,7 +472,7 @@
           </div>
           <div id="dshSections"></div>
           <!-- EXTENSION POINT: a future hard-to-trigger feature adds one more entry to
-               DIAGNOSTIC_SHELL_TOOLS (js/test-console.js) with an `anchor` selector
+               DIAGNOSTIC_SHELL_TOOLS (js/dev/test-console.js) with an `anchor` selector
                pointing at a new .input-group block placed here — never write campaign
                state, never bypass confirmAction() for a destructive:true tool. -->
         </div>
@@ -474,7 +491,7 @@
     </div>
 
     <!-- Power-on affordance (Protocol 42 fix): visible ONLY while SHUTDOWN/OFF
-         (body.rt-shutdown / body.rt-shutdown-plain — see terminal.css), sitting
+         (body.rt-shutdown / body.rt-shutdown-plain — see the split terminal-*.css files), sitting
          above the shutdown cover. Fixes the owner-reported blind-black-screen
          bug — there was previously no visible way back on. -->
     <button
@@ -508,7 +525,7 @@
          core.js). Lives at BODY level (never inside .container/.machine)
          so it is never affected by the ambient-runtime filter/transform
          containing-block trade-off documented above the fixed bezel dock
-         (terminal.css). Empty/inert until _locationCardShow() populates
+         (the split terminal-*.css files). Empty/inert until _locationCardShow() populates
          it; role=status + aria-live=polite doubles as a screen-reader
          announcement. Purely transient DOM — zero campaign-state write. -->
     <div
@@ -527,7 +544,7 @@
            DEVICE CHRome (DO-N, Protocol UI-7): the app becomes a physical
            RobCo terminal. Casing-top = brand plate + status lamps + uptime.
            Structural for every game (Protocol 38); flavor text (serial/brand
-           subtitle) is CSS-swapped per [data-game] in terminal.css, never a
+           subtitle) is CSS-swapped per [data-game] in the split terminal-*.css files, never a
            JS ctx branch.
            ════════════════════════════════════════════════════════════════ -->
       <div class="casing-top">
@@ -540,7 +557,7 @@
           >
         </div>
         <!-- Owner-report batch: casing lamps go from decorative to functional
-             (js/ui-core.js) — PWR powers the terminal off (reuses the A3
+             (js/ui/ui-core.js) — PWR powers the terminal off (reuses the A3
              AmbientRuntime shutdown path), UPLINK reflects + opens the AI
              connection (SLOT 05), FAULT reflects + opens the client error log.
              Real <button>s (Protocol UI-5), so the row is no longer
@@ -4001,7 +4018,7 @@
                    existing appendToChat()/transmitMessage() pipeline (Protocol 22 —
                    never forked). Per-game flavor (title/relay/status strip/state
                    tags) is read from getIdentity().overseer by OverseerScope
-                   (js/ui-core.js) — no literal game text lives here. -->
+                   (js/ui/ui-core.js) — no literal game text lives here. -->
               <div class="ovs-head">
                 <span class="ovs-lamp" aria-hidden="true"></span>
                 <span id="ovsTitle">DIRECTOR UPLINK</span>
@@ -4121,7 +4138,7 @@
         <!-- Tool Deck + Quick-Draw Holster (Design Overhaul command-cluster overhaul).
              Anchored to .glass-frame (position:relative;overflow:hidden), NOT
              .chat-panel/.col-right (both scroll/clip and would mis-place an absolute
-             bottom sheet — see terminal.css). Zero standing footprint at rest;
+             bottom sheet — see the split terminal-*.css files). Zero standing footprint at rest;
              renderHolster() (ui-render.js) populates the four sockets from
              state.padBindings on open and after every bind. Every tool row reuses its
              EXISTING handler (Protocol 22) via _wireToolDeck() (ui-core.js) — never
@@ -4214,7 +4231,7 @@
          classic script BEFORE the boot loader below, so window.IdbStore exists
          before state.js (injected by the loader) first calls it. Its absence is
          harmless — MetaStore's write-through no-ops when IdbStore is undefined. -->
-    <script src="js/idb.js"></script>
+    <script src="js/core/idb.js"></script>
     <script>
       // Context-conditional boot loader — replaces the legacy write-based script injector.
       // Injects exactly ONE db + ONE reg + shared state.js, chosen by activeContext, as
@@ -4240,8 +4257,18 @@
         // no boot-loader code edit. Per-entry order is db → state → reg → registry-core
         // (script.async = false preserves it). Unknown/absent ctx → FNV fail-safe.
         var GAME_FILES = {
-          FNV: ['js/db_nv.js', 'js/state.js', 'js/reg_nv.js', 'js/registry-core.js'],
-          FO3: ['js/db_fo3.js', 'js/state.js', 'js/reg_fo3.js', 'js/registry-core.js'],
+          FNV: [
+            'js/data/db_nv.js',
+            'js/core/state.js',
+            'js/data/reg_nv.js',
+            'js/data/registry-core.js',
+          ],
+          FO3: [
+            'js/data/db_fo3.js',
+            'js/core/state.js',
+            'js/data/reg_fo3.js',
+            'js/data/registry-core.js',
+          ],
         };
         var bootScripts = GAME_FILES[ctx] || GAME_FILES.FNV;
 
@@ -4262,31 +4289,31 @@
         });
       })();
     </script>
-    <script src="js/ui-audio.js"></script>
-    <script src="js/ui-render.js"></script>
-    <script src="js/ui-saves.js"></script>
-    <script src="js/ui-account.js"></script>
+    <script src="js/ui/ui-audio.js"></script>
+    <script src="js/ui/ui-render.js"></script>
+    <script src="js/ui/ui-saves.js"></script>
+    <script src="js/ui/ui-account.js"></script>
     <!-- Visual Upload OCR (planning/VISUAL_UPLOAD_OCR_PLAN.md): lazy-loaded, never
          imports Tesseract.js itself at boot; only exposes _ensureTesseract(),
          runVisualOcrTest(), the deterministic parser, and routeVisualUpload()'s hybrid
          routing (the composer [+] attach flow's entry point, plus the staging-only Dev
          Console OCR test boards). Must load after ui-render.js (openModal/escapeHtml
          precedent) and before ui-core.js (Protocol 22, no forked helper). -->
-    <script src="js/ocr.js"></script>
-    <script src="js/runtime.js"></script>
-    <script src="js/ui-core.js"></script>
+    <script src="js/services/ocr.js"></script>
+    <script src="js/core/runtime.js"></script>
+    <script src="js/ui/ui-core.js"></script>
     <!-- ui-core-*.js (2.8.5 U-A1): the ui-core.js spine split by responsibility.
          Global scope, static tags — intra-group order is flexible (nothing
          reads these until window.onload, itself defined in ui-core.js above),
-         but they must all load before api.js/test-console.js like ui-core.js did. -->
-    <script src="js/ui-core-nav.js"></script>
-    <script src="js/ui-core-overseer.js"></script>
-    <script src="js/ui-core-chassis.js"></script>
-    <script src="js/ui-core-modulebay.js"></script>
-    <script src="js/ui-core-cmd.js"></script>
-    <script src="js/test-console.js"></script>
-    <script src="js/api.js"></script>
-    <script type="module" src="js/cloud.js"></script>
+         but they must all load before api.js/dev/test-console.js like ui-core.js did. -->
+    <script src="js/ui/ui-core-nav.js"></script>
+    <script src="js/ui/ui-core-overseer.js"></script>
+    <script src="js/ui/ui-core-chassis.js"></script>
+    <script src="js/ui/ui-core-modulebay.js"></script>
+    <script src="js/ui/ui-core-cmd.js"></script>
+    <script src="js/dev/test-console.js"></script>
+    <script src="js/services/api.js"></script>
+    <script type="module" src="js/services/cloud.js"></script>
 
     <script>
       // PWA Service Worker Registration & Auto-Update
@@ -4375,7 +4402,7 @@
         }
 
         // Diagnostic Shell U5 seam: force the SAME real update modal on
-        // demand (js/test-console.js RESILIENCE & INFRA), reusing
+        // demand (js/dev/test-console.js RESILIENCE & INFRA), reusing
         // _triggerUpdate() verbatim (Protocol 22 — never a second modal
         // implementation) instead of duplicating its focus-trap/keydown
         // wiring. A REAL waiting worker (a genuine deploy is staged) is

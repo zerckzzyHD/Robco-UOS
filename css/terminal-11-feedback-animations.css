@@ -1,0 +1,1283 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-11-feedback-animations.css — part 11/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 11805-13078. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: Feedback Animation Waves 1-3
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 1 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Every rule below is a plain @keyframes (never transition-only), so the
+   existing global prefers-reduced-motion block (top of this file) already
+   neutralizes each to an instant, correct final frame with no bespoke
+   carve-out (Protocol UI-9). Transform/opacity/filter only — compositor
+   friendly, mobile-safe, never blocks input.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── THE STATUS ANNUNCIATOR — casing-top echo (§2) ──────────────────── */
+@keyframes annunciator-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes annunciator-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.status-annunciator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--robco-green);
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.status-annunciator.show {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: annunciator-in 260ms ease-out;
+}
+.status-annunciator.hide {
+  animation: annunciator-out 200ms ease-in forwards;
+}
+.status-annunciator.tone-amber {
+  color: var(--robco-alert);
+  border-color: var(--robco-alert);
+}
+.status-annunciator.tone-red {
+  color: var(--robco-danger);
+  border-color: var(--robco-danger);
+}
+.status-annunciator .an-glyph {
+  font-size: 13px;
+}
+.status-annunciator .an-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .status-annunciator {
+    flex-basis: 100%;
+    order: 5;
+    max-width: none;
+  }
+}
+
+/* ── LOCATION CONFIRMATION CARD — top-right arrival toast (Suite 204) ───
+   Distinct from the STATUS ANNUNCIATOR above: a dedicated, more prominent
+   slide-in/out card confirming the player's CURRENT location changed,
+   shown regardless of the active subsystem — reuses the same
+   _echoShouldShow() visibility gate (js/ui-core.js) but skips the
+   annunciator's homeSubsystem suppression, since "where did I just go" is
+   meaningful even while looking at the CARTOGRAPHY TABLE itself. Retires
+   the older inline "ARRIVED" annunciator chip (#27 TRIANGULATE's echo
+   half) so the player sees ONE clean location confirmation instead of two
+   competing toasts; the map's own "you" reticle pulse (TRIANGULATE's home
+   half) is untouched. Lives at BODY level in index.html (never inside
+   .container/.machine) so it is never subject to the ambient-runtime
+   filter/transform containing-block trade-off documented above the fixed
+   bezel dock. Plain @keyframes (Protocol UI-9) — the existing global
+   prefers-reduced-motion block neutralizes both to an instant
+   appear/disappear with no bespoke carve-out. */
+@keyframes location-card-in {
+  0% {
+    opacity: 0;
+    transform: translate(28px, -14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+@keyframes location-card-out {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(28px, -14px);
+  }
+}
+.location-card {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 5000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(280px, calc(100vw - 24px));
+  padding: 8px 14px;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--robco-green);
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.location-card.show {
+  opacity: 1;
+  animation: location-card-in 260ms ease-out;
+}
+.location-card.hide {
+  animation: location-card-out 220ms ease-in forwards;
+}
+.location-card .loc-card-glyph {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.location-card .loc-card-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .location-card {
+    top: 8px;
+    right: 8px;
+    max-width: min(240px, calc(100vw - 16px));
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+}
+
+/* ── #1 FLATLINE WARNING — BUS-01 HP trace (Group 1) ────────────────── */
+@keyframes flatline-stutter {
+  0%,
+  100% {
+    filter: brightness(1) contrast(1);
+  }
+  10%,
+  30%,
+  50% {
+    filter: brightness(2.2) contrast(1.4);
+  }
+  20%,
+  40%,
+  60% {
+    filter: brightness(0.6) contrast(1.4);
+  }
+  70% {
+    filter: brightness(1.6);
+  }
+}
+#opTraceHp.flatline-stutter .hp-bar-fill {
+  animation: flatline-stutter 1.6s ease-in-out;
+}
+@keyframes hp-vignette-breathe {
+  0%,
+  100% {
+    box-shadow: inset 0 0 40px 6px rgba(231, 76, 60, 0.15);
+  }
+  50% {
+    box-shadow: inset 0 0 70px 14px rgba(231, 76, 60, 0.4);
+  }
+}
+body.hp-critical-vignette .glass-frame {
+  animation: hp-vignette-breathe 1.1s ease-in-out infinite;
+}
+
+/* ── #4 GEIGER SPIKE / #5 RADAWAY DRAIN — BUS-01 RAD trace (Group 1) ─── */
+@keyframes rad-spike-chatter {
+  0%,
+  100% {
+    transform: translateX(0);
+    filter: brightness(1);
+  }
+  15% {
+    transform: translateX(-2px);
+    filter: brightness(2);
+  }
+  30% {
+    transform: translateX(2px);
+    filter: brightness(1.4);
+  }
+  45% {
+    transform: translateX(-1px);
+    filter: brightness(2);
+  }
+  60% {
+    transform: translateX(1px);
+    filter: brightness(1.2);
+  }
+}
+#opRadLineWrap.rad-spike {
+  animation: rad-spike-chatter 1.1s ease-in-out;
+}
+@keyframes rad-drain-bubble {
+  0% {
+    filter: brightness(1.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#opRadLineWrap.rad-drain {
+  animation: rad-drain-bubble 1.1s ease-out;
+}
+@keyframes geiger-film-grain {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    opacity: 0.06;
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    opacity: 0.02;
+  }
+}
+body.geiger-film-grain .crt-overlay {
+  animation: geiger-film-grain 1s steps(8, end);
+}
+
+/* ── #6 X-RAY FLASH / #7 SPLINT WRAP — BUS-03 zone plate (Group 1) ──── */
+@keyframes xray-invert-flash {
+  0% {
+    filter: invert(0) brightness(1);
+  }
+  15% {
+    filter: invert(1) brightness(2.4);
+  }
+  100% {
+    filter: invert(0) brightness(1);
+  }
+}
+.zone-body.zone-xray-flash svg {
+  animation: xray-invert-flash 0.5s ease-out;
+}
+@keyframes zone-fracture-draw {
+  0% {
+    filter: brightness(1);
+    stroke-dashoffset: 40;
+  }
+  20% {
+    filter: brightness(3);
+  }
+  100% {
+    filter: brightness(1);
+    stroke-dashoffset: 0;
+  }
+}
+.zone.zone-fracture .zshape,
+.zone.zone-fracture path {
+  animation: zone-fracture-draw 0.9s ease-out;
+  stroke-dasharray: 40;
+}
+@keyframes zone-splint-wrap {
+  0% {
+    filter: brightness(0.6) saturate(0.4);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+.zone.zone-splint-wrap .zshape,
+.zone.zone-splint-wrap path {
+  animation: zone-splint-wrap 0.9s ease-out;
+}
+
+/* ── #9 VAULT-BOY LEVEL CARD — BUS-01, the flagship (Group 2) ───────── */
+.crt-mon {
+  position: relative;
+}
+@keyframes level-card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes level-card-sunburst {
+  0% {
+    transform: rotate(0deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotate(360deg);
+    opacity: 0.35;
+  }
+}
+.level-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid var(--robco-green);
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.level-card.show {
+  opacity: 1;
+  animation: level-card-in 500ms ease-out;
+}
+.level-card .lc-sunburst {
+  position: absolute;
+  inset: -30%;
+  background: repeating-conic-gradient(var(--robco-green) 0deg 4deg, transparent 4deg 20deg);
+  opacity: 0.35;
+}
+.level-card.show .lc-sunburst {
+  animation: level-card-sunburst 2.2s linear;
+}
+.level-card .lc-figure {
+  position: relative;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.level-card .lc-stencil {
+  position: relative;
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+@keyframes xp-sweep-shimmer {
+  0% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.6);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#xp_bar_fill.xp-sweep-shimmer {
+  animation: xp-sweep-shimmer 1.4s ease-out;
+}
+
+/* ── #14 REPUTATION STAMP — BUS-08 reputation console (Group 3) ─────── */
+@keyframes facon-stamp-slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60%) rotate(-4deg) scale(2.2);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(4deg) scale(0.92);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(3deg) scale(1.05);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) rotate(4deg) scale(1);
+  }
+}
+.facon-stamp {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 4;
+  padding: 4px 14px;
+  border: 3px solid var(--robco-danger);
+  border-radius: 3px;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--robco-danger);
+  background: rgba(0, 0, 0, 0.2);
+  animation: facon-stamp-slam 700ms ease-out both;
+  pointer-events: none;
+}
+.facon-stamp--idolized {
+  border-color: var(--robco-green);
+  color: var(--robco-green);
+}
+
+/* ── #23 CASE-CLOSED STAMP / #24 FILAMENT DIE — BUS-17 slot (Group 5) ── */
+@keyframes dir-stamp-punch {
+  0% {
+    opacity: 0;
+    transform: scale(2.4) rotate(-6deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.95) rotate(2deg);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scale(1) rotate(0deg);
+  }
+}
+/* Owner report fix: the stamp used to be position:absolute at right:10px/
+   top:50%, landing directly on top of .dir-keys (the CYCLE/DELETE buttons),
+   which also settles to the slot's right edge via margin-left:auto — the two
+   fought for the same space and the stamp covered the controls. It's now a
+   normal-flow flex child pinned to its own line ABOVE everything else in the
+   slot (order:-1 + flex-basis:100%, .dir-slot is already display:flex;
+   flex-wrap:wrap), so it can never overlap .dir-main or .dir-keys at any
+   viewport width — no absolute positioning, no coordinate math to keep in
+   sync with the buttons' own layout. */
+.dir-stamp {
+  order: -1;
+  flex: 1 0 100%;
+  width: fit-content;
+  margin: 0 0 4px;
+  padding: 2px 8px;
+  border: 2px solid var(--robco-green);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  animation: dir-stamp-punch 550ms ease-out both;
+  pointer-events: none;
+}
+.dir-stamp--failed {
+  border-color: var(--robco-danger);
+  color: var(--robco-danger);
+}
+@keyframes dir-lamp-flicker-out {
+  0%,
+  20%,
+  45%,
+  100% {
+    opacity: 0.15;
+  }
+  10%,
+  30%,
+  60% {
+    opacity: 0.9;
+  }
+}
+.dir-slot--stamped.failed .dir-lamp {
+  animation: dir-lamp-flicker-out 1.2s steps(6, end);
+}
+@keyframes dir-lamp-steady {
+  0% {
+    opacity: 0.3;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(2.4);
+  }
+  100% {
+    opacity: 0.7;
+    filter: brightness(1);
+  }
+}
+.dir-slot--stamped.complete .dir-lamp {
+  animation: dir-lamp-steady 900ms ease-out;
+}
+
+/* ── #22 EXHIBIT LIGHT-UP — BUS-15 curio archive (Group 4) ──────────── */
+@keyframes curio-lightup {
+  0% {
+    filter: brightness(0.35) saturate(0.4);
+  }
+  30% {
+    filter: brightness(0.5) saturate(0.5);
+  }
+  45% {
+    filter: brightness(0.4) saturate(0.4);
+  }
+  70% {
+    filter: brightness(1.6) saturate(1.3);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+}
+.curio-obj.curio-lightup {
+  animation: curio-lightup 1.4s ease-out;
+}
+
+/* ── #26 SURVEY PING — BUS-16 cartography table (Group 5) ───────────── */
+@keyframes survey-ping-ring {
+  0% {
+    r: 6;
+    opacity: 0.9;
+    stroke-width: 2.5;
+  }
+  100% {
+    r: 22;
+    opacity: 0;
+    stroke-width: 0.5;
+  }
+}
+.survey-ping-ring {
+  fill: none;
+  stroke: var(--robco-green);
+  animation: survey-ping-ring 1.6s ease-out both;
+}
+@keyframes survey-ping-dot-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.6);
+  }
+}
+.node.survey-ping .dot {
+  animation: survey-ping-dot-pulse 1.6s ease-out both;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 2 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Same rules as WAVE 1 above: every rule is a plain @keyframes (never
+   transition-only), auto-neutralized to an instant correct final frame by
+   the existing global prefers-reduced-motion block (Protocol UI-9).
+   Transform/opacity/filter only — compositor friendly, mobile-safe.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── #10 XP CHUNK FILL — BUS-01 GRADE trace (Group 2) ───────────────── */
+@keyframes xp-chunk-brighten {
+  0% {
+    filter: brightness(1);
+  }
+  25% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+.hp-bar-fill.xp-chunk-fill {
+  animation: xp-chunk-brighten 0.7s ease-out;
+}
+@keyframes xp-ticker-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -22px);
+  }
+}
+#xp_bar_container {
+  position: relative;
+  overflow: visible;
+}
+.xp-ticker {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  font-size: 10px;
+  color: var(--robco-blue);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+  animation: xp-ticker-float 1.15s ease-out forwards;
+}
+
+/* ── #11 SERVO RECALIBRATE — BUS-02 SPECIAL fader (Group 2) ─────────── */
+@keyframes servo-cap-overshoot {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-16px);
+  }
+  65% {
+    transform: translateY(4px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.fd-cap.servo-overshoot {
+  animation: servo-cap-overshoot 0.55s cubic-bezier(0.3, 1.3, 0.55, 1);
+}
+@keyframes servo-letter-flash {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.4);
+    text-shadow: 0 0 8px var(--robco-green);
+  }
+}
+.fd-letter.servo-flash {
+  animation: servo-letter-flash 0.55s ease-out;
+}
+
+/* ── #12 INK STAMP — skill-book spine / magazine cover racks (Group 2) ─ */
+@keyframes ink-stamp-land {
+  0% {
+    transform: scale(1.4) rotate(0deg);
+    opacity: 0.5;
+  }
+  55% {
+    transform: scale(0.95) rotate(4deg);
+    opacity: 1;
+    filter: drop-shadow(-6px 4px 0 rgba(var(--robco-green-rgb), 0.35))
+      drop-shadow(8px -3px 0 rgba(var(--robco-green-rgb), 0.3));
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+button.spine.ink-stamp-land,
+button.mag.ink-stamp-land {
+  animation: ink-stamp-land 0.5s ease-out;
+}
+
+/* ── #17 CAPS ODOMETER SPIN — BUS-10 requisition credit tile (Group 4) ─ */
+@keyframes caps-digit-roll {
+  0% {
+    filter: blur(0) brightness(1);
+  }
+  35% {
+    filter: blur(1.5px) brightness(2);
+  }
+  100% {
+    filter: blur(0) brightness(1);
+  }
+}
+#c_caps.caps-digit-roll {
+  animation: caps-digit-roll 0.5s ease-out;
+}
+@keyframes caps-glyph-arc {
+  0% {
+    opacity: 0;
+    transform: translate(0, 10px) scale(0.6) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -26px) scale(1) rotate(180deg);
+  }
+}
+.rb-tile.wire {
+  position: relative;
+  overflow: visible;
+}
+.caps-arc-glyph {
+  position: absolute;
+  right: 8px;
+  top: -6px;
+  font-size: 13px;
+  color: var(--bezel-wire, var(--robco-alert));
+  pointer-events: none;
+  z-index: 5;
+  animation: caps-glyph-arc 0.85s ease-out forwards;
+}
+
+/* ── #18 MANIFEST PUNCH — CARGO MANIFEST rows + drawer badges (Group 4) ─ */
+@keyframes manifest-row-slide-in {
+  0% {
+    transform: translateX(-14px);
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.mrow.manifest-punch-in {
+  animation: manifest-row-slide-in 0.4s ease-out;
+}
+@keyframes manifest-eyelet-punch {
+  0% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.mrow.manifest-punch-in .hole {
+  animation: manifest-eyelet-punch 0.4s ease-out;
+}
+@keyframes drawer-count-blip {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.5);
+    color: var(--bezel-wire, var(--robco-alert));
+  }
+}
+[data-dcount].drawer-count-blip {
+  animation: drawer-count-blip 0.45s ease-out;
+}
+
+/* ── #20 WELD SPARKS + TAG — BUS-12 fabrication bench (Group 4) ──────── */
+@keyframes weld-spark-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    opacity: 1;
+  }
+}
+#craftPanel.weld-spark-flash > summary .board-led {
+  animation: weld-spark-flash 0.4s steps(2, end);
+  box-shadow: 0 0 10px 3px var(--robco-alert);
+}
+@keyframes claim-tag-tear {
+  0% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  70% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 60% 0 0);
+    opacity: 0;
+    transform: translateY(6px) rotate(-3deg);
+  }
+}
+#craftPanel {
+  position: relative;
+}
+.craft-claim-tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid var(--robco-alert);
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--robco-alert);
+  z-index: 5;
+  pointer-events: none;
+  animation: claim-tag-tear 1.6s ease-in forwards;
+}
+
+/* ── #30 CLOCK SPIN-DOZE — chrono board + glass (Group 5) ────────────── */
+@keyframes doze-scanline-collapse {
+  0% {
+    transform: scaleY(1);
+  }
+  40%,
+  70% {
+    transform: scaleY(0.02);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+body.sleep-doze .glass-frame .crt-overlay {
+  animation: doze-scanline-collapse 1.4s ease-in-out;
+  transform-origin: center;
+}
+@keyframes doze-flip-spin {
+  0% {
+    transform: rotateX(0deg);
+  }
+  100% {
+    transform: rotateX(1080deg);
+  }
+}
+body.sleep-doze .chrono-wrap .flip {
+  animation: doze-flip-spin 0.9s linear;
+}
+
+/* ── #2 CRT FLINCH — BUS-01 monitor (Group 1) ────────────────────────── */
+@keyframes crt-flinch-tear {
+  0%,
+  100% {
+    filter: none;
+    transform: translateX(0);
+  }
+  30% {
+    filter: contrast(2) brightness(1.8);
+    transform: translateX(-3px);
+  }
+  50% {
+    filter: contrast(2.4) brightness(0.6);
+    transform: translateX(4px);
+  }
+}
+.crt-mon.crt-flinch {
+  animation: crt-flinch-tear 0.26s steps(2, end);
+}
+
+/* ── #31 HOLOTAPE COMMIT — SAVE ARCHIVE panel (Group 6) ──────────────── */
+#savesPanel {
+  position: relative;
+}
+@keyframes holotape-slide-in {
+  0% {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes holotape-reel-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.holotape-commit-badge {
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  font-size: 11px;
+  color: var(--robco-green);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 5;
+  animation: holotape-slide-in 0.35s ease-out;
+}
+.holotape-commit-badge .htc-reel {
+  display: inline-block;
+  animation: holotape-reel-spin 1s linear;
+}
+@keyframes carrier-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(var(--robco-green-rgb), 0);
+  }
+}
+#savesPanel.carrier-ripple > summary {
+  animation: carrier-ripple 0.9s ease-out;
+  border-radius: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FEEDBACK ANIMATION WAVE 3 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
+   Same rules as WAVE 1/2 above: every rule is a plain @keyframes (never
+   transition-only), auto-neutralized to an instant correct final frame by
+   the existing global prefers-reduced-motion block (Protocol UI-9).
+   Transform/opacity/filter only — compositor friendly, mobile-safe.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── #3 STIM FLUSH — BUS-01 HP trace (Group 1) ───────────────────────── */
+@keyframes stim-flush-fill {
+  0% {
+    filter: brightness(2.4);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+.hp-bar-fill.stim-flush {
+  animation: stim-flush-fill 0.7s ease-out;
+}
+@keyframes stim-plus-blink {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  25%,
+  75% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.stim-plus-blink {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--robco-green);
+  animation: stim-plus-blink 0.7s steps(1, end);
+}
+
+/* ── #8 BRIDGE CLANG — OPERATIONS BUS-10 weigh bridge (Group 1) ──────── */
+@keyframes bridge-clang-shake {
+  0% {
+    transform: translateY(0);
+  }
+  20% {
+    transform: translateY(3px);
+  }
+  40% {
+    transform: translateY(-4px);
+  }
+  60% {
+    transform: translateY(2px);
+  }
+  80% {
+    transform: translateY(-1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.beam-instrument.bridge-clang {
+  animation: bridge-clang-shake 0.5s cubic-bezier(0.3, 1.3, 0.4, 1);
+}
+@keyframes bridge-dust-puff {
+  0% {
+    opacity: 0.8;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.4);
+  }
+}
+.beam-instrument.bridge-clang::before,
+.beam-instrument.bridge-clang::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(var(--robco-green-rgb), 0.6);
+  animation: bridge-dust-puff 0.5s ease-out;
+  pointer-events: none;
+}
+.beam-instrument.bridge-clang::before {
+  left: 26%;
+}
+.beam-instrument.bridge-clang::after {
+  left: 72%;
+  animation-delay: 60ms;
+}
+
+/* ── #13 CARD SEAT — BUS-06 perk loadout rack (Group 2) ──────────────── */
+@keyframes card-seat-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.slot-row.slot-row--seated {
+  animation: card-seat-drop 0.4s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+@keyframes card-pin-spark {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  30%,
+  70% {
+    filter: brightness(2.6);
+  }
+}
+.slot-row--seated .s-rank {
+  animation: card-pin-spark 0.4s ease-out;
+}
+
+/* ── #15 NEEDLE KICK — BUS-08 reputation console meter (Group 3) ─────── */
+@keyframes needle-kick-bounce {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  25% {
+    filter: brightness(2.6);
+  }
+  50% {
+    filter: brightness(1);
+  }
+  70% {
+    filter: brightness(2);
+  }
+}
+.facon-pin.needle-kick {
+  animation: needle-kick-bounce 0.5s ease-out;
+}
+
+/* ── #16 SCALES TIP — BUS-09 karma alignment needle (Group 3) ────────── */
+@keyframes scales-tip-bounce {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  30% {
+    filter: brightness(2.4);
+  }
+  55% {
+    filter: brightness(1);
+  }
+  75% {
+    filter: brightness(2);
+  }
+}
+.kn-needle.scales-tip {
+  animation: scales-tip-bounce 0.7s ease-out;
+}
+@keyframes karma-tier-glyph-blink {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.karma-tier-glyph {
+  display: inline-block;
+  margin-left: 5px;
+  animation: karma-tier-glyph-blink 0.9s ease-out;
+}
+
+/* ── #19 IN-SERVICE STAMP — CARGO MANIFEST equip button (Group 4) ────── */
+@keyframes in-service-stamp-slap {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) skewX(-8deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.95) skewX(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) skewX(0deg);
+  }
+}
+.equip-btn.in-service-stamp {
+  animation: in-service-stamp-slap 0.5s ease-out;
+}
+
+/* ── #21 PART DROP — BREAKDOWN VISE yield card (Group 4) ──────────────── */
+@keyframes scrap-part-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) rotate(-15deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(2px) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+}
+.scrap-part-drop {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--robco-green);
+  animation: scrap-part-drop 0.4s ease-out both;
+}
+
+/* ── #25 DIRECTIVE FILED — BUS-17 slot (Group 5) ──────────────────────── */
+@keyframes dir-slot-filed-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.dir-slot--filed {
+  animation: dir-slot-filed-in 0.35s ease-out;
+}
+@keyframes dir-lamp-warmup {
+  0% {
+    background: #3a3d35;
+    box-shadow: none;
+  }
+  100% {
+    background: var(--bezel-wire);
+    box-shadow: 0 0 8px var(--bezel-wire);
+  }
+}
+.dir-slot--filed .dir-lamp {
+  animation: dir-lamp-warmup 0.9s ease-out both;
+}
+
+/* ── #27 TRIANGULATE — BUS-16 cartography table [YOU] reticle (Group 5) ─ */
+@keyframes you-triangulate-hop {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  15% {
+    opacity: 0.25;
+    transform: scale(1.3);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(0.85);
+  }
+  45% {
+    opacity: 0.25;
+    transform: scale(1.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.you.you-triangulate circle {
+  animation: you-triangulate-hop 0.7s ease-in-out;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+/* ── #28 TUNGSTEN WARM-UP — BUS-07 status lamp bank (Group 5) ────────── */
+@keyframes tungsten-warmup-glow {
+  0% {
+    filter: brightness(0.25) saturate(0.3);
+    opacity: 0.4;
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+    opacity: 1;
+  }
+}
+.stlamp-tile.tungsten-warmup {
+  animation: tungsten-warmup-glow 0.95s ease-out both;
+}
+
+/* ── #29 GUTTERING LAMP — BUS-07 status lamp bank (Group 5) ──────────── */
+@keyframes lamp-gutter-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0.4;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  65% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.5;
+  }
+}
+.stlamp-tile.lamp-guttering .stlamp-led {
+  animation: lamp-gutter-flicker 1.8s ease-in-out infinite;
+}
+
+/* ── #32 FAULT (polish) — casing FAULT lamp + BUS-24 counter (Group 6) ─ */
+@keyframes fault-flicker-in {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  15%,
+  45% {
+    opacity: 0.2;
+  }
+  30%,
+  60% {
+    opacity: 0.8;
+  }
+}
+#lampFault.fault-flicker-in,
+#svcFaultNum.fault-flicker-in {
+  animation: fault-flicker-in 0.7s steps(6, end);
+}
+
+/* ── #33 QTY DIGIT FLIP — CARGO MANIFEST qty stepper (Group 6) ───────── */
+@keyframes qty-digit-flip-anim {
+  0% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: rotateX(90deg);
+    filter: brightness(2);
+  }
+  100% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+.qtybox .q.qty-digit-flip {
+  display: inline-block;
+  animation: qty-digit-flip-anim 0.4s ease-in-out;
+}

@@ -25,10 +25,76 @@ function Fail($msg) { Write-Host "  [FAIL]  $msg" -ForegroundColor Red;    $scri
 function Check($ok, $msg) { if ($ok) { Pass $msg } else { Fail $msg } }
 function Sep($title) { Write-Host ("`n-- " + $title + " " + ("-" * [Math]::Max(0, 52 - $title.Length))) }
 
+# js/ subfolder resolver (2.8.5 U-A2) -- mirrors allJsFiles()/_jsFileLocation()
+# in tests/robco-diagnostics.js (Protocol 15 parity). The reorg moved every
+# js/*.js file into one of these subfolders. Read-Src resolves a legacy flat
+# 'js/<name>.js' argument against the real on-disk location transparently --
+# same call signature, same return value, same failure behavior for a name
+# that doesn't exist anywhere (e.g. the sanctioned MUST-NOT-EXIST 'js/ui.js'
+# probe still fails exactly as before).
+$JS_SUBFOLDERS = @('data', 'core', 'ui', 'services', 'dev')
+
+# Recursively lists every js/<subfolder>/*.js file (js/vendor/ deliberately
+# excluded -- a separate, manually-curated precache allowlist). Returns
+# objects with .Sub / .Name / .Rel ('sub/name.js', the path used to build
+# './js/'+Rel entries). Any full-repo js-file scan must walk subfolders like
+# this, or it silently scans zero files post-reorg.
+function Get-AllJsFiles {
+    param([string[]]$Exclude = @())
+    $out = @()
+    foreach ($sub in $JS_SUBFOLDERS) {
+        $subDir = Join-Path $Root "js/$sub"
+        if (-not (Test-Path $subDir)) { continue }
+        foreach ($f in (Get-ChildItem -Path $subDir -File -Filter '*.js')) {
+            if ($Exclude -contains $f.Name) { continue }
+            $out += [PSCustomObject]@{ Sub = $sub; Name = $f.Name; Rel = "$sub/$($f.Name)" }
+        }
+    }
+    return $out
+}
+
+$script:JsLocationCache = $null
+function Get-JsFileLocation($basename) {
+    if ($null -eq $script:JsLocationCache) {
+        $script:JsLocationCache = @{}
+        foreach ($f in (Get-AllJsFiles)) { $script:JsLocationCache[$f.Name] = "js/$($f.Rel)" }
+    }
+    return $script:JsLocationCache[$basename]
+}
+
 function Read-Src($rel) {
     $p = Join-Path $Root $rel
+    if (-not (Test-Path $p)) {
+        if ($rel -match '^js[/\\]([A-Za-z0-9_-]+\.js)$') {
+            $resolved = Get-JsFileLocation $Matches[1]
+            if ($resolved) { $p = Join-Path $Root $resolved }
+        }
+    }
     if (-not (Test-Path $p)) { Fail "Missing file: $rel"; exit 1 }
     return [IO.File]::ReadAllText($p)
+}
+
+# CSS split read helper (2.8.5 U-A2) -- terminal.css was split into 12 files
+# as a pure ordered cut (cascade is order-sensitive -- terminal-12-mobile.css
+# must load last). CSS_SPLIT_FILES is the ONE canonical list. Read-Css()
+# replaces every old Read-Css call site with the exact
+# same concatenated text the browser cascade actually sees.
+$CSS_SPLIT_FILES = @(
+    'terminal-01-base.css',
+    'terminal-02-chrome.css',
+    'terminal-03-overseer.css',
+    'terminal-04-diagnostic-shell.css',
+    'terminal-05-toolbar.css',
+    'terminal-06-modulebay.css',
+    'terminal-07-operator-boards.css',
+    'terminal-08-curio-operations.css',
+    'terminal-09-databank.css',
+    'terminal-10-chassis.css',
+    'terminal-11-feedback-animations.css',
+    'terminal-12-mobile.css'
+)
+function Read-Css {
+    return (($CSS_SPLIT_FILES | ForEach-Object { Read-Src "css/$_" }) -join "`n")
 }
 
 # Logical-bundle read helper (2.8.5 U-A0) -- mirrors readGroup() in
@@ -50,12 +116,22 @@ function Read-Group($stem) {
         $parts = $GROUP_OVERRIDES[$stem] | ForEach-Object { Read-Src "js/$_" }
         return ($parts -join "`n")
     }
-    $jsDir = Join-Path $Root 'js'
-    $files = Get-ChildItem -Path $jsDir -Filter '*.js' | Where-Object {
-        $_.Name -eq "$stem.js" -or $_.Name -like "$stem-*.js"
-    } | Sort-Object Name
-    if ($files.Count -eq 0) { Fail "Source file family not found: js/$stem.js (or js/$stem-*.js)"; exit 1 }
-    $parts = $files | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }
+    # 2.8.5 U-A2: the family now lives inside one js/<subfolder>/, not flat
+    # js/ -- search every subfolder (a stem's siblings always share one
+    # subfolder, e.g. all six ui-core* files live in js/ui/) and sort by name
+    # so join order stays deterministic (equivalent to Node's full-path sort,
+    # since a stem's matches all share one subfolder).
+    $matchedFiles = @()
+    foreach ($sub in $JS_SUBFOLDERS) {
+        $subDir = Join-Path $Root "js/$sub"
+        if (-not (Test-Path $subDir)) { continue }
+        $matchedFiles += Get-ChildItem -Path $subDir -Filter '*.js' | Where-Object {
+            $_.Name -eq "$stem.js" -or $_.Name -like "$stem-*.js"
+        }
+    }
+    $matchedFiles = @($matchedFiles | Sort-Object Name)
+    if ($matchedFiles.Count -eq 0) { Fail "Source file family not found: js/$stem.js (or js/$stem-*.js)"; exit 1 }
+    $parts = $matchedFiles | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }
     return ($parts -join "`n")
 }
 
@@ -139,8 +215,13 @@ function Get-SkillKeys($source) {
 $stateSrc  = Read-Group "state"
 $apiSrc    = Read-Group "api"
 $cloudSrc  = Read-Group "cloud"
-$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js')
-$uiSrc     = (@(($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) })) + @(Read-Group "ui-core")) -join "`n"
+# 2.8.5 U-A2: the flat js\ui-audio.js-style paths no longer exist on disk (the
+# reorg moved every one of these into js/ui/) -- a bare Test-Path filter would
+# silently drop all four files from $uiSrc. Fall back to Get-JsFileLocation
+# (the subfolder resolver) before filtering, then let Read-Src's own
+# smart-resolve do the actual read.
+$uiFiles   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js')
+$uiSrc     = (@(($uiFiles | Where-Object { (Test-Path (Join-Path $Root $_)) -or (Get-JsFileLocation (Split-Path $_ -Leaf)) } | ForEach-Object { Read-Src $_ })) + @(Read-Group "ui-core")) -join "`n"
 
 Write-Host "`n==  RobCo Persistence Audit  ==============================`n"
 
@@ -218,7 +299,7 @@ try {
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js','js/ui-core-nav.js','js/ui-core-overseer.js','js/ui-core-chassis.js','js/ui-core-modulebay.js','js/ui-core-cmd.js'];
+const UI_FILES = ['js/ui/ui-audio.js','js/ui/ui-render.js','js/ui/ui-saves.js','js/ui/ui-account.js','js/ui/ui-core.js','js/ui/ui-core-nav.js','js/ui/ui-core-overseer.js','js/ui/ui-core-chassis.js','js/ui/ui-core-modulebay.js','js/ui/ui-core-cmd.js'];
 const uiSource = UI_FILES.filter(f => fs.existsSync(path.join('$repoRootNode', f))).map(f => fs.readFileSync(path.join('$repoRootNode', f), 'utf8')).join('\n');
 const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
@@ -472,7 +553,7 @@ try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
-        $statePathNode = (Join-Path $repoRoot "js/state.js").Replace('\', '/')
+        $statePathNode = (Join-Path $repoRoot "js/core/state.js").Replace('\', '/')
         $testScript = @"
 const vm = require('vm');
 const fs = require('fs');
@@ -585,7 +666,7 @@ try {
 # 15 tests
 # ===========================================================
 Sep "Suite 15 -- CSS Invariants (Protocol 20)"
-$cssSrc = Read-Src "css/terminal.css"
+$cssSrc = Read-Css
 # Strip block comments so embedded {} in comments don't break rule-block extraction
 $cssSrcStripped = $cssSrc -replace '(?s)/\*.*?\*/', ''
 # Phase 3 OPERATOR batch 2: .faction-btn/.faction-card-btns retired along
@@ -646,7 +727,7 @@ $cacheVer = ([regex]::Match($swSrc, "CACHE_NAME\s*=\s*'robco-terminal-v([\d.]+)"
 $appVer   = ([regex]::Match($stateSrc, "const APP_VERSION\s*=\s*'([\d.]+)'")).Groups[1].Value
 Check ($cacheVer -ne '' -and $appVer -ne '' -and $cacheVer -eq $appVer) "CACHE_NAME version ($cacheVer) matches APP_VERSION ($appVer)"
 Check ([bool]([regex]::Match($swSrcStripped, 'activate[\s\S]{0,400}caches\.delete').Success)) 'activate handler calls caches.delete for old-cache cleanup'
-Check ($swSrc -match "'./index.html'" -and $swSrc -match "'./js/ui-core.js'")  'ASSETS list includes index.html and js/ui-core.js'
+Check ($swSrc -match "'./index.html'" -and $swSrc -match "'./js/ui/ui-core.js'")  'ASSETS list includes index.html and js/ui-core.js'
 Check ($htmlSrc -match 'SKIP_WAITING' -and $htmlSrc -match 'reg\.waiting' -and $htmlSrc -match 'controllerchange') 'index.html SW registration references SKIP_WAITING, reg.waiting, and controllerchange'
 
 # ===========================================================
@@ -684,8 +765,8 @@ try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
-        $uiPathNode = (Join-Path $repoRoot "js/ui-core.js").Replace('\', '/')
-        $uiRenderPathNode = (Join-Path $repoRoot "js/ui-render.js").Replace('\', '/')
+        $uiPathNode = (Join-Path $repoRoot "js/ui/ui-core.js").Replace('\', '/')
+        $uiRenderPathNode = (Join-Path $repoRoot "js/ui/ui-render.js").Replace('\', '/')
         $dcScript = @"
 const vm = require('vm');
 const fs = require('fs');
@@ -1295,7 +1376,7 @@ Check $chem32ok "_applyChemHighlights() clears via .skill-row.chem-boost and app
 # 10 tests
 # ===========================================================
 Sep "Suite 33 -- Phase 2b Guards"
-$cssSrc33 = Read-Src 'css/terminal.css'
+$cssSrc33 = Read-Css
 $htmlSrc33 = Read-Src 'index.html'
 
 # 33.1 --robco-green-rgb defined in terminal.css :root
@@ -1343,7 +1424,7 @@ Check $noPlus33 'No hardcoded [+] text in index.html summary elements (P1-4)'
 # 10 tests
 # ===========================================================
 Sep "Suite 34 -- Phase 2c Guards"
-$cssSrc34 = Read-Src 'css/terminal.css'
+$cssSrc34 = Read-Css
 $htmlSrc34 = Read-Src 'index.html'
 $uiSrc34   = Read-Group "ui-core"
 
@@ -1395,7 +1476,7 @@ Sep "Suite 35 -- Phase 3a Performance Guards"
 $apiSrc35    = Read-Group "api"
 $stateSrc35  = Read-Group "state"
 $uiSrc35     = Read-Group "ui-core"
-$cssSrc35    = Read-Src 'css/terminal.css'
+$cssSrc35    = Read-Css
 $regNvSrc35  = Read-Group "reg_nv"
 $regCoreSrc35 = Read-Group "registry-core"
 
@@ -2460,7 +2541,7 @@ if ($assetsBlockM49.Success) {
 }
 
 # 49.1  All js/ files listed in sw.js ASSETS
-$jsFiles49 = Get-ChildItem (Join-Path $Root "js") -File -Filter "*.js" | Select-Object -ExpandProperty Name
+$jsFiles49 = (Get-AllJsFiles) | ForEach-Object { $_.Rel }
 $jsMissing49 = @($jsFiles49 | Where-Object { -not $assetsSet49.Contains("./js/$_") })
 Check ($jsMissing49.Count -eq 0) ("All js/ files listed in sw.js ASSETS (asset-manifest completeness)" + $(if ($jsMissing49.Count) { " -- missing: " + ($jsMissing49 -join ", ") } else { "" }))
 
@@ -3214,90 +3295,90 @@ Sep "Suite 56 -- UI Module Split Guards"
 $htmlSrc56 = $htmlSrc55  # reuse (same index.html read above)
 $swSrc56   = Read-Src "sw.js"
 
-# 56.1 js/ui-audio.js file exists on disk
-Check (Test-Path (Join-Path $Root "js\ui-audio.js")) `
-    "js/ui-audio.js file exists (Slice A: audio module extracted)"
+# 56.1 js/ui/ui-audio.js file exists on disk
+Check (Test-Path (Join-Path $Root "js/ui/ui-audio.js")) `
+    "js/ui/ui-audio.js file exists (Slice A: audio module extracted)"
 
-# 56.2 ./js/ui-audio.js appears in sw.js ASSETS list
-Check ([bool]($swSrc56 -match 'js/ui-audio\.js')) `
-    "'./js/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
+# 56.2 ./js/ui/ui-audio.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui/ui-audio\.js')) `
+    "'./js/ui/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
 
-# 56.3 <script src="js/ui-audio.js"> appears in index.html
-Check ([bool]($htmlSrc56 -match 'src="js/ui-audio\.js"')) `
-    '<script src="js/ui-audio.js"> present in index.html'
+# 56.3 <script src="js/ui/ui-audio.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui/ui-audio\.js"')) `
+    '<script src="js/ui/ui-audio.js"> present in index.html'
 
 # 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
-$audioIdx56  = $htmlSrc56.IndexOf('js/ui-audio.js')
-$apiIdx56    = $htmlSrc56.IndexOf('js/api.js')
+$audioIdx56  = $htmlSrc56.IndexOf('js/ui/ui-audio.js')
+$apiIdx56    = $htmlSrc56.IndexOf('js/services/api.js')
 Check ($audioIdx56 -ne -1 -and $apiIdx56 -ne -1 -and $audioIdx56 -lt $apiIdx56) `
     "ui-audio.js <script> appears before api.js in index.html (load-order guard)"
 
 # 56.5 ui-audio.js script appears before ui.js in index.html
-$audioIdx56b = $htmlSrc56.IndexOf('js/ui-audio.js')
-$uiIdx56     = $htmlSrc56.IndexOf('"js/ui-core.js"')
+$audioIdx56b = $htmlSrc56.IndexOf('js/ui/ui-audio.js')
+$uiIdx56     = $htmlSrc56.IndexOf('"js/ui/ui-core.js"')
 Check ($audioIdx56b -ne -1 -and $uiIdx56 -ne -1 -and $audioIdx56b -lt $uiIdx56) `
     "ui-audio.js <script> appears before ui.js in index.html (audio loads before core)"
 
-# 56.6 js/ui-render.js file exists on disk
-Check (Test-Path (Join-Path $Root "js\ui-render.js")) `
-    "js/ui-render.js file exists (Slice B: render module extracted)"
+# 56.6 js/ui/ui-render.js file exists on disk
+Check (Test-Path (Join-Path $Root "js/ui/ui-render.js")) `
+    "js/ui/ui-render.js file exists (Slice B: render module extracted)"
 
-# 56.7 ./js/ui-render.js appears in sw.js ASSETS list
-Check ([bool]($swSrc56 -match 'js/ui-render\.js')) `
-    "'./js/ui-render.js' in sw.js ASSETS (cache covers the render module)"
+# 56.7 ./js/ui/ui-render.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui/ui-render\.js')) `
+    "'./js/ui/ui-render.js' in sw.js ASSETS (cache covers the render module)"
 
-# 56.8 <script src="js/ui-render.js"> appears in index.html
-Check ([bool]($htmlSrc56 -match 'src="js/ui-render\.js"')) `
-    '<script src="js/ui-render.js"> present in index.html'
+# 56.8 <script src="js/ui/ui-render.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui/ui-render\.js"')) `
+    '<script src="js/ui/ui-render.js"> present in index.html'
 
 # 56.9 ui-render.js script appears before api.js in index.html
-$renderIdx56  = $htmlSrc56.IndexOf('js/ui-render.js')
-$apiIdx56b    = $htmlSrc56.IndexOf('js/api.js')
+$renderIdx56  = $htmlSrc56.IndexOf('js/ui/ui-render.js')
+$apiIdx56b    = $htmlSrc56.IndexOf('js/services/api.js')
 Check ($renderIdx56 -ne -1 -and $apiIdx56b -ne -1 -and $renderIdx56 -lt $apiIdx56b) `
     "ui-render.js <script> appears before api.js in index.html (load-order guard)"
 
 # 56.10 ui-render.js script appears before ui.js in index.html
-$renderIdx56b = $htmlSrc56.IndexOf('js/ui-render.js')
-$uiIdx56b     = $htmlSrc56.IndexOf('"js/ui-core.js"')
+$renderIdx56b = $htmlSrc56.IndexOf('js/ui/ui-render.js')
+$uiIdx56b     = $htmlSrc56.IndexOf('"js/ui/ui-core.js"')
 Check ($renderIdx56b -ne -1 -and $uiIdx56b -ne -1 -and $renderIdx56b -lt $uiIdx56b) `
     "ui-render.js <script> appears before ui.js in index.html (render loads before core)"
 
-# 56.11 js/ui-saves.js file exists on disk
-Check (Test-Path (Join-Path $Root "js\ui-saves.js")) `
-    "js/ui-saves.js file exists (Slice C: saves module extracted)"
-# 56.12 ./js/ui-saves.js appears in sw.js ASSETS list
-Check ([bool]($swSrc56 -match 'js/ui-saves\.js')) `
-    "'./js/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
-# 56.13 <script src="js/ui-saves.js"> appears in index.html
-Check ([bool]($htmlSrc56 -match 'src="js/ui-saves\.js"')) `
-    '<script src="js/ui-saves.js"> present in index.html'
+# 56.11 js/ui/ui-saves.js file exists on disk
+Check (Test-Path (Join-Path $Root "js/ui/ui-saves.js")) `
+    "js/ui/ui-saves.js file exists (Slice C: saves module extracted)"
+# 56.12 ./js/ui/ui-saves.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui/ui-saves\.js')) `
+    "'./js/ui/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
+# 56.13 <script src="js/ui/ui-saves.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui/ui-saves\.js"')) `
+    '<script src="js/ui/ui-saves.js"> present in index.html'
 # 56.14 ui-saves.js script appears before api.js in index.html
-$savesIdx56  = $htmlSrc56.IndexOf('js/ui-saves.js')
-$apiIdx56c   = $htmlSrc56.IndexOf('js/api.js')
+$savesIdx56  = $htmlSrc56.IndexOf('js/ui/ui-saves.js')
+$apiIdx56c   = $htmlSrc56.IndexOf('js/services/api.js')
 Check ($savesIdx56 -ne -1 -and $apiIdx56c -ne -1 -and $savesIdx56 -lt $apiIdx56c) `
     "ui-saves.js <script> appears before api.js in index.html (load-order guard)"
 # 56.15 ui-saves.js script appears before ui.js in index.html
-$savesIdx56b = $htmlSrc56.IndexOf('js/ui-saves.js')
-$uiIdx56c    = $htmlSrc56.IndexOf('"js/ui-core.js"')
+$savesIdx56b = $htmlSrc56.IndexOf('js/ui/ui-saves.js')
+$uiIdx56c    = $htmlSrc56.IndexOf('"js/ui/ui-core.js"')
 Check ($savesIdx56b -ne -1 -and $uiIdx56c -ne -1 -and $savesIdx56b -lt $uiIdx56c) `
     "ui-saves.js <script> appears before ui.js in index.html (saves loads before core)"
-# 56.16 js/ui-account.js file exists on disk
-Check (Test-Path (Join-Path $Root "js\ui-account.js")) `
-    "js/ui-account.js file exists (Slice D: account module extracted)"
-# 56.17 ./js/ui-account.js appears in sw.js ASSETS list
-Check ([bool]($swSrc56 -match 'js/ui-account\.js')) `
-    "'./js/ui-account.js' in sw.js ASSETS (cache covers the account module)"
-# 56.18 <script src="js/ui-account.js"> appears in index.html
-Check ([bool]($htmlSrc56 -match 'src="js/ui-account\.js"')) `
-    '<script src="js/ui-account.js"> present in index.html'
+# 56.16 js/ui/ui-account.js file exists on disk
+Check (Test-Path (Join-Path $Root "js/ui/ui-account.js")) `
+    "js/ui/ui-account.js file exists (Slice D: account module extracted)"
+# 56.17 ./js/ui/ui-account.js appears in sw.js ASSETS list
+Check ([bool]($swSrc56 -match 'js/ui/ui-account\.js')) `
+    "'./js/ui/ui-account.js' in sw.js ASSETS (cache covers the account module)"
+# 56.18 <script src="js/ui/ui-account.js"> appears in index.html
+Check ([bool]($htmlSrc56 -match 'src="js/ui/ui-account\.js"')) `
+    '<script src="js/ui/ui-account.js"> present in index.html'
 # 56.19 ui-account.js script appears before api.js in index.html
-$acctIdx56  = $htmlSrc56.IndexOf('js/ui-account.js')
-$apiIdx56d  = $htmlSrc56.IndexOf('js/api.js')
+$acctIdx56  = $htmlSrc56.IndexOf('js/ui/ui-account.js')
+$apiIdx56d  = $htmlSrc56.IndexOf('js/services/api.js')
 Check ($acctIdx56 -ne -1 -and $apiIdx56d -ne -1 -and $acctIdx56 -lt $apiIdx56d) `
     "ui-account.js <script> appears before api.js in index.html (load-order guard)"
 # 56.20 ui-account.js script appears before ui-core.js in index.html
-$acctIdx56b = $htmlSrc56.IndexOf('js/ui-account.js')
-$uiIdx56d   = $htmlSrc56.IndexOf('"js/ui-core.js"')
+$acctIdx56b = $htmlSrc56.IndexOf('js/ui/ui-account.js')
+$uiIdx56d   = $htmlSrc56.IndexOf('"js/ui/ui-core.js"')
 Check ($acctIdx56b -ne -1 -and $uiIdx56d -ne -1 -and $acctIdx56b -lt $uiIdx56d) `
     "ui-account.js <script> appears before ui-core.js in index.html (account loads before core)"
 # 56.21 js/ui.js must NOT exist (Slice E: fully renamed to ui-core.js)
@@ -3321,25 +3402,25 @@ Check ([bool]($htmlSrc56 -match '\.appendChild\(')) `
 Check ([bool]($htmlSrc56 -match '\.async\s*=\s*false')) `
     "boot loader sets script.async = false (preserves db->state->reg load order)"
 
-# 56.26 Boot loader references js/db_nv.js (FNV database)
-Check ([bool]($htmlSrc56 -match 'js/db_nv\.js')) `
-    "boot loader references js/db_nv.js (FNV database path present)"
+# 56.26 Boot loader references js/data/db_nv.js (FNV database)
+Check ([bool]($htmlSrc56 -match 'js/data/db_nv\.js')) `
+    "boot loader references js/data/db_nv.js (FNV database path present)"
 
-# 56.27 Boot loader references js/db_fo3.js (FO3 database)
-Check ([bool]($htmlSrc56 -match 'js/db_fo3\.js')) `
-    "boot loader references js/db_fo3.js (FO3 database path present)"
+# 56.27 Boot loader references js/data/db_fo3.js (FO3 database)
+Check ([bool]($htmlSrc56 -match 'js/data/db_fo3\.js')) `
+    "boot loader references js/data/db_fo3.js (FO3 database path present)"
 
-# 56.28 Boot loader references js/state.js (shared state module)
-Check ([bool]($htmlSrc56 -match 'js/state\.js')) `
-    "boot loader references js/state.js (shared state module path present)"
+# 56.28 Boot loader references js/core/state.js (shared state module)
+Check ([bool]($htmlSrc56 -match 'js/core/state\.js')) `
+    "boot loader references js/core/state.js (shared state module path present)"
 
-# 56.29 Boot loader references js/reg_nv.js (FNV registry)
-Check ([bool]($htmlSrc56 -match 'js/reg_nv\.js')) `
-    "boot loader references js/reg_nv.js (FNV registry path present)"
+# 56.29 Boot loader references js/data/reg_nv.js (FNV registry)
+Check ([bool]($htmlSrc56 -match 'js/data/reg_nv\.js')) `
+    "boot loader references js/data/reg_nv.js (FNV registry path present)"
 
-# 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
-Check ([bool]($htmlSrc56 -match 'js/reg_fo3\.js')) `
-    "boot loader references js/reg_fo3.js (FO3 registry path present)"
+# 56.30 Boot loader references js/data/reg_fo3.js (FO3 registry)
+Check ([bool]($htmlSrc56 -match 'js/data/reg_fo3\.js')) `
+    "boot loader references js/data/reg_fo3.js (FO3 registry path present)"
 
 # 56.31 Boot loader reads activeContext (primary context selector)
 Check ([bool]($htmlSrc56 -match 'activeContext')) `
@@ -3609,7 +3690,7 @@ Check ([bool]$pkgJson60.scripts.a11y) `
 # 7 tests
 # ===========================================================
 Sep "Suite 61 -- Mobile Layout Overflow Guards"
-$css61 = Read-Src "css/terminal.css"
+$css61 = Read-Css
 
 # 61.1 .main-grid uses minmax(0, 1fr)
 Check ([bool]($css61 -match '\.main-grid\s*\{[^}]*grid-template-columns\s*:\s*minmax\s*\(\s*0\s*,\s*1fr\s*\)')) `
@@ -3715,8 +3796,12 @@ Check (($cfStaging62 -match 'DEV BUILD') -and ($cfStaging62 -match 'position:fix
 # 404s on that environment, and because the SW does not precache it the runtime
 # fetch has no fallback and rejects with "CHANGELOG NOT FOUND". These four guards
 # lock every runtime-fetched local asset into all three publish/precache sets.
-$jsFiles62 = @('js/ui-core.js', 'js/api.js', 'js/ui-render.js', 'js/ui-saves.js', 'js/ui-account.js', 'js/ui-audio.js', 'js/state.js', 'js/cloud.js', 'js/registry-core.js', 'js/reg_nv.js', 'js/reg_fo3.js', 'js/db_nv.js', 'js/db_fo3.js')
-$jsAll62 = ($jsFiles62 | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { Read-Src $_ }) -join "`n"
+# 2.8.5 U-A2 (closes AUDIT_U4 Finding A): derived from a full js/**/*.js glob
+# rather than hand-maintained -- a hardcoded list silently stopped covering
+# the 5 ui-core-*.js siblings after the U-A1 split (never caught because none
+# of them happened to contain a fetch() call yet). Scanning every js file
+# makes this class of gap structurally impossible.
+$jsAll62 = ((Get-AllJsFiles) | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root "js/$($_.Rel)")) }) -join "`n"
 $rx62 = "fetch\(\s*['`"``]([^'`"``]+)['`"``]"
 $localFetched62 = @([regex]::Matches($jsAll62, $rx62) | ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -notmatch '^https?:' -and -not $_.StartsWith('//') } | Select-Object -Unique)
 
@@ -3743,7 +3828,7 @@ Check ($precacheMissing62.Count -eq 0) `
     ('Every runtime-fetched local asset is precached in sw.js (cache-first, no runtime-network SPOF)' + $(if ($precacheMissing62.Count) { ' -- missing: ' + ($precacheMissing62 -join ', ') } else { '' }))
 
 # -- WU-C11 part (c): the changelog viewer visual glow-up structure guards --
-$cssSrc62 = Read-Src "css/terminal.css"
+$cssSrc62 = Read-Css
 $parseBody62 = ''
 $showBody62 = ''
 try { $parseBody62 = Get-FunctionBody $uiCoreSrc62 '_parseChangelog' } catch {}
@@ -4044,7 +4129,7 @@ Check (-not ($uiCoreSrc65 -match 'updateModal')) `
     'ui-core.js ESC handler does not reference updateModal (updateModal manages its own Esc -- not caught by global handler)'
 
 # 65.12  #updateModalMsg is left-aligned in terminal.css (message body reads flush-left, not ragged/centered)
-$cssSrc65 = Read-Src "css\terminal.css"
+$cssSrc65 = Read-Css
 Check ([bool]($cssSrc65 -match '(?s)#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left')) `
     '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
 
@@ -4562,7 +4647,7 @@ Sep "Suite 71 -- Phase 6 UI Consistency"
 $htmlSrc71     = Read-Src 'index.html'
 $uiRenderSrc71 = Read-Group "ui-render"
 $uiCoreSrc71   = Read-Group "ui-core"
-$cssSrc71      = Read-Src 'css\terminal.css'
+$cssSrc71      = Read-Css
 
 # 71.1  #traitsSection is a <details> element
 Check ([bool]($htmlSrc71 -match '<details[^>]+id="traitsSection"')) `
@@ -4698,7 +4783,7 @@ Check (-not ($traitsBody71 -match 'min-height:28px;display:inline-flex')) `
 $htmlSrc72  = Get-Content "$ROOT\index.html"      -Raw
 $uiSavesSrc72 = Read-Group "ui-saves"
 $uiCoreSrc72  = Read-Group "ui-core"
-$cssSrc72     = Get-Content "$ROOT\css\terminal.css" -Raw
+$cssSrc72     = Read-Css
 
 Sep "Suite 72 -- Location datalist bleed fix + update-modal whitespace"
 
@@ -4985,7 +5070,7 @@ try {
         $repScript77 = @"
 const vm = require('vm');
 const fs = require('fs');
-const src = fs.readFileSync('$repoRootNode77/js/ui-render.js', 'utf8');
+const src = fs.readFileSync('$repoRootNode77/js/ui/ui-render.js', 'utf8');
 const threshMatch = src.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = src.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
 const fnMatch = src.match(/function getFactionStanding\([\s\S]*?\n\}/);
@@ -5688,7 +5773,7 @@ Sep "Suite 86 -- Maskable shortcut icons + OPTICS label wrap"
 $manifestSrc86 = Read-Src "manifest.json"
 $manifest86    = $manifestSrc86 | ConvertFrom-Json
 $shorts86      = if ($manifest86.shortcuts -is [array]) { $manifest86.shortcuts } else { @() }
-$cssSrc86      = Read-Src "css/terminal.css"
+$cssSrc86      = Read-Css
 $idxSrc86      = Read-Src "index.html"
 
 # 86.1-86.4  Each shortcut icon has purpose containing "maskable"
@@ -5856,7 +5941,7 @@ Sep "Suite 88 -- GATE-UI: UI consistency structural guards"
 $uiRenderSrc88 = Read-Group "ui-render"
 $uiCoreSrc88   = Read-Group "ui-core"
 $idxSrc88      = Read-Src "index.html"
-$cssSrc88      = Read-Src "css/terminal.css"
+$cssSrc88      = Read-Css
 
 # 88.1  Every details.panel (not sub-panel) in index.html has summary > h2 starting with ">" or "&gt;"
 $panelTagsAll88 = [regex]::Matches($idxSrc88, '<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*>')
@@ -6024,7 +6109,7 @@ Check (([bool]($stateSrc89 -match '(?s)FNV:\s*\{.*?trackerDirectives\s*:')) -and
     'GATE-AGNOSTIC-16: GAME_DEFS.FNV/.FO3.ai.trackerDirectives exist and _directiveTrackers() reads from them -- GA-5 data-driven trackers (U1)'
 
 # ===========================================================
-# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
+# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (16 tests)
 # ===========================================================
 Sep "Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding"
 # Detect double-encoding from PowerShell Latin-1 read + UTF-8 write.
@@ -6035,17 +6120,29 @@ Sep "Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding"
 $rfChar90 = [char]0xFFFD
 $mojiA90  = ([char]0x00E2).ToString() + ([char]0x20AC).ToString()
 $mojiB90  = ([char]0x00E2).ToString() + ([char]0x2013).ToString()
+# 2.8.5 U-A2 (closes AUDIT_U4 Finding B): widened to the five ui-core-*.js
+# siblings, which the U-A1 split moved ~70% of ui-core's non-ASCII content
+# into but this list was never widened to cover (latent -- all five are
+# mojibake-clean today). Kept as a per-file hand list (not a full glob
+# derivation, unlike Suite 62's jsAll62 above) so this stays a fixed,
+# Protocol-2a-stable 15-file suite rather than growing one assertion per
+# js file on every future file add.
 $srcPairs90 = @(
-    @{ File = 'js/api.js';        Label = 'GATE-CORRUPT-1' },
-    @{ File = 'js/state.js';      Label = 'GATE-CORRUPT-2' },
-    @{ File = 'js/ui-core.js';    Label = 'GATE-CORRUPT-3' },
-    @{ File = 'js/ui-render.js';  Label = 'GATE-CORRUPT-4' },
-    @{ File = 'js/ui-saves.js';   Label = 'GATE-CORRUPT-5' },
-    @{ File = 'js/ui-audio.js';   Label = 'GATE-CORRUPT-6' },
-    @{ File = 'js/ui-account.js'; Label = 'GATE-CORRUPT-7' },
-    @{ File = 'index.html';       Label = 'GATE-CORRUPT-8' },
-    @{ File = 'README.md';        Label = 'GATE-CORRUPT-9' },
-    @{ File = 'ARCHITECTURE.md';  Label = 'GATE-CORRUPT-10' }
+    @{ File = 'js/services/api.js';         Label = 'GATE-CORRUPT-1' },
+    @{ File = 'js/core/state.js';           Label = 'GATE-CORRUPT-2' },
+    @{ File = 'js/ui/ui-core.js';           Label = 'GATE-CORRUPT-3' },
+    @{ File = 'js/ui/ui-render.js';         Label = 'GATE-CORRUPT-4' },
+    @{ File = 'js/ui/ui-saves.js';          Label = 'GATE-CORRUPT-5' },
+    @{ File = 'js/ui/ui-audio.js';          Label = 'GATE-CORRUPT-6' },
+    @{ File = 'js/ui/ui-account.js';        Label = 'GATE-CORRUPT-7' },
+    @{ File = 'js/ui/ui-core-nav.js';       Label = 'GATE-CORRUPT-8' },
+    @{ File = 'js/ui/ui-core-overseer.js';  Label = 'GATE-CORRUPT-9' },
+    @{ File = 'js/ui/ui-core-chassis.js';   Label = 'GATE-CORRUPT-10' },
+    @{ File = 'js/ui/ui-core-modulebay.js'; Label = 'GATE-CORRUPT-11' },
+    @{ File = 'js/ui/ui-core-cmd.js';       Label = 'GATE-CORRUPT-12' },
+    @{ File = 'index.html';                 Label = 'GATE-CORRUPT-13' },
+    @{ File = 'README.md';                  Label = 'GATE-CORRUPT-14' },
+    @{ File = 'ARCHITECTURE.md';            Label = 'GATE-CORRUPT-15' }
 )
 foreach ($pair90 in $srcPairs90) {
     $content90 = [System.IO.File]::ReadAllText((Join-Path $Root $pair90.File), [System.Text.Encoding]::UTF8)
@@ -6061,7 +6158,7 @@ $mulCorrupt90    = ([char]0x00C3).ToString() + ([char]0x2014).ToString()
 $rfChar90doc     = ([char]0xFFFD).ToString()
 $clBad = $changelog90ps.Contains($emCorrupt90) -or $changelog90ps.Contains($enCorrupt90) -or `
          $changelog90ps.Contains($mulCorrupt90) -or $changelog90ps.Contains($rfChar90doc)
-Check (-not $clBad) 'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+Check (-not $clBad) 'GATE-CORRUPT-16: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
 
 # ===========================================================
 # Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
@@ -6116,8 +6213,8 @@ Check ($loadUIBody91ps.Contains('renderSavesList(); // always')) `
 Sep "Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS"
 # Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
 # to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
-$css92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
-$uiRender92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-render.js'), [System.Text.Encoding]::UTF8)
+$css92ps = Read-Css
+$uiRender92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui/ui-render.js'), [System.Text.Encoding]::UTF8)
 $html92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
 
 # 92.1  .tag class carries white-space: nowrap in terminal.css
@@ -6171,17 +6268,17 @@ Check (
 # one reg file per game -- FO3 had registrySearch=undefined.
 # ===========================================================
 Sep "Suite 93 -- FO3 Autocomplete Guard"
-$rc93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/registry-core.js'), [System.Text.Encoding]::UTF8)
+$rc93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/data/registry-core.js'), [System.Text.Encoding]::UTF8)
 $sw93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'sw.js'), [System.Text.Encoding]::UTF8)
 $idx93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
-$nv93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/reg_nv.js'), [System.Text.Encoding]::UTF8)
-$fo393ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/reg_fo3.js'), [System.Text.Encoding]::UTF8)
+$nv93ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/data/reg_nv.js'), [System.Text.Encoding]::UTF8)
+$fo393ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/data/reg_fo3.js'), [System.Text.Encoding]::UTF8)
 
 # 93.1  registry-core.js file exists (ReadAllText throws if absent)
 Check ($rc93ps.Length -gt 0) 'registry-core.js file exists on disk'
 
 # 93.2  registry-core.js is listed in sw.js ASSETS
-Check ($sw93ps.Contains('./js/registry-core.js')) `
+Check ($sw93ps.Contains('./js/data/registry-core.js')) `
     'registry-core.js is listed in sw.js ASSETS (service worker will cache it)'
 
 # 93.3  registry-core.js defines registrySearch function
@@ -6197,13 +6294,13 @@ Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($nv93ps, 'function\s
     'reg_nv.js does NOT define registrySearch() -- function extracted to registry-core.js'
 
 # 93.6  FO3 boot path in index.html includes registry-core.js after reg_fo3.js
-$fo3Idx93ps = $idx93ps.IndexOf("'js/reg_fo3.js'")
-$rcNearFo393ps = ($fo3Idx93ps -ge 0) -and $idx93ps.Substring($fo3Idx93ps, [Math]::Min(200, $idx93ps.Length - $fo3Idx93ps)).Contains("'js/registry-core.js'")
+$fo3Idx93ps = $idx93ps.IndexOf("'js/data/reg_fo3.js'")
+$rcNearFo393ps = ($fo3Idx93ps -ge 0) -and $idx93ps.Substring($fo3Idx93ps, [Math]::Min(200, $idx93ps.Length - $fo3Idx93ps)).Contains("'js/data/registry-core.js'")
 Check $rcNearFo393ps "FO3 boot path in index.html includes registry-core.js after reg_fo3.js"
 
 # 93.7  FNV boot path in index.html includes registry-core.js after reg_nv.js
-$nvIdx93ps = $idx93ps.IndexOf("'js/reg_nv.js'")
-$rcNearNv93ps = ($nvIdx93ps -ge 0) -and $idx93ps.Substring($nvIdx93ps, [Math]::Min(200, $idx93ps.Length - $nvIdx93ps)).Contains("'js/registry-core.js'")
+$nvIdx93ps = $idx93ps.IndexOf("'js/data/reg_nv.js'")
+$rcNearNv93ps = ($nvIdx93ps -ge 0) -and $idx93ps.Substring($nvIdx93ps, [Math]::Min(200, $idx93ps.Length - $nvIdx93ps)).Contains("'js/data/registry-core.js'")
 Check $rcNearNv93ps "FNV boot path in index.html includes registry-core.js after reg_nv.js"
 
 # 93.8  Behavioral: FO3 registry has Galaxy News Radio quest (FO3 autocomplete data present)
@@ -6217,7 +6314,7 @@ Check ($fo393ps.Contains("'Galaxy News Radio'") -or $fo393ps.Contains('"Galaxy N
 # sysModal dialog ARIA semantics. A-1/A-S4/A-7/A-S1 spec items.
 # ===========================================================
 Sep "Suite 94 -- Accessibility Guards"
-$css94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
+$css94ps = Read-Css
 $idx94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
 $uiCore94ps = Read-Group "ui-core"
 
@@ -6272,9 +6369,9 @@ Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore94ps, 'function\s+
 # ===========================================================
 Sep "Suite 95 -- Save-Load Reload Guard (import clobber regression)"
 $uiCore95 = Read-Group "ui-core"
-$state95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/state.js'), [System.Text.Encoding]::UTF8)
-$saves95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-saves.js'), [System.Text.Encoding]::UTF8)
-$cloud95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/cloud.js'), [System.Text.Encoding]::UTF8)
+$state95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/core/state.js'), [System.Text.Encoding]::UTF8)
+$saves95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui/ui-saves.js'), [System.Text.Encoding]::UTF8)
+$cloud95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/services/cloud.js'), [System.Text.Encoding]::UTF8)
 
 # 95.1  beforeunload flush is guarded by _loadingSave (not an unconditional robco_v8 write)
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore95, 'beforeunload[\s\S]{0,400}?_loadingSave')) `
@@ -6367,7 +6464,7 @@ Check ([System.Text.RegularExpressions.Regex]::IsMatch($th96, 'PERSISTENCE AUDIT
     '96.1: tests/test.html is the runtime persistence audit (executes autoImportState)'
 
 # 96.2  test.html loads the current FNV boot chain (db -> state -> reg -> registry-core -> api)
-$chain96 = @('db_nv.js','state.js','reg_nv.js','registry-core.js','api.js')
+$chain96 = @('data/db_nv.js','core/state.js','data/reg_nv.js','data/registry-core.js','services/api.js')
 $missing96 = @($chain96 | Where-Object { -not $th96.Contains('../js/' + $_) })
 Check ($missing96.Count -eq 0) `
     ('96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api)' + $(if ($missing96.Count) { ' -- missing: ' + ($missing96 -join ', ') } else { '' }))
@@ -6926,7 +7023,7 @@ $dbnv106 = Read-Group "db_nv"
 $dbfo3106 = Read-Group "db_fo3"
 $api106 = Read-Group "api"
 $core106 = Read-Group "ui-core"
-$css106 = Read-Src "css/terminal.css"
+$css106 = Read-Css
 $st106 = Read-Group "state"
 $doBuyBody = ''
 $doSellBody = ''
@@ -7118,7 +7215,7 @@ Sep "Suite 108 -- WU-N4 CONSULT native databank lookup"
 $ren108 = Read-Group "ui-render"
 $api108 = Read-Group "api"
 $core108 = Read-Group "ui-core"
-$css108 = Read-Src "css/terminal.css"
+$css108 = Read-Css
 # CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML core
 # (WU-N4b option C, Protocol 22) -- concatenate so engine-level checks find the behavior wherever it lives.
 $consultBody = ''
@@ -7215,7 +7312,7 @@ Sep "Suite 109 -- WU-N5 BIO-SCAN native medical advisory"
 $ren109 = Read-Group "ui-render"
 $api109 = Read-Group "api"
 $core109 = Read-Group "ui-core"
-$css109 = Read-Src "css/terminal.css"
+$css109 = Read-Css
 $html109 = Read-Src "index.html"
 $dbnv109 = Read-Group "db_nv"
 $dbfo3109 = Read-Group "db_fo3"
@@ -7283,7 +7380,7 @@ Sep "Suite 110 -- WU-N6 LOOT native add/value terminal"
 $ren110 = Read-Group "ui-render"
 $api110 = Read-Group "api"
 $core110 = Read-Group "ui-core"
-$css110 = Read-Src "css/terminal.css"
+$css110 = Read-Css
 $html110 = Read-Src "index.html"
 $routerBlock110 = [regex]::Match($api110, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
 $ls110 = $ren110.IndexOf('function _lootAdd')
@@ -7402,7 +7499,7 @@ Check ((-not ($html111 -match 'ATTACH VISUAL DATA')) -and ($html111 -match 'VISU
 # ===========================================================
 Sep "Suite 112 -- WU-E2 reusable disabled banner templates"
 $html112 = Read-Src "index.html"
-$css112  = Read-Src "css/terminal.css"
+$css112  = Read-Css
 
 # 112.1  #updateBannerTemplate <template> still EXISTS (not deleted)
 Check ([bool]($html112 -match '<template id="updateBannerTemplate">')) `
@@ -7796,7 +7893,7 @@ Check (($html119 -match 'id="unitPowerPlantPanel"') -and ($html119 -match '<deta
 # pure-CSS boosts. Game-agnostic, no AI. (PS mirror of JS Suite 120.)
 # ===========================================================
 Sep "Suite 120 -- WU-F8 High-Lumen Optics (high-contrast)"
-$css120    = Read-Src "css/terminal.css"
+$css120    = Read-Css
 $uiCore120 = Read-Group "ui-core"
 $html120   = Read-Src "index.html"
 $mStart120 = $css120.IndexOf('html.high-lumen body')
@@ -7902,7 +7999,7 @@ Check (($html121 -match 'id="radioToggle"') -and ($html121 -match 'for="radioTog
 # ===========================================================
 Sep "Suite 122 -- WU-F6 Cold-Start / Degraded-Tube Boot"
 $uiAudio122 = Read-Group "ui-audio"
-$css122     = Read-Src "css/terminal.css"
+$css122     = Read-Css
 $pick122      = [regex]::Match($uiAudio122, '(?s)function _pickBootFlavor\([\s\S]*?\n\}').Value
 $bootLines122 = [regex]::Match($uiAudio122, '(?s)function _bootLinesFor\([\s\S]*?\n\}').Value
 $runBoot122   = [regex]::Match($uiAudio122, '(?s)function runBootSequence\([\s\S]*?\n\}').Value
@@ -8198,7 +8295,7 @@ Check (-not (($sessFn125 + $logPanel125 + $statusPanel125) -match 'New Vegas|Moj
 Sep "Suite 126 -- WU-F11 native mark-visited map control"
 $render126 = Read-Group "ui-render"
 $state126  = Read-Group "state"
-$css126    = Read-Src "css/terminal.css"
+$css126    = Read-Css
 $markFn126 = [regex]::Match($render126, '(?s)function markLocationVisited\(loc\)[\s\S]*?\n\}').Value
 $recFn126  = [regex]::Match($state126, '(?s)function recordLocationVisit\([\s\S]*?\n\}').Value
 # Phase 3 . Piece 3 renamed the button to MARK SURVEYED (class="mark") as
@@ -8255,7 +8352,7 @@ Sep "Suite 127 -- WU-T3 per-game identity strings + save header"
 $state127   = Read-Group "state"
 $audio127   = Read-Group "ui-audio"
 $account127 = Read-Group "ui-account"
-$css127     = Read-Src "css/terminal.css"
+$css127     = Read-Css
 $fnvTheme127 = [regex]::Match($state127, '(?s)FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
 $fo3Theme127 = [regex]::Match($state127, '(?s)FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}').Groups[1].Value
 $blf127 = [regex]::Match($audio127, '(?s)function _bootLinesFor\(flavor\)[\s\S]*?\n\}').Value
@@ -8338,7 +8435,7 @@ Check (($gate128 -match 'robco-diagnostics\.js') -and ($gate128 -match 'robco-di
 # (PS mirror of JS 129.)
 # ===========================================================
 Sep "Suite 129 -- first-load desktop-layout pointer/hover gate"
-$css129 = Read-Src "css/terminal.css"
+$css129 = Read-Css
 $core129 = Read-Group "ui-core"
 
 # 129.1  the desktop app-shell media query carries the pointer/hover gate
@@ -8481,8 +8578,8 @@ $goldenLabels131 = @(
 try {
     $nodeCheck131 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck131) {
-        $apiPathNode131 = (Join-Path $Root "js/api.js").Replace('\', '/')
-        $statePathNode131 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $apiPathNode131 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $statePathNode131 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $testScript131 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -8714,9 +8811,9 @@ $labels133 = @(
 try {
     $nodeCheck133 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck133) {
-        $apiPathNode133 = (Join-Path $Root "js/api.js").Replace('\', '/')
-        $statePathNode133 = (Join-Path $Root "js/state.js").Replace('\', '/')
-        $regPathNode133 = (Join-Path $Root "js/reg_nv.js").Replace('\', '/')
+        $apiPathNode133 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $statePathNode133 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
+        $regPathNode133 = (Join-Path $Root "js/data/reg_nv.js").Replace('\', '/')
         $testScript133 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -8870,7 +8967,7 @@ $labels134 = @(
 try {
     $nodeCheck134 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck134) {
-        $statePathNode134 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $statePathNode134 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $testScript134 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -8988,8 +9085,8 @@ $labels135 = @(
 try {
     $nodeCheck135 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck135) {
-        $statePathNode135 = (Join-Path $Root "js/state.js").Replace('\', '/')
-        $apiPathNode135   = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $statePathNode135 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
+        $apiPathNode135   = (Join-Path $Root "js/services/api.js").Replace('\', '/')
         $testScript135 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -9205,7 +9302,7 @@ $html136   = Read-Src "index.html"
 $api136    = Read-Group "api"
 $core136   = Read-Group "ui-core"
 $render136 = Read-Group "ui-render"
-$css136    = Read-Src "css/terminal.css"
+$css136    = Read-Css
 $dbNv136   = Read-Group "db_nv"
 $dbFo3136  = Read-Group "db_fo3"
 
@@ -9519,11 +9616,11 @@ Check (
 ) '138.1: js/idb.js is an IIFE that publishes window.IdbStore'
 
 # 138.2  the new served module is precached in sw.js ASSETS (Suite 49 sibling)
-Check ($sw138 -match '\./js/idb\.js') '138.2: js/idb.js is precached in sw.js ASSETS'
+Check ($sw138 -match '\./js/core/idb\.js') '138.2: js/idb.js is precached in sw.js ASSETS'
 
 # 138.3  idb.js loads before state.js (which calls it) and before the boot loader
-$iIdb138    = $html138.IndexOf('js/idb.js')
-$iState138  = $html138.IndexOf('js/state.js')
+$iIdb138    = $html138.IndexOf('js/core/idb.js')
+$iState138  = $html138.IndexOf('js/core/state.js')
 $iLoader138 = $html138.IndexOf('GAME_FILES')
 Check (
     ($iIdb138 -gt -1) -and ($iState138 -gt -1) -and ($iLoader138 -gt -1) -and
@@ -10377,18 +10474,18 @@ $initRt146 = Get-FunctionBody $runtime146 'initAmbientRuntime'
 
 # 146.1  js/runtime.js exists on disk (served file)
 Check (
-    Test-Path (Join-Path $Root "js/runtime.js")
+    Test-Path (Join-Path $Root "js/core/runtime.js")
 ) '146.1: js/runtime.js exists on disk (A1 new served file)'
 
 # 146.2  ./js/runtime.js is precached in sw.js ASSETS
 Check (
-    $sw146 -match "'\./js/runtime\.js'"
+    $sw146 -match "'\./js/core/runtime\.js'"
 ) "146.2: './js/runtime.js' is listed in sw.js ASSETS (PWA precaches the runtime)"
 
 # 146.3  index.html loads runtime.js and orders it BEFORE ui-core.js
 Check (
-    ($index146 -match '<script src="js/runtime\.js"></script>') -and
-    ($index146.IndexOf('js/runtime.js') -lt $index146.IndexOf('js/ui-core.js'))
+    ($index146 -match '<script src="js/core/runtime\.js"></script>') -and
+    ($index146.IndexOf('js/core/runtime.js') -lt $index146.IndexOf('js/ui/ui-core.js'))
 ) '146.3: index.html loads js/runtime.js as a static tag ordered before js/ui-core.js'
 
 # 146.4  window.AmbientRuntime exposes the full API surface
@@ -10669,19 +10766,19 @@ $isStagingBody149 = Get-FunctionBody $testConsole149 '_devConsoleUnlocked'
 
 # 149.1  js/test-console.js exists on disk (new served file)
 Check (
-    Test-Path (Join-Path $Root "js/test-console.js")
+    Test-Path (Join-Path $Root "js/dev/test-console.js")
 ) '149.1: js/test-console.js exists on disk (Test Console new served file)'
 
 # 149.2  ./js/test-console.js is precached in sw.js ASSETS
 Check (
-    $sw149 -match "'\./js/test-console\.js'"
+    $sw149 -match "'\./js/dev/test-console\.js'"
 ) "149.2: './js/test-console.js' is listed in sw.js ASSETS (PWA precaches the console)"
 
 # 149.3  index.html loads test-console.js AFTER ui-core.js and before api.js
 Check (
-    ($index149 -match '<script src="js/test-console\.js"></script>') -and
-    ($index149.IndexOf('<script src="js/ui-core.js"></script>') -lt $index149.IndexOf('<script src="js/test-console.js"></script>')) -and
-    ($index149.IndexOf('<script src="js/test-console.js"></script>') -lt $index149.IndexOf('<script src="js/api.js"></script>'))
+    ($index149 -match '<script src="js/dev/test-console\.js"></script>') -and
+    ($index149.IndexOf('<script src="js/ui/ui-core.js"></script>') -lt $index149.IndexOf('<script src="js/dev/test-console.js"></script>')) -and
+    ($index149.IndexOf('<script src="js/dev/test-console.js"></script>') -lt $index149.IndexOf('<script src="js/services/api.js"></script>'))
 ) '149.3: index.html loads js/test-console.js as a static tag ordered after js/ui-core.js and before js/api.js'
 
 # 149.4  the panel markup lives inert inside <template id="testConsoleTemplate">
@@ -10841,7 +10938,7 @@ Check (
 # ===========================================================
 Sep "Suite 150 -- A3 IDLE/STANDBY/SHUTDOWN ambient experiences"
 $uiCore150 = Read-Group "ui-core"
-$css150 = Read-Src "css/terminal.css"
+$css150 = Read-Css
 $wireAmbient150 = Get-FunctionBody $uiCore150 '_wireAmbientExperiences'
 $exitStandbyBody150 = Get-FunctionBody $uiCore150 'exitStandby'
 $isShuttingDownBody150 = Get-FunctionBody $uiCore150 '_isShuttingDown'
@@ -10975,7 +11072,7 @@ $apiSrc151 = Read-Group "api"
 $uiCoreSrc151 = Read-Group "ui-core"
 $uiSavesSrc151 = Read-Group "ui-saves"
 $htmlSrc151 = Read-Src "index.html"
-$cssSrc151 = Read-Src "css/terminal.css"
+$cssSrc151 = Read-Css
 
 # 151.1  robco_input_mode is registered as a DEVICE PREFERENCE (MetaStore),
 #        never campaign state -- same two-store boundary as robco_immersion.
@@ -11181,7 +11278,7 @@ Check (
 # ===========================================================
 Sep "Suite 152 -- Shutdown/OFF power-on affordance (Protocol 42 fix)"
 $htmlSrc152 = Read-Src "index.html"
-$cssSrc152 = Read-Src "css/terminal.css"
+$cssSrc152 = Read-Css
 $uiCoreSrc152 = Read-Group "ui-core"
 $powerOnBody152 = Get-FunctionBody $uiCoreSrc152 '_powerOnFromShutdown'
 
@@ -11400,7 +11497,7 @@ $html154   = Read-Src "index.html"
 $core154   = Read-Group "ui-core"
 $audio154  = Read-Group "ui-audio"
 $state154  = Read-Group "state"
-$css154    = Read-Src "css/terminal.css"
+$css154    = Read-Css
 $claude154 = Read-Src "CLAUDE.md"
 
 # 154.1  the bay chrome + all 6 SLOT sub-panels are present, each a real
@@ -11845,7 +11942,7 @@ Sep "Suite 155 -- Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes"
 $html155   = Read-Src "index.html"
 $core155   = Read-Group "ui-core"
 $state155  = Read-Group "state"
-$css155    = Read-Src "css/terminal.css"
+$css155    = Read-Css
 $claude155 = Read-Src "CLAUDE.md"
 $rules155  = Read-Src "RULES.md"
 
@@ -12023,7 +12120,7 @@ $html156  = Read-Src "index.html"
 $core156  = Read-Group "ui-core"
 $audio156 = Read-Group "ui-audio"
 $state156 = Read-Group "state"
-$css156   = Read-Src "css/terminal.css"
+$css156   = Read-Css
 $arch156  = Read-Src "ARCHITECTURE.md"
 
 # 156.1  FIX 1: #chipGrid id is present on the 13-chip grid so JS can target
@@ -12216,7 +12313,7 @@ $labels157 = @(
 try {
     $nodeCheck157 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck157) {
-        $statePathNode157 = (Join-Path $Root "js/state.js").Replace('\', '/')
+        $statePathNode157 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $testScript157 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -12366,7 +12463,7 @@ $html158 = Read-Src "index.html"
 $core158 = Read-Group "ui-core"
 $state158 = Read-Group "state"
 $sw158 = Read-Src "sw.js"
-$css158 = Read-Src "css/terminal.css"
+$css158 = Read-Css
 
 # 158.1  every navkey exists with its id + hotkey label
 Check ($html158 -match 'id="navkey-operator"') "158.1a: navkey-operator keycap exists"
@@ -12651,7 +12748,7 @@ Check (
 Sep "Suite 159 -- Owner bug-fix batch: eventLog live-render + centering rule"
 $stateSrc159 = Read-Group "state"
 $htmlSrc159 = Read-Src "index.html"
-$cssSrc159 = Read-Src "css/terminal.css"
+$cssSrc159 = Read-Css
 $logEventFn159 = Get-FunctionBody $stateSrc159 '_logEvent'
 
 # 159.1  _logEvent() is the single writer for state.eventLog (Protocol 22) -- patching
@@ -12696,7 +12793,7 @@ Check (
 # fits. Mirrors JS Suite 160.
 # ===========================================================
 Sep "Suite 160 -- Owner audit: bezel bottom placement + stray-pin cleanup"
-$cssSrc160 = Read-Src "css/terminal.css"
+$cssSrc160 = Read-Css
 
 # 160.1  the nav-cluster never wraps its own 5 tabs independently -- the whole
 #        strip shrinks together instead of orphaning a key onto its own line
@@ -12922,7 +13019,7 @@ Sep "Suite 162 -- DO-O: the living Overseer (DIRECTOR UPLINK)"
 $html162  = Read-Src "index.html"
 $core162  = Read-Group "ui-core"
 $api162   = Read-Group "api"
-$css162   = Read-Src "css/terminal.css"
+$css162   = Read-Css
 $state162 = Read-Group "state"
 
 $ovsStart162 = $core162.IndexOf('DO-O START')
@@ -13056,7 +13153,7 @@ Check (
 try {
     $nodeCheck162 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck162) {
-        $jsDirNode162 = (Join-Path $Root "js").Replace('\', '/')
+        $jsDirNode162 = (Join-Path $Root "js/ui").Replace('\', '/')
         $testScript162 = @"
 const fs = require('fs');
 const path = require('path');
@@ -13391,7 +13488,7 @@ Sep "Suite 163 -- Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY +
 $uiSaves163 = Read-Group "ui-saves"
 $uiAcct163 = Read-Group "ui-account"
 $cloud163 = Read-Group "cloud"
-$css163 = Read-Src "css/terminal.css"
+$css163 = Read-Css
 
 # Assignment-form extractor (`window.X = async function (...) { ... }`) --
 # re-declared locally per the Suite 137/161 precedent.
@@ -13627,10 +13724,10 @@ $labels164 = @(
 try {
     $nodeCheck164 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck164) {
-        $apiPathNode164 = (Join-Path $Root "js/api.js").Replace('\', '/')
-        $statePathNode164 = (Join-Path $Root "js/state.js").Replace('\', '/')
-        $regPathNode164 = (Join-Path $Root "js/reg_nv.js").Replace('\', '/')
-        $jsDirNode164 = (Join-Path $Root "js").Replace('\', '/')
+        $apiPathNode164 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $statePathNode164 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
+        $regPathNode164 = (Join-Path $Root "js/data/reg_nv.js").Replace('\', '/')
+        $jsDirNode164 = (Join-Path $Root "js/ui").Replace('\', '/')
         $testScript164 = @"
 const fs = require('fs');
 const path = require('path');
@@ -14304,7 +14401,7 @@ Sep "Suite 167 -- [CROSSROADS] command retirement + OVERSEER transcript tag"
 $api167    = Read-Group "api"
 $uiCore167 = Read-Group "ui-core"
 $html167   = Read-Src "index.html"
-$css167    = Read-Src "css/terminal.css"
+$css167    = Read-Css
 $registry167 = [regex]::Match($uiCore167, 'const COMMAND_REGISTRY = \[([\s\S]*?)\n\];').Groups[1].Value
 $appendBody167 = [regex]::Match($uiCore167, '(?s)function appendToChat\([^)]*\)[\s\S]*?\n\}\n\n').Value
 
@@ -14359,7 +14456,7 @@ $api168      = Read-Group "api"
 $uiCore168   = Read-Group "ui-core"
 $uiRender168 = Read-Group "ui-render"
 $html168     = Read-Src "index.html"
-$css168      = Read-Src "css/terminal.css"
+$css168      = Read-Css
 $router168   = [regex]::Match($api168, '(?s)const NATIVE_COMMAND_ROUTER = \{[\s\S]*?\n\};').Value
 $registry168 = [regex]::Match($uiCore168, '(?s)const COMMAND_REGISTRY = \[[\s\S]*?\n\];').Value
 
@@ -14421,7 +14518,7 @@ Check (($uiRender168 -match 'function renderHolster\(') -and ($uiCore168 -match 
 Sep "Suite 169 -- transcript cleanup + composer autocomplete drop-up + scope pulse"
 $uiCore169 = Read-Group "ui-core"
 $uiSaves169 = Read-Group "ui-saves"
-$css169 = Read-Src "css/terminal.css"
+$css169 = Read-Css
 $appendBody169 = Get-FunctionBody $uiCore169 "appendToChat"
 
 # 169.1  appendToChat() adds a symmetric 'msg-tag--terminal' tag reading
@@ -14544,7 +14641,7 @@ Check (($setStateBody169 -match 'tap to pulse the scope') -and ($setStateBody169
 Sep "Suite 170 -- Owner batch: CRT hum follows power state + scanline contained in screen"
 $uiAudio170 = Read-Group "ui-audio"
 $uiCore170 = Read-Group "ui-core"
-$css170 = Read-Src "css/terminal.css"
+$css170 = Read-Css
 $html170 = Read-Src "index.html"
 
 # 170.1  stopCrtHum() fully tears down the hum's audio graph
@@ -14636,7 +14733,7 @@ Check (
 # ===========================================================
 Sep "Suite 171 -- WIPE TERMINAL dialog: one cancel + Complete RNG lock warning"
 $uiCore171 = Read-Group "ui-core"
-$css171 = Read-Src "css/terminal.css"
+$css171 = Read-Css
 
 # 171.1  openModal() supports hideCloseBtn -> .confirm-mode class toggle
 $openModalBody171 = Get-FunctionBody $uiCore171 "openModal"
@@ -14860,7 +14957,7 @@ Sep "Suite 174 -- SVC tray EJECT HOLOTAPE export consolidation"
 $html174 = Read-Src "index.html"
 $uiCore174 = Read-Group "ui-core"
 $uiSaves174 = Read-Group "ui-saves"
-$css174 = Read-Src "css/terminal.css"
+$css174 = Read-Css
 $eslintCfg174 = Read-Src "eslint.config.mjs"
 
 # 174.1  the four old export buttons are gone -- only the consolidated
@@ -15198,7 +15295,7 @@ Sep "Suite 177 -- SU-4: dynamic ACCOUNT (REG PORT) status words"
 $html177 = Read-Src "index.html"
 $acctSrc177 = Read-Group "ui-account"
 $core177 = Read-Group "ui-core"
-$css177 = Read-Src "css/terminal.css"
+$css177 = Read-Css
 
 # 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
 #        styled via .panel-substatus
@@ -15233,7 +15330,7 @@ $labels177 = @(
 try {
     $nodeCheck177 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck177) {
-        $acctPathNode177 = (Join-Path $Root "js/ui-account.js").Replace('\', '/')
+        $acctPathNode177 = (Join-Path $Root "js/ui/ui-account.js").Replace('\', '/')
         $testScript177 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -15341,7 +15438,7 @@ Check (
 Sep "Suite 178 -- SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)"
 $html178 = Read-Src "index.html"
 $core178 = Read-Group "ui-core"
-$css178 = Read-Src "css/terminal.css"
+$css178 = Read-Css
 $cfgStart178 = $html178.IndexOf('id="campaignConfigPanel"')
 $cfgEnd178 = $html178.IndexOf('<div class="col-right">', $cfgStart178)
 $configBlock178 = $html178.Substring($cfgStart178, $cfgEnd178 - $cfgStart178)
@@ -15549,7 +15646,7 @@ Sep "Suite 179 -- Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pil
 $html179 = Read-Src "index.html"
 $core179 = Read-Group "ui-core"
 $state179 = Read-Group "state"
-$css179 = Read-Src "css/terminal.css"
+$css179 = Read-Css
 
 # 179.1  every GAME_DEFS entry (FNV/FO3/FO4) declares theme.cartridgeTape --
 #        the data seam renderCartDeck() reads instead of a hardcoded per-game
@@ -15772,7 +15869,7 @@ Check (
 Sep "Suite 180 -- OPERATIONAL TEMPO centered rotary dial (SU-3 rework)"
 $html180 = Read-Src "index.html"
 $core180 = Read-Group "ui-core"
-$css180 = Read-Src "css/terminal.css"
+$css180 = Read-Css
 $cfgStart180 = $html180.IndexOf('id="campaignConfigPanel"')
 $cfgEnd180 = $html180.IndexOf('<div class="col-right">', $cfgStart180)
 $configBlock180 = $html180.Substring($cfgStart180, $cfgEnd180 - $cfgStart180)
@@ -15998,7 +16095,7 @@ Sep "Suite 181 -- PHASE 3 OPERATOR hero-three reskin (id-preservation contract)"
 $html181 = Read-Src "index.html"
 $uiCore181 = Read-Group "ui-core"
 $uiRender181 = Read-Group "ui-render"
-$css181 = Read-Src "css/terminal.css"
+$css181 = Read-Css
 
 # 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md sec3
 $FIXED_IDS_181 = @(
@@ -16171,7 +16268,7 @@ Write-Host "`n-- Suite 182 -- OPERATOR follow-up: drag controls + RAD max clamp 
 $uiCore182 = Read-Group "ui-core"
 $stateSrc182 = Read-Group "state"
 $apiSrc182 = Read-Group "api"
-$css182 = Read-Src "css/terminal.css"
+$css182 = Read-Css
 $index182 = Read-Src "index.html"
 
 # 182.1-182.4 + 182.7  behavioral -- shell out to node and actually execute the
@@ -16188,7 +16285,7 @@ $labels182 = @(
 try {
     $nodeCheck182 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck182) {
-        $jsDirNode182 = (Join-Path $Root "js").Replace('\', '/')
+        $jsDirNode182 = (Join-Path $Root "js/ui").Replace('\', '/')
         $testScript182 = @"
 const fs = require('fs');
 const path = require('path');
@@ -16404,7 +16501,7 @@ Check (-not [System.Text.RegularExpressions.Regex]::IsMatch($dragBlockSrc182, 'r
 # ===========================================================
 Write-Host "`n-- Suite 183 -- OPERATOR frames + readback centering + tempo dial hit-areas $('-' * 5)"
 $html183 = Read-Src "index.html"
-$css183 = Read-Src "css/terminal.css"
+$css183 = Read-Css
 
 # 183.1  top-level bay-board panels (OPERATOR) get the same 12px clearance
 #        the Module Bay's SLOT sub-panels already get from .bay-grid's grid gap.
@@ -16467,7 +16564,7 @@ Check (
 # ===========================================================
 Write-Host "`n-- Suite 184 -- owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries $('-' * 5)"
 $html184 = Read-Src "index.html"
-$css184 = Read-Src "css/terminal.css"
+$css184 = Read-Css
 $core184 = Read-Group "ui-core"
 $audio184 = Read-Group "ui-audio"
 $acct184 = Read-Group "ui-account"
@@ -16516,7 +16613,7 @@ $labels184 = @(
 try {
     $nodeCheck184 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck184) {
-        $jsDirNode184 = (Join-Path $Root "js").Replace('\', '/')
+        $jsDirNode184 = (Join-Path $Root "js/ui").Replace('\', '/')
         $testScript184 = @"
 const fs = require('fs');
 const path = require('path');
@@ -16741,7 +16838,7 @@ Check (
 # ===========================================================
 Write-Host "`n-- Suite 185 -- Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15) $('-' * 5)"
 $html185 = Read-Src "index.html"
-$css185 = Read-Src "css/terminal.css"
+$css185 = Read-Css
 $core185 = Read-Group "ui-core"
 $render185 = Read-Group "ui-render"
 $api185 = Read-Group "api"
@@ -16971,7 +17068,7 @@ Check (
 Write-Host "`n-- Suite 186 -- Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin $('-' * 5)"
 $core186 = Read-Group "ui-core"
 $render186 = Read-Group "ui-render"
-$css186 = Read-Src 'css/terminal.css'
+$css186 = Read-Css
 $stateSrc186 = Read-Group "state"
 $skillsBody186 = Get-FunctionBody $core186 'renderSkills'
 $statusBody186 = Get-FunctionBody $render186 'renderStatus'
@@ -17143,7 +17240,7 @@ Check (
 Write-Host "`n-- Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin $('-' * 5)"
 $core187 = Read-Group "ui-core"
 $render187 = Read-Group "ui-render"
-$css187 = Read-Src "css/terminal.css"
+$css187 = Read-Css
 $html187 = Read-Src "index.html"
 $perksBody187 = Get-FunctionBody $render187 'renderPerks'
 $karmaBody187 = Get-FunctionBody $core187 'updateKarmaUI'
@@ -17215,7 +17312,7 @@ Check (($karmaBoardStart187 -ge 0) -and ($readoutIdx187 -gt $karmaBoardStart187)
 try {
     $nodeCheck187 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck187) {
-        $renderPathNode187 = (Join-Path $Root "js/ui-render.js").Replace('\', '/')
+        $renderPathNode187 = (Join-Path $Root "js/ui/ui-render.js").Replace('\', '/')
         $testScript187 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -17362,7 +17459,7 @@ Check $titlesOk187 `
 # Mirrors JS Suite 188. (4 tests)
 # ===========================================================
 Write-Host "`n-- Suite 188 -- CARGO TAG row fix: USE button clipping (owner report) $('-' * 5)"
-$css188 = Read-Src "css/terminal.css"
+$css188 = Read-Css
 $render188 = Read-Group "ui-render"
 
 # 188.1  Root cause (Protocol 27): the pre-existing .inventory-list li rule
@@ -17417,7 +17514,7 @@ Sep "Suite 189 -- Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)"
 $html189 = Read-Src "index.html"
 $render189 = Read-Group "ui-render"
 $state189src = Read-Group "state"
-$css189 = Read-Src "css/terminal.css"
+$css189 = Read-Css
 $mapBody189 = ''
 try { $mapBody189 = Get-FunctionBody $render189 'renderWorldMap' } catch {}
 $questsBody189 = ''
@@ -17479,8 +17576,8 @@ $labels189 = @(
 try {
     $nodeCheck189 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck189) {
-        $statePathNode189 = (Join-Path $Root "js/state.js").Replace('\', '/')
-        $renderPathNode189 = (Join-Path $Root "js/ui-render.js").Replace('\', '/')
+        $statePathNode189 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
+        $renderPathNode189 = (Join-Path $Root "js/ui/ui-render.js").Replace('\', '/')
         $testScript189 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -17623,7 +17720,7 @@ Check (
 Sep "Suite 190 -- owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip"
 $core190 = Read-Group "ui-core"
 $render190 = Read-Group "ui-render"
-$css190 = Read-Src "css/terminal.css"
+$css190 = Read-Css
 $html190 = Read-Src "index.html"
 
 # 190.1  _wireRadDragSurface(containerId) -- the shared drag mechanism both
@@ -17660,7 +17757,7 @@ Check (
 
 # 190.4  BEHAVIORAL -- dragging #opRadLineWrap to 50% of its width sets
 #        #stat_rads/state.rads to ~half of the ACTIVE game's maxRads.
-$jsDirNode190 = (Join-Path $Root "js").Replace('\', '/')
+$jsDirNode190 = (Join-Path $Root "js/ui").Replace('\', '/')
 $testScript190a = @"
 const fs = require('fs');
 const path = require('path');
@@ -17886,7 +17983,7 @@ $state191 = Read-Group "state"
 $render191 = Read-Group "ui-render"
 $reg191 = Read-Group "reg_fo3"
 $html191 = Read-Src "index.html"
-$css191 = Read-Src "css/terminal.css"
+$css191 = Read-Css
 
 # 191.1  The pre-existing tracker-toggle contract is fully preserved --
 #        every function the mockup notes promise stays unchanged is
@@ -18179,7 +18276,7 @@ $core192 = Read-Group "ui-core"
 $audio192 = Read-Group "ui-audio"
 $saves192 = Read-Group "ui-saves"
 $cloud192 = Read-Group "cloud"
-$css192 = Read-Src "css/terminal.css"
+$css192 = Read-Css
 
 # 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
 #        .panel.bay-board with its own BUS slot tag
@@ -18779,7 +18876,7 @@ Check (
 # ===========================================================
 Sep "Suite 193 -- Owner polish batch: tap-highlight kill + Lincoln side-by-side grid"
 $html193 = Read-Src "index.html"
-$css193 = Read-Src "css/terminal.css"
+$css193 = Read-Css
 $cssStripped193 = [regex]::Replace($css193, '/\*[\s\S]*?\*/', '')
 
 # 193.1  -webkit-tap-highlight-color:transparent is declared on a broad
@@ -18886,7 +18983,7 @@ Check (
 # ===========================================================
 Sep "Suite 194 -- CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)"
 $html194 = Read-Src "index.html"
-$css194 = Read-Src "css/terminal.css"
+$css194 = Read-Css
 $cssStripped194 = [regex]::Replace($css194, '/\*[\s\S]*?\*/', '')
 $core194 = Read-Group "ui-core"
 $audio194 = Read-Group "ui-audio"
@@ -19143,7 +19240,7 @@ Check (
 # 8 tests
 # ===========================================================
 Sep "Suite 195 -- LIVING CORE ring visual-parity fix (owner audit)"
-$css195 = Read-Src "css/terminal.css"
+$css195 = Read-Css
 $cssStripped195 = [regex]::Replace($css195, '/\*[\s\S]*?\*/', '')
 
 # 195.1  perspective holds the SAME ratio-to-own-size at EVERY mini tier
@@ -19307,7 +19404,7 @@ $coreSrc196 = Read-Group "ui-core"
 $renderSrc196 = Read-Group "ui-render"
 $apiSrc196 = Read-Group "api"
 $htmlSrc196 = Read-Src "index.html"
-$css196 = Read-Src "css/terminal.css"
+$css196 = Read-Css
 $cssStripped196 = [regex]::Replace($css196, '/\*[\s\S]*?\*/', '')
 
 # 196.1  rad.tier emitted once at the existing radThreshold crossing
@@ -19588,7 +19685,7 @@ Check (
 try {
     $nodeCheck196 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck196) {
-        $apiPathNode196 = (Join-Path $Root "js/api.js").Replace('\', '/')
+        $apiPathNode196 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
         $testScript196 = @"
 const fs = require('fs');
 const vm = require('vm');
@@ -19798,7 +19895,7 @@ Sep "Suite 197 -- FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations"
 $coreSrc197 = Read-Group "ui-core"
 $renderSrc197 = Read-Group "ui-render"
 $apiSrc197 = Read-Group "api"
-$css197 = Read-Src "css/terminal.css"
+$css197 = Read-Css
 $cssStripped197 = [regex]::Replace($css197, '/\*[\s\S]*?\*/', '')
 
 # 197.1  addItem() emits item.added on the manual-add path.
@@ -20025,7 +20122,7 @@ Check (
 # ===========================================================
 Sep "Suite 198 -- DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin"
 $renderSrc198 = Read-Group "ui-render"
-$css198 = Read-Src "css/terminal.css"
+$css198 = Read-Css
 $cssStripped198 = [regex]::Replace($css198, '/\*[\s\S]*?\*/', '')
 
 $preserveScrollBody198 = Get-FunctionBody $renderSrc198 '_rerenderMapPreservingScroll'
@@ -20201,7 +20298,7 @@ $renderSrc199 = Read-Group "ui-render"
 $savesSrc199 = Read-Group "ui-saves"
 $apiSrc199 = Read-Group "api"
 $stateSrc199 = Read-Group "state"
-$css199 = Read-Src "css/terminal.css"
+$css199 = Read-Css
 $cssStripped199 = [regex]::Replace($css199, '/\*[\s\S]*?\*/', '')
 
 # -- the 5 new additive emits --
@@ -20581,8 +20678,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode200';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const renderSrc = rd('js/ui-render.js');
 const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
@@ -20832,8 +20929,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode201';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const apiSrc = rd('js/api.js');
 const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
@@ -21123,8 +21220,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode202';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const uiRenderSrc = rd('js/ui-render.js');
 const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
@@ -21240,8 +21337,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode202b';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21396,8 +21493,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode203';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const uiRenderSrc = rd('js/ui-render.js');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21482,7 +21579,7 @@ console.log('RESULT:' + results.map(function (r) { return r ? '1' : '0'; }).join
 Sep "Suite 204 -- LOCATION CONFIRMATION CARD (top-right arrival toast)"
 $coreSrc204 = Read-Group "ui-core"
 $htmlSrc204 = Read-Src "index.html"
-$css204 = Read-Src "css/terminal.css"
+$css204 = Read-Css
 $cssStripped204 = [regex]::Replace($css204, '/\*[\s\S]*?\*/', '')
 $onLocChangeBody204 = Get-FunctionBody $coreSrc204 'onLocationChange'
 $showBody204 = Get-FunctionBody $coreSrc204 '_locationCardShow'
@@ -21530,8 +21627,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode204a';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21627,8 +21724,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode204b';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21780,7 +21877,7 @@ $consoleSrc205 = Read-Group "test-console"
 $repomixSrc205 = Read-Src "repomix.config.json"
 
 # 205.1 js/ocr.js exists on disk
-Check (Test-Path (Join-Path $Root "js/ocr.js")) `
+Check (Test-Path (Join-Path $Root "js/services/ocr.js")) `
     "js/ocr.js file exists (Unit 1 infra)"
 
 # 205.2 the vendored Tesseract.js files exist on disk (self-hosted, no CDN)
@@ -21794,13 +21891,13 @@ Check (
 ) "js/vendor/{tesseract.min.js,worker.min.js,tesseract-core-lstm.wasm(.js)}, assets/ocr/eng.traineddata.gz, and js/vendor/LICENSE-tesseract all exist on disk (self-hosted, Apache-2.0 attributed)"
 
 # 205.3 <script src="js/ocr.js"> present in index.html
-Check ([bool]($htmlSrc205 -match '"js/ocr\.js"')) `
+Check ([bool]($htmlSrc205 -match '"js/services/ocr\.js"')) `
     '<script src="js/ocr.js"> present in index.html'
 
 # 205.4 ocr.js loads after ui-render.js and before ui-core.js (plan-mandated boot order)
-$renderIdx205 = $htmlSrc205.IndexOf('"js/ui-render.js"')
-$ocrIdx205 = $htmlSrc205.IndexOf('"js/ocr.js"')
-$coreIdx205 = $htmlSrc205.IndexOf('"js/ui-core.js"')
+$renderIdx205 = $htmlSrc205.IndexOf('"js/ui/ui-render.js"')
+$ocrIdx205 = $htmlSrc205.IndexOf('"js/services/ocr.js"')
+$coreIdx205 = $htmlSrc205.IndexOf('"js/ui/ui-core.js"')
 Check (
     ($renderIdx205 -ne -1) -and ($ocrIdx205 -ne -1) -and ($coreIdx205 -ne -1) -and
     ($renderIdx205 -lt $ocrIdx205) -and ($ocrIdx205 -lt $coreIdx205)
@@ -21809,7 +21906,7 @@ Check (
 # 205.5 './js/ocr.js' and the small vendor shims (tesseract.min.js/worker.min.js) are
 #       in the all-or-nothing sw.js ASSETS precache list
 Check (
-    ([regex]::IsMatch($swSrc205, "['`"]\./js/ocr\.js['`"]")) -and
+    ([regex]::IsMatch($swSrc205, "['`"]\./js/services/ocr\.js['`"]")) -and
     ([regex]::IsMatch($swSrc205, "['`"]\./js/vendor/tesseract\.min\.js['`"]")) -and
     ([regex]::IsMatch($swSrc205, "['`"]\./js/vendor/worker\.min\.js['`"]"))
 ) "sw.js ASSETS precache includes './js/ocr.js', './js/vendor/tesseract.min.js', and './js/vendor/worker.min.js' (small, safe shims)"
@@ -21872,8 +21969,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode205a';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 const ocrSrc = rd('js/ocr.js');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -22149,8 +22246,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode206';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22576,8 +22673,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode207';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22769,7 +22866,7 @@ Sep "Suite 208 -- CEREMONY MOMENTS WAVE 1 (M1-M5)"
 $coreSrc208 = Read-Group "ui-core"
 $audioSrc208 = Read-Group "ui-audio"
 $stateSrc208 = Read-Group "state"
-$css208 = Read-Src "css/terminal.css"
+$css208 = Read-Css
 $cssStripped208 = [regex]::Replace($css208, '/\*[\s\S]*?\*/', '')
 $claudeSrc208 = Read-Src "CLAUDE.md"
 
@@ -22870,8 +22967,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23035,8 +23132,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23134,8 +23231,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23265,8 +23362,8 @@ const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23427,7 +23524,7 @@ Check (
 # 10 tests
 # ===========================================================
 Sep "Suite 209 -- MOBILE DENSITY STANDARD, TIER-1"
-$css209 = Read-Src "css/terminal.css"
+$css209 = Read-Css
 $cssStripped209 = [regex]::Replace($css209, '/\*[\s\S]*?\*/', '')
 
 $rootMatch209 = [regex]::Match($cssStripped209, ':root\s*\{[^}]*\}')
@@ -23632,8 +23729,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode210';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23829,8 +23926,8 @@ try {
 const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode210b';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23891,7 +23988,7 @@ try {
 Sep "Suite 211 -- Diagnostic Shell U2: mobile overlay + identity + icons"
 $testConsole211 = Read-Group "test-console"
 $index211 = Read-Src "index.html"
-$css211 = Read-Src "css/terminal.css"
+$css211 = Read-Css
 $tplStart211 = $index211.IndexOf('<template id="testConsoleTemplate">')
 $tplEnd211 = $index211.IndexOf('</template>', $tplStart211)
 $tplSrc211 = if ($tplStart211 -ge 0) { $index211.Substring($tplStart211, $tplEnd211 - $tplStart211) } else { '' }
@@ -23958,8 +24055,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode211';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -24212,8 +24309,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode212';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -24450,14 +24547,18 @@ try {
 var ALLOWLIST_212 = ['runtime.state'];
 var KNOWN_FLAGS_212 = ['robco_bay_opened', 'robco_last_seen_version', 'robco_booted_before'];
 function scanRealEmitEvents() {
-  var jsDir = path.join(ROOT, 'js');
-  var files = fs.readdirSync(jsDir).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; });
+  var subs = ['data', 'core', 'ui', 'services', 'dev'];
   var names = {};
-  files.forEach(function (f) {
-    var src = fs.readFileSync(path.join(jsDir, f), 'utf8');
-    var re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
-    var m;
-    while ((m = re.exec(src))) names[m[1]] = true;
+  subs.forEach(function (sub) {
+    var subDir = path.join(ROOT, 'js', sub);
+    if (!fs.existsSync(subDir)) return;
+    var files = fs.readdirSync(subDir).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; });
+    files.forEach(function (f) {
+      var src = fs.readFileSync(path.join(subDir, f), 'utf8');
+      var re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
+      var m;
+      while ((m = re.exec(src))) names[m[1]] = true;
+    });
   });
   return Object.keys(names);
 }
@@ -24565,7 +24666,7 @@ Check (
 #        every synthesized button reuses .btn-sm. The formerly-checked
 #        .dsh-tool-subhead rule is retired (U4a, Suite 214) in favor of every
 #        group being its own collapsible details.sub-panel.
-$css212 = Read-Src "css/terminal.css"
+$css212 = Read-Css
 $renderShellBody212 = Get-FunctionBody $testConsole212 '_renderShell'
 Check (
     ($renderShellBody212 -match 'flex-wrap:\s*wrap') -and
@@ -24607,7 +24708,7 @@ Check (
 Sep "Suite 213 -- Diagnostic Shell mobile chrome fixes (owner report)"
 $testConsole213 = Read-Group "test-console"
 $index213 = Read-Src "index.html"
-$css213 = Read-Src "css/terminal.css"
+$css213 = Read-Css
 $stateSrc213 = Read-Group "state"
 
 function Get-MobileBlocks213($src) {
@@ -24778,8 +24879,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode214';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -25138,7 +25239,7 @@ Check (
 Sep "Suite 215 -- Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy"
 $testConsole215 = Read-Group "test-console"
 $index215 = Read-Src "index.html"
-$terminalCss215 = Read-Src "css/terminal.css"
+$terminalCss215 = Read-Css
 
 # 215.1-215.13, 215.15 -- BEHAVIORAL, via a spawned node process against the
 # ACTUAL source (Protocol 42 stdin-corruption-safe transport -- a temp file).
@@ -25167,8 +25268,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode215';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -25744,7 +25845,7 @@ Sep "Suite 216 -- Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremo
 $testConsole216 = Read-Group "test-console"
 $stateSrc216 = Read-Group "state"
 $index216 = Read-Src "index.html"
-$terminalCss216 = Read-Src "css/terminal.css"
+$terminalCss216 = Read-Css
 
 # 216.1-216.14, 216.18, 216.19 -- BEHAVIORAL, via a spawned node process
 # against the ACTUAL source (Protocol 42 stdin-corruption-safe transport --
@@ -25779,8 +25880,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode216';
-function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
+function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -26148,7 +26249,14 @@ try {
 
 // 216.19
 try {
-  var jsFiles19 = fs.readdirSync(path.join(ROOT, 'js')).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; });
+  var jsFiles19 = [];
+  ['data', 'core', 'ui', 'services', 'dev'].forEach(function (sub) {
+    var subDir = path.join(ROOT, 'js', sub);
+    if (!fs.existsSync(subDir)) return;
+    fs.readdirSync(subDir).filter(function (f) { return f.endsWith('.js') && f !== 'test-console.js'; }).forEach(function (f) {
+      jsFiles19.push(sub + '/' + f);
+    });
+  });
   var allJsSrc19 = jsFiles19.map(function (f) { return rd('js/' + f); }).join('\n');
   var emitNames19 = {};
   var re19 = /RobcoEvents\.emit\(\s*'([^']+)'/g, mm19;
@@ -26252,7 +26360,7 @@ Sep "Suite 217 -- Mobile UX polish: cloud-save prominence + toast audit"
 $htmlSrc217 = Read-Src "index.html"
 $uiCore217 = Read-Group "ui-core"
 $uiAccount217 = Read-Group "ui-account"
-$cssSrc217 = Read-Src "css/terminal.css"
+$cssSrc217 = Read-Css
 
 # 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button.
 $idx217 = $htmlSrc217.IndexOf('id="btnSaveToCloud"')
@@ -26338,7 +26446,7 @@ Check (
 # 8 tests
 # ===========================================================
 Sep "Suite 218 -- NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired"
-$cssSrc218 = Read-Src "css/terminal.css"
+$cssSrc218 = Read-Css
 $apiSrc218 = Read-Group "api"
 $uiCoreSrc218 = Read-Group "ui-core"
 
@@ -26558,9 +26666,12 @@ $docText220 = @{}
 foreach ($d in $docFiles220) { $docText220[$d] = Read-Src $d }
 $docBlob220 = ($docFiles220 | ForEach-Object { $docText220[$_] }) -join "`n"
 
-# Existence corpus: every js/*.js (top-level only) + index.html
+# Existence corpus: every js/**/*.js + index.html (window.* may be assigned
+# in the index.html pre-paint head scripts, not only in js/). 2.8.5 U-A2:
+# js/ is no longer flat -- walk every js/<subfolder>/ via Get-AllJsFiles
+# (shared with Suites 49/212/216's own js-file scans).
 $srcParts220 = @()
-foreach ($f in (Get-ChildItem (Join-Path $Root 'js') -Filter *.js)) { $srcParts220 += [IO.File]::ReadAllText($f.FullName) }
+foreach ($f in (Get-AllJsFiles)) { $srcParts220 += [IO.File]::ReadAllText((Join-Path $Root "js/$($f.Rel)")) }
 $srcCorpus220 = ($srcParts220 -join "`n") + "`n" + (Read-Src 'index.html')
 
 function Norm-Order220($s) { ($s -replace '^db_(nv|fo3)$', 'db') -replace '^reg_(nv|fo3)$', 'reg' }
@@ -26593,12 +26704,15 @@ foreach ($mm in [regex]::Matches($docBlob220, '(?<![.\w/])(?:js|css|tests|script
 Check ($missingPath220.Count -eq 0) ('220.2: every explicit js/ css/ tests/ scripts/ file path in the docs exists on disk (allowlist: js/ui.js -- guarded MUST-NOT-EXIST, Suite 56)' + $(if ($missingPath220.Count) { ' -- DRIFT: ' + (($missingPath220.Keys | Sort-Object) -join ', ') } else { '' }))
 
 # Canonical boot order, derived mechanically from index.html
+# 2.8.5 U-A2: js/ is subfoldered (js/ui/ui-core.js, ...) -- the optional
+# '<subfolder>/' group absorbs it; the captured stem (group 1) is what
+# Norm-Order220 operates on, same as the pre-reorg flat js/<stem>.js form.
 $html220 = Read-Src 'index.html'
 $statics220 = @()
-foreach ($mm in [regex]::Matches($html220, '<script[^>]*\s+src=["'']js/([A-Za-z0-9_-]+)\.js["'']')) { $statics220 += $mm.Groups[1].Value }
+foreach ($mm in [regex]::Matches($html220, '<script[^>]*\s+src=["'']js/(?:[A-Za-z0-9_-]+/)?([A-Za-z0-9_-]+)\.js["'']')) { $statics220 += $mm.Groups[1].Value }
 $game220 = @()
 $gf220 = [regex]::Match($html220, 'FNV:\s*\[([^\]]+)\]')
-if ($gf220.Success) { foreach ($mm in [regex]::Matches($gf220.Groups[1].Value, 'js/([A-Za-z0-9_-]+)\.js')) { $game220 += $mm.Groups[1].Value } }
+if ($gf220.Success) { foreach ($mm in [regex]::Matches($gf220.Groups[1].Value, 'js/(?:[A-Za-z0-9_-]+/)?([A-Za-z0-9_-]+)\.js')) { $game220 += $mm.Groups[1].Value } }
 $seq220 = @()
 $seq220 += $statics220[0]
 $seq220 += $game220
@@ -26615,7 +26729,7 @@ function Extract-DocOrder220($text) {
     foreach ($line in ($bm.Groups[1].Value -split "`r?`n")) {
         if ($line -notmatch '^\s*\d+\.') { continue }
         $subj = ([regex]::Split($line, '→|->'))[0]
-        foreach ($mm in [regex]::Matches($subj, 'js/([A-Za-z0-9_-]+)\.js')) { $out += (Norm-Order220 $mm.Groups[1].Value) }
+        foreach ($mm in [regex]::Matches($subj, 'js/(?:[A-Za-z0-9_-]+/)?([A-Za-z0-9_-]+)\.js')) { $out += (Norm-Order220 $mm.Groups[1].Value) }
     }
     return @(Dedupe-Consec220 $out)
 }

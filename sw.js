@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.8.0-r5';
+const CACHE_NAME = 'robco-terminal-v2.8.0-r6';
 const ASSETS = [
   './',
   './index.html',
@@ -14,35 +14,46 @@ const ASSETS = [
   './assets/inventory-icon.png',
   './assets/stats-icon.png',
   './assets/new-campaign-icon.png',
-  './css/terminal.css',
-  './js/api.js',
-  './js/cloud.js',
-  './js/db_nv.js',
-  './js/db_fo3.js',
-  './js/idb.js',
-  './js/state.js',
-  './js/ui-audio.js',
-  './js/ui-render.js',
-  './js/ui-saves.js',
-  './js/ui-account.js',
-  './js/ui-core.js',
-  './js/ui-core-nav.js',
-  './js/ui-core-overseer.js',
-  './js/ui-core-chassis.js',
-  './js/ui-core-modulebay.js',
-  './js/ui-core-cmd.js',
-  './js/reg_nv.js',
-  './js/reg_fo3.js',
-  './js/registry-core.js',
-  './js/runtime.js',
-  './js/test-console.js',
+  './css/terminal-01-base.css',
+  './css/terminal-02-chrome.css',
+  './css/terminal-03-overseer.css',
+  './css/terminal-04-diagnostic-shell.css',
+  './css/terminal-05-toolbar.css',
+  './css/terminal-06-modulebay.css',
+  './css/terminal-07-operator-boards.css',
+  './css/terminal-08-curio-operations.css',
+  './css/terminal-09-databank.css',
+  './css/terminal-10-chassis.css',
+  './css/terminal-11-feedback-animations.css',
+  './css/terminal-12-mobile.css',
+  './js/services/api.js',
+  './js/services/cloud.js',
+  './js/data/db_nv.js',
+  './js/data/db_fo3.js',
+  './js/core/idb.js',
+  './js/core/state.js',
+  './js/ui/ui-audio.js',
+  './js/ui/ui-render.js',
+  './js/ui/ui-saves.js',
+  './js/ui/ui-account.js',
+  './js/ui/ui-core.js',
+  './js/ui/ui-core-nav.js',
+  './js/ui/ui-core-overseer.js',
+  './js/ui/ui-core-chassis.js',
+  './js/ui/ui-core-modulebay.js',
+  './js/ui/ui-core-cmd.js',
+  './js/data/reg_nv.js',
+  './js/data/reg_fo3.js',
+  './js/data/registry-core.js',
+  './js/core/runtime.js',
+  './js/dev/test-console.js',
   // Visual Upload OCR Unit 1 (planning/VISUAL_UPLOAD_OCR_PLAN.md) — small, safe shims only.
   // The heavy Tesseract core+lang (~9.5MB: js/vendor/tesseract-core-lstm.wasm(.js) +
   // assets/ocr/eng.traineddata.gz) are DELIBERATELY excluded here: cache.addAll below is
   // all-or-nothing, so putting multi-MB files in the install-time precache would bloat
   // and risk install failure. They are cached at runtime, best-effort, on first OCR use
-  // (js/ocr.js _cacheOcrAssetsBestEffort) instead — offline works only AFTER first use.
-  './js/ocr.js',
+  // (js/services/ocr.js _cacheOcrAssetsBestEffort) instead — offline works only AFTER first use.
+  './js/services/ocr.js',
   './js/vendor/tesseract.min.js',
   './js/vendor/worker.min.js',
 ];

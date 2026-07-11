@@ -1,0 +1,1499 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-08-curio-operations.css — part 8/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 8534-10023. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: BUS-15 Curio Archive display case + Phase 3 Piece 2 Operations console
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════════════
+   BUS-15 · CURIO ARCHIVE — collectibles as THEMED OBJECTS on SHELVES
+   INSIDE a sealed glass display case (owner-approved redesign, Protocol 25
+   sanctioned exception; mockup: planning/mockups/curio-display-case.html,
+   the CASE and SHELF variants merged per owner clarification — a sealed
+   display case naturally has shelves inside it, so this is ONE unified
+   vitrine, never a switchable view). Every collectible renders as its
+   recognizable Fallout object (snow globe / bobblehead / typed Lincoln
+   relic) instead of a plain [ACQUIRED]/[MISSING] text row. Object class is
+   category-driven (Protocol 38) — never a JS ctx branch: see
+   _curioObjectIconHtml() in ui-render.js. The glass frame (border + dark
+   backlit interior + diagonal sheen + the "SEALED EXHIBIT" latch plate)
+   wraps the scroll region so the shelves and the objects resting on them
+   read as sitting BEHIND the glass — the sheen and the frame chrome sit at
+   a higher z-index than the shelves/objects, painting over them. Each
+   object carries its OWN shelf plank (button.curio-obj::after, below) —
+   attached to the object itself rather than a shared row/container
+   background, so a plank always travels with its object through scrolling
+   and is immune to row-height variance (e.g. the Lincoln sub-case's taller
+   "found" rows) — see the .curio-caselist comment for the full root cause.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Fixed "museum brass" plaque material — deliberately NOT --bezel-wire,
+     since the brass plaque/base trim reads the same regardless of the
+     active game's per-game accent (a physical-material constant, not a
+     per-game flavor token). */
+  --curio-copper: #d9a24a;
+  --curio-copper-rgb: 217, 162, 74;
+}
+
+.curio-tally {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  margin-bottom: 6px;
+}
+
+/* the sealed glass display case — the outer vitrine frame */
+.curio-display {
+  margin-top: 8px;
+  position: relative;
+  border: 2px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(var(--robco-green-rgb), 0.07), transparent 60%), #01100a;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+.curio-display::before {
+  /* the glass sheen — painted above the shelves/objects (z-index) so they
+     read as sitting BEHIND the glass, not as flat page content */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.045) 42%,
+    transparent 54%,
+    rgba(255, 255, 255, 0.03) 70%,
+    transparent 78%
+  );
+}
+.curio-display::after {
+  /* the sealed latch plate */
+  content: '◈ SEALED EXHIBIT';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 6.5px;
+  letter-spacing: 2px;
+  color: var(--curio-copper);
+  border: 1px solid rgba(var(--curio-copper-rgb), 0.45);
+  border-top: none;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 9px;
+  z-index: 3;
+  white-space: nowrap;
+}
+.curio-scrollwrap {
+  position: relative;
+  min-width: 0;
+}
+/* the bounded in-panel scroll VIEWPORT for long collections (e.g. FO3's 20
+   bobbleheads), every item reachable by scrolling, the page never grows.
+   Owner report (Protocol 27 root cause): the plank-shelf used to be a
+   single repeating-gradient background painted HERE, on the scroll
+   viewport itself — CSS backgrounds default to background-attachment:
+   scroll, which anchors a background to the element it's declared on and
+   does NOT scroll with that element's own overflow CONTENT, so the shelf
+   stayed fixed in place while the objects (the actual scrolled content)
+   moved past it. A shared background on the scrolled content box itself
+   (.curio-row-flex) would fix the pure scroll-desync case, but the Lincoln
+   sub-case's rows are NOT uniform height (a "found" relic grows its cell
+   to fit the disposition <select>), so a single fixed-cycle repeating
+   background would still drift out of alignment row-to-row there. Instead
+   each object now carries its OWN shelf plank as a `button.curio-obj::after`
+   pseudo-element (below) — attached to the object itself, it is immune to
+   both scroll position and row-height variance by construction. */
+.curio-caselist {
+  max-height: 430px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 8px 6px; /* top clearance for the latch plate above */
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--robco-green-rgb), 0.55) rgba(0, 0, 0, 0.45);
+}
+.curio-caselist--linc {
+  max-height: 320px;
+}
+.curio-caselist::-webkit-scrollbar {
+  width: 9px;
+}
+.curio-caselist::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.18);
+}
+.curio-caselist::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.65),
+    rgba(var(--robco-green-rgb), 0.35)
+  );
+  border: 1px solid rgba(0, 0, 0, 0.7);
+}
+.curio-scrollwrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 9px;
+  bottom: 0;
+  height: 20px;
+  background: linear-gradient(180deg, transparent, rgba(1, 10, 7, 0.85));
+  pointer-events: none;
+}
+.curio-row-flex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: flex-start;
+  gap: 12px 10px;
+  min-width: 0;
+}
+.curio-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 12px clears the button's own ::after shelf plank (protrudes 11px below
+     the button's border-box, see button.curio-obj::after) so the Lincoln
+     disposition <select> that can follow the button never overlaps it;
+     cells with no second child (every collectible, every "missing" Lincoln
+     relic) are unaffected since there's nothing to gap against. */
+  gap: 12px;
+}
+/* Owner report: the Lincoln relics rendered ONE PER ROW instead of side by
+   side like the snow globes/bobbleheads. Root cause — the disposition
+   <select> below sized itself to its own widest OPTION content (~234px,
+   see the .curio-linc-disposition comment below), which made every "found"
+   Lincoln cell far wider than the 88px object button above it; .curio-cell
+   has no width of its own (sizes to its widest child), so the row-flex's
+   flex-wrap only ever fit ONE such wide cell per line. Pinning the Lincoln
+   cell to a fixed compact width (min-width:0 lets it shrink below the
+   select's natural content width — the classic flexbox min-width:auto trap)
+   forces the select to size to ITS CELL instead of its content, restoring
+   the same side-by-side layout the other collectibles already have. */
+.curio-caselist--linc .curio-cell {
+  width: 128px;
+  flex: 0 0 128px;
+  min-width: 0;
+}
+.c-plate {
+  font-size: 6.5px;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  max-width: 84px;
+  overflow-wrap: break-word;
+  /* museum brass plaque under every object on the shelf */
+  border: 1px solid rgba(var(--curio-copper-rgb), 0.45);
+  background: linear-gradient(180deg, rgba(var(--curio-copper-rgb), 0.14), rgba(0, 0, 0, 0.5));
+  color: var(--curio-copper);
+  padding: 2px 5px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* the curio button — object + plate, toggles
+   collected. button.curio-obj (not plain .curio-obj) for the same
+   specificity reason as button.spine/button.mag above (Protocol 42). */
+button.curio-obj {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 88px;
+  min-width: 88px;
+  min-height: 112px;
+  padding: 4px 2px 6px;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  text-align: center;
+  text-transform: uppercase;
+  position: relative;
+}
+button.curio-obj:hover {
+  background: rgba(var(--robco-green-rgb), 0.05);
+}
+/* the object's own shelf plank — a pseudo-element on the button itself
+   (not a shared row/container background) so it always renders directly
+   under THIS object, immune to scroll position and to row-height variance
+   from taller neighboring cells (owner report, Protocol 27 root cause —
+   see the .curio-caselist comment above). Absolutely positioned outside
+   the button's own border-box (bottom is negative), so it never affects
+   the button's or the row's layout size. */
+button.curio-obj::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  width: 76px;
+  height: 5px;
+  background: linear-gradient(180deg, #3d4136, #191c17 80%);
+  border-bottom: 1px solid rgba(var(--curio-copper-rgb), 0.5);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+button.curio-obj.tracker-toggle--inactive::after {
+  opacity: 0.4;
+}
+button.curio-obj.tracker-toggle--inactive .c-plate {
+  opacity: 0.35;
+}
+.c-chip {
+  font-size: 6px;
+  letter-spacing: 1.5px;
+  color: var(--robco-green);
+  opacity: 0.6;
+}
+button.curio-obj.tracker-toggle--inactive .c-chip {
+  color: rgba(var(--robco-green-rgb), 0.4);
+}
+/* Owner report round 1: the fixed width: 88px (matching the object button
+   above it) clipped the longer disposition labels ("HANNIBAL (FREE
+   SLAVES)", "LEROY WALKER (SLAVERS)") mid-glyph with no ellipsis — fixed
+   with width: auto so the label always shows in full.
+   Owner report round 2 (Protocol 27 root cause): width: auto alone lets
+   a NATIVE <select> render using the browser/OS's own default form-control
+   chrome (padding, minimum touch height, dropdown-arrow gutter), which
+   varies a lot across browsers/devices and can render far bigger than this
+   rule's own box model specifies — measured live, Chromium alone rendered
+   this control ~8px wider than an appearance:none version at the same
+   content, and other engines are known to go considerably further. `
+   appearance: none` (+ prefixes) strips that native chrome entirely so the
+   box's PADDING is always driven by this rule, not native chrome variance.
+   Owner report round 3 (side-by-side): width: auto also meant the select
+   sized itself to its widest OPTION regardless of viewport, forcing every
+   found relic's cell wide enough to strand it one-per-row (see the
+   .curio-caselist--linc .curio-cell comment above). It now sizes to its
+   grid CELL instead (width: 100%, min-width: 0) with overflow/text-overflow
+   handling any label too long for that compact width the same graceful,
+   non-mid-glyph way ellipsis always does — the full label is still always
+   reachable by opening the dropdown's own option list. font-size stays
+   >=16px (Protocol 17 — prevents iOS/Android focus auto-zoom) and
+   min-height stays >=28px (Protocol 17 tap target floor); neither is
+   reduced to chase compactness. */
+.curio-linc-disposition {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-size: 16px;
+  line-height: 1.1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--robco-green) 50%),
+    linear-gradient(135deg, var(--robco-green) 50%, transparent 50%);
+  background-position:
+    calc(100% - 10px) center,
+    calc(100% - 6px) center;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+  color: inherit;
+  border: 1px solid var(--robco-green);
+  border-radius: 0;
+  min-height: 28px;
+  padding: 1px 16px 1px 4px;
+  cursor: pointer;
+}
+
+/* ── SNOW GLOBE ── */
+.curio-globe {
+  display: block;
+  position: relative;
+  width: 64px;
+}
+.cg-dome {
+  display: block;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--robco-green-rgb), 0.8);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255, 255, 255, 0.16), transparent 38%),
+    radial-gradient(1.4px 1.4px at 26% 62%, rgba(255, 255, 255, 0.85) 49%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 44% 40%, rgba(255, 255, 255, 0.75) 49%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 62% 55%, rgba(255, 255, 255, 0.85) 49%, transparent 51%),
+    radial-gradient(1.1px 1.1px at 73% 34%, rgba(255, 255, 255, 0.7) 49%, transparent 51%),
+    radial-gradient(1.3px 1.3px at 36% 24%, rgba(255, 255, 255, 0.7) 49%, transparent 51%),
+    linear-gradient(
+      180deg,
+      rgba(var(--robco-green-rgb), 0.05),
+      rgba(var(--robco-green-rgb), 0.2) 82%
+    );
+  box-shadow:
+    0 0 12px rgba(var(--robco-green-rgb), 0.35),
+    inset 0 -4px 10px rgba(var(--robco-green-rgb), 0.18);
+}
+.cg-dome::after {
+  /* the scene — skyline + spire silhouette */
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 70%;
+  background: rgba(var(--robco-green-rgb), 0.65);
+  clip-path: polygon(
+    0% 100%,
+    0% 78%,
+    12% 78%,
+    12% 58%,
+    24% 58%,
+    24% 72%,
+    38% 72%,
+    40% 34%,
+    46% 22%,
+    49% 0%,
+    52% 22%,
+    58% 34%,
+    60% 72%,
+    74% 72%,
+    74% 52%,
+    86% 52%,
+    86% 78%,
+    100% 78%,
+    100% 100%
+  );
+  filter: drop-shadow(0 0 3px rgba(var(--robco-green-rgb), 0.6));
+}
+.cg-base {
+  display: block;
+  width: 62px;
+  height: 15px;
+  margin: -3px auto 0;
+  clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, #3d4136, #191c17 80%);
+  border-bottom: 1px solid rgba(var(--curio-copper-rgb), 0.5);
+  position: relative;
+  z-index: 2;
+}
+button.curio-obj.tracker-toggle--inactive .cg-dome {
+  border-style: dashed;
+  border-color: rgba(var(--robco-green-rgb), 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+}
+button.curio-obj.tracker-toggle--inactive .cg-dome::after {
+  background: none;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  clip-path: none;
+  left: 22%;
+  right: 22%;
+  bottom: 6%;
+  height: 46%;
+}
+button.curio-obj.tracker-toggle--inactive .cg-base {
+  opacity: 0.35;
+}
+
+/* ── BOBBLEHEAD ── */
+.curio-bob {
+  display: block;
+  position: relative;
+  width: 56px;
+}
+.cb-head {
+  display: block;
+  width: 27px;
+  height: 27px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 1.4px solid var(--robco-green);
+  background:
+    radial-gradient(circle at 34% 32%, rgba(255, 255, 255, 0.14), transparent 45%),
+    rgba(var(--robco-green-rgb), 0.2);
+  position: relative;
+  box-shadow: 0 0 9px rgba(var(--robco-green-rgb), 0.4);
+  transform-origin: 50% 100%;
+  animation: curioBob 3.2s ease-in-out infinite; /* the bobble — plain animation, reduced-motion-safe via the existing global block */
+}
+@keyframes curioBob {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+.cb-head::before {
+  /* hair swoosh */
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 55%;
+  width: 10px;
+  height: 8px;
+  border-radius: 60% 100% 0 60%;
+  background: var(--robco-green);
+  opacity: 0.85;
+}
+.cb-head::after {
+  /* the grin */
+  content: '';
+  position: absolute;
+  left: 26%;
+  right: 26%;
+  bottom: 24%;
+  height: 7px;
+  border: 1.3px solid var(--robco-green);
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0 0 50% 50%;
+}
+.cb-body {
+  display: block;
+  width: 20px;
+  height: 22px;
+  margin: -2px auto 0;
+  border: 1.3px solid rgba(var(--robco-green-rgb), 0.8);
+  border-radius: 5px 5px 2px 2px;
+  background: rgba(var(--robco-green-rgb), 0.12);
+}
+.cb-base {
+  display: block;
+  width: 44px;
+  height: 13px;
+  margin: -1px auto 0;
+  clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, #3d4136, #191c17 80%);
+  border-bottom: 1px solid rgba(var(--curio-copper-rgb), 0.5);
+  position: relative;
+}
+.cb-base::after {
+  content: 'VAULT-TEC';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  font-size: 4.5px;
+  letter-spacing: 1px;
+  color: var(--curio-copper);
+  text-align: center;
+}
+button.curio-obj.tracker-toggle--inactive .cb-head {
+  animation: none;
+  border-style: dashed;
+  border-color: rgba(var(--robco-green-rgb), 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+}
+button.curio-obj.tracker-toggle--inactive .cb-head::before,
+button.curio-obj.tracker-toggle--inactive .cb-head::after {
+  opacity: 0.2;
+  background: rgba(var(--robco-green-rgb), 0.3);
+  border-color: rgba(var(--robco-green-rgb), 0.3);
+}
+button.curio-obj.tracker-toggle--inactive .cb-body {
+  border-style: dashed;
+  border-color: rgba(var(--robco-green-rgb), 0.3);
+  background: none;
+}
+button.curio-obj.tracker-toggle--inactive .cb-base {
+  opacity: 0.35;
+}
+
+/* ── LINCOLN ARTIFACTS (typed shapes, per-item `shape` registry field) ── */
+.curio-linc {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 64px;
+  height: 58px;
+  filter: drop-shadow(0 0 5px rgba(var(--robco-green-rgb), 0.4));
+}
+.curio-linc i {
+  display: block;
+}
+.curio-linc--rifle i {
+  width: 58px;
+  height: 14px;
+  background: var(--robco-green);
+  clip-path: polygon(
+    0 45%,
+    12% 30%,
+    30% 30%,
+    33% 0,
+    38% 0,
+    40% 30%,
+    100% 38%,
+    100% 55%,
+    62% 62%,
+    58% 100%,
+    48% 100%,
+    46% 62%,
+    12% 62%,
+    0 78%
+  );
+  margin-bottom: 14px;
+}
+.curio-linc--poster i {
+  width: 36px;
+  height: 48px;
+  border: 1.4px solid var(--robco-green);
+  background:
+    repeating-linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.5) 0 2px, transparent 2px 7px)
+      50% 60% no-repeat,
+    rgba(var(--robco-green-rgb), 0.08);
+  background-size: 70% 55%;
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 84% 100%, 0 100%);
+  margin-bottom: 3px;
+}
+.curio-linc--book i {
+  width: 40px;
+  height: 30px;
+  border: 1.4px solid var(--robco-green);
+  border-radius: 2px 6px 6px 2px;
+  background:
+    linear-gradient(90deg, var(--robco-green) 0 5px, transparent 5px),
+    rgba(var(--robco-green-rgb), 0.12);
+  margin-bottom: 6px;
+}
+.curio-linc--coin i {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.6px solid var(--robco-green);
+  background:
+    radial-gradient(circle at 42% 46%, rgba(var(--robco-green-rgb), 0.55) 0 7px, transparent 8px),
+    rgba(var(--robco-green-rgb), 0.1);
+  margin-bottom: 6px;
+}
+.curio-linc--figure i {
+  width: 16px;
+  height: 38px;
+  background: var(--robco-green);
+  clip-path: polygon(
+    50% 0,
+    72% 8%,
+    72% 22%,
+    100% 34%,
+    100% 48%,
+    70% 42%,
+    70% 70%,
+    92% 100%,
+    62% 100%,
+    50% 78%,
+    38% 100%,
+    8% 100%,
+    30% 70%,
+    30% 42%,
+    0 48%,
+    0 34%,
+    28% 22%,
+    28% 8%
+  );
+  margin-bottom: 6px;
+}
+.curio-linc--cylinder i {
+  width: 44px;
+  height: 22px;
+  border: 1.4px solid var(--robco-green);
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(var(--robco-green-rgb), 0.4) 0 2px,
+    transparent 2px 6px
+  );
+  margin-bottom: 8px;
+}
+.curio-linc--hat i {
+  /* the brim */
+  width: 34px;
+  height: 4px;
+  background: var(--robco-green);
+  border-radius: 2px;
+  position: relative;
+  margin-bottom: 4px;
+}
+.curio-linc--hat i::before {
+  /* the stovepipe crown */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 26px;
+  border: 1.4px solid var(--robco-green);
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  background: rgba(var(--robco-green-rgb), 0.12);
+}
+button.curio-obj.tracker-toggle--inactive .curio-linc {
+  filter: none;
+  opacity: 0.3;
+}
+button.curio-obj.tracker-toggle--inactive .curio-linc i,
+button.curio-obj.tracker-toggle--inactive .curio-linc i::before,
+button.curio-obj.tracker-toggle--inactive .curio-linc i::after {
+  background-color: transparent;
+  border-style: dashed;
+}
+button.curio-obj.tracker-toggle--inactive .curio-linc--rifle i,
+button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
+  background: rgba(var(--robco-green-rgb), 0.25);
+}
+
+@media (max-width: 479.98px) {
+  button.curio-obj {
+    width: 78px;
+    min-width: 78px;
+  }
+  .curio-globe,
+  .curio-bob,
+  .curio-linc {
+    width: 56px;
+  }
+}
+
+/* ── BUS-09 · KARMA ALIGNMENT — EVIL |^| GOOD swing needle ── */
+.kn-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+/* The swing-needle readout half — hidden on a usesKarmaCenter game
+   (renderKarmaCenter()) so the board never shows two karma readouts. */
+.kn-readout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 12px 26px;
+  align-items: center;
+  width: 100%;
+}
+.kn-face {
+  width: 190px;
+  height: 99px;
+  margin: 0 auto;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-bottom: 2px solid var(--robco-green);
+  border-radius: 190px 190px 0 0;
+  position: relative;
+  overflow: hidden;
+  background:
+    conic-gradient(
+      from -90deg at 50% 100%,
+      rgba(231, 76, 60, 0.28) 0deg 72deg,
+      rgba(0, 0, 0, 0.35) 72deg 108deg,
+      rgba(var(--robco-green-rgb), 0.2) 108deg 180deg
+    ),
+    #02120c;
+}
+.kn-face .kn-detent {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.kn-needle {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 3px;
+  height: 88px;
+  margin-left: -1.5px;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  transform-origin: bottom center;
+  transition: transform 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.kn-needle.evil {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+}
+.kn-ends {
+  display: flex;
+  justify-content: space-between;
+  width: 190px;
+  margin: 3px auto 0;
+  font-size: 7px;
+  letter-spacing: 1px;
+  opacity: 0.45;
+}
+.kn-side {
+  flex: 1 1 200px;
+  max-width: 320px;
+  min-width: 0;
+  text-align: center;
+}
+.k-standing {
+  font-size: 14px;
+  letter-spacing: 3px;
+}
+.k-standing.good {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.k-standing.evil {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.k-standing.neut {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.k-val {
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+.tier-lamps {
+  display: flex;
+  justify-content: center; /* centering rule */
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.tier-lamps span {
+  font-size: 7px;
+  letter-spacing: 1px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  padding: 3px 6px;
+  opacity: 0.35;
+}
+.tier-lamps span.cur {
+  opacity: 1;
+  border-color: currentColor;
+}
+.tier-lamps .t-evil.cur {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.tier-lamps .t-neut.cur {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.tier-lamps .t-good.cur {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.k-slider {
+  margin-top: 0;
+  width: 100%;
+  max-width: 320px;
+  text-align: center; /* was inherited from the old parent .kn-side; now a direct .kn-wrap child */
+}
+.k-slider input {
+  width: min(100%, 280px);
+}
+.k-slider .ks-cap {
+  display: block;
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.45;
+  margin-top: 3px;
+  text-transform: none;
+}
+.karma-center {
+  margin-top: 14px;
+  border: 1px dashed rgba(var(--bezel-wire-rgb), 0.5);
+  padding: 9px 11px 11px;
+}
+.kc-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · PIECE 2 — OPERATIONS "quartermaster's freight console"
+   (Protocol 22/25 reskin). Matches planning/PHASE3_OPERATIONS_PLAN.md +
+   the owner-approved planning/mockups/operations-console.html (BEAM
+   bridge variant + Variant A CARGO TAG rows). Every board reuses the
+   existing .bay-board/.bay-slot-tag/.bay-part-no/.panel-substatus/
+   .board-led machine-language classes (Protocol 22) — only the
+   BUS-10/11 hero instruments (weigh bridge, drawer bank) get new CSS.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* amber "over the wire" board (BARTER UPLINK) — rides --bezel-wire so it
+   is amber under NV and falls back to local phosphor for an unauthored
+   game (Protocol 38), distinct from the fixed-amber .bay-board.uplink
+   (SLOT 05 AI Uplink) which is a locked identity, not a --bezel-wire read. */
+details.bay-board.wireboard {
+  border-color: rgba(var(--bezel-wire-rgb), 0.55);
+}
+details.bay-board.wireboard .bay-slot-tag {
+  border-color: rgba(var(--bezel-wire-rgb), 0.55);
+  color: var(--bezel-wire);
+}
+.board-led.wire {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+
+/* ── BUS-10 · LOAD-CELL WEIGH BRIDGE ─────────────────────────────────── */
+.bridge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  justify-content: center; /* centering rule */
+  align-items: center;
+  margin-top: 6px;
+}
+@keyframes opsBridgeShudder {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-2px) rotate(-0.2deg);
+  }
+  40% {
+    transform: translateX(2px);
+  }
+  60% {
+    transform: translateX(-1.5px) rotate(0.2deg);
+  }
+  80% {
+    transform: translateX(1.5px);
+  }
+}
+/* SEIZED shudder — a plain `animation:`, so the existing global
+   prefers-reduced-motion block (animation-duration:0.01ms + iteration-
+   count:1) collapses it to the resting static bend automatically. */
+body.weight-over .beam-instrument {
+  animation: opsBridgeShudder 0.5s linear infinite;
+}
+.beam-instrument {
+  position: relative;
+  text-align: center;
+}
+.beam-instrument svg {
+  display: block;
+  width: min(300px, 84vw);
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+.beam-path {
+  stroke: var(--robco-green);
+  stroke-width: 4;
+  fill: none;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(var(--robco-green-rgb), 0.7));
+  /* LIVE PROPORTIONAL BEND — a plain CSS transition on the `d` attribute
+     (supported in current evergreen browsers) so the beam bends smoothly
+     as real carry weight changes, never 4 discrete frames. The existing
+     global prefers-reduced-motion block (transition-duration:0.01ms
+     !important) collapses this to an instant snap with no bespoke
+     carve-out. */
+  transition: d 0.7s;
+}
+body.weight-heavy .beam-path,
+body.weight-critical .beam-path {
+  stroke: var(--robco-alert);
+  filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+}
+body.weight-over .beam-path {
+  stroke: var(--robco-danger);
+  filter: drop-shadow(0 0 5px rgba(231, 76, 60, 0.7));
+}
+.beam-support {
+  stroke: rgba(var(--robco-green-rgb), 0.55);
+  stroke-width: 2;
+  fill: rgba(0, 0, 0, 0.4);
+}
+.beam-block {
+  fill: rgba(var(--robco-green-rgb), 0.18);
+  stroke: var(--robco-green);
+  stroke-width: 1.4;
+  transition: y 0.7s;
+}
+body.weight-heavy .beam-block,
+body.weight-critical .beam-block {
+  stroke: var(--robco-alert);
+}
+body.weight-over .beam-block {
+  stroke: var(--robco-danger);
+}
+.beam-pct {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  fill: var(--robco-green);
+  text-anchor: middle;
+}
+.seized-stamp {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%) rotate(-7deg);
+  border: 2px solid var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  font-size: 13px;
+  letter-spacing: 3px;
+  padding: 3px 10px;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 14px rgba(231, 76, 60, 0.5);
+  z-index: 2;
+}
+.wb-readouts {
+  flex: 1 1 190px;
+  max-width: 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 3-tier CARGO LOAD readout — nominal/heavy-amber/seized-red — the same
+   body.weight-* classes updateMath() already toggles drive both this
+   tile's text AND the beam/needle color (single source, Phase 3 · Piece 2). */
+#display_weight {
+  color: var(--robco-green);
+}
+body.weight-heavy #display_weight,
+body.weight-critical #display_weight {
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+body.weight-over #display_weight {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.rb-tile.loadtile,
+.rb-tile.wire {
+  flex: 1 1 auto;
+  max-width: none;
+}
+.seized-note {
+  margin-top: 10px;
+  padding: 6px 9px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  line-height: 1.5;
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  border: 1px dashed var(--robco-danger);
+  background: rgba(231, 76, 60, 0.06);
+  text-transform: none;
+}
+
+/* ── BUS-11 · CARGO MANIFEST — pull-drawer bank ──────────────────────── */
+.drawer-bank {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 7px;
+  margin-top: 10px;
+}
+button.drawer {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 84px;
+  min-height: 46px;
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #2c3027, #1b1e18 65%, #14160f);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--bezel-etch, rgba(214, 224, 200, 0.65));
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 5px 8px 7px;
+  position: relative;
+}
+button.drawer::after {
+  /* drawer handle slot */
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 26%;
+  right: 26%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+button.drawer .d-count {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+  padding: 1px 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(var(--robco-green-rgb), 0.55);
+}
+button.drawer.pulled,
+button.drawer.active {
+  transform: translateY(3px);
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  border-color: rgba(var(--robco-green-rgb), 0.55);
+  box-shadow:
+    0 0 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 10px rgba(var(--robco-green-rgb), 0.2);
+}
+button.drawer.pulled .d-count,
+button.drawer.active .d-count {
+  color: var(--robco-green);
+  border-color: var(--robco-green);
+}
+/* DRAWER-SLIDE — a plain `animation:`, auto-neutralised by the global
+   prefers-reduced-motion block (Protocol UI-9). */
+@keyframes opsDrawerSlide {
+  from {
+    opacity: 0.3;
+    transform: translateY(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tray-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 6px;
+  animation: opsDrawerSlide 0.25s ease-out;
+}
+.tray-head .t-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.75;
+}
+.tray-head input[type='search'] {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+/* The open drawer's item list scrolls IN-PANEL — every item reachable by
+   scrolling, the page never grows (the owner-approved no-render-cap
+   answer to the mobile no-infinite-scroll problem). */
+.tray-scrollwrap {
+  position: relative;
+  min-width: 0;
+}
+.tray-list {
+  max-height: 342px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 7px;
+  min-width: 0;
+  margin: 0;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--robco-green-rgb), 0.55) rgba(0, 0, 0, 0.45);
+}
+.tray-list::-webkit-scrollbar {
+  width: 9px;
+}
+.tray-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.18);
+}
+.tray-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.65),
+    rgba(var(--robco-green-rgb), 0.35)
+  );
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 5px rgba(var(--robco-green-rgb), 0.35);
+}
+.tray-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--robco-green-rgb), 0.75);
+}
+/* Desktop-only tweak — carries the same pointer/hover gate as every other
+   desktop-only rule (Suite 129) so a touch phone with a mis-measured wide
+   viewport can never match it. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .tray-list {
+    max-height: 420px;
+  }
+}
+
+/* ══ CARGO TAG manifest rows (the approved Variant A row style) — a
+   punched freight tag: pointed left end + eyelet + dashed perforation
+   rail above the controls. No condition indicator (the app does not
+   track item condition). ══ */
+.mrow {
+  border: none;
+  margin: 0 0 9px;
+  padding: 9px 10px 9px 30px;
+  position: relative;
+  list-style: none;
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 18px 100%, 0 50%);
+  background:
+    linear-gradient(90deg, rgba(var(--robco-green-rgb), 0.14) 0 18px, transparent 18px),
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--robco-green-rgb), 0.02) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.07), rgba(0, 0, 0, 0.45) 75%);
+  box-shadow: inset 0 0 0 1px rgba(var(--robco-green-rgb), 0.4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+}
+/* Owner report (Protocol 27 root cause): the pre-existing .inventory-list li
+   rule (element+class, specificity 0-1-1) was beating .mrow's bare class
+   (0-1-0) for padding/justify-content/border-bottom — collapsing the tag's
+   30px left clearance back to 0 and pulling the USE button into the pointed
+   clip-path corner + eyelet hole, clipping "USE". Every .mrow lives inside a
+   .tray-list, so scoping the fix there (0-2-0) wins on specificity
+   regardless of source order. CSS/layout only — no id/handler change. */
+.tray-list .mrow {
+  padding: 9px 12px 9px 30px;
+  justify-content: flex-start;
+  border-bottom: none;
+}
+.tray-list .mrow .use-btn {
+  margin: 0 6px 0 0;
+  padding: 4px 10px;
+}
+.mrow .hole {
+  display: block;
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--robco-dark);
+  box-shadow:
+    0 0 0 2px rgba(var(--robco-green-rgb), 0.7),
+    inset 0 0 3px rgba(0, 0, 0, 0.9);
+}
+.mrow .m-id {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.mrow .m-name {
+  font-size: 12.5px;
+  letter-spacing: 2px;
+  display: block;
+  overflow-wrap: break-word;
+}
+.mrow .m-meta {
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-top: 2px;
+}
+.mrow .tag {
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  opacity: 0.8;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.m-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.3); /* perforation rail */
+  padding-top: 6px;
+  margin-top: 2px;
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+.m-ctrl button {
+  font-size: 9px;
+  padding: 3px 7px;
+  min-height: 28px;
+  min-width: 28px;
+  width: auto;
+}
+.qtybox {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.qtybox .q {
+  min-width: 22px;
+  text-align: center;
+  font-size: 12px;
+}
+.equip-btn.equip-btn--on {
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.14);
+  text-shadow: var(--robco-glow);
+  box-shadow: 0 0 8px rgba(var(--robco-green-rgb), 0.25);
+}
+.mrow.iseq {
+  box-shadow:
+    inset 0 0 0 1px var(--bezel-wire),
+    0 0 12px rgba(var(--bezel-wire-rgb), 0.25);
+  background:
+    linear-gradient(90deg, rgba(var(--bezel-wire-rgb), 0.2) 0 18px, transparent 18px),
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--bezel-wire-rgb), 0.035) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.08), rgba(0, 0, 0, 0.45) 75%);
+}
+.mrow.iseq::after {
+  content: 'IN SERVICE';
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  transform: rotate(-4deg);
+  border: 1px solid var(--bezel-wire);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.mrow.iseq .hole {
+  box-shadow:
+    0 0 0 2px var(--bezel-wire),
+    inset 0 0 3px rgba(0, 0, 0, 0.9);
+}
+.mrow.iseq .m-name {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+.rack-note {
+  font-size: 10px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+  margin: 10px 0 0;
+  text-transform: none;
+}
+
+/* ammo drawer rows */
+.arow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.25);
+  padding: 6px 2px;
+  font-size: 11.5px;
+  letter-spacing: 1px;
+}
+.arow b {
+  font-weight: normal;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.arow .a-count {
+  font-size: 13px;
+}
+
+/* ── BUS-12 · FIELD FABRICATION — HAVE/NEED ingredient meters ────────── */
+.ing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.2);
+}
+.ing b {
+  font-weight: normal;
+  flex: 1 1 130px;
+  min-width: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+.ing .hn-meter {
+  flex: 1 1 90px;
+  min-width: 70px;
+  max-width: 150px;
+  height: 9px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.ing .hn-meter i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+  /* meter fill — plain `animation:`, auto-neutralised by the global
+     prefers-reduced-motion block (Protocol UI-9). */
+  animation: opsMeterFill 0.6s ease-out;
+}
+@keyframes opsMeterFill {
+  from {
+    width: 0 !important;
+  }
+}
+.ing.short .hn-meter i {
+  background: var(--robco-danger);
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.6);
+}
+.ing .hn-txt {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  flex: 0 0 auto;
+}
+.ing.short .hn-txt {
+  color: var(--robco-danger);
+  text-shadow: 0 0 5px rgba(231, 76, 60, 0.5);
+}
+
+/* ── BUS-14 · SQUAD ROSTER ────────────────────────────────────────────── */
+#squadList {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 10px;
+  margin-top: 4px;
+}
+.sq-card {
+  flex: 1 1 230px;
+  max-width: 330px;
+  min-width: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 9px 10px 10px;
+}
+.sq-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.sq-name {
+  font-size: 11.5px;
+  letter-spacing: 1.5px;
+}
+.sq-head button {
+  font-size: 8px;
+  padding: 2px 6px;
+  min-height: 28px;
+  width: auto;
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--robco-danger);
+}
+.sq-bar {
+  margin-top: 6px;
+  height: 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.sq-bar i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--robco-green) 0 6px,
+    rgba(var(--robco-green-rgb), 0.25) 6px 9px
+  );
+}
+.sq-stats {
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+.aff-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.aff-row .a-cap {
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+}
+.aff-meter {
+  flex: 1 1 80px;
+  min-width: 60px;
+  height: 8px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.aff-meter i {
+  position: absolute;
+  inset: 1px auto 1px 1px;
+  background: var(--robco-green);
+  box-shadow: 0 0 5px rgba(var(--robco-green-rgb), 0.6);
+}
+.aff-row button {
+  min-width: 28px;
+  min-height: 28px;
+  width: auto;
+  padding: 2px 0;
+  font-size: 11px;
+}
+.enlist {
+  margin-top: 12px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.enlist select {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.enlist .keybtn {
+  flex: 0 1 auto;
+  width: auto;
+}
+.enlist-note {
+  width: 100%;
+  font-size: 8px;
+  opacity: 0.4;
+  letter-spacing: 1px;
+  text-transform: none;
+}
+
+/* ── mobile: keep the drawer bank + squad grid from overflowing at 360px ── */
+@media (max-width: 480px) {
+  button.drawer {
+    min-width: 76px;
+    font-size: 8.5px;
+  }
+}

@@ -1,0 +1,101 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-12-mobile.css — part 12/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 13079-13169. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: Mobile Density Standard (Tier-1) — MUST stay last: every selector here has an earlier unconditional base rule elsewhere, and CSS resolves equal-specificity ties by source order (see header comment inside the file).
+=== SPLIT-FILE-HEADER-END === */
+/* ─── Mobile Density Standard — Tier-1 safe tightening ─────────────
+   (planning/MOBILE_DENSITY_PLAN.md §2/§3, owner-approved Tier-1 only).
+   Deliberately placed at the END of the file: every selector below already
+   has an earlier, unconditional base rule elsewhere in this stylesheet, and
+   CSS resolves equal-specificity ties by source order — an override placed
+   before its own base rule would be silently beaten by it. Living here
+   guarantees this block always wins at ≤480px regardless of where a future
+   edit adds a same-selector rule earlier in the file.
+   Spacing/sizing-only, behaviour-identical, desktop untouched (scoped to
+   this narrow-phone query, never the ≥1000px hover/pointer desktop gate —
+   Suite 129). Every trimmed interactive tile stays ≥28px (Protocol 17);
+   the F2 .bay-part-no subtitle is NEVER hidden, only its margin tightens
+   (Protocol 25 searchable-label guardrail). Reclaims the shared board
+   chrome (~30 boards), the faction/status/perk/skill tile surplus padding,
+   and the UPLINK transcript padding — roughly a phone-screen off the
+   longest boards with zero behaviour change. */
+@media (max-width: 480px) {
+  :root {
+    --d-board-pad-block: 7px;
+    --d-board-pad-btm: 8px;
+    --d-board-pad-inline: 8px;
+    --d-board-gap: 8px;
+    --d-section-gap: 8px;
+    --d-subtitle-mb: 4px;
+  }
+
+  /* F1 — shared board shell padding + inter-board gap (all ~30 boards) */
+  details.bay-board {
+    padding: var(--d-board-pad-block) var(--d-board-pad-inline) var(--d-board-pad-btm);
+  }
+  .panel.bay-board {
+    margin-top: var(--d-board-gap);
+  }
+  .bay-grid {
+    gap: var(--d-board-gap);
+  }
+  details.sub-panel {
+    margin-top: var(--d-board-gap);
+  }
+
+  /* F2 — header subtitle margin (every board). Never display:none — the
+     real, searchable control label must always ride along (Protocol 25). */
+  .bay-part-no {
+    margin: 1px 0 var(--d-subtitle-mb);
+  }
+
+  /* F3 — FACTION STANDING keycaps + meter wrap. Floor: 34px ≥ 28px. */
+  .facon-chan {
+    min-height: 34px;
+  }
+  .facon-meter-wrap {
+    padding: 8px 10px 9px;
+  }
+
+  /* F4 — STATUS EFFECTS lamp tiles. Floor: .stlamp-purge stays 28px (untouched). */
+  .stlamp-tile {
+    padding: 6px 9px 7px;
+  }
+  .stlamp-grid {
+    gap: 6px;
+  }
+
+  /* F5 — PERK LOADOUT / SKILL BOOKS / SKILL MAGAZINES slot rows.
+     Floor: the inner .pk-x delete button stays 28px (untouched). */
+  .slot-row {
+    padding: 5px 8px;
+    margin-bottom: 5px;
+  }
+
+  /* F6 — SKILL MATRIX VU rows. Floor: .vu-track drag surface (20px height,
+     arrow-key + drag input) is untouched. */
+  .vu-row {
+    padding: 3px 0;
+  }
+
+  /* F7 — DIRECTOR UPLINK transcript + composer.
+     Floor: .composer-input stays 16px font / 40px min-height (untouched). */
+  #chatDisplay {
+    padding: 10px;
+    gap: 10px;
+  }
+  .composer {
+    padding: 6px 10px 8px;
+  }
+
+  /* F8 — inner readout/light rows (board bodies app-wide). */
+  .op-light-row {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+}

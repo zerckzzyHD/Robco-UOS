@@ -49,36 +49,53 @@
 
 ```
 ├── index.html          ~55KB  DOM structure + all inline event handlers
-├── css/terminal.css    ~16KB  All styling, animations, CRT effects
-├── js/
-│   ├── idb.js          ~4KB   Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
-│   ├── state.js        7.6KB  State definition, persistence, migration
-│   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
-│   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
-│   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
-│   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
-│   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
-│   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
-│   ├── ui-core.js      ~111KB Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
-│   ├── ui-core-nav.js  ~21KB  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
-│   ├── ui-core-overseer.js ~34KB Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
-│   ├── ui-core-chassis.js ~42KB THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
-│   ├── ui-core-modulebay.js ~51KB Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
-│   ├── ui-core-cmd.js  ~95KB  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
-│   ├── test-console.js ~5KB   Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
-│   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
-│   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
-│   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
-│   ├── reg_fo3.js      ~46KB  FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
-│   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
-│   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+├── css/                       terminal.css split by section (2.8.5 U-A2), pure ordered cut
+│   ├── terminal-01-base.css              Tokens, reset, layout, app-shell
+│   ├── terminal-02-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
+│   ├── terminal-03-overseer.css          Director Uplink / Overseer presence
+│   ├── terminal-04-diagnostic-shell.css  Diagnostic Shell mobile overlay (dev-only)
+│   ├── terminal-05-toolbar.css           Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
+│   ├── terminal-06-modulebay.css         Module Bay (Security & Configuration)
+│   ├── terminal-07-operator-boards.css   Phase 3 Operator boards (batches 1-3)
+│   ├── terminal-08-curio-operations.css  Curio Archive + Operations console
+│   ├── terminal-09-databank.css          Databank / Records Bay
+│   ├── terminal-10-chassis.css           Chassis diagnostic bay + Living Core
+│   ├── terminal-11-feedback-animations.css Feedback Animation Waves 1-3
+│   └── terminal-12-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
+├── js/                        Reorganized into subfolders by responsibility (2.8.5 U-A2)
+│   ├── data/                  Fallout game content: item DBs + registries
+│   │   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
+│   │   ├── reg_fo3.js      ~46KB  FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
+│   │   └── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
+│   ├── core/                  The engine: campaign state, ambient runtime, storage layer
+│   │   ├── state.js        7.6KB  State definition, persistence, migration
+│   │   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
+│   │   └── idb.js          ~4KB   Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
+│   ├── ui/                    UI lifecycle hub, panels, render/audio/save/account modules
+│   │   ├── ui-core.js      ~111KB Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
+│   │   ├── ui-core-nav.js  ~21KB  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
+│   │   ├── ui-core-overseer.js ~34KB Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   │   ├── ui-core-chassis.js ~42KB THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
+│   │   ├── ui-core-modulebay.js ~51KB Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   │   ├── ui-core-cmd.js  ~95KB  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
+│   │   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
+│   │   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
+│   │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
+│   │   └── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
+│   ├── services/               Everything that talks to the outside world
+│   │   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
+│   │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
+│   │   └── ocr.js                Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
+│   ├── dev/                    Dev-only tooling
+│   │   └── test-console.js ~5KB   Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
+│   └── vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
-├── js/ocr.js                  Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
-├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2953-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2953-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2958-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2958-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -101,7 +118,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 ```
    ── LOAD-ORDER-GUARD:BEGIN (Suite 220 / Protocol 45 — the numbered `js/….js` items below are machine-checked against index.html; keep them + their order in sync) ──
    ── Static durability engine (index.html, before the boot manifest) ──
-0. js/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
+0. js/core/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
                        'meta' + 'campaign' so the two-store boundary is structural in IndexedDB).
                        Step 2 · Phase 1 · P1 durability shadow: MetaStore's set/remove mirror
                        device-pref writes here fire-and-forget; localStorage stays the sole READ
@@ -110,7 +127,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        MetaStore's write-through has window.IdbStore. getRaw() returns the full
                        { value, schemaVersion, checksum, mt } envelope for P2's checksum verify.
 
-   P2 (device-pref boot hydration/reconciliation, js/ui-core.js): window.onload is `async` and
+   P2 (device-pref boot hydration/reconciliation, js/ui/ui-core.js): window.onload is `async` and
    `await`s _hydrateMetaFromIdb() BEFORE the rest of boot reads any device preference. It
    reconciles the 'meta' store against localStorage under a strict AUTHORITY RULE — localStorage is
    the source of record: a present localStorage value always wins; the sole exception is RECOVERY
@@ -123,7 +140,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    at page-parse time), and a slow/hung IndexedDB is capped so boot proceeds on localStorage
    exactly as today (fail-safe — never hangs, never black-screens).
 
-   P3 (cold-store IDB-primary, js/state.js accessors): save slots + rolling backups live
+   P3 (cold-store IDB-primary, js/core/state.js accessors): save slots + rolling backups live
    IDB-PRIMARY in the 'campaign' object store (keys slot_<n> / backup_<n>) with localStorage
    (robco_slot_<n> / robco_backup_<n>) kept as a synchronous MIRROR + FALLBACK — this is the ~5MB
    ceiling relief (a save too large for localStorage still persists to IDB; a localStorage quota
@@ -140,7 +157,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    Two-store boundary held: cold store uses ONLY the 'campaign' object store; device prefs (P1/P2)
    stay in 'meta'.
 
-   P5 (save version history, js/state.js accessors + js/ui-saves.js UI): each save slot retains up
+   P5 (save version history, js/core/state.js accessors + js/ui/ui-saves.js UI): each save slot retains up
    to SLOT_VERSION_CAP (5) prior revisions in the 'campaign' object store under key
    slot_<n>_versions (an array, newest-first) — IDB-ONLY (never mirrored to localStorage) so it
    rides the P3 IndexedDB headroom and can never consume the ~5MB localStorage ceiling. saveToSlot
@@ -153,7 +170,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    no IndexedDB → readSlotVersions returns [], no VER affordance, and save/load is byte-identical to
    pre-P5. Two-store boundary held (version data is campaign data → 'campaign' store only).
 
-   P6 (full backup bundle, js/state.js data layer + js/ui-saves.js UI): EXPORT FULL BACKUP writes the
+   P6 (full backup bundle, js/core/state.js data layer + js/ui/ui-saves.js UI): EXPORT FULL BACKUP writes the
    user's ENTIRE local history to one portable file — the live campaign container (robco_v8) + every
    save slot (each with its P5 version ring) + the rolling-backup ring + chat + playstyle. The
    envelope is version-stamped and checksummed with the SAME computeSaveChecksum helper as every other
@@ -175,7 +192,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    the IDB-primary accessors, so with no IndexedDB it simply exports whatever localStorage holds
    (version rings empty), and import degrades to localStorage writes.
 
-   P7 (offline cloud-push queue, js/state.js data layer + js/cloud.js orchestration): resilience for a
+   P7 (offline cloud-push queue, js/core/state.js data layer + js/services/cloud.js orchestration): resilience for a
    USER-INITIATED manual cloud push ONLY — it NEVER auto-pushes on a state/stat change (cloud sync
    stays manual-only; guarded by Suite 23.4/23.5 + Suite 144.11). When the user taps SAVE TO CLOUD
    while offline (navigator.onLine === false) or the push fails with a connectivity error
@@ -197,7 +214,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    IndexedDB / kill-switch off → the queue isn't offered and a manual push behaves exactly as today
    (fails/no-ops offline). Airplane-mode operation is unaffected.
 
-   P8 (Global Immersion dial, js/state.js gate helpers + js/ui-core.js UI): ONE device-level control
+   P8 (Global Immersion dial, js/core/state.js gate helpers + js/ui/ui-core.js UI): ONE device-level control
    governing how much of the atmosphere/immersion layer runs — Full / Balanced / Minimal. It is a
    DEVICE PREFERENCE (MetaStore key robco_immersion, registered in META_MANIFEST, default 'full') —
    NOT campaign state, so it never rides the campaign save/cloud (two-store boundary, Protocol 23),
@@ -216,8 +233,8 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    agnostic (Protocol 38). No pre-paint apply is needed (the dial gates ambient behaviors, not the base
    visual palette), so a normal boot restore suffices.
 
-   P9 (SAVES LIST overhaul — local DELETE, cloud VERSION HISTORY, per-game filter, js/ui-saves.js +
-   js/ui-account.js + js/cloud.js): local slots gain a confirm-gated DELETE (confirmDeleteSlot /
+   P9 (SAVES LIST overhaul — local DELETE, cloud VERSION HISTORY, per-game filter, js/ui/ui-saves.js +
+   js/ui/ui-account.js + js/services/cloud.js): local slots gain a confirm-gated DELETE (confirmDeleteSlot /
    _deleteSlotApply, ui-saves.js) that removes the localStorage mirror, the IDB-primary slot_<n> entry
    (P3), and the slot's P5 version ring together, so a deleted slot leaves nothing orphaned. Cloud saves
    gain their OWN version history, mirroring the local P5 ring but translated to Firestore's structural
@@ -244,60 +261,60 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    growing LOAD/OVERWRITE/VER/DELETE(/NAME) button set wraps instead of clipping at 360/412px.
 
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
-1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
+1. js/data/db_nv.js / js/data/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
-2. js/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
+2. js/core/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
                        exportSaveFile, migrateState (game-time helpers live in ui-render.js)
-3. js/reg_nv.js / js/reg_fo3.js + js/registry-core.js → defines: FALLOUT_REGISTRY
+3. js/data/reg_nv.js / js/data/reg_fo3.js + js/data/registry-core.js → defines: FALLOUT_REGISTRY
                        (read-only game data) + registrySearch() (autocomplete search engine)
-4. js/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
+4. js/ui/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
                        limb/wake/boot/level-up sounds, runBootSequence,
                        triggerPhosphorGhost, changeOpticsColor)
-5. js/ui-render.js  → defines: all render*() functions, CRUD helpers (addItem/delItem,
+5. js/ui/ui-render.js  → defines: all render*() functions, CRUD helpers (addItem/delItem,
                        addAmmo/removeAmmo, addPerk/removePerk, etc.), FACTION_THRESHOLDS,
                        getFactionStanding, adjustFaction, game-time helpers
                        (ticksToGameTime/_resolveGameDateTime/formatGameTime/getGameDate),
                        map helpers (setMapView/zoomMapToZone/renderWorldMap),
                        _updateContextPanels, _invFilter, setInvFilter
-6. js/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
+6. js/ui/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
                        exportCampaignLog, restoreRollingBackup, restoreChatHistory,
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
-7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
+7. js/ui/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
+8. js/services/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
                        window.runVisualOcr, window.routeVisualUpload (Visual Upload on-device OCR —
                        lazy Tesseract.js load + deterministic parser + hybrid routing/kill-switch,
                        the feature's native-primary/AI-vision-fallback entry point — LAZY, never
                        loads Tesseract.js itself at boot; see Visual Upload OCR below)
-9. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
+9. js/core/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
-10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
+10. js/ui/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
                        ui-core spine hub; the ui-core-*.js split below leans on this file)
-11. js/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
+11. js/ui/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
                        #go= routing, hotkeys, the DIRECTORY modal (2.8.5 U-A1 split)
-12. js/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
+12. js/ui/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
                        composer wiring, the Tool Deck launcher (2.8.5 U-A1 split)
-13. js/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
+13. js/ui/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
                        initChassisCore, System Status, the Service & Fault Console
                        (2.8.5 U-A1 split)
-14. js/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
+14. js/ui/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
                        wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
-15. js/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
+15. js/ui/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
                        event-bus subscriber wiring for stat/quest/faction feedback
                        (2.8.5 U-A1 split)
-16. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+16. js/dev/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
                        _isStagingEnv; gated by _devConsoleUnlocked(), no-ops until unlocked —
                        see Developer Console below)
-17. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-18. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+17. js/services/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+18. js/services/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.saveCurrentToCloud, window.loadCloudSave (plus the auth /
                        feature-flag / save-version helpers) — the manual cloud push/pull entry
                        points; the old pushToCloud/pullFromCloud names were never real, and are retired
    ── LOAD-ORDER-GUARD:END ──
 ```
 
-**Visual Upload OCR (`js/ocr.js` + `js/ui-render.js` + `js/cloud.js`, complete — Units 1–3,
+**Visual Upload OCR (`js/services/ocr.js` + `js/ui/ui-render.js` + `js/services/cloud.js`, complete — Units 1–3,
 `planning/VISUAL_UPLOAD_OCR_PLAN.md`):** self-hosted, lazy-loaded Tesseract.js (Apache-2.0,
 `js/vendor/`) — `_ensureTesseract()` injects `js/vendor/tesseract.min.js` only on first use
 (idempotent via a module-scope promise, never at boot), and the shared `_runOcrPipeline(file)`
@@ -313,16 +330,16 @@ ASSETS precaches only the small `tesseract.min.js`/`worker.min.js` shims; the he
 total) cache at runtime, best-effort, on first OCR use (`_cacheOcrAssetsBestEffort`, reusing the
 SYSTEM STATUS active-cache-name lookup) — offline works only after that first use.
 
-Unit 2 adds the deterministic, game-agnostic parser `_parseOcrText(text, ctx)` (`js/ocr.js`,
+Unit 2 adds the deterministic, game-agnostic parser `_parseOcrText(text, ctx)` (`js/services/ocr.js`,
 pure — no DOM, no state): each OCR line is tried first as a stat line (`_tryParseStatLine`,
-resolved via the shared `_resolveStatToken()`/`_statTokenLabel()` from `js/api.js` — the same
+resolved via the shared `_resolveStatToken()`/`_statTokenLabel()` from `js/services/api.js` — the same
 resolver Native USE and TERMINAL stat edits already use, Protocol 22), then as an inventory line
 (`_tryParseInventoryLine`, quantity extraction + `lookupItemInDb()` exact/fuzzy cross-reference —
 whichever per-game database the active game loaded, Protocol 38); a line that resolves neither
 and doesn't even look like a plausible item name (`_looksLikeItemName`) is dropped to `unparsed`
 rather than fabricated into a fake row (Protocol 24). `runVisualOcr(file)` chains
 `_runOcrPipeline` → `_parseOcrText` → `renderVisualParsePreview(parsed, file)`
-(`js/ui-render.js`) — a confirm-gated preview modal (the LOOT-modal pattern, `openModal()`/
+(`js/ui/ui-render.js`) — a confirm-gated preview modal (the LOOT-modal pattern, `openModal()`/
 `#sysModal`) listing every detected inventory/stat row with an editable qty/value and a
 keep/discard checkbox. **Nothing writes to state until the player taps CONFIRM & APPLY** —
 `_confirmVisualParse()` reads the live preview DOM and calls `applyVisualParse(parsed)`, the
@@ -335,19 +352,19 @@ triggered) — every write rides `state.inventory` and the existing native sette
 
 Unit 3 wires this into the real composer `[+]` attach control and completes the feature as a
 **hybrid** (`planning/VISUAL_UPLOAD_OCR_PLAN.md` §4): `handleImageSelection()`
-(`js/ui-saves.js`) stashes `attachedImageData`/`attachedImageMimeType` exactly as before, then
-calls the new `routeVisualUpload(file)` (`js/ocr.js`), which is now the feature's single entry
+(`js/ui/ui-saves.js`) stashes `attachedImageData`/`attachedImageMimeType` exactly as before, then
+calls the new `routeVisualUpload(file)` (`js/services/ocr.js`), which is now the feature's single entry
 point. On-device OCR is the **primary** path — gated on `isFeatureEnabled('visualOcr')`
-(`js/cloud.js` `_featureFlags`, fail-open, Protocol 33). The pre-existing, byte-for-byte
-UNCHANGED `transmitMessage()` `inlineData` AI-vision branch (`js/api.js`) is now the
+(`js/services/cloud.js` `_featureFlags`, fail-open, Protocol 33). The pre-existing, byte-for-byte
+UNCHANGED `transmitMessage()` `inlineData` AI-vision branch (`js/services/api.js`) is now the
 **fallback only** — reused verbatim (Protocol 22), reached via `_tryAiVisionFallback()` when
 `visualOcr` is off, an OCR load/recognize attempt throws, or the player explicitly taps a
 **TRY AI VISION** button that Unit 3 adds to the preview modal's "NOTHING DETECTED" empty
 state (alongside the existing MANUAL ENTRY). The fallback is itself gated on
 `_aiVisionAvailable()` — the `visualAiVision` flag AND the real `_isUplinkConnected()`
-(`js/ui-core.js`, the same key/aiChat-flag/online signal the Director Uplink scope already
+(`js/ui/ui-core.js`, the same key/aiChat-flag/online signal the Director Uplink scope already
 uses, Protocol 22 — no forked check). An OCR failure also calls the real
-`window._recordFeatureFailure('visualOcr', …)` (`js/cloud.js`), auto-disabling OCR into the
+`window._recordFeatureFailure('visualOcr', …)` (`js/services/cloud.js`), auto-disabling OCR into the
 fallback after `FAIL_THRESHOLD` (3) failures for the rest of the session (Protocol 35's client
 analogue) — no reload needed. When neither path is available (both flags off, no key, or
 offline), `_visualUploadDeadEnd()` clears the attach stash and posts a plain-English
@@ -357,11 +374,11 @@ offline), `_visualUploadDeadEnd()` clears the attach stash and posts a plain-Eng
 (tracked by a one-shot `_visualParseRoutingToAiVision` flag the modal's `onClose` callback
 consumes), and `transmitMessage()`'s own existing `_resetTransmitUI()` at the end of an
 AI-vision round trip. The AI directive's old "Visual Upload Override" imperative
-(`_directiveCoreTracking()`, `js/api.js`) is reframed to "Visual Upload Fallback" framing —
+(`_directiveCoreTracking()`, `js/services/api.js`) is reframed to "Visual Upload Fallback" framing —
 native OCR is primary; the AI now only ever sees an image via the fallback — with the
 STRICTLY FORBIDDEN no-clobber rule preserved verbatim (Protocol 14). The staging-only
 Developer Console boards (`_wireOcrTest` for the Unit 1 raw-text dump, `_wireVisualParseTest`
-for the Unit 2 pipeline, both `js/test-console.js`) are unchanged and remain useful for
+for the Unit 2 pipeline, both `js/dev/test-console.js`) are unchanged and remain useful for
 debugging the pipeline independent of the hybrid routing.
 
 **Critical constraint:** Because these are `<script>` tags (not modules), all globals are shared
@@ -375,13 +392,13 @@ its exports to `window.*` for the other scripts to call.
 
 **Auth (Phase 5c-i/ii):** `cloud.js` signs in anonymously on every boot (non-fatal; app stays usable offline). Firebase Auth is tracked via `onAuthStateChanged`; the current `uid` routes all Firestore reads/writes to `users/{uid}/saves/main`. Phase 5c-ii adds Google sign-in: `window.signInWithGoogle()` links the anonymous session to a Google account via popup on all platforms (redirect was removed — iOS/Android storage partitioning blocked the cross-origin iframe used to retrieve the credential, so `getRedirectResult` always returned null on mobile); `window.signOutAccount()` signs out then re-signs in anonymously; `getRedirectResult` is still called at boot to drain any in-flight redirect from a previously cached client before the anon-fallback guard runs; and `auth/credential-already-in-use` collisions fall back to `signInWithCredential`. Boot sequence is a single sequential async IIFE: `await getRedirectResult` → `await authStateReady` → anon fallback if no user. The ACCOUNT panel (`#accountPanel`, `data-tab="settings"` since the Step 2 v2.8.0 Settings-tab unit) shows sign-in status and the sign-in/sign-out button. Push to production is gated on the owner enabling the Google provider in the Firebase console.
 
-**Dynamic ACCOUNT status words (SU-4, Step 2 v2.8.0):** `renderAccount()` (`js/ui-account.js`) paints the REG PORT / Operator Registry board entirely from live state — `window.getAccountState()`, `isFeatureEnabled('googleSignIn')`, and the SAME `_isUplinkConnected()` carrier signal the UPLINK lamp/bezel telemetry/SYSTEM STATUS panel already read (Protocol 22 — no second `navigator.onLine` check) — across four conditions (signed-out×googleSignIn-on/off, signed-in×carrier-connected/disconnected). A collapsed-state summary line (`#acctSummaryStatus`, `.panel-substatus`) sits in the panel's `<summary>` so the state reads even while collapsed. `renderAccount()` is called from `refreshOverseerCarrier()` — the same connection choke point that drives `_updateUplinkLamp()`/`_refreshBezelTelemetry()`/`renderSystemStatus()` — so none of those readouts can disagree; it's also called from `loadUI()` at boot and from the three sign-in/out/collision call sites in `cloud.js`. The summary line is set via `.textContent` (not parsed as HTML), so its name/email separator is the literal Unicode `·` character, never the `&middot;` entity used inside the `.innerHTML`-rendered board.
+**Dynamic ACCOUNT status words (SU-4, Step 2 v2.8.0):** `renderAccount()` (`js/ui/ui-account.js`) paints the REG PORT / Operator Registry board entirely from live state — `window.getAccountState()`, `isFeatureEnabled('googleSignIn')`, and the SAME `_isUplinkConnected()` carrier signal the UPLINK lamp/bezel telemetry/SYSTEM STATUS panel already read (Protocol 22 — no second `navigator.onLine` check) — across four conditions (signed-out×googleSignIn-on/off, signed-in×carrier-connected/disconnected). A collapsed-state summary line (`#acctSummaryStatus`, `.panel-substatus`) sits in the panel's `<summary>` so the state reads even while collapsed. `renderAccount()` is called from `refreshOverseerCarrier()` — the same connection choke point that drives `_updateUplinkLamp()`/`_refreshBezelTelemetry()`/`renderSystemStatus()` — so none of those readouts can disagree; it's also called from `loadUI()` at boot and from the three sign-in/out/collision call sites in `cloud.js`. The summary line is set via `.textContent` (not parsed as HTML), so its name/email separator is the literal Unicode `·` character, never the `&middot;` entity used inside the `.innerHTML`-rendered board.
 
 **Content Security Policy (CSP Stage 2 — enforcing):** The `<meta http-equiv="Content-Security-Policy">` in `index.html` is now in enforcing mode. It was run in report-only mode for Stage 1 and confirmed clean (boot + Firebase + auth + Firestore produced zero violations) before the flip. **`'unsafe-inline'` is intentionally retained** in `script-src` and `style-src`: the app has ~148 inline event handlers, and per CSP Level 2+ a `sha256-` or `nonce-` token in `script-src` silently disables `unsafe-inline`, breaking all of them. Guard 55.10 (tripwire: `'unsafe-inline'` still present) and 55.11 (tripwire: no `sha256-`/`nonce-` token) enforce this invariant. `img-src` includes `blob:` to cover canvas and screenshot-preview images. The suite-55 and suite-30 guards enforce that the enforcing policy is present and report-only is absent.
 
 ---
 
-## Ambient Runtime (`js/runtime.js` — Step 2 · Phase 2 · A1)
+## Ambient Runtime (`js/core/runtime.js` — Step 2 · Phase 2 · A1)
 
 `window.AmbientRuntime` is the OS-level lifecycle substrate for everything atmospheric: it owns **one canonical terminal state**, runs **one heartbeat**, and hosts an **observer registry**. Every ambient consumer (timers, UPLINK, hardware choreography, the attract/standby experiences) subscribes here rather than re-implementing its own tick or its own immersion-dial check.
 
@@ -389,7 +406,7 @@ its exports to `window.*` for the other scripts to call.
 
 **Observer registry.** `register({ id, cadenceMs, states, tier, onTick, onEnter, onExit })` returns an `unregister()` handle. Each heartbeat, an observer's `onTick` runs **iff** `states.includes(getState())` **and** `immersionAllows(tier)` **and** `cadenceMs` has elapsed since its last tick. Every callback is wrapped in `try/catch`, so one bad observer can never break the heartbeat or its siblings (the `RobcoEvents` listener-guard pattern).
 
-**Central dial enforcement (the ONE place).** The runtime is the single point where the Immersion dial (`immersionAllows`, `js/state.js`) is enforced — re-evaluated live every beat, so a dial change takes effect immediately. No ambient feature re-implements the gate. `immersionAllows` is `typeof`-guarded and fails **open** (never suppress on a missing gate).
+**Central dial enforcement (the ONE place).** The runtime is the single point where the Immersion dial (`immersionAllows`, `js/core/state.js`) is enforced — re-evaluated live every beat, so a dial change takes effect immediately. No ambient feature re-implements the gate. `immersionAllows` is `typeof`-guarded and fails **open** (never suppress on a missing gate).
 
 **A1 was purely additive; A2 migrates the timers/standby on (one behavior per commit).** A1 tracked state **in parallel** with the existing standby/timers (only the inert `runtime-selftest` observer). A2 folds them onto the runtime as observers:
 
@@ -443,7 +460,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 ---
 
-## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)
+## Developer Console / Diagnostic Shell (`js/dev/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)
 
 **This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more registry entry here).
 
@@ -477,7 +494,7 @@ Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durabl
 
 **Mobile chrome fixes (owner report, on top of U2, MOBILE ONLY except FIX 4).** Five presentation fixes, all gated behind the exact inverse of the `(min-width:1000px)...` Suite 129 desktop signal (`(max-width:999.98px)` in CSS, a new `_dshIsMobile()` matchMedia helper in JS) — desktop's drawer/FAB stay byte-identical to what U2 shipped.
 
-- **FIX 1 — partial-height bottom sheet.** Below the mobile breakpoint, `.dsh-drawer` becomes a bottom-anchored, resizable sheet (`height: var(--dsh-sheet-h, 50vh)`, `box-sizing: border-box` — required, since `left:0;right:0;width:100%` is over-constrained under the default content-box and silently overflows the viewport by its own horizontal padding otherwise) instead of the desktop right-side full-height drawer, so the terminal stays visible **and usable** above it. `_setSheetVh()` (`js/test-console.js`) is the one choke point clamping to `[SHEET_MIN_VH, SHEET_MAX_VH]` and writing both the CSS custom property and `#dshDragHandle`'s `aria-valuenow` — shared by a pointer-drag on the handle (`role="slider"`, `tabindex="0"`), the handle's own ArrowUp/ArrowDown keyboard support, and the `#dshExpandToggle` button (cycling between the 50vh default and an 85vh expanded state). `#dshScrim` goes fully inert on mobile (`background: transparent; pointer-events: none`) — a "tap outside to dismiss" gesture no longer applies once outside is the now-interactive terminal; desktop's scrim keeps dimming + closing on click, unchanged.
+- **FIX 1 — partial-height bottom sheet.** Below the mobile breakpoint, `.dsh-drawer` becomes a bottom-anchored, resizable sheet (`height: var(--dsh-sheet-h, 50vh)`, `box-sizing: border-box` — required, since `left:0;right:0;width:100%` is over-constrained under the default content-box and silently overflows the viewport by its own horizontal padding otherwise) instead of the desktop right-side full-height drawer, so the terminal stays visible **and usable** above it. `_setSheetVh()` (`js/dev/test-console.js`) is the one choke point clamping to `[SHEET_MIN_VH, SHEET_MAX_VH]` and writing both the CSS custom property and `#dshDragHandle`'s `aria-valuenow` — shared by a pointer-drag on the handle (`role="slider"`, `tabindex="0"`), the handle's own ArrowUp/ArrowDown keyboard support, and the `#dshExpandToggle` button (cycling between the 50vh default and an 85vh expanded state). `#dshScrim` goes fully inert on mobile (`background: transparent; pointer-events: none`) — a "tap outside to dismiss" gesture no longer applies once outside is the now-interactive terminal; desktop's scrim keeps dimming + closing on click, unchanged.
 - **FIX 2 — draggable FAB.** `_wireFabDrag()` mirrors the Immersion dial's tap-vs-drag pointer pattern (`ui-core.js` `_dialPointerDown`/`_dialPointerMove`/`_dialPointerEnd`) in two dimensions, gated by `_dshIsMobile()` so desktop's bubble stays click-only. A genuine drag (past a 6px threshold) repositions `#dshFab` via inline `left`/`top`, clamped to the viewport, and persists the final position through a new registered MetaStore device pref (`robco_dsh_fab_pos`, `state.js` `META_MANIFEST`, Protocol 4/UI-6) — `_restoreFabPosition()` re-clamps it to the current viewport on every mount, also mobile-gated.
 - **FIX 3 — highlight keys off an open-state class, not `:hover`.** `_openShell()`/`_closeShell()` toggle a new `.dsh-fab--open` class, and the mobile-only CSS rule for it (never applied outside the mobile block) is what drives the bubble's amber highlight there — replacing the touch-sticky-`:hover`-prone reliance desktop's untouched `[aria-expanded='true']` rule still uses. `.dsh-fab:hover`'s fill is also reset unconditionally then re-gated behind `(hover: hover) and (pointer: fine)` (the same mode-pill fix pattern, Suite 129's signal), so a touch tap can never leave it visually stuck lit.
 - **FIX 4 — glyph centering (all breakpoints).** `.dsh-fab span` gets its own `line-height: 1` plus a small `translateY` nudge, correcting a font-metrics offset present at every screen size — the only one of the five fixes not mobile-gated.
@@ -506,9 +523,9 @@ Guarded by Suite 215 (both runners, 16 tests: the U4b registry/synthesis-path/na
 
 ---
 
-## Fallout Data Registry (`js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js`)
+## Fallout Data Registry (`js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js`)
 
-Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/reg_nv.js` (FNV) and `js/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
+Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/data/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/data/reg_nv.js` (FNV) and `js/data/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
 
 ### Key Properties
 
@@ -556,15 +573,15 @@ const FALLOUT_REGISTRY = {
 
 ### Locked Decisions (see architecture_review.md)
 
-| Decision         | Value                                                    |
-| ---------------- | -------------------------------------------------------- |
-| Global name      | `FALLOUT_REGISTRY`                                       |
-| File name        | `js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js` |
-| Category keys    | `quests`, `items`, `perks`, `locations`, `companions`    |
-| Search function  | `registrySearch(category, query)`                        |
-| Max results      | 7                                                        |
-| Min query length | 2 chars                                                  |
-| Keywords         | Deferred                                                 |
+| Decision         | Value                                                                   |
+| ---------------- | ----------------------------------------------------------------------- |
+| Global name      | `FALLOUT_REGISTRY`                                                      |
+| File name        | `js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js` |
+| Category keys    | `quests`, `items`, `perks`, `locations`, `companions`                   |
+| Search function  | `registrySearch(category, query)`                                       |
+| Max results      | 7                                                                       |
+| Min query length | 2 chars                                                                 |
+| Keywords         | Deferred                                                                |
 
 ---
 
@@ -607,7 +624,7 @@ future audit.
 
 ### Reserved-column register
 
-Every `js/db_nv.js` / `js/db_fo3.js` CSV table carries a matching header comment (same content,
+Every `js/data/db_nv.js` / `js/data/db_fo3.js` CSV table carries a matching header comment (same content,
 kept at parity between the two files). Full per-column detail lives there; summary below.
 Authored-but-unconsumed columns fall into two buckets:
 
@@ -636,7 +653,7 @@ Authored-but-unconsumed columns fall into two buckets:
 
 FO4 has no traditional SPECIAL-skill system, so every `getSkillKeys()` consumer must degrade
 cleanly to an empty array rather than assume at least one skill exists. Audited every call site
-(`js/api.js`, `js/state.js`, `js/ui-core.js`, `js/ui-render.js`) that invokes `getSkillKeys()`:
+(`js/services/api.js`, `js/core/state.js`, `js/ui/ui-core.js`, `js/ui/ui-render.js`) that invokes `getSkillKeys()`:
 
 | Call site                                                        | Behavior on `getSkillKeys() === []`                                                                                                            |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -711,7 +728,7 @@ every game, so `identity.theme` is the exact same object reference. `changeOptic
 save-header consumer (`ui-account.js`) all keep reading the untouched literal — zero risk of the
 two ever drifting apart.
 
-**Accessor:** `getIdentity(ctx)` (`js/state.js`) mirrors `getFactionRegistry()`/`getSkillKeys()` —
+**Accessor:** `getIdentity(ctx)` (`js/core/state.js`) mirrors `getFactionRegistry()`/`getSkillKeys()` —
 omit `ctx` to resolve the active game via `_activeDef()`, or pass an explicit `ctx` to inspect any
 game's identity (including FO4's design-only entry) without switching context. Fails safe to
 FNV's identity for an unknown/invalid `ctx` — never returns `undefined`.
@@ -732,13 +749,13 @@ voice/ambient facets) are still future consumers. No `state.<field>` / `saveStat
 write exists anywhere in the identity block itself. DO-K itself landed under `[Unreleased]` as a
 cache-rev-only change; `APP_VERSION` bumped to 2.8.0 at the v2.8.0 release cut. Guarded end-to-end by
 Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
-`js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
+`js/core/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
 write sites.
 
 ---
 
-## Bezel Chrome + Subsystem Nav (`index.html` + `css/terminal.css` + `js/ui-core.js` — Design Overhaul DO-N)
+## Bezel Chrome + Subsystem Nav (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` — Design Overhaul DO-N)
 
 The vertical slice's first _visible_ unit (`planning/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-N).
 Replaces the flat `.tab-bar`/`.tab-btn` webpage nav with a physical-terminal bezel — a
@@ -940,7 +957,7 @@ horizontal overflow, and the active keycap's pressed-in look (r120) is untouched
 
 ---
 
-## Director Uplink — the Living Overseer (`js/ui-core.js` + `js/api.js` + `css/terminal.css` — Design Overhaul DO-O)
+## Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/terminal-*.css` — Design Overhaul DO-O)
 
 Reskins the Comm-Link (`.col-right`) into the mockup's **DIRECTOR UPLINK**: a phosphor
 oscilloscope `<canvas id="overseerScope">` whose waveform reacts to the **real** AI/chat
@@ -951,7 +968,7 @@ adopted at this unit — see `CLAUDE.md`.
 **A reskin, not a fork (Protocol 22):** `appendToChat()` and `transmitMessage()` are the exact
 same functions as before, hooked at two points each — no parallel chat pipeline exists.
 
-**The state machine (`js/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
+**The state machine (`js/ui/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
 observers rather than a new served file):**
 
 | Function                                        | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -965,14 +982,14 @@ observers rather than a new served file):**
 
 **Hooked into the real lifecycle, not a demo timer:**
 
-- `js/api.js` `transmitMessage()`: `setOverseerState('thinking')` at the exact point the thermal-load
+- `js/services/api.js` `transmitMessage()`: `setOverseerState('thinking')` at the exact point the thermal-load
   window opens (`document.body.classList.add('thermal-load')`), **after** the native-router/
   feature-flag/no-key early-return gates — so a deterministic command (`[THREAT]`, TERMINAL mode)
   never touches the scope. Its `finally` block resets **only if** `getOverseerState() === 'thinking'`
   — critical, because a successful reply has already called `appendToChat(...,'ai')`, which kicks
   off an **async** typewriter that owns its own reset to `listening`; a blind reset in `finally`
   (which runs synchronously right after) would truncate a `speaking` frame that hasn't finished yet.
-- `js/ui-core.js` `appendToChat(text, sender, isHistoryLoad)`: sets `speaking` at the AI typewriter's
+- `js/ui/ui-core.js` `appendToChat(text, sender, isHistoryLoad)`: sets `speaking` at the AI typewriter's
   **start**, and `listening` at its **completion callback** — both guarded on `sender==='ai' &&
 !isHistoryLoad`, so replayed chat history on reload never touches the scope. The reduced-motion /
   `isHistoryLoad`-false instant branch (no typewriter to wait on) fires `speaking` then immediately
@@ -1137,7 +1154,7 @@ value (a plain `.value` write never fires `'input'`, so there is no feedback loo
 `#chatInput`'s `'input'` event via `_wireComposerAutoGrow()` (boot-called from `_restoreDevicePrefs()`
 alongside `_wireModeHint()`), re-invoked by `_renderModePill()` whenever the placeholder itself
 changes (mode toggle), and called again by both `transmitMessage()` and `transmitTerminal()`
-(`js/api.js`) immediately after they clear `#chatInput`'s value, so the box snaps back to its small
+(`js/services/api.js`) immediately after they clear `#chatInput`'s value, so the box snaps back to its small
 size after every send. Second: the mode pill's `:hover` fill (from the general
 `button.action-btn:hover` rule) was "sticking" after a touch tap — mobile browsers apply `:hover` on
 tap with no `pointerleave` event to clear it. `button.mode-pill--terminal:hover` /
@@ -1155,7 +1172,7 @@ custom property that falls back to `--bezel-wire`; the save-menu button sets it 
 
 ---
 
-## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/terminal.css` + `js/ui-core.js` + `js/ui-audio.js` + `js/ui-saves.js` + `js/cloud.js` — Design Overhaul CHASSIS unit)
+## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)
 
 Rebuilds the CHASSIS `[5]` tab from one flat SYSTEM STATUS panel into three real
 `.panel.bay-board` boards, and adds THE LIVING CORE — a decorative reactor glyph driven entirely
@@ -1164,17 +1181,17 @@ Reskin only (Protocol 22/25): every existing id/handler is kept unchanged.
 
 **The three boards:**
 
-| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                                                                                                                                                                                                                                                                                            |
-| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every flag `_systemStatusFlagKeys()` returns) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35). `_systemStatusFlagKeys()` reads `window.getFeatureFlagKeys()` (`js/cloud.js`, `Object.keys(_featureFlags)` — the single source, Protocol 22) first, falling back to a literal `_SYSTEM_STATUS_FLAGS_FALLBACK` array only when that accessor is unavailable — a v2.8.0 hotfix (Suite 219) after the old standalone hardcoded array silently missed `visualOcr`/`visualAiVision`. |
-| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered."                                                                                                                                                                                                                                                                         |
+| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every flag `_systemStatusFlagKeys()` returns) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35). `_systemStatusFlagKeys()` reads `window.getFeatureFlagKeys()` (`js/services/cloud.js`, `Object.keys(_featureFlags)` — the single source, Protocol 22) first, falling back to a literal `_SYSTEM_STATUS_FLAGS_FALLBACK` array only when that accessor is unavailable — a v2.8.0 hotfix (Suite 219) after the old standalone hardcoded array silently missed `visualOcr`/`visualAiVision`. |
+| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered."                                                                                                                                                                                                                                                                                  |
 
 `expandPanelForCategory()`'s `log` category and `_bezelSubsystemLabel('chassis')` were both
 repointed from the old single "SYSTEM STATUS" title to "UNIT POWER PLANT" / "SELF-DIAGNOSTIC BAY"
 to match the split (Suite 176.8/192 both guard this).
 
-**THE LIVING CORE (`js/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
+**THE LIVING CORE (`js/ui/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
 block it reuses):** a shared visual shell, `.chassis-core-shape` (rings + a pulsing heart, CSS-only
 — no canvas), carried by BOTH `#chassisCore` (a real `<button>`, BUS-22, Protocol UI-5) and
 `#chassisCoreMini` (a decorative `aria-hidden` mirror). **Owner follow-up:** the mini mirror
@@ -1207,12 +1224,12 @@ One choke point paints both from a single snapshot:
   thinking/speaking/disabled/offline transitions the oscilloscope already reacts to.
 - **Fault strain** — the new shared `_readErrorLog()` reader; `_updateFaultLamp()` (existing) calls
   both `renderServiceFaultConsole()` and `_coreRefresh()`.
-- **Radio-reactive** — `_updateRadioUI()` (`js/ui-audio.js`, the one function both `startRadio()`
+- **Radio-reactive** — `_updateRadioUI()` (`js/ui/ui-audio.js`, the one function both `startRadio()`
   and `stopRadio()` already call) gained one line, `_coreRefresh()`. `_radioPlaying()` is exposed
   cross-file for this read.
 - **Save/sync write-pulse** — a NEW `RobcoEvents` bus event, `'data.write'`, emitted from
-  `saveToSlot()` (`js/ui-saves.js`, local slot save) and `saveCurrentToCloud()` /
-  `loadCloudSave()` / `overwriteCloudSave()` (`js/cloud.js`, cloud push ×2 + pull) — an event
+  `saveToSlot()` (`js/ui/ui-saves.js`, local slot save) and `saveCurrentToCloud()` /
+  `loadCloudSave()` / `overwriteCloudSave()` (`js/services/cloud.js`, cloud push ×2 + pull) — an event
   rather than a direct call into the core, matching the DO-O hook convention.
 - **Colour follows optic** — free: the core's CSS reads `var(--robco-green)`/
   `var(--robco-green-rgb)`, the same custom property `changeOpticsColor()` already sets on
@@ -1284,18 +1301,18 @@ Ten more real-signal-driven behaviors, all painted on both `#chassisCore` and `#
 from the same `_coreRefresh()` snapshot, gated by the existing `_coreShouldAnimate()`/`.core-still`
 mechanism (no bespoke carve-out), zero campaign-state write:
 
-| #   | Behavior                     | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Thermal glow                 | `_coreTemp` (0-100, in-memory only) is mutated by `_coreThermalTick()` — an `AmbientRuntime` observer (`id: 'core-thermal'`, states `['ACTIVE','IDLE']`, tier `'balanced'`, `cadenceMs: 4000`) — warming on real activity (thinking/radio/a buffered fault) and cooling otherwise. `_coreRefresh()` only reads it, painting `core-temp-warm`/`core-temp-hot`, which tint `.c-heart` via `filter: hue-rotate()` — optic-agnostic (rides whatever `--robco-green` is active), never a hardcoded amber/red rgb.                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 2   | Energy sparks                | Two `.c-spark` dots (`s1`/`s2`), identical markup on both cores, orbiting via the classic `rotate() translateX(var(--spark-r))` technique (no wrapper element). `--spark-r` is scaled down for the mini core so the orbit stays inside its smaller box. `s2` is hidden at rest, revealed only while `core-thinking`/`core-overclock`/`core-temp-hot` — density tracks real activity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 3   | Spin inertia                 | `--core-spin-mul-r1`/`-r3` are registered via `@property` (`syntax: '<number>'`, `initial-value: 1`) so they are interpolatable; the base `.chassis-core-shape` rule transitions both over 1.6s. The r1/r3 ring `animation-duration` is `calc(14s / var(--core-spin-mul-r1))` / `calc(9s / var(--core-spin-mul-r3))`, so easing the multiplier eases the ring speed instead of snapping. Every per-state multiplier (`core-boot`/`-standby`/`-thinking`/`-overclock`) is calculated to reproduce the EXACT pre-existing target duration — regression-safe, only the ramp between targets is new. Progressive enhancement: a browser without `@property` support just keeps the old instant snap.                                                                                                                                                                                                                                         |
-| 4   | Power-surge ripple           | A dedicated `.c-ripple` child (not `::after` — that pseudo-element is already the fault ring's, and a ripple can legitimately overlap a buffered fault) fires `_coreRipple()` on the SAME `'data.write'`/`'level.up'` RobcoEvents signals already wired, plus a reconnect edge (`_lastCoreDisconnected` transitioning to `!disconnected`) computed inside `_coreRefresh()` itself.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 5   | Idle flares                  | An `AmbientRuntime` observer (`id: 'core-idle-flare'`, states `['IDLE']`, tier `'balanced'`, `cadenceMs: 42000`) mirroring the DO-O Overseer idle-blip timer exactly — roughly half its ticks fire a faint, faded `core-idle-flare` one-shot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 6   | Reactor hum                  | A second synthesized WebAudio channel (`js/ui-audio.js`: `startReactorHum()`/`stopReactorHum()`/`_updateReactorHumLevel()`), tuned to 90Hz — a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental, with its own distinct 0.05Hz LFO drift — so the two tones blend harmonically instead of beating/clashing. Its own Protocol 7 channel: `robco_reactorhum_muted` (`META_MANIFEST`), `AudioSettings.reactorHum`, a 14th SLOT 02 SONIC PROCESSOR chip (`CH-14`), wired through the existing `toggleAudio()`/`toggleMasterMute()` choke points. Its live gain target is computed from the SAME `thinking`/`radioOn`/`faultCount` signals `_coreRefresh()` already derives (no second polling loop), boosted while `document.body.dataset.subsystem === 'chassis'` and quieted elsewhere. Powers down/resumes with the terminal via a `reactor-hum-power` `AmbientRuntime` observer mirroring the existing `crt-hum-power` one. |
-| 7   | Recovery animation           | `_coreRefresh()` tracks `_lastCoreFaultCount`; on the `>0 → 0` edge it fires `core-recovering` (`_coreOneShot`), which safely reuses `::after` because `core-fault` is already removed in the SAME classList pass before `core-recovering` is applied — the two classes can never coexist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 8   | Uptime-milestone pulse       | `_tickUptimeClock()` (the existing session-uptime tick) compares the current whole-hour count against `_lastCoreUptimeMilestone`; crossing a new hour fires `_coreMilestonePulse()` exactly once.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 9   | Tap-and-hold overcharge      | `_coreHoldStart()`/`_coreHoldEnd()` wired to `#chassisCore`'s `pointerdown`/`pointerup`/`pointercancel`/`pointerleave`. Holding `CORE_HOLD_MS` (850ms) ramps `core-charging` (reusing the #3 `--core-spin-mul-r1`/`-r3` inertia mechanism) to `core-charged`; releasing after that threshold fires `core-overcharge` — reusing the #14 stat-change burst's own `chassisCoreOrbitBurst1`/`3` tumble keyframes — plus an optional `playBoardThunk()` kick (Protocol 7, already guarded). `_coreSuppressNextTap` consumes the trailing `click` event a charged release still generates, so it never ALSO fires a plain tap-poke. Gated by `_coreShouldAnimate()` at the top of `_coreHoldStart()` — a closed gate degrades to a plain no-flourish hold, never a broken half-state.                                                                                                                                                          |
-| 10  | Center readout — **dropped** | Evaluated and intentionally not shipped: a live glyph/number could not be made legible on the small casing-top mini core (33-54px across its responsive tiers, already sharing its circle with 3 rings + the heart) without hurting the design — the owner's own stated escape hatch for this item.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| #   | Behavior                     | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Thermal glow                 | `_coreTemp` (0-100, in-memory only) is mutated by `_coreThermalTick()` — an `AmbientRuntime` observer (`id: 'core-thermal'`, states `['ACTIVE','IDLE']`, tier `'balanced'`, `cadenceMs: 4000`) — warming on real activity (thinking/radio/a buffered fault) and cooling otherwise. `_coreRefresh()` only reads it, painting `core-temp-warm`/`core-temp-hot`, which tint `.c-heart` via `filter: hue-rotate()` — optic-agnostic (rides whatever `--robco-green` is active), never a hardcoded amber/red rgb.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2   | Energy sparks                | Two `.c-spark` dots (`s1`/`s2`), identical markup on both cores, orbiting via the classic `rotate() translateX(var(--spark-r))` technique (no wrapper element). `--spark-r` is scaled down for the mini core so the orbit stays inside its smaller box. `s2` is hidden at rest, revealed only while `core-thinking`/`core-overclock`/`core-temp-hot` — density tracks real activity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 3   | Spin inertia                 | `--core-spin-mul-r1`/`-r3` are registered via `@property` (`syntax: '<number>'`, `initial-value: 1`) so they are interpolatable; the base `.chassis-core-shape` rule transitions both over 1.6s. The r1/r3 ring `animation-duration` is `calc(14s / var(--core-spin-mul-r1))` / `calc(9s / var(--core-spin-mul-r3))`, so easing the multiplier eases the ring speed instead of snapping. Every per-state multiplier (`core-boot`/`-standby`/`-thinking`/`-overclock`) is calculated to reproduce the EXACT pre-existing target duration — regression-safe, only the ramp between targets is new. Progressive enhancement: a browser without `@property` support just keeps the old instant snap.                                                                                                                                                                                                                                            |
+| 4   | Power-surge ripple           | A dedicated `.c-ripple` child (not `::after` — that pseudo-element is already the fault ring's, and a ripple can legitimately overlap a buffered fault) fires `_coreRipple()` on the SAME `'data.write'`/`'level.up'` RobcoEvents signals already wired, plus a reconnect edge (`_lastCoreDisconnected` transitioning to `!disconnected`) computed inside `_coreRefresh()` itself.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 5   | Idle flares                  | An `AmbientRuntime` observer (`id: 'core-idle-flare'`, states `['IDLE']`, tier `'balanced'`, `cadenceMs: 42000`) mirroring the DO-O Overseer idle-blip timer exactly — roughly half its ticks fire a faint, faded `core-idle-flare` one-shot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 6   | Reactor hum                  | A second synthesized WebAudio channel (`js/ui/ui-audio.js`: `startReactorHum()`/`stopReactorHum()`/`_updateReactorHumLevel()`), tuned to 90Hz — a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental, with its own distinct 0.05Hz LFO drift — so the two tones blend harmonically instead of beating/clashing. Its own Protocol 7 channel: `robco_reactorhum_muted` (`META_MANIFEST`), `AudioSettings.reactorHum`, a 14th SLOT 02 SONIC PROCESSOR chip (`CH-14`), wired through the existing `toggleAudio()`/`toggleMasterMute()` choke points. Its live gain target is computed from the SAME `thinking`/`radioOn`/`faultCount` signals `_coreRefresh()` already derives (no second polling loop), boosted while `document.body.dataset.subsystem === 'chassis'` and quieted elsewhere. Powers down/resumes with the terminal via a `reactor-hum-power` `AmbientRuntime` observer mirroring the existing `crt-hum-power` one. |
+| 7   | Recovery animation           | `_coreRefresh()` tracks `_lastCoreFaultCount`; on the `>0 → 0` edge it fires `core-recovering` (`_coreOneShot`), which safely reuses `::after` because `core-fault` is already removed in the SAME classList pass before `core-recovering` is applied — the two classes can never coexist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 8   | Uptime-milestone pulse       | `_tickUptimeClock()` (the existing session-uptime tick) compares the current whole-hour count against `_lastCoreUptimeMilestone`; crossing a new hour fires `_coreMilestonePulse()` exactly once.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 9   | Tap-and-hold overcharge      | `_coreHoldStart()`/`_coreHoldEnd()` wired to `#chassisCore`'s `pointerdown`/`pointerup`/`pointercancel`/`pointerleave`. Holding `CORE_HOLD_MS` (850ms) ramps `core-charging` (reusing the #3 `--core-spin-mul-r1`/`-r3` inertia mechanism) to `core-charged`; releasing after that threshold fires `core-overcharge` — reusing the #14 stat-change burst's own `chassisCoreOrbitBurst1`/`3` tumble keyframes — plus an optional `playBoardThunk()` kick (Protocol 7, already guarded). `_coreSuppressNextTap` consumes the trailing `click` event a charged release still generates, so it never ALSO fires a plain tap-poke. Gated by `_coreShouldAnimate()` at the top of `_coreHoldStart()` — a closed gate degrades to a plain no-flourish hold, never a broken half-state.                                                                                                                                                             |
+| 10  | Center readout — **dropped** | Evaluated and intentionally not shipped: a live glyph/number could not be made legible on the small casing-top mini core (33-54px across its responsive tiers, already sharing its circle with 3 rings + the heart) without hurting the design — the owner's own stated escape hatch for this item.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### LIVING CORE ring visual-parity fix (owner audit, Suite 195)
 
@@ -1335,10 +1352,10 @@ despite reading as "moved further." The final offset was computed precisely
 (not eyeballed) so the button's nearest corner clears the ring radius with
 margin (~55px).
 
-All three fixes are CSS-only (`css/terminal.css`), shared by both cores
+All three fixes are CSS-only (`css/terminal-*.css`), shared by both cores
 from the same `.chassis-core-shape`/`.chassis-core-mini` selectors with
-zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui-core.js`
-or `js/ui-audio.js`, write nothing durable to the campaign, and leave the
+zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui/ui-core.js`
+or `js/ui/ui-audio.js`, write nothing durable to the campaign, and leave the
 existing `.core-still` gate-stacking mechanism untouched.
 
 **A second issue was caught during this same unit's own live render-
@@ -1361,7 +1378,7 @@ future edit reverts to the bare, cascade-dead selector.
 
 ---
 
-## OPERATOR Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-core.js` — Design Overhaul, Phase-3 hero-three)
+## OPERATOR Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)
 
 The STAT tab's panels are reskinned into the same labeled-hardware-board language as the Module
 Bay and Director Uplink, per the owner-approved `planning/mockups/operator-combined.html` mockup.
@@ -1392,7 +1409,7 @@ campaign write was added beyond what the existing handlers already did.
   carrying an `.top` amber accent, plus a `.fd-cap` position marker) with the original input
   (`class="num-sm fader-input"`, `oninput="capStatMax(this); updateMath();"`,
   `onchange="commitStat(this)"` all unchanged) and a new `.fd-steps` pair of `±` buttons calling a
-  new `_bumpSpecialStat(key, delta)` helper (`js/ui-core.js`) that only writes the input's `.value`
+  new `_bumpSpecialStat(key, delta)` helper (`js/ui/ui-core.js`) that only writes the input's `.value`
   and dispatches the same `change`/`input` events `commitStat`/`capStatMax` already listen for —
   never a parallel state-write path.
 - **BUS-03 SKELETAL HARNESS** — an SVG anatomical zone plate (`.zone[data-limb="hd|la|ra|ll|rl"]`,
@@ -1447,7 +1464,7 @@ unrecognized tier is still rendered, never silently dropped. No disclosure/colla
 reintroduced — both sections stay always-visible (zero added taps, Protocol 25); only the mini-pin
 strip (`stripHtml`) stays flat/ungrouped.
 
-**`_syncOperatorTelemetry()`** (`js/ui-core.js`, called from `updateMath()`) is the one new
+**`_syncOperatorTelemetry()`** (`js/ui/ui-core.js`, called from `updateMath()`) is the one new
 central sync function driving every derived OPERATOR readout: the HP condition word
 (`#opCondWord`, NOMINAL/IMPAIRED/CRITICAL) and its critical-state pulse, the RAD trace/bar widths
 and the BUS-03 mirror, each SPECIAL fader's lit-segment count and cap position, the limb-fault LED,
@@ -1455,10 +1472,10 @@ and every board's `.panel-substatus` 0i status line (via a local `setStatus(id, 
 helper) — all read from existing `state`/DOM values, none of it introduces a new write path.
 
 **A real Protocol 42 fix landed in the same commit:** `expandPanelForCategory()`'s `map` lookup
-table (`js/ui-core.js`) still targeted the old `'> BIO-METRICS'`/`'> BIO-SCAN'` heading strings for
+table (`js/ui/ui-core.js`) still targeted the old `'> BIO-METRICS'`/`'> BIO-SCAN'` heading strings for
 the `special`/`bio` categories — since those headings were renamed to `'> VITAL TELEMETRY'`/
 `'> SKELETAL HARNESS'` in this same unit, the Comm-Link's panel-expand-on-mention behavior (driven
-by `PANEL_NAV_ALIASES` in `js/api.js` — e.g. typing "stats" or "bio scan") would have silently
+by `PANEL_NAV_ALIASES` in `js/services/api.js` — e.g. typing "stats" or "bio scan") would have silently
 stopped finding these panels. Fixed alongside the rename, with the pre-existing regression tests
 covering it (123.7, 168.7) updated to the new strings rather than left stale.
 
@@ -1470,7 +1487,7 @@ part-number fix, and the `expandPanelForCategory()` string-literal fix.
 **Owner interactivity fold-in (Phase 3 OPERATOR follow-up):** the hero-three controls are genuinely
 interactive, not display-only readouts beside an editable number field:
 
-- **HP/XP bars are draggable.** `setupHpBarInteraction()`/`setupXpBarInteraction()` (`js/ui-core.js`)
+- **HP/XP bars are draggable.** `setupHpBarInteraction()`/`setupXpBarInteraction()` (`js/ui/ui-core.js`)
   already existed (the "C11" mouse+touch drag pattern, pre-dating this reskin) and target the exact
   same `hp_bar_container`/`xp_bar_container` ids the CRT-trace markup reused verbatim — no new code
   was needed here, only live verification that the reskin didn't break the existing drag wiring.
@@ -1487,14 +1504,14 @@ interactive, not display-only readouts beside an editable number field:
 - **RAD EXPOSURE max-rads clamp (pre-existing bug, fixed in this unit):** the RAD field had no upper
   bound. `GAME_DEFS.FNV/FO3/FO4` each gained a `maxRads: 1000` field (fallout.wiki-sourced, Protocol
   3 — 1000 rads is the documented fatal radiation-poisoning threshold in both live games). A new
-  `capRadsMax(el)` (`js/ui-core.js`, mirrors `capStatMax()`'s upper-clamp-on-input pattern) reads
+  `capRadsMax(el)` (`js/ui/ui-core.js`, mirrors `capStatMax()`'s upper-clamp-on-input pattern) reads
   `GAME_DEFS[ctx].maxRads` — never a bare hardcoded 1000 — and is wired into `#stat_rads`'s `oninput`
   alongside `updateMath()`. The same `[0, GAME_DEFS[ctx].maxRads]` clamp is applied at two more
-  layers for defense in depth: `syncStateFromDom()` (`js/state.js`, mirroring the adjacent SPECIAL-stat
-  clamp) and `autoImportState()` (`js/api.js`, so an AI response can't push rads above the per-game max
+  layers for defense in depth: `syncStateFromDom()` (`js/core/state.js`, mirroring the adjacent SPECIAL-stat
+  clamp) and `autoImportState()` (`js/services/api.js`, so an AI response can't push rads above the per-game max
   either).
 - **RAD EXPOSURE bar is draggable** (`#radDragTrack` on BUS-03 SKELETAL HARNESS, wrapping
-  `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui-core.js`) mirrors
+  `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui/ui-core.js`) mirrors
   `setupHpBarInteraction()`/`setupXpBarInteraction()` byte-for-byte (mouse+touch, pct-of-width, writes
   `#stat_rads` + `state.rads`, scales to `_resolveMaxRads()` instead of a fixed max). An owner report
   that the drag still didn't work despite this landing (and its own mock-event regression test
@@ -1598,7 +1615,7 @@ fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
 
 ---
 
-## OPERATIONS Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-core.js` + `js/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
+## OPERATIONS Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
 
 The INV tab's five panels (BACKPACK INVENTORY, COLLECTIBLES, CRAFTING, TRADE, SQUAD STATUS) are
 reskinned into six `bay-board` panels — BUS-10 through BUS-15, continuing the OPERATOR BUS-01…09
@@ -1615,7 +1632,7 @@ add-item fields, `craftPanel`/`craftRecipeList`/`craftScrapList`, `tradePanel`/`
 
 **BUS-10 LOAD-CELL WEIGH BRIDGE** (new hero board) — a read-only mirror of the exact `curWt`/
 `maxWeight` `updateMath()` already computes, painted by one new function, `_paintWeighBridge(curWt,
-maxWeight)` (`js/ui-core.js`), called from `updateMath()` right after the pre-existing
+maxWeight)` (`js/ui/ui-core.js`), called from `updateMath()` right after the pre-existing
 `weight-heavy`/`weight-critical`/`weight-over` body-class toggle — a read-only second projection,
 never a second computation (Module Bay bay↔schematic precedent). It drives a load-beam SVG
 (`#opsBeamPath`/`#opsBeamBlock`/`#opsBeamPct`) that bends **continuously** in proportion to real
@@ -1630,7 +1647,7 @@ readout can never visually disagree. `#c_caps` and `#display_weight` — previou
 readback strip — **moved verbatim onto this board** (same ids, same `updateMath()`/`doBuy`/`doSell`
 references; `#c_caps` stays the ONE editable caps input in the whole app). A SEIZED bridge also flags
 the board's own `.board-led` red and appends "⚠ CARGO SEIZED" to the bezel telemetry strip
-(`_bezelStatusSuffix()`, `js/ui-core.js`) — reading the same `body.weight-over` class, never a second
+(`_bezelStatusSuffix()`, `js/ui/ui-core.js`) — reading the same `body.weight-over` class, never a second
 weight computation.
 
 **BUS-11 CARGO MANIFEST** (new hero board, ex-BACKPACK INVENTORY) — the flat inventory filter bar
@@ -1655,7 +1672,7 @@ indicator** (the app never tracked item condition, so none was added). Two new n
 `adjItemQty(idx, delta)` (a per-row qty ± stepper, clamped ≥0, removing the row entirely at 0 — Protocol
 13 regression-tested) and `toggleEquipItem(idx)` (the first **native EQUIP control**, closing the U10
 audit gap — `state.equipped.weapon`/`.armor` one-per-slot-family, toggle-off on re-tap;
-`autoImportState()`'s own AI-write equip path in `js/api.js` is untouched, Protocol 14/24 additive,
+`autoImportState()`'s own AI-write equip path in `js/services/api.js` is untouched, Protocol 14/24 additive,
 not a fork). `_updateContextPanels()`'s FO3 no-mods fallback now resets to `'weapon'` instead of the
 retired `'all'`.
 
@@ -1672,7 +1689,7 @@ not a `--bezel-wire` read. `doBuy`/`doSell`/`renderTrade*` unchanged.
 
 **BUS-14 SQUAD ROSTER** (ex-SQUAD STATUS) — a real bug fix: the `#newSquadName` ENLIST `<select>`
 was a hardcoded 8-name FNV companion list shown even in FO3 campaigns (a Protocol 38 violation). A
-new `_populateSquadEnlistOptions()` (`js/ui-render.js`) populates it from `FALLOUT_REGISTRY.companions`
+new `_populateSquadEnlistOptions()` (`js/ui/ui-render.js`) populates it from `FALLOUT_REGISTRY.companions`
 — the active game's registry, already swapped in at boot — filtering out already-enlisted companions,
 mirroring `renderCollectibles()`'s `FALLOUT_REGISTRY.collectibles` read pattern. `renderSquad()` now
 also renders `.sq-card` roster cards (HP bar, HP/AMMO/CND/WPN/DT row, an affinity meter with the
@@ -1751,7 +1768,7 @@ Protocol 17 tap-target floor, and the bezel-telemetry SEIZED flag.
 
 ---
 
-## DATABANK Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-render.js` + `js/ui-core.js` + `js/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
+## DATABANK Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
 
 The DATA/CAMPG tab's six panels (WORLD MAP, QUEST LOG, DATABANK search, CAMPAIGN NOTES, CAMPAIGN LOG,
 CAMPAIGN RECORD) are reskinned into six `bay-board` panels — BUS-16 through BUS-21, continuing the
@@ -1785,14 +1802,14 @@ auto-neutralized by the existing global `prefers-reduced-motion` block. `state.m
 exact meaning (`'full'` = STRATEGIC, else CORE) but now drives an SVG `viewBox` crop over the SAME
 node set, rather than physically excluding off-crop zones from the DOM as the old grid did. Real
 per-node keyboard traversal: every `<g class="node">` is `tabindex="0"` with an `onkeydown` wired to
-a new `_mapNodeKeyNav(event, zoneName)` (`js/ui-render.js`) — arrow keys move focus to the nearest
+a new `_mapNodeKeyNav(event, zoneName)` (`js/ui/ui-render.js`) — arrow keys move focus to the nearest
 node in the pressed direction by real grid coordinate (reading a module-level `_mapLastNodes` cache
 set at render time), Enter/Space pulls the sector sheet. The zoom-detail view is reskinned as a
 "sector sheet" (`.sheet`/`.loc-row`/`.loc-st`) — same `_mapActiveZone`/`zoomMapToZone`/`resetMapZoom`
 logic, only the markup changed; the MARK SURVEYED key (renamed from LOG VISIT, class `.mark`) still
 routes through the unchanged `markLocationVisited()` → `recordLocationVisit()` single source
 (add-only, permanent fog-of-war). A sibling TRAVEL HERE key (same `.mark` class, native, no AI)
-calls a new `travelToLocation(loc)` (`js/ui-render.js`) that delegates to the SAME shared
+calls a new `travelToLocation(loc)` (`js/ui/ui-render.js`) that delegates to the SAME shared
 `onLocationChange(overrideLoc)` setter the `#stat_loc` field already uses (Protocol 22 — never a
 forked setter) to move `[CURRENT]` to the tapped location and record it visited; since
 `onLocationChange()` owns its own single `renderWorldMap()` call, `travelToLocation()` wraps that
@@ -1815,10 +1832,10 @@ physical status lamp (`.dir-lamp`, amber-active/green-complete/red-failed). A st
 verbatim) is a pure display-only filter over `state.quests` — never mutates it — with the last-open
 choice persisted via a new registered `robco_databank_qdrawer` MetaStore device pref (`setQuestDrawer()`,
 Protocol UI-6). An in-tray search field (`#questSearch`) narrows the list client-side. The owner-locked
-**⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui-render.js`) is the ONE new native write path this unit
+**⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui/ui-render.js`) is the ONE new native write path this unit
 adds: advances a directive's status ACTIVE→COMPLETE→FAILED→ACTIVE with no AI involved, proven by a
 real Node `vm`-sandbox behavioral test (both runners) that actually executes the function body across
-three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/api.js`)
+three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/services/api.js`)
 is completely untouched — this is a second, additive entry point onto the same `state.quests[i].status`
 field (Protocol 14/24), exactly like the existing native affinity/mark-visited setters. `addQuest`/
 `removeQuest`/the add-form ids are unchanged.
@@ -1854,7 +1871,7 @@ FOUND) — same `state.stats`/`state.ticks`/`state.locationHistory` reads. The r
 ZERO CAMPAIGN COUNTERS but still calls the unchanged `resetSessionStats()`.
 
 A new `identity.databank` facet (`mapCaption`/`mapCaptionSub`/`recordsLabel`) extends the DO-K
-per-game identity keystone (`js/state.js`, Protocol 38) on all three `GAME_DEFS` entries (FNV/FO3/FO4)
+per-game identity keystone (`js/core/state.js`, Protocol 38) on all three `GAME_DEFS` entries (FNV/FO3/FO4)
 — read by BUS-16's map caption via `getIdentity()`. Every board carries a live `.panel-substatus` 0i
 collapsed-summary line (`dbMapStatus`/`dbQuestStatus`/`dbChronStatus`/`dbCatalogStatus`/`dbNotesStatus`/
 `dbTallyStatus`), each painted by its own owning render function. Mobile default-open is the two heroes
@@ -1874,7 +1891,7 @@ and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new rend
 
 ---
 
-## Ceremony Moments Wave 1 (`js/ui-core.js` + `js/ui-audio.js` + `js/state.js` + `css/terminal.css` — Suite 208)
+## Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/terminal-*.css` — Suite 208)
 
 Five small transition/ceremony beats picked from `planning/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
 slate — none touch campaign state (Protocol 4 not triggered); every write is a transient module
@@ -1933,7 +1950,7 @@ invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavo
 
 ---
 
-## Mobile Density Standard, Tier-1 (`css/terminal.css` — planning/MOBILE_DENSITY_PLAN.md §2/§3)
+## Mobile Density Standard, Tier-1 (`css/terminal-*.css` — planning/MOBILE_DENSITY_PLAN.md §2/§3)
 
 Owner-approved Tier-1 mobile spacing tightening. The plan measured every board's spacing (padding,
 inter-board gap, header subtitle, tile padding) as using its base, desktop-shared value on mobile —
@@ -1975,7 +1992,7 @@ placement after every base rule, and the no-desktop-gate-leak guard.
 
 ## State Architecture
 
-### The `state` Object (js/state.js)
+### The `state` Object (js/core/state.js)
 
 ```javascript
 let state = {
@@ -2334,7 +2351,7 @@ JSON string → parse
 field `autoImportState()` can write must also have a NATIVE input/edit path — the player must
 never be stuck depending on the AI to create, correct, or initialize a value.
 
-Audited every `state.X` write inside `autoImportState()` (`js/api.js`) against the app's native
+Audited every `state.X` write inside `autoImportState()` (`js/services/api.js`) against the app's native
 UI/CRUD surface:
 
 | Field(s)                                                                | Native path                                                                                                                                                                                | Status                                                                                                                                                    |
@@ -2361,7 +2378,7 @@ UI/CRUD surface:
 | `padBindings` (Quick-Draw Holster)                                      | intentionally **never** read from AI responses (player authority — Protocol 24); native `_nativePadBind()` via the Tool Deck's holster UI or a typed `[BIND: gear, DIR]` only              | OK (by design — the strongest case here, since `autoImportState()` has no read path for it at all)                                                        |
 
 **U10 fix landed:** squad/companion affinity now has native `[+]`/`[-]` buttons on every squad row
-(`adjustAffinity()`, `js/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
+(`adjustAffinity()`, `js/ui/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
 0% instead of hiding the bar). `addSquadMember()` now seeds `affinity: 0` for newly-added members.
 
 **Known gap (documented, not fixed this unit):** `state.equipped` has no native setter — a courier's
@@ -2371,25 +2388,25 @@ action on each inventory row would close it using the same pattern as the other 
 
 **Native USE + TERMINAL stat edits (v2.8.0):** two more entry points joined this audit's "OK" column
 without changing any field's status. (1) The CARGO MANIFEST's USE button, previously a free-text
-`> [USE] <name>` round-trip to the AI, is now the deterministic `nativeUseItem()` (`js/ui-render.js`)
+`> [USE] <name>` round-trip to the AI, is now the deterministic `nativeUseItem()` (`js/ui/ui-render.js`)
 — gated to `cat==='aid'`, it parses the active game's `getChemsTable()` Effect/Duration columns via the
 pure `_computeAidUse()`/`_durationToTicks()` parsers into heal/rad/limb-heal/timed-BUFF/addiction-clear/
 poison-clear, applied through the shared A.2 native setters below and the extracted
 `_applyStatusEffect()` (Protocol 22, reused by `addStatusEffect()` too) — closing the `status`/`hpCur`/
 `rads`/limb fields' AI-narrative dependency for the single most common player action (consuming an
-item). (2) TERMINAL mode (`js/api.js`) now edits every scalar stat, SPECIAL, and skill directly — a
+item). (2) TERMINAL mode (`js/services/api.js`) now edits every scalar stat, SPECIAL, and skill directly — a
 generic `"<stat> <N>"` SET grammar, both delta forms, and a `"level up"`/`"leveled up"` phrase, all
 resolved via `_resolveStatToken()` (static scalar/SPECIAL alias maps — universal Fallout mechanics —
 plus `getSkillKeys()` for the per-game skill set) and applied through the SAME shared setters. Those
 setters — `_nativeSetHp`/`_nativeSetRads`/`_nativeSetXp`/`_nativeSetLevel`/`_nativeSetSpecial`/
-`_nativeSetSkill`/`_nativeSetKarma`/`_nativeSetCaps` (`js/ui-core.js`) — are the ONE clamp/mirror/emit/
+`_nativeSetSkill`/`_nativeSetKarma`/`_nativeSetCaps` (`js/ui/ui-core.js`) — are the ONE clamp/mirror/emit/
 save choke point per stat (Protocol 22): `commitStat()`'s own SPECIAL DOM `onchange` path now delegates
 to `_nativeSetSpecial()` rather than clamping independently, so the DOM path, Native USE, and TERMINAL
 edits can never disagree on a clamp. No new `state` field — Protocol 4's 4-file dance does not apply.
 
 ---
 
-## Command-Line MODE (`js/api.js` + `js/ui-core.js` — Step 2 · Phase 2 · B1)
+## Command-Line MODE (`js/services/api.js` + `js/ui/ui-core.js` — Step 2 · Phase 2 · B1)
 
 A single mode pill (`#modePill`, in the Comm-Link input toolbar) chooses which of two
 paths the Comm-Link input takes on submit — a device preference (`robco_input_mode`,
@@ -2448,7 +2465,7 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
   code change. Falls back to the plain native-token/quick-log-verb suggestions (unchanged) when no
   verb lead-in matches. Every suggestion preserves whatever prefix `_resolveCommandInput` stripped
   (e.g. a `/` override), so picking one never silently drops the user's explicit override.
-  `wireInput()` (`js/ui-saves.js`, the shared `#acPanel` singleton documented under "Registry
+  `wireInput()` (`js/ui/ui-saves.js`, the shared `#acPanel` singleton documented under "Registry
   Autocomplete System" below) accepts this resolver **function** in addition to a registry category
   string; `#chatInput` is wired to `_commandSuggestions()`, which returns `[]` whenever the message
   would resolve to OVERSEER.
@@ -2685,7 +2702,7 @@ registry instead.
 
 ### OS Event Bus (RobcoEvents)
 
-`js/state.js` declares a tiny synchronous pub/sub, `RobcoEvents.on(event, fn)` /
+`js/core/state.js` declares a tiny synchronous pub/sub, `RobcoEvents.on(event, fn)` /
 `RobcoEvents.emit(event, payload)`, added in Step 2 (v2.8.0) Phase 0 Unit 7. It
 decouples STATE CROSSING DETECTION from the code that reacts to it: a detector
 calls `emit()` once when it observes a crossing; any number of independent
@@ -2787,9 +2804,9 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 
 Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structurally by the Suite 134 / U6 boundary gate):
 
-### MetaStore — device preferences (`js/state.js`)
+### MetaStore — device preferences (`js/core/state.js`)
 
-`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (41 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
+`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (41 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui/ui-audio.js` / `js/ui/ui-render.js` / `js/ui/ui-core.js` / `js/services/api.js` / `js/services/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
 | Key                            | Type   | Owner        | Description                                                                                                                                                                                                                                                                            |
 | ------------------------------ | ------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2834,7 +2851,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 | `robco_bezel_subsystem`        | string | ui-core.js   | Last-focused bezel subsystem (`'operator'`/`'operations'`/`'databank'`/`'uplink'`/`'chassis'`/`'settings'`, DO-N + Step 2 SETTINGS-tab unit) — `chassis`/`settings` are now real tabs restored by `initTabs()`; only the `uplink` highlight still needs the cosmetic boot-time re-sync |
 | `robco_cargo_drawer`           | string | ui-render.js | Last-open CARGO MANIFEST drawer (`'weapon'`/`'armor'`/`'aid'`/`'mod'`/`'misc'`/`'ammo'`, Phase 3 · Piece 2 OPERATIONS reskin) — restored at boot by `_restoreDevicePrefs()`, written by `setInvFilter()`                                                                               |
 
-### Module Bay (`js/ui-core.js`, B2a/B2b) — settings as installable hardware
+### Module Bay (`js/ui/ui-core.js`, B2a/B2b) — settings as installable hardware
 
 The SECURITY & CONFIGURATION panel's _contents_ are reframed as a chassis of hardware boards — an owner-approved redesign (Protocol 25 sanctioned exception). As of the Step 2 (v2.8.0) SETTINGS-tab unit the panel itself also carries `data-tab="settings"` (it moved out of its old always-visible, tab-less placement into the SETTINGS subsystem) — the hatch/schematic/re-sync mechanics below are otherwise unchanged. **One-truth model:** the bay and the permanent Schematic View fallback are both projections of the same MetaStore-backed prefs above; every control still calls the exact setter it always called (`changeOpticsColor`, `toggleHighLumen`, `toggleMasterMute`, `toggleRadio`, `toggleWakeLock`, `toggleHaptic`, `onImmersionChange`, `setGeminiKeySync`, `toggleAudio`) — zero new persistence paths, zero AI involvement. `renderModuleBay()` is the single re-sync point: it re-syncs every boolean control's `.checked` from MetaStore (so a change made via the Schematic View's separate DOM checkboxes always pushes back to the bay's own controls), refreshes the two combined status lines (SLOT 01 optics+high-lumen, SLOT 02 channel-count+radio), and regenerates the Schematic View if it's open — called after every bay/schematic control change and once at boot from `initModuleBay()`. `initModuleBay()` (called from `window.onload`, after `_restoreOpticsPreference()`/`_restoreDevicePrefs()`) decides whether the first-visit hatch ceremony (`#bayHatch`, `releaseBayHatch()`) shows at all, then applies whichever of Bay/Schematic was last viewed. The first-visit hatch now fires from a genuine `selectSubsystem('settings')` visit (which re-opens `#securityConfigPanel`, firing its own once-only toggle listener) rather than the old CHASSIS scroll-to-bay branch, which is retired — `initTabs()`'s boot-time restore never calls `selectSubsystem()`, so a reload landing on SETTINGS never re-triggers the ceremony (Protocol 42). The bay's `.bay-grid` is **single-column unconditionally** — the desktop shell fixes the settings panel's own column at a hard 380px (`grid-template-columns: 380px 1fr` in the ≥1000px shell), so a two-column `@container` breakpoint would never engage in this shell and was removed as dead code after live desktop measurement (confirmed via manual render-check, not just the automated 360/412px gate).
 
@@ -2892,7 +2909,7 @@ graph TD
     K -.-|validates| D
     K -.-|validates| H
 
-    L[js/registry-core.js] -->|registrySearch| D
+    L[js/data/registry-core.js] -->|registrySearch| D
 ```
 
 ### Critical Paths (modify with extreme care)
@@ -3012,7 +3029,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 **Bump `CACHE_NAME` in `sw.js` whenever a commit stages a served/precached file.** Doc-only, config-only, and test-only commits do not require a bump. The following always qualify and must never ship without a bump:
 
 - `index.html` (any UI change, new panel, new button, layout tweak)
-- `css/terminal.css` (any style change)
+- `css/terminal-*.css` (any style change)
 - `js/*.js` (any logic change the user will see or interact with)
 - `sw.js` itself
 
@@ -3074,7 +3091,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2953-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2958-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

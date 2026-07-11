@@ -1,0 +1,1533 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-07-operator-boards.css — part 7/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 7010-8533. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: Phase 3 Operator boards, batches 1-3 (hero-three + batch 2 + batch 3)
+=== SPLIT-FILE-HEADER-END === */
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · OPERATOR/STAT hero-three (Protocol 22/25 RESKIN — wraps the
+   exact shipped ids/handlers, no behavior change). Matches
+   planning/PHASE3_OPERATOR_PLAN.md + the owner-approved
+   planning/mockups/operator-combined.html (Option C vitals CRT monitor +
+   Option B fader bank + Option B zone plate). Every OPERATOR board reuses
+   the existing .bay-board/.bay-slot-tag/.bay-part-no/.panel-substatus
+   machine-language classes (Module Bay / ACCOUNT precedent) rather than a
+   parallel class family — the hero-three add new instrument CSS below;
+   the other 5 boards are light-framed with just those reused classes.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* .panel + .bay-board together: details.bay-board (specificity 0,1,1) wins
+   the shared border/background/padding over plain .panel (0,1,0); the h2
+   edge-bleed trick (.panel h2's -10px margins) still lines up because
+   .bay-board's own padding keeps the same 10px top/side values. */
+.board-led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+  margin-right: 2px;
+  flex-shrink: 0;
+  animation: rad-pulse 3s infinite;
+}
+.board-led.red {
+  background: var(--robco-danger);
+  box-shadow: 0 0 7px var(--robco-danger);
+  animation: rad-pulse 1.2s infinite;
+}
+.op-light-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  font-size: 11px;
+}
+.op-light-row label {
+  flex-shrink: 0;
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+/* ── shared readback field sizing (mirrors the mockup's .num/.num-sm) ── */
+input.num {
+  width: 64px;
+}
+input.num-sm {
+  width: 46px;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-01 — CRT MULTI-TRACE VITAL TELEMETRY (Option C)
+   ──────────────────────────────────────────────────────────────────── */
+.crt-mon {
+  margin-top: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    repeating-linear-gradient(0deg, rgba(var(--robco-green-rgb), 0.03) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.03) 0 1px,
+      transparent 1px 14px
+    ),
+    #02120c;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.85);
+  padding: 10px 12px 12px;
+}
+.trace {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  padding: 7px 0;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.18);
+}
+.trace:last-child {
+  border-bottom: none;
+}
+.trace .t-cap {
+  flex: 0 0 74px;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+}
+.real-label {
+  opacity: 0.55;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+}
+/* .t-line reuses the existing .hp-bar-container track — scoped here so the
+   CRT-trace look never leaks to any other future .hp-bar-container use. */
+.crt-mon .t-line {
+  flex: 1 1 110px;
+  min-width: 90px;
+  height: 12px;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden; /* the glow-dot ::after marker bleeds past a 0%-width fill at 0 HP/RAD — clip it here so a healthy stat can never register a stray few px of inner scroll overflow */
+}
+.crt-mon .hp-bar-fill {
+  position: relative;
+  box-shadow: 0 0 8px currentColor;
+}
+.crt-mon .hp-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: inherit;
+  box-shadow: 0 0 10px currentColor;
+}
+#opRadLineWrap {
+  flex: 1 1 110px;
+  min-width: 90px;
+  height: 12px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  overflow: hidden; /* matches .crt-mon .t-line — clips the glow-dot ::after marker at 0 RAD so it can never register a stray few px of inner scroll overflow */
+  cursor: ew-resize;
+  /* Owner follow-up (Protocol 27): this trace is now a real drag surface
+     (_wireRadDragSurface('opRadLineWrap')) — matching the #radDragTrack fix,
+     touch-action:none stops a real touch-drag from being reinterpreted as a
+     page-scroll gesture before touchmove ever fires. */
+  touch-action: none;
+}
+#opRadLineWrap i {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  /* Matches .hp-bar-fill/.bar-fill.rad's transition exactly (Protocol 22) — the
+     previous 0.9s cubic-bezier would lag far enough behind a real-time drag to
+     read as unresponsive, the same bug already fixed on the SKELETAL HARNESS bar. */
+  transition: width 0.3s ease;
+}
+/* Owner follow-up (Protocol 27, 3rd report): even at the matched 0.3s duration,
+   the fill still visibly chased a fast real-time drag, since the transition
+   retriggers a fresh tween on every mousemove/touchmove target — unlike HP/XP,
+   nothing here ever suppressed it mid-drag. #opRadLineWrap.dragging (toggled by
+   _wireRadDragSurface(), mirroring the tempo dial's .knob2.dragging precedent)
+   zeroes the transition only while actively dragging, so the fill snaps exactly
+   to the pointer every frame; the 0.3s transition still applies to any
+   programmatic (non-drag) width change. */
+#opRadLineWrap.dragging i {
+  transition: none;
+}
+#opRadLineWrap i::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: inherit;
+  box-shadow: 0 0 10px currentColor;
+}
+.trace.critline .crt-mon .hp-bar-fill,
+.trace.critline .hp-bar-fill {
+  box-shadow: 0 0 8px var(--robco-danger);
+  animation: rad-pulse 1.2s infinite;
+}
+.trace .t-read {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.trace .t-read label {
+  font-size: 7.5px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+}
+.cond-word {
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.cond-word.crit {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  animation: rad-pulse 1.2s infinite;
+}
+
+/* ── the readback strip: one uniform 4-tile hardware row ── */
+.readback-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+.rb-tile {
+  flex: 1 1 128px;
+  max-width: 190px;
+  min-width: 122px;
+  min-height: 68px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background: linear-gradient(rgba(var(--robco-green-rgb), 0.025), rgba(0, 0, 0, 0.5)), #05100b;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 8px 10px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  text-align: center;
+  position: relative;
+  box-sizing: border-box;
+}
+.rb-cap {
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  display: block;
+}
+.rb-val {
+  font-size: 17px;
+  letter-spacing: 1.5px;
+  display: block;
+}
+.rb-sub {
+  font-size: 6.5px;
+  letter-spacing: 1px;
+  opacity: 0.32;
+  display: block;
+  text-transform: none;
+}
+/* max-width:100% beats the mobile input[type='number']{max-width:56px} cap
+   (@media max-width:480px, below) — same (0,1,1) specificity, later in source
+   order, so it wins the tie. Without it, #c_caps (the readback-strip BOTTLE
+   CAPS tile, the only <input> among the 4 readback tiles) got clamped to
+   56px wide at phone widths: text-align:center correctly centered the "0"
+   within THAT 56px box, but the box itself never stretched to fill the
+   ~150px tile, so it sat flush left of the tile as a whole (confirmed by
+   screenshot: box width measured 56px vs the tile's ~150px content width,
+   both before AND after trying several appearance-based fixes, which were
+   a dead end — this was a width/max-width bug, not a text-align bug). The
+   56px mobile cap exists for #stat_hp_cur/#stat_lvl/#stat_xp inside
+   .input-group rows, a different layout this rule does not touch. */
+.rb-tile input {
+  border: none;
+  background: transparent;
+  font-size: 17px;
+  letter-spacing: 1.5px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  text-shadow: var(--robco-glow);
+  text-align: center;
+}
+.rb-tile.amber {
+  outline-color: rgba(var(--amber-rgb, 255, 182, 66), 0.5);
+  border-color: rgba(255, 182, 66, 0.3);
+}
+.rb-tile.amber .rb-val,
+.rb-tile.amber input {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(255, 182, 66, 0.55);
+}
+.rb-tile.amber .rb-cap {
+  color: var(--bezel-wire);
+  opacity: 0.55;
+}
+/* the level-up key — same footprint as the tiles, reads as a keycap */
+button.rb-key {
+  flex: 1 1 128px;
+  max-width: 190px;
+  min-width: 122px;
+  min-height: 68px;
+  border: 1px solid var(--robco-green);
+  outline: none;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.1),
+    rgba(var(--robco-green-rgb), 0.03) 55%,
+    rgba(0, 0, 0, 0.4)
+  );
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(var(--robco-green-rgb), 0.25),
+    0 0 10px rgba(var(--robco-green-rgb), 0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  padding: 8px 6px;
+  margin-top: 0;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+button.rb-key .rb-cap {
+  opacity: 0.5;
+  color: var(--robco-green);
+}
+button.rb-key:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.65),
+    0 0 10px rgba(var(--robco-green-rgb), 0.14);
+}
+button.rb-key:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* the RadAway lamp — restyles the existing #radAwayAlert (JS still only
+   toggles style.display; the flex/lamp look is purely CSS via this class,
+   already present on the element in index.html). */
+.radaway-lamp {
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(255, 182, 66, 0.55);
+  border: 1px dashed rgba(255, 182, 66, 0.5);
+  padding: 5px 8px;
+  text-align: left;
+}
+.radaway-lamp i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  animation: rad-pulse 1s infinite;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-02 — SEVEN-FADER EQUALIZER BANK (Option B)
+   ──────────────────────────────────────────────────────────────────── */
+.fader-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  justify-content: center; /* centering rule */
+  margin-top: 10px;
+}
+.fader {
+  flex: 0 0 38px;
+  text-align: center;
+}
+.fd-letter {
+  font-size: 12px;
+  display: block;
+}
+.fd-ladder {
+  width: 28px; /* Protocol 17 -- this is also the drag hit-area (owner interactivity fold-in), so it must clear the 28px tap-target floor itself, not just its .fader column */
+  height: 110px;
+  margin: 4px auto;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  padding: 2px;
+  box-sizing: border-box;
+  touch-action: none; /* scoped to the ladder only -- the page/panel still scrolls everywhere else */
+  cursor: ns-resize;
+}
+.fd-ladder i {
+  flex: 1;
+  background: rgba(var(--robco-green-rgb), 0.1);
+}
+.fd-ladder i.lit {
+  background: var(--robco-green);
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.7);
+}
+.fd-ladder i.lit.top {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 6px rgba(255, 182, 66, 0.7);
+}
+.fd-cap {
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  height: 7px;
+  background: linear-gradient(180deg, #3a3e33, #22251e);
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: bottom 0.35s cubic-bezier(0.3, 1.3, 0.55, 1); /* SEAT */
+  bottom: 40%;
+}
+.fader input.fader-input {
+  width: 36px;
+  font-size: 16px;
+  padding: 3px 1px;
+  margin-top: 3px;
+}
+.fd-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+}
+.fd-steps button {
+  width: 100%;
+  min-height: 28px;
+  padding: 1px 0;
+  font-size: 11px;
+  margin-top: 0;
+  border-color: rgba(var(--robco-green-rgb), 0.4);
+}
+.fader-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   BUS-03 — ANATOMICAL ZONE PLATE (Option B)
+   ──────────────────────────────────────────────────────────────────── */
+.zone-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 26px;
+  align-items: center;
+  justify-content: center; /* centering rule */
+  margin-top: 8px;
+}
+.zone-body svg {
+  display: block;
+  width: 148px;
+  height: auto;
+  overflow: visible;
+}
+.zone {
+  cursor: pointer;
+}
+.zone path,
+.zone circle.zshape {
+  fill: rgba(var(--robco-green-rgb), 0.1);
+  stroke: rgba(var(--robco-green-rgb), 0.8);
+  stroke-width: 1.6;
+}
+.zone text {
+  fill: var(--robco-green);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-anchor: middle;
+  font-family: inherit;
+}
+.zone:hover path,
+.zone:hover circle.zshape {
+  fill: rgba(var(--robco-green-rgb), 0.2);
+}
+.zone:focus-visible {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 2px;
+}
+.zone.crippled path,
+.zone.crippled circle.zshape {
+  fill: rgba(231, 76, 60, 0.3);
+  stroke: var(--robco-danger);
+  animation: zoneCriBlink 1s steps(2) infinite;
+}
+.zone.crippled text {
+  fill: var(--robco-danger);
+}
+@keyframes zoneCriBlink {
+  50% {
+    opacity: 0.4;
+  }
+}
+.zone-readout {
+  flex: 1 1 190px;
+  max-width: 330px;
+  min-width: 0;
+}
+.zone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: center; /* centering rule */
+  margin-top: 4px;
+}
+/* .limb-ok/.limb-crip are the shipped classes loadUI() sets directly via
+   btn.className — restyled here (never renamed) to read as the mockup's
+   zone-chip boxes, so the "mirrored readout list" IS the real limb toggles,
+   not a second parallel element. */
+.zone-chips button.limb-ok,
+.zone-chips button.limb-crip {
+  border-radius: 0;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 6px 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.zone-chips button.limb-crip {
+  text-shadow: 0 0 6px rgba(231, 76, 60, 0.5);
+}
+.rad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.rad-row .rr-meter {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.rad-row .rr-label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  opacity: 0.65;
+  color: var(--bezel-wire);
+}
+.bar-track {
+  margin-top: 4px;
+  height: 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+/* Owner batch item 2: the RAD EXPOSURE bar is now a drag surface
+   (setupRadBarInteraction(), ui-core.js), not just a read-only mirror —
+   Protocol 17's >=28px tap-target minimum applies to it same as any other
+   interactive control, so its own track grows taller (the fill still fills
+   it via inset:0, no separate change needed there).
+   Owner report follow-up (Protocol 27 root cause): the drag mechanism's JS
+   logic was already correct (mousedown/mousemove/mouseup + touchstart/
+   touchmove all wired and clamping through _resolveMaxRads()), but this was
+   the ONE drag surface in the whole OPERATOR redesign missing
+   touch-action:none — every sibling (.fd-ladder, .vu-track, the tempo/
+   immersion dial knobs) declares it so a real touch-drag is never
+   reinterpreted as a page-scroll gesture before the touchmove handler gets
+   to run; a synthetic-event test (mousedown/mousemove dispatched directly)
+   never exercises that browser-level scroll-vs-gesture arbitration, so the
+   existing regression test passed while a real on-device drag still failed.
+   Restoring the same touch-action every other drag surface already has. */
+#radDragTrack {
+  height: 28px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.bar-fill.rad {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--bezel-wire) 0 5px,
+    rgba(255, 182, 66, 0.25) 5px 8px
+  );
+  box-shadow: 0 0 7px rgba(255, 182, 66, 0.5);
+  /* Matches .hp-bar-fill's transition exactly (Protocol 22) — the previous
+     0.9s cubic-bezier lagged far enough behind a real-time drag that the
+     fill visibly failed to track the cursor, reading as unresponsive/broken
+     even though #stat_rads/state.rads were already updating correctly. */
+  transition: width 0.3s ease;
+}
+/* Owner follow-up (Protocol 27, 3rd report) — same fix as #opRadLineWrap.dragging
+   above: #radDragTrack.dragging zeroes the fill's transition only while actively
+   dragging, so it snaps to the pointer every frame instead of visibly chasing a
+   fast drag; a programmatic (non-drag) width change still transitions at 0.3s. */
+#radDragTrack.dragging .bar-fill.rad {
+  transition: none;
+}
+.bio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 8px;
+  margin-top: 12px;
+}
+.bio-actions .keybtn {
+  width: auto;
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+/* ── mobile: keep the fader bank to a single row even at 360px ── */
+@media (max-width: 480px) {
+  .fader {
+    flex: 0 0 34px;
+  }
+  .fd-ladder {
+    width: 28px;
+    height: 96px;
+  }
+}
+
+/* No bespoke reduced-motion carve-out needed here: .board-led/.zone.crippled/
+   .radaway-lamp i are all plain `animation:` (rad-pulse / zoneCriBlink), so
+   the existing global `*, *::before, *::after` prefers-reduced-motion block
+   already zeroes them to their resting frame automatically. */
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · OPERATOR BATCH 2 — ground-up redesigns of the three most-
+   visible light-framed OPERATOR boards (Protocol 22/25 reskin). Matches
+   PHASE3_OPERATOR_PLAN.md Boards 5/7/8 + the owner-approved
+   planning/mockups/operator-boards2.html (skills=vu / fac=console
+   variants). Every board keeps reusing .bay-board/.bay-slot-tag/
+   .bay-part-no/.panel-substatus (Protocol 22) — only the INNER template
+   built by renderSkills()/renderStatus()/renderFactionRep() changes:
+
+     BUS-05 · SKILL MATRIX  → 13-channel horizontal VU meter rows.
+              renderSkills() still emits sk_<key> number inputs
+              (0-100, oninput reads through the SAME syncStateFromDom()
+              clamp + saveState() the typed field always used) — the
+              meter is an ADDED drag/keyboard affordance over the same
+              inputs, never a parallel state path. Channel count comes
+              from getSkillKeys() (Protocol 38 — never hardcoded 13).
+     BUS-07 · STATUS EFFECTS → lit/dark compound lamps (BUFF phosphor /
+              DEBUFF red / NEUTRAL amber), tick countdown + pip meter,
+              ✕ purge. addStatusEffect()/removeStatusEffect() and the
+              newStatusName/newStatusTicks/newStatusType form ids are
+              unchanged (Protocol 22).
+     BUS-08 · FACTION STANDING → one shared dual-scale INFAMY◂▸FAME
+              console: a channel keycap selector (ALL factions from
+              getFactionRegistry(), major+minor together — nothing
+              hidden behind a collapsed sub-panel, Protocol 25 no-added-
+              taps), the selected channel's wide meter + the same ±5
+              adjustFaction() keys, and an all-faction mini-pin strip so
+              every faction's standing is visible without switching
+              channels. Last-picked channel persists via the registered
+              robco_faction_channel device pref (Protocol UI-6).
+
+   All new motion is a plain `animation:` (vu fill-in, lamp pulse), auto-
+   neutralized by the existing global prefers-reduced-motion block — no
+   bespoke carve-out. Centering rule: every wrapping row (VU legend,
+   lamp tiles, selector keycaps) uses flex-wrap + justify-content:center,
+   which — unlike CSS Grid auto-fill — centers an incomplete last row for
+   free, so no lone-item nth-child hack is needed (retiring the old
+   .faction-grid/.faction-card grid's nth-child(odd) rule below).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── BUS-05 · SKILL VU ARRAY (horizontal VU meter rows) ── */
+.vu-rows {
+  display: flex;
+  flex-direction: column;
+}
+.vu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.18);
+  min-width: 0;
+}
+.vu-row:last-child {
+  border-bottom: none;
+}
+.vu-label {
+  flex: 0 0 96px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vu-track {
+  flex: 1 1 90px;
+  min-width: 60px;
+  height: 20px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 24.4%,
+      rgba(var(--robco-green-rgb), 0.18) 24.4% 25%
+    ),
+    rgba(0, 0, 0, 0.55);
+  position: relative;
+  overflow: hidden;
+  touch-action: none; /* drag-to-set */
+  cursor: pointer;
+}
+.vu-track:focus-visible {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 2px;
+}
+.vu-fill {
+  position: absolute;
+  inset: 2px auto 2px 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--robco-green) 0 5px,
+    rgba(var(--robco-green-rgb), 0.15) 5px 8px
+  );
+  box-shadow: 0 0 7px rgba(var(--robco-green-rgb), 0.45);
+  animation: vuFillIn 0.4s ease-out;
+  pointer-events: none;
+}
+@keyframes vuFillIn {
+  from {
+    opacity: 0.3;
+  }
+}
+.vu-fill::after {
+  /* amber peak cap */
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--robco-alert);
+  box-shadow: 0 0 6px rgba(243, 156, 18, 0.8);
+}
+.vu-input {
+  width: 46px;
+  flex-shrink: 0;
+  padding: 3px 2px;
+  text-align: center;
+  font-size: 16px;
+}
+.vu-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  padding: 4px 2px 0 104px;
+}
+@media (max-width: 480px) {
+  .vu-label {
+    flex-basis: 78px;
+    font-size: 9px;
+  }
+  .vu-legend {
+    padding-left: 86px;
+  }
+}
+
+/* ── BUS-07 · COMPOUND LAMPS (status effects) ── */
+.stlamp-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 8px;
+  margin-top: 6px;
+}
+.stlamp-tile {
+  flex: 1 1 156px;
+  max-width: 230px;
+  min-width: 140px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background: linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.06), rgba(0, 0, 0, 0.45) 70%);
+  padding: 8px 10px 9px;
+  position: relative;
+}
+.stlamp-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.stlamp-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  animation: stlampPulse 2.6s infinite;
+}
+@keyframes stlampPulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.stlamp-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  overflow-wrap: break-word;
+}
+.stlamp-purge {
+  flex-shrink: 0;
+  font-size: 9px;
+  padding: 2px 6px;
+  min-height: 28px;
+  min-width: 28px;
+  width: auto;
+  border-color: rgba(231, 76, 60, 0.55);
+  color: var(--robco-danger);
+}
+.stlamp-sub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.stlamp-type {
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  border: 1px solid currentColor;
+  padding: 1px 5px;
+}
+.stlamp-ticks {
+  font-size: 8.5px;
+  letter-spacing: 0.5px;
+  opacity: 0.65;
+}
+.stlamp-pips {
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-left: auto;
+}
+.stlamp-tile.debuff {
+  border-color: rgba(231, 76, 60, 0.55);
+  background: linear-gradient(180deg, rgba(231, 76, 60, 0.08), rgba(0, 0, 0, 0.45) 70%);
+}
+.stlamp-tile.debuff .stlamp-led {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+  animation-duration: 1.2s;
+}
+.stlamp-tile.debuff .stlamp-name,
+.stlamp-tile.debuff .stlamp-type,
+.stlamp-tile.debuff .stlamp-pips {
+  color: var(--robco-danger);
+}
+.stlamp-tile.neutral {
+  border-color: rgba(243, 156, 18, 0.55);
+  background: linear-gradient(180deg, rgba(243, 156, 18, 0.07), rgba(0, 0, 0, 0.45) 70%);
+}
+.stlamp-tile.neutral .stlamp-led {
+  background: var(--robco-alert);
+  box-shadow: 0 0 8px var(--robco-alert);
+}
+.stlamp-tile.neutral .stlamp-name,
+.stlamp-tile.neutral .stlamp-type,
+.stlamp-tile.neutral .stlamp-pips {
+  color: var(--robco-alert);
+}
+.stlamp-tile.dark {
+  opacity: 0.4;
+  border-style: dashed;
+}
+.stlamp-tile.dark .stlamp-led {
+  background: #3a3d35;
+  box-shadow: none;
+  animation: none;
+}
+.stlamp-tile.dark .stlamp-name {
+  opacity: 0.55;
+  letter-spacing: 2px;
+}
+.stlamp-empty-note {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  margin-top: 8px;
+}
+
+/* ── BUS-08 · REPUTATION CONSOLE (shared dual-scale meter + selector) ── */
+/* Owner follow-up: the pre-reskin card grid grouped factions into MAJOR/MINOR
+   sections; the console's flat keycap selector had dropped that grouping.
+   .facon-section restores it as a labeled group around each tier's own
+   .facon-selector row — the tier split is read from the SAME data-driven
+   f.tier field the retired card grid used (getFactionRegistry(), Protocol 38 —
+   both FNV/FO3 registries declare it), never a hardcoded key list. Owner
+   batch item 6: MINOR FACTIONS is now collapsible (a data-sub-id sub-panel,
+   see .facon-section.sub-panel below) sitting directly under MAJOR; MAJOR
+   and OTHER stay always-visible plain sections. */
+.facon-groups {
+  display: block;
+}
+.facon-section + .facon-section {
+  margin-top: 10px;
+}
+.facon-section-label {
+  text-align: center;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+}
+/* MINOR FACTIONS collapsible — reuses details.sub-panel's collapse mechanics
+   (persistence via _wireDynamicSubPanel(), the [+]/[-] summary-marker CSS)
+   but overrides its boxed look so the expanded content "just fits in" under
+   MAJOR FACTIONS: no dashed divider, and the <summary><h3> reads exactly like
+   the plain .facon-section-label above it instead of the generic sub-panel
+   header style. */
+.facon-section.sub-panel {
+  border-top: none;
+  padding-top: 0;
+}
+.facon-section.sub-panel > summary {
+  text-align: center;
+}
+.facon-section.sub-panel > summary h3 {
+  display: inline;
+  font-size: 8.5px;
+  font-weight: normal;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  margin: 0;
+}
+.facon-selector {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 6px;
+  margin-top: 8px;
+}
+.facon-chan {
+  flex: 0 0 auto;
+  min-width: 84px;
+  min-height: 40px;
+  width: auto;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.facon-chan.cur {
+  color: var(--robco-alert);
+  border-color: var(--robco-alert);
+  box-shadow: 0 0 8px rgba(243, 156, 18, 0.3);
+}
+.facon-meter-wrap {
+  margin-top: 12px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 10px 12px 12px;
+}
+.facon-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.facon-name {
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+.facon-standing {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+.facon-scale {
+  margin-top: 10px;
+  height: 22px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 9.4%, rgba(255, 255, 255, 0.07) 9.4% 10%),
+    linear-gradient(
+      90deg,
+      rgba(231, 76, 60, 0.35),
+      rgba(0, 0, 0, 0.25) 46%,
+      rgba(0, 0, 0, 0.25) 54%,
+      rgba(var(--robco-green-rgb), 0.3)
+    );
+}
+.facon-scale::before {
+  /* center detent */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+.facon-pin {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 5px;
+  background: var(--robco-alert);
+  box-shadow: 0 0 8px rgba(243, 156, 18, 0.8);
+  transform: translateX(-50%);
+  transition: left 0.5s cubic-bezier(0.3, 1.4, 0.5, 1); /* pin SEAT */
+}
+.facon-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  margin-top: 5px;
+}
+.facon-nums {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.facon-keys {
+  display: flex;
+  justify-content: center; /* centering rule */
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.facon-keys button {
+  min-width: 56px;
+  min-height: 32px;
+  font-size: 9.5px;
+  width: auto;
+}
+.facon-keys button.ikey {
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--robco-danger);
+}
+.facon-strip {
+  margin-top: 12px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  padding-top: 8px;
+}
+.facon-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+.facon-strip-row b {
+  font-weight: normal;
+  flex: 0 0 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.facon-mini {
+  /* Owner batch item 7: was flex:1 1 60px (grow+shrink), so this track's
+     final width was whatever space was left after the STANDING label —
+     which varies row to row ("IDOLIZED" vs "NEUTRAL" vs "VILIFIED"), the
+     only other unconstrained item in this flex row. A fixed, non-growing
+     basis makes every row's track the same width regardless of faction name
+     or standing-word length. */
+  flex: 0 0 90px;
+  height: 7px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  background: linear-gradient(
+    90deg,
+    rgba(231, 76, 60, 0.25),
+    rgba(0, 0, 0, 0.2) 50%,
+    rgba(var(--robco-green-rgb), 0.22)
+  );
+}
+.facon-mini::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  bottom: -1px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.facon-mini i {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  background: var(--robco-alert);
+  box-shadow: 0 0 5px rgba(243, 156, 18, 0.7);
+  transform: translateX(-50%);
+}
+
+/* No bespoke reduced-motion carve-out needed here either: vuFillIn/
+   stlampPulse are plain `animation:`, and .facon-pin's `transition:` is
+   neutralized by the same global block's transition-duration:0.01ms
+   (the tempo-dial precedent) — one shared block, no per-verb exception. */
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · OPERATOR batch 3 (Protocol 22/25 reskin) — the last five
+   OPERATOR boards, ground-up: BUS-04 POSITION & MISSION CLOCK, BUS-06 PERK
+   LOADOUT (+ FNV traits), BUS-05a SKILL BOOKS shelf, BUS-05b SKILL MAGAZINES
+   rack, BUS-09 KARMA ALIGNMENT. Matches planning/mockups/operator-boards3.html
+   (owner-picked variants: perks=rack, karma=needle). Every id/handler this
+   wraps is unchanged — see planning/PHASE3_OPERATOR_PLAN.md §3.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── BUS-04 · CHRONO / POSITION — flip-card date tiles + LCD clock + a
+   position-fix plate. Every input inside stays the real, editable field. ── */
+.chrono-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 14px 22px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+.chrono-unit {
+  flex: 1 1 210px;
+  max-width: 320px;
+  min-width: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px 12px;
+  text-align: center;
+}
+.chrono-unit--pos {
+  flex: 1 1 250px;
+}
+.cu-cap {
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  opacity: 0.55;
+  display: block;
+  margin-bottom: 8px;
+}
+.flip-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.flip {
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background: linear-gradient(180deg, #0a1812 48%, #05100b 52%);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 4px 2px;
+  text-align: center;
+}
+.flip input {
+  border: none;
+  background: transparent;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  font-size: 17px;
+  letter-spacing: 1px;
+  padding: 2px 0;
+  text-align: center;
+}
+.flip .f-cap {
+  display: block;
+  font-size: 6.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.4;
+}
+.flip.f-mm input,
+.flip.f-dd input {
+  width: 44px;
+}
+.flip.f-yy input {
+  width: 72px;
+}
+.flip.f-hh input,
+.flip.f-mi input {
+  width: 48px;
+}
+.colon {
+  font-size: 18px;
+  animation: chronoColonBlink 2s steps(2) infinite;
+}
+@keyframes chronoColonBlink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.chrono-readout {
+  margin-top: 9px;
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  padding-top: 7px;
+  opacity: 0.75;
+}
+.pos-plate {
+  margin-top: 2px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background:
+    repeating-linear-gradient(0deg, rgba(var(--robco-green-rgb), 0.04) 0 1px, transparent 1px 13px),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.04) 0 1px,
+      transparent 1px 13px
+    ),
+    #02120c;
+  padding: 12px 12px 10px;
+}
+.pos-dot {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 9px var(--robco-green);
+  animation: bayLedPulse 1.6s infinite;
+}
+.pos-plate input {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border-color: rgba(var(--robco-green-rgb), 0.5);
+}
+.pos-last {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  margin-top: 7px;
+  text-align: left;
+  text-transform: none;
+}
+
+/* ── BUS-06 · PERK LOADOUT — numbered loadout slots + FNV trait chips ── */
+.slot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  border-left: 4px solid rgba(var(--robco-green-rgb), 0.55);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 7px 10px;
+  margin-bottom: 7px;
+}
+.slot-row .s-idx {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  opacity: 0.45;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.slot-row .s-name {
+  flex: 1 1 150px;
+  min-width: 0;
+  font-size: 11px;
+  letter-spacing: 1px;
+  overflow-wrap: break-word;
+}
+.slot-row .s-meta {
+  font-size: 8.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.slot-row .s-rank {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.slot-row .pk-x {
+  margin-left: auto;
+  min-width: 28px;
+  min-height: 28px;
+  width: auto;
+}
+.slot-row.vacant {
+  border-style: dashed;
+  border-left-style: dashed;
+  opacity: 0.4;
+  justify-content: center;
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  min-height: 40px;
+}
+.perk-form {
+  margin-top: 12px;
+  border-top: 1px dashed var(--robco-green);
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.perk-form .p-name {
+  flex: 1 1 160px;
+  min-width: 130px;
+}
+.perk-form .p-rank,
+.perk-form .p-lvl {
+  width: 64px;
+}
+.perk-form .keybtn {
+  flex: 0 1 auto;
+  min-height: 34px;
+  letter-spacing: 1.5px;
+  font-size: 10.5px;
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.07);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(var(--robco-green-rgb), 0.15);
+}
+/* FNV FACTORY-BURNED trait chips — the shipped .tracker-row/.tracker-toggle
+   pattern (Protocol UI-3) restyled as a chip rack via CSS only.
+   Owner report fix: renderTraits() now emits ONE <button class="tracker-row
+   tracker-toggle ..."> per trait (the row IS the toggle, Protocol UI-5 — the
+   whole chip is clickable, not just a small inner sub-element), matching
+   every other tracker (skill books/magazines/curios). width:100% (was
+   width:auto + inline-flex, which sized each chip to its OWN content —
+   short-effect traits like Skilled/Small Frame rendered narrower than the
+   rest) makes every chip the same uniform full-row width regardless of its
+   text length. */
+.trait-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.trait-chips .tracker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed rgba(var(--bezel-wire-rgb), 0.6);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  padding: 7px 11px;
+  min-height: 28px;
+  background: rgba(var(--bezel-wire-rgb), 0.05);
+  opacity: 1;
+  width: 100%;
+  text-align: left;
+}
+.trait-chips .tracker-row.tracker-toggle--inactive {
+  opacity: 0.55;
+  border-style: dotted;
+}
+.trait-chips .trait-lamp {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.trait-chips .tracker-meta {
+  font-size: 6.5px;
+  opacity: 0.7;
+  letter-spacing: 1px;
+}
+
+/* ── BUS-05a · SKILL BOOKS — the reference shelf ── */
+.shelf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: flex-end;
+  gap: 7px 5px;
+  margin-top: 14px;
+  padding: 0 4px;
+  /* a plank under EVERY wrapped row (row cycle = 96px spine + 7px gap) */
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 96px,
+    #343830 96px 99px,
+    #14160f 99px 103px
+  );
+}
+/* button.spine (not plain .spine) so the base rule's specificity (0,1,1)
+   ties button.tracker-toggle's own (0,1,1) and wins on source order — a
+   plain single-class .spine (0,1,0) lost to button.tracker-toggle's
+   display:inline-flex/width:auto/min-height:28px, leaving every spine an
+   un-shelved-looking horizontal chip instead of a vertical shelf spine
+   (caught live during render-verify, Protocol 42). */
+button.spine {
+  display: block;
+  width: 34px;
+  min-width: 34px; /* cancels button.tracker-toggle's inherited min-width:44px floor */
+  min-height: 96px;
+  border: 1px solid var(--robco-green);
+  background: linear-gradient(
+    90deg,
+    rgba(var(--robco-green-rgb), 0.22),
+    rgba(var(--robco-green-rgb), 0.06) 30%,
+    rgba(0, 0, 0, 0.5)
+  );
+  writing-mode: vertical-rl;
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  padding: 6px 0;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+}
+.spine .tracker-meta {
+  display: block;
+  font-size: 6px;
+  opacity: 0.5;
+  letter-spacing: 1px;
+}
+.spine::after {
+  /* read-ribbon bookmark */
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -1px;
+  width: 5px;
+  height: 14px;
+  background: var(--bezel-wire);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  box-shadow: 0 0 5px rgba(var(--bezel-wire-rgb), 0.7);
+}
+.spine.unread {
+  border-style: dashed;
+  border-color: rgba(var(--robco-green-rgb), 0.35);
+  color: rgba(var(--robco-green-rgb), 0.55);
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.35);
+  transform: rotate(4deg) translateY(3px); /* leaning, unshelved */
+}
+.spine.unread::after {
+  display: none;
+}
+.shelf-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}
+
+/* ── BUS-05b · SKILL MAGAZINES — the periodical rack (sibling) ── */
+.mag-rack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+  margin-top: 12px;
+}
+/* button.mag (not plain .mag) -- same button.tracker-toggle specificity fix
+   as button.spine above (Protocol 42). */
+button.mag {
+  display: block;
+  flex: 0 0 auto;
+  width: 104px;
+  min-height: 66px;
+  border: 1px solid var(--bezel-wire);
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.1), rgba(0, 0, 0, 0.45) 75%);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  padding: 8px 7px;
+  text-align: left;
+  position: relative;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%
+  ); /* dog-ear */
+}
+.mag .tracker-meta {
+  display: block;
+  font-size: 6.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+.mag.consumed {
+  border-style: dashed;
+  border-color: rgba(var(--bezel-wire-rgb), 0.35);
+  color: rgba(var(--bezel-wire-rgb), 0.45);
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.35);
+}
+.mag.consumed::after {
+  content: 'CONSUMED';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  font-size: 6.5px;
+  letter-spacing: 2px;
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.6);
+  /* Owner batch item 3: the generated-content stamp inherited the ancestor
+     .panel's overflow-wrap:anywhere, wrapping to "CONSUM/ED" even though it
+     fits on one line at this size — nowrap keeps it a single-line stamp. */
+  white-space: nowrap;
+}
+.mag-note {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: none;
+}

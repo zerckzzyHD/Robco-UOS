@@ -15,15 +15,15 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) |
 | **Canonical protocol & gate rules** | this file (`CLAUDE.md`) |
 | **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
-| **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/api.js`) — design rationale in `ARCHITECTURE.md` |
+| **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/services/api.js`) — design rationale in `ARCHITECTURE.md` |
 | **Boot lifecycle** — `window.onload`'s call order, the boot-phase functions, the event-bus subscriber wiring order | `library/CODE_MAP.md` § Boot Lifecycle (`js/ui-core*.js` — the hub + the 2.8.5 U-A1 split family) |
-| **State shape** — `let state = {…}`, `GAME_DEFS`, `migrateState()`, the save envelope | `library/CODE_MAP.md` § State (`js/state.js`) |
+| **State shape** — `let state = {…}`, `GAME_DEFS`, `migrateState()`, the save envelope | `library/CODE_MAP.md` § State (`js/core/state.js`) |
 | **Event bus** — `RobcoEvents`, every emitted event name, every subscriber-wiring function and which file owns it | `library/CODE_MAP.md` § Event Bus |
-| **Native command router** — `NATIVE_COMMAND_ROUTER`, the quick-log grammar, the native stat-token setters | `library/CODE_MAP.md` § Native Command Router (`js/api.js`) |
-| **Audio model** — the `AudioSettings` cache, `ensureAudioCtx()`, every sound-trigger function, the mute-guard pattern | `library/CODE_MAP.md` § Audio (`js/ui-audio.js`) |
+| **Native command router** — `NATIVE_COMMAND_ROUTER`, the quick-log grammar, the native stat-token setters | `library/CODE_MAP.md` § Native Command Router (`js/services/api.js`) |
+| **Audio model** — the `AudioSettings` cache, `ensureAudioCtx()`, every sound-trigger function, the mute-guard pattern | `library/CODE_MAP.md` § Audio (`js/ui/ui-audio.js`) |
 | **Two-store boundary** — campaign state (`state` / `robco_v8`) vs. device prefs (`MetaStore` / `META_MANIFEST`) | `library/CODE_MAP.md` § Two-Store Boundary; the rule itself is Protocol 23 below |
-| **Render pipeline** — `loadUI()`, every `render*()` function and its panel, the CRUD helpers | `library/CODE_MAP.md` § Render Pipeline (`js/ui-render.js`) |
-| **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/test-console.js`) |
+| **Render pipeline** — `loadUI()`, every `render*()` function and its panel, the CRUD helpers | `library/CODE_MAP.md` § Render Pipeline (`js/ui/ui-render.js`) |
+| **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/dev/test-console.js`) |
 | **Test system** — how the gate runs, both runners, suite numbering, parity | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
 | **Full per-suite test catalog** — every suite's coverage, every work-unit's build narration (large; read only when suite-level detail is actually needed) | `library/TEST_CATALOG.md` (gitignored, local-only — see the 3-class model below) |
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
@@ -53,11 +53,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2953 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2958 tests via gate:fast)
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **2953 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **2958 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` when served files change.** Required when any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). Doc-, config-, and test-only commits skip the check entirely.
 - **Cache-bump guard runs at commit time** — the hook first detects whether any staged file is in the served/precached set. If so, it requires a strict monotonic increase in `CACHE_NAME`. Non-served commits (doc-only, CI, tests) bypass the cache check entirely.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -152,7 +152,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 2953 tests must pass
+- [ ] Run `git commit` — 2958 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -166,7 +166,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (2953 tests) → Protocol 2
+- [ ] Lint, format, commit (2958 tests) → Protocol 2
 
 ---
 
@@ -466,7 +466,7 @@ When reviewing structural changes, check `repomix.config.json` alongside `ARCHIT
 Every feature's runtime behavior must be driven by `GAME_DEFS[ctx]` data, not hardcoded game literals. No feature code may contain `=== 'FO3' ? 'FO3' : 'FNV'`-style coercions that silently collapse a third game to FNV, two-game arrays of faction keys or file paths, or `if (ctx !== 'FNV' && ctx !== 'FO3')` literal allowlists. Adding a new game must require only a new `GAME_DEFS` entry and any game-specific data files — never a search-and-replace of game literals across feature code.
 
 **Sanctioned exceptions (do not change):**
-- The `GAME_DEFS` declaration block itself (`js/state.js`)
+- The `GAME_DEFS` declaration block itself (`js/core/state.js`)
 - `|| 'FNV'` fail-safe defaults (absence guard, not a game validation)
 - Legacy `robco_v7`→`v8` bootstrap migration code
 - The `GAME_FILES` boot manifest in `index.html` — the ONE sanctioned game→files map (WU-A5). It must precede `state.js`/`GAME_DEFS` (it selects the files that *define* `GAME_DEFS`), so it cannot live inside `GAME_DEFS`. A new game = one manifest line + its two data files; selection is `GAME_FILES[ctx] || GAME_FILES.FNV`. Guarded by Suite 89 (sanctioned-map) + Suite 56 (boot load-order).
@@ -474,7 +474,7 @@ Every feature's runtime behavior must be driven by `GAME_DEFS[ctx]` data, not ha
 
 **Why:** As the app grows to support more Fallout titles, hardcoded two-game assumptions silently break or exclude the new game. Data-driven dispatch via `GAME_DEFS` is the only pattern that scales without requiring scattered literal updates across feature code.
 
-**Extension — the `identity` block (owner-approved, added at the Design Overhaul DO-K unit):** `GAME_DEFS[ctx].identity` is the ONE sanctioned per-game **design-data** home — material/persona/ceremony/motion/audio/cursor/voice/ambient. Every per-machine design facet is data on this block; feature code reads it, never hardcodes a per-game design literal (a chrome color, a persona string, a motion-verb texture, a cursor shape). The **FO4 entry must exist and validate** (design-only — see its `designOnly: true` flag) so the N-game abstraction is proved before FO4 actually builds. `identity.theme` is an alias to each game's existing `theme` facet, never a duplicated copy (Protocol 22) — see `js/state.js` and Suite 157.
+**Extension — the `identity` block (owner-approved, added at the Design Overhaul DO-K unit):** `GAME_DEFS[ctx].identity` is the ONE sanctioned per-game **design-data** home — material/persona/ceremony/motion/audio/cursor/voice/ambient. Every per-machine design facet is data on this block; feature code reads it, never hardcodes a per-game design literal (a chrome color, a persona string, a motion-verb texture, a cursor shape). The **FO4 entry must exist and validate** (design-only — see its `designOnly: true` flag) so the N-game abstraction is proved before FO4 actually builds. `identity.theme` is an alias to each game's existing `theme` facet, never a duplicated copy (Protocol 22) — see `js/core/state.js` and Suite 157.
 
 **Pending protocol amendments (owner-approved batch, folding in as their units land):** alongside the DO-K `identity` extension above, the owner has approved a wider batch of protocol changes for the Design Overhaul program. **Adopted at DO-N** (see their full sections above/below): Protocol 25 (UX Stability)'s sanctioned-exception clause extended site-wide plus explicit authorization to replace the tab bar with bezel subsystem nav; **Protocol UI-7** (Device Chrome/Bezel Standard); **Protocol UI-9** (Motion-Verb Grammar — the SWEEP token; SEAT/WAKE/FAULT/BREATHE land with later units, SEAT since adopted at Ceremony Moments Wave 1 — WAKE/FAULT/BREATHE remain pending). **Adopted at DO-O** (see its own section above/below): **Protocol UI-10** (Overseer Presence — the Director Uplink reskin is its first build). **Still pending** (not yet adopted): **UI-8** (the Centering Rule as its own formal protocol — DO-N's bezel already follows the rule informally); Protocol 10 (UI Verification) amended to a per-machine × per-breakpoint render matrix (gates DO-M); and the new Design-Unit Workflow protocol. Each remaining item folds in with the unit that first depends on it — see `planning/DESIGN_OVERHAUL_BUILD_PLAN.md` §8 for the full text of each pending amendment.
 
@@ -491,7 +491,7 @@ All source files are UTF-8. The app is intentionally full of non-ASCII character
 
 **Enforcement:** Suite 90 fails the build if any source file contains U+FFFD (`�`) or the `â€` / `â–` mojibake prefixes — the double-encoding signatures for E2-80-xx and E2-96-xx UTF-8 sequences respectively.
 
-**Incident reference:** Commit `48feb96` introduced double-encoding across the entire `js/api.js` (a PowerShell write during WU-A4); commit `c108beb` restored the file from a clean snapshot and added the Suite 90 guard.
+**Incident reference:** Commit `48feb96` introduced double-encoding across the entire `js/services/api.js` (a PowerShell write during WU-A4); commit `c108beb` restored the file from a clean snapshot and added the Suite 90 guard.
 
 ---
 
@@ -583,7 +583,7 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 ## Protocol 44 — Every Hard-to-Trigger Feature Ships a Diagnostic Shell Trigger
 
-Any new **ambient, conditional, time-gated, view-once, or otherwise hard-to-reproduce** feature — a new `RobcoEvents` event, a new AmbientRuntime observer/state effect, a new boot flavor, a new ceremony/view-once MetaStore flag, a new feedback animation — must register a **Diagnostic Shell tool** (`DIAGNOSTIC_SHELL_TOOLS` entry, `js/test-console.js`) that fires it on demand, **in the same commit**. The tool declares which event(s)/flag(s) it covers via its `triggers: [...]` metadata.
+Any new **ambient, conditional, time-gated, view-once, or otherwise hard-to-reproduce** feature — a new `RobcoEvents` event, a new AmbientRuntime observer/state effect, a new boot flavor, a new ceremony/view-once MetaStore flag, a new feedback animation — must register a **Diagnostic Shell tool** (`DIAGNOSTIC_SHELL_TOOLS` entry, `js/dev/test-console.js`) that fires it on demand, **in the same commit**. The tool declares which event(s)/flag(s) it covers via its `triggers: [...]` metadata.
 
 **Why:** these features are exactly the ones that can't be exercised by normal play in a test pass, so they silently rot. A guaranteed on-demand trigger keeps every one of them verifiable, and keeps the Diagnostic Shell a complete control surface rather than a stale subset.
 
@@ -736,25 +736,25 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 <!-- LOAD-ORDER-GUARD:BEGIN — Suite 220 extracts the numbered `js/….js` items (the subject before each `→`) and asserts they equal the real boot order in index.html (idb → the GAME_FILES manifest → the remaining static tags). Keep this list in sync whenever a `<script>` tag or the GAME_FILES manifest changes. -->
 
-1. `js/idb.js` → `window.IdbStore` (IndexedDB durable-shadow engine; first static tag, before the boot manifest)
-2. `js/db_nv.js` / `js/db_fo3.js` → `databaseCSVs`, `lookupItemInDb()` (per-game CSV data; injected by the `GAME_FILES` manifest in `index.html`, FNV fail-safe)
-3. `js/state.js` → `state`, `APP_VERSION`, `GAME_DEFS`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
-4. `js/reg_nv.js` / `js/reg_fo3.js` + `js/registry-core.js` → `FALLOUT_REGISTRY` (per-game data), `registrySearch()` (read-only engine, never touches state)
-5. `js/ui-audio.js` → all audio functions (`audioCtx`, geiger/tinnitus/CRT hum, limb/wake/boot/level-up sounds, `runBootSequence`, `triggerPhosphorGhost`, `changeOpticsColor`)
-6. `js/ui-render.js` → all `render*()` functions, CRUD helpers (`addItem`/`delItem`/`addAmmo`/etc.), faction utilities (`FACTION_THRESHOLDS`, `getFactionStanding`, `adjustFaction`), game-time helpers, map helpers, `_updateContextPanels`
-7. `js/ui-saves.js` → save slots, file import/export (`handleFileUpload`), rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist
-8. `js/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
-9. `js/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
-10. `js/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
-11. `js/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
-12. `js/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
-13. `js/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
-14. `js/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
-15. `js/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
-16. `js/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
-17. `js/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
-18. `js/api.js` → `autoImportState()`, `transmitMessage()`, `getSystemDirective()`
-19. `js/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
+1. `js/core/idb.js` → `window.IdbStore` (IndexedDB durable-shadow engine; first static tag, before the boot manifest)
+2. `js/data/db_nv.js` / `js/data/db_fo3.js` → `databaseCSVs`, `lookupItemInDb()` (per-game CSV data; injected by the `GAME_FILES` manifest in `index.html`, FNV fail-safe)
+3. `js/core/state.js` → `state`, `APP_VERSION`, `GAME_DEFS`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
+4. `js/data/reg_nv.js` / `js/data/reg_fo3.js` + `js/data/registry-core.js` → `FALLOUT_REGISTRY` (per-game data), `registrySearch()` (read-only engine, never touches state)
+5. `js/ui/ui-audio.js` → all audio functions (`audioCtx`, geiger/tinnitus/CRT hum, limb/wake/boot/level-up sounds, `runBootSequence`, `triggerPhosphorGhost`, `changeOpticsColor`)
+6. `js/ui/ui-render.js` → all `render*()` functions, CRUD helpers (`addItem`/`delItem`/`addAmmo`/etc.), faction utilities (`FACTION_THRESHOLDS`, `getFactionStanding`, `adjustFaction`), game-time helpers, map helpers, `_updateContextPanels`
+7. `js/ui/ui-saves.js` → save slots, file import/export (`handleFileUpload`), rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist
+8. `js/ui/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
+9. `js/services/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
+10. `js/core/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
+11. `js/ui/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
+12. `js/ui/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
+13. `js/ui/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
+14. `js/ui/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
+15. `js/ui/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
+16. `js/ui/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
+17. `js/dev/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
+18. `js/services/api.js` → `autoImportState()`, `transmitMessage()`, `getSystemDirective()`
+19. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
 
 <!-- LOAD-ORDER-GUARD:END -->
 
@@ -762,4 +762,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 2953 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2953 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 2958 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2958 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).

@@ -487,7 +487,7 @@ export default [
   },
   // cloud.js uses ES module syntax (import/export)
   {
-    files: ['js/cloud.js'],
+    files: ['js/services/cloud.js'],
     languageOptions: {
       sourceType: 'module',
       globals: {

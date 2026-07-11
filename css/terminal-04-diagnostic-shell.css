@@ -1,0 +1,789 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-04-diagnostic-shell.css — part 4/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 1822-2601. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: Diagnostic Shell mobile overlay (dev-only tooling, U2)
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════════════
+   DIAGNOSTIC SHELL — mobile overlay (U2, planning/DIAGNOSTIC_SHELL_PLAN.md
+   §6). Replaces the U1 document-flow <details class="panel"> (which shoved
+   the machine down on mobile) with a floating toggle (#dshFab) + a fixed
+   overlay drawer (#testConsolePanel) + a scrim, all mounted BODY-LEVEL as
+   siblings of .container.machine (js/test-console.js appends them straight
+   into #testConsoleMount, which sits before .container.machine in
+   index.html — the exact placement #locationCard already uses above).
+   Every piece here is position:fixed, so #testConsoleMount itself always
+   collapses to zero height regardless of whether the drawer is open —
+   zero document-flow displacement, open or closed. Being a body-level
+   sibling (never a descendant of .container) also means these three
+   elements are NEVER subject to the filter/transform containing-block
+   trade-off documented above the fixed .bezel dock (idle/night/shutdown
+   apply filter/transform to .container only) — they stay pinned to the
+   viewport in every ambient-runtime state, mirroring #locationCard.
+   z-index sits above ordinary content/modals (sysModal 2000, location-card
+   5000) but well below the system-critical overlays that must always win
+   over a dev tool (#bootScreen 100000, the shutdown covers 99998-100002).
+   U4b (Protocol 42 fix): a confirm dialog the shell's OWN _invoke() opens
+   (via the shared #sysModal) is the one exception — see the scoped
+   body.dsh-modal-elevate rule on .modal-overlay, toggled only for the
+   duration of that one confirmAction() call, so it is never buried behind
+   this z-index range while every other #sysModal use stays exactly where
+   this comment describes.
+   The slide-in is a plain `animation:` (Protocol UI-9) — the existing
+   global prefers-reduced-motion block (animation-duration:0.01ms on *)
+   neutralizes it to an instant open with no bespoke carve-out.
+   Owner report (mobile chrome batch, MOBILE ONLY — desktop stays exactly
+   as U2 shipped it, the Suite 129 (min-width:1000px)/(max-width:999.98px)
+   split this file already uses everywhere else): U2's shape (a right-side,
+   FULL-HEIGHT drawer) covered the entire mobile screen, so a tester
+   couldn't watch a trigger's effect on the terminal while using the tools.
+   Below (max-width:999.98px), #testConsolePanel becomes a resizable
+   PARTIAL-height BOTTOM SHEET (js/test-console.js _wireSheetResize()) and
+   #dshScrim goes permanently inert (transparent + pointer-events:none) so
+   the visible terminal above the sheet stays fully USABLE, not just
+   visible. The desktop rules directly below are BYTE-IDENTICAL to what U2
+   shipped. ══════════════════════════════════════════════════════════ */
+.dsh-fab {
+  position: fixed;
+  left: 12px;
+  bottom: 16px;
+  z-index: 20002;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--bezel-wire, var(--robco-green));
+  background: rgba(0, 0, 0, 0.78);
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 10px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(var(--bezel-wire-rgb), 0.35);
+}
+.dsh-fab span {
+  /* Owner report (FIX 4, all breakpoints — a pure font-metrics correction,
+     not a layout change): the bare glyph read visibly off-center inside
+     the already flex-centered button — the gear glyph's own font metrics
+     (leading/descender space Courier New bakes into the glyph box) aren't
+     removed by a line-height:1 on the BUTTON alone. Locking the SPAN's own
+     line-height/display strips that inherited leading from the glyph's own
+     box, and the 1px nudge corrects the small residual optical offset. */
+  display: block;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+/* Owner report (FIX 3, all breakpoints): button:hover's fill "stuck" after
+   a mobile tap (no pointerleave to clear it on touch), so the bubble read
+   identically to its OPEN look even while genuinely closed. Reset the
+   hover look unconditionally first (every pointer type), then layer the
+   real hover fill back in for hover-capable pointers only — the same
+   (hover: hover) and (pointer: fine) gate the mode-pill fix already
+   established (Suite 129's own signal). On an actual desktop (hover:hover
+   true) this reproduces the ORIGINAL unconditional hover rule exactly —
+   same two colors, same trigger — so desktop's hover feedback is
+   unaffected; only a touch device (hover:hover false), which can never
+   satisfy the gated rule, gets the fix. :focus-visible stays unconditional
+   (Protocol 17 — keyboard focus is never hover-gated). */
+.dsh-fab:hover {
+  background: rgba(0, 0, 0, 0.78);
+  color: var(--bezel-wire, var(--robco-green));
+}
+@media (hover: hover) and (pointer: fine) {
+  .dsh-fab:hover {
+    background: var(--bezel-wire, var(--robco-green));
+    color: #000;
+  }
+}
+.dsh-fab:focus-visible {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
+}
+.dsh-fab[aria-expanded='true'] {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
+}
+/* Mobile: sit above the fixed bezel dock (60px z, reserved via the machine's
+   own 100px padding-bottom) instead of behind/under it. This is only the
+   fallback resting spot for a device that has never dragged the bubble —
+   _wireFabDrag() (js/test-console.js, MOBILE-ONLY-WIRED) overrides
+   left/top with an inline style the instant it's dragged, and restores a
+   persisted position (robco_dsh_fab_pos, MetaStore) on every mount. */
+@media (max-width: 999.98px) {
+  .dsh-fab {
+    bottom: 112px;
+    /* Owner report (FIX 2, MOBILE ONLY — desktop's bubble stays click-only,
+       exactly as U2 shipped it): the bubble is draggable anywhere on
+       screen (js/test-console.js _wireFabDrag(), wired only under this
+       same max-width:999.98px signal) — touch-action:none hands the
+       gesture entirely to the pointer handlers instead of the browser
+       interpreting a touch-drag as a page scroll (the tempo-dial/
+       Immersion-dial drag precedent, ui-core.js/ui-render.js). */
+    touch-action: none;
+  }
+  /* Owner report (FIX 3, MOBILE ONLY): the bubble's highlighted look is
+     driven ONLY by .dsh-fab--open (toggled by _openShell()/_closeShell())
+     on mobile — never by [aria-expanded], which desktop still uses above
+     — so it lights up exactly when, and only when, the sheet is genuinely
+     open, immune to the touch-sticky-hover confusion this fix targets.
+     Desktop keeps its original [aria-expanded='true'] rule untouched. */
+  .dsh-fab.dsh-fab--open {
+    background: var(--bezel-wire, var(--robco-green));
+    color: #000;
+  }
+}
+.dsh-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.6);
+}
+.dsh-scrim[hidden] {
+  display: none;
+}
+@keyframes dsh-slide-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.dsh-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20001;
+  width: min(92vw, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+  border-left: 1px solid var(--bezel-wire, var(--robco-green));
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.06), transparent 20%), #050803;
+  box-shadow:
+    -8px 0 30px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+  padding: 12px 14px 24px;
+  animation: dsh-slide-in 0.22s ease-out;
+}
+.dsh-drawer[hidden] {
+  display: none;
+}
+/* #dshDragHandle/#dshExpandToggle are new mobile-only controls (FIX 1) —
+   hidden by default so the desktop drawer's header renders exactly as
+   before (icon + title + close button only); the mobile block below shows
+   them. Both "show" overrides inside that block target the SAME id
+   selectors used here (equal specificity, later in source) rather than a
+   lower-specificity class — an earlier version of this fix used
+   `.dsh-drag-handle { display: flex }` for the show rule, which an id
+   selector's specificity always beats regardless of source order, so the
+   handle stayed display:none on mobile until this was caught live. */
+#dshDragHandle {
+  display: none;
+}
+#dshExpandToggle {
+  display: none;
+}
+/* Owner report (FIX 1, MOBILE ONLY): #testConsolePanel becomes a resizable
+   PARTIAL-height BOTTOM SHEET — 50% of the viewport by default — instead
+   of the desktop-style right-side full-height drawer above, so the app
+   screen stays visible AND usable above it. --dsh-sheet-h is written on
+   <html> by _wireSheetResize() (js/test-console.js) via drag
+   (#dshDragHandle) or the expand/collapse toggle (#dshExpandToggle); the
+   :root default below is the pre-drag, first-open size. #dshScrim also
+   goes fully inert here — a "tap outside to dismiss" gesture no longer
+   applies once the terminal above the sheet must stay clickable, so the
+   sheet closes only via #dshClose, Escape, or dragging the handle down.
+   Desktop is completely untouched by this block. */
+@media (max-width: 999.98px) {
+  :root {
+    --dsh-sheet-h: 50vh;
+  }
+  .dsh-scrim {
+    background: transparent;
+    pointer-events: none;
+  }
+  @keyframes dsh-slide-up {
+    from {
+      transform: translateY(28px);
+      opacity: 0.35;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  .dsh-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: var(--dsh-sheet-h, 50vh);
+    min-height: 180px;
+    max-height: 94vh;
+    /* box-sizing:border-box is required here — left:0;right:0;width:100%
+       is over-constrained under the default content-box, and the browser
+       drops `right` to satisfy it, so the horizontal padding below would
+       otherwise silently push the sheet's right edge past the viewport
+       (caught live at 360px: right computed to 388 against a 360
+       viewport). border-box keeps the declared 100% width as the OUTER
+       edge the padding is carved out of. */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: none;
+    border-top: 1px solid var(--bezel-wire, var(--robco-green));
+    border-radius: 16px 16px 0 0;
+    box-shadow:
+      0 -8px 30px rgba(0, 0, 0, 0.8),
+      0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+    padding: 0 14px 16px;
+    animation: dsh-slide-up 0.22s ease-out;
+  }
+  /* Drag handle — resizes the sheet height on pointer drag, or via
+     ArrowUp/ArrowDown when focused (role=slider, tabindex=0, the
+     tempo-dial keyboard-slider precedent). A genuine >=28px tap target
+     (Protocol 17) even though the visible grip is a thin decorative
+     ::before bar. touch-action:none hands the vertical gesture entirely to
+     the pointer handlers instead of scrolling the page underneath (the
+     tempo-dial/Immersion-dial precedent). Hidden on desktop above — the
+     display override here targets the id selector (not .dsh-drag-handle)
+     to match that hide rule's specificity, so it actually wins here. */
+  #dshDragHandle {
+    display: flex;
+  }
+  .dsh-drag-handle {
+    flex-shrink: 0;
+    width: 100%;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    cursor: ns-resize;
+    touch-action: none;
+  }
+  .dsh-drag-handle::before {
+    content: '';
+    width: 42px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  .dsh-drag-handle:hover::before,
+  .dsh-drag-handle:focus-visible::before {
+    background: var(--bezel-wire, var(--robco-green));
+  }
+  /* Everything below the drag handle + head scrolls internally — the
+     handle and title bar stay pinned at the top of the sheet regardless
+     of scroll position. On desktop this wrapper is a plain, unstyled div
+     and the ORIGINAL .dsh-drawer overflow-y:auto (above) keeps scrolling
+     the whole drawer exactly as U2 shipped it. */
+  .dsh-drawer-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+  }
+  #dshExpandToggle {
+    display: inline-block;
+  }
+}
+.dsh-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+}
+.dsh-drawer-icon {
+  font-size: 16px;
+  color: var(--bezel-wire, var(--robco-green));
+  flex-shrink: 0;
+}
+.dsh-drawer-head h2 {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--bezel-wire, var(--robco-green));
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.dsh-drawer-head .dx {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  background: transparent;
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+.dsh-drawer-head .dx:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.15);
+}
+.dsh-drawer-head .dx[aria-pressed='true'] {
+  background: var(--bezel-wire, var(--robco-green));
+  color: #000;
+}
+/* Per-tool icon glyph (registry `icon` field) prepended to each migrated
+   control's existing .optics-label by _renderShell() (js/test-console.js);
+   a per-category glyph is likewise prepended to each section's <h3>. */
+.dsh-tool-icon,
+.dsh-section-icon {
+  display: inline-block;
+  margin-right: 5px;
+  color: var(--bezel-wire, var(--robco-green));
+}
+/* U4a: every registry `group` (e.g. TRIGGERS' LIVING CORE / BOOT FLAVOR /
+   CEREMONIES / FIRE ANIMATION, or an anchor's FORCE TRANSITION / VIEW-ONCE
+   CEREMONIES / etc.) is now its own collapsible details.sub-panel NESTED
+   inside the category's details.sub-panel — see _buildGroupDetails() in
+   js/test-console.js. The plain .sub-panel rule below already styles it
+   (border-top + summary cursor); the retired .dsh-tool-subhead (a flat,
+   always-expanded label div) is gone — a collapsible heading replaces it.
+   .dsh-tool-grid (the synthesized-button flex-wrap row) is unchanged. */
+
+/* U4b: SUBMENU VISUAL HIERARCHY (owner screenshot report — a nested group
+   heading, e.g. OPTICAL SCAN TEST under RESILIENCE & INFRA, read as the SAME
+   level as its parent category heading, since both reused the identical
+   plain `details.sub-panel` rule above with zero visual distinction). Scoped
+   to `#dshSections` (unique to the Diagnostic Shell drawer) so no other
+   nested-sub-panel usage in the app (e.g. AMMO RESERVES inside BACKPACK
+   INVENTORY, which is only ONE level deep, not sub-panel-inside-sub-panel)
+   is touched — a genuinely NESTED sub-panel (any details.sub-panel that is a
+   descendant of another details.sub-panel, both inside #dshSections) gets a
+   left indent + a dimmer/smaller heading so it visibly reads as a child of
+   its category, never a sibling. */
+#dshSections details.sub-panel details.sub-panel {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(var(--robco-green-rgb), 0.25);
+  border-top-color: rgba(var(--robco-green-rgb), 0.25);
+}
+#dshSections details.sub-panel details.sub-panel > summary h3 {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* U4b: a synthesized parameterized-cheat row (control:'input'|'select'|
+   'select-input' — a select and/or an input plus a GO button, see
+   _renderShell() in js/test-console.js) sits inside the same .dsh-tool-grid
+   flex-wrap row as the plain buttons; the row's own label wraps to its own
+   line (flex-basis:100%) so the select/input/GO trio always reads below it,
+   never crammed onto one crowded line at 360/412px. */
+.dsh-tool-row select,
+.dsh-tool-row input {
+  box-sizing: border-box;
+}
+
+/* U4b: the small on-panel DEV-MARKER reset button (_mountInlineResets(),
+   js/test-console.js) — a dimmed .btn-sm variant so it reads as a
+   staging-only affordance riding alongside the panel's own real controls,
+   never mistaken for one of them. .btn-sm already guarantees the Protocol 17
+   28px tap-target floor; this only tweaks color/size/spacing. */
+.dsh-inline-reset {
+  opacity: 0.6;
+  border-color: rgba(var(--robco-green-rgb), 0.4);
+  color: var(--bezel-wire, var(--robco-green));
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  margin: 4px 0;
+}
+.dsh-inline-reset:hover,
+.dsh-inline-reset:focus-visible {
+  opacity: 1;
+}
+
+/* U4a: a labeled read-only INSPECT line (js/test-console.js _inspectRow(),
+   shared with _chassisIdRow()) — human-readable "LABEL: VALUE" text only,
+   never a raw data dump. */
+.dsh-inspect-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+  flex-wrap: wrap;
+}
+.dsh-inspect-line b {
+  font-weight: normal;
+  opacity: 0.6;
+}
+.dsh-inspect-line span {
+  text-align: right;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+/* ─── Sub-Panel (nested <details> inside a top-level panel) ──────── */
+/* Used by AMMO RESERVES nested inside BACKPACK INVENTORY */
+details.sub-panel {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding-top: 6px;
+}
+details.sub-panel > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  padding: 2px 0;
+}
+details.sub-panel > summary::-webkit-details-marker {
+  display: none;
+}
+details.sub-panel > summary h3 {
+  display: inline;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  margin: 0;
+  opacity: 0.85;
+}
+details.sub-panel > summary h3::after {
+  content: ' [+]';
+  font-family: monospace;
+  font-size: 11px;
+}
+details.sub-panel[open] > summary h3::after {
+  content: ' [-]';
+}
+
+.modal-box {
+  background: rgba(2, 28, 20, 0.95);
+  border: 2px solid var(--robco-green);
+  padding: 20px;
+  min-width: 320px;
+  max-width: 600px;
+  box-shadow: var(--robco-glow);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal-title {
+  font-weight: bold;
+  font-size: 16px;
+  border-bottom: 1px dashed var(--robco-green);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  color: var(--robco-green);
+}
+.modal-content {
+  white-space: pre-wrap;
+  overflow-y: auto;
+  flex-grow: 1;
+  padding-right: 10px;
+  line-height: 1.3;
+}
+#updateModalMsg {
+  text-align: left;
+  white-space: normal;
+}
+.close-btn {
+  margin-top: 15px;
+  width: 100%;
+}
+
+/* ── Step 2 Phase 0 U12: confirmAction() diegetic confirm dialog ──── */
+.modal-confirm-body {
+  white-space: normal; /* override .modal-content pre-wrap for structured <p> text */
+}
+.modal-confirm-body p {
+  margin: 0 0 6px 0;
+}
+.modal-confirm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.modal-confirm-actions button {
+  flex: 1 1 auto;
+  min-width: 120px;
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+}
+/* Owner report: a confirmAction() dialog already carries its own labeled
+   CONTINUE + CANCEL pair (.modal-confirm-actions above) — the modal's
+   always-present static "[ CLOSE INTERFACE ]" button duplicated CANCEL's
+   exact dismiss behavior, reading as two cancels. Suppressed only while
+   .confirm-mode is set (openModal({hideCloseBtn:true}), toggled by
+   confirmAction() alone); every other modal (help/error log/changelog/save
+   help) keeps its one CLOSE INTERFACE button untouched. */
+.modal-box.confirm-mode .close-btn {
+  display: none;
+}
+
+/* ── WU-C11 Changelog viewer ("FIRMWARE REVISION LOG") ──────────── */
+/* Changelog-only wide mode: a comfortable ~700px reading column on desktop,
+   never edge-to-edge; capped to the viewport on mobile so it can't overflow. */
+.modal-box.changelog-wide {
+  /* WU-C15: LOCK the width to the expanded size at every breakpoint. Without an
+     explicit width the flex box shrink-to-fits its content, so collapsing all
+     categories produced a narrow box. A fixed width makes collapse/expand change
+     WIDTH never. On mobile this is the same full-width-minus-margin (94vw) the
+     expanded state already uses. */
+  width: min(740px, 94vw);
+  max-width: min(740px, 94vw);
+  /* WU-C15 follow-up: LOCK the HEIGHT too. Without a fixed height the flex column
+     shrink-to-fits its content, so collapsing all categories produced a short box
+     and expanding produced a tall one. Pinning the height (capped to the viewport)
+     makes the box dimensions CONSTANT regardless of how many <details> are open:
+     .modal-content (flex-grow:1; overflow-y:auto) fills the space and scrolls
+     internally, while the .close-btn stays pinned at the bottom of the flex column.
+     min(85vh, 820px) keeps it viewport-safe on short screens and avoids an
+     oversized empty box on very tall monitors. box-sizing:border-box makes the
+     locked width/height the TOTAL footprint (incl. the 20px padding + 2px border),
+     so min(740px,94vw) can never exceed the viewport at narrow widths (no overflow
+     at 360/412) and the height cap is exact. */
+  box-sizing: border-box;
+  height: min(85vh, 820px);
+  max-height: min(85vh, 820px);
+}
+/* WU-C15: expand/collapse-all toggle control row at the top of the viewer. */
+.changelog-controls {
+  margin-bottom: 12px;
+}
+.changelog-toggle-all {
+  width: auto; /* override global button { width: 100% } */
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.08);
+  border: 1px solid var(--robco-green);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.changelog-toggle-all:hover {
+  background: rgba(var(--robco-green-rgb), 0.16);
+}
+.changelog-viewer {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  white-space: normal; /* override .modal-content pre-wrap for structured HTML */
+}
+.changelog-firmware-head {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--robco-green);
+  opacity: 0.85;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.5);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+.changelog-ver-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.changelog-ver-label {
+  font-size: 13px;
+  letter-spacing: 1px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+.changelog-ver-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  font-family: inherit;
+  font-size: 16px; /* ≥16px: no iOS focus-zoom (Protocol 17) */
+  color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.08);
+  border: 1px solid var(--robco-green);
+  padding: 4px 8px;
+}
+.changelog-meta {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.changelog-cat {
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.35);
+  padding: 6px 0;
+}
+.changelog-cat > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  padding: 4px 0;
+  min-height: 28px; /* ≥28px tap target (Protocol 17) */
+}
+.changelog-cat > summary::-webkit-details-marker {
+  display: none;
+}
+.changelog-cat-tag {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  white-space: nowrap;
+}
+.changelog-cat-count {
+  font-size: 12px;
+  opacity: 0.85; /* ≥AA contrast on the dark modal bg (axe-verified) */
+}
+.changelog-cat > summary::after {
+  content: ' [+]';
+  float: right;
+  font-family: monospace;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.changelog-cat[open] > summary::after {
+  content: ' [-]';
+}
+.changelog-entries {
+  list-style: none;
+  margin: 6px 0 4px 0;
+  padding: 0;
+}
+.changelog-entries li {
+  margin: 0 0 8px 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.changelog-empty {
+  opacity: 0.85; /* ≥AA contrast on the dark modal bg */
+  font-style: italic;
+}
+@media (max-width: 600px) {
+  .changelog-viewer {
+    max-width: 100%;
+  }
+}
+
+/* ── Command Registry Card Grid ─────────────────────────────── */
+.cmd-registry {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  white-space: normal;
+}
+.cmd-group {
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding: 8px;
+}
+.cmd-group-title {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
+  padding-bottom: 4px;
+}
+.cmd-card {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.1);
+  font-size: 11px;
+}
+.cmd-card:last-child {
+  border-bottom: none;
+}
+.cmd-name {
+  color: var(--robco-green);
+  font-weight: bold;
+}
+.cmd-desc {
+  opacity: 0.55;
+  font-size: 10px;
+}
+
+/* WU-T3: per-game save-manager identity header (saveLabel from GAME_DEFS theme) */
+.saves-archive-header {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  opacity: 0.75;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* SAVES LIST row (owner report — all buttons fit, nothing cut off): the label and
+   its button group stack independently so a growing action set (LOAD/OVERWRITE/
+   VER/DELETE, +NAME on cloud rows) wraps onto its own line instead of clipping or
+   forcing horizontal scroll at 360/412px (Protocol 17). Replaces the previous
+   single-line inline-styled row. */
+.save-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.15);
+}
+.save-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.save-row-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.save-row-tag {
+  font-size: 9px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.save-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.save-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* WU-F10: OVERSEER'S LOG section dividers (device telemetry vs campaign log) */
+.overseer-section-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+  margin: 8px 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  white-space: nowrap;
+}
+.overseer-section-label:first-child {
+  margin-top: 0;
+}

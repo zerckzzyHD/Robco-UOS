@@ -9,7 +9,8 @@
  *   3. the physical js/*.js files on disk
  *   4. the CLAUDE.md / ARCHITECTURE.md LOAD-ORDER-GUARD doc blocks
  *   5. tests/test.html's boot chain
- * plus repomix.config.json's pack coverage (Protocol 37).
+ * plus repomix.config.json's pack coverage (Protocol 37), plus (2.8.5 U-A2)
+ * the CSS split's <link> order in index.html and its sw.js precache coverage.
  *
  * Missing any one of these is either a black screen (a loaded file 404s, or a
  * file the app needs was never given a <script> tag) or a silently-missing
@@ -22,6 +23,14 @@
  * fast, standalone preflight runnable on its own (`node scripts/check-boot-chain.js`)
  * without paying for either full runner, and it additionally covers sw.js
  * ASSETS, on-disk file coverage, and test.html, which Suite 220 does not.
+ *
+ * 2.8.5 U-A2 (js/ subfolder reorg + terminal.css split): js/ stopped being
+ * flat — every js file now lives under one of js/{data,core,ui,services,dev}/
+ * (js/vendor/ is a separate, never-a-boot-<script>-tag allowlist, unchanged).
+ * Every derivation below tracks the FULL relative path (e.g. "ui/ui-core"),
+ * not just the bare stem — existence/precache checks need the real path;
+ * only the doc LOAD-ORDER-GUARD comparison collapses to the bare, normalized
+ * stem (db_nv/db_fo3 -> "db", reg_nv/reg_fo3 -> "reg"), same as before.
  *
  * Run:  node scripts/check-boot-chain.js
  * Exit: 0 all consistent, 1 otherwise (prints every mismatch found).
@@ -58,33 +67,41 @@ function read(rel) {
 // so both stay honest against the same source of truth.
 const normStem = s => s.replace(/^db_(?:nv|fo3)$/, 'db').replace(/^reg_(?:nv|fo3)$/, 'reg');
 const dedupeConsec = a => a.filter((x, i) => i === 0 || x !== a[i - 1]);
+const JS_SUBFOLDERS = ['data', 'core', 'ui', 'services', 'dev'];
 
 const html = read('index.html');
 
-const staticStems = [];
+// Captures the FULL relative path (optional subfolder + stem), e.g.
+// "ui/ui-core" or "idb" for a not-yet-subfoldered reference.
+const staticRelPaths = [];
 {
-  const sr = /<script[^>]*\ssrc=["']js\/([A-Za-z0-9_-]+)\.js["']/g;
+  const sr = /<script[^>]*\ssrc=["']js\/((?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_-]+)\.js["']/g;
   let m;
-  while ((m = sr.exec(html))) staticStems.push(m[1]);
+  while ((m = sr.exec(html))) staticRelPaths.push(m[1]);
 }
 
-function gameFilesStemsFor(ctx) {
+function gameFilesRelPathsFor(ctx) {
   const re = new RegExp(`${ctx}:\\s*\\[([^\\]]+)\\]`);
   const m = re.exec(html);
-  return m ? [...m[1].matchAll(/js\/([A-Za-z0-9_-]+)\.js/g)].map(x => x[1]) : [];
+  return m
+    ? [...m[1].matchAll(/js\/((?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_-]+)\.js/g)].map(x => x[1])
+    : [];
 }
-const fnvGameFiles = gameFilesStemsFor('FNV');
-const fo3GameFiles = gameFilesStemsFor('FO3');
+const fnvGameFiles = gameFilesRelPathsFor('FNV');
+const fo3GameFiles = gameFilesRelPathsFor('FO3');
 
-// Normalized order (db_nv/db_fo3 -> "db", reg_nv/reg_fo3 -> "reg") — matches
-// Suite 220's canonicalOrder220, used only for the doc LOAD-ORDER-GUARD compare.
+const relStem = relPath => relPath.split('/').pop();
+
+// Normalized STEM order (db_nv/db_fo3 -> "db", reg_nv/reg_fo3 -> "reg"),
+// subfolder discarded — used only for the doc LOAD-ORDER-GUARD compare.
 const canonicalOrder = dedupeConsec(
-  [staticStems[0], ...fnvGameFiles, ...staticStems.slice(1)].map(normStem)
+  [staticRelPaths[0], ...fnvGameFiles, ...staticRelPaths.slice(1)].map(p => normStem(relStem(p)))
 );
 
 // The real, ungrouped set of every physical js file the app can boot with
-// (both game variants expanded) — used for existence/coverage checks.
-const REAL_BOOT_STEMS = new Set([...staticStems, ...fnvGameFiles, ...fo3GameFiles]);
+// (both game variants expanded), as full relative paths (subfolder intact) —
+// used for existence/precache checks, where the real on-disk location matters.
+const REAL_BOOT_RELPATHS = new Set([...staticRelPaths, ...fnvGameFiles, ...fo3GameFiles]);
 
 ok(
   canonicalOrder.length >= 10 && canonicalOrder[0] === 'idb' && canonicalOrder.at(-1) === 'cloud',
@@ -94,14 +111,20 @@ ok(
 
 // ── CHECK A: every physical js/*.js file on disk is part of the boot chain ──
 // (js/vendor/* is lazy-loaded by ocr.js at runtime, never a <script> tag —
-// sanctioned exclusion, same allowlist as CHECK D below.)
+// sanctioned exclusion, same allowlist as CHECK D below.) 2.8.5 U-A2: js/ is
+// no longer flat — walk every js/<subfolder>/ and build "sub/stem" paths.
 {
   const jsDir = path.join(ROOT, 'js');
-  const onDisk = fs
-    .readdirSync(jsDir, { withFileTypes: true })
-    .filter(d => d.isFile() && d.name.endsWith('.js'))
-    .map(d => d.name.replace(/\.js$/, ''));
-  const orphans = onDisk.filter(stem => !REAL_BOOT_STEMS.has(stem));
+  const onDisk = [];
+  for (const sub of JS_SUBFOLDERS) {
+    const subDir = path.join(jsDir, sub);
+    if (!fs.existsSync(subDir)) continue;
+    for (const f of fs.readdirSync(subDir, { withFileTypes: true })) {
+      if (f.isFile() && f.name.endsWith('.js'))
+        onDisk.push(`${sub}/${f.name.replace(/\.js$/, '')}`);
+    }
+  }
+  const orphans = onDisk.filter(relPath => !REAL_BOOT_RELPATHS.has(relPath));
   ok(
     orphans.length === 0,
     'every physical js/*.js file on disk has a <script> tag or GAME_FILES entry in index.html',
@@ -111,8 +134,8 @@ ok(
 
 // ── CHECK B: every file index.html references actually exists on disk ──────
 {
-  const missing = [...REAL_BOOT_STEMS].filter(
-    stem => !fs.existsSync(path.join(ROOT, 'js', `${stem}.js`))
+  const missing = [...REAL_BOOT_RELPATHS].filter(
+    relPath => !fs.existsSync(path.join(ROOT, 'js', `${relPath}.js`))
   );
   ok(
     missing.length === 0,
@@ -128,15 +151,15 @@ ok(
 // tags: lazily runtime-cached by ocr.js on first OCR use (see sw.js's own
 // comment on this exact exclusion).
 const ASSETS_VENDOR_ALLOW = new Set(['js/vendor/tesseract.min.js', 'js/vendor/worker.min.js']);
+const swText = read('sw.js');
+const assetsBlock = /const ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swText);
 {
-  const sw = read('sw.js');
-  const assetsBlock = /const ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(sw);
   const assetJsPaths = assetsBlock
     ? [...assetsBlock[1].matchAll(/'\.\/(js\/[^']+)'/g)].map(m => m[1])
     : [];
 
-  const missingFromAssets = [...REAL_BOOT_STEMS].filter(
-    stem => !assetJsPaths.includes(`js/${stem}.js`)
+  const missingFromAssets = [...REAL_BOOT_RELPATHS].filter(
+    relPath => !assetJsPaths.includes(`js/${relPath}.js`)
   );
   ok(
     missingFromAssets.length === 0,
@@ -147,8 +170,8 @@ const ASSETS_VENDOR_ALLOW = new Set(['js/vendor/tesseract.min.js', 'js/vendor/wo
   );
 
   const orphanAssets = assetJsPaths.filter(p => {
-    const stem = p.replace(/^js\//, '').replace(/\.js$/, '');
-    return !REAL_BOOT_STEMS.has(stem) && !ASSETS_VENDOR_ALLOW.has(p);
+    const relPath = p.replace(/^js\//, '').replace(/\.js$/, '');
+    return !REAL_BOOT_RELPATHS.has(relPath) && !ASSETS_VENDOR_ALLOW.has(p);
   });
   ok(
     orphanAssets.length === 0,
@@ -179,8 +202,8 @@ function extractDocOrder(text) {
     if (!/^\s*\d+\./.test(line)) continue;
     const subj = line.split(/→|->/)[0];
     let mm;
-    const fr = /js\/([A-Za-z0-9_-]+)\.js/g;
-    while ((mm = fr.exec(subj))) out.push(normStem(mm[1]));
+    const fr = /js\/((?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_-]+)\.js/g;
+    while ((mm = fr.exec(subj))) out.push(normStem(relStem(mm[1])));
   }
   return dedupeConsec(out);
 }
@@ -210,26 +233,102 @@ for (const doc of ['CLAUDE.md', 'ARCHITECTURE.md']) {
 // boot file appear.
 {
   const testHtml = read('tests/test.html');
-  const stems = [];
-  const sr = /<script[^>]*\ssrc=["']\.\.\/js\/([A-Za-z0-9_-]+)\.js["']/g;
+  const relPaths = [];
+  const sr = /<script[^>]*\ssrc=["']\.\.\/js\/((?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_-]+)\.js["']/g;
   let m;
-  while ((m = sr.exec(testHtml))) stems.push(m[1]);
+  while ((m = sr.exec(testHtml))) relPaths.push(m[1]);
 
-  const unknown = stems.filter(s => !REAL_BOOT_STEMS.has(s));
+  const unknown = relPaths.filter(s => !REAL_BOOT_RELPATHS.has(s));
   ok(
     unknown.length === 0,
     'every js file tests/test.html loads is a real, current boot-chain file (no stale/retired reference)',
     unknown.length ? `unknown/retired: ${unknown.join(', ')}` : undefined
   );
 
-  const GAME_PREFIX = ['idb', 'db_nv', 'db_fo3', 'state', 'reg_nv', 'reg_fo3', 'registry-core'];
-  const testHtmlPrefixOrder = stems.filter(s => GAME_PREFIX.includes(s));
-  const canonicalPrefixOrder = staticStems[0] === 'idb' ? ['idb', ...fnvGameFiles] : [];
-  const expectedPrefixOrder = canonicalPrefixOrder.filter(s => testHtmlPrefixOrder.includes(s));
+  const GAME_PREFIX_STEMS = [
+    'idb',
+    'db_nv',
+    'db_fo3',
+    'state',
+    'reg_nv',
+    'reg_fo3',
+    'registry-core',
+  ];
+  const testHtmlPrefixOrder = relPaths.filter(s => GAME_PREFIX_STEMS.includes(relStem(s)));
+  const canonicalPrefixRelPaths =
+    staticRelPaths[0] && GAME_PREFIX_STEMS.includes(relStem(staticRelPaths[0]))
+      ? [staticRelPaths[0], ...fnvGameFiles]
+      : [];
+  const expectedPrefixOrder = canonicalPrefixRelPaths.filter(s => testHtmlPrefixOrder.includes(s));
   ok(
     JSON.stringify(testHtmlPrefixOrder) === JSON.stringify(expectedPrefixOrder),
     "tests/test.html keeps idb -> db -> state -> reg -> registry-core in index.html's relative order",
     `test.html order: ${JSON.stringify(testHtmlPrefixOrder)}\n         expected: ${JSON.stringify(expectedPrefixOrder)}`
+  );
+}
+
+// ── CHECK I/J/K: css/terminal-*.css split order (2.8.5 U-A2) ───────────────
+// terminal.css was split into 12 files as a PURE ORDERED CUT — CSS cascade
+// resolves equal-specificity ties by source order, so the <link> order in
+// index.html is not cosmetic, it's load-bearing (terminal-12-mobile.css in
+// particular MUST be last). This is the CSS analogue of CHECK A/B/C/D/F/G
+// above, newly added for the split.
+const CANONICAL_CSS_ORDER = [
+  'terminal-01-base.css',
+  'terminal-02-chrome.css',
+  'terminal-03-overseer.css',
+  'terminal-04-diagnostic-shell.css',
+  'terminal-05-toolbar.css',
+  'terminal-06-modulebay.css',
+  'terminal-07-operator-boards.css',
+  'terminal-08-curio-operations.css',
+  'terminal-09-databank.css',
+  'terminal-10-chassis.css',
+  'terminal-11-feedback-animations.css',
+  'terminal-12-mobile.css',
+];
+{
+  const cssLinkOrder = [];
+  const lr = /<link[^>]*\srel=["']stylesheet["'][^>]*\shref=["']css\/([A-Za-z0-9_-]+\.css)["']/g;
+  let m;
+  while ((m = lr.exec(html))) cssLinkOrder.push(m[1]);
+
+  // CHECK I: index.html's <link> order is EXACTLY the canonical split order
+  // (not just a permutation — order is the entire point of this guard).
+  ok(
+    JSON.stringify(cssLinkOrder) === JSON.stringify(CANONICAL_CSS_ORDER),
+    'index.html <link> tags list the 12 split CSS files in the exact canonical cascade order',
+    `index.html order: ${JSON.stringify(cssLinkOrder)}\n         canonical order: ${JSON.stringify(CANONICAL_CSS_ORDER)}`
+  );
+
+  // CHECK J: every css/*.css file on disk is one of the 12 canonical files
+  // (no orphaned split file, no leftover monolithic terminal.css).
+  const cssDir = path.join(ROOT, 'css');
+  const onDiskCss = fs.existsSync(cssDir)
+    ? fs.readdirSync(cssDir).filter(f => f.endsWith('.css'))
+    : [];
+  const orphanCss = onDiskCss.filter(f => !CANONICAL_CSS_ORDER.includes(f));
+  const missingCss = CANONICAL_CSS_ORDER.filter(f => !onDiskCss.includes(f));
+  ok(
+    orphanCss.length === 0 && missingCss.length === 0,
+    'css/ on disk contains exactly the 12 canonical split files (no orphans, none missing)',
+    orphanCss.length || missingCss.length
+      ? `orphaned: ${orphanCss.join(', ') || 'none'}; missing: ${missingCss.join(', ') || 'none'}`
+      : undefined
+  );
+
+  // CHECK K: sw.js ASSETS precaches every one of the 12 split CSS files
+  // (precache order doesn't affect the cascade — only existence matters here).
+  const assetCssPaths = assetsBlock
+    ? [...assetsBlock[1].matchAll(/'\.\/(css\/[^']+)'/g)].map(mm => mm[1].replace(/^css\//, ''))
+    : [];
+  const missingFromCssAssets = CANONICAL_CSS_ORDER.filter(f => !assetCssPaths.includes(f));
+  ok(
+    missingFromCssAssets.length === 0,
+    'every split CSS file is precached in sw.js ASSETS (Protocol 1)',
+    missingFromCssAssets.length
+      ? `missing from ASSETS: ${missingFromCssAssets.join(', ')}`
+      : undefined
   );
 }
 
@@ -239,6 +338,8 @@ if (failCount > 0) {
   console.error(`[boot-chain] ${failCount} inconsistency(ies) found. See [FAIL] lines above.`);
   process.exit(1);
 } else {
-  console.log('[boot-chain] All 5 sources consistent — index.html, sw.js, disk, docs, test.html.');
+  console.log(
+    '[boot-chain] All sources consistent — index.html, sw.js, disk, docs, test.html, css split order.'
+  );
   process.exit(0);
 }

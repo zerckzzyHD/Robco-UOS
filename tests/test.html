@@ -165,14 +165,14 @@
     <!-- Boot chain — same files, same order as the live FNV boot in index.html:
          idb → db → state → reg → registry-core, then api. idb.js loads before
          state.js so MetaStore's P1 write-through has window.IdbStore. -->
-    <script src="../js/idb.js"></script>
-    <script src="../js/db_nv.js"></script>
-    <script src="../js/state.js"></script>
-    <script src="../js/reg_nv.js"></script>
-    <script src="../js/registry-core.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/runtime.js"></script>
-    <script src="../js/test-console.js"></script>
+    <script src="../js/core/idb.js"></script>
+    <script src="../js/data/db_nv.js"></script>
+    <script src="../js/core/state.js"></script>
+    <script src="../js/data/reg_nv.js"></script>
+    <script src="../js/data/registry-core.js"></script>
+    <script src="../js/services/api.js"></script>
+    <script src="../js/core/runtime.js"></script>
+    <script src="../js/dev/test-console.js"></script>
   </head>
   <body>
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>

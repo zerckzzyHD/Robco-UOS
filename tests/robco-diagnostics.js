@@ -65,8 +65,63 @@ function header(title) {
   console.log(`\n── ${title} ${'─'.repeat(Math.max(0, 50 - title.length))}`);
 }
 
+// ── js/ subfolder resolver (2.8.5 U-A2) ─────────────────────────
+// The reorg moved every js/*.js file into one of these subfolders. Rather
+// than rewriting every readFile('js/<name>.js') call site across both
+// runners, readFile() resolves a legacy flat 'js/<name>.js' path against
+// the real on-disk location transparently — same call signature, same
+// return value, same failure behavior for a name that doesn't exist
+// anywhere (e.g. the sanctioned MUST-NOT-EXIST 'js/ui.js' probe still
+// fails exactly as before). This mirrors readGroup's own "keep the call
+// signature, resolve internally" precedent below.
+const JS_SUBFOLDERS = ['data', 'core', 'ui', 'services', 'dev'];
+
+// Recursively lists every js/<subfolder>/*.js file (js/vendor/ deliberately
+// excluded — it's a separate, manually-curated precache allowlist, same
+// scope js/ 's own flat readdirSync had pre-reorg since 'vendor' is a
+// directory name, never a '.js' file). Returns {sub, name, rel} objects,
+// rel being the 'sub/name.js' path used to build './js/'+rel entries.
+// Any full-repo js-file scan (Suites 49, 212, 216, 220, ...) must walk
+// subfolders like this, or it silently scans zero files post-reorg — an
+// empty-corpus guard can vacuously pass OR spuriously fail depending on
+// what it asserts, either way the exact class of regression Protocol 42
+// requires fixing on discovery.
+function allJsFiles(opts = {}) {
+  const exclude = new Set(opts.exclude || []);
+  const out = [];
+  for (const sub of JS_SUBFOLDERS) {
+    const subDir = path.join(ROOT, 'js', sub);
+    if (!fs.existsSync(subDir)) continue;
+    for (const f of fs.readdirSync(subDir)) {
+      if (f.endsWith('.js') && !exclude.has(f)) out.push({ sub, name: f, rel: `${sub}/${f}` });
+    }
+  }
+  return out;
+}
+
+let _jsLocationCache = null;
+function _jsFileLocation(basename) {
+  if (_jsLocationCache === null) {
+    _jsLocationCache = new Map();
+    const jsDir = path.join(ROOT, 'js');
+    for (const sub of JS_SUBFOLDERS) {
+      const subDir = path.join(jsDir, sub);
+      if (!fs.existsSync(subDir)) continue;
+      for (const f of fs.readdirSync(subDir)) {
+        if (f.endsWith('.js')) _jsLocationCache.set(f, `js/${sub}/${f}`);
+      }
+    }
+  }
+  return _jsLocationCache.get(basename);
+}
+
 function readFile(rel) {
-  const abs = path.join(ROOT, rel);
+  let abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) {
+    const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel);
+    const resolved = m && _jsFileLocation(m[1]);
+    if (resolved) abs = path.join(ROOT, resolved);
+  }
   if (!fs.existsSync(abs)) {
     fail(`Source file not found: ${rel}`);
     process.exit(1);
@@ -99,16 +154,53 @@ function readGroup(stem) {
   if (GROUP_OVERRIDES[stem]) {
     return GROUP_OVERRIDES[stem].map(f => readFile(`js/${f}`)).join('\n');
   }
+  // 2.8.5 U-A2: the family now lives inside one js/<subfolder>/, not flat
+  // js/ — search every subfolder (a stem's siblings always share one
+  // subfolder, e.g. all six ui-core* files live in js/ui/) and sort file
+  // paths so join order stays deterministic.
   const jsDir = path.join(ROOT, 'js');
-  const files = fs
-    .readdirSync(jsDir)
-    .filter(f => f === `${stem}.js` || (f.startsWith(`${stem}-`) && f.endsWith('.js')))
-    .sort();
-  if (files.length === 0) {
+  const matches = [];
+  for (const sub of JS_SUBFOLDERS) {
+    const subDir = path.join(jsDir, sub);
+    if (!fs.existsSync(subDir)) continue;
+    for (const f of fs.readdirSync(subDir)) {
+      if (f === `${stem}.js` || (f.startsWith(`${stem}-`) && f.endsWith('.js'))) {
+        matches.push(path.join(subDir, f));
+      }
+    }
+  }
+  matches.sort();
+  if (matches.length === 0) {
     fail(`Source file family not found: js/${stem}.js (or js/${stem}-*.js)`);
     process.exit(1);
   }
-  return files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n');
+  return matches.map(f => fs.readFileSync(f, 'utf8')).join('\n');
+}
+
+// ── CSS split read helper (2.8.5 U-A2) ──────────────────────────
+// terminal.css was split into 12 files as a pure ordered cut (cascade is
+// order-sensitive — see terminal-12-mobile.css's own header comment on why
+// it must load last). CSS_SPLIT_FILES is the ONE canonical list — the same
+// list index.html's <link> tags, sw.js's ASSETS precache, and the CSS-order
+// guard (Suite 220bis below) all derive from/are checked against. readCss()
+// replaces every old readCss() call site with the exact
+// same concatenated text the browser cascade actually sees.
+const CSS_SPLIT_FILES = [
+  'terminal-01-base.css',
+  'terminal-02-chrome.css',
+  'terminal-03-overseer.css',
+  'terminal-04-diagnostic-shell.css',
+  'terminal-05-toolbar.css',
+  'terminal-06-modulebay.css',
+  'terminal-07-operator-boards.css',
+  'terminal-08-curio-operations.css',
+  'terminal-09-databank.css',
+  'terminal-10-chassis.css',
+  'terminal-11-feedback-animations.css',
+  'terminal-12-mobile.css',
+];
+function readCss() {
+  return CSS_SPLIT_FILES.map(f => readFile(`css/${f}`)).join('\n');
 }
 
 // ── AST-lite helpers ───────────────────────────────────────────
@@ -246,7 +338,11 @@ const stateSource = readGroup('state');
 const apiSource = readGroup('api');
 const cloudSource = readGroup('cloud');
 const uiSource = ['js/ui-audio.js', 'js/ui-render.js', 'js/ui-saves.js', 'js/ui-account.js']
-  .filter(f => fs.existsSync(path.join(ROOT, f)))
+  .filter(f => {
+    if (fs.existsSync(path.join(ROOT, f))) return true;
+    const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(f);
+    return !!(m && _jsFileLocation(m[1]));
+  })
   .map(f => readFile(f))
   .concat([readGroup('ui-core')]) // 2.8.5 U-A1: ui-core.js + its ui-core-*.js split family
   .join('\n');
@@ -988,7 +1084,7 @@ assert(
 //  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
-const cssSource = readFile('css/terminal.css');
+const cssSource = readCss();
 // Strip block comments so embedded {} in comments don't break rule-block extraction
 const cssSourceStripped = cssSource.replace(/\/\*[\s\S]*?\*\//g, '');
 // Phase 3 OPERATOR batch 2: .faction-btn/.faction-card-btns retired along
@@ -1100,7 +1196,7 @@ assert(
   'activate handler calls caches.delete for old-cache cleanup'
 );
 assert(
-  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui-core\.js['"]/.test(swSource),
+  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui\/ui-core\.js['"]/.test(swSource),
   'ASSETS list includes index.html and js/ui-core.js'
 );
 assert(
@@ -2265,7 +2361,7 @@ header('Phase 2b Guards');
 
 // 33.1 --robco-green-rgb defined in terminal.css :root
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /--robco-green-rgb\s*:\s*20,\s*253,\s*206/.test(cssSrc33),
     '--robco-green-rgb: 20, 253, 206 defined in terminal.css :root (P1-1)'
@@ -2274,7 +2370,7 @@ header('Phase 2b Guards');
 
 // 33.2 No rgba(20,253,206, literal survives in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     !/rgba\(20,\s*253,\s*206,/.test(cssSrc33),
     'No hardcoded rgba(20,253,206,...) literal remains in terminal.css (P1-1)'
@@ -2307,7 +2403,7 @@ header('Phase 2b Guards');
 
 // 33.5 .empty-state CSS class defined in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /\.empty-state\s*\{/.test(cssSrc33),
     '.empty-state CSS class defined in terminal.css (P1-2)'
@@ -2331,7 +2427,7 @@ assert(
 
 // 33.8 .audio-row CSS class defined in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /\.audio-row\s*\{/.test(cssSrc33),
     '.audio-row utility class defined in terminal.css (P1-3)'
@@ -2340,7 +2436,7 @@ assert(
 
 // 33.9 config-summary::after toggle CSS exists in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /config-summary::after/.test(cssSrc33) && /content\s*:\s*['"]\s*\[\+\]/.test(cssSrc33),
     'summary.config-summary::after [+]/[-] toggle CSS exists in terminal.css (P1-4)'
@@ -2363,19 +2459,19 @@ header('Phase 2c Guards');
 
 // 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(!/\.faction-item\s*\{/.test(css34), '.faction-item rule deleted from terminal.css (P2-1)');
 }
 
 // 34.2 .faction-name rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(!/\.faction-name\s*\{/.test(css34), '.faction-name rule deleted from terminal.css (P2-1)');
 }
 
 // 34.3 .faction-standing rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(
     !/\.faction-standing\s*\{/.test(css34),
     '.faction-standing rule deleted from terminal.css (P2-1)'
@@ -2384,7 +2480,7 @@ header('Phase 2c Guards');
 
 // 34.4 .list-row-content utility defined in terminal.css (P2-2 flex pattern)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(
     /\.list-row-content\s*\{/.test(css34),
     '.list-row-content utility defined in terminal.css (P2-2)'
@@ -2393,13 +2489,13 @@ header('Phase 2c Guards');
 
 // 34.5 .btn-sm utility defined in terminal.css (P2-3 compact button)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(/\.btn-sm\s*\{/.test(css34), '.btn-sm utility class defined in terminal.css (P2-3)');
 }
 
 // 34.6 .delete-btn has min-height:28px in terminal.css (P2-3 tap target Protocol 17)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   const css34Stripped = css34.replace(/\/\*[\s\S]*?\*\//g, '');
   const deleteBtnRule = (css34Stripped.match(/\.delete-btn\s*\{[^}]*\}/) || [''])[0];
   assert(
@@ -2457,7 +2553,7 @@ header('Phase 3a Performance Guards');
 const apiSrc35 = readGroup('api');
 const stateSrc35 = readGroup('state');
 const uiSrc35 = readGroup('ui-core');
-const cssSrc35 = readFile('css/terminal.css');
+const cssSrc35 = readCss();
 const regNvSrc35 = readGroup('reg_nv');
 const regCoreSrc35 = readGroup('registry-core');
 
@@ -4302,7 +4398,7 @@ header('Suite 49 — CI / Repo Hardening Guards');
   }
 
   // 49.1  Every js/ file is listed in sw.js ASSETS
-  const jsFiles49 = fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js'));
+  const jsFiles49 = allJsFiles().map(f => f.rel);
   const jsMissing49 = jsFiles49.filter(f => !assetsSet49.has('./js/' + f));
   assert(
     jsMissing49.length === 0,
@@ -5655,28 +5751,28 @@ header('Suite 56 — UI Module Split Guards');
   const htmlSource56 = readFile('index.html');
   const swSrc56 = readFile('sw.js');
 
-  // 56.1 js/ui-audio.js file exists on disk
+  // 56.1 js/ui/ui-audio.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-audio.js')),
-    'js/ui-audio.js file exists (Slice A: audio module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-audio.js')),
+    'js/ui/ui-audio.js file exists (Slice A: audio module extracted)'
   );
 
-  // 56.2 ./js/ui-audio.js appears in sw.js ASSETS list
+  // 56.2 ./js/ui/ui-audio.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-audio\.js['"]/.test(swSrc56),
-    "'./js/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
+    /['"]\.\/js\/ui\/ui-audio\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
   );
 
-  // 56.3 <script src="js/ui-audio.js"> appears in index.html
+  // 56.3 <script src="js/ui/ui-audio.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-audio\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-audio.js"> present in index.html'
+    /src=['"]js\/ui\/ui-audio\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-audio.js"> present in index.html'
   );
 
   // 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
   {
-    const audioIdx56 = htmlSource56.indexOf('js/ui-audio.js');
-    const apiIdx56 = htmlSource56.indexOf('js/api.js');
+    const audioIdx56 = htmlSource56.indexOf('js/ui/ui-audio.js');
+    const apiIdx56 = htmlSource56.indexOf('js/services/api.js');
     assert(
       audioIdx56 !== -1 && apiIdx56 !== -1 && audioIdx56 < apiIdx56,
       'ui-audio.js <script> appears before api.js in index.html (load-order guard)'
@@ -5685,36 +5781,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.5 ui-audio.js script appears before ui.js in index.html (ui-audio must load first)
   {
-    const audioIdx56b = htmlSource56.indexOf('js/ui-audio.js');
-    const uiIdx56 = htmlSource56.indexOf('"js/ui-core.js"');
+    const audioIdx56b = htmlSource56.indexOf('js/ui/ui-audio.js');
+    const uiIdx56 = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
       'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
     );
   }
 
-  // 56.6 js/ui-render.js file exists on disk
+  // 56.6 js/ui/ui-render.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-render.js')),
-    'js/ui-render.js file exists (Slice B: render module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-render.js')),
+    'js/ui/ui-render.js file exists (Slice B: render module extracted)'
   );
 
-  // 56.7 ./js/ui-render.js appears in sw.js ASSETS list
+  // 56.7 ./js/ui/ui-render.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-render\.js['"]/.test(swSrc56),
-    "'./js/ui-render.js' in sw.js ASSETS (cache covers the render module)"
+    /['"]\.\/js\/ui\/ui-render\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-render.js' in sw.js ASSETS (cache covers the render module)"
   );
 
-  // 56.8 <script src="js/ui-render.js"> appears in index.html
+  // 56.8 <script src="js/ui/ui-render.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-render\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-render.js"> present in index.html'
+    /src=['"]js\/ui\/ui-render\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-render.js"> present in index.html'
   );
 
   // 56.9 ui-render.js script appears before api.js in index.html
   {
-    const renderIdx56 = htmlSource56.indexOf('js/ui-render.js');
-    const apiIdx56b = htmlSource56.indexOf('js/api.js');
+    const renderIdx56 = htmlSource56.indexOf('js/ui/ui-render.js');
+    const apiIdx56b = htmlSource56.indexOf('js/services/api.js');
     assert(
       renderIdx56 !== -1 && apiIdx56b !== -1 && renderIdx56 < apiIdx56b,
       'ui-render.js <script> appears before api.js in index.html (load-order guard)'
@@ -5723,36 +5819,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.10 ui-render.js script appears before ui.js in index.html
   {
-    const renderIdx56b = htmlSource56.indexOf('js/ui-render.js');
-    const uiIdx56b = htmlSource56.indexOf('"js/ui-core.js"');
+    const renderIdx56b = htmlSource56.indexOf('js/ui/ui-render.js');
+    const uiIdx56b = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
       'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
     );
   }
 
-  // 56.11 js/ui-saves.js file exists on disk
+  // 56.11 js/ui/ui-saves.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-saves.js')),
-    'js/ui-saves.js file exists (Slice C: saves module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-saves.js')),
+    'js/ui/ui-saves.js file exists (Slice C: saves module extracted)'
   );
 
-  // 56.12 ./js/ui-saves.js appears in sw.js ASSETS list
+  // 56.12 ./js/ui/ui-saves.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-saves\.js['"]/.test(swSrc56),
-    "'./js/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
+    /['"]\.\/js\/ui\/ui-saves\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
   );
 
-  // 56.13 <script src="js/ui-saves.js"> appears in index.html
+  // 56.13 <script src="js/ui/ui-saves.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-saves\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-saves.js"> present in index.html'
+    /src=['"]js\/ui\/ui-saves\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-saves.js"> present in index.html'
   );
 
   // 56.14 ui-saves.js script appears before api.js in index.html
   {
-    const savesIdx56 = htmlSource56.indexOf('js/ui-saves.js');
-    const apiIdx56c = htmlSource56.indexOf('js/api.js');
+    const savesIdx56 = htmlSource56.indexOf('js/ui/ui-saves.js');
+    const apiIdx56c = htmlSource56.indexOf('js/services/api.js');
     assert(
       savesIdx56 !== -1 && apiIdx56c !== -1 && savesIdx56 < apiIdx56c,
       'ui-saves.js <script> appears before api.js in index.html (load-order guard)'
@@ -5761,36 +5857,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.15 ui-saves.js script appears before ui.js in index.html
   {
-    const savesIdx56b = htmlSource56.indexOf('js/ui-saves.js');
-    const uiIdx56c = htmlSource56.indexOf('"js/ui-core.js"');
+    const savesIdx56b = htmlSource56.indexOf('js/ui/ui-saves.js');
+    const uiIdx56c = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
       'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
     );
   }
 
-  // 56.16 js/ui-account.js file exists on disk
+  // 56.16 js/ui/ui-account.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-account.js')),
-    'js/ui-account.js file exists (Slice D: account module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-account.js')),
+    'js/ui/ui-account.js file exists (Slice D: account module extracted)'
   );
 
-  // 56.17 ./js/ui-account.js appears in sw.js ASSETS list
+  // 56.17 ./js/ui/ui-account.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-account\.js['"]/.test(swSrc56),
-    "'./js/ui-account.js' in sw.js ASSETS (cache covers the account module)"
+    /['"]\.\/js\/ui\/ui-account\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-account.js' in sw.js ASSETS (cache covers the account module)"
   );
 
-  // 56.18 <script src="js/ui-account.js"> appears in index.html
+  // 56.18 <script src="js/ui/ui-account.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-account\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-account.js"> present in index.html'
+    /src=['"]js\/ui\/ui-account\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-account.js"> present in index.html'
   );
 
   // 56.19 ui-account.js script appears before api.js in index.html
   {
-    const acctIdx56 = htmlSource56.indexOf('js/ui-account.js');
-    const apiIdx56d = htmlSource56.indexOf('js/api.js');
+    const acctIdx56 = htmlSource56.indexOf('js/ui/ui-account.js');
+    const apiIdx56d = htmlSource56.indexOf('js/services/api.js');
     assert(
       acctIdx56 !== -1 && apiIdx56d !== -1 && acctIdx56 < apiIdx56d,
       'ui-account.js <script> appears before api.js in index.html (load-order guard)'
@@ -5799,8 +5895,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.20 ui-account.js script appears before ui-core.js in index.html
   {
-    const acctIdx56b = htmlSource56.indexOf('js/ui-account.js');
-    const uiIdx56d = htmlSource56.indexOf('"js/ui-core.js"');
+    const acctIdx56b = htmlSource56.indexOf('js/ui/ui-account.js');
+    const uiIdx56d = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       acctIdx56b !== -1 && uiIdx56d !== -1 && acctIdx56b < uiIdx56d,
       'ui-account.js <script> appears before ui-core.js in index.html (account loads before core)'
@@ -5836,20 +5932,32 @@ header('Suite 56 — UI Module Split Guards');
       'boot loader sets script.async = false (preserves db→state→reg load order)',
     ],
 
-    // 56.26 Boot loader references js/db_nv.js (FNV database)
-    [/js\/db_nv\.js/, 'boot loader references js/db_nv.js (FNV database path present)'],
+    // 56.26 Boot loader references js/data/db_nv.js (FNV database)
+    [/js\/data\/db_nv\.js/, 'boot loader references js/data/db_nv.js (FNV database path present)'],
 
-    // 56.27 Boot loader references js/db_fo3.js (FO3 database)
-    [/js\/db_fo3\.js/, 'boot loader references js/db_fo3.js (FO3 database path present)'],
+    // 56.27 Boot loader references js/data/db_fo3.js (FO3 database)
+    [
+      /js\/data\/db_fo3\.js/,
+      'boot loader references js/data/db_fo3.js (FO3 database path present)',
+    ],
 
-    // 56.28 Boot loader references js/state.js (shared state module)
-    [/js\/state\.js/, 'boot loader references js/state.js (shared state module path present)'],
+    // 56.28 Boot loader references js/core/state.js (shared state module)
+    [
+      /js\/core\/state\.js/,
+      'boot loader references js/core/state.js (shared state module path present)',
+    ],
 
-    // 56.29 Boot loader references js/reg_nv.js (FNV registry)
-    [/js\/reg_nv\.js/, 'boot loader references js/reg_nv.js (FNV registry path present)'],
+    // 56.29 Boot loader references js/data/reg_nv.js (FNV registry)
+    [
+      /js\/data\/reg_nv\.js/,
+      'boot loader references js/data/reg_nv.js (FNV registry path present)',
+    ],
 
-    // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
-    [/js\/reg_fo3\.js/, 'boot loader references js/reg_fo3.js (FO3 registry path present)'],
+    // 56.30 Boot loader references js/data/reg_fo3.js (FO3 registry)
+    [
+      /js\/data\/reg_fo3\.js/,
+      'boot loader references js/data/reg_fo3.js (FO3 registry path present)',
+    ],
 
     // 56.31 Boot loader reads activeContext (primary context selector)
     [/activeContext/, 'boot loader reads activeContext (primary game-context selector)'],
@@ -6272,7 +6380,7 @@ header('Suite 60 — A11y Gate Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 61 — Mobile Layout Overflow Guards');
 {
-  const css61 = readFile('css/terminal.css');
+  const css61 = readCss();
 
   // 61.1 .main-grid uses minmax(0, 1fr) — not bare 1fr (which silently expands grid track)
   assert(
@@ -6463,23 +6571,14 @@ header('Suite 62 — Changelog viewer guards');
   // NOT FOUND". These four guards lock every runtime-fetched local asset into all
   // three publish/precache sets so this class can't recur (Protocol 36b/42).
   {
-    const jsAll62 = [
-      'js/ui-core.js',
-      'js/api.js',
-      'js/ui-render.js',
-      'js/ui-saves.js',
-      'js/ui-account.js',
-      'js/ui-audio.js',
-      'js/state.js',
-      'js/cloud.js',
-      'js/registry-core.js',
-      'js/reg_nv.js',
-      'js/reg_fo3.js',
-      'js/db_nv.js',
-      'js/db_fo3.js',
-    ]
-      .filter(f => fs.existsSync(path.join(ROOT, f)))
-      .map(f => readFile(f))
+    // 2.8.5 U-A2 (closes AUDIT_U4 Finding A): derived from a full js/**/*.js
+    // glob rather than hand-maintained — a hardcoded list silently stopped
+    // covering the 5 ui-core-*.js siblings after the U-A1 split (this was
+    // never caught because none of them happened to contain a fetch() call
+    // yet). Scanning every js file makes this class of gap structurally
+    // impossible: a future file split or add is covered for free.
+    const jsAll62 = allJsFiles()
+      .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
       .join('\n');
     // Discover same-origin (non-http) string literals passed to fetch().
     const localFetched62 = [
@@ -6532,7 +6631,7 @@ header('Suite 62 — Changelog viewer guards');
   }
 
   // ── WU-C11 part (c): the changelog viewer visual glow-up structure guards ──
-  const cssSrc62 = readFile('css/terminal.css');
+  const cssSrc62 = readCss();
   let parseBody62 = '';
   let showBody62 = '';
   try {
@@ -7016,7 +7115,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 65.12  #updateModalMsg is left-aligned in terminal.css (message body reads flush-left, not ragged/centered)
-  const cssSrc65 = readFile('css/terminal.css');
+  const cssSrc65 = readCss();
   assert(
     /#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left/.test(cssSrc65),
     '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
@@ -7887,7 +7986,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const htmlSrc71 = readFile('index.html');
   const uiRenderSrc71 = readGroup('ui-render');
   const uiCoreSrc71 = readGroup('ui-core');
-  const cssSrc71 = readFile('css/terminal.css');
+  const cssSrc71 = readCss();
 
   // 71.1  #traitsSection is a <details> element (collapsible sub-panel)
   guards(htmlSrc71, [
@@ -8103,7 +8202,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const htmlSrc72 = readFile('index.html');
   const uiSavesSrc72 = readGroup('ui-saves');
   const uiCoreSrc72 = readGroup('ui-core');
-  const cssSrc72 = readFile('css/terminal.css');
+  const cssSrc72 = readCss();
 
   // 72.1  Static nv_locations datalist is gone from index.html
   guards(htmlSrc72, [
@@ -10237,7 +10336,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const uiRenderSrc88 = readGroup('ui-render');
   const uiCoreSrc88 = readGroup('ui-core');
   const idxSrc88 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const cssSrc88 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const cssSrc88 = readCss();
 
   // 88.1  Every details.panel (not sub-panel) in index.html has a summary > h2 starting with ">" or "&gt;"
   const panelDetails88 = [...idxSrc88.matchAll(/<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*>/g)]
@@ -10491,7 +10590,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
+//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (16 tests)
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding');
@@ -10500,24 +10599,35 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // (em-dash, en-dash, curly quotes, etc.). â– covers E2-96-xx box-drawing
   // (U+25B2 triangle, U+2588 full-block, etc.). � is the replacement character.
   const MOJIBAKE90 = /�|â€|â–/;
+  // 2.8.5 U-A2 (closes AUDIT_U4 Finding B): widened to the five ui-core-*.js
+  // siblings, which the U-A1 split moved ~70% of ui-core's non-ASCII content
+  // into but this list was never widened to cover (latent — all five are
+  // mojibake-clean today). Kept as a per-file hand list (not a full glob
+  // derivation, unlike Suite 62's jsAll62 above) so this stays a fixed,
+  // Protocol-2a-stable 11-test suite rather than growing one assertion per
+  // js file on every future file add.
   const srcFiles90 = [
-    '../js/api.js',
-    '../js/state.js',
-    '../js/ui-core.js',
-    '../js/ui-render.js',
-    '../js/ui-saves.js',
-    '../js/ui-audio.js',
-    '../js/ui-account.js',
-    '../index.html',
-    '../README.md',
-    '../ARCHITECTURE.md',
+    'js/services/api.js',
+    'js/core/state.js',
+    'js/ui/ui-core.js',
+    'js/ui/ui-render.js',
+    'js/ui/ui-saves.js',
+    'js/ui/ui-audio.js',
+    'js/ui/ui-account.js',
+    'js/ui/ui-core-nav.js',
+    'js/ui/ui-core-overseer.js',
+    'js/ui/ui-core-chassis.js',
+    'js/ui/ui-core-modulebay.js',
+    'js/ui/ui-core-cmd.js',
+    'index.html',
+    'README.md',
+    'ARCHITECTURE.md',
   ];
   srcFiles90.forEach((rel, i) => {
-    const label = rel.replace('../', '');
-    const src = fs.readFileSync(path.join(__dirname, rel), 'utf8');
+    const src = readFile(rel);
     assert(
       !MOJIBAKE90.test(src),
-      `GATE-CORRUPT-${i + 1}: ${label} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
+      `GATE-CORRUPT-${i + 1}: ${rel} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
     );
   });
   // CHANGELOG.md: uses FULL 3-char sequence check only — the 2-char prefix would
@@ -10532,7 +10642,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       !changelog90.includes(enDashCorrupt90) &&
       !changelog90.includes(mulSignCorrupt90) &&
       !changelog90.includes(rfChar90doc),
-    'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+    'GATE-CORRUPT-16: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
   );
 }
 
@@ -10608,7 +10718,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   header('Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS');
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
   // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
-  const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const css92 = readCss();
   const uiRender92 = readGroup('ui-render');
   const html92 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
@@ -10686,7 +10796,7 @@ header('Suite 93 — FO3 Autocomplete Guard');
 
   // 93.2  registry-core.js is listed in sw.js ASSETS
   assert(
-    swSrc93.includes('./js/registry-core.js'),
+    swSrc93.includes('./js/data/registry-core.js'),
     'registry-core.js is listed in sw.js ASSETS (service worker will cache it)'
   );
 
@@ -10710,17 +10820,17 @@ header('Suite 93 — FO3 Autocomplete Guard');
 
   // 93.6  FO3 boot path in index.html includes registry-core.js after reg_fo3.js
   {
-    const fo3Idx = indexSrc93.indexOf("'js/reg_fo3.js'");
+    const fo3Idx = indexSrc93.indexOf("'js/data/reg_fo3.js'");
     const rcNearFo3 =
-      fo3Idx >= 0 && indexSrc93.slice(fo3Idx, fo3Idx + 200).includes("'js/registry-core.js'");
+      fo3Idx >= 0 && indexSrc93.slice(fo3Idx, fo3Idx + 200).includes("'js/data/registry-core.js'");
     assert(rcNearFo3, 'FO3 boot path in index.html includes registry-core.js after reg_fo3.js');
   }
 
   // 93.7  FNV boot path in index.html includes registry-core.js after reg_nv.js
   {
-    const nvIdx = indexSrc93.indexOf("'js/reg_nv.js'");
+    const nvIdx = indexSrc93.indexOf("'js/data/reg_nv.js'");
     const rcNearNv =
-      nvIdx >= 0 && indexSrc93.slice(nvIdx, nvIdx + 200).includes("'js/registry-core.js'");
+      nvIdx >= 0 && indexSrc93.slice(nvIdx, nvIdx + 200).includes("'js/data/registry-core.js'");
     assert(rcNearNv, 'FNV boot path in index.html includes registry-core.js after reg_nv.js');
   }
 
@@ -10753,7 +10863,7 @@ header('Suite 93 — FO3 Autocomplete Guard');
 // ══════════════════════════════════════════════════════════════
 header('Suite 94 — Accessibility Guards');
 {
-  const css94 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const css94 = readCss();
   const idx94 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const uiCore94 = readGroup('ui-core');
 
@@ -11013,7 +11123,13 @@ header('Suite 96 — test.html Runtime Mirror Parity');
 
   // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core → api)
   {
-    const chain = ['db_nv.js', 'state.js', 'reg_nv.js', 'registry-core.js', 'api.js'];
+    const chain = [
+      'data/db_nv.js',
+      'core/state.js',
+      'data/reg_nv.js',
+      'data/registry-core.js',
+      'services/api.js',
+    ];
     const missing = chain.filter(f => !th.includes('../js/' + f));
     assert(
       missing.length === 0,
@@ -11896,7 +12012,7 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
   const api106 = readGroup('api');
   const core106 = readGroup('ui-core');
   const html106 = htmlSource;
-  const css106 = readFile('css/terminal.css');
+  const css106 = readCss();
   const st106 = readGroup('state');
   let doBuyBody = '';
   let doSellBody = '';
@@ -12246,7 +12362,7 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   const ren108 = readGroup('ui-render');
   const api108 = readGroup('api');
   const core108 = readGroup('ui-core');
-  const css108 = readFile('css/terminal.css');
+  const css108 = readCss();
   // The CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML
   // core (WU-N4b option C, Protocol 22). Concatenate so the engine-level checks (108.4–108.9,
   // 108.13) verify the behavior wherever it lives across the split.
@@ -12453,7 +12569,7 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
   const ren109 = readGroup('ui-render');
   const api109 = readGroup('api');
   const core109 = readGroup('ui-core');
-  const css109 = readFile('css/terminal.css');
+  const css109 = readCss();
   const html109 = readFile('index.html');
   const dbnv109 = readGroup('db_nv');
   const dbfo3109 = readGroup('db_fo3');
@@ -12620,7 +12736,7 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
   const ren110 = readGroup('ui-render');
   const api110 = readGroup('api');
   const core110 = readGroup('ui-core');
-  const css110 = readFile('css/terminal.css');
+  const css110 = readCss();
   const html110 = readFile('index.html');
   const routerBlock110 = (api110.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
@@ -12881,7 +12997,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('WU-E2 reusable disabled banner templates');
-  const cssSrc112 = readFile('css/terminal.css');
+  const cssSrc112 = readCss();
 
   // 112.1  #updateBannerTemplate <template> still EXISTS (not deleted)
   assert(
@@ -13652,7 +13768,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 120 — WU-F8 High-Lumen Optics (high-contrast)');
-  const css120 = readFile('css/terminal.css');
+  const css120 = readCss();
   const uiCore120 = readGroup('ui-core');
   const html120 = htmlSource;
   // Slice each activation path so we can assert the boosts live in BOTH.
@@ -13877,7 +13993,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 122 — WU-F6 Cold-Start / Degraded-Tube Boot');
   const uiAudio122 = readGroup('ui-audio');
-  const css122 = readFile('css/terminal.css');
+  const css122 = readCss();
   let pick122 = '';
   let bootLines122 = '';
   let runBoot122 = '';
@@ -14431,7 +14547,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 126 — WU-F11 native mark-visited map control');
   const render126 = readGroup('ui-render');
   const state126 = readGroup('state');
-  const css126 = readFile('css/terminal.css');
+  const css126 = readCss();
   const markFn126 = (render126.match(/function markLocationVisited\(loc\)[\s\S]*?\n\}/) || [''])[0];
   const recFn126 = (state126.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [''])[0];
   // Phase 3 · Piece 3 renamed the button to MARK SURVEYED (class="mark") as
@@ -14518,7 +14634,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const state127 = readGroup('state');
   const audio127 = readGroup('ui-audio');
   const account127 = readGroup('ui-account');
-  const css127 = readFile('css/terminal.css');
+  const css127 = readCss();
   const fnvTheme127 = (state127.match(/FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
   const fo3Theme127 = (state127.match(/FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
   const grab127 = (block, k) => (block.match(new RegExp(k + ":\\s*'([^']+)'")) || [])[1] || '';
@@ -14696,7 +14812,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 129 — first-load desktop-layout pointer/hover gate');
-  const css129 = readFile('css/terminal.css');
+  const css129 = readCss();
   const core129 = readGroup('ui-core');
   const GATE = '(min-width: 1000px) and (hover: hover) and (pointer: fine)';
 
@@ -16130,7 +16246,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const api136 = readGroup('api');
   const uiCore136 = readGroup('ui-core');
   const uiRender136 = readGroup('ui-render');
-  const css136 = readFile('css/terminal.css');
+  const css136 = readCss();
   const dbNv136 = readGroup('db_nv');
   const dbFo3136 = readGroup('db_fo3');
 
@@ -16699,13 +16815,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 138.2  the new served module is precached in sw.js ASSETS (Suite 49 sibling)
-  assert(/['"]\.\/js\/idb\.js['"]/.test(sw138), '138.2: js/idb.js is precached in sw.js ASSETS');
+  assert(
+    /['"]\.\/js\/core\/idb\.js['"]/.test(sw138),
+    '138.2: js/idb.js is precached in sw.js ASSETS'
+  );
 
   // 138.3  idb.js loads BEFORE state.js (which calls it) and before the boot
   //         loader that injects state.js — a static tag ahead of everything
   {
-    const iIdb = html138.indexOf('js/idb.js');
-    const iState = html138.indexOf('js/state.js');
+    const iIdb = html138.indexOf('js/core/idb.js');
+    const iState = html138.indexOf('js/core/state.js');
     const iLoader = html138.indexOf('GAME_FILES');
     assert(
       iIdb > -1 && iState > -1 && iLoader > -1 && iIdb < iState && iIdb < iLoader,
@@ -17758,21 +17877,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 146.1  js/runtime.js exists on disk (served file)
   assert(
-    fs.existsSync(path.join(ROOT, 'js/runtime.js')),
+    fs.existsSync(path.join(ROOT, 'js/core/runtime.js')),
     '146.1: js/runtime.js exists on disk (A1 new served file)'
   );
 
   // 146.2  ./js/runtime.js is precached in sw.js ASSETS (Protocol 1 / Suite 49 completeness)
   assert(
-    /'\.\/js\/runtime\.js'/.test(sw146),
+    /'\.\/js\/core\/runtime\.js'/.test(sw146),
     "146.2: './js/runtime.js' is listed in sw.js ASSETS (PWA precaches the runtime)"
   );
 
   // 146.3  index.html loads runtime.js and orders it BEFORE ui-core.js (which calls
   //        initAmbientRuntime()), consistent with the static sibling tags
   assert(
-    /<script src="js\/runtime\.js"><\/script>/.test(index146) &&
-      index146.indexOf('js/runtime.js') < index146.indexOf('js/ui-core.js'),
+    /<script src="js\/core\/runtime\.js"><\/script>/.test(index146) &&
+      index146.indexOf('js/core/runtime.js') < index146.indexOf('js/ui/ui-core.js'),
     '146.3: index.html loads js/runtime.js as a static tag ordered before js/ui-core.js'
   );
 
@@ -18119,24 +18238,24 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 149.1  js/test-console.js exists on disk (new served file)
   assert(
-    fs.existsSync(path.join(ROOT, 'js/test-console.js')),
+    fs.existsSync(path.join(ROOT, 'js/dev/test-console.js')),
     '149.1: js/test-console.js exists on disk (Test Console new served file)'
   );
 
   // 149.2  ./js/test-console.js is precached in sw.js ASSETS
   assert(
-    /'\.\/js\/test-console\.js'/.test(sw149),
+    /'\.\/js\/dev\/test-console\.js'/.test(sw149),
     "149.2: './js/test-console.js' is listed in sw.js ASSETS (PWA precaches the console)"
   );
 
   // 149.3  index.html loads test-console.js AFTER ui-core.js (needs _isStagingEnv)
   //        and before api.js, consistent with the static sibling tags
   assert(
-    /<script src="js\/test-console\.js"><\/script>/.test(index149) &&
-      index149.indexOf('<script src="js/ui-core.js"></script>') <
-        index149.indexOf('<script src="js/test-console.js"></script>') &&
-      index149.indexOf('<script src="js/test-console.js"></script>') <
-        index149.indexOf('<script src="js/api.js"></script>'),
+    /<script src="js\/dev\/test-console\.js"><\/script>/.test(index149) &&
+      index149.indexOf('<script src="js/ui/ui-core.js"></script>') <
+        index149.indexOf('<script src="js/dev/test-console.js"></script>') &&
+      index149.indexOf('<script src="js/dev/test-console.js"></script>') <
+        index149.indexOf('<script src="js/services/api.js"></script>'),
     '149.3: index.html loads js/test-console.js as a static tag ordered after js/ui-core.js and before js/api.js'
   );
 
@@ -18374,7 +18493,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 150 — A3 IDLE/STANDBY/SHUTDOWN ambient experiences');
   const uiCore150 = readGroup('ui-core');
-  const css150 = readFile('css/terminal.css');
+  const css150 = readCss();
   const wireAmbient150 = extractFunctionBody(uiCore150, '_wireAmbientExperiences');
   const exitStandbyBody150 = extractFunctionBody(uiCore150, 'exitStandby');
   const isShuttingDownBody150 = extractFunctionBody(uiCore150, '_isShuttingDown');
@@ -18633,7 +18752,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const uiCoreSrc151 = readGroup('ui-core');
   const uiSavesSrc151 = readGroup('ui-saves');
   const htmlSrc151 = readFile('index.html');
-  const cssSrc151 = readFile('css/terminal.css');
+  const cssSrc151 = readCss();
 
   // 151.1  robco_input_mode is registered as a DEVICE PREFERENCE (MetaStore),
   //        never campaign state — same two-store boundary as robco_immersion.
@@ -18934,7 +19053,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)');
   const htmlSrc152 = readFile('index.html');
-  const cssSrc152 = readFile('css/terminal.css');
+  const cssSrc152 = readCss();
   const uiCoreSrc152 = readGroup('ui-core');
   const powerOnBody152 = extractFunctionBody(uiCoreSrc152, '_powerOnFromShutdown');
 
@@ -19391,7 +19510,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const core154 = readGroup('ui-core');
   const audio154 = readGroup('ui-audio');
   const state154 = readGroup('state');
-  const css154 = readFile('css/terminal.css');
+  const css154 = readCss();
   const claude154 = readFile('CLAUDE.md');
 
   // 154.1  the bay chrome + all 6 SLOT sub-panels are present, each a real
@@ -19934,7 +20053,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html155 = readFile('index.html');
   const core155 = readGroup('ui-core');
   const state155 = readGroup('state');
-  const css155 = readFile('css/terminal.css');
+  const css155 = readCss();
   const claude155 = readFile('CLAUDE.md');
   const rules155 = readFile('RULES.md');
 
@@ -20153,7 +20272,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const core156 = readGroup('ui-core');
   const audio156 = readGroup('ui-audio');
   const state156 = readGroup('state');
-  const css156 = readFile('css/terminal.css');
+  const css156 = readCss();
   const arch156 = readFile('ARCHITECTURE.md');
 
   // 156.1  FIX 1: #chipGrid id is present on the 13-chip grid so JS can target
@@ -20615,7 +20734,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
-  const cssSource158 = readFile('css/terminal.css');
+  const cssSource158 = readCss();
 
   // 158.1  every navkey exists with its id + hotkey label
   guards(htmlSource, [
@@ -20983,7 +21102,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 159 — Owner bug-fix batch: eventLog live-render + centering rule');
-  const cssSource159 = readFile('css/terminal.css');
+  const cssSource159 = readCss();
   const logEventFn159 = (stateSource.match(/function _logEvent\(type, text\)[\s\S]*?\n\}/) || [
     '',
   ])[0];
@@ -21036,7 +21155,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 160 — Owner audit: bezel bottom placement + stray-pin cleanup');
-  const cssSource160 = readFile('css/terminal.css');
+  const cssSource160 = readCss();
 
   // 160.1  the nav-cluster never wraps its own 5 tabs independently — the whole
   //        strip shrinks together instead of orphaning a key onto its own line
@@ -23166,7 +23285,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const api167 = readGroup('api');
   const uiCore167 = readGroup('ui-core');
   const html167 = readFile('index.html');
-  const css167 = readFile('css/terminal.css');
+  const css167 = readCss();
   const registry167 = (uiCore167.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
     '',
     '',
@@ -23262,7 +23381,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const uiCore168 = readGroup('ui-core');
   const uiRender168 = readGroup('ui-render');
   const html168 = readFile('index.html');
-  const css168 = readFile('css/terminal.css');
+  const css168 = readCss();
   const router168 = (api168.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
     '',
     '',
@@ -23366,7 +23485,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 169 — transcript cleanup + composer autocomplete drop-up + scope pulse');
   const uiCore169 = readGroup('ui-core');
   const uiSaves169 = readGroup('ui-saves');
-  const css169 = readFile('css/terminal.css');
+  const css169 = readCss();
   const appendBody169 = extractFunctionBody(uiCore169, 'appendToChat');
 
   // 169.1  appendToChat() adds a symmetric 'msg-tag--terminal' tag reading
@@ -23518,7 +23637,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 170 — Owner batch: CRT hum follows power state + scanline contained in screen');
   const uiAudio170 = readGroup('ui-audio');
   const uiCore170 = readGroup('ui-core');
-  const css170 = readFile('css/terminal.css');
+  const css170 = readCss();
   const html170 = readFile('index.html');
 
   // 170.1  stopCrtHum() exists and fully tears down the hum's audio graph
@@ -23627,7 +23746,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 171 — WIPE TERMINAL dialog: one cancel + Complete RNG lock warning');
   const uiCore171 = readGroup('ui-core');
-  const css171 = readFile('css/terminal.css');
+  const css171 = readCss();
 
   // 171.1  openModal() supports hideCloseBtn, toggling a .confirm-mode class
   //        on .modal-box — the same class-toggle idiom the pre-existing
@@ -24212,7 +24331,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html174 = readFile('index.html');
   const uiCore174 = readGroup('ui-core');
   const uiSaves174 = readGroup('ui-saves');
-  const css174 = readFile('css/terminal.css');
+  const css174 = readCss();
   const eslintCfg174 = readFile('eslint.config.mjs');
 
   // 174.1  the four old export buttons are gone — only the consolidated
@@ -24629,7 +24748,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html177 = htmlSource;
   const acctSrc177 = readGroup('ui-account');
   const core177 = readGroup('ui-core');
-  const css177 = readFile('css/terminal.css');
+  const css177 = readCss();
 
   // 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
   //        styled via .panel-substatus (visible whether the panel is open or collapsed)
@@ -24831,7 +24950,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 178 — SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)');
   const html178 = htmlSource;
   const core178 = readGroup('ui-core');
-  const css178 = readFile('css/terminal.css');
+  const css178 = readCss();
   const configBlock178 = (html178.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
   ) || [''])[0];
@@ -25102,7 +25221,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html179 = readFile('index.html');
   const core179 = readGroup('ui-core');
   const state179 = readGroup('state');
-  const css179 = readFile('css/terminal.css');
+  const css179 = readCss();
 
   // 179.1  every GAME_DEFS entry (FNV/FO3/FO4) declares theme.cartridgeTape —
   //        the data seam renderCartDeck() reads instead of a hardcoded per-game
@@ -25382,7 +25501,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
   const html180 = readFile('index.html');
   const core180 = readGroup('ui-core');
-  const css180 = readFile('css/terminal.css');
+  const css180 = readCss();
   const configBlock180 = (html180.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
   ) || [''])[0];
@@ -25647,7 +25766,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 181 — PHASE 3 OPERATOR hero-three reskin (id-preservation contract)');
   const html181 = readFile('index.html');
   const uiCore181 = readGroup('ui-core');
-  const css181 = readFile('css/terminal.css');
+  const css181 = readCss();
 
   // 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md §3
   //        still exists verbatim — the load-bearing constraint loadUI()/
@@ -26325,7 +26444,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         >=28px in BOTH the base rule and the <=480px mobile override
   //         (was 22px/20px before this fold-in), and touch-action:none is
   //         scoped to the ladder itself so the surrounding page still scrolls.
-  const css182 = readFile('css/terminal.css');
+  const css182 = readCss();
   // Brace-depth extraction (not a lazy [\s\S]*?\n\}) -- the mobile media query
   // nests OTHER rules' own closing braces before its own, which a lazy match
   // would stop at prematurely (a real bug this test caught while being written).
@@ -26386,7 +26505,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 183 — OPERATOR frames + readback centering + tempo dial hit-areas');
   const html183 = readFile('index.html');
-  const css183 = readFile('css/terminal.css');
+  const css183 = readCss();
 
   // 183.1  top-level bay-board panels (OPERATOR) get the SAME 12px
   //        clearance the Module Bay's SLOT sub-panels already get from
@@ -26503,7 +26622,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'Suite 184 — owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries'
   );
   const html184 = readFile('index.html');
-  const css184 = readFile('css/terminal.css');
+  const css184 = readCss();
   const core184 = readGroup('ui-core');
   const audio184 = readGroup('ui-audio');
   const acct184 = readGroup('ui-account');
@@ -26934,7 +27053,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
   const html185 = readFile('index.html');
-  const css185 = readFile('css/terminal.css');
+  const css185 = readCss();
   const core185 = readGroup('ui-core');
   const render185 = readGroup('ui-render');
   const api185 = readGroup('api');
@@ -27318,7 +27437,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
   const core186 = readGroup('ui-core');
   const render186 = readGroup('ui-render');
-  const css186 = readFile('css/terminal.css');
+  const css186 = readCss();
   const stateSrc186 = readGroup('state');
   const skillsBody186 = extractFunctionBody(core186, 'renderSkills');
   const statusBody186 = extractFunctionBody(render186, 'renderStatus');
@@ -27542,7 +27661,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
   const core187 = readGroup('ui-core');
   const render187 = readGroup('ui-render');
-  const css187 = readFile('css/terminal.css');
+  const css187 = readCss();
   const html187 = readFile('index.html');
   const perksBody187 = extractFunctionBody(render187, 'renderPerks');
   const karmaBody187 = extractFunctionBody(core187, 'updateKarmaUI');
@@ -27872,7 +27991,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 188 — CARGO TAG row fix: USE button clipping (owner report)');
-  const css188 = readFile('css/terminal.css');
+  const css188 = readCss();
 
   // 188.1  Root cause (Protocol 27): the pre-existing .inventory-list li rule
   //        (element+class, specificity 0-1-1) beats .mrow's bare class
@@ -27943,7 +28062,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const html189 = readFile('index.html');
   const render189 = readGroup('ui-render');
   const state189src = readGroup('state');
-  const css189 = readFile('css/terminal.css');
+  const css189 = readCss();
   const mapBody189 = (() => {
     try {
       return extractFunctionBody(render189, 'renderWorldMap');
@@ -28259,7 +28378,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
   const core190 = readGroup('ui-core');
   const render190 = readGroup('ui-render');
-  const css190 = readFile('css/terminal.css');
+  const css190 = readCss();
 
   function declareFn190(src, name) {
     const nameIdx = src.indexOf('function ' + name);
@@ -28620,7 +28739,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const render191 = readGroup('ui-render');
   const reg191 = readGroup('reg_fo3');
   const html191 = readFile('index.html');
-  const css191 = readFile('css/terminal.css');
+  const css191 = readCss();
 
   // 191.1  The pre-existing tracker-toggle contract is fully preserved —
   //        every function the mockup notes promise stays unchanged is
@@ -28976,7 +29095,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const audio192 = readGroup('ui-audio');
   const saves192 = readGroup('ui-saves');
   const cloud192 = readGroup('cloud');
-  const css192 = readFile('css/terminal.css');
+  const css192 = readCss();
 
   // 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
   //        .panel.bay-board with its own BUS slot tag
@@ -29713,7 +29832,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 193 — Owner polish batch: tap-highlight kill + Lincoln side-by-side grid');
   const html193 = readFile('index.html');
-  const css193 = readFile('css/terminal.css');
+  const css193 = readCss();
   const cssStripped193 = css193.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // 193.1  -webkit-tap-highlight-color:transparent is declared on a broad
@@ -29853,7 +29972,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 194 — CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)');
   const html194 = readFile('index.html');
-  const css194 = readFile('css/terminal.css');
+  const css194 = readCss();
   const cssStripped194 = css194.replace(/\/\*[\s\S]*?\*\//g, '');
   const core194 = readGroup('ui-core');
   const audio194 = readGroup('ui-audio');
@@ -30244,7 +30363,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 195 — LIVING CORE ring visual-parity fix (owner audit)');
-  const css195 = readFile('css/terminal.css');
+  const css195 = readCss();
   const cssStripped195 = css195.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // 195.1  perspective holds the SAME ratio-to-own-size at EVERY mini tier
@@ -30472,7 +30591,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const renderSrc196 = readGroup('ui-render');
   const apiSrc196 = readGroup('api');
   const htmlSrc196 = readFile('index.html');
-  const css196 = readFile('css/terminal.css');
+  const css196 = readCss();
   const cssStripped196 = css196.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── New additive emits (§4 of the build plan) ──────────────────────────
@@ -31088,7 +31207,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const coreSrc197 = readGroup('ui-core');
   const renderSrc197 = readGroup('ui-render');
   const apiSrc197 = readGroup('api');
-  const css197 = readFile('css/terminal.css');
+  const css197 = readCss();
   const cssStripped197 = css197.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── item.added — the one new additive emit (3 call sites) ─────────────
@@ -31330,7 +31449,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 198 — DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin');
   const renderSrc198 = readGroup('ui-render');
-  const css198 = readFile('css/terminal.css');
+  const css198 = readCss();
   const cssStripped198 = css198.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── DATABANK CARTOGRAPHY TABLE — node-back scroll re-fix (owner report:
@@ -31549,7 +31668,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const savesSrc199 = readGroup('ui-saves');
   const apiSrc199 = readGroup('api');
   const stateSrc199 = readGroup('state');
-  const css199 = readFile('css/terminal.css');
+  const css199 = readCss();
   const cssStripped199 = css199.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── the 5 new additive emits ────────────────────────────────────────
@@ -33100,7 +33219,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header('Suite 204 — LOCATION CONFIRMATION CARD (top-right arrival toast)');
   const coreSrc204 = readGroup('ui-core');
   const htmlSrc204 = readFile('index.html');
-  const css204 = readFile('css/terminal.css');
+  const css204 = readCss();
   const cssStripped204 = css204.replace(/\/\*[\s\S]*?\*\//g, '');
   const onLocChangeBody204 = extractFunctionBody(coreSrc204, 'onLocationChange');
   const showBody204 = extractFunctionBody(coreSrc204, '_locationCardShow');
@@ -33362,7 +33481,10 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   const repomix205 = readFile('repomix.config.json');
 
   // 205.1 js/ocr.js exists on disk
-  assert(fs.existsSync(path.join(ROOT, 'js/ocr.js')), 'js/ocr.js file exists (Unit 1 infra)');
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/services/ocr.js')),
+    'js/ocr.js file exists (Unit 1 infra)'
+  );
 
   // 205.2 the vendored Tesseract.js files exist on disk (self-hosted, no CDN)
   assert(
@@ -33376,13 +33498,16 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   );
 
   // 205.3 <script src="js/ocr.js"> present in index.html
-  assert(/"js\/ocr\.js"/.test(htmlSrc205), '<script src="js/ocr.js"> present in index.html');
+  assert(
+    /"js\/services\/ocr\.js"/.test(htmlSrc205),
+    '<script src="js/ocr.js"> present in index.html'
+  );
 
   // 205.4 ocr.js loads after ui-render.js and before ui-core.js (plan-mandated boot order)
   {
-    const renderIdx205 = htmlSrc205.indexOf('"js/ui-render.js"');
-    const ocrIdx205 = htmlSrc205.indexOf('"js/ocr.js"');
-    const coreIdx205 = htmlSrc205.indexOf('"js/ui-core.js"');
+    const renderIdx205 = htmlSrc205.indexOf('"js/ui/ui-render.js"');
+    const ocrIdx205 = htmlSrc205.indexOf('"js/services/ocr.js"');
+    const coreIdx205 = htmlSrc205.indexOf('"js/ui/ui-core.js"');
     assert(
       renderIdx205 !== -1 &&
         ocrIdx205 !== -1 &&
@@ -33396,7 +33521,7 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   // 205.5 './js/ocr.js' and the small vendor shims (tesseract.min.js/worker.min.js) are
   //       in the all-or-nothing sw.js ASSETS precache list
   assert(
-    /['"]\.\/js\/ocr\.js['"]/.test(swSrc205) &&
+    /['"]\.\/js\/services\/ocr\.js['"]/.test(swSrc205) &&
       /['"]\.\/js\/vendor\/tesseract\.min\.js['"]/.test(swSrc205) &&
       /['"]\.\/js\/vendor\/worker\.min\.js['"]/.test(swSrc205),
     "sw.js ASSETS precache includes './js/ocr.js', './js/vendor/tesseract.min.js', and './js/vendor/worker.min.js' (small, safe shims)"
@@ -34628,7 +34753,7 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
   const coreSrc208 = readGroup('ui-core');
   const audioSrc208 = readGroup('ui-audio');
   const stateSrc208 = readGroup('state');
-  const css208 = readFile('css/terminal.css');
+  const css208 = readCss();
   const cssStripped208 = css208.replace(/\/\*[\s\S]*?\*\//g, '');
   const claudeSrc208 = readFile('CLAUDE.md');
 
@@ -35202,7 +35327,7 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
-  const css209 = readFile('css/terminal.css');
+  const css209 = readCss();
   const cssStripped209 = css209.replace(/\/\*[\s\S]*?\*\//g, '');
 
   const rootMatch209 = cssStripped209.match(/:root\s*\{[^}]*\}/);
@@ -35782,7 +35907,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header('Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons');
   const testConsole211 = readGroup('test-console');
   const index211 = readFile('index.html');
-  const css211 = readFile('css/terminal.css');
+  const css211 = readCss();
   const tplStart211 = index211.indexOf('<template id="testConsoleTemplate">');
   const tplEnd211 = index211.indexOf('</template>', tplStart211);
   const tplSrc211 = tplStart211 !== -1 ? index211.slice(tplStart211, tplEnd211) : '';
@@ -36645,11 +36770,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'robco_booted_before',
   ];
   function _scanRealEmitEvents212() {
-    const jsDir = path.join(ROOT, 'js');
-    const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js') && f !== 'test-console.js');
+    const files = allJsFiles({ exclude: ['test-console.js'] });
     const names = new Set();
     files.forEach(f => {
-      const src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+      const src = fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8');
       const re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
       let m;
       while ((m = re.exec(src))) names.add(m[1]);
@@ -36725,7 +36849,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         details.sub-panel rule.
   {
     const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
-    const css212 = readFile('css/terminal.css');
+    const css212 = readCss();
     assert(
       /flex-wrap:\s*wrap/.test(renderShellBody212) &&
         !/\.dsh-tool-subhead\s*\{/.test(css212) &&
@@ -36845,7 +36969,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header('Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)');
   const testConsole213 = readGroup('test-console');
   const index213 = readFile('index.html');
-  const css213 = readFile('css/terminal.css');
+  const css213 = readCss();
   // Pulls every top-level @media(max-width:999.98px){...} block's body and
   // concatenates them — this file has several such blocks (bezel, FAB,
   // drawer/sheet, telemetry), so a single-block regex would miss content in
@@ -37598,7 +37722,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header('Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy');
   const testConsole215 = readGroup('test-console');
   const index215 = readFile('index.html');
-  const terminalCss215 = readFile('css/terminal.css');
+  const terminalCss215 = readCss();
 
   function _evalRealTools215() {
     const toolsStart = testConsole215.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
@@ -38674,7 +38798,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   const cloudSrc216 = readGroup('cloud');
   const stateSrc216 = readGroup('state');
   const index216 = readFile('index.html');
-  const terminalCss216 = readFile('css/terminal.css');
+  const terminalCss216 = readCss();
 
   function _evalRealTools216() {
     const toolsStart = testConsole216.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
@@ -39412,10 +39536,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     let ok216 = false;
     let err216 = null;
     try {
-      const jsFiles216 = fs
-        .readdirSync(path.join(ROOT, 'js'))
-        .filter(f => f.endsWith('.js') && f !== 'test-console.js');
-      const allJsSrc216 = jsFiles216.map(f => readFile('js/' + f)).join('\n');
+      const jsFiles216 = allJsFiles({ exclude: ['test-console.js'] });
+      const allJsSrc216 = jsFiles216
+        .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
+        .join('\n');
       const emitNames216 = new Set(
         [...allJsSrc216.matchAll(/RobcoEvents\.emit\(\s*'([^']+)'/g)].map(m => m[1])
       );
@@ -39483,7 +39607,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   const htmlSource217 = readFile('index.html');
   const uiCore217 = readGroup('ui-core');
   const uiAccount217 = readGroup('ui-account');
-  const cssSource217 = readFile('css/terminal.css');
+  const cssSource217 = readCss();
 
   // 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button —
   //        the two primary "preserve your campaign" actions at equal weight.
@@ -39617,7 +39741,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header(
     'Suite 218 — NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired'
   );
-  const cssSource218 = readFile('css/terminal.css');
+  const cssSource218 = readCss();
   const apiSrc218 = readGroup('api');
   const uiCoreSrc218 = readGroup('ui-core');
 
@@ -39933,14 +40057,13 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   for (const d of DOC_FILES_220) docText220[d] = readFile(d);
   const docBlob220 = DOC_FILES_220.map(d => docText220[d]).join('\n');
 
-  // Existence corpus: every js/*.js plus index.html (window.* may be assigned
-  // in the index.html pre-paint head scripts, not only in js/).
-  const jsDir220 = path.join(ROOT, 'js');
+  // Existence corpus: every js/**/*.js plus index.html (window.* may be
+  // assigned in the index.html pre-paint head scripts, not only in js/).
+  // 2.8.5 U-A2: js/ is no longer flat — walk every js/<subfolder>/ (see
+  // allJsFiles(), shared with Suites 49/212/216's own js-file scans).
   const srcCorpus220 =
-    fs
-      .readdirSync(jsDir220)
-      .filter(f => f.endsWith('.js'))
-      .map(f => fs.readFileSync(path.join(jsDir220, f), 'utf8'))
+    allJsFiles()
+      .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
       .join('\n') +
     '\n' +
     readFile('index.html');
@@ -40010,10 +40133,15 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     const html = readFile('index.html');
     const statics = [];
     let m;
-    const sr = /<script[^>]*\ssrc=["']js\/([A-Za-z0-9_-]+)\.js["']/g;
+    // 2.8.5 U-A2: js/ is subfoldered (js/ui/ui-core.js, ...) — the optional
+    // '<subfolder>/' group absorbs it; the captured stem (group 2) is what
+    // normOrder220 operates on, same as the pre-reorg flat js/<stem>.js form.
+    const sr = /<script[^>]*\ssrc=["']js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js["']/g;
     while ((m = sr.exec(html))) statics.push(m[1]);
     const gf = /FNV:\s*\[([^\]]+)\]/.exec(html);
-    const game = gf ? [...gf[1].matchAll(/js\/([A-Za-z0-9_-]+)\.js/g)].map(x => x[1]) : [];
+    const game = gf
+      ? [...gf[1].matchAll(/js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js/g)].map(x => x[1])
+      : [];
     return dedupeConsec220([statics[0], ...game, ...statics.slice(1)].map(normOrder220));
   })();
 
@@ -40027,7 +40155,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       if (!/^\s*\d+\./.test(line)) continue;
       const subj = line.split(/→|->/)[0];
       let mm;
-      const fr = /js\/([A-Za-z0-9_-]+)\.js/g;
+      const fr = /js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js/g;
       while ((mm = fr.exec(subj))) out.push(normOrder220(mm[1]));
     }
     return dedupeConsec220(out);

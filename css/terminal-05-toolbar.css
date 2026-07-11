@@ -1,0 +1,2322 @@
+/* === SPLIT-FILE-HEADER-START ===
+   terminal-05-toolbar.css — part 5/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   Original lines 2602-4914. Pure ordered cut: content below is verbatim,
+   byte-identical to that line range in the pre-split terminal.css. Do NOT
+   reorder this file relative to its siblings in index.html <link> tags —
+   CSS cascade resolves equal-specificity ties by source order, and several
+   rules across this split rely on the original relative order (see
+   terminal-12-mobile.css, which must always load last).
+   Contents: Tool Deck + Quick-Draw Holster command cluster. Also carries the global WCAG reduced-motion block and the High-Lumen Optics a11y mode, which landed chronologically in this region of the original file (not reordered here).
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════════════
+   TOOL DECK + QUICK-DRAW HOLSTER (Design Overhaul command-cluster overhaul)
+   Replaces the old always-present/collapsible Tactical Command Dashboard.
+   Zero standing footprint: the ◈ deck-key (composer toolbar) raises this
+   in-glass bottom sheet. Anchored to .glass-frame (position:relative;
+   overflow:hidden — see that rule above), NOT .chat-panel/.col-right
+   (both scroll/clip and would mis-place an absolute bottom sheet).
+   --bezel-wire tokens only (Protocol 38 — no game literal). Deck-raise and
+   socket-pulse are plain `animation:` declarations so the existing global
+   prefers-reduced-motion block neutralizes them with no bespoke carve-out
+   (Protocol UI-9). ══════════════════════════════════════════════════════ */
+.composer-icon-btn.deck-key {
+  border-style: dashed;
+  position: relative;
+}
+.composer-icon-btn.deck-key.open {
+  background: var(--bezel-wire);
+  color: #000;
+}
+.deck-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.55);
+}
+.deck-scrim[hidden] {
+  display: none;
+}
+.tool-deck {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 41;
+  border: 1px solid var(--bezel-wire);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(var(--bezel-wire-rgb), 0.05), transparent 30%), #050803;
+  box-shadow:
+    0 -6px 30px rgba(0, 0, 0, 0.8),
+    0 0 18px rgba(var(--bezel-wire-rgb), 0.15);
+  padding: 6px 12px 12px;
+  animation: deckUp 0.22s ease-out;
+  max-height: 92%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--bezel-wire-rgb), 0.4) transparent;
+}
+.tool-deck[hidden] {
+  display: none;
+}
+@keyframes deckUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0.3;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.deck-grip {
+  width: 44px;
+  height: 3px;
+  border-radius: 2px;
+  margin: 0 auto 6px;
+  background: rgba(var(--bezel-wire-rgb), 0.4);
+}
+.deck-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bezel-wire);
+  font-size: 10.5px;
+  letter-spacing: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  margin-bottom: 9px;
+}
+.deck-head .dx {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.5);
+  background: transparent;
+  color: var(--bezel-wire);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+.deck-head .dx:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.15);
+}
+.deck-target {
+  width: 100%;
+  font-family: inherit;
+  font-size: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.55);
+  color: var(--bezel-wire);
+  padding: 7px 9px;
+  margin-bottom: 9px;
+}
+.deck-target::placeholder {
+  color: rgba(var(--bezel-wire-rgb), 0.35);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 40px;
+  background: transparent;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.3);
+  border-radius: 6px;
+  color: var(--bezel-wire);
+  padding: 5px 8px 5px 5px;
+  margin-bottom: 6px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.tool-row:hover {
+  background: rgba(var(--bezel-wire-rgb), 0.1);
+  border-color: rgba(var(--bezel-wire-rgb), 0.6);
+}
+.tool-chip {
+  flex-shrink: 0;
+  min-width: 72px;
+  padding: 5px 7px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: var(--bezel-wire);
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-align: center;
+}
+.tool-row:active .tool-chip {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.tool-row span {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.tool-row .uses-target {
+  margin-left: auto;
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.35);
+  padding: 1px 5px;
+  opacity: 0.65;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-style: normal;
+}
+/* Owner report: Tool Deck descriptions truncated with "..." at 360/412px —
+   the chip + tag squeeze the description column too tight for the full
+   text to render on its one allotted line. Fix without adding row height:
+   drop the per-char letter-spacing on the description (the row's own
+   min-height/tool-chip size are untouched) and tighten the TARGET/TOPIC
+   tag's own footprint — mobile-only so desktop (already roomy) is
+   unchanged. */
+@media (max-width: 999.98px) {
+  .tool-row span {
+    letter-spacing: 0;
+  }
+  .tool-row .uses-target {
+    font-size: 6.5px;
+    padding: 1px 4px;
+  }
+}
+.holster {
+  border-top: 1px dashed rgba(var(--bezel-wire-rgb), 0.3);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.holster-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(var(--bezel-wire-rgb), 0.65);
+  margin-bottom: 7px;
+}
+.bind-key {
+  margin-left: auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: rgba(214, 224, 200, 0.38);
+  font-size: 8px;
+  letter-spacing: 2px;
+  width: auto;
+}
+.bind-key:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.bind-key.armed {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.6);
+  box-shadow:
+    0 2px 0 #0c0e0a,
+    0 0 10px rgba(var(--bezel-wire-rgb), 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+.holster-rack {
+  display: flex;
+  gap: 6px;
+}
+.socket {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 46px;
+  padding: 4px 5px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #31352b, #1d201a 60%, #171a14);
+  box-shadow:
+    0 3px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  color: rgba(214, 224, 200, 0.38);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-transform: uppercase;
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s;
+  width: auto;
+}
+.socket:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0c0e0a;
+}
+.socket-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.socket-dir {
+  font-size: 9px;
+  opacity: 0.6;
+}
+.socket-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a3d35;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+.socket.bound {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.35);
+}
+.socket.bound .socket-led {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+.socket-gear {
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.socket:not(.bound) .socket-gear {
+  opacity: 0.45;
+  font-style: italic;
+}
+.holster.binding .socket {
+  border-style: dashed;
+  border-color: rgba(var(--bezel-wire-rgb), 0.65);
+  animation: socketPulse 1.2s infinite;
+}
+@keyframes socketPulse {
+  50% {
+    box-shadow:
+      0 3px 0 #0c0e0a,
+      0 0 12px rgba(var(--bezel-wire-rgb), 0.35);
+  }
+}
+.holster-hint {
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  color: rgba(var(--bezel-wire-rgb), 0.75);
+  text-align: center;
+  margin-top: 6px;
+  min-height: 10px;
+}
+.holster-hint:empty {
+  display: none;
+}
+
+/* WU-N2: native BARTER UPLINK rows. flex + min-width:0 on the name keeps long item
+   names from forcing horizontal overflow at 360px (Protocol 17/mobile baseline). */
+.trade-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 11px;
+}
+.trade-row .trade-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.trade-row .trade-price {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.trade-row .trade-btn {
+  flex-shrink: 0;
+}
+/* WU-N6: LOOT salvage terminal. minmax via min-width:0 + overflow-wrap keep long
+   item names from forcing horizontal overflow at 360px. */
+.loot-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.loot-qty-label {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.loot-list {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.loot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 11px;
+}
+.loot-row .loot-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.loot-row .loot-val {
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.loot-row .loot-btn {
+  flex-shrink: 0;
+}
+.loot-hint {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 6px;
+}
+/* Visual Upload OCR Unit 2 — preview/confirm modal (renderVisualParsePreview,
+   js/ui-render.js). min-width:0 + overflow-wrap on the name span, and ≥16px
+   font/≥28px min-height on every input (Protocol 17), keep this overflow-safe
+   and tap-safe at 360/412px. */
+.visparse-thumb {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  margin: 0 auto 10px auto;
+  border: 1px solid var(--robco-green);
+  opacity: 0.9;
+}
+.visparse-section-label {
+  font-size: 11px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding-bottom: 3px;
+  margin: 10px 0 4px 0;
+}
+.visparse-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+.visparse-keep,
+.visparse-stat-keep {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 20px;
+  min-height: 20px;
+}
+.visparse-qty,
+.visparse-stat-value {
+  flex-shrink: 0;
+  width: 56px;
+  font-size: 16px; /* Protocol 17 — no iOS/Android focus auto-zoom */
+  min-height: 28px; /* Protocol 17 — ≥28px tap target */
+}
+.visparse-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.visparse-meta {
+  white-space: nowrap;
+  opacity: 0.7;
+  font-size: 10px;
+}
+.visparse-unmatched {
+  flex-shrink: 0;
+  color: var(--robco-danger, #ff4136);
+  font-size: 9px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.visparse-hint {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 8px;
+}
+/* WU-N3: THREAT ASSESSMENT card (native bestiary + TTK). minmax(0,1fr) + overflow-wrap
+   keep long enemy/weapon names from forcing horizontal overflow at 360px. */
+.threat-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.threat-name {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: var(--robco-green);
+  border-bottom: 1px solid var(--robco-dim);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.threat-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+  margin-bottom: 6px;
+}
+.threat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.threat-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+}
+.threat-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+.threat-weakness {
+  margin: 8px 0;
+  padding: 4px 8px;
+  text-align: center;
+  letter-spacing: 1px;
+  font-weight: bold;
+  color: #010a07;
+  background: #ffb000;
+  border-radius: 2px;
+  overflow-wrap: anywhere;
+}
+.threat-weakness--none {
+  color: var(--robco-dim);
+  background: transparent;
+  letter-spacing: 0.5px;
+  font-weight: normal;
+}
+.threat-calc {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+  margin-top: 6px;
+}
+.threat-ttk {
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+}
+.threat-ammo {
+  color: var(--robco-green);
+  margin-top: 2px;
+}
+.threat-weapon {
+  color: var(--robco-dim);
+  font-size: 11px;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.threat-ammo-advisory {
+  font-size: 11px;
+  margin-top: 2px;
+  color: var(--robco-green);
+  overflow-wrap: anywhere;
+}
+.threat-ammo-advisory--low {
+  color: var(--robco-danger);
+  font-weight: bold;
+}
+.threat-note {
+  color: var(--robco-dim);
+  font-style: italic;
+}
+/* WU-N4: native CONSULT databank result. min-width:0 + overflow-wrap keep long
+   record names from forcing horizontal overflow at 360px (Protocol 17/mobile). */
+.consult-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.consult-query {
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: var(--robco-green);
+  border-bottom: 1px solid var(--robco-dim);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.consult-stats {
+  margin-bottom: 8px;
+}
+.consult-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.consult-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+}
+.consult-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+.consult-group {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 5px;
+  margin-top: 5px;
+}
+.consult-cat {
+  color: var(--robco-dim);
+  letter-spacing: 1px;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+.consult-hit {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.consult-hit-name {
+  color: var(--robco-green);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.consult-hit-meta {
+  color: var(--robco-dim);
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* WU-N5: native BIO-SCAN advisory. min-width:0 + overflow-wrap keep long advisory
+   lines from forcing horizontal overflow at 360px (Protocol 17/mobile). */
+.bio-card {
+  font-size: 12px;
+  line-height: 1.55;
+}
+.bio-vitals {
+  margin-bottom: 8px;
+}
+.bio-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.bio-label {
+  color: var(--robco-dim);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.bio-val {
+  color: var(--robco-green);
+  font-weight: bold;
+  text-align: right;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.bio-hp--critical {
+  color: var(--robco-alert);
+}
+.bio-hp--wounded {
+  color: #ffb000;
+}
+.bio-limbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 14px;
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+  margin-bottom: 6px;
+}
+.bio-limb {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.bio-limb-name {
+  color: var(--robco-dim);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.bio-limb-state {
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.bio-limb-state--ok {
+  color: var(--robco-green);
+}
+.bio-limb-state--crippled {
+  color: var(--robco-alert);
+}
+.bio-advisories {
+  border-top: 1px dashed var(--robco-dim);
+  padding-top: 6px;
+}
+.bio-advisory {
+  color: var(--robco-green);
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
+}
+.bio-advisory--addiction,
+.bio-advisory--rad {
+  color: #ffb000;
+}
+.bio-advisory--limb,
+.bio-advisory--hp {
+  color: var(--robco-alert);
+}
+.bio-nominal {
+  color: var(--robco-green);
+  letter-spacing: 0.5px;
+}
+.vats-scanning::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(var(--robco-green-rgb), 0.9);
+  box-shadow: 0 0 8px var(--robco-green);
+  animation: vats-scan 1s linear infinite alternate;
+  z-index: 10;
+}
+@keyframes vats-scan {
+  0% {
+    top: 0%;
+  }
+  100% {
+    top: calc(100% - 2px);
+  }
+}
+
+/* HP Bar */
+.hp-bar-container {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--robco-green);
+  height: 8px;
+  margin-top: 5px;
+  margin-bottom: 2px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+}
+.hp-bar-fill {
+  height: 100%;
+  background: var(--robco-green);
+  transition:
+    width 0.3s ease,
+    background 0.4s ease;
+}
+/* Hide spinners on compact number fields — spinners eat into display width.
+   #c_caps (the readback-strip BOTTLE CAPS tile) joins this list: its native
+   spin button was reserving space on the right of the input's content box,
+   so text-align:center centered the "0" against a narrower effective width
+   than the tile itself — reading as left-skewed even though the box was
+   correctly centered (owner report). Same fix, same reason, as the other
+   compact number fields below (Protocol 22). */
+#stat_hp_cur::-webkit-outer-spin-button,
+#stat_hp_cur::-webkit-inner-spin-button,
+#stat_hp_max::-webkit-outer-spin-button,
+#stat_hp_max::-webkit-inner-spin-button,
+#stat_lvl::-webkit-outer-spin-button,
+#stat_lvl::-webkit-inner-spin-button,
+#stat_xp::-webkit-outer-spin-button,
+#stat_xp::-webkit-inner-spin-button,
+#c_caps::-webkit-outer-spin-button,
+#c_caps::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#stat_hp_cur,
+#stat_hp_max,
+#stat_lvl,
+#stat_xp,
+#c_caps {
+  -moz-appearance: textfield;
+}
+/* Themed Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--robco-green);
+  opacity: 0.8;
+}
+::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.4);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--robco-green) rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Boot Screen ─────────────────────────────────────────────── */
+#bootScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #010a07;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  transition: opacity 0.4s ease;
+}
+#bootLines {
+  line-height: 2;
+  width: 90%;
+  max-width: 520px;
+}
+#bootCursor {
+  display: inline-block;
+  animation: cursor-blink 0.6s step-end infinite;
+  margin-top: 4px;
+}
+@keyframes cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.boot-fade-out {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* ─── WU-F6: Degraded-Tube Cold-Start Boot ─────────────────────
+   A rare flickery "cold CRT warming up" boot variant. The flicker is a pure CSS
+   animation, so the global prefers-reduced-motion block (animation-duration:
+   0.01ms !important on *) neutralises it for motion-sensitive users — the
+   degraded boot still shows its POST lines, just without the unstable flicker.
+   The chromatic-aberration text-shadow is static (not an animation), so the
+   "degraded tube" look persists even under reduced motion. */
+@keyframes boot-degraded-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0.35;
+  }
+  11% {
+    opacity: 0.9;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  23% {
+    opacity: 1;
+  }
+  56% {
+    opacity: 0.7;
+  }
+  59% {
+    opacity: 1;
+  }
+  71% {
+    opacity: 0.4;
+  }
+  74% {
+    opacity: 0.95;
+  }
+}
+#bootScreen.boot-degraded {
+  animation: boot-degraded-flicker 1.6s steps(60) infinite;
+}
+#bootScreen.boot-degraded #bootLines {
+  text-shadow:
+    0 0 2px var(--robco-green),
+    1px 0 0 rgba(255, 0, 0, 0.25),
+    -1px 0 0 rgba(0, 120, 255, 0.2);
+}
+
+/* ─── Phosphor Ghost ──────────────────────────────────────────── */
+@keyframes phosphor-ghost {
+  0% {
+    text-shadow:
+      0 0 4px var(--robco-green),
+      0 0 14px var(--robco-green),
+      0 0 28px var(--robco-green);
+  }
+  100% {
+    text-shadow: var(--robco-glow);
+  }
+}
+.phosphor-ghost {
+  animation: phosphor-ghost 0.8s ease-out forwards;
+}
+
+/* ─── Delta Arrow Animations ──────────────────────────────────── */
+@keyframes delta-rise {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes delta-fall {
+  0% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.delta-up {
+  display: inline-block;
+  animation: delta-rise 0.45s ease-out forwards;
+  color: var(--robco-green);
+  font-weight: bold;
+}
+.delta-down {
+  display: inline-block;
+  animation: delta-fall 0.45s ease-out forwards;
+  color: var(--robco-danger);
+  font-weight: bold;
+}
+
+/* ─── G3: Active Chem Boost Highlight ─────────────────────────── */
+/* Applied to skill matrix rows when an active BUFF with ticks > 0 matches the skill. */
+/* Monochrome: brighter phosphor only, not a different color. */
+.chem-boost {
+  text-shadow:
+    0 0 6px var(--robco-green),
+    0 0 14px var(--robco-green);
+  filter: brightness(1.45);
+  transition:
+    text-shadow 0.3s ease,
+    filter 0.3s ease;
+}
+
+/* ─── Limb Trauma Glitch ──────────────────────────────────────── */
+@keyframes limb-glitch {
+  0%,
+  84%,
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+  85% {
+    opacity: 0.15;
+    filter: blur(0.5px);
+    transform: translateX(1px);
+  }
+  86% {
+    opacity: 0.9;
+    filter: none;
+    transform: none;
+  }
+  90% {
+    opacity: 0.1;
+    transform: translateX(-1px);
+  }
+  91% {
+    opacity: 0.85;
+    transform: none;
+  }
+  95% {
+    opacity: 0.3;
+    filter: blur(0.3px);
+  }
+  96% {
+    opacity: 1;
+    filter: none;
+  }
+}
+.limb-glitch {
+  animation: limb-glitch 4.5s ease-in-out infinite;
+}
+
+/* ─── Radiation Screen Interference ──────────────────────────── */
+@keyframes flicker-medium {
+  0% {
+    opacity: 0.94;
+  }
+  25% {
+    opacity: 0.86;
+  }
+  50% {
+    opacity: 0.96;
+  }
+  75% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.93;
+  }
+}
+@keyframes rad-shift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10% {
+    transform: translateX(-2px);
+  }
+  11% {
+    transform: translateX(2px);
+  }
+  12% {
+    transform: translateX(0);
+  }
+  80% {
+    transform: translateX(1px);
+  }
+  81% {
+    transform: translateX(-1px);
+  }
+  82% {
+    transform: translateX(0);
+  }
+}
+@keyframes rad-chaos {
+  0%,
+  100% {
+    transform: translateX(0) skewX(0deg);
+  }
+  5% {
+    transform: translateX(-4px) skewX(-0.4deg);
+    opacity: 0.65;
+  }
+  6% {
+    transform: translateX(4px) skewX(0.4deg);
+    opacity: 0.95;
+  }
+  7% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(0);
+  }
+  70% {
+    transform: translateX(-5px);
+    opacity: 0.5;
+  }
+  71% {
+    transform: translateX(5px);
+    opacity: 0.95;
+  }
+  72% {
+    transform: translateX(0);
+  }
+}
+body.rad-warning .crt-overlay {
+  animation: flicker-medium 0.1s infinite !important;
+}
+body.rad-critical .crt-overlay {
+  animation:
+    flicker-medium 0.05s infinite,
+    rad-shift 2.5s ease-in-out infinite !important;
+}
+body.rad-fatal .crt-overlay {
+  animation:
+    flicker-medium 0.03s infinite,
+    rad-chaos 0.7s ease-in-out infinite !important;
+}
+
+/* ── Stat Delta Ghost Register ─────────────────────────────────── */
+.delta-ghost {
+  position: fixed;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  pointer-events: none;
+  z-index: 10000;
+  text-align: center;
+  animation: ghost-rise 0.85s ease-out forwards;
+}
+@keyframes ghost-rise {
+  0% {
+    opacity: 0.9;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* ── Carry Weight Interface Deformation ────────────────────────── */
+@keyframes weight-sag {
+  0%,
+  100% {
+    transform: translateY(0) skewX(0deg);
+  }
+  50% {
+    transform: translateY(1px) skewX(-0.1deg);
+  }
+}
+@keyframes weight-buckle {
+  0%,
+  100% {
+    transform: translateY(0) skewX(0deg);
+  }
+  20% {
+    transform: translateY(2px) skewX(-0.4deg);
+  }
+  40% {
+    transform: translateY(1px) skewX(0.3deg);
+  }
+  60% {
+    transform: translateY(3px) skewX(-0.6deg);
+  }
+  80% {
+    transform: translateY(0px) skewX(0.4deg);
+  }
+}
+body.weight-heavy .col-left {
+  animation: weight-sag 4s ease-in-out infinite;
+}
+body.weight-critical .col-left {
+  animation: weight-sag 1.8s ease-in-out infinite;
+}
+body.weight-over .col-left {
+  animation: weight-buckle 0.7s ease-in-out infinite;
+}
+
+/* ── Tab Standby Mode ──────────────────────────────────────────── */
+body.standby .container {
+  opacity: 0.06;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+body.standby::after {
+  content: '> TERMINAL IDLE. AWAITING COURIER...';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Courier New', monospace;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  font-size: 14px;
+  letter-spacing: 2px;
+  z-index: 99999;
+  animation: cursor-blink 1s step-end infinite;
+  pointer-events: none;
+}
+body.standby .crt-overlay,
+body.standby .crt-overlay::after {
+  animation-play-state: paused;
+}
+
+/* ── A3: Ambient Runtime experiences (IDLE / STANDBY deepen / SHUTDOWN) ──
+   Step 2 (v2.8.0) Phase 2 A3. Each is a dial-gated AmbientRuntime observer
+   (js/ui-core.js: _wireAmbientExperiences) that toggles a body class on
+   state entry/exit — pure CSS, no durable writes anywhere. Every animation
+   below is neutralised by the global prefers-reduced-motion block further
+   down (animation-duration:0.01ms + iteration-count:1 on *), which freezes
+   each keyframe to its resting/final frame instead of playing it out — the
+   required static/instant fallback for motion-sensitive users. */
+
+/* IDLE — phosphor-preservation screensaver flourish (tier 'balanced'). A
+   gentle dim, understated — NOT the full standby blackout (the tab is still
+   focused; the player just hasn't touched anything in a while), so pointer
+   events are left alone (unlike standby, a click both wakes AND registers).
+   Reverts instantly on any interaction (noteActivity() transitions IDLE→ACTIVE,
+   crossing this observer's onExit). */
+body.rt-idle .container {
+  filter: brightness(0.82);
+  transition: filter 1.4s ease;
+}
+body.rt-idle::after {
+  content: '> REDUCING PHOSPHOR WEAR';
+  position: fixed;
+  bottom: 10px;
+  right: 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  z-index: 9990;
+  pointer-events: none;
+  animation: idle-breathe 4s ease-in-out infinite;
+}
+@keyframes idle-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* STANDBY (deepen) — an ADDITIONAL flourish layered OVER the A2 essential dim
+   (body.standby above, unchanged, tier 'minimal' — never quiets). This one is
+   tier 'balanced': a slow "breathing" vignette pulse, silent at Minimal. Uses
+   ::before (not ::after, which body.standby already owns for its diegetic
+   text) so both classes' pseudo-elements coexist without conflict. */
+body.standby-deep::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.55) 100%);
+  animation: standby-breathe 6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes standby-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* SHUTDOWN — a proper CRT power-down. tier 'full': the classic collapse-to-
+   a-line-then-dot flourish (rt-shutdown). Balanced/Minimal degrade to a
+   plain, brief fade to black (rt-shutdown-plain) — still functionally "off",
+   no theatrics, never a broken half-state. Both cover the ENTIRE viewport
+   above everything — including #bootScreen, modals, and the standby overlay
+   — since a genuine shutdown wins over any other visual (js/ui-core.js's
+   shutdown-crt observer also force-clears any lingering idle/standby class
+   first, so nothing else bleeds through underneath). */
+body.rt-shutdown .container {
+  animation: crt-power-off 0.7s ease-in forwards;
+  transform-origin: center;
+}
+body.rt-shutdown::after,
+body.rt-shutdown-plain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+body.rt-shutdown::after {
+  animation: shutdown-cover 0.7s ease-in forwards;
+}
+body.rt-shutdown-plain::after {
+  animation: shutdown-cover-plain 0.3s ease-in forwards;
+}
+@keyframes crt-power-off {
+  0% {
+    transform: scaleY(1) scaleX(1);
+    filter: brightness(1);
+  }
+  60% {
+    transform: scaleY(0.006) scaleX(1);
+    filter: brightness(3);
+  }
+  85% {
+    transform: scaleY(0.006) scaleX(0.01);
+    filter: brightness(3);
+  }
+  100% {
+    transform: scaleY(0.006) scaleX(0.01);
+    opacity: 0;
+    filter: brightness(0);
+  }
+}
+@keyframes shutdown-cover {
+  0%,
+  85% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes shutdown-cover-plain {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Power-on affordance (Protocol 42 fix) — hidden by default; the SAME body
+   classes the shutdown-crt observer already toggles (js/ui-core.js) drive its
+   visibility declaratively (Protocol 22 — no separate JS show/hide bookkeeping,
+   so it can never drift from the shutdown visual). z-index sits ABOVE the
+   shutdown cover (100001) so it is always visible over the black overlay —
+   the cover's own pointer-events:none means clicks were already reaching
+   whatever sits beneath it, this just makes the target visible + labeled.
+   >=28px tap target (Protocol 17); the pulse glow is neutralised by the
+   global prefers-reduced-motion block like every other CRT effect. */
+.power-on-btn {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100002;
+  width: auto;
+  min-height: 44px;
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid var(--robco-green);
+  color: var(--robco-green);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  cursor: pointer;
+  text-shadow: var(--robco-glow);
+  animation: power-on-glow 2s ease-in-out infinite;
+}
+.power-on-btn:hover,
+.power-on-btn:focus-visible {
+  background: var(--robco-green);
+  color: var(--robco-dark);
+}
+body.rt-shutdown .power-on-btn,
+body.rt-shutdown-plain .power-on-btn {
+  display: block;
+}
+@keyframes power-on-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(var(--robco-green-rgb), 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(var(--robco-green-rgb), 0.9);
+  }
+}
+
+/* ── Thermal Ambient Shift ─────────────────────────────────────── */
+body {
+  transition: background-color 0.8s ease;
+}
+body.thermal-load {
+  background-color: #0f0905 !important;
+}
+body.thermal-load .panel {
+  background: rgba(28, 14, 4, 0.55) !important;
+}
+
+/* Desktop app-shell layout (fixed-height, two-column, non-scrolling). Gated on a fine
+   pointer + hover so it can ONLY apply to a real mouse-driven desktop — never a touch
+   phone/tablet. This makes the breakpoint robust against a first-paint layout-viewport
+   race (Protocol 42): on rare first-loads after a service-worker update a standalone PWA
+   could momentarily settle with a desktop-width (>=1000px) layout viewport, applying this
+   PC shell on a phone until a manual reload. With the pointer/hover gate a touch device
+   (pointer:coarse, hover:none) keeps the mobile layout regardless of any width mis-measure. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  body {
+    padding: 20px;
+    height: 100vh;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  .container {
+    max-width: 1600px;
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Bezel fidelity pass (Gap 1) — the full framed-device outer shadow +
+     rounded casing corners, desktop-only per Suite 129 (never a bare
+     min-width:1000px query). body{padding:20px} above already reserves
+     room for the shadow to render without clipping. */
+  .container.machine {
+    box-shadow:
+      0 0 60px rgba(0, 0, 0, 0.9),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+  }
+  /* Desk-terminal shell: casing on top, the bezel keycap strip visually at
+     the BOTTOM (a real console's control strip sits under the screen), the
+     glass in between — via CSS `order`, not DOM order, so keyboard/tab
+     order still visits the nav early (matches the mobile in-flow DOM
+     position — mobile instead docks the bezel as a fixed thumb-zone bar,
+     see the max-width:999.98px block above) while the desktop layout reads
+     as physical hardware. */
+  .casing-top {
+    order: 1;
+    flex-shrink: 0;
+  }
+  /* Gap 4 (serial plate): .serial now carries the row's one margin-left:auto
+     on desktop, absorbing the free space to push it to the right edge; the
+     mini core follows with a small fixed gap instead of its own auto margin
+     (two auto-margin siblings would split the free space and separate
+     them). Mobile is unaffected — .serial is display:none there, so the
+     mini core's base margin-left:auto (unchanged) still works alone. */
+  .chassis-screen-mini {
+    margin-left: 14px;
+  }
+  .glass-frame {
+    order: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    /* Gap 5 — fuller recessed-glass framing at desktop size. */
+    border-radius: 20px;
+    margin: 0;
+    padding: 7px;
+  }
+  .glass-frame::before {
+    inset: 7px;
+    border-radius: 14px;
+  }
+  .bezel {
+    order: 3;
+    flex-shrink: 0;
+    /* Gap 3/6/7 — desktop bezel gains side room for the flanking governor
+       dial + field-kit line, plus the hazard strip along its top edge. */
+    padding: 10px 24px 16px;
+  }
+  .bezel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12%;
+    right: 12%;
+    height: 3px;
+    background: repeating-linear-gradient(
+      115deg,
+      rgba(var(--bezel-wire-rgb), 0.35) 0 8px,
+      rgba(0, 0, 0, 0.5) 8px 16px
+    );
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  /* Owner-report fix (uniform-keycap-width pass) — desktop's own uniform
+     width, comfortably larger than mobile's since the desk-terminal shell
+     has far more horizontal room (verified safe down to the 1000px gate
+     floor). dirkey no longer needs its own min-width override — it now
+     shares this same value via the base .navkey rule (Protocol 22, one
+     source of truth via --navkey-w). */
+  .nav-row {
+    --navkey-w: 100px;
+  }
+  .navkey {
+    min-height: 52px;
+    padding: 6px 4px 5px;
+  }
+  .nk-label {
+    /* Desktop has ample content-box room at the larger uniform width, so
+       the label restores a bigger, easier-to-read size/spacing than the
+       mobile-shrunk values above. */
+    font-size: 9px;
+    letter-spacing: 0.4px;
+  }
+  .main-grid {
+    grid-template-columns: 380px 1fr;
+    gap: 25px;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+  .col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    padding-right: 10px;
+    min-width: 0;
+    min-height: 0;
+  }
+  .col-right {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+  }
+  .panel.chat-panel {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    min-height: 0;
+    /* Protocol 42 fix (found live while verifying the composer-integration
+       redesign): the command cluster tray defaults OPEN on desktop and has
+       no height cap, so with a short-ish viewport it could starve
+       .transcript-card's flex-grow down toward zero with nowhere for the
+       overflow to go (.col-right clips with overflow:hidden). Scrolling the
+       whole panel — mirroring the existing mobile behavior — means the
+       transcript's own min-height (below) is always honored; any excess
+       tray content scrolls into view instead of being lost. */
+    overflow-y: auto;
+  }
+  .transcript-card {
+    flex-grow: 1;
+    /* A real floor, not 0 — with min-height:0 here, .chat-panel's flex
+       algorithm was free to crush this card toward zero BEFORE its own
+       overflow-y:auto ever engaged (the card conceded the space instead of
+       .chat-panel scrolling), which in turn crushed #chatDisplay against
+       .composer's then-fixed ~149px inside the card's own overflow:hidden —
+       clipping the transcript to a sliver with no scrollbar in sight
+       (Protocol 42, same investigation as the .chat-panel fix above). The
+       floor below is #chatDisplay's real minimum footprint — its 90px
+       content min-height PLUS its own 15px+15px padding (content-box, so
+       padding isn't absorbed into the 90px) — plus the composer's own
+       height and the card's 2px border, so any further squeeze is absorbed
+       by .chat-panel's scroll instead of clipping the transcript. #chatInput
+       is now auto-grow (small-UI-polish batch) rather than a fixed 80px, so
+       this floor is a conservative upper bound, not an exact tally. */
+    min-height: 282px;
+  }
+  #chatDisplay {
+    flex-grow: 1;
+    height: 0;
+    min-height: 90px;
+    overflow-y: auto;
+    font-size: 15px;
+  }
+  #chatInput {
+    flex-shrink: 0;
+  }
+}
+
+/* ── Skills Grid — legacy container, contents now built by the BUS-05
+   VU array below (Phase 3 OPERATOR batch 2); kept as a plain block so
+   #skillsGrid's own box model is unaffected. ── */
+.skills-grid {
+  display: block;
+}
+
+/* ── Campaign Notes ──────────────────────────────────────────── */
+.notes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.notes-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ── Faction Standing — retired card-grid layout; BUS-08 now renders the
+   INFAMY◂▸FAME console (selector + wide meter + mini-pin strip) via the
+   .facon-* classes further below (Phase 3 OPERATOR batch 2). ── */
+
+/* ── Day/Night Indicator ─────────────────────────────────────── */
+/* Applied to body by updateMath() based on ticks % 240 */
+body.time-night .container {
+  box-shadow: inset 0 0 40px rgba(0, 0, 60, 0.18);
+}
+body.time-night .crt-overlay {
+  filter: hue-rotate(20deg) brightness(0.92);
+}
+
+/* ── Karma Event Flash ───────────────────────────────────────── */
+@keyframes karma-good-flash {
+  0% {
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0);
+  }
+  30% {
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0.55);
+  }
+  100% {
+    box-shadow: inset 0 0 0 3px rgba(var(--robco-green-rgb), 0);
+  }
+}
+@keyframes karma-evil-flash {
+  0% {
+    box-shadow: inset 0 0 0 3px rgba(231, 76, 60, 0);
+  }
+  30% {
+    box-shadow: inset 0 0 0 3px rgba(231, 76, 60, 0.6);
+  }
+  100% {
+    box-shadow: inset 0 0 0 3px rgba(231, 76, 60, 0);
+  }
+}
+body.karma-flash-good {
+  animation: karma-good-flash 0.9s ease-out;
+}
+body.karma-flash-evil {
+  animation: karma-evil-flash 0.9s ease-out;
+}
+
+/* ── Critical HP Flash ───────────────────────────────────────── */
+/* Fixed for mobile: animates a pseudo-element overlay rather than body background */
+@keyframes crit-hp-flash {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: rgba(231, 76, 60, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+body.crit-hp-flash::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  animation: crit-hp-flash 0.7s ease-out;
+}
+
+/* ── Panel Notification Badge ────────────────────────────────── */
+.panel-badge {
+  display: inline-block;
+  background: var(--robco-alert);
+  color: #010a07;
+  font-size: 9px;
+  font-weight: bold;
+  font-family: inherit;
+  border-radius: 2px;
+  padding: 0px 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.5px;
+  text-shadow: none;
+  line-height: 1.5;
+  animation: badge-pop 0.25s ease-out;
+}
+@keyframes badge-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ── Skill Check Highlight ───────────────────────────────────── */
+@keyframes skill-ping {
+  0% {
+    box-shadow: 0 0 0 2px var(--robco-alert);
+  }
+  50% {
+    box-shadow: 0 0 8px 3px var(--robco-alert);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+.skill-ping {
+  animation: skill-ping 1.2s ease-out;
+}
+
+/* ── Sync Complete Tone visual cue ───────────────────────────── */
+@keyframes sync-flash {
+  0% {
+    opacity: 1;
+  }
+  40% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+body.sync-complete {
+  animation: sync-flash 0.4s ease-out;
+}
+
+/* ── USE button in inventory ────────────────────────── */
+.use-btn {
+  background: transparent;
+  border: 1px solid var(--robco-green);
+  color: var(--robco-green);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 1px 5px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  margin-right: 3px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  min-height: 44px;
+  width: auto;
+  flex-shrink: 0;
+}
+.use-btn:hover {
+  opacity: 1;
+  text-shadow: var(--robco-glow);
+}
+
+/* ─── Registry Autocomplete Panel (Phase 3) ────────────── */
+.autocomplete-panel {
+  position: fixed;
+  z-index: 8000;
+  background: rgba(2, 28, 20, 0.97);
+  border: 1px solid var(--robco-green);
+  box-shadow:
+    var(--robco-glow),
+    0 4px 16px rgba(0, 0, 0, 0.8);
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+  min-width: 220px;
+  max-width: 340px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+}
+.autocomplete-panel.ac-visible {
+  display: block;
+}
+.ac-item {
+  padding: 5px 8px;
+  color: var(--robco-green);
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.1s ease;
+}
+.ac-item:last-child {
+  border-bottom: none;
+}
+.ac-item:hover,
+.ac-item.ac-active {
+  background: rgba(var(--robco-green-rgb), 0.15);
+  text-shadow: var(--robco-glow);
+}
+.ac-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.ac-item-tag {
+  font-size: 10px;
+  color: rgba(var(--robco-green-rgb), 0.5);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.ac-empty {
+  padding: 6px 8px;
+  color: rgba(var(--robco-green-rgb), 0.4);
+  font-style: italic;
+  font-size: 11px;
+}
+
+/* ─── Command-Line MODE — pill + hint (Step 2 Phase 2 B1) ────────────── */
+/* .action-btn.btn-sm already supplies width:auto + min-height/width:28px
+   (Protocol 17 tap target); this layer only adds the pill shape + per-mode
+   color and prevents the label from ever wrapping (Suite 92 pattern). */
+.mode-pill {
+  border-radius: 12px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.mode-pill--terminal {
+  border-color: var(--robco-green);
+  color: var(--robco-green);
+}
+.mode-pill--overseer {
+  border-color: var(--robco-blue);
+  color: var(--robco-blue);
+}
+/* FIX (owner report, small-UI-polish batch): button.action-btn:hover's fill
+   "sticks" after a touch tap — mobile browsers apply :hover on tap with no
+   pointerleave event to clear it, so the pill stayed lit green/dark until
+   something else was tapped. Reset the pill's hover look unconditionally
+   (every pointer type) here, then layer the real fill back in for genuine
+   hover-capable pointers only — the same (hover: hover) signal Suite 129
+   already uses for desktop-only behavior — so mouse users keep the
+   feedback and a touch tap never looks stuck. toggleInputMode() (ui-core.js)
+   also blurs the pill after a tap as a second line of defense.
+   Both reset rules must tie-or-beat button.action-btn:hover's specificity
+   (element + class + pseudo-class) and be declared AFTER it in source
+   order to win the cascade tie; the gated restore below is declared after
+   THEM for the same reason. */
+button.mode-pill--terminal:hover {
+  background: transparent;
+  filter: none;
+  color: var(--robco-green);
+}
+button.mode-pill--overseer:hover {
+  background: transparent;
+  filter: none;
+  color: var(--bezel-wire);
+}
+@media (hover: hover) and (pointer: fine) {
+  button.mode-pill:hover {
+    background: var(--robco-green);
+    color: var(--robco-dark);
+    filter: brightness(1.1);
+  }
+}
+/* Inline reveal (not a floating overlay) so it can never overflow at
+   360/412px — it simply occupies its own row while `/` or `@` is typed. */
+.mode-hint {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  color: var(--robco-alert);
+  margin: 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Zone Detail View — "sector sheet" (Phase 3 · Piece 3 renamed the
+   surrounding markup to .sheet/.loc-row; .map-back-btn/.map-collectible-badge
+   are the two classes from the old boxed-grid map still reused verbatim by
+   the reskinned sector sheet, Protocol 22 — everything else that rendered
+   the retired boxed 6×6 grid (.map-cell/.map-detail-row/.map-mark-visited/
+   .map-legend/.map-toggle-btn/.map-you-marker) was deleted as dead CSS,
+   superseded by the BUS-16 Phosphor Cartography SVG node-map rules
+   (Phase 3 · Piece 3 DATABANK section, further below in this file). ── */
+.map-back-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+.map-collectible-badge {
+  font-size: 9px;
+  color: var(--robco-alert);
+  margin-left: 3px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* ── Campaign Status Panel (v2.0.1) ────────────────────── */
+.campg-stat-box {
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding: 5px 8px;
+  text-align: center;
+}
+.campg-stat-label {
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  margin-bottom: 2px;
+}
+.campg-stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+}
+.campg-stat-sub {
+  font-size: 8px;
+  opacity: 0.55;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Narrow Phone Layout (≤ 480px) ─────────────────────────────────
+   The mobile-first base styles already collapse the main grid to a single
+   column below 1000px. This block fixes the remaining horizontal overflow
+   on true phone widths: oversized boot/header text, wide tab buttons, the
+   Location field truncating "Goodsprings", multi-column sub-grids, and — the
+   r5 fix — number inputs / limb buttons in the BIO-METRICS rows that were
+   running off the right edge. Verified at 360px and 412px with the media
+   query active: zero right-side overflow in the bio-metrics panel. */
+@media (max-width: 480px) {
+  body {
+    padding: 6px;
+    font-size: 13px;
+  }
+  .container {
+    padding: 8px;
+  }
+
+  /* Boot screen: wrap and shrink long uplink lines so they never overflow */
+  #bootScreen {
+    font-size: 12px;
+  }
+  #bootLines {
+    width: 94%;
+    word-break: break-word;
+  }
+
+  /* Casing/bezel: shrink and allow wrap so it never forces a scrollbar */
+  .brand-plate {
+    font-size: 11px;
+    letter-spacing: 1px;
+    white-space: normal;
+    word-break: break-word;
+  }
+  .uptime-line {
+    font-size: 9px;
+    word-break: break-word;
+  }
+
+  /* Rows wrap their right-hand control column under the label instead of
+     spilling past the viewport edge when it is too wide. */
+  .input-group {
+    gap: 8px;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  /* TEXT inputs / selects grow to fill the row (e.g. #stat_loc shows the full
+     value). The override beats inline style="width:100px/130px" via !important. */
+  .input-group input[type='text'],
+  .input-group input[type='password'],
+  .input-group select {
+    flex: 1 1 auto;
+    width: auto !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* NUMBER inputs must stay compact — NEVER grow. A UA-default <input
+     type=number> with width:auto balloons to ~170px+ on mobile, which pushed
+     the HP "/ 100", LVL/XP "/ 1249" and CAPS value columns off the right edge
+     and produced a stray vertical green line from the stacked input borders.
+     Cap them hard so neither flex nor UA intrinsic sizing can over-widen them. */
+  input[type='number'] {
+    max-width: 56px;
+    box-sizing: border-box;
+  }
+
+  /* The casing-top readout window shrinks a touch at narrow widths so the
+     header (brand plate + lamps + vents + screen) has room to wrap cleanly
+     instead of ever forcing a scrollbar (Protocol 17 — the core itself,
+     stays comfortably clear of any tap-target floor since it's decorative).
+     The compound .chassis-core-shape.chassis-core-mini selector (Protocol 42
+     — see the base rule's comment) keeps this shrink effective regardless of
+     source order relative to the shared .chassis-core-shape base rule. This
+     is the >400-480px tier (roughly 412-428px phones); a stricter <=400px
+     tier further down the file shrinks it once more for narrower phones.
+     Second bump (owner follow-up): 56x44 / 32px -> 68x54 / 40px. */
+  .chassis-screen-mini {
+    width: 68px;
+    height: 54px;
+  }
+  .chassis-core-shape.chassis-core-mini {
+    width: 40px;
+    height: 40px;
+  }
+  /* perspective + the diagonal ring's border-width both hold the SAME
+     ratio to this tier's 40px size that the full core keeps at 96px (see
+     the base .chassis-core-shape.chassis-core-mini rule's comment) — big/
+     mini visual-parity fix, not a new design choice at this breakpoint.
+     `body ` is a deliberate specificity bump (0,2,0 -> 0,2,1): the
+     UNCONDITIONAL base rules for these two properties live much further
+     down the file (near the ring's own definition, for comment cohesion)
+     and would otherwise always win regardless of viewport — media queries
+     add no specificity of their own, so equal-specificity + later-in-file
+     beats an earlier, narrower media block every time without this. */
+  body .chassis-core-shape.chassis-core-mini {
+    perspective: 83px;
+  }
+  body .chassis-core-shape.chassis-core-mini::before {
+    border-width: 4px;
+  }
+
+  /* Nested value wrappers (HP/LVL "cur / max") and the limb button groups stay
+     inside the row and may wrap rather than clip. */
+  .input-group > div {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* Limb status buttons shrink to share the row instead of clipping at the
+     right edge, while keeping a usable tap target. */
+  button.limb-ok,
+  button.limb-crip {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    font-size: 10px;
+    padding: 4px 2px;
+    box-sizing: border-box;
+  }
+
+  /* Hard guard: no embedded element may force a horizontal scrollbar */
+  img,
+  pre,
+  table,
+  canvas {
+    max-width: 100%;
+  }
+
+  /* AUTO-ZOOM GUARD — iOS/Android zoom any focusable input whose font-size is
+     below 16px and persist that zoom across reloads. A fresh navigation resets
+     scale to 1.0, so the page looks fine on a clean load but is zoomed-in and
+     clipped after a reload. !important beats the UA 13px default, the 12px
+     SPECIAL/skills rule, and any inline style="font-size:12px" on those inputs.
+     Widths are unaffected — box-sizing:border-box + the existing max-width caps
+     (56px numbers, 100% text) still hold, so this does NOT reintroduce the
+     r5 number-input ballooning. */
+  input[type='number'],
+  input[type='text'],
+  input[type='password'],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Cap standalone controls (outside .input-group) at viewport width. */
+  select,
+  textarea,
+  input[type='password'] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Neutralize horizontal-shear animations on mobile — weight/rad overlays
+     apply translate/skew keyframes that can push content past the right edge
+     when the viewport is zoom-locked from a previous visit. Desktop keeps
+     the effects; they are disabled only on narrow screens. */
+  body.weight-heavy .col-left,
+  body.weight-critical .col-left,
+  body.weight-over .col-left,
+  body.rad-warning .crt-overlay,
+  body.rad-critical .crt-overlay,
+  body.rad-fatal .crt-overlay {
+    animation: none !important;
+  }
+}
+
+/* The casing-top readout window's narrowest tier (owner follow-up,
+   prominence pass) — narrower phones (~360-393px) get one size down from
+   the >400-480px tier above, since the casing-top row has less spare width
+   to wrap into cleanly. Still noticeably bigger than the pre-prominence-pass
+   size at every tier. A later, narrower media query wins over the wider
+   @media (max-width: 480px) block above for the same selector at equal
+   specificity purely by source order — deliberately placed after it.
+   Second bump (owner follow-up): 46x36 / 27px -> 56x44 / 33px. */
+@media (max-width: 400px) {
+  .chassis-screen-mini {
+    width: 56px;
+    height: 44px;
+  }
+  .chassis-core-shape.chassis-core-mini {
+    width: 33px;
+    height: 33px;
+  }
+  /* perspective + the diagonal ring's border-width both hold the SAME
+     ratio to this tier's 33px size that the full core keeps at 96px — the
+     narrowest-phone leg of the same big/mini visual-parity fix. `body `
+     is the same deliberate specificity bump as the 480px tier above (see
+     its comment) — needed here too since this block's own later position
+     (relative to the 480px block) only settles the fight BETWEEN the two
+     media tiers, not against the unconditional base rule further down. */
+  body .chassis-core-shape.chassis-core-mini {
+    perspective: 69px;
+  }
+  body .chassis-core-shape.chassis-core-mini::before {
+    border-width: 3px;
+  }
+}
+
+/* ─── SW Update Banner (reusable template — WU-E2) ─────────────── */
+/* Fixed amber strip for a "firmware update staged" / feature notice.
+   INTENTIONAL TEMPLATE, NEVER DELETE: the active update path is the blocking
+   #updateModal; this class styles the lighter-weight banner held inert inside
+   #updateBannerTemplate (a <template>, so disabled by default). Class selector
+   (not an id) keeps it reusable for any future instantiated banner.
+   Uses position:fixed so it never contributes to document overflow. */
+.update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: var(--robco-alert);
+  color: #000;
+  padding: 10px 16px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  animation: update-banner-pulse 2s ease-in-out infinite;
+  user-select: none;
+  -webkit-user-select: none;
+  text-shadow: none;
+}
+@keyframes update-banner-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+/* ─── Phase 2b Utility Classes ─────────────────────────────────── */
+
+/* Empty-state message shown when a list has no items */
+.empty-state {
+  color: rgba(var(--robco-green-rgb), 0.5);
+}
+
+/* Audio toggle row: checkbox + label pair in the Audio Systems panel */
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Inner <details> summary: consistent appearance + CSS [+]/[-] toggle */
+summary.config-summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  font-family: inherit;
+  letter-spacing: 1px;
+}
+summary.config-summary::-webkit-details-marker {
+  display: none;
+}
+summary.config-summary::after {
+  content: ' [+]';
+  font-family: monospace;
+}
+details[open] > summary.config-summary::after {
+  content: ' [-]';
+}
+
+/* ─── Focus Indicators (WCAG 2.4.7 — A-1 CRITICAL) ──────────────────
+   Phosphor-glow ring for keyboard navigation.
+   :focus-visible fires only for keyboard / programmatic focus — not
+   mouse clicks — so mouse users see no outline change.
+   The outline:none rules above suppress the browser default on mouse
+   click; these :focus-visible rules restore a visible ring for keyboard
+   users at higher specificity (pseudo-class beats element selector). */
+:root:has(body) button:focus-visible,
+button:focus-visible,
+.tab-btn:focus-visible,
+.tracker-toggle:focus-visible {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
+}
+input:focus-visible,
+input[type='number']:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+  box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
+}
+details.panel summary:focus-visible,
+details.sub-panel > summary:focus-visible,
+summary.config-summary:focus-visible {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+}
+
+/* ─── Reduced Motion (WCAG 2.3.1 / A-S4 CRITICAL) ───────────────────
+   flicker @6.7Hz and flicker-medium @10Hz exceed the 3Hz seizure
+   threshold. When the OS/browser reduced-motion preference is set,
+   freeze all 22 CRT keyframe animations to a static resting state.
+   0.01ms (not 0s) avoids browser bugs that skip animationend events.
+   .crt-overlay opacity:1 keeps the static scanline look intact. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .crt-overlay {
+    opacity: 1;
+  }
+}
+
+/* ── WU-F8: HIGH-LUMEN OPTICS (AA+ contrast mode) ──────────────
+   An accessibility/legibility boost framed in-world as driving the
+   phosphor harder. It maximises text-vs-background contrast: a pure-black
+   background, no glow halo (sharper glyph edges), every dimmed/secondary
+   surface lifted to full opacity, and the scanline/refresh veil dropped
+   to a whisper. Pure CSS, game-agnostic — it layers over whatever optics
+   colour (--robco-green token) is active, so it works in every theme and
+   every game. Activated TWO ways, both applying the identical boosts:
+     1. the manual OPTICS toggle  → html.high-lumen  (localStorage pref)
+     2. the OS preference         → @media (prefers-contrast: more)
+   The two blocks below are intentional mirrors — keep them in lock-step. */
+html.high-lumen body {
+  background-color: #000;
+  text-shadow: none;
+}
+html.high-lumen {
+  --robco-dark: #000;
+  --robco-glow: none;
+}
+html.high-lumen .tab-btn,
+html.high-lumen .list-row-prefix,
+html.high-lumen .tracker-toggle--inactive,
+html.high-lumen .tracker-meta,
+html.high-lumen .inv-filter-btn,
+html.high-lumen .empty-state {
+  opacity: 1 !important;
+}
+html.high-lumen .crt-overlay,
+html.high-lumen .crt-overlay::after {
+  opacity: 0.5;
+}
+html.high-lumen .panel,
+html.high-lumen .sub-panel {
+  border-color: var(--robco-green);
+}
+
+@media (prefers-contrast: more) {
+  body {
+    background-color: #000;
+    text-shadow: none;
+  }
+  :root {
+    --robco-dark: #000;
+    --robco-glow: none;
+  }
+  .tab-btn,
+  .list-row-prefix,
+  .tracker-toggle--inactive,
+  .tracker-meta,
+  .inv-filter-btn,
+  .empty-state {
+    opacity: 1 !important;
+  }
+  .crt-overlay,
+  .crt-overlay::after {
+    opacity: 0.5;
+  }
+  .panel,
+  .sub-panel {
+    border-color: var(--robco-green);
+  }
+}
+
+/* Add-row form: flex row below each panel's list */
+.panel-form {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* ── Compact-Button Utility (P2-3) ──────────────────────────── */
+/* Overrides the global button{width:100%;padding:12px;margin-top:5px} defaults.
+   min 28×28 touch target (Protocol 17). Use alongside action-btn or alert-btn. */
+.btn-sm {
+  width: auto;
+  padding: 3px 8px;
+  font-size: 11px;
+  margin: 0;
+  min-height: 28px;
+  min-width: 28px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Inventory Category Filter Buttons (P4d) ────────────────── */
+.inv-filter-btn {
+  opacity: 0.5;
+}
+.inv-filter-btn.active {
+  opacity: 1;
+  background: rgba(var(--robco-green-rgb), 0.18);
+  border-color: var(--robco-green);
+}
+
+/* ── List-Row Layout Utilities (P2-2) ───────────────────────── */
+/* Prefix glyph ("> ") in perks/quests/notes flex rows */
+.list-row-prefix {
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+/* Grows to fill available width, pushes delete-btn to the right */
+.list-row-content {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── Tracker rows (compact registry-backed lists) ──────────────── */
+.tracker-row {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* Keyboard-accessible tracker toggle; ≥28px tap target per Protocol 17 */
+button.tracker-toggle {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-height: 28px;
+  min-width: 44px;
+  padding: 0 2px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  margin-right: 4px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+button.tracker-toggle--active {
+  color: var(--robco-green);
+}
+button.tracker-toggle--inactive {
+  opacity: 0.5;
+}
+.tracker-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}
