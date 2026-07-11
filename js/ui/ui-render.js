@@ -90,7 +90,7 @@ function adjItemQty(idx, delta) {
 }
 
 // Phase 3 · Piece 2: native EQUIP control, closing the U10 audit gap
-// (state.equipped was previously AI-write-only — see api.js autoImportState,
+// (state.equipped was previously AI-write-only — see api-import.js autoImportState,
 // which keeps validating/applying the AI's own equipped writes unchanged).
 // One equipped item per slot family: 'weapon'-typed items occupy
 // state.equipped.weapon, 'armor'-typed items occupy state.equipped.armor.
@@ -635,7 +635,7 @@ function removeSquadMember(idx) {
 }
 
 // U10 (FP-AI-5/FP-FEAT-3): native affinity control \u2014 companion affinity was
-// previously AI-write-only (autoImportState, api.js). Nudges by delta, clamped
+// previously AI-write-only (autoImportState, api-import.js). Nudges by delta, clamped
 // 0-100, defaulting an unset member.affinity to 0 (mirrors the render fallback).
 function adjustAffinity(idx, delta) {
   if (!state.squad || !state.squad[idx]) return;
@@ -1006,7 +1006,7 @@ function _applyStatusEffect(name, ticks, type) {
     // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP) — new additive emit,
     // fired only for a genuinely NEW compound (never a re-application — the
     // #12 INK STAMP "lands once" precedent); the AI status-set path in
-    // autoImportState() (api.js) emits the same event.
+    // autoImportState() (api-import.js) emits the same event.
     RobcoEvents.emit('effect.applied', { name: nm, type: tp });
     _pendingEffectWarmup.push(nm);
   }
@@ -3673,7 +3673,7 @@ function _visualParseInventoryMerge(inventory, row) {
 // _lootAdd()/_threatCompute() are. Inventory rows route through
 // _visualParseInventoryMerge() (additive, no-clobber); stat rows route
 // through the SAME _resolveStatToken()/_applyStatToken() choke point Native
-// USE and TERMINAL stat edits already use (js/api.js, Protocol 22) — those
+// USE and TERMINAL stat edits already use (js/services/api-router.js, Protocol 22) — those
 // setters already clamp (SPECIAL 1–10, skill 0–100, HP≤max, rads≤maxRads,
 // level≤MAX_PLAYER_LEVEL) and call saveState() themselves, so an OCR
 // misread (e.g. "S: 99") can never exceed a real limit (Protocol 24). No new

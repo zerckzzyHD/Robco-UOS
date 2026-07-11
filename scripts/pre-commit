@@ -72,12 +72,12 @@ if printf '%s\n' "$STAGED_DIFF" | grep -E '^\+[^+]' | grep -qE 'BEGIN [A-Z0-9 ]*
   echo ""
   exit 1
 fi
-# Check for Google API key pattern — exclude js/cloud.js (contains a legitimate public Firebase web API key)
+# Check for Google API key pattern — exclude js/services/cloud.js (contains a legitimate public Firebase web API key)
 STAGED_NO_CLOUD=$(printf '%s\n' "$STAGED_DIFF" | awk '/^diff --git /{if(/cloud\.js/)in_cloud=1;else in_cloud=0} !in_cloud{print}')
 if printf '%s\n' "$STAGED_NO_CLOUD" | grep -E '^\+[^+]' | grep -qE 'AIza[0-9A-Za-z_-]{35}'; then
   echo ""
   echo "  [FAIL]  Secret detected: Google API key (AIza...) in staged diff (non-cloud.js file)."
-  echo "  Public Firebase web keys belong in js/cloud.js only. Remove secrets before committing."
+  echo "  Public Firebase web keys belong in js/services/cloud.js only. Remove secrets before committing."
   echo ""
   exit 1
 fi

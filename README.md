@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 2958-test gate at parity + boot-smoke / render / a11y checks                |
+| **Testing**     | Node + PowerShell + Playwright                   | 2971-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -198,7 +198,10 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 │   │   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
 │   │   └── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
 │   ├── services/           Everything that talks to the outside world
-│   │   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
+│   │   ├── api.js              Network-layer hub — transmitMessage lifecycle, comm-config cache, fetchAuthorizedModels
+│   │   ├── api-directive.js    getSystemDirective + its 8 _directive* section builders (Suite 131 golden-master)
+│   │   ├── api-import.js       AI → state import — autoImportState, sanitizeImportedContainer
+│   │   ├── api-router.js       Offline native command routing — NATIVE_COMMAND_ROUTER, quick-log, transmitTerminal
 │   │   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
 │   │   └── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
 │   ├── dev/                Dev-only tooling
@@ -207,7 +210,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2958 tests, 221 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2971 tests, 221 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -240,8 +243,11 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 15. ui/ui-core-modulebay.js   →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
 16. ui/ui-core-cmd.js         →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
 17. dev/test-console.js       →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
-18. services/api.js           →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
-19. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
+18. services/api.js           →  transmitMessage, fetchAuthorizedModels, comm-config cache (2.8.5 U-A3 split)
+19. services/api-directive.js →  getSystemDirective + its 8 _directive* section builders (2.8.5 U-A3 split)
+20. services/api-import.js    →  autoImportState, sanitizeImportedContainer (2.8.5 U-A3 split)
+21. services/api-router.js    →  NATIVE_COMMAND_ROUTER, transmitTerminal, quick-log routing (2.8.5 U-A3 split)
+22. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
@@ -304,7 +310,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2958-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2971-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -368,7 +374,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2958 tests across 221 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2971 tests across 221 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

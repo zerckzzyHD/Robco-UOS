@@ -75,24 +75,25 @@ function Read-Src($rel) {
 }
 
 # CSS split read helper (2.8.5 U-A2) -- terminal.css was split into 12 files
-# as a pure ordered cut (cascade is order-sensitive -- 99-mobile.css
-# must load last). CSS_SPLIT_FILES is the ONE canonical list. Read-Css()
-# replaces every old Read-Css call site with the exact
-# same concatenated text the browser cascade actually sees.
-$CSS_SPLIT_FILES = @(
-    '05-base.css',
-    '10-chrome.css',
-    '15-overseer.css',
-    '20-diagnostic-shell.css',
-    '25-toolbar.css',
-    '30-modulebay.css',
-    '35-operator-boards.css',
-    '40-curio-operations.css',
-    '45-databank.css',
-    '50-chassis.css',
-    '55-feedback-animations.css',
-    '99-mobile.css'
-)
+# as a pure ordered cut (cascade is order-sensitive -- 99-mobile.css must load
+# last). CSS_SPLIT_FILES is DERIVED from index.html's own <link> tags (audit
+# N2, 2.8.5 U-A3 -- mirrors tests/robco-diagnostics.js's Read-Group parity): a
+# hand-maintained copy here could silently drift from the real cascade order,
+# since nothing cross-checked it against index.html -- only
+# scripts/check-boot-chain.js's CANONICAL_CSS_ORDER ever was. Deriving it
+# collapses this runner's copy to zero duplication: Read-Css() always
+# concatenates in whatever order the browser actually loads, and
+# check-boot-chain.js CHECK I/J/K independently guards that index.html's own
+# order is the CORRECT one (this derivation can't detect a wrong order in
+# index.html itself -- only reproduce it faithfully).
+function Get-CssSplitOrder {
+    $html = Read-Src "index.html"
+    $linkMatches = [regex]::Matches($html, '<link[^>]*\srel=["'']stylesheet["''][^>]*\shref=["'']css/([A-Za-z0-9_-]+\.css)["'']')
+    $out = @($linkMatches | ForEach-Object { $_.Groups[1].Value })
+    if ($out.Count -eq 0) { Fail 'index.html has no css/*.css <link rel="stylesheet"> tags -- cannot derive CSS split order'; exit 1 }
+    return $out
+}
+$CSS_SPLIT_FILES = Get-CssSplitOrder
 function Read-Css {
     return (($CSS_SPLIT_FILES | ForEach-Object { Read-Src "css/$_" }) -join "`n")
 }
@@ -3608,7 +3609,8 @@ $htmlSrc59   = Read-Src "index.html"
 $jsFiles59   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js',
                   'js/ui-core.js','js/ui-core-nav.js','js/ui-core-overseer.js',
                   'js/ui-core-chassis.js','js/ui-core-modulebay.js','js/ui-core-cmd.js',
-                  'js/api.js','js/cloud.js','js/state.js',
+                  'js/api.js','js/api-directive.js','js/api-import.js','js/api-router.js',
+                  'js/cloud.js','js/state.js',
                   'js/reg_nv.js','js/reg_fo3.js')
 $allJsSrc59  = ($jsFiles59 | ForEach-Object { Read-Src $_ }) -join "`n"
 
@@ -6109,7 +6111,9 @@ Check (([bool]($stateSrc89 -match '(?s)FNV:\s*\{.*?trackerDirectives\s*:')) -and
     'GATE-AGNOSTIC-16: GAME_DEFS.FNV/.FO3.ai.trackerDirectives exist and _directiveTrackers() reads from them -- GA-5 data-driven trackers (U1)'
 
 # ===========================================================
-# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding (16 tests)
+# Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding
+# (dynamic: every non-vendor js/**/*.js file + 3 docs + 1 CHANGELOG check --
+# see audit N5 note below for why the count is no longer hand-typed)
 # ===========================================================
 Sep "Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding"
 # Detect double-encoding from PowerShell Latin-1 read + UTF-8 write.
@@ -6120,34 +6124,30 @@ Sep "Suite 90 -- UTF-8 CORRUPTION GUARD: no symbol double-encoding"
 $rfChar90 = [char]0xFFFD
 $mojiA90  = ([char]0x00E2).ToString() + ([char]0x20AC).ToString()
 $mojiB90  = ([char]0x00E2).ToString() + ([char]0x2013).ToString()
-# 2.8.5 U-A2 (closes AUDIT_U4 Finding B): widened to the five ui-core-*.js
-# siblings, which the U-A1 split moved ~70% of ui-core's non-ASCII content
-# into but this list was never widened to cover (latent -- all five are
-# mojibake-clean today). Kept as a per-file hand list (not a full glob
-# derivation, unlike Suite 62's jsAll62 above) so this stays a fixed,
-# Protocol-2a-stable 15-file suite rather than growing one assertion per
-# js file on every future file add.
-$srcPairs90 = @(
-    @{ File = 'js/services/api.js';         Label = 'GATE-CORRUPT-1' },
-    @{ File = 'js/core/state.js';           Label = 'GATE-CORRUPT-2' },
-    @{ File = 'js/ui/ui-core.js';           Label = 'GATE-CORRUPT-3' },
-    @{ File = 'js/ui/ui-render.js';         Label = 'GATE-CORRUPT-4' },
-    @{ File = 'js/ui/ui-saves.js';          Label = 'GATE-CORRUPT-5' },
-    @{ File = 'js/ui/ui-audio.js';          Label = 'GATE-CORRUPT-6' },
-    @{ File = 'js/ui/ui-account.js';        Label = 'GATE-CORRUPT-7' },
-    @{ File = 'js/ui/ui-core-nav.js';       Label = 'GATE-CORRUPT-8' },
-    @{ File = 'js/ui/ui-core-overseer.js';  Label = 'GATE-CORRUPT-9' },
-    @{ File = 'js/ui/ui-core-chassis.js';   Label = 'GATE-CORRUPT-10' },
-    @{ File = 'js/ui/ui-core-modulebay.js'; Label = 'GATE-CORRUPT-11' },
-    @{ File = 'js/ui/ui-core-cmd.js';       Label = 'GATE-CORRUPT-12' },
-    @{ File = 'index.html';                 Label = 'GATE-CORRUPT-13' },
-    @{ File = 'README.md';                  Label = 'GATE-CORRUPT-14' },
-    @{ File = 'ARCHITECTURE.md';            Label = 'GATE-CORRUPT-15' }
-)
-foreach ($pair90 in $srcPairs90) {
-    $content90 = [System.IO.File]::ReadAllText((Join-Path $Root $pair90.File), [System.Text.Encoding]::UTF8)
+# 2.8.5 U-A3 (closes AUDIT_U5 Finding N5): widened from a hand-maintained
+# file list to a full glob over every non-vendor js/**/*.js file, via
+# Get-AllJsFiles (mirrors Node's allJsFiles()/Suite 62 family helper). The
+# prior hand list omitted the per-game data files (db_nv.js/db_fo3.js/
+# reg_nv.js/reg_fo3.js) that Protocol 39 explicitly says DO contain
+# non-ASCII (ae/inverted-! placeholder prose aside -- see the real chars in
+# the source files themselves) -- so a PowerShell-corruption of one of them
+# would have gone completely undetected (a pre-existing gap, not introduced
+# by any one split). Globbing means every future file (a new split, a new
+# data file) is automatically covered with zero manual widening step -- the
+# guard can no longer go stale the way this exact list already did once
+# (2.8.5 U-A2 widened it for the ui-core-*.js siblings and still missed the
+# data files). The tradeoff: this suite's test COUNT now moves with the file
+# count instead of being Protocol-2a-stable -- accepted, since a moving
+# count that's always complete beats a fixed count that silently isn't.
+$jsFiles90 = (Get-AllJsFiles) | ForEach-Object { "js/$($_.Rel)" }
+$docFiles90 = @('index.html', 'README.md', 'ARCHITECTURE.md')
+$srcFiles90 = @($jsFiles90) + $docFiles90
+$idx90 = 0
+foreach ($rel90 in $srcFiles90) {
+    $idx90++
+    $content90 = [System.IO.File]::ReadAllText((Join-Path $Root $rel90), [System.Text.Encoding]::UTF8)
     $corrupt90 = $content90.Contains($rfChar90) -or $content90.Contains($mojiA90) -or $content90.Contains($mojiB90)
-    Check (-not $corrupt90) "$($pair90.Label): $($pair90.File) has no U+FFFD or mojibake double-encoding (PowerShell UTF-8 write guard)"
+    Check (-not $corrupt90) "GATE-CORRUPT-${idx90}: $rel90 has no U+FFFD or mojibake double-encoding (PowerShell UTF-8 write guard)"
 }
 # CHANGELOG.md: uses FULL 3-char sequence check only -- the 2-char prefix would
 # false-positive on the intentional documentation examples in line 10 (Protocol 39).
@@ -6158,7 +6158,8 @@ $mulCorrupt90    = ([char]0x00C3).ToString() + ([char]0x2014).ToString()
 $rfChar90doc     = ([char]0xFFFD).ToString()
 $clBad = $changelog90ps.Contains($emCorrupt90) -or $changelog90ps.Contains($enCorrupt90) -or `
          $changelog90ps.Contains($mulCorrupt90) -or $changelog90ps.Contains($rfChar90doc)
-Check (-not $clBad) 'GATE-CORRUPT-16: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+$idx90++
+Check (-not $clBad) "GATE-CORRUPT-${idx90}: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)"
 
 # ===========================================================
 # Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
@@ -6463,11 +6464,13 @@ $gate96 = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts/gate.js'), [Sy
 Check ([System.Text.RegularExpressions.Regex]::IsMatch($th96, 'PERSISTENCE AUDIT', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase) -and $th96.Contains('autoImportState')) `
     '96.1: tests/test.html is the runtime persistence audit (executes autoImportState)'
 
-# 96.2  test.html loads the current FNV boot chain (db -> state -> reg -> registry-core -> api)
-$chain96 = @('data/db_nv.js','core/state.js','data/reg_nv.js','data/registry-core.js','services/api.js')
+# 96.2  test.html loads the current FNV boot chain (db -> state -> reg -> registry-core -> api-import
+# -- 2.8.5 U-A3: test.html only exercises autoImportState()/sanitizeImportedContainer(), which now
+# live in api-import.js, not the api.js hub)
+$chain96 = @('data/db_nv.js','core/state.js','data/reg_nv.js','data/registry-core.js','services/api-import.js')
 $missing96 = @($chain96 | Where-Object { -not $th96.Contains('../js/' + $_) })
 Check ($missing96.Count -eq 0) `
-    ('96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api)' + $(if ($missing96.Count) { ' -- missing: ' + ($missing96 -join ', ') } else { '' }))
+    ('96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api-import)' + $(if ($missing96.Count) { ' -- missing: ' + ($missing96 -join ', ') } else { '' }))
 
 # 96.3  declared "Suites: N" marker matches the actual number of section() calls
 $declared96 = [regex]::Match($th96, 'Suites:\s*(\d+)')
@@ -8578,13 +8581,14 @@ $goldenLabels131 = @(
 try {
     $nodeCheck131 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck131) {
-        $apiPathNode131 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $apiFamilyFiles131 = @('api.js','api-directive.js','api-import.js','api-router.js') | ForEach-Object { (Join-Path $Root "js/services/$_").Replace('\', '/') }
+        $apiFamilyJs131 = ($apiFamilyFiles131 | ForEach-Object { "'$_'" }) -join ','
         $statePathNode131 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $testScript131 = @"
 const fs = require('fs');
 const vm = require('vm');
 const crypto = require('crypto');
-const apiSource = fs.readFileSync('$apiPathNode131', 'utf8');
+const apiSource = [$apiFamilyJs131].map(function(p){ return fs.readFileSync(p, 'utf8'); }).join('\n');
 const stateSource = fs.readFileSync('$statePathNode131', 'utf8');
 function extractFunctionDecl(src, name) {
   const idx = src.indexOf('function ' + name);
@@ -8811,13 +8815,14 @@ $labels133 = @(
 try {
     $nodeCheck133 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck133) {
-        $apiPathNode133 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $apiFamilyFiles133 = @('api.js','api-directive.js','api-import.js','api-router.js') | ForEach-Object { (Join-Path $Root "js/services/$_").Replace('\', '/') }
+        $apiFamilyJs133 = ($apiFamilyFiles133 | ForEach-Object { "'$_'" }) -join ','
         $statePathNode133 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $regPathNode133 = (Join-Path $Root "js/data/reg_nv.js").Replace('\', '/')
         $testScript133 = @"
 const fs = require('fs');
 const vm = require('vm');
-const apiSource = fs.readFileSync('$apiPathNode133', 'utf8');
+const apiSource = [$apiFamilyJs133].map(function(p){ return fs.readFileSync(p, 'utf8'); }).join('\n');
 const stateSource = fs.readFileSync('$statePathNode133', 'utf8');
 const regSource = fs.readFileSync('$regPathNode133', 'utf8');
 function extractFunctionBody(source, fnName) {
@@ -9086,12 +9091,13 @@ try {
     $nodeCheck135 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck135) {
         $statePathNode135 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
-        $apiPathNode135   = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $apiFamilyFiles135 = @('api.js','api-directive.js','api-import.js','api-router.js') | ForEach-Object { (Join-Path $Root "js/services/$_").Replace('\', '/') }
+        $apiFamilyJs135 = ($apiFamilyFiles135 | ForEach-Object { "'$_'" }) -join ','
         $testScript135 = @"
 const fs = require('fs');
 const vm = require('vm');
 const stateSource = fs.readFileSync('$statePathNode135', 'utf8');
-const apiSource = fs.readFileSync('$apiPathNode135', 'utf8');
+const apiSource = [$apiFamilyJs135].map(function(p){ return fs.readFileSync(p, 'utf8'); }).join('\n');
 function extractFunctionBody(source, fnName) {
   let idx = source.indexOf('function ' + fnName);
   let i = source.indexOf('{', idx);
@@ -13724,7 +13730,8 @@ $labels164 = @(
 try {
     $nodeCheck164 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck164) {
-        $apiPathNode164 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $apiFamilyFiles164 = @('api.js','api-directive.js','api-import.js','api-router.js') | ForEach-Object { (Join-Path $Root "js/services/$_").Replace('\', '/') }
+        $apiFamilyJs164 = ($apiFamilyFiles164 | ForEach-Object { "'$_'" }) -join ','
         $statePathNode164 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
         $regPathNode164 = (Join-Path $Root "js/data/reg_nv.js").Replace('\', '/')
         $jsDirNode164 = (Join-Path $Root "js/ui").Replace('\', '/')
@@ -13732,7 +13739,7 @@ try {
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const apiSource = fs.readFileSync('$apiPathNode164', 'utf8');
+const apiSource = [$apiFamilyJs164].map(function(p){ return fs.readFileSync(p, 'utf8'); }).join('\n');
 const stateSource = fs.readFileSync('$statePathNode164', 'utf8');
 const regSource = fs.readFileSync('$regPathNode164', 'utf8');
 const uiCoreSource = fs.readdirSync('$jsDirNode164').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode164', f), 'utf8')).join('\n');
@@ -19685,12 +19692,13 @@ Check (
 try {
     $nodeCheck196 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck196) {
-        $apiPathNode196 = (Join-Path $Root "js/services/api.js").Replace('\', '/')
+        $apiFamilyFiles196 = @('api.js','api-directive.js','api-import.js','api-router.js') | ForEach-Object { (Join-Path $Root "js/services/$_").Replace('\', '/') }
+        $apiFamilyJs196 = ($apiFamilyFiles196 | ForEach-Object { "'$_'" }) -join ','
         $testScript196 = @"
 const fs = require('fs');
 const vm = require('vm');
 try {
-  const src = fs.readFileSync('$apiPathNode196', 'utf8');
+  const src = [$apiFamilyJs196].map(function(p){ return fs.readFileSync(p, 'utf8'); }).join('\n');
   function extractFunctionBody(source, fnName) {
     let idx = source.indexOf('function ' + fnName);
     let i = source.indexOf('{', idx);
@@ -20931,7 +20939,7 @@ const path = require('path');
 const ROOT = '$repoRootNode201';
 function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
 function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
-const apiSrc = rd('js/api.js');
+const apiSrc = rdGroup('api');
 const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -22281,7 +22289,7 @@ function declareConstObj(src, name) {
 }
 
 const ocrSrc = rd('js/ocr.js');
-const apiSrc = rd('js/api.js');
+const apiSrc = rdGroup('api');
 const coreSrc = rdGroup('ui-core');
 const renderSrc = rd('js/ui-render.js');
 

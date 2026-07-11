@@ -179,26 +179,31 @@ function readGroup(stem) {
 
 // ── CSS split read helper (2.8.5 U-A2) ──────────────────────────
 // terminal.css was split into 12 files as a pure ordered cut (cascade is
-// order-sensitive — see 99-mobile.css's own header comment on why
-// it must load last). CSS_SPLIT_FILES is the ONE canonical list — the same
-// list index.html's <link> tags, sw.js's ASSETS precache, and the CSS-order
-// guard (Suite 220bis below) all derive from/are checked against. readCss()
-// replaces every old readCss() call site with the exact
-// same concatenated text the browser cascade actually sees.
-const CSS_SPLIT_FILES = [
-  '05-base.css',
-  '10-chrome.css',
-  '15-overseer.css',
-  '20-diagnostic-shell.css',
-  '25-toolbar.css',
-  '30-modulebay.css',
-  '35-operator-boards.css',
-  '40-curio-operations.css',
-  '45-databank.css',
-  '50-chassis.css',
-  '55-feedback-animations.css',
-  '99-mobile.css',
-];
+// order-sensitive — see 99-mobile.css's own header comment on why it must
+// load last). CSS_SPLIT_FILES is DERIVED from index.html's own <link> tags
+// (audit N2, 2.8.5 U-A3: a hand-maintained copy here could silently drift
+// from the real cascade order, since nothing cross-checked it against
+// index.html — only scripts/check-boot-chain.js's CANONICAL_CSS_ORDER ever
+// was). Deriving it collapses this runner's copy to zero duplication: readCss()
+// always concatenates in whatever order the browser actually loads, and
+// check-boot-chain.js CHECK I/J/K independently guards that index.html's own
+// order is the CORRECT one (this derivation can't detect a wrong order in
+// index.html itself — only reproduce it faithfully).
+function _deriveCssSplitOrder() {
+  const html = readFile('index.html');
+  const re = /<link[^>]*\srel=["']stylesheet["'][^>]*\shref=["']css\/([A-Za-z0-9_-]+\.css)["']/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(html))) out.push(m[1]);
+  if (out.length === 0) {
+    fail(
+      'index.html has no css/*.css <link rel="stylesheet"> tags — cannot derive CSS split order'
+    );
+    process.exit(1);
+  }
+  return out;
+}
+const CSS_SPLIT_FILES = _deriveCssSplitOrder();
 function readCss() {
   return CSS_SPLIT_FILES.map(f => readFile(`css/${f}`)).join('\n');
 }
@@ -6220,6 +6225,9 @@ header('Suite 59 — Inline Handler Integrity');
     'js/ui-core-modulebay.js',
     'js/ui-core-cmd.js',
     'js/api.js',
+    'js/api-directive.js',
+    'js/api-import.js',
+    'js/api-router.js',
     'js/cloud.js',
     'js/state.js',
     'js/reg_nv.js',
@@ -10590,7 +10598,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (16 tests)
+//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding
+//  (dynamic: every non-vendor js/**/*.js file + 3 docs + 1 CHANGELOG check —
+//  see audit N5 note below for why the count is no longer hand-typed)
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding');
@@ -10599,30 +10609,23 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // (em-dash, en-dash, curly quotes, etc.). â– covers E2-96-xx box-drawing
   // (U+25B2 triangle, U+2588 full-block, etc.). � is the replacement character.
   const MOJIBAKE90 = /�|â€|â–/;
-  // 2.8.5 U-A2 (closes AUDIT_U4 Finding B): widened to the five ui-core-*.js
-  // siblings, which the U-A1 split moved ~70% of ui-core's non-ASCII content
-  // into but this list was never widened to cover (latent — all five are
-  // mojibake-clean today). Kept as a per-file hand list (not a full glob
-  // derivation, unlike Suite 62's jsAll62 above) so this stays a fixed,
-  // Protocol-2a-stable 11-test suite rather than growing one assertion per
-  // js file on every future file add.
-  const srcFiles90 = [
-    'js/services/api.js',
-    'js/core/state.js',
-    'js/ui/ui-core.js',
-    'js/ui/ui-render.js',
-    'js/ui/ui-saves.js',
-    'js/ui/ui-audio.js',
-    'js/ui/ui-account.js',
-    'js/ui/ui-core-nav.js',
-    'js/ui/ui-core-overseer.js',
-    'js/ui/ui-core-chassis.js',
-    'js/ui/ui-core-modulebay.js',
-    'js/ui/ui-core-cmd.js',
-    'index.html',
-    'README.md',
-    'ARCHITECTURE.md',
-  ];
+  // 2.8.5 U-A3 (closes AUDIT_U5 Finding N5): widened from a hand-maintained
+  // file list to a full glob over every non-vendor js/**/*.js file, via
+  // allJsFiles() (Suite 62's own family helper). The prior hand list omitted
+  // the per-game data files (db_nv.js/db_fo3.js/reg_nv.js/reg_fo3.js) that
+  // Protocol 39 explicitly says DO contain non-ASCII (æ/¡) — so a
+  // PowerShell-corruption of one of them would have gone completely
+  // undetected (a pre-existing gap, not introduced by any one split).
+  // Globbing means every future file (a new split, a new data file) is
+  // automatically covered with zero manual widening step — the guard can no
+  // longer go stale the way this exact list already did once (2.8.5 U-A2
+  // widened it for the ui-core-*.js siblings and still missed the data
+  // files). The tradeoff: this suite's test COUNT now moves with the file
+  // count instead of being Protocol-2a-stable — accepted, since a moving
+  // count that's always complete beats a fixed count that silently isn't.
+  const jsFiles90 = allJsFiles().map(f => `js/${f.rel}`);
+  const docFiles90 = ['index.html', 'README.md', 'ARCHITECTURE.md'];
+  const srcFiles90 = [...jsFiles90, ...docFiles90];
   srcFiles90.forEach((rel, i) => {
     const src = readFile(rel);
     assert(
@@ -10642,7 +10645,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       !changelog90.includes(enDashCorrupt90) &&
       !changelog90.includes(mulSignCorrupt90) &&
       !changelog90.includes(rfChar90doc),
-    'GATE-CORRUPT-16: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+    `GATE-CORRUPT-${srcFiles90.length + 1}: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)`
   );
 }
 
@@ -11121,19 +11124,21 @@ header('Suite 96 — test.html Runtime Mirror Parity');
     '96.1: tests/test.html is the runtime persistence audit (executes autoImportState)'
   );
 
-  // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core → api)
+  // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core →
+  // api-import — 2.8.5 U-A3: test.html only exercises autoImportState()/sanitizeImportedContainer(),
+  // which now live in api-import.js, not the api.js hub)
   {
     const chain = [
       'data/db_nv.js',
       'core/state.js',
       'data/reg_nv.js',
       'data/registry-core.js',
-      'services/api.js',
+      'services/api-import.js',
     ];
     const missing = chain.filter(f => !th.includes('../js/' + f));
     assert(
       missing.length === 0,
-      '96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api)' +
+      '96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api-import)' +
         (missing.length ? ' — missing: ' + missing.join(', ') : '')
     );
   }

@@ -244,8 +244,8 @@ function _looksLikeItemName(name) {
 // A single "LABEL <number>" (optionally "LABEL: <number>" / "LABEL -
 // <number>" / "LABEL <cur>/<max>") line -- resolved ONLY when the label
 // cross-references a real stat/SPECIAL/skill via the shared _resolveStatToken()
-// (js/api.js -- the exact resolver Native USE and the TERMINAL stat-edit
-// grammar already use, Protocol 22, zero forked alias table). Returns null
+// (js/services/api-router.js -- the exact resolver Native USE and the TERMINAL
+// stat-edit grammar already use, Protocol 22, zero forked alias table). Returns null
 // (never a guess) when the line doesn't match the shape or the label doesn't
 // resolve -- the caller then tries the line as an inventory candidate instead,
 // so a line like "Stimpak 3" (unresolved label "Stimpak") correctly falls
@@ -392,7 +392,7 @@ async function runVisualOcr(file, onStatus) {
 // fallback below needs those two globals set verbatim; nothing about that
 // stash changes). This is the hybrid: on-device OCR is PRIMARY
 // (isFeatureEnabled('visualOcr')); the existing, UNTOUCHED transmitMessage()
-// inlineData branch (api.js ~2174) is the FALLBACK, reached only when OCR is
+// inlineData branch (js/services/api.js ~322) is the FALLBACK, reached only when OCR is
 // off/failing or the player explicitly taps TRY AI VISION in the "NOTHING
 // DETECTED" empty state (renderVisualParsePreview, js/ui-render.js). Both
 // flags are fail-open (Protocol 33) via window.isFeatureEnabled(), which

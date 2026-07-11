@@ -4313,6 +4313,13 @@
     <script src="js/ui/ui-core-cmd.js"></script>
     <script src="js/dev/test-console.js"></script>
     <script src="js/services/api.js"></script>
+    <!-- api-*.js (2.8.5 U-A3): the api.js spine split by responsibility.
+         Global scope, static tags — intra-group order is flexible (nothing
+         reads these until window.onload), but they must all load before
+         cloud.js like api.js did. -->
+    <script src="js/services/api-directive.js"></script>
+    <script src="js/services/api-import.js"></script>
+    <script src="js/services/api-router.js"></script>
     <script type="module" src="js/services/cloud.js"></script>
 
     <script>

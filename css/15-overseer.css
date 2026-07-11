@@ -1,7 +1,8 @@
 /* === SPLIT-FILE-HEADER-START ===
    css/15-overseer.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
-   Original lines 1288-1821. Pure ordered cut: content below is verbatim,
-   byte-identical to that line range in the pre-split terminal.css.
+   Original lines 1288-1821. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
 
    NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
    NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties

@@ -53,11 +53,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2958 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2971 tests via gate:fast)
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **2958 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **2971 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` when served files change.** Required when any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). Doc-, config-, and test-only commits skip the check entirely.
 - **Cache-bump guard runs at commit time** — the hook first detects whether any staged file is in the served/precached set. If so, it requires a strict monotonic increase in `CACHE_NAME`. Non-served commits (doc-only, CI, tests) bypass the cache check entirely.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -152,7 +152,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 2958 tests must pass
+- [ ] Run `git commit` — 2971 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -166,7 +166,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (2958 tests) → Protocol 2
+- [ ] Lint, format, commit (2971 tests) → Protocol 2
 
 ---
 
@@ -753,8 +753,11 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 15. `js/ui/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
 16. `js/ui/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
 17. `js/dev/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
-18. `js/services/api.js` → `autoImportState()`, `transmitMessage()`, `getSystemDirective()`
-19. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
+18. `js/services/api.js` → `transmitMessage()` lifecycle (retry/abort, `_resetTransmitUI`), the AI comm-config cache (`_commGet`), `fetchAuthorizedModels()`, `saveApiKeySilent()` — the network-layer hub (2.8.5 U-A3 split)
+19. `js/services/api-directive.js` → `getSystemDirective()` + its 8 `_directive*` section builders (Suite 131 golden-master guarded) (2.8.5 U-A3 split)
+20. `js/services/api-import.js` → `autoImportState()`, `sanitizeImportedContainer()`, `_wireApiEventBusSubscribers()` — the AI→state import path (2.8.5 U-A3 split)
+21. `js/services/api-router.js` → `NATIVE_COMMAND_ROUTER`, `_routeNativeCommand()`, quick-log routing, `transmitTerminal()` — offline/native command routing, never calls the AI (2.8.5 U-A3 split)
+22. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
 
 <!-- LOAD-ORDER-GUARD:END -->
 
@@ -762,4 +765,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 2958 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2958 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 2971 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2971 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).

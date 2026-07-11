@@ -286,7 +286,7 @@ function nativeLevelUp() {
 // opens/scrolls to the existing native CARTOGRAPHY TABLE (DATABANK tab) —
 // zero AI round-trip. Reuses the SAME expandPanelForCategory('map') path
 // the typed panel-nav aliases ("map"/"world"/"locations", PANEL_NAV_ALIASES
-// in api.js) already use (Protocol 22) — one panel-opening mechanism for
+// in api-router.js) already use (Protocol 22) — one panel-opening mechanism for
 // every route to the world map.
 function _nativeOpenMap() {
   if (typeof closeModal === 'function') closeModal();
@@ -296,7 +296,7 @@ function _nativeOpenMap() {
 }
 
 // Called by #stat_loc onchange (no arg — reads the value the user just typed into the
-// input) AND by the quick-log "arrived <location>" TERMINAL verb (api.js, passes the new
+// input) AND by the quick-log "arrived <location>" TERMINAL verb (api-router.js, passes the new
 // location text explicitly since there's no onchange DOM event to read it from). One
 // function, not a forked quick-log-only setter (Protocol 22) — this is what makes
 // "arrived Primm" actually move [CURRENT] on the WORLD MAP instead of only adding Primm
@@ -544,7 +544,7 @@ ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.
 }
 
 // WU-E3: the command registry is kept in lock-step with reality — every entry
-// resolves to a NATIVE_COMMAND_ROUTER token (api.js), a live panel/UI control, an
+// resolves to a NATIVE_COMMAND_ROUTER token (api-router.js), a live panel/UI control, an
 // AI-directive-defined command (getSystemDirective), or a keyboard handler. The six
 // deterministic NATIVE TERMINALS run fully offline with no AI call. Retired AI macros
 // (the old screenshot-V.A.T.S., [TACTICS], [CURRENCY], [AUDIT], [STASH]/[EXCESS],
@@ -711,7 +711,7 @@ function capRadsMax(el) {
 // ── NATIVE STAT SETTERS (Native USE + TERMINAL stat edits) ──────────────────
 // The ONE clamp/mirror/emit/save choke point per stat (Protocol 22) — shared by
 // the native USE handler (nativeUseItem() in ui-render.js), the TERMINAL
-// stat-edit grammar (_resolveStatToken() in api.js), and commitStat()'s own DOM
+// stat-edit grammar (_resolveStatToken() in api-router.js), and commitStat()'s own DOM
 // onchange path just below. Each setter mirrors BOTH state.<field> AND the
 // matching DOM input's .value — the WU-N2 caps lesson: saveState() always runs
 // syncStateFromDom() first, which reads the DOM back into state, so an
@@ -814,7 +814,7 @@ function _nativeSetKarma(v) {
   return val;
 }
 
-// Absolute-set sibling of the existing delta-only _quickLogCaps() (api.js) —
+// Absolute-set sibling of the existing delta-only _quickLogCaps() (api-router.js) —
 // that function stays as-is for the "+/-N caps" quick-log pattern; this is the
 // new "set to an exact value" entry point USE/TERMINAL stat-edits need.
 function _nativeSetCaps(v) {
@@ -839,7 +839,7 @@ function toggleLimb(limb) {
   state[limb] = wasOk ? 'CRIPPLED' : 'OK';
   // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP): one
   // additive emit at this existing setter (U7/U8 precedent) — the AI limb-set
-  // path in autoImportState() (js/api.js) emits the same event.
+  // path in autoImportState() (js/services/api-import.js) emits the same event.
   RobcoEvents.emit('limb.state', { limb, state: wasOk ? 'crippled' : 'ok' });
   if (wasOk) {
     if (limb === 'hd') {
@@ -2173,7 +2173,7 @@ function macroCommand(actionStr) {
 
 // Quick-Draw Holster — the sole writer of state.padBindings. Reached three ways
 // (socket BIND flow, typed [BIND: gear, DIR], and read-side _nativePadFire); the AI
-// never calls this (player-authority, Protocol 24 — see api.js autoImportState()).
+// never calls this (player-authority, Protocol 24 — see api-import.js autoImportState()).
 function _nativePadBind(gear, dir) {
   const d = String(dir || '').toLowerCase();
   if (!['up', 'down', 'left', 'right'].includes(d)) {

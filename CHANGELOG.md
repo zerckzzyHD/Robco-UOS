@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 2958/2958 | Cache: robco-terminal-v2.8.0-r6 -->
+## [Unreleased]<!-- Tests: 2971/2971 | Cache: robco-terminal-v2.8.0-r8 -->
 
 ### Under the Hood
 
@@ -8,6 +8,7 @@
 - Hardened the test suite against an upcoming internal file reorganization: tests that check where a piece of code lives now check the whole feature area instead of one exact file, so splitting a large file into smaller ones later can't accidentally weaken the safety net. Also added an automated pre-flight check that catches a startup-file inconsistency (a script forgotten from the app's load list, the offline-caching list, or the developer documentation) before it ever reaches the live site, and cleaned up a few stale file names in the internal test descriptions. Nothing you can see changed.
 - Split the single largest piece of the app's front-end code into six smaller files organized by what each one actually does (navigation, the AI presence, the device status screen, the settings hardware, and the command layer), instead of one very large catch-all file. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - Reorganized the entire internal code folder into labeled subfolders by purpose (game content, core engine, on-screen interface, outside-world services, developer-only tools) instead of one large flat pile of files, and split the single largest stylesheet into twelve smaller files grouped by the screen or feature they style, in the exact same order they always loaded in so nothing about how the terminal looks changed. Also widened two safety checks that had quietly stopped watching some of the app's own files after an earlier reorganization, so they're now watching everything again. Purely an internal filing exercise — every screen, button, and behavior works exactly as before. Nothing you can see changed.
+- Split the file handling the AI conversation into four smaller files by responsibility (the network connection itself, the AI's instructions, applying the AI's replies to your campaign, and the offline typed-command shortcuts), instead of one large catch-all file. Also widened the internal file-corruption safety check so it automatically covers every code file going forward instead of a fixed hand-picked list. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 
 ---
 

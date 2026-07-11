@@ -163,14 +163,19 @@
     </script>
 
     <!-- Boot chain — same files, same order as the live FNV boot in index.html:
-         idb → db → state → reg → registry-core, then api. idb.js loads before
-         state.js so MetaStore's P1 write-through has window.IdbStore. -->
+         idb → db → state → reg → registry-core, then api-import. idb.js loads
+         before state.js so MetaStore's P1 write-through has window.IdbStore.
+         2.8.5 U-A3: api.js split into a hub + api-directive/api-import/api-router;
+         this page only exercises autoImportState()/sanitizeImportedContainer()
+         (api-import.js) — the hub (transmitMessage/fetchAuthorizedModels) and the
+         directive/router siblings are not referenced anywhere below, so they are
+         deliberately NOT loaded (Protocol 40 — a subset, not full inclusion). -->
     <script src="../js/core/idb.js"></script>
     <script src="../js/data/db_nv.js"></script>
     <script src="../js/core/state.js"></script>
     <script src="../js/data/reg_nv.js"></script>
     <script src="../js/data/registry-core.js"></script>
-    <script src="../js/services/api.js"></script>
+    <script src="../js/services/api-import.js"></script>
     <script src="../js/core/runtime.js"></script>
     <script src="../js/dev/test-console.js"></script>
   </head>
