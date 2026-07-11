@@ -342,14 +342,15 @@ function extractSkillKeys(source) {
 const stateSource = readGroup('state');
 const apiSource = readGroup('api');
 const cloudSource = readGroup('cloud');
-const uiSource = ['js/ui-audio.js', 'js/ui-render.js', 'js/ui-saves.js', 'js/ui-account.js']
+const uiSource = ['js/ui-audio.js', 'js/ui-saves.js', 'js/ui-account.js']
   .filter(f => {
     if (fs.existsSync(path.join(ROOT, f))) return true;
     const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(f);
     return !!(m && _jsFileLocation(m[1]));
   })
   .map(f => readFile(f))
-  .concat([readGroup('ui-core')]) // 2.8.5 U-A1: ui-core.js + its ui-core-*.js split family
+  .concat([readGroup('ui-core'), readGroup('ui-render')]) // 2.8.5 U-A1/U-A4: ui-core.js + its
+  // ui-core-*.js split family, and ui-render.js + its ui-render-*.js split family
   .join('\n');
 
 console.log('\n══ RobCo Persistence Audit ════════════════════════════════════\n');
@@ -6216,6 +6217,15 @@ header('Suite 59 — Inline Handler Integrity');
   const jsFiles59 = [
     'js/ui-audio.js',
     'js/ui-render.js',
+    'js/ui-render-inventory.js',
+    'js/ui-render-character.js',
+    'js/ui-render-record.js',
+    'js/ui-render-ledger.js',
+    'js/ui-render-map.js',
+    'js/ui-render-factions.js',
+    'js/ui-render-economy.js',
+    'js/ui-render-loot.js',
+    'js/ui-render-databank.js',
     'js/ui-saves.js',
     'js/ui-account.js',
     'js/ui-core.js',
@@ -12442,12 +12452,16 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     '108.9: renderConsult is read-only (no saveState/pushToCloud/state writes)'
   );
   // 108.10 game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals in the consult code.
-  // Use a stable source slice (from the _CONSULT_CATS decl to the next function) rather than
+  // Use a stable source slice (from the _CONSULT_CATS decl to end-of-file) rather than
   // brace-counted body extraction, which diverges between runners on template-literal-heavy code.
+  // 2.8.5 U-A4: _CONSULT_CATS through BIO-SCAN all live in js/ui/ui-render-databank.js, and
+  // _updateContextPanels (the original end-of-file marker) moved OUT to the ui-render.js hub —
+  // scope to just this one file (its own EOF is the correct boundary) rather than the whole
+  // ui-render-*.js family, whose readGroup() join order is alphabetical, not source order.
   {
-    const cs = ren108.indexOf('const _CONSULT_CATS');
-    const ce = ren108.indexOf('function _updateContextPanels');
-    const region = cs >= 0 && ce > cs ? ren108.slice(cs, ce) : '';
+    const databank108 = readGroup('ui-render-databank');
+    const cs = databank108.indexOf('const _CONSULT_CATS');
+    const region = cs >= 0 ? databank108.slice(cs) : '';
     assert(
       region !== '' && !/\bFNV\b|\bFO3\b|Fallout|New Vegas/.test(region),
       '108.10: renderConsult/_consultDetail carry no FNV/FO3/Fallout literals (Protocol 38 — registry-driven)'
@@ -12747,12 +12761,14 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
     '',
   ])[0];
   // Stable source slice of the LOOT core (the pure helper through doLoot).
-  const lootRegionStart = ren110.indexOf('function _lootAdd');
-  const lootRegionEnd = ren110.indexOf('// ── WU-N3: THREAT');
-  const lootRegion =
-    lootRegionStart >= 0 && lootRegionEnd > lootRegionStart
-      ? ren110.slice(lootRegionStart, lootRegionEnd)
-      : '';
+  // 2.8.5 U-A4: _lootAdd through the end of the Visual Upload OCR apply flow all live in
+  // js/ui/ui-render-loot.js, immediately followed (in the ORIGINAL monolith) by the WU-N3
+  // THREAT section, which now lives in a different sibling (ui-render-databank.js) — scope to
+  // just this one file (its own EOF is the correct boundary) rather than the whole
+  // ui-render-*.js family, whose readGroup() join order is alphabetical, not source order.
+  const loot110 = readGroup('ui-render-loot');
+  const lootRegionStart = loot110.indexOf('function _lootAdd');
+  const lootRegion = lootRegionStart >= 0 ? loot110.slice(lootRegionStart) : '';
   let doLootBody = '';
   let lootAddBody = '';
   try {

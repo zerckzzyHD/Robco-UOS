@@ -83,7 +83,16 @@
 │   │   ├── ui-core-modulebay.js ~51KB Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
 │   │   ├── ui-core-cmd.js  ~95KB  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
 │   │   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
-│   │   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
+│   │   ├── ui-render.js    ~2KB   Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+│   │   ├── ui-render-inventory.js ~22KB Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
+│   │   ├── ui-render-character.js ~32KB Character & Field Status — squad, clock/calendar, faction standing, status effects, perks, quests
+│   │   ├── ui-render-record.js ~17KB Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
+│   │   ├── ui-render-ledger.js ~15KB Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
+│   │   ├── ui-render-map.js   ~27KB Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
+│   │   ├── ui-render-factions.js ~13KB Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
+│   │   ├── ui-render-economy.js ~25KB Resource Economy — Craft panel, native Trade barter terminal
+│   │   ├── ui-render-loot.js  ~19KB Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
+│   │   ├── ui-render-databank.js ~25KB Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
 │   │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
 │   │   └── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
 │   ├── services/               Everything that talks to the outside world
@@ -96,8 +105,8 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2971-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2971-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2980-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2980-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -267,60 +276,83 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
 2. js/core/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
-                       exportSaveFile, migrateState (game-time helpers live in ui-render.js)
+                       exportSaveFile, migrateState (game-time helpers live in ui-render-character.js)
 3. js/data/reg_nv.js / js/data/reg_fo3.js + js/data/registry-core.js → defines: FALLOUT_REGISTRY
                        (read-only game data) + registrySearch() (autocomplete search engine)
 4. js/ui/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
                        limb/wake/boot/level-up sounds, runBootSequence,
                        triggerPhosphorGhost, changeOpticsColor)
-5. js/ui/ui-render.js  → defines: all render*() functions, CRUD helpers (addItem/delItem,
-                       addAmmo/removeAmmo, addPerk/removePerk, etc.), FACTION_THRESHOLDS,
-                       getFactionStanding, adjustFaction, game-time helpers
-                       (ticksToGameTime/_resolveGameDateTime/formatGameTime/getGameDate),
-                       map helpers (setMapView/zoomMapToZone/renderWorldMap),
-                       _updateContextPanels, _invFilter, setInvFilter
-6. js/ui/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
+5. js/ui/ui-render.js  → the render-pipeline hub after the 2.8.5 U-A4 split: defines only
+                       _updateContextPanels (cross-panel visibility glue not owned by one
+                       sibling) — every render*() panel now lives in a js/ui/ui-render-*.js
+                       sibling below
+6. js/ui/ui-render-inventory.js → CARGO MANIFEST & AMMO: addItem/delItem/adjItemQty/
+                       toggleEquipItem, drawer-filter helpers, nativeUseItem, renderInventory,
+                       renderAmmo/addAmmo/removeAmmo (2.8.5 U-A4 split)
+7. js/ui/ui-render-character.js → CHARACTER & FIELD STATUS: squad roster, the in-game clock/
+                       calendar (ticksToGameTime/_resolveGameDateTime/formatGameTime/
+                       getGameDate), FACTION_THRESHOLDS/getFactionStanding, status effects, the
+                       PERK loadout rack, the quest DIRECTIVE registry (2.8.5 U-A4 split)
+8. js/ui/ui-render-record.js → PERSONAL RECORD: session-stat odometer tally, equipped-gear
+                       readout, CURIO collectibles archive, FO3 Lincoln memorabilia, character
+                       traits (2.8.5 U-A4 split)
+9. js/ui/ui-render-ledger.js → FIELD LEDGER: the shared SHELF/RACK read-tracker renderer
+                       (_renderReadTracker), skill books, skill magazines, campaign field notes,
+                       the campaign status/chronicle event log (2.8.5 U-A4 split)
+10. js/ui/ui-render-map.js → CARTOGRAPHY TABLE: map helpers (setMapView/zoomMapToZone/
+                       renderWorldMap), zone visited-marking, arrow-key node navigation
+                       (2.8.5 U-A4 split)
+11. js/ui/ui-render-factions.js → FACTION REPUTATION & KARMA: adjustFaction, renderFactionRep,
+                       the FO3 Karma Center appendix (2.8.5 U-A4 split)
+12. js/ui/ui-render-economy.js → RESOURCE ECONOMY: the CRAFT panel (crafting + scrapping), the
+                       native TRADE barter terminal (2.8.5 U-A4 split)
+13. js/ui/ui-render-loot.js → ITEM ACQUISITION: the native LOOT add-to-inventory terminal, the
+                       Visual Upload OCR preview/confirm/apply flow (2.8.5 U-A4 split)
+14. js/ui/ui-render-databank.js → NATIVE DATABANK TOOLS: THREAT assessment, CONSULT lookup, the
+                       ELIGIBLE PERKS survey, the DATABANK panel search, the BIO-SCAN medical
+                       advisory (2.8.5 U-A4 split)
+15. js/ui/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
                        exportCampaignLog, restoreRollingBackup, restoreChatHistory,
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
-7. js/ui/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/services/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
+16. js/ui/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
+17. js/services/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
                        window.runVisualOcr, window.routeVisualUpload (Visual Upload on-device OCR —
                        lazy Tesseract.js load + deterministic parser + hybrid routing/kill-switch,
                        the feature's native-primary/AI-vision-fallback entry point — LAZY, never
                        loads Tesseract.js itself at boot; see Visual Upload OCR below)
-9. js/core/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
+18. js/core/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
-10. js/ui/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
+19. js/ui/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
                        ui-core spine hub; the ui-core-*.js split below leans on this file)
-11. js/ui/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
+20. js/ui/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
                        #go= routing, hotkeys, the DIRECTORY modal (2.8.5 U-A1 split)
-12. js/ui/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
+21. js/ui/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
                        composer wiring, the Tool Deck launcher (2.8.5 U-A1 split)
-13. js/ui/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
+22. js/ui/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
                        initChassisCore, System Status, the Service & Fault Console
                        (2.8.5 U-A1 split)
-14. js/ui/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
+23. js/ui/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
                        wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
-15. js/ui/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
+24. js/ui/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
                        event-bus subscriber wiring for stat/quest/faction feedback
                        (2.8.5 U-A1 split)
-16. js/dev/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+25. js/dev/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
                        _isStagingEnv; gated by _devConsoleUnlocked(), no-ops until unlocked —
                        see Developer Console below)
-17. js/services/api.js       → defines: transmitMessage, fetchAuthorizedModels, saveApiKeySilent,
+26. js/services/api.js       → defines: transmitMessage, fetchAuthorizedModels, saveApiKeySilent,
                        the AI comm-config cache (_commGet), _resetTransmitUI — the network-layer
                        hub; the directive/import/router responsibilities below were split out
                        of this file (2.8.5 U-A3)
-18. js/services/api-directive.js → defines: getSystemDirective + its 8 _directive* section
+27. js/services/api-directive.js → defines: getSystemDirective + its 8 _directive* section
                        builders (Suite 131 golden-master SHA-256 guarded; Protocol 14) (2.8.5 U-A3 split)
-19. js/services/api-import.js → defines: autoImportState, sanitizeImportedContainer,
+28. js/services/api-import.js → defines: autoImportState, sanitizeImportedContainer,
                        _wireApiEventBusSubscribers — the AI-JSON-response → state field-mapping
                        path (Protocol 24) (2.8.5 U-A3 split)
-20. js/services/api-router.js → defines: NATIVE_COMMAND_ROUTER, _routeNativeCommand,
+29. js/services/api-router.js → defines: NATIVE_COMMAND_ROUTER, _routeNativeCommand,
                        QUICK_LOG_PATTERNS, transmitTerminal — deterministic offline command
                        routing, never calls the AI (2.8.5 U-A3 split)
-21. js/services/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+30. js/services/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.saveCurrentToCloud, window.loadCloudSave (plus the auth /
                        feature-flag / save-version helpers) — the manual cloud push/pull entry
                        points; the old pushToCloud/pullFromCloud names were never real, and are retired
@@ -3104,7 +3136,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2971-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2980-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

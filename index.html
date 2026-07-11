@@ -4139,7 +4139,7 @@
              Anchored to .glass-frame (position:relative;overflow:hidden), NOT
              .chat-panel/.col-right (both scroll/clip and would mis-place an absolute
              bottom sheet — see the split terminal-*.css files). Zero standing footprint at rest;
-             renderHolster() (ui-render.js) populates the four sockets from
+             renderHolster() (ui-render-loot.js) populates the four sockets from
              state.padBindings on open and after every bind. Every tool row reuses its
              EXISTING handler (Protocol 22) via _wireToolDeck() (ui-core.js) — never
              forked. [TERMLINK] and [CROSSROADS] were both retired as commands entirely
@@ -4291,6 +4291,19 @@
     </script>
     <script src="js/ui/ui-audio.js"></script>
     <script src="js/ui/ui-render.js"></script>
+    <!-- ui-render-*.js (2.8.5 U-A4): the ui-render.js spine split by responsibility.
+         Global scope, static tags — intra-group order is flexible (nothing reads
+         these until window.onload), but they must all load before ui-saves.js
+         like ui-render.js did. -->
+    <script src="js/ui/ui-render-inventory.js"></script>
+    <script src="js/ui/ui-render-character.js"></script>
+    <script src="js/ui/ui-render-record.js"></script>
+    <script src="js/ui/ui-render-ledger.js"></script>
+    <script src="js/ui/ui-render-map.js"></script>
+    <script src="js/ui/ui-render-factions.js"></script>
+    <script src="js/ui/ui-render-economy.js"></script>
+    <script src="js/ui/ui-render-loot.js"></script>
+    <script src="js/ui/ui-render-databank.js"></script>
     <script src="js/ui/ui-saves.js"></script>
     <script src="js/ui/ui-account.js"></script>
     <!-- Visual Upload OCR (planning/VISUAL_UPLOAD_OCR_PLAN.md): lazy-loaded, never

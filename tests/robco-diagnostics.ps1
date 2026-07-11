@@ -221,8 +221,8 @@ $cloudSrc  = Read-Group "cloud"
 # silently drop all four files from $uiSrc. Fall back to Get-JsFileLocation
 # (the subfolder resolver) before filtering, then let Read-Src's own
 # smart-resolve do the actual read.
-$uiFiles   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js')
-$uiSrc     = (@(($uiFiles | Where-Object { (Test-Path (Join-Path $Root $_)) -or (Get-JsFileLocation (Split-Path $_ -Leaf)) } | ForEach-Object { Read-Src $_ })) + @(Read-Group "ui-core")) -join "`n"
+$uiFiles   = @('js/ui-audio.js','js/ui-saves.js','js/ui-account.js')
+$uiSrc     = (@(($uiFiles | Where-Object { (Test-Path (Join-Path $Root $_)) -or (Get-JsFileLocation (Split-Path $_ -Leaf)) } | ForEach-Object { Read-Src $_ })) + @(Read-Group "ui-core") + @(Read-Group "ui-render")) -join "`n"
 
 Write-Host "`n==  RobCo Persistence Audit  ==============================`n"
 
@@ -300,7 +300,7 @@ try {
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const UI_FILES = ['js/ui/ui-audio.js','js/ui/ui-render.js','js/ui/ui-saves.js','js/ui/ui-account.js','js/ui/ui-core.js','js/ui/ui-core-nav.js','js/ui/ui-core-overseer.js','js/ui/ui-core-chassis.js','js/ui/ui-core-modulebay.js','js/ui/ui-core-cmd.js'];
+const UI_FILES = ['js/ui/ui-audio.js','js/ui/ui-render.js','js/ui/ui-render-inventory.js','js/ui/ui-render-character.js','js/ui/ui-render-record.js','js/ui/ui-render-ledger.js','js/ui/ui-render-map.js','js/ui/ui-render-factions.js','js/ui/ui-render-economy.js','js/ui/ui-render-loot.js','js/ui/ui-render-databank.js','js/ui/ui-saves.js','js/ui/ui-account.js','js/ui/ui-core.js','js/ui/ui-core-nav.js','js/ui/ui-core-overseer.js','js/ui/ui-core-chassis.js','js/ui/ui-core-modulebay.js','js/ui/ui-core-cmd.js'];
 const uiSource = UI_FILES.filter(f => fs.existsSync(path.join('$repoRootNode', f))).map(f => fs.readFileSync(path.join('$repoRootNode', f), 'utf8')).join('\n');
 const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
@@ -767,11 +767,14 @@ try {
     if ($nodeCheck) {
         $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
         $uiPathNode = (Join-Path $repoRoot "js/ui/ui-core.js").Replace('\', '/')
-        $uiRenderPathNode = (Join-Path $repoRoot "js/ui/ui-render.js").Replace('\', '/')
+        $repoRootNode18 = $repoRoot.Replace('\', '/')
         $dcScript = @"
 const vm = require('vm');
 const fs = require('fs');
-const src = (fs.existsSync('$uiRenderPathNode') ? fs.readFileSync('$uiRenderPathNode', 'utf8') + '\n' : '') + fs.readFileSync('$uiPathNode', 'utf8');
+const path = require('path');
+const uiDir18 = path.join('$repoRootNode18', 'js', 'ui');
+const renderFiles18 = fs.readdirSync(uiDir18).filter(function(f){ return f === 'ui-render.js' || (f.indexOf('ui-render-') === 0 && f.slice(-3) === '.js'); }).sort();
+const src = renderFiles18.map(function(f){ return fs.readFileSync(path.join(uiDir18, f), 'utf8'); }).join('\n') + '\n' + fs.readFileSync('$uiPathNode', 'utf8');
 const fnIdx = src.indexOf('function scoreZoneForLoc');
 if (fnIdx === -1) { console.log('EXTRACT_FAIL'); process.exit(0); }
 function extractBody(source, name) {
@@ -3606,7 +3609,11 @@ Check (-not ($recSlice58  -match 'fetch\(') -and -not ($recSlice58  -match 'XMLH
 # ===========================================================
 Sep "Suite 59 -- Inline Handler Integrity"
 $htmlSrc59   = Read-Src "index.html"
-$jsFiles59   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js',
+$jsFiles59   = @('js/ui-audio.js','js/ui-render.js',
+                  'js/ui-render-inventory.js','js/ui-render-character.js','js/ui-render-record.js',
+                  'js/ui-render-ledger.js','js/ui-render-map.js','js/ui-render-factions.js',
+                  'js/ui-render-economy.js','js/ui-render-loot.js','js/ui-render-databank.js',
+                  'js/ui-saves.js','js/ui-account.js',
                   'js/ui-core.js','js/ui-core-nav.js','js/ui-core-overseer.js',
                   'js/ui-core-chassis.js','js/ui-core-modulebay.js','js/ui-core-cmd.js',
                   'js/api.js','js/api-directive.js','js/api-import.js','js/api-router.js',
@@ -5072,7 +5079,10 @@ try {
         $repScript77 = @"
 const vm = require('vm');
 const fs = require('fs');
-const src = fs.readFileSync('$repoRootNode77/js/ui/ui-render.js', 'utf8');
+const path = require('path');
+const uiDir77 = path.join('$repoRootNode77', 'js', 'ui');
+const renderFiles77 = fs.readdirSync(uiDir77).filter(function(f){ return f === 'ui-render.js' || (f.indexOf('ui-render-') === 0 && f.slice(-3) === '.js'); }).sort();
+const src = renderFiles77.map(function(f){ return fs.readFileSync(path.join(uiDir77, f), 'utf8'); }).join('\n');
 const threshMatch = src.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = src.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
 const fnMatch = src.match(/function getFactionStanding\([\s\S]*?\n\}/);
@@ -6215,7 +6225,7 @@ Sep "Suite 92 -- VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS"
 # Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
 # to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
 $css92ps = Read-Css
-$uiRender92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui/ui-render.js'), [System.Text.Encoding]::UTF8)
+$uiRender92ps = Read-Group "ui-render"
 $html92ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
 
 # 92.1  .tag class carries white-space: nowrap in terminal.css
@@ -7252,10 +7262,14 @@ Check ($consultBody -match 'escapeHtml\(e\.name\)') `
 Check ((-not ($consultBody -match 'saveState\s*\(')) -and (-not ($consultBody -match 'pushToCloud\s*\(')) -and (-not ($consultBody -match '\bstate\.\w+\s*='))) `
     '108.9: renderConsult is read-only (no saveState/pushToCloud/state writes)'
 # 108.10 game-agnostic -- stable source slice (avoids brace-counted body extraction that
-# diverges between runners on template-literal-heavy code)
-$cs108 = $ren108.IndexOf('const _CONSULT_CATS')
-$ce108 = $ren108.IndexOf('function _updateContextPanels')
-$region108 = if (($cs108 -ge 0) -and ($ce108 -gt $cs108)) { $ren108.Substring($cs108, $ce108 - $cs108) } else { '' }
+# diverges between runners on template-literal-heavy code). 2.8.5 U-A4: _CONSULT_CATS
+# through BIO-SCAN all live in js/ui/ui-render-databank.js, and _updateContextPanels (the
+# original end-of-file marker) moved OUT to the ui-render.js hub -- scope to just this one
+# file (its own EOF is the correct boundary) rather than the whole ui-render-*.js family,
+# whose Read-Group join order is alphabetical, not source order.
+$databank108 = Read-Group "ui-render-databank"
+$cs108 = $databank108.IndexOf('const _CONSULT_CATS')
+$region108 = if ($cs108 -ge 0) { $databank108.Substring($cs108) } else { '' }
 # -cmatch (case-sensitive) mirrors Node's case-sensitive regex: the sanctioned uppercase
 # FALLOUT_REGISTRY API is allowed; only human-readable Fallout/New Vegas/FNV/FO3 literals are banned.
 Check (($region108 -ne '') -and (-not ($region108 -cmatch '\bFNV\b|\bFO3\b|Fallout|New Vegas'))) `
@@ -7320,11 +7334,15 @@ $html109 = Read-Src "index.html"
 $dbnv109 = Read-Group "db_nv"
 $dbfo3109 = Read-Group "db_fo3"
 $routerBlock109 = [regex]::Match($api109, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
-$rs109 = $ren109.IndexOf('const _BIO_LIMBS')
-$re109 = $ren109.IndexOf('function renderBioScan')
-$bioRegion109 = if (($rs109 -ge 0) -and ($re109 -gt $rs109)) { $ren109.Substring($rs109, $re109 - $rs109) } else { '' }
-$be109 = $ren109.IndexOf('function _updateContextPanels')
-$bioScanBody109 = if (($re109 -ge 0) -and ($be109 -gt $re109)) { $ren109.Substring($re109, $be109 - $re109) } else { '' }
+# 2.8.5 U-A4: _BIO_LIMBS through renderBioScan (end of file) all live in
+# js/ui/ui-render-databank.js, and _updateContextPanels (the original end-of-file marker)
+# moved OUT to the ui-render.js hub -- scope to just this one file rather than the whole
+# ui-render-*.js family, whose Read-Group join order is alphabetical, not source order.
+$databank109 = Read-Group "ui-render-databank"
+$rs109 = $databank109.IndexOf('const _BIO_LIMBS')
+$re109 = $databank109.IndexOf('function renderBioScan')
+$bioRegion109 = if (($rs109 -ge 0) -and ($re109 -gt $rs109)) { $databank109.Substring($rs109, $re109 - $rs109) } else { '' }
+$bioScanBody109 = if ($re109 -ge 0) { $databank109.Substring($re109) } else { '' }
 
 # 109.1 renderBioScan + the pure compute core both defined
 Check (($ren109 -match 'function renderBioScan\s*\(') -and ($ren109 -match 'function _bioScanCompute\s*\(')) `
@@ -7386,12 +7404,16 @@ $core110 = Read-Group "ui-core"
 $css110 = Read-Css
 $html110 = Read-Src "index.html"
 $routerBlock110 = [regex]::Match($api110, 'const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};').Value
-$ls110 = $ren110.IndexOf('function _lootAdd')
-$le110 = $ren110.IndexOf('// -- WU-N3: THREAT')
-if ($le110 -lt 0) { $le110 = $ren110.IndexOf('function _threatCompute') }
-$lootRegion110 = if (($ls110 -ge 0) -and ($le110 -gt $ls110)) { $ren110.Substring($ls110, $le110 - $ls110) } else { '' }
-$ds110 = $ren110.IndexOf('function doLoot')
-$doLootBody110 = if (($ds110 -ge 0) -and ($le110 -gt $ds110)) { $ren110.Substring($ds110, $le110 - $ds110) } else { '' }
+# 2.8.5 U-A4: _lootAdd through the end of the Visual Upload OCR apply flow all live in
+# js/ui/ui-render-loot.js, immediately followed (in the ORIGINAL monolith) by the WU-N3
+# THREAT section, which now lives in a different sibling (ui-render-databank.js) -- scope to
+# just this one file (its own EOF is the correct boundary) rather than the whole
+# ui-render-*.js family, whose Read-Group join order is alphabetical, not source order.
+$loot110 = Read-Group "ui-render-loot"
+$ls110 = $loot110.IndexOf('function _lootAdd')
+$lootRegion110 = if ($ls110 -ge 0) { $loot110.Substring($ls110) } else { '' }
+$ds110 = $loot110.IndexOf('function doLoot')
+$doLootBody110 = if ($ds110 -ge 0) { $loot110.Substring($ds110) } else { '' }
 
 # 110.1 renderLoot + renderLootList + doLoot + the pure core all defined
 Check (($ren110 -match 'function renderLoot\s*\(') -and ($ren110 -match 'function renderLootList\s*\(') -and ($ren110 -match 'function doLoot\s*\(') -and ($ren110 -match 'function _lootAdd\s*\(')) `
@@ -17319,11 +17341,14 @@ Check (($karmaBoardStart187 -ge 0) -and ($readoutIdx187 -gt $karmaBoardStart187)
 try {
     $nodeCheck187 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck187) {
-        $renderPathNode187 = (Join-Path $Root "js/ui/ui-render.js").Replace('\', '/')
+        $repoRootNode187 = $Root.Replace('\', '/')
         $testScript187 = @"
 const fs = require('fs');
 const vm = require('vm');
-const renderSource = fs.readFileSync('$renderPathNode187', 'utf8');
+const path = require('path');
+const uiDir187 = path.join('$repoRootNode187', 'js', 'ui');
+const renderFiles187 = fs.readdirSync(uiDir187).filter(function(f){ return f === 'ui-render.js' || (f.indexOf('ui-render-') === 0 && f.slice(-3) === '.js'); }).sort();
+const renderSource = renderFiles187.map(function(f){ return fs.readFileSync(path.join(uiDir187, f), 'utf8'); }).join('\n');
 function extractFunctionBody(source, fnName) {
   let idx = source.indexOf('function ' + fnName);
   if (idx === -1) throw new Error('Cannot find function "' + fnName + '"');
@@ -17584,13 +17609,16 @@ try {
     $nodeCheck189 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck189) {
         $statePathNode189 = (Join-Path $Root "js/core/state.js").Replace('\', '/')
-        $renderPathNode189 = (Join-Path $Root "js/ui/ui-render.js").Replace('\', '/')
+        $repoRootNode189 = $Root.Replace('\', '/')
         $testScript189 = @"
 const fs = require('fs');
 const vm = require('vm');
+const path = require('path');
 const results = [];
 try {
-  const src = fs.readFileSync('$renderPathNode189', 'utf8');
+  const uiDir189 = path.join('$repoRootNode189', 'js', 'ui');
+  const renderFiles189 = fs.readdirSync(uiDir189).filter(function(f){ return f === 'ui-render.js' || (f.indexOf('ui-render-') === 0 && f.slice(-3) === '.js'); }).sort();
+  const src = renderFiles189.map(function(f){ return fs.readFileSync(path.join(uiDir189, f), 'utf8'); }).join('\n');
   function extractFunctionBody(source, fnName) {
     let idx = source.indexOf('function ' + fnName);
     let i = source.indexOf('{', idx);
@@ -20688,7 +20716,7 @@ const path = require('path');
 const ROOT = '$repoRootNode200';
 function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
 function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
-const renderSrc = rd('js/ui-render.js');
+const renderSrc = rdGroup('ui-render');
 const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21230,7 +21258,7 @@ const path = require('path');
 const ROOT = '$repoRootNode202';
 function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
 function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
-const uiRenderSrc = rd('js/ui-render.js');
+const uiRenderSrc = rdGroup('ui-render');
 const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21503,7 +21531,7 @@ const path = require('path');
 const ROOT = '$repoRootNode203';
 function rd(rel) { var p = path.join(ROOT, rel); if (!fs.existsSync(p)) { var rm = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel); if (rm) { var subs = ['data', 'core', 'ui', 'services', 'dev']; for (var si = 0; si < subs.length; si++) { var cand = path.join(ROOT, 'js', subs[si], rm[1]); if (fs.existsSync(cand)) { p = cand; break; } } } } return fs.readFileSync(p, 'utf8'); }
 function rdGroup(stem) { var subs = ['data', 'core', 'ui', 'services', 'dev']; var matches = []; for (var si = 0; si < subs.length; si++) { var d = path.join(ROOT, 'js', subs[si]); if (!fs.existsSync(d)) continue; fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).forEach(function(f){ matches.push(path.join(d, f)); }); } matches.sort(); return matches.map(function(f){ return fs.readFileSync(f, 'utf8'); }).join('\n'); }
-const uiRenderSrc = rd('js/ui-render.js');
+const uiRenderSrc = rdGroup('ui-render');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22291,7 +22319,7 @@ function declareConstObj(src, name) {
 const ocrSrc = rd('js/ocr.js');
 const apiSrc = rdGroup('api');
 const coreSrc = rdGroup('ui-core');
-const renderSrc = rd('js/ui-render.js');
+const renderSrc = rdGroup('ui-render');
 
 var results = [];
 

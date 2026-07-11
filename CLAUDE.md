@@ -53,11 +53,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2971 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (2980 tests via gate:fast)
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **2971 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **2980 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` when served files change.** Required when any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). Doc-, config-, and test-only commits skip the check entirely.
 - **Cache-bump guard runs at commit time** — the hook first detects whether any staged file is in the served/precached set. If so, it requires a strict monotonic increase in `CACHE_NAME`. Non-served commits (doc-only, CI, tests) bypass the cache check entirely.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
@@ -152,7 +152,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 2971 tests must pass
+- [ ] Run `git commit` — 2980 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -166,7 +166,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (2971 tests) → Protocol 2
+- [ ] Lint, format, commit (2980 tests) → Protocol 2
 
 ---
 
@@ -741,23 +741,32 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 3. `js/core/state.js` → `state`, `APP_VERSION`, `GAME_DEFS`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
 4. `js/data/reg_nv.js` / `js/data/reg_fo3.js` + `js/data/registry-core.js` → `FALLOUT_REGISTRY` (per-game data), `registrySearch()` (read-only engine, never touches state)
 5. `js/ui/ui-audio.js` → all audio functions (`audioCtx`, geiger/tinnitus/CRT hum, limb/wake/boot/level-up sounds, `runBootSequence`, `triggerPhosphorGhost`, `changeOpticsColor`)
-6. `js/ui/ui-render.js` → all `render*()` functions, CRUD helpers (`addItem`/`delItem`/`addAmmo`/etc.), faction utilities (`FACTION_THRESHOLDS`, `getFactionStanding`, `adjustFaction`), game-time helpers, map helpers, `_updateContextPanels`
-7. `js/ui/ui-saves.js` → save slots, file import/export (`handleFileUpload`), rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist
-8. `js/ui/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
-9. `js/services/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
-10. `js/core/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
-11. `js/ui/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
-12. `js/ui/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
-13. `js/ui/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
-14. `js/ui/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
-15. `js/ui/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
-16. `js/ui/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
-17. `js/dev/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
-18. `js/services/api.js` → `transmitMessage()` lifecycle (retry/abort, `_resetTransmitUI`), the AI comm-config cache (`_commGet`), `fetchAuthorizedModels()`, `saveApiKeySilent()` — the network-layer hub (2.8.5 U-A3 split)
-19. `js/services/api-directive.js` → `getSystemDirective()` + its 8 `_directive*` section builders (Suite 131 golden-master guarded) (2.8.5 U-A3 split)
-20. `js/services/api-import.js` → `autoImportState()`, `sanitizeImportedContainer()`, `_wireApiEventBusSubscribers()` — the AI→state import path (2.8.5 U-A3 split)
-21. `js/services/api-router.js` → `NATIVE_COMMAND_ROUTER`, `_routeNativeCommand()`, quick-log routing, `transmitTerminal()` — offline/native command routing, never calls the AI (2.8.5 U-A3 split)
-22. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
+6. `js/ui/ui-render.js` → the render-pipeline hub after the 2.8.5 U-A4 split: only `_updateContextPanels()` (cross-panel visibility glue not owned by one sibling) remains here; every `render*()` panel lives in a `js/ui/ui-render-*.js` sibling below
+7. `js/ui/ui-render-inventory.js` → CARGO MANIFEST & AMMO: `addItem`/`delItem`/`adjItemQty`/`toggleEquipItem`, drawer-filter helpers, `nativeUseItem`, `renderInventory()`, `renderAmmo`/`addAmmo`/`removeAmmo` (2.8.5 U-A4 split)
+8. `js/ui/ui-render-character.js` → CHARACTER & FIELD STATUS: squad roster, the in-game clock/calendar, faction-standing lookup (`FACTION_THRESHOLDS`, `getFactionStanding`), status effects, the PERK loadout rack, the quest DIRECTIVE registry (2.8.5 U-A4 split)
+9. `js/ui/ui-render-record.js` → PERSONAL RECORD: session-stat odometer tally, equipped-gear readout, CURIO collectibles archive, FO3 Lincoln memorabilia, character traits (2.8.5 U-A4 split)
+10. `js/ui/ui-render-ledger.js` → FIELD LEDGER: the shared SHELF/RACK read-tracker renderer (`_renderReadTracker`), skill books, skill magazines, campaign field notes, the campaign status/chronicle event log (2.8.5 U-A4 split)
+11. `js/ui/ui-render-map.js` → CARTOGRAPHY TABLE: the Phosphor Cartography world-map SVG renderer (`renderWorldMap`), zone zoom/travel/visited-marking, arrow-key node navigation (2.8.5 U-A4 split)
+12. `js/ui/ui-render-factions.js` → FACTION REPUTATION & KARMA: the inline fame/infamy editor (`adjustFaction`, `renderFactionRep`), the FO3 Karma Center appendix (2.8.5 U-A4 split)
+13. `js/ui/ui-render-economy.js` → RESOURCE ECONOMY: the CRAFT panel (crafting + scrapping), the native TRADE barter terminal (2.8.5 U-A4 split)
+14. `js/ui/ui-render-loot.js` → ITEM ACQUISITION: the native LOOT add-to-inventory terminal, the Visual Upload OCR preview/confirm/apply flow (2.8.5 U-A4 split)
+15. `js/ui/ui-render-databank.js` → NATIVE DATABANK TOOLS: THREAT assessment, CONSULT lookup, the ELIGIBLE PERKS survey, the DATABANK panel search, the BIO-SCAN medical advisory (2.8.5 U-A4 split)
+16. `js/ui/ui-saves.js` → save slots, file import/export (`handleFileUpload`), rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist
+17. `js/ui/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
+18. `js/services/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
+19. `js/core/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
+20. `js/ui/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
+21. `js/ui/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
+22. `js/ui/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
+23. `js/ui/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
+24. `js/ui/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
+25. `js/ui/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
+26. `js/dev/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
+27. `js/services/api.js` → `transmitMessage()` lifecycle (retry/abort, `_resetTransmitUI`), the AI comm-config cache (`_commGet`), `fetchAuthorizedModels()`, `saveApiKeySilent()` — the network-layer hub (2.8.5 U-A3 split)
+28. `js/services/api-directive.js` → `getSystemDirective()` + its 8 `_directive*` section builders (Suite 131 golden-master guarded) (2.8.5 U-A3 split)
+29. `js/services/api-import.js` → `autoImportState()`, `sanitizeImportedContainer()`, `_wireApiEventBusSubscribers()` — the AI→state import path (2.8.5 U-A3 split)
+30. `js/services/api-router.js` → `NATIVE_COMMAND_ROUTER`, `_routeNativeCommand()`, quick-log routing, `transmitTerminal()` — offline/native command routing, never calls the AI (2.8.5 U-A3 split)
+31. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
 
 <!-- LOAD-ORDER-GUARD:END -->
 
@@ -765,4 +774,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 2971 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2971 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 2980 tests across 221 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 2980 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).

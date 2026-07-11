@@ -255,6 +255,13 @@ export default [
         // Render module cross-file globals (js/ui/ui-render.js ↔ the other ui-*.js siblings)
         _invFilter: 'writable',
         setInvFilter: 'readonly',
+        // ui-render.js spine split (2.8.5 U-A4) — js/ui/ui-render.js (hub, now just
+        // _updateContextPanels) + nine js/ui/ui-render-*.js siblings now cross-reference
+        // each other exactly like the ui-core-*.js family does; only the two names below
+        // moved OUT of same-file scope by the split (every other render*() cross-call
+        // already had a globals entry from referencing ui-core.js/ui-saves.js).
+        getFactionStanding: 'readonly', // ui-render-character.js -> ui-render-factions.js/ui-render-ledger.js
+        _bioChemHasRisk: 'readonly', // ui-render-databank.js -> ui-render-inventory.js
         _syncDrawerButtons: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer bank (ui-render.js)
         _DRAWER_LABELS: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer labels (ui-render.js)
         _updatePanelBadges: 'readonly',

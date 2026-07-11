@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 2971-test gate at parity + boot-smoke / render / a11y checks                |
+| **Testing**     | Node + PowerShell + Playwright                   | 2980-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -193,7 +193,16 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 │   │   ├── ui-core-chassis.js  THE LIVING CORE + CHASSIS panel — _coreRefresh, System Status, Service & Fault Console
 │   │   ├── ui-core-modulebay.js Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
 │   │   ├── ui-core-cmd.js      Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
-│   │   ├── ui-render.js        render*() functions, CRUD helpers, map/faction/time utilities
+│   │   ├── ui-render.js        Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+│   │   ├── ui-render-inventory.js  Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
+│   │   ├── ui-render-character.js  Character & Field Status — squad, clock/calendar, faction standing, status, perks, quests
+│   │   ├── ui-render-record.js     Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
+│   │   ├── ui-render-ledger.js     Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
+│   │   ├── ui-render-map.js        Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
+│   │   ├── ui-render-factions.js   Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
+│   │   ├── ui-render-economy.js    Resource Economy — Craft panel, native Trade barter terminal
+│   │   ├── ui-render-loot.js       Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
+│   │   ├── ui-render-databank.js   Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
 │   │   ├── ui-audio.js         Audio engine, boot sequence, optics (THEMES table)
 │   │   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
 │   │   └── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
@@ -210,7 +219,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2971 tests, 221 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2980 tests, 221 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
@@ -231,23 +240,32 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 3. data/reg_nv.js / data/reg_fo3.js →  FALLOUT_REGISTRY (active game, read-only)
 4. data/registry-core.js      →  registrySearch (shared, game-agnostic)
 5. ui/ui-audio.js             →  AudioSettings, audio + boot + optics functions
-6. ui/ui-render.js            →  render*() functions, CRUD helpers, map/faction/time
-7. ui/ui-saves.js             →  save slots, file import/export, autocomplete
-8. ui/ui-account.js           →  renderAccount, renderSavesList, undoLastSync
-9. services/ocr.js            →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
-10. core/runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
-11. ui/ui-core.js             →  appendToChat, loadUI, updateMath (the ui-core spine hub)
-12. ui/ui-core-nav.js         →  selectSubsystem, switchTab, SHORTCUT_ROUTES (2.8.5 U-A1 split)
-13. ui/ui-core-overseer.js    →  setOverseerState, the Director Uplink scope canvas (2.8.5 U-A1 split)
-14. ui/ui-core-chassis.js     →  _coreRefresh, initChassisCore, System Status (2.8.5 U-A1 split)
-15. ui/ui-core-modulebay.js   →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
-16. ui/ui-core-cmd.js         →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
-17. dev/test-console.js       →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
-18. services/api.js           →  transmitMessage, fetchAuthorizedModels, comm-config cache (2.8.5 U-A3 split)
-19. services/api-directive.js →  getSystemDirective + its 8 _directive* section builders (2.8.5 U-A3 split)
-20. services/api-import.js    →  autoImportState, sanitizeImportedContainer (2.8.5 U-A3 split)
-21. services/api-router.js    →  NATIVE_COMMAND_ROUTER, transmitTerminal, quick-log routing (2.8.5 U-A3 split)
-22. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
+6. ui/ui-render.js            →  render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+7. ui/ui-render-inventory.js  →  Cargo Manifest & Ammo (2.8.5 U-A4 split)
+8. ui/ui-render-character.js  →  Character & Field Status: squad, clock/calendar, faction standing, status, perks, quests (2.8.5 U-A4 split)
+9. ui/ui-render-record.js     →  Personal Record: session tally, equipped, collectibles, Lincoln, traits (2.8.5 U-A4 split)
+10. ui/ui-render-ledger.js    →  Field Ledger: skill/magazine tracker, campaign notes, chronicle (2.8.5 U-A4 split)
+11. ui/ui-render-map.js       →  Cartography Table: renderWorldMap (2.8.5 U-A4 split)
+12. ui/ui-render-factions.js  →  Faction Reputation & Karma (2.8.5 U-A4 split)
+13. ui/ui-render-economy.js   →  Resource Economy: Craft + Trade (2.8.5 U-A4 split)
+14. ui/ui-render-loot.js      →  Item Acquisition: Loot + Visual Upload OCR apply (2.8.5 U-A4 split)
+15. ui/ui-render-databank.js  →  Native Databank Tools: Threat/Consult/Eligible Perks/Bio-Scan (2.8.5 U-A4 split)
+16. ui/ui-saves.js            →  save slots, file import/export, autocomplete
+17. ui/ui-account.js          →  renderAccount, renderSavesList, undoLastSync
+18. services/ocr.js           →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
+19. core/runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
+20. ui/ui-core.js             →  appendToChat, loadUI, updateMath (the ui-core spine hub)
+21. ui/ui-core-nav.js         →  selectSubsystem, switchTab, SHORTCUT_ROUTES (2.8.5 U-A1 split)
+22. ui/ui-core-overseer.js    →  setOverseerState, the Director Uplink scope canvas (2.8.5 U-A1 split)
+23. ui/ui-core-chassis.js     →  _coreRefresh, initChassisCore, System Status (2.8.5 U-A1 split)
+24. ui/ui-core-modulebay.js   →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
+25. ui/ui-core-cmd.js         →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
+26. dev/test-console.js       →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
+27. services/api.js           →  transmitMessage, fetchAuthorizedModels, comm-config cache (2.8.5 U-A3 split)
+28. services/api-directive.js →  getSystemDirective + its 8 _directive* section builders (2.8.5 U-A3 split)
+29. services/api-import.js    →  autoImportState, sanitizeImportedContainer (2.8.5 U-A3 split)
+30. services/api-router.js    →  NATIVE_COMMAND_ROUTER, transmitTerminal, quick-log routing (2.8.5 U-A3 split)
+31. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
@@ -310,7 +328,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2971-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2980-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -374,7 +392,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2971 tests across 221 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2980 tests across 221 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
