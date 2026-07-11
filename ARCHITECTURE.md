@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.8.0
-> **Last Updated:** 2026-07-10
+> **Last Updated:** 2026-07-11
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -72,8 +72,8 @@
 ├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2938-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2938-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2945-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2945-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1142,11 +1142,11 @@ Reskin only (Protocol 22/25): every existing id/handler is kept unchanged.
 
 **The three boards:**
 
-| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                    |
-| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every `_SYSTEM_STATUS_FLAGS` entry) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35).                                                                                                                   |
-| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered." |
+| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                                                                                                                                                                                                                                                                                            |
+| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every flag `_systemStatusFlagKeys()` returns) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35). `_systemStatusFlagKeys()` reads `window.getFeatureFlagKeys()` (`js/cloud.js`, `Object.keys(_featureFlags)` — the single source, Protocol 22) first, falling back to a literal `_SYSTEM_STATUS_FLAGS_FALLBACK` array only when that accessor is unavailable — a v2.8.0 hotfix (Suite 219) after the old standalone hardcoded array silently missed `visualOcr`/`visualAiVision`. |
+| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered."                                                                                                                                                                                                                                                                         |
 
 `expandPanelForCategory()`'s `log` category and `_bezelSubsystemLabel('chassis')` were both
 repointed from the old single "SYSTEM STATUS" title to "UNIT POWER PLANT" / "SELF-DIAGNOSTIC BAY"
@@ -3052,7 +3052,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2938-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2945-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

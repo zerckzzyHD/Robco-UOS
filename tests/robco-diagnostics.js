@@ -1852,9 +1852,23 @@ header('Meta / Runner Parity');
 
   // Canonical count in CHANGELOG.md matches README.md and ARCHITECTURE.md (Protocol 2a).
   // The CHANGELOG header format is: <!-- Tests: N/N | Cache: ... -->
+  // Protocol 42 fix (v2.8.0-r3 hotfix): this used to take the FIRST "Tests: N/N"
+  // match in the file, which is always the [Unreleased] header — correct only by
+  // coincidence, since every prior push happened to leave Unreleased's count equal
+  // to the latest released block's count. The Hotfix model (Protocol 2a) explicitly
+  // freezes the Unreleased header while a hotfix updates the ALREADY-RELEASED
+  // block's header instead, so a hotfix that changes the total test count (like
+  // this one, Suite 219) legitimately diverges the two — the first-match read then
+  // picks the stale, frozen Unreleased number instead of the real current count.
+  // Fixed to take the MAXIMUM across every "Tests: N/N" header in the file: the
+  // total only ever grows within a release cycle, so the max is always the
+  // genuinely-current count, whether that's Unreleased (the normal case) or a
+  // just-hotfixed released block (this case).
   const changelog = readFile('CHANGELOG.md');
-  const countMatch = changelog.match(/Tests:\s*(\d+)\/\d+/);
-  const canonicalCount = countMatch ? countMatch[1] : '';
+  const countMatches = [...changelog.matchAll(/Tests:\s*(\d+)\/\d+/g)];
+  const canonicalCount = countMatches.length
+    ? String(Math.max(...countMatches.map(m => parseInt(m[1], 10))))
+    : '';
   assert(!!canonicalCount, 'CHANGELOG.md contains Tests: N/N header (Protocol 2a)');
   const readme = readFile('README.md');
   assert(
@@ -39652,6 +39666,190 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         /label:\s*'Fallout 4'/.test(fo4Slice218) &&
         !/label:\s*'Fallout 3'/.test(fo4Slice218),
       "218.8: GAME_DEFS.FO4 carries its own distinct label ('Fallout 4', not 'Fallout 3') — the GAME_DEFS[ctx].label fix genuinely generalizes past FNV/FO3"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 219 — v2.8.0 Hotfix: CHASSIS SYSTEM STATUS breaker readout
+//  single-sourced against the real kill-switch flags (Protocol 22)
+// ══════════════════════════════════════════════════════════════
+//  THE BUG (r2 → r3): the SYSTEM STATUS / IDENTITY PLATE & BREAKERS board's
+//  breaker-rack readout (renderSystemStatus(), js/ui-core.js) drove itself
+//  off a separately-hardcoded array (_SYSTEM_STATUS_FLAGS) that was never
+//  updated when the Visual Upload OCR unit added visualOcr/visualAiVision
+//  to the real flag set (js/cloud.js, _featureFlags) — the board silently
+//  showed 6 of the 8 real flags. THE FIX: js/cloud.js now exports
+//  window.getFeatureFlagKeys() (Object.keys(_featureFlags), the one real
+//  source), and js/ui-core.js's _systemStatusFlagKeys() reads it first,
+//  falling back to a literal array (_SYSTEM_STATUS_FLAGS_FALLBACK) only
+//  when that accessor isn't available (a reduced test harness). Also fixes
+//  a Protocol 42 gate defect this hotfix's own net test-count change exposed
+//  (Suite 28's canonical-count reader picked a stale, frozen count). 7 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 219 — v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced');
+  const cloudSrc219 = readFile('js/cloud.js');
+  const uiCoreSrc219 = readFile('js/ui-core.js');
+
+  // 219.1  cloud.js exports window.getFeatureFlagKeys() as the single source
+  //        of every real flag key (Object.keys(_featureFlags) — never a
+  //        second, independently-maintained list).
+  assert(
+    /window\.getFeatureFlagKeys\s*=\s*function\s*\(\s*\)\s*\{\s*return Object\.keys\(_featureFlags\);\s*\}/.test(
+      cloudSrc219
+    ),
+    '219.1: cloud.js exports window.getFeatureFlagKeys() = Object.keys(_featureFlags) — the single source of every registered kill-switch flag key'
+  );
+
+  // 219.2  ui-core.js's _systemStatusFlagKeys() prefers window.getFeatureFlagKeys()
+  //        when available, and only falls back to the literal array otherwise —
+  //        structural proof it is genuinely single-sourced, not a renamed dupe.
+  const flagKeysFnBody219 = extractFunctionBody(uiCoreSrc219, '_systemStatusFlagKeys');
+  assert(
+    /typeof window\.getFeatureFlagKeys === 'function'/.test(flagKeysFnBody219) &&
+      /window\.getFeatureFlagKeys\(\)/.test(flagKeysFnBody219) &&
+      /_SYSTEM_STATUS_FLAGS_FALLBACK/.test(flagKeysFnBody219),
+    '219.2: _systemStatusFlagKeys() reads window.getFeatureFlagKeys() when available, falling back to the literal array only when it is not'
+  );
+
+  // 219.3  renderSystemStatus() reads the breaker-rack flag list through
+  //        _systemStatusFlagKeys() — regression guard against reintroducing
+  //        the old bare hardcoded-array reference this hotfix retired.
+  const renderBody219 = extractFunctionBody(uiCoreSrc219, 'renderSystemStatus');
+  assert(
+    /_systemStatusFlagKeys\(\)\.map/.test(renderBody219) &&
+      !/_SYSTEM_STATUS_FLAGS\.map/.test(renderBody219),
+    '219.3: renderSystemStatus() maps over _systemStatusFlagKeys() (never the retired bare _SYSTEM_STATUS_FLAGS array)'
+  );
+
+  // 219.4  DRIFT GUARD — the exact class of bug that shipped in r2: the
+  //        fallback array's key SET must always equal the real _featureFlags
+  //        key SET in cloud.js. This is the check that would have caught the
+  //        original bug, and prevents the fallback itself from silently
+  //        drifting stale again in the future.
+  {
+    const ffBlockMatch219 = cloudSrc219.match(/let _featureFlags = \{([\s\S]*?)\n\};/);
+    const realFlagKeys219 = (ffBlockMatch219 ? ffBlockMatch219[1] : '').match(
+      /^\s*([a-zA-Z][a-zA-Z0-9]*):\s*true,?\s*$/gm
+    );
+    const realKeySet219 = new Set((realFlagKeys219 || []).map(l => l.trim().split(':')[0].trim()));
+
+    const fallbackBlockMatch219 = uiCoreSrc219.match(
+      /_SYSTEM_STATUS_FLAGS_FALLBACK = \[([\s\S]*?)\];/
+    );
+    const fallbackKeys219 = (fallbackBlockMatch219 ? fallbackBlockMatch219[1] : '').match(
+      /'([a-zA-Z][a-zA-Z0-9]*)'/g
+    );
+    const fallbackKeySet219 = new Set((fallbackKeys219 || []).map(s => s.replace(/'/g, '')));
+
+    const missingFromFallback219 = [...realKeySet219].filter(k => !fallbackKeySet219.has(k));
+    const extraInFallback219 = [...fallbackKeySet219].filter(k => !realKeySet219.has(k));
+    assert(
+      !!ffBlockMatch219 &&
+        !!fallbackBlockMatch219 &&
+        realKeySet219.size > 0 &&
+        missingFromFallback219.length === 0 &&
+        extraInFallback219.length === 0,
+      '219.4: DRIFT GUARD — _SYSTEM_STATUS_FLAGS_FALLBACK carries the exact same key set as the real _featureFlags in cloud.js' +
+        (missingFromFallback219.length
+          ? ` — MISSING from fallback: ${missingFromFallback219.join(', ')}`
+          : '') +
+        (extraInFallback219.length ? ` — STALE in fallback: ${extraInFallback219.join(', ')}` : '')
+    );
+  }
+
+  // 219.5  BEHAVIORAL — the exact reported bug: visualOcr and visualAiVision
+  //        are present in the real flag set AND flow through to the breaker
+  //        readout via _systemStatusFlagKeys().
+  {
+    const vm = require('vm');
+    let ok = false;
+    let err = null;
+    try {
+      const fn219 = extractFunctionBody(uiCoreSrc219, '_systemStatusFlagKeys');
+      const sb = { window: {} };
+      vm.createContext(sb);
+      vm.runInContext(
+        `var _SYSTEM_STATUS_FLAGS_FALLBACK = ${JSON.stringify([
+          'aiChat',
+          'cloudSync',
+          'googleSignIn',
+          'keySync',
+          'saveMigration',
+          'offlineQueue',
+          'visualOcr',
+          'visualAiVision',
+        ])};\n` + `var _systemStatusFlagKeys = function ()${fn219};`,
+        sb
+      );
+      // Scenario A: no window.getFeatureFlagKeys (reduced harness) — falls
+      // back to the literal array, which itself now carries all 8 keys.
+      const fallbackResult219 = sb.window.getFeatureFlagKeys
+        ? null
+        : vm.runInContext('_systemStatusFlagKeys()', sb);
+      // Scenario B: window.getFeatureFlagKeys IS present (the real boot
+      // order) — it wins over the fallback, proving genuine single-sourcing
+      // rather than "the fallback array happens to be current."
+      vm.runInContext(
+        "window.getFeatureFlagKeys = function () { return ['aiChat', 'aBrandNewFlagNoOneHasSeen']; };",
+        sb
+      );
+      const liveResult219 = vm.runInContext('_systemStatusFlagKeys()', sb);
+      ok =
+        Array.isArray(fallbackResult219) &&
+        fallbackResult219.includes('visualOcr') &&
+        fallbackResult219.includes('visualAiVision') &&
+        Array.isArray(liveResult219) &&
+        liveResult219.length === 2 &&
+        liveResult219.includes('aBrandNewFlagNoOneHasSeen');
+    } catch (e) {
+      err = e;
+    }
+    assert(
+      ok,
+      '219.5: BEHAVIORAL — the fallback path includes visualOcr/visualAiVision, and when window.getFeatureFlagKeys() is present it is used verbatim (proving real single-sourcing, not just an updated fallback list)' +
+        (err ? ' — ' + err.message : '')
+    );
+  }
+
+  // 219.6  the breaker-rack markup itself renders every flag returned by
+  //        _systemStatusFlagKeys() as its own labeled breaker (structural —
+  //        the map() → _chassisBreaker() wiring is unchanged by this fix).
+  assert(
+    /flags\s*\n?\s*\.map\(f => _chassisBreaker\(f\.key\.toUpperCase\(\), f\.on, false, 'ENABLED', 'DISABLED'\)\)/.test(
+      renderBody219
+    ),
+    '219.6: every key _systemStatusFlagKeys() returns is rendered as its own ENABLED/DISABLED breaker in the rack — no silent per-flag drop'
+  );
+
+  // 219.7  PROTOCOL 42 — while shipping this very hotfix (a net test-count
+  //        change), Suite 28's "canonical test count" reader was found to read
+  //        only the FIRST "Tests: N/N" header in CHANGELOG.md (always the
+  //        [Unreleased] header) — correct only by coincidence, since every prior
+  //        push happened to leave Unreleased's count equal to the latest
+  //        released block's count. The Hotfix model (Protocol 2a) explicitly
+  //        freezes Unreleased while a hotfix updates the ALREADY-RELEASED
+  //        block's header instead, so a hotfix that changes the total test
+  //        count (this one) legitimately diverges the two, and the old
+  //        first-match read picked the stale, frozen number. REAL shipped-code
+  //        defect (the gate runs on every commit) — fixed in the SAME commit
+  //        (both runners) to take the MAXIMUM across every header, and locked
+  //        here with a behavioral proof against a synthetic frozen-Unreleased /
+  //        hotfixed-released pair.
+  {
+    const synthetic219 =
+      '## [Unreleased]<!-- Tests: 2938/2938 | Cache: x -->\n\n## [v2.8.0]<!-- Tests: 2944/2944 | Cache: y -->\n';
+    const matches219 = [...synthetic219.matchAll(/Tests:\s*(\d+)\/\d+/g)];
+    const max219 = matches219.length
+      ? String(Math.max(...matches219.map(m => parseInt(m[1], 10))))
+      : '';
+    const suite28Src219 = readFile('tests/robco-diagnostics.js');
+    assert(
+      max219 === '2944' &&
+        /matchAll\(\/Tests:\\s\*\(\\d\+\)\\\/\\d\+\/g\)/.test(suite28Src219) &&
+        /Math\.max\(\.\.\.countMatches\.map/.test(suite28Src219),
+      '219.7: PROTOCOL 42 — Suite 28\'s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2944, the current value, not 2938, the first/stale match) — the bug this hotfix\'s own net test-count change exposed'
     );
   }
 }

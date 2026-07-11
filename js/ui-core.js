@@ -285,14 +285,31 @@ function _readActiveCacheName(cb) {
     })
     .catch(() => cb(null));
 }
-const _SYSTEM_STATUS_FLAGS = [
+// Protocol 22 — a literal fallback ONLY, exercised if window.getFeatureFlagKeys()
+// (js/cloud.js, the real single source of every registered kill-switch flag) is
+// unavailable, e.g. a reduced test harness that never loads cloud.js. In the real
+// boot order cloud.js loads before this function is ever CALLED at runtime (it's a
+// script-tag load-order dependency, not a call-time one — see Suite 219), so a live
+// player always gets the real, current key list, never this frozen snapshot. Kept
+// in sync with _featureFlags in cloud.js as a courtesy, not a requirement — the r2
+// hotfix bug (visualOcr/visualAiVision missing from the breaker rack) was exactly
+// this list silently drifting out of sync with the real flags; Suite 219 guards
+// both this fallback and the primary source against drifting again.
+const _SYSTEM_STATUS_FLAGS_FALLBACK = [
   'aiChat',
   'cloudSync',
   'googleSignIn',
   'keySync',
   'saveMigration',
   'offlineQueue',
+  'visualOcr',
+  'visualAiVision',
 ];
+function _systemStatusFlagKeys() {
+  return typeof window.getFeatureFlagKeys === 'function'
+    ? window.getFeatureFlagKeys()
+    : _SYSTEM_STATUS_FLAGS_FALLBACK;
+}
 // BUS-23 IDENTITY PLATE & BREAKERS reskin (CHASSIS): the same firmware/cache/
 // carrier/feature-flag read-out, now rendered as a stamped serial plate (id-
 // plate/rivets/id-row) + a breaker-lever rack (one per remote kill-switch
@@ -326,7 +343,7 @@ function renderSystemStatus() {
   const el = document.getElementById('systemStatusDisplay');
   if (!el) return;
   const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
-  const flags = _SYSTEM_STATUS_FLAGS.map(k => ({
+  const flags = _systemStatusFlagKeys().map(k => ({
     key: k,
     on: typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled(k) !== false,
   }));

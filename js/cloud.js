@@ -75,6 +75,18 @@ let _featureFlags = {
   visualOcr: true,
   visualAiVision: true,
 };
+
+// Protocol 22 — the single source of truth for "every real kill-switch flag
+// key that exists," consumed by the CHASSIS SYSTEM STATUS breaker-rack readout
+// (js/ui-core.js, renderSystemStatus()) so a newly-added flag can never again
+// silently go missing from that board (the r2 hotfix bug: visualOcr/
+// visualAiVision were added to _featureFlags above but the readout kept its
+// own separately-hardcoded, never-updated array). Object.keys() preserves
+// insertion order, so the breaker rack always lists flags in the same order
+// they're declared here.
+window.getFeatureFlagKeys = function () {
+  return Object.keys(_featureFlags);
+};
 try {
   // cloud.js is the one ES module in the boot chain; cross-file globals from the
   // classic scripts (state.js et al.) are always read via window.X here (matching
