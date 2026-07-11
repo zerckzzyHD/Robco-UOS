@@ -1,3 +1,18 @@
+// ── ui-core.js — HUB: BOOT ORCHESTRATOR + MASTER RENDER (2.8.5 U-A1 split remainder) ──
+// This is what stayed in the hub after 2.8.5 U-A1 carved five siblings out of
+// the former monolithic ui-core.js: bezel nav → ui-core-nav.js, the Director
+// Uplink presence → ui-core-overseer.js, the Living Core + casing lamps →
+// ui-core-chassis.js, the Module Bay → ui-core-modulebay.js, and the command
+// layer (native stat setters, COMMAND_REGISTRY, event-bus subscriber wiring)
+// → ui-core-cmd.js. Exposes: the AudioSettings mute-pref cache, the client
+// error ring-buffer, window.onload + its ~20 boot-phase functions, loadUI()
+// (the master per-tick render pass) and updateMath() (derived-stat repaint +
+// audio/visual threshold gates, ends by calling saveState()), appendToChat()'s
+// typewriter, the shared #sysModal driver (openModal/closeModal/
+// confirmAction), the changelog viewer, and wipeTerminal(). Global scope,
+// static <script> tag — loads alongside the rest of the ui-core-*.js family,
+// immediately before window.onload fires (see index.html load order).
+
 // Phase 3 · Piece 2 (CARGO MANIFEST drawer bank): default drawer before the
 // robco_cargo_drawer MetaStore pref is restored at boot (_restoreDevicePrefs).
 // No 'all' drawer exists in the physical pull-drawer design (each item type
@@ -412,6 +427,7 @@ function _hydrateStateFromStorage() {
   });
 }
 
+// ── API KEY / CHAT-HISTORY RESTORE + STANDBY WIRING (boot phases) ──
 function _restoreApiKeyAndChatHistory() {
   if (MetaStore.get('robco_gemini_key')) {
     document.getElementById('apiKeyInput').value = MetaStore.get('robco_gemini_key');
@@ -576,6 +592,7 @@ function _wireAmbientExperiences() {
   });
 }
 
+// ── POWER-ON RECOVERY + PANEL/SUB-PANEL PERSISTENCE (boot phases) ──
 // Power-on affordance (Protocol 42 fix): the #powerOnBtn click handler. Owner
 // bug — forcing SHUTDOWN/OFF left a fully black screen with no visible way
 // back on. Recovers using ONLY legal transition() edges (never forceState(),
@@ -726,6 +743,7 @@ function _wirePanelPersistence() {
   if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);
 }
 
+// ── OPTICS + DEVICE-PREF BOOT RESTORE (boot phases) ──
 function _restoreOpticsPreference() {
   // DO-K: keep the pre-paint data-game attribute in sync with the resolved game context. The
   // index.html head script already sets it (best-effort) from raw localStorage before state.js
@@ -899,6 +917,7 @@ function _restoreDevicePrefs() {
   if (typeof renderModuleBay === 'function') renderModuleBay();
 }
 
+// ── BOOT BRIEFING, AMBIENT TIMERS, UNLOAD FLUSH (boot phases) ──
 function _runBootSequenceAndBriefing() {
   // Defer changelog display until after boot sequence completes
   let needsChangelog = false;
@@ -1016,12 +1035,17 @@ function _startAmbientTimers() {
 }
 
 function _wireUnloadFlush() {
-  // Flush any pending debounced save immediately on tab close
+  // Flush any pending debounced save immediately on tab close.
+  // GOTCHA (Protocol 42 precedent — same guard saveState()'s own debounced
+  // write applies in state.js): suppress the unload flush when a context
+  // switch OR a save-load reload is in flight — otherwise the stale
+  // in-memory state would clobber the robco_v8 a load path just wrote,
+  // making IMPORT SAVE / RESTORE BACKUP / cloud load no-ops. A WU-A5
+  // verification pass once hit this exact clobber with the guard missing
+  // (harness-only — every shipped reload path was already guarded — see
+  // Suite 95.8/95.9, the regression locks for this pattern).
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
-    // Suppress the unload flush when a context switch OR a save-load reload is in
-    // flight — otherwise the stale in-memory state would clobber the robco_v8 a
-    // load path just wrote, making IMPORT SAVE / RESTORE BACKUP / cloud load no-ops.
     if (window._contextSwitching || window._loadingSave) return;
     if (!window.robco_v8)
       window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
@@ -1031,6 +1055,16 @@ function _wireUnloadFlush() {
   });
 }
 
+// ── window.onload — BOOT ORCHESTRATOR ───────────────────────────
+// Calls every boot-phase function above (plus a handful defined in sibling
+// ui-core-*.js files, already in scope by this point — see index.html load
+// order) in the exact order they ran in the original pre-split monolith.
+// GOTCHA: do not reorder without re-auditing every boot/lifecycle entry path
+// (planning/STEP2_PHASE0_PLAN.md) — two orderings are load-bearing today:
+// _hydrateMetaFromIdb() must resolve before anything reads a device pref
+// (P2's IndexedDB reconciliation), and routeLaunchShortcut() must run last,
+// after initTabs(), so a PWA shortcut deep-link isn't overridden by the
+// normal saved-tab restore.
 window.onload = async function () {
   try {
     // U7: wire the OS Event Bus subscribers first (RobcoEvents is guaranteed loaded by onload).
@@ -1086,8 +1120,6 @@ window.onload = async function () {
   }
 };
 
-// ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
-// format: 'txt' (default), 'html' (#41), 'md' (#27)
 // ── WU-F4 PENDING-DIRECTIVES TALLY (Badging API) ──────────────────────────
 // Posts the count of unresolved directives — active quests — on the installed
 // terminal icon while the app is backgrounded, and clears it the moment the
@@ -1125,6 +1157,7 @@ function _updateAppBadge() {
 // the terminal is hidden, clear it when reopened ("clears on open").
 document.addEventListener('visibilitychange', _updateAppBadge);
 
+// ── PANEL BADGES (Protocol UI-4) ────────────────────────────────
 function _updatePanelBadges() {
   const badges = [
     { h2text: '> PERK LOADOUT', count: (state.perks || []).length },
@@ -1553,6 +1586,7 @@ function showFullChangelog() {
     });
 }
 
+// ── SHARED SYSTEM MODAL (open / close / confirm) ────────────────
 function _openSysModal() {
   _sysModalTrigger = document.activeElement || null;
   var modal = document.getElementById('sysModal');
@@ -1685,6 +1719,7 @@ function confirmAction(opts) {
   });
 }
 
+// ── CLIENT ERROR LOG VIEWER (reads the ring-buffer at file top) ──
 function _clearErrorLog() {
   MetaStore.remove(ERROR_LOG_KEY);
   showErrorLog();
@@ -1729,6 +1764,12 @@ function showErrorLog() {
   openModal();
 }
 
+// ── loadUI() — MASTER PER-TICK RENDER PASS ──────────────────────
+// Every panel below is gated by _isDirty() (the render-signature cache
+// declared at the top of this file), so a loadUI() call is cheap when
+// nothing relevant changed — it always re-syncs the raw stat inputs, but
+// only re-renders a panel's DOM when that panel's own state slice differs
+// from its last-rendered signature.
 function seedNewCampaignInventory(ctx) {
   const seedItems = (GAME_DEFS[ctx] || GAME_DEFS.FNV).seedInventory || [];
   if (seedItems.length === 0) return;
@@ -1959,6 +2000,15 @@ function _radTierName(threshold) {
 let _lastGameHourBand = -1; // 0=night(20-5), 1=morning(6-11), 2=day(12-18), 3=evening(19)
 let _lastChemExpiry = new Set(); // names of chems we've already warned about
 
+// ── updateMath() — DERIVED-STAT REPAINT + AUDIO/VISUAL THRESHOLD GATES ──
+// Recomputes AP/carry-weight/HP%/XP%/rad tier from the current DOM + state,
+// repaints every dependent visual (bars, body classList flags, the weigh
+// bridge, the bezel telemetry strip), fires the one-shot contextual chat
+// messages and audio cues on each threshold crossing, and — GOTCHA — ends by
+// calling saveState(), so every call to updateMath() schedules a debounced
+// persist. loadUI() and most stat-editing call sites already call this once
+// per user action; avoid adding a new call inside a tight loop or a per-frame
+// handler without accounting for that.
 function updateMath() {
   let maxAp = 65 + state.a * 3;
   document.getElementById('display_ap').innerText = maxAp;
@@ -2286,6 +2336,7 @@ function getTypewriterSpeed(text) {
   return Math.max(1, Math.round(base * (1 / speedMult)));
 }
 
+// ── CHAT TRANSCRIPT RENDERING (appendToChat + typewriter) ───────
 function appendToChat(text, sender, isHistoryLoad = false) {
   if (!text) return;
   const chatBox = document.getElementById('chatDisplay');
@@ -2474,7 +2525,3 @@ async function wipeTerminal() {
     appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
   });
 }
-
-// ── SAVE SLOTS (#6) ────────────────────────────────────────────────
-// 3 named slots (A/B/C) stored as robco_slot_1/2/3 in localStorage.
-// Each slot stores the full envelope {version, state, chat, playstyle, savedAt, slotName}.

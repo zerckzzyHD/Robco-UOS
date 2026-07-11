@@ -17,6 +17,19 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Device chrome (bezel/casing/glass, Protocol UI-7) + per-game [data-game] identity theming
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   10-chrome.css — cascade slot 10: the device chrome — casing-top
+   header, curved glass frame, the bottom bezel subsystem-selector
+   nav (replaces the old tab bar), the SWEEP motion verb, and the
+   per-[data-game] "wire" accent + custom-cursor theming that most
+   later files' amber accents key off of.
+   WHY HERE: loads right after 05-base because it defines the
+   --bezel-wire/--bezel-wire-rgb tokens that many later files
+   (15-overseer onward) read, and because it is structural scaffolding
+   (the frame everything else renders inside) rather than any one
+   panel's content — it has to exist before panel-specific styling is
+   layered on, but has no reason to load before the base tokens/reset.
+   ══════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
    DEVICE CHROME — DO-N bezel/casing (Protocol UI-7). The app becomes a
    physical RobCo terminal: casing-top (brand/lamps) + a curved glass frame

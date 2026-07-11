@@ -17,6 +17,28 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Mobile Density Standard (Tier-1) — MUST stay last: every selector here has an earlier unconditional base rule elsewhere, and CSS resolves equal-specificity ties by source order (see header comment inside the file).
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   99-mobile.css — cascade slot 99: the Mobile Density Standard
+   (Tier-1) — narrow-phone (<=480px) spacing/sizing overrides layered
+   on top of the board/panel chrome, faction/status/perk/skill tiles,
+   and UPLINK transcript padding that every earlier file already
+   defines.
+   WHY HERE (GOTCHA — load-bearing, do not reorder): this file MUST
+   load LAST. Every selector in it (details.bay-board, .panel.bay-board,
+   .bay-grid, .facon-chan, .stlamp-tile, etc.) already has an earlier,
+   UNCONDITIONAL base rule somewhere in files 05-55, at the SAME
+   specificity as the rule here. CSS resolves an equal-specificity tie
+   by SOURCE ORDER — the rule that appears later in the concatenated
+   cascade wins — not by which @media condition is "more specific."
+   If this file loaded earlier than one of those base rules, its
+   (max-width:480px) override would be silently beaten by the later,
+   unconditional desktop-and-mobile rule and the mobile density
+   tightening would simply not apply, with no error or warning of any
+   kind. Placing it last guarantees it always wins at <=480px
+   regardless of where a future edit adds a same-selector rule
+   anywhere earlier in the cascade. This is the single most important
+   ordering fact in this whole 12-file split.
+   ══════════════════════════════════════════════════════════════ */
 /* ─── Mobile Density Standard — Tier-1 safe tightening ─────────────
    (planning/MOBILE_DENSITY_PLAN.md §2/§3, owner-approved Tier-1 only).
    Deliberately placed at the END of the file: every selector below already

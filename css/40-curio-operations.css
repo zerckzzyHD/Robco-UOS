@@ -17,6 +17,20 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: BUS-15 Curio Archive display case + Phase 3 Piece 2 Operations console
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   40-curio-operations.css — cascade slot 40: the BUS-15 Curio
+   Archive display case (collectibles/bobbleheads/Lincoln relics as
+   themed shelf objects behind glass) + Phase 3 Piece 2 OPERATIONS
+   "quartermaster's freight console" (the load-cell weigh bridge, the
+   pull-drawer cargo-manifest bank, the cargo-tag manifest rows, the
+   field-fabrication ingredient meters, the squad roster cards).
+   WHY HERE: also reuses the .bay-board/.bay-slot-tag/.bay-part-no/
+   .panel-substatus/.board-led vocabulary from 30-modulebay.css (per
+   this file's own header comment), so it must load after that file.
+   Its position after 35-operator-boards.css is chronological — the
+   OPERATIONS piece was built as "Piece 2," after OPERATOR — rather
+   than a required cascade dependency between the two.
+   ══════════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════════════
    BUS-15 · CURIO ARCHIVE — collectibles as THEMED OBJECTS on SHELVES
    INSIDE a sealed glass display case (owner-approved redesign, Protocol 25

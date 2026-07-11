@@ -2,8 +2,12 @@
 // selectSubsystem/switchTab/_syncBezelNav, SHORTCUT_ROUTES + #go= routing,
 // hotkeys, the DIRECTORY modal, tab/scroll persistence. Global scope, static
 // <script> tag — loads alongside the rest of the ui-core-*.js family, before
-// window.onload fires (see index.html load order).
+// window.onload fires (see index.html load order). GOTCHA: two independent
+// numeric-hotkey schemes share one keydown handler — Ctrl+1-6 toggles the
+// first 6 <details class="panel"> elements, while bare 1-6 (no modifier,
+// outside an input) selects a bezel subsystem — do not conflate them.
 
+// ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────
 function _wireKeyboardShortcuts() {
   // #15 Keyboard Shortcuts — Ctrl+1–6 toggle first 6 panels, Ctrl+/ focus chat
   document.addEventListener('keydown', e => {
@@ -42,6 +46,9 @@ function _wireKeyboardShortcuts() {
         // DIRECTORY fallback. [4]/[5] are new (UPLINK/CHASSIS were never
         // gated by a tab); [1]-[3] keep routing through switchTab() exactly
         // as before via selectSubsystem()'s _NAV_TAB_FOR map.
+        // PROTOCOL 25 (bezel-nav extension): the tab-bar-to-bezel swap was
+        // conditioned on hotkeys [1]-[5] (+[0] for DIRECTORY) continuing to
+        // work — this map is the literal guarantee of that condition.
         const hotkeyMap = {
           1: 'operator',
           2: 'operations',
@@ -242,6 +249,7 @@ function _saveOutgoingScroll() {
   if (_lastScrollSubsystem) _saveScrollFor(_lastScrollSubsystem);
 }
 
+// ── BEZEL NAV SYNC + TELEMETRY STRIP ─────────────────────────────────
 function _syncBezelNav(subsystem) {
   if (!NAV_KEYS.includes(subsystem)) return;
   NAV_KEYS.forEach(k => {
@@ -249,6 +257,8 @@ function _syncBezelNav(subsystem) {
     if (!btn) return;
     const on = k === subsystem;
     btn.classList.toggle('active', on);
+    // PROTOCOL 25: aria-selected preservation is one of the bezel-nav
+    // extension's explicit conditions — this is the one place it's set.
     btn.setAttribute('aria-selected', String(on));
   });
   const lcd = document.getElementById('bezelTelemetry');
@@ -343,6 +353,7 @@ function _refreshBezelTelemetry() {
 }
 window._refreshBezelTelemetry = _refreshBezelTelemetry;
 
+// ── MOTION VERBS (Protocol UI-9) ─────────────────────────────────────
 // SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.
 // Reduced-motion is handled by the existing global prefers-reduced-motion
 // CSS block, which zeroes the animation to an instant resting frame.
@@ -367,6 +378,7 @@ function _motionSeat(el) {
 }
 window._motionSeat = _motionSeat;
 
+// ── SUBSYSTEM SELECTION ───────────────────────────────────────────────
 // selectSubsystem(view) — the bezel keycap click handler.
 function selectSubsystem(view) {
   const tab = _NAV_TAB_FOR[view];
@@ -414,6 +426,7 @@ function selectSubsystem(view) {
   _bezelSweep();
 }
 
+// ── DIRECTORY FALLBACK ────────────────────────────────────────────────
 // DIRECTORY fallback (Protocol 25) — a flat, plain-label list of every
 // subsystem, one tap away, reusing the shared #sysModal driver (Protocol 22)
 // rather than a bespoke dialog.
@@ -445,6 +458,7 @@ function openBezelDirectory() {
   openModal({ title: '> SUBSYSTEM DIRECTORY', body });
 }
 
+// ── BOOT-TIME BEZEL RESTORE ───────────────────────────────────────────
 // Restore the last-focused non-tab subsystem (uplink) highlight on boot —
 // visual only, never scrolls/focuses anything on page load. chassis/settings
 // are now real tabs (Step 2 v2.8.0 Settings-tab unit) restored by initTabs()
@@ -462,7 +476,11 @@ function _initBezelChrome() {
   _updateFaultLamp();
 }
 
+// ── PWA DEEP-LINK ROUTING (#go=) ──────────────────────────────────────
 // PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
+// PROTOCOL 25: preserving #go= deep-links was one of the bezel-nav
+// extension's explicit conditions for replacing the tab bar — this table
+// (plus routeLaunchShortcut() below) is that guarantee.
 const SHORTCUT_ROUTES = {
   comm: () => {
     _saveOutgoingScroll(); // FIX 2

@@ -17,6 +17,18 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Base tokens, reset, layout, app-shell
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   05-base.css — cascade slot 05: root CSS custom properties
+   (--robco-*), the html/body reset, and the foundational layout/
+   component primitives (.container, .main-grid, .panel, .panel h2,
+   input/select/button base styles, .special-grid, the chat
+   transcript classes .msg-user/.msg-ai/.msg-sys, .col-left/.col-right).
+   WHY HERE: loads FIRST because every other file in this cascade
+   references the --robco-* custom properties and the base element/
+   class rules (button, input, .panel) defined here. This is the
+   foundation the other 11 files build on or selectively override —
+   nothing here depends on anything loading before it.
+   ══════════════════════════════════════════════════════════════ */
 :root {
   --robco-green-rgb: 20, 253, 206;
   --robco-green: #14fdce;

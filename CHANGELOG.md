@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 2980/2980 | Cache: robco-terminal-v2.8.0-r9 -->
+## [Unreleased]<!-- Tests: 2980/2980 | Cache: robco-terminal-v2.8.0-r10 -->
 
 ### Under the Hood
 
@@ -10,6 +10,7 @@
 - Reorganized the entire internal code folder into labeled subfolders by purpose (game content, core engine, on-screen interface, outside-world services, developer-only tools) instead of one large flat pile of files, and split the single largest stylesheet into twelve smaller files grouped by the screen or feature they style, in the exact same order they always loaded in so nothing about how the terminal looks changed. Also widened two safety checks that had quietly stopped watching some of the app's own files after an earlier reorganization, so they're now watching everything again. Purely an internal filing exercise — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - Split the file handling the AI conversation into four smaller files by responsibility (the network connection itself, the AI's instructions, applying the AI's replies to your campaign, and the offline typed-command shortcuts), instead of one large catch-all file. Also widened the internal file-corruption safety check so it automatically covers every code file going forward instead of a fixed hand-picked list. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - Split the last of the big catch-all front-end files into nine smaller ones organized by what each actually does (your cargo and ammo, your character and squad status, your personal record and collectibles, your field notes and event log, the cartography table, faction standing, crafting and trade, item pickups, and the native databank lookups), instead of one very large file covering every on-screen panel. Also fixed a couple of internal test checks that were quietly scanning the wrong slice of code after the split. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
+- Added plain-English "what this file is and how it fits together" notes and internal signposting throughout the code and stylesheets, and corrected a few stale internal cross-references left over from the recent reorganization. Purely a readability pass for future development — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 
 ---
 

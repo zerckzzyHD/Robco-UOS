@@ -4,6 +4,11 @@
 // Tool Deck launcher, and the campaign-ignition ceremony. Global scope,
 // static <script> tag — see index.html load order.
 
+// GOTCHA: these two are the sole declaration of a cross-file image-attach
+// stash — ui-saves.js (file picker) and ocr.js (Visual Upload) WRITE them,
+// api.js and api-router.js READ them when a transmit is in flight. They land
+// in this file only because this is where the split put them; there is no
+// functional tie to the Director Uplink code below.
 let attachedImageData = null;
 let attachedImageMimeType = null;
 // ── DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK (Protocol UI-10) ───────────
@@ -73,6 +78,12 @@ function _overseerRestSignals() {
 }
 window._overseerRestSignals = _overseerRestSignals; // exposed for api.js's finally hook
 
+// PROTOCOL UI-10: the ONE gate function every animation entry/exit point
+// (_scopeLoop, _armScopeLoop, _scopePulse, the AmbientRuntime onEnter/onExit
+// below) calls through — reduced-motion, the Immersion dial, Ambient Runtime
+// power-down, and tab-hidden are checked here and ONLY here, so no caller can
+// drift into its own bespoke reduced-motion carve-out. Re-evaluated live on
+// every call (never cached), since any of the four signals can flip mid-loop.
 function _scopeShouldAnimate() {
   const reduced =
     typeof window.matchMedia === 'function' &&
@@ -247,6 +258,11 @@ window.setOverseerState = setOverseerState;
 // getOverseerState()==='thinking' — see api.js — since a blind reset here
 // would truncate a SPEAKING typewriter that starts asynchronously after
 // finally runs).
+// PROTOCOL UI-10 (deterministic reset ordering): this is the "check the
+// presence's OWN current state before resetting" rule in practice — the
+// thinking/speaking guard two lines below is what stops a lifecycle hook
+// from stomping a state a longer-running async step (the typewriter) already
+// advanced past.
 function refreshOverseerCarrier() {
   const ov = _overseerIdentity();
   const titleEl = document.getElementById('ovsTitle');
@@ -462,6 +478,7 @@ function _runCampaignIgnition(onComplete) {
 window._runCampaignIgnition = _runCampaignIgnition;
 // ── M1 END ──────────────────────────────────────────────────────────────
 
+// ── INPUT HISTORY (#36) ─────────────────────────────────────────────────
 function _wireInputHistoryNav() {
   // #36 Input History — Up/Down arrows cycle through sent user commands
   // (history source is chatHistory filtered to user messages; _inputHistoryIdx is the nav cursor)
@@ -587,6 +604,7 @@ function _wireModeHint() {
   if (input) input.addEventListener('input', _updateModeHint);
 }
 
+// ── COMPOSER AUTO-GROW (small-UI-polish batch) ─────────────────────────────
 // Owner fix (small-UI-polish batch): #chatInput starts as small as possible
 // (sized to fit its own placeholder sentence — no dead space below the
 // text) and grows with typed content up to a cap, then scrolls internally.
@@ -620,6 +638,7 @@ function _wireComposerAutoGrow() {
   _autoGrowComposer();
 }
 
+// ── HELP MODALS — COMM-LINK COMMAND REGISTRY + SAVE & DATA FIELD MANUAL ────
 function showHelpModal() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');

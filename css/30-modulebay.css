@@ -17,6 +17,23 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Module Bay (Security & Configuration, Step 2 Phase 2 B2a)
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   30-modulebay.css — cascade slot 30: the Module Bay (SECURITY &
+   CONFIGURATION reframed as installable hardware) — the first-visit
+   hatch ceremony, the generic .bay-board/.bay-slot-tag/.bay-module
+   board/module machine-language classes that BOTH this file's own
+   SLOT boards AND every later OPERATOR/Databank/Chassis board reuse,
+   the program-cartridge deck, the doctrine rocker, the tempo dial,
+   the randomizer interlock, and the phosphor-tube rack.
+   WHY HERE: loads after the chrome/overseer/diagnostic-shell
+   infrastructure and before the OPERATOR boards (35) that consume
+   the .bay-board/.bay-slot-tag/.bay-part-no/.board-status classes
+   this file defines first. Beyond "defines the shared board
+   vocabulary before its consumers," no further deliberate ordering
+   rationale versus its immediate neighbors was identified — its
+   exact position reflects when the Module Bay redesign landed in the
+   original monolith's build order.
+   ══════════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════════════════
    MODULE BAY (Step 2 · Phase 2 · B2a) — Security & Configuration reframed
    as installable hardware. Every control below drives the SAME setter it

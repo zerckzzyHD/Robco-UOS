@@ -4,7 +4,15 @@
 // faction.threshold chat-alert/sound/haptic reaction to a crossing this
 // file's autoImportState() detects), and autoImportState() itself — the
 // AI-JSON-response → state field-mapping path (Protocol 24). Global scope,
-// static <script> tag — see index.html load order.
+// static <script> tag — api*.js family, loads late in the boot chain right
+// before cloud.js (see index.html load order).
+// EXPOSES: autoImportState(), sanitizeImportedContainer(),
+// _wireApiEventBusSubscribers().
+// GOTCHA: never use recursive key transformation on AI JSON here (Protocol
+// 24 / Prohibited Patterns) — every field below is an explicit, named
+// mapping (parsed.<key> → state.<key>) with its own type coercion/clamp.
+// A generic "flatten and assign" pass would let the AI write arbitrary
+// state keys unvalidated; that is exactly what this file exists to prevent.
 
 /* global playQuestCompleteSound, playQuestFailSound, playFactionThresholdSound */
 // Type-coerces and validates a robco_v8 container before writing to localStorage.
@@ -169,6 +177,7 @@ function sanitizeImportedContainer(container) {
   return out;
 }
 
+// ── EVENT BUS SUBSCRIBERS ─────────────────────────────────────────────────────
 // U7: faction-threshold reaction (chat alert + sound + haptic) — the detector
 // inside autoImportState() below only detects the crossing and emits; this is
 // the one subscriber for it, unchanged from the code it replaces except for
@@ -192,6 +201,10 @@ function _wireApiEventBusSubscribers() {
   });
 }
 
+// ── AI JSON → STATE FIELD MAPPING ─────────────────────────────────────────────
+// Called from transmitMessage() (api.js) with the raw JSON string of the AI's
+// "state" node, and from cloud-pull / file-import paths. Every field is mapped
+// and coerced explicitly below (Protocol 24) — see the file header GOTCHA.
 function autoImportState(jsonString) {
   try {
     // Snapshot current state for undo before applying changes
@@ -586,6 +599,12 @@ function autoImportState(jsonString) {
     // the old ['ncr','legion','house','bos','boomers','khans'] literal only ever
     // matched FNV keys, so FO3 campaigns never fired a threshold alert at all.
     if (state.factions && typeof expandPanelForCategory === 'function') {
+      // WHY -500/750: this crossing-detector is intentionally independent of the
+      // FACTION_THRESHOLDS 4x4 standing-label matrix (ui-render-character.js,
+      // GECK-sourced bp1/bp2/bp3) — different subsystem, different purpose (a
+      // one-time chat/sound/haptic alert here vs. the always-visible standing
+      // label there), so it uses its own round-number net thresholds rather
+      // than reusing the canonical per-faction breakpoints.
       const VILIFIED_NET = -500;
       const prevFactions = JSON.parse(window._lastStateBeforeSync || '{}').factions || {};
       getFactionRegistry().forEach(f => {

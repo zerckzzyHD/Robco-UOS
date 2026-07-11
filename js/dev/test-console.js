@@ -285,6 +285,7 @@
   // migration only, no new tools. A future trigger/reset/inspector is one
   // more entry (see the EXTENSION POINT comment beside the template).
   var DIAGNOSTIC_SHELL_TOOLS = [
+    // ── FORCE TRANSITION ──
     {
       id: 'runtime-force-transition',
       label: 'FORCE TRANSITION',
@@ -325,6 +326,7 @@
       triggers: ['runtime.state'],
       anchor: '[data-dsh-anchor="testConsoleTransitions"]',
     },
+    // ── IMMERSION TIER ──
     {
       id: 'a11y-immersion',
       label: 'IMMERSION TIER',
@@ -338,6 +340,7 @@
       triggers: [],
       anchor: '[data-dsh-anchor="testConsoleImmersionSelect"]',
     },
+    // ── VIEW-ONCE CEREMONIES ──
     {
       id: 'replay-hatch',
       label: 'REPLAY HATCH',
@@ -358,6 +361,7 @@
       // thrown error) — see Suite 210.14's registry-completeness regression test.
       action: _replayHatch,
     },
+    // ── OPTICAL SCAN TEST ──
     {
       id: 'ocr-unit1-scan',
       label: 'OPTICAL SCAN TEST',
@@ -372,6 +376,7 @@
       triggers: [],
       anchor: '[data-dsh-anchor="ocrTestInput"]',
     },
+    // ── SCAN & PARSE TEST ──
     {
       id: 'ocr-unit2-scan',
       label: 'SCAN & PARSE TEST',
@@ -393,6 +398,7 @@
     // entry really is the whole cost of adding a future trigger (Protocol 44).
 
     // Living core states (setOverseerState — the ONE state-setter, Protocol 22).
+    // ── LIVING CORE ──
     {
       id: 'core-state-thinking',
       label: 'CORE: THINKING',
@@ -486,6 +492,7 @@
     },
 
     // Boot flavors (window.__robcoBootFlavor override + a real reboot).
+    // ── BOOT FLAVOR ──
     {
       id: 'boot-flavor-normal',
       label: 'BOOT: NORMAL',
@@ -528,6 +535,7 @@
 
     // Ceremonies M1-M5 (Ceremony Moments Wave 1) — replay only, never clears
     // the real persisted view-once flag (planning §4).
+    // ── CEREMONIES ──
     {
       id: 'ceremony-ignition',
       label: 'CEREMONY: IGNITION (M1)',
@@ -615,6 +623,7 @@
     // as in real play (e.g. limb.state alone fires BOTH #6 X-RAY FLASH and
     // #7 SPLINT WRAP). tier:'prod' below is confirmed non-destructive per the
     // Protocol 42 finding at the top of this file's U3 helpers.
+    // ── FIRE ANIMATION ──
     {
       id: 'fire-anim-limb.state',
       label: 'FIRE: LIMB STATE',
@@ -820,6 +829,7 @@
     // The 7 bus events with a REACTIVE auto-log subscriber (Protocol 42
     // finding, documented above) — writes the campaign event log, so these are
     // correctly staging-tier + destructive (auto-confirm-gated), NOT prod.
+    // ── FIRE ANIMATION (WRITES EVENT LOG) ──
     {
       id: 'fire-anim-level.up',
       label: 'FIRE: LEVEL UP',
@@ -921,6 +931,7 @@
     },
 
     // Fire any of the 7 pending-var animations (planning §1.4).
+    // ── FIRE ANIMATION (PENDING) ──
     {
       id: 'fire-pending-rep-stamp',
       label: 'FIRE: REPUTATION STAMP',
@@ -1030,6 +1041,7 @@
     // REGISTERED OBSERVERS anchors above) / CONNECTION / FLAGS. INSPECT
     // itself is the LAST category in CATEGORY_ORDER (below) so the readout
     // sits at the bottom of the shell.
+    // ── VITALS & CAMPAIGN SUMMARY ──
     {
       id: 'inspect-vitals',
       label: 'VITALS & CAMPAIGN SUMMARY',
@@ -1049,6 +1061,7 @@
     // group's first-encountered tool sits after VITALS in registry order —
     // that ordering is what determines each group wrapper's position among
     // its siblings in _renderShell() (first tool of a group wins the slot).
+    // ── DEVICE / SYSTEM ──
     {
       id: 'inspect-runtime-state',
       label: 'RUNTIME STATE',
@@ -1102,6 +1115,7 @@
       triggers: [],
       anchor: '[data-dsh-anchor="dshInspectSwInternal"]',
     },
+    // ── CONNECTION ──
     {
       id: 'inspect-connection',
       label: 'CONNECTION',
@@ -1115,6 +1129,7 @@
       triggers: [],
       anchor: '[data-dsh-anchor="dshInspectConnection"]',
     },
+    // ── FLAGS ──
     {
       id: 'inspect-flags',
       label: 'FEATURE FLAGS',
@@ -1143,6 +1158,7 @@
       triggers: [],
       anchor: '[data-dsh-anchor="dshInspectFlagsInternal"]',
     },
+    // ── COPY DIAGNOSTICS ──
     {
       id: 'inspect-copy',
       label: 'COPY DIAGNOSTICS',
@@ -1163,6 +1179,7 @@
     // ever appear on a prod-minigame build (leak-proof by construction,
     // §2.2). Every action routes through an existing native setter (Protocol
     // 22/24, see the helper block above for the full rationale).
+    // ── VITALS ──
     {
       id: 'state-full-heal',
       label: 'FULL HEAL',
@@ -1247,6 +1264,7 @@
       triggers: [],
       action: () => _dshMaxRads(),
     },
+    // ── PROGRESSION ──
     {
       id: 'state-set-level',
       label: 'SET LEVEL',
@@ -1305,6 +1323,7 @@
       triggers: [],
       action: v => _dshAddXp(v),
     },
+    // ── SPECIAL ──
     {
       id: 'state-special-max-all',
       label: 'MAX ALL (10s)',
@@ -1356,6 +1375,7 @@
       triggers: [],
       action: arg => _dshSetOneSpecial(arg),
     },
+    // ── SKILLS ──
     {
       id: 'state-skills-max-all',
       label: 'MAX ALL (100)',
@@ -1401,6 +1421,7 @@
       triggers: [],
       action: () => _dshBoostCombatSkills(),
     },
+    // ── KARMA ──
     {
       id: 'state-karma-good',
       label: 'SET KARMA GOOD',
@@ -1440,6 +1461,7 @@
       triggers: [],
       action: () => _dshSetKarmaEvil(),
     },
+    // ── ECONOMY ──
     {
       id: 'state-caps-add1k',
       label: 'ADD 1,000 CAPS',
@@ -1479,6 +1501,7 @@
       triggers: [],
       action: () => _dshZeroCaps(),
     },
+    // ── INVENTORY ──
     {
       id: 'state-give-item',
       label: 'GIVE ITEM',
@@ -1547,6 +1570,7 @@
       triggers: [],
       action: () => _dshAddAmmo(),
     },
+    // ── FACTIONS ──
     {
       id: 'state-faction-set-max',
       label: 'SET ONE MAX (IDOLIZED)',
@@ -1603,6 +1627,7 @@
       triggers: [],
       action: () => _dshAllFactionsVilified(),
     },
+    // ── COLLECTIBLES ──
     {
       id: 'state-collectibles-unlock-all',
       label: 'UNLOCK ALL',
@@ -1629,6 +1654,7 @@
       triggers: [],
       action: () => _dshCollectiblesClearAll(),
     },
+    // ── PERKS / TRAITS / BOOKS ──
     {
       id: 'state-grant-perk',
       label: 'GRANT PERK',
@@ -1697,6 +1723,7 @@
       triggers: [],
       action: () => _dshMarkAllMagsRead(),
     },
+    // ── QUESTS ──
     {
       id: 'state-add-quest',
       label: 'ADD DIRECTIVE',
@@ -1752,6 +1779,7 @@
       triggers: [],
       action: () => _dshClearQuests(),
     },
+    // ── MAP ──
     {
       id: 'state-reveal-all-fog',
       label: 'REVEAL ALL FOG',
@@ -1794,6 +1822,7 @@
       triggers: ['location.current'],
       action: v => _dshSetCurrentLocationCheat(v),
     },
+    // ── CONDITIONS ──
     {
       id: 'state-apply-buff',
       label: 'APPLY BUFF',
@@ -1880,6 +1909,7 @@
       triggers: [],
       action: () => _dshClearAllEffects(),
     },
+    // ── COMPANIONS ──
     {
       id: 'state-add-companion',
       label: 'ADD COMPANION',
@@ -1922,6 +1952,7 @@
       triggers: [],
       action: () => _dshClearSquad(),
     },
+    // ── TIME ──
     {
       id: 'state-set-time-of-day',
       label: 'SET TIME OF DAY',
@@ -1958,6 +1989,7 @@
       triggers: [],
       action: v => _dshAdvanceTime(v),
     },
+    // ── MEGA PRESETS ──
     {
       id: 'state-preset-max-everything',
       label: 'MAX EVERYTHING',
@@ -2158,6 +2190,7 @@
       triggers: [],
       action: () => _dshResetBezelView(),
     },
+    // ── CAMPAIGN DATA ──
     {
       id: 'reset-map-fog',
       label: 'RESET MAP FOG',

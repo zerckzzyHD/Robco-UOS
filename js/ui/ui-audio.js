@@ -1,6 +1,38 @@
+// ── UI-AUDIO — the procedural WebAudio synth + optics/theme engine ──────────
+// Every sound in the app (geiger clicks, tinnitus, CRT/reactor hum, limb-
+// trauma stings, level-up/quest/faction jingles, the radio station, haptic
+// buzz) is synthesized on the fly via the Web Audio API — no audio files are
+// shipped. This file also owns the optics/phosphor-color engine (THEMES table
+// application, per-game default resolution, the SLOT 01 picker's family
+// expand/collapse) since color and CRT hum are both "device chrome" driven by
+// the same THEMES data (Protocol 22 — one theme-application path, not two).
+//
 // The Mechanical Audio Synth (Procedural, no files required)
 // Lazily created on first user gesture to comply with Chrome's autoplay policy.
 // Before any user interaction, audioCtx is null and all audio functions early-return.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 5 — after
+// js/data/reg_nv.js / reg_fo3.js + registry-core.js, before js/ui/ui-render*.js).
+// Depends on THEMES / GAME_DEFS / MetaStore (js/core/state.js, slot 3) already
+// being defined; every read of them here happens inside a function body, never
+// at parse time, so load order is safe even though this file sits before
+// ui-core.js (which does the window.onload boot sequencing).
+// EXPOSES (global scope, no window prefix needed — classic <script> tags share
+// one realm): ensureAudioCtx, triggerHaptic/isHapticEnabled/toggleHaptic/
+// initHaptic, playClack/playGeigerClick/scheduleGeiger/setGeigerRate,
+// startTinnitus/stopTinnitus, startCrtHum/stopCrtHum/setCrtHumIntensity,
+// startReactorHum/stopReactorHum, playLimbCrippleSound/playLimbRestoreSound/
+// playHeadCrippleSound, playWakeTone/playSyncTone, changeOpticsColor and the
+// optics-family picker helpers, toggleAudio/toggleMasterMute, the WU-F5 radio
+// (startRadio/stopRadio/toggleRadio/initRadio), the quest/faction/level-up
+// jingles, playPanelClick, playBootDrone, runBootSequence (the boot-screen
+// owner — Ambient Runtime only OBSERVES it, per runtime.js's boot-order
+// lesson), startHeartbeat/stopHeartbeat, triggerPhosphorGhost.
+// GOTCHA: every continuous ambient starter (CRT hum, geiger/tinnitus/heartbeat
+// loops resumed at boot) MUST be deferred through _armAmbientAudio() rather
+// than calling ensureAudioCtx() directly — see the FIRST-GESTURE ARM comment
+// below for why (Chrome autoplay policy blocks a pre-gesture AudioContext and
+// a self-rescheduling loop would otherwise re-warn every cycle).
 let audioCtx = null;
 function ensureAudioCtx() {
   if (!audioCtx) {
@@ -560,6 +592,7 @@ function playSyncTone() {
   setTimeout(() => document.body.classList.remove('sync-complete'), 450);
 }
 
+// ── OPTICS / PHOSPHOR COLOR (WU-T1 table-driven theme) ────────────────────
 // WU-T1: table-driven optics. Applies the five --robco-* CSS vars for a THEMES key
 // (glow + refresh derived from the rgb triplet — single source, never drifts). Apply-only;
 // does NOT persist, so the per-game default path can apply without recording an explicit pick.
@@ -825,6 +858,7 @@ function _updateUplinkBoardStatus() {
 }
 window._updateUplinkBoardStatus = _updateUplinkBoardStatus;
 
+// ── MUTE TOGGLES ───────────────────────────────────────────────
 function toggleAudio(key, isMuted) {
   MetaStore.set(key, isMuted);
   // Keep in-memory cache in sync so audio functions don't need localStorage reads
@@ -1604,6 +1638,10 @@ function _checkLongAbsence() {
   return days >= LONG_ABSENCE_DAYS ? days : null;
 }
 
+// GOTCHA: must be called from window.onload (ui-core.js), never at parse
+// time — it reads #bootScreen/#bootLines from the DOM and is the function
+// that OWNS clearing the boot screen (runtime.js's AmbientRuntime only
+// observes #bootScreen's cleared state afterward; it never drives this).
 function runBootSequence(onComplete) {
   const bootScreen = document.getElementById('bootScreen');
   if (!bootScreen) {

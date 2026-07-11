@@ -17,6 +17,22 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Phase 3 Operator boards, batches 1-3 (hero-three + batch 2 + batch 3)
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   35-operator-boards.css — cascade slot 35: Phase 3 OPERATOR/STAT
+   boards (batches 1-3) — the CRT vital-telemetry monitor, the
+   readback strip, the 7-fader equalizer bank, the anatomical zone
+   plate, the skill VU-meter array, the compound status-effect lamps,
+   the faction reputation console, the chrono/position clock, the
+   perk loadout rack + FNV trait chips, and the skill-book/magazine
+   shelving.
+   WHY HERE: loads after 30-modulebay.css, whose .bay-board/
+   .bay-slot-tag/.bay-part-no/.panel-substatus classes this file's
+   own header comment confirms it reuses rather than redefines
+   (Protocol 22) — it must load after the file that defines that
+   shared vocabulary. Its position relative to 40/45/50 (which make
+   the same reuse claim) is otherwise chronological — OPERATOR was
+   the first Phase 3 piece built.
+   ══════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
    PHASE 3 · OPERATOR/STAT hero-three (Protocol 22/25 RESKIN — wraps the
    exact shipped ids/handlers, no behavior change). Matches

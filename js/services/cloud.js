@@ -1,3 +1,55 @@
+// ── CLOUD — Firebase auth + Firestore sync + remote kill-switch flags ───────
+// The ONE file that talks to the network for account/save sync: Firebase
+// Auth (anonymous → Google account linking), Firestore cloud saves (manual
+// push/pull only — never automatic on a stat change, per the Prohibited
+// Patterns table in CLAUDE.md), the remote kill-switch feature-flag doc
+// (Protocol 32/33/35), the offline cloud-push retry queue (P7), Gemini-key
+// cloud sync, and App Check. Every write in this file is ADDITIVE and every
+// destructive op (overwrite/delete a cloud save, load a cloud save over the
+// live campaign) is confirm-gated — Protocol 34 governs this entire file:
+// saves are created with addDoc (never a blind setDoc), modified by id with
+// updateDoc, and any setDoc to a mutable settings/preferences doc always
+// passes { merge: true } so it can never erase sibling fields.
+//
+// THIS IS THE ONE ES MODULE IN THE CODEBASE (index.html loads it with
+// type="module"; every other file is a classic global-scope <script>). That
+// means normal top-level `const`/`function` here are MODULE-SCOPED, not
+// global — anything another classic script needs to call is deliberately
+// attached to `window.*` (see the EXPOSES list below); anything not
+// attached is private to this module and invisible to the rest of the app.
+//
+// LOAD ORDER: index.html slot 31 — LAST in the boot chain, after every
+// classic <script> (including js/ui/ui-core*.js and js/services/api*.js).
+// Being a module, its own top-level code still runs in source order relative
+// to other modules, but browsers defer module execution until after the
+// document has parsed — so this file's module-scope code can safely assume
+// the DOM exists, but must NOT assume any particular classic-script global
+// (state, MetaStore, isFeatureEnabled's own consumers, etc.) has run its
+// window.onload boot phase yet. Every read of a classic-script global here
+// happens inside a function body (called from a later user action or the
+// onAuthStateChanged callback), never at module-top-level, mirroring the
+// same forward-reference safety pattern used across the codebase (Protocol 27).
+// EXPOSES (all via explicit window.* assignment — see PROTOCOL 23 note
+// below): getFeatureFlagKeys, isFeatureEnabled, _recordFeatureFailure,
+// _getFeatureFlagOverride/_setFeatureFlagOverride (Diagnostic Shell U5 seam),
+// signInWithGoogle, the account sign-out entry point, getAccountState,
+// saveCurrentToCloud, flushCloudQueue, listCloudSaves, syncLocalSavesToCloud,
+// loadCloudSave, listCloudSaveVersions/restoreCloudSaveVersion,
+// overwriteCloudSave, renameCloudSave, deleteCloudSave, saveGeminiKeyToCloud,
+// setGeminiKeySync.
+// (The old documented globals `pushToCloud`/`pullFromCloud` never existed
+// under those names — saveCurrentToCloud/loadCloudSave are the real push/
+// pull entry points; see Protocol 45's incident note.)
+// PROTOCOL 23 (architectural boundary): this file reads the campaign's active
+// game via the sanctioned accessors (getGameContext(), snapshotActiveCampaign())
+// — never the global campaign object's field directly — so state ownership
+// stays inside state.js even though cloud.js is a separate module.
+// PROTOCOL 31 GOTCHA: the boot-time signInAnonymously() call below (in the
+// onAuthStateChanged/getRedirectResult sequence) is guarded behind
+// auth.authStateReady() + an explicit !auth.currentUser check — an
+// unconditional call would mint a fresh anonymous user and silently replace
+// an already-signed-in Google session on every reload (the 5c-ii clobber bug).
+//
 // SRI (Subresource Integrity) cannot be applied to ES module import statements in JS source —
 // there is no HTML element to attach an integrity= attribute to. The version pin @12.15.0
 // is the primary supply-chain mitigation; updates are always deliberate (no floating 'latest').

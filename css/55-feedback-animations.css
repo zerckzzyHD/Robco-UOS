@@ -17,6 +17,22 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Feedback Animation Waves 1-3
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   55-feedback-animations.css — cascade slot 55: Feedback Animation
+   Waves 1-3 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md) — the status
+   annunciator, and the rest of this build's plain-@keyframes visual
+   feedback flourishes layered on top of controls/panels already
+   styled by every file before it.
+   WHY HERE: sits near the end of the cascade (only 99-mobile.css
+   follows) because — per this file's own header comment — every
+   rule here is a plain `@keyframes` animation applied via a toggled
+   class on top of elements those earlier files already fully style;
+   it adds motion, not new layout/structure, so it has nothing later
+   files need to build on and nothing earlier files need from it.
+   Its position specifically after 50-chassis.css (rather than
+   somewhere else in that "add motion on top" zone) is chronological
+   — Feedback Animation was the build wave that followed Chassis.
+   ══════════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════════════
    FEEDBACK ANIMATION WAVE 1 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md)
    Every rule below is a plain @keyframes (never transition-only), so the

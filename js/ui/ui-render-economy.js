@@ -1,7 +1,14 @@
 // ── ui-render-economy.js — RESOURCE ECONOMY (split from ui-render.js, 2.8.5 U-A4) ──
-// The CRAFT panel (recipe crafting + component scrapping) and the native
-// TRADE barter terminal. Global scope, static <script> tag — see index.html
-// load order.
+// The CRAFT panel — recipe crafting (renderCraft/renderCraftCard/doCraft) and
+// component scrapping (renderScrapCard/doScrap) — and the native TRADE
+// barter terminal (renderTrade/doBuy/doSell). Global scope, static <script>
+// tag — see index.html load order.
+//
+// GOTCHA: doBuy()/doSell() mutate state.caps directly, then mirror the new
+// value into the #c_caps DOM field by hand (the sync source-of-truth
+// syncStateFromDom()/saveState() reads back from) — a WU-N2 fix. Any future
+// TRADE mutation of state.caps must keep doing this mirror, or the caps
+// change silently reverts on the next save.
 
 // ── CRAFT PANEL ──────────────────────────────────────────────────────────────
 

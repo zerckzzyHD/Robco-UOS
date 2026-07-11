@@ -10,6 +10,19 @@
 // js/api.js transmitMessage()'s AI-vision inlineData path are both untouched
 // by this unit (Protocol 22 -- additive infra only, nothing forked or
 // removed). Game-agnostic (Protocol 38): no game literal anywhere in here.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 18 — after
+// js/ui/ui-account.js, before js/core/runtime.js). Lazy by design: Tesseract
+// itself is never fetched at parse time or at boot, only from
+// runVisualOcrTest()/runVisualOcr() (a real user attach action). Forward-
+// references attachedImageData/attachedImageMimeType (declared `let` in
+// ui-core.js, which loads AFTER this file) and _isUplinkConnected() —
+// safe because every reference lives inside a function body, called long
+// after boot completes, never at parse time.
+// EXPOSES: routeVisualUpload (the one entry point handleImageSelection()
+// calls), runVisualOcrTest, runVisualOcr, _parseOcrText (pure, VM-testable),
+// _ensureTesseract, _visualOcrEnabled, _aiVisionAvailable,
+// _clearVisualUploadStash, _tryAiVisionFallback, _visualUploadDeadEnd.
 
 let _tesseractPromise = null;
 

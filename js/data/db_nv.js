@@ -2,6 +2,19 @@
 // v1.6.7: Expanded to ~170 weapons, ~70 armors, ~45 chems.
 // databaseCSVs is injected via systemInstruction in api.js for guaranteed model attention.
 //
+// LOAD ORDER: injected by the GAME_FILES boot manifest in index.html (before
+// js/core/state.js, which defines GAME_DEFS) when the active game is FNV
+// (the FNV fail-safe default); db_fo3.js loads instead for FO3. No other
+// file dependency at parse time — this file only defines the databaseCSVs
+// string + the lookup helpers below.
+// EXPOSES: databaseCSVs (the raw CSV text, read by api.js's directive
+// builder), lookupItemInDb(), getQuestItemDetail(), getChemsTable(),
+// lookupWeaponStats(), lookupBestiaryEntry(), getBestiaryNames(),
+// getVendors(), getTradeCatalog(), getAmmoCalibers().
+// PROTOCOL 3: every data row here is sourced from fallout.wiki — this file
+// (and its lookup helpers) is a typist for that data, never an authority
+// that invents or edits Fallout facts.
+//
 // ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
 // Columns below are authored (fallout.wiki-sourced) but have no current code
 // consumer — never read by any lookup*()/get*() accessor, or parsed but never

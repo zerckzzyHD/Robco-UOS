@@ -1,3 +1,29 @@
+// ── UI-SAVES — save slots, file import/export, rolling backups, registry
+//    autocomplete ────────────────────────────────────────────────────────
+// Owns every user-initiated way a campaign leaves or enters this device: the
+// 3 local save slots (+ their P5 version rings), file export/import, the full
+// backup bundle (P6), the rolling-backup safety net, campaign-log export
+// (txt/html/md), and the registry-driven autocomplete wiring for free-text
+// inputs (quests/items/perks/locations/companions). Cloud push/pull itself
+// lives in cloud.js — this file only owns the LOCAL (device-file/localStorage/
+// IDB) save surface.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 16 — after
+// js/ui/ui-render-databank.js, before js/ui/ui-account.js). Depends on
+// state.js (state, saveState, snapshotActiveCampaign, the cold-store/backup/
+// bundle accessors), registry-core.js (registrySearch), and the render-*
+// functions it calls to repaint after a load/import.
+// EXPOSES (global scope, no window prefix needed): exportCampaignLog,
+// ejectHolotape, listLocalSaves, saveToSlot/loadFromSlot/confirmOverwriteSlot/
+// confirmDeleteSlot, viewSlotVersions/restoreSlotVersion,
+// viewCloudSaveVersions, addQuest, resetSessionStats, updateTokenBudget,
+// triggerFileInput/handleFileUpload, restoreRollingBackup, restoreChatHistory,
+// exportFullBundle/importBundle, triggerImageUpload/handleImageSelection,
+// initRegistryAutocomplete, initAmmoDatalist, initLocationDatalist.
+// GOTCHA (Protocol 34): every local-slot overwrite/delete/restore here is
+// confirm-gated (confirmOverwriteSlot/confirmDeleteSlot) and a rolling backup
+// is snapped before any state-replacing load — never add a new destructive
+// path that skips the confirm step or the pre-load snapshot.
 function exportCampaignLog(format = 'txt') {
   if (!chatHistory || chatHistory.length === 0) {
     if (typeof openModal === 'function')
@@ -200,6 +226,7 @@ function listLocalSaves() {
   return saves;
 }
 
+// ── SAVE (local slot) ─────────────────────────────────────────────────────
 // P3: async — the slot is written IDB-PRIMARY (js/state.js _coldWriteObj: IDB
 // 'campaign' store, no ~5MB ceiling) with a best-effort localStorage mirror. A
 // localStorage quota failure is no longer fatal: the save persists to IDB, so a
@@ -319,6 +346,7 @@ async function _deleteSlotApply(slotNum) {
   if (typeof renderSavesList === 'function') renderSavesList();
 }
 
+// ── LOAD (local slot) ─────────────────────────────────────────────────────
 async function loadFromSlot(slotNum) {
   // P3: IDB-PRIMARY read — the newer of {IDB 'campaign' slot, localStorage} wins
   // (_coldReadObj), so an oversized slot saved only to IDB still loads, and a

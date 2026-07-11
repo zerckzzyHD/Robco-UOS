@@ -7,7 +7,21 @@
 // loadout rack (renderPerks/addPerk), and the quest DIRECTIVE registry
 // (renderQuests/cycleQuestStatus). Global scope, static <script> tag — see
 // index.html load order.
+//
+// GOTCHA (2.8.5 U-A4 split audit — planning/AUDIT_U7_ui-render-split.md): this
+// is the largest and least cohesive sibling in the ui-render-*.js family — it
+// groups six otherwise-unrelated subsystems under one CHARACTER & FIELD
+// STATUS banner. The clock/calendar and faction-standing-lookup code in
+// particular ended up here not because either belongs to "character" but
+// because nothing else in the U-A4 split claimed them cleanly: the calendar
+// helpers are pure utilities with no natural panel owner, and
+// getFactionStanding() is consumed by both the Faction Reputation panel
+// (ui-render-factions.js) and the Campaign Chronicle panel
+// (ui-render-ledger.js), so it lives in neither and sits here instead.
+// Splitting this file further is explicitly out of scope for a
+// readability-only pass — this note documents the grouping, it doesn't fix it.
 
+// \u2500\u2500 SQUAD ROSTER \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Phase 3 \u00b7 Piece 2 (SQUAD ROSTER, BUS-14): registry-driven ENLIST options,
 // replacing the hardcoded 8-FNV-companion <select> (a Protocol 38 game-literal
 // bug \u2014 FO3 campaigns previously showed FNV companion names). Reads the SAME
@@ -123,7 +137,6 @@ function addSquadMember() {
   updateMath();
 }
 
-// ── UTILITY FUNCTIONS ──────────────────────────────────────────
 // ── TIME SYSTEM ───────────────────────────────────────────────────
 // Internal representation: ticks (integer). 240 ticks = 1 in-game day.
 // 1 tick = 6 minutes. 10 ticks = 1 hour.
@@ -294,6 +307,7 @@ function getFactionStanding(key, fame, infamy) {
   return { label, color };
 }
 
+// ── STATUS EFFECTS ───────────────────────────────────────────────
 // BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2, ground-up reskin) — each
 // active status effect becomes a lit lamp tile, color-coded by type (BUFF
 // phosphor / DEBUFF red / NEUTRAL amber), with a tick countdown + pip meter
@@ -481,6 +495,7 @@ function addStatusEffect() {
   updateMath();
 }
 
+// ── PERK LOADOUT ─────────────────────────────────────────────────
 // BUS-06 · PERK LOADOUT (Phase 3 OPERATOR batch 3, ground-up reskin) — a
 // numbered loadout-slot rack rendered inside the shared CARGO MANIFEST
 // drawer scroll+search pattern (.tray-scrollwrap/.tray-list, Protocol 22 —

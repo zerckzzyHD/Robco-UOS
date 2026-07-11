@@ -3,6 +3,14 @@
 // "Overseer's Maintenance Log" telemetry (reskinned as CHASSIS's Unit Power
 // Plant), System Status, the Service & Fault Console, and the casing lamps.
 // Global scope, static <script> tag — see index.html load order.
+// GOTCHA: this file only DEFINES its boot-time entry points — initOverseerLog(),
+// initChassisCore(), and _wireChassisCoreEventBusSubscribers() are all invoked
+// from window.onload in ui-core.js, not from anywhere in this file. The event-
+// bus wiring in particular is deferred to that later call because RobcoEvents
+// (state.js) may not exist yet at THIS file's static <script> parse time (the
+// Suite 135 U7 boot-order lesson). Every signal this file reads is transient/
+// in-memory or a MetaStore device pref (Protocol 23 two-store boundary) — it
+// never reads or writes campaign `state`.
 
 // ── WU-F7: OVERSEER'S MAINTENANCE LOG ─────────────────────────
 // Local-only device telemetry surfaced as the Overseer's maintenance log: boot
@@ -245,6 +253,7 @@ function renderSystemStatus() {
 }
 window.renderSystemStatus = renderSystemStatus;
 
+// ── OVERSEER LOG — BOOT WIRING & LIFECYCLE PERSISTENCE ─────────────────────
 function initOverseerLog() {
   // Boot-count increments exactly once per page load (window.onload), even though
   // renderOverseerLog() is re-run from loadUI on every tab switch.
@@ -285,6 +294,7 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', _flushOverseerLog);
 
+// ── CASING FAULT LAMP ───────────────────────────────────────────────────
 // FEEDBACK ANIMATION WAVE 3 (#32 FAULT, polish tier) — the "did this
 // ACTUALLY change?" crossing cache (the _lastRadThreshold/_lastWeightSeized
 // precedent). Deliberately does NOT seed at boot.
@@ -294,6 +304,9 @@ let _lastFaultHasErrors = null;
 // has been recorded this device, cleared by the existing [LOGS] CLEAR action.
 function _updateFaultLamp() {
   const lamp = document.getElementById('lampFault');
+  // GOTCHA (Protocol 23 two-store boundary): _readErrorLog() reads the
+  // MetaStore device-pref ring buffer (robco_error_log) — device telemetry,
+  // never campaign `state`, even though it drives a CHASSIS panel readout.
   const hasErrors = _readErrorLog().length > 0;
   if (lamp) lamp.classList.toggle('fault', hasErrors);
   // #32 FAULT — a one-shot flicker on the lamp + the BUS-24 counter, fired
@@ -584,6 +597,14 @@ function _coreOneShot(cls, ms) {
     _coreShells().forEach(el => el.classList.remove(cls));
   }, ms);
 }
+// PROTOCOL 44: _coreFlare()/_coreStatBurst() are also wired as direct
+// Diagnostic Shell triggers (js/dev/test-console.js, group 'LIVING CORE',
+// ids 'core-flare'/'core-burst') — tier: 'prod' there because calling them
+// directly (rather than emitting 'level.up' on the bus) skips state.js's
+// reactive auto-log subscriber entirely, so it's a pure cosmetic no-op with
+// no campaign-state write. Contrast with the 'level.up' bus subscription in
+// _wireChassisCoreEventBusSubscribers() below, which IS tier: 'staging' for
+// exactly that reason.
 function _coreFlare() {
   _coreOneShot('core-flare', 900);
 }
@@ -704,6 +725,7 @@ function _emitStatChangeIfDiffers(key, newVal) {
   }
 }
 
+// ── LIVING CORE — FIELD MANUAL (help modal) ─────────────────────────────
 // The "?" explainer (Suite 103 showSaveHelpModal precedent, Protocol 22) —
 // plain, in-voice language describing what the cell is and what each
 // behaviour means. Game-agnostic (Protocol 38) — device fiction only.
@@ -813,6 +835,7 @@ function showCoreHelpModal() {
 }
 window.showCoreHelpModal = showCoreHelpModal;
 
+// ── LIVING CORE — BOOT WIRING ────────────────────────────────────────────
 // Boot wiring — mirrors initOverseerScope()'s call shape (called once from
 // window.onload). Stamps the BUS-24 revision line, paints the fault console
 // + the core's initial frame, and re-arms the gate on the two live signals
@@ -886,6 +909,7 @@ function initChassisCore() {
 }
 window.initChassisCore = initChassisCore;
 
+// ── LIVING CORE — EVENT BUS SUBSCRIBERS ──────────────────────────────────
 // RobcoEvents subscriptions — deferred to a function called from
 // window.onload (the Suite 135 U7 boot-order lesson: ui-core.js is a static
 // <script> tag that can execute before state.js, which defines RobcoEvents,
@@ -895,6 +919,14 @@ function _wireChassisCoreEventBusSubscribers() {
   // #1/#4/#5/#7 idle/standby/shutdown/boot — every Ambient Runtime
   // transition already broadcasts here (runtime.js _emit()).
   RobcoEvents.on('runtime.state', () => _coreRefresh());
+  // PROTOCOL 44: 'level.up' is one of the seven RobcoEvents bus events with a
+  // REACTIVE auto-log subscriber in state.js (RobcoEvents.on('level.up', ...)
+  // there appends a real entry to state.eventLog on every fire, regardless of
+  // source). Subscribing to it here for a cosmetic flare means firing this
+  // event from the Diagnostic Shell also writes campaign state — that's why
+  // js/dev/test-console.js's trigger for the raw event ('fire-anim-level.up')
+  // is tier: 'staging' + destructive: true, not 'prod', unlike the direct
+  // _coreFlare()/_coreStatBurst() triggers noted above their definitions.
   // #8 level-up flare — the SAME event nativeLevelUp() already emits.
   RobcoEvents.on('level.up', () => _coreFlare());
   // #9 save/sync write-pulse — emitted by saveToSlot() (ui-saves.js) and

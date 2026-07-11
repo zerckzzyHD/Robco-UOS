@@ -17,6 +17,18 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Phase 3 Piece 3 Databank / Records Bay (BUS-16..21)
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   45-databank.css — cascade slot 45: Phase 3 Piece 3 "THE RECORDS
+   BAY" (BUS-16..21) — the Phosphor Cartography node-map, the
+   directive-slot rack, and the rest of the DATABANK panel's archival
+   instrumentation.
+   WHY HERE: same pattern as 35/40 — reuses the shared .bay-board/
+   .bay-slot-tag/.bay-part-no/.panel-substatus/.board-led vocabulary
+   from 30-modulebay.css, so it must load after that file. Its
+   position after 40-curio-operations.css is chronological (Piece 3
+   after Piece 2) rather than a required cascade dependency between
+   the two.
+   ══════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
    PHASE 3 · PIECE 3 — DATABANK "THE RECORDS BAY" (BUS-16…21)
    An archival cartography station: the machine's memory and maps.

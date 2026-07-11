@@ -17,6 +17,30 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Tool Deck + Quick-Draw Holster command cluster. Also carries the global WCAG reduced-motion block and the High-Lumen Optics a11y mode, which landed chronologically in this region of the original file (not reordered here).
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   25-toolbar.css — cascade slot 25: primarily the Tool Deck +
+   Quick-Draw Holster command-cluster bottom sheet, BUT this file is
+   also host to a wide grab-bag of rules that happened to occupy this
+   stretch of the original monolith: the global WCAG
+   prefers-reduced-motion block, the High-Lumen Optics a11y mode, the
+   boot screen + degraded-boot flicker, numerous stat-feedback
+   animations (phosphor ghost, delta arrows, chem-boost glow, limb
+   glitch, radiation screen interference, standby/idle/shutdown
+   Ambient Runtime experiences, thermal shift, karma/crit-HP flashes,
+   panel badges), the desktop (>=1000px) two-column app-shell layout
+   media query, and several native-terminal panel styles (threat/
+   consult/bio cards, trade/loot rows, registry autocomplete).
+   WHY HERE: this file's exact contents/position is honestly a
+   byproduct of the original monolith's chronological build order —
+   the Tool Deck feature and this large surrounding block of earlier
+   global/animation rules simply occupy adjacent original line ranges
+   (2602-4914). No deliberate cross-file dependency was identified
+   for most of it; the one rule worth flagging is the desktop app-
+   shell media query here, which — like every rule in this stylesheet
+   — sits above 99-mobile.css in source order, so 99-mobile.css's
+   own (max-width:480px) overrides still win at narrow widths
+   regardless of anything this file's (min-width:1000px) block sets.
+   ══════════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════════════
    TOOL DECK + QUICK-DRAW HOLSTER (Design Overhaul command-cluster overhaul)
    Replaces the old always-present/collapsible Tactical Command Dashboard.

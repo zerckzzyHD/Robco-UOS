@@ -200,6 +200,7 @@ function toggleCollectible(name) {
   updateMath();
 }
 
+// ── LINCOLN MEMORABILIA (FO3) ────────────────────────────────────
 function renderLincolnMemorabilia() {
   const subPanel = document.getElementById('lincolnSubPanel');
   const container = document.getElementById('lincolnMemorabiliaDisplay');
@@ -297,6 +298,7 @@ function setLincolnDisposition(name, value) {
   saveState();
 }
 
+// ── TRAITS ────────────────────────────────────────────────────────
 function renderTraits() {
   const section = document.getElementById('traitsSection');
   const container = document.getElementById('traitsDisplay');
@@ -375,6 +377,8 @@ function toggleTrait(name) {
   if (idx !== -1) {
     state.traits.splice(idx, 1);
   } else {
+    // GOTCHA: 2 is the canonical FNV/FO3 max simultaneous traits (a real
+    // game rule sourced from fallout.wiki, Protocol 3 — not an arbitrary UI cap).
     if (state.traits.length >= 2) {
       if (typeof appendToChat === 'function') {
         appendToChat('> [TRAITS] Maximum 2 traits — deselect one first.', 'sys');

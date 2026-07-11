@@ -80,13 +80,13 @@ const META_MANIFEST = {
   robco_scroll_positions: { type: 'json', default: '{}', owner: 'ui-core.js' },
   // Phase 3 · Piece 2 — OPERATIONS CARGO MANIFEST: which pull-drawer was last
   // open (Protocol UI-6, "everything remembers on reload").
-  robco_cargo_drawer: { type: 'string', default: 'weapon', owner: 'ui-render.js' },
+  robco_cargo_drawer: { type: 'string', default: 'weapon', owner: 'ui-render-inventory.js' },
   // Phase 3 OPERATOR batch 2 — BUS-08 REPUTATION CONSOLE: which faction
   // channel the shared meter/selector was last showing (Protocol UI-6).
-  robco_faction_channel: { type: 'string', default: '', owner: 'ui-render.js' },
+  robco_faction_channel: { type: 'string', default: '', owner: 'ui-render-factions.js' },
   // Phase 3 · Piece 3 — DATABANK BUS-17 DIRECTIVE REGISTRY: which status
   // drawer (all/active/complete/failed) was last open (Protocol UI-6).
-  robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render.js' },
+  robco_databank_qdrawer: { type: 'string', default: 'all', owner: 'ui-render-character.js' },
   // Diagnostic Shell mobile-chrome batch (owner report, FIX 2): the last
   // dragged position of the #dshFab bubble, {left, top} viewport px,
   // clamped to the current viewport on every apply (Protocol UI-6 —
@@ -1438,6 +1438,7 @@ Object.keys(GAME_DEFS).forEach(k => {
 });
 window.GAME_DEFS = GAME_DEFS;
 
+// ── ACTIVE-GAME RESOLUTION ────────────────────────────────────────
 // _activeDef() — TDZ-safe: returns the active game's config object.
 // Falls back to FNV if state is not yet initialized (during let state init).
 function _activeDef() {
@@ -1511,6 +1512,13 @@ function _buildFactions() {
   return f;
 }
 
+// ── DEFAULT CAMPAIGN STATE SHAPE (Protocol 4 anchor) ─────────────
+// The live, mutable campaign object every panel reads/writes and every save
+// (slot/file/cloud) serializes. Adding a new field here is step 1 of the
+// Protocol 4 checklist (default here → migration in migrateState() below →
+// import mapping in autoImportState() (api-import.js) → sanitize entry if
+// typed → optional AI schema / render panel). This is CAMPAIGN STATE, not a
+// device preference — see the METASTORE banner above for that boundary.
 let state = {
   lvl: 1,
   xp: 0,
@@ -1696,12 +1704,21 @@ function recordLocationVisit(locName) {
 let _lastSaveStr = null;
 function saveState() {
   syncStateFromDom();
-  // Debounce the disk write — at most once per 500ms
-  // A beforeunload handler in ui.js flushes immediately on tab close
+  // Debounced write — coalesces bursts of rapid stat/DOM changes (e.g. a
+  // slider drag or several quick edits) into at most one localStorage write
+  // per 500ms, instead of thrashing disk/serialization on every keystroke.
+  // The window.addEventListener('beforeunload', ...) handler in ui-core.js
+  // flushes this pending write immediately on tab close/reload so a debounce
+  // window can never lose the last edit.
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
-    // Same suppression as the unload flush: never let a debounced write of stale
-    // in-memory state land on top of a robco_v8 that a load path just wrote.
+    // GOTCHA (Protocol 42 precedent): this guard exists because an earlier,
+    // unguarded version let a stale debounced write land AFTER a load path
+    // (context switch / save-slot load) had already written a fresh
+    // robco_v8 — silently clobbering the just-loaded state. _loadingSave /
+    // _contextSwitching are set for the duration of those load paths so this
+    // callback (and the beforeunload flush, which applies the same check)
+    // backs off instead of overwriting them.
     if (window._contextSwitching || window._loadingSave) return;
     try {
       snapshotActiveCampaign();

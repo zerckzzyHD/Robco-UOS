@@ -5,7 +5,19 @@
 // TERMINAL-mode entry point — never calls the AI), submitCommandInput's
 // mode resolver, command-line autocomplete suggestions, and the
 // CROSSROADS/SLEEP/WAIT native offline terminals. Global scope, static
-// <script> tag — see index.html load order.
+// <script> tag — api*.js family, loads late in the boot chain, immediately
+// before cloud.js (the last static <script> tag — see index.html load
+// order).
+// EXPOSES: transmitTerminal() / window.transmitTerminal,
+// submitCommandInput() / window.submitCommandInput, _routeNativeCommand(),
+// _resolveCommandInput() / window._resolveCommandInput,
+// _commandSuggestions() / window._commandSuggestions,
+// NATIVE_COMMAND_ROUTER, QUICK_LOG_PATTERNS / window.QUICK_LOG_PATTERNS.
+// GOTCHA: this file NEVER calls the AI — no fetch, no Director Link. That is
+// its entire reason to exist as a separate module from api.js/transmitMessage
+// (the AI-calling path). A newcomer adding a new [TOKEN] or quick-log verb
+// here could easily reach for a network call out of habit; don't — anything
+// that needs the AI belongs in transmitMessage() (api.js) instead.
 
 // ── Native Command Router (Phase 5a) ─────────────────────────────
 // Deterministic commands intercepted BEFORE the Gemini fetch.
@@ -490,6 +502,7 @@ function _routeQuickLogMulti(userText) {
   return { anyMatched, anyUnmatched };
 }
 
+// ── TERMINAL MODE ENTRY POINTS ───────────────────────────────────────────────
 // The ONE choke point for a message submitted while TERMINAL mode is in effect
 // (persisted mode, or a one-off `/`/`@` override targeting it). Runs every
 // existing native command first, on the WHOLE, unsplit line (so `[TOKEN]`
@@ -591,6 +604,7 @@ function submitCommandInput() {
 }
 window.submitCommandInput = submitCommandInput;
 
+// ── COMMAND-LINE AUTOCOMPLETE ────────────────────────────────────────────────
 // Autocomplete source for #chatInput in TERMINAL mode (extends the shared
 // registry-autocomplete singleton in ui-saves.js, Protocol 22 — see wireInput()
 // there). Suppressed entirely when the message would resolve to OVERSEER, so
@@ -724,6 +738,7 @@ function _commandSuggestions(rawQuery) {
 }
 window._commandSuggestions = _commandSuggestions;
 
+// ── NATIVE OFFLINE TERMINALS (CROSSROADS / SLEEP / WAIT) ─────────────────────
 function _nativeCrossroads() {
   const factions = (state && state.factions) || {};
   const quests = (state && state.quests) || [];
@@ -788,6 +803,9 @@ function _nativeCrossroads() {
   appendToChat('> [CROSSROADS] Analysis computed from current state.', 'sys');
 }
 
+// WHY 80 (below): 8 hours * 10 ticks/hour, matching the "[WAIT: X Hrs] = X * 10
+// Ticks" formula the AI directive itself uses (api-directive.js Core Tracking
+// section) — keeps native SLEEP's tick math consistent with what the AI assumes.
 function _nativeSleep() {
   const oldTicks = (state && state.ticks) || 0;
   const newTicks = oldTicks + 80;

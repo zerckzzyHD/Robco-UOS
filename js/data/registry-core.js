@@ -1,5 +1,11 @@
 /* exported registrySearch */
 /* global FALLOUT_REGISTRY */
+// Static <script> tag, global scope (index.html load-order slot 4 — after the
+// per-game js/data/reg_nv.js / reg_fo3.js, which must already have set the
+// global FALLOUT_REGISTRY this file searches). EXPOSES: registrySearch().
+// Protocol 23: this is the read-only search ENGINE — it only reads
+// FALLOUT_REGISTRY and never touches `state` or any campaign field; the
+// per-game reg_*.js files own the actual data.
 // ── REGISTRY SEARCH ──────────────────────────────────────────────────────────
 /**
  * Search the Fallout Registry for entries matching a query string.

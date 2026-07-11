@@ -4,7 +4,12 @@
 // perk/quest/equipped/session systems, tracker directives, and the
 // injection-resistance boundary). Guarded by the Suite 131 golden-master
 // SHA-256 test (Protocol 14) — a pure move, byte-identical composed output.
-// Global scope, static <script> tag — see index.html load order.
+// Global scope, static <script> tag — api*.js family, loads late in the boot
+// chain right before cloud.js (see index.html load order).
+// GOTCHA: changing directive text (any string returned by a _directive*
+// builder below) without updating the Suite 131 golden-master hash breaks
+// the gate ON PURPOSE (Protocol 14) — that failure is the safety net, not a
+// bug. Update the hash deliberately, never silence the suite.
 
 // THE MASTER SYSTEM PROMPT (Consolidated BRAIN.md)
 // U1 (Step 2 Phase 0): decomposed into per-section builders (module-scope, hoisted

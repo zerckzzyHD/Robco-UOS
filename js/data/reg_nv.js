@@ -16,6 +16,13 @@
 //   - No keywords (deferred — add manually post-launch per real usage)
 //   - No prerequisites, region, weight, value (no consumers exist)
 //   - No id field (name is the unique identifier within each category)
+//
+// LOAD ORDER: injected by the GAME_FILES boot manifest in index.html (the
+// FNV fail-safe default), right before js/data/registry-core.js (which
+// searches whichever of reg_nv.js / reg_fo3.js the manifest chose).
+// EXPOSES: FALLOUT_REGISTRY.
+// PROTOCOL 3 / 23: sourced from fallout.wiki, never invented; read-only —
+// this file must never touch `state` or any campaign field.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FALLOUT_REGISTRY = {

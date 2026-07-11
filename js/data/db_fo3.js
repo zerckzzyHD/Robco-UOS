@@ -3,6 +3,18 @@
 // databaseCSVs is injected via systemInstruction in api.js for guaranteed model attention.
 // Same structure as db_nv.js — loaded in place of it when state.gameContext === 'FO3'.
 //
+// LOAD ORDER: injected by the GAME_FILES boot manifest in index.html (before
+// js/core/state.js, which defines GAME_DEFS) when the active game is FO3;
+// db_nv.js loads instead for FNV. No other file dependency at parse time —
+// this file only defines the databaseCSVs string + the lookup helpers below.
+// EXPOSES: databaseCSVs (the raw CSV text, read by api.js's directive
+// builder), lookupItemInDb(), getQuestItemDetail(), getChemsTable(),
+// lookupWeaponStats(), lookupBestiaryEntry(), getBestiaryNames(),
+// getVendors(), getTradeCatalog(), getAmmoCalibers().
+// PROTOCOL 3: every data row here is sourced from fallout.wiki — this file
+// (and its lookup helpers) is a typist for that data, never an authority
+// that invents or edits Fallout facts.
+//
 // ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
 // Columns below are authored (fallout.wiki-sourced) but have no current code
 // consumer — never read by any lookup*()/get*() accessor, or parsed but never
@@ -555,7 +567,7 @@ function getChemsTable() {
       effect: ei >= 0 ? (cols[ei] || '').trim() : '',
       // Native USE (Part A): the raw Duration column ("4m"/"1h"/"30s"/"0"), needed to
       // decide whether a leftover modifier clause becomes a timed BUFF status effect
-      // (see _durationToTicks() in ui-render.js). Previously unexposed — BIO-SCAN never
+      // (see _durationToTicks() in ui-render-inventory.js). Previously unexposed — BIO-SCAN never
       // needed it, but the deterministic USE parser does (Protocol 3 — data authority).
       duration: di >= 0 ? (cols[di] || '').trim() : '',
       addictionRisk: ari >= 0 ? (cols[ari] || '').trim() : '',

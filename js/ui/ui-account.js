@@ -1,3 +1,24 @@
+// ── UI-ACCOUNT — account/sign-in status board + the unified saves list ──────
+// Renders two panels: the REG PORT / Operator Registry sign-in status board
+// (renderAccount, driven entirely by real auth + carrier-connection state —
+// never a hardcoded story) and the unified [LOCAL]/[CLOUD] saves list
+// (renderSavesList) that supersedes the old cloud-only renderCloudSavePicker.
+// Also owns undoLastSync(), the one-shot rollback for the last cloud pull.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 17 — right
+// after js/ui/ui-saves.js, before js/services/ocr.js). Depends on
+// getAccountState/isFeatureEnabled/_isUplinkConnected/signInWithGoogle/
+// signOutAccount (cloud.js, an ES module that still attaches these to
+// window — see cloud.js's own header) and listLocalSaves/loadFromSlot/
+// confirmOverwriteSlot/confirmDeleteSlot/viewSlotVersions (ui-saves.js).
+// EXPOSES (global scope): renderAccount, renderSavesList, undoLastSync.
+// GOTCHA: renderSavesList's cloud-save buttons are wired via inline
+// onclick="window.xxx(...)" strings baked into the innerHTML (not addEventListener) —
+// this is intentional (Protocol 22, matches the existing local-save row
+// pattern) but means every id/label interpolated into those strings MUST be
+// escapeHtml()'d first (already done throughout) to avoid breaking the
+// onclick attribute, not just to avoid XSS.
+//
 // listLocalSaves() — the synchronous local-save lister — lives in ui-saves.js
 // (co-located with the slot-schema helpers _slotKey/_slotLabel). renderSavesList()
 // below calls it as a global. (DUP-2 consolidation, WU-B7.)

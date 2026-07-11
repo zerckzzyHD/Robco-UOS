@@ -1,8 +1,12 @@
 // ── ui-render-databank.js — NATIVE DATABANK TOOLS (split from ui-render.js, 2.8.5 U-A4) ──
-// THREAT bestiary/TTK assessment, CONSULT registry+DB lookup, the ELIGIBLE
-// PERKS survey, the persistent DATABANK panel search, and the BIO-SCAN
-// medical advisory — all read-only, offline, no-AI lookups. Global scope,
-// static <script> tag — see index.html load order.
+// THREAT bestiary/TTK assessment (renderThreat/_threatCompute), CONSULT
+// registry+DB lookup (renderConsult/_consultSearch/_consultRenderHTML), the
+// ELIGIBLE PERKS survey (renderEligiblePerks/_computeEligiblePerks), the
+// persistent DATABANK panel search (renderDatabankPanel — the same
+// _consultSearch engine as CONSULT, rendered inline instead of in a modal),
+// and the BIO-SCAN medical advisory (renderBioScan/_bioScanCompute) — all
+// read-only, offline, no-AI lookups. Global scope, static <script> tag — see
+// index.html load order.
 
 // ── WU-N3: THREAT — native bestiary assessment + TTK ──────────────────────
 // Pure combat math (no DOM) so the gate can unit-test it. Read-only. Floors
@@ -565,5 +569,3 @@ function renderBioScan() {
       'sys'
     );
 }
-
-// Switch faction/karma panels based on game context (called from loadUI).

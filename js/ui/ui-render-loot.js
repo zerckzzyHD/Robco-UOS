@@ -1,8 +1,12 @@
 // ── ui-render-loot.js — ITEM ACQUISITION (split from ui-render.js, 2.8.5 U-A4) ──
-// The native LOOT add-to-inventory terminal and the Visual Upload OCR
-// preview/confirm/apply flow — both additive item-intake paths into
-// state.inventory (Protocol 34). Global scope, static <script> tag — see
-// index.html load order.
+// The native LOOT add-to-inventory terminal (renderLoot/renderLootList/doLoot)
+// and the Visual Upload OCR preview/confirm/apply flow
+// (renderVisualParsePreview/_confirmVisualParse/applyVisualParse) — both
+// additive item-intake paths into state.inventory (Protocol 34). Also carries
+// renderHolster(), the Tool Deck's Quick-Draw Holster gear-vector display —
+// not an item-intake path itself, it just has no other sibling file that
+// claims it (see the section banner below). Global scope, static <script>
+// tag — see index.html load order.
 
 // ── WU-N6: LOOT — deterministic add/value (hybrid) ────────────────────────
 // A native "add salvaged loot to inventory" terminal. Pick any priced item from
@@ -36,6 +40,7 @@ function _lootAdd(inventory, item, qty, db) {
   return inv;
 }
 
+// ── QUICK-DRAW HOLSTER (TOOL DECK) ───────────────────────────────
 // Quick-Draw Holster (Tool Deck unit) — renders the four gear-vector sockets from
 // state.padBindings. Idempotent + safe to call while the deck is hidden (the socket
 // elements exist in the DOM, just not visible). Gear names go through textContent /

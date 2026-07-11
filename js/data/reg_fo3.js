@@ -9,6 +9,12 @@
 //   - Loaded instead of reg_nv.js when state.gameContext === 'FO3'.
 //
 // Schema mirrors reg_nv.js exactly. Same category keys.
+//
+// LOAD ORDER: injected by the GAME_FILES boot manifest in index.html, right
+// before js/data/registry-core.js (which searches whichever of reg_nv.js /
+// reg_fo3.js the manifest chose). EXPOSES: FALLOUT_REGISTRY.
+// PROTOCOL 3 / 23: sourced from fallout.wiki, never invented; read-only —
+// this file must never touch `state` or any campaign field.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FALLOUT_REGISTRY = {

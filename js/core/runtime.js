@@ -33,6 +33,16 @@
 // additionally typeof-guarded and fail OPEN, mirroring the _startMemCycle seam.
 //
 // Game-agnostic (Protocol 38): pure lifecycle logic, no game literals.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 19 — after
+// js/services/ocr.js, before js/ui/ui-core.js). Per the boot-order lesson
+// above, nothing at this file's top level touches another module; only
+// initAmbientRuntime() (called from ui-core.js's window.onload) reaches out to
+// window.immersionAllows / window.RobcoEvents, so this file has no real
+// load-order dependency despite sitting mid-chain.
+// EXPOSES: window.AmbientRuntime (getState/register/transition/noteActivity/
+// shutdown/forceState/start/listObservers — the observer API other modules
+// subscribe through) and window.initAmbientRuntime (the boot-phase entry point).
 (function () {
   'use strict';
 

@@ -3,6 +3,13 @@
 // Sustained Power Cell (SLOT 03) and High-Lumen/Immersion-dial clusters, and
 // the campaign-config board (game context, tempo dial, randomizer interlock,
 // cart deck). Global scope, static <script> tag — see index.html load order.
+// GOTCHA: this file straddles BOTH stores (Protocol 23 two-store boundary) —
+// device prefs (optics, wake lock, immersion tier, haptics, key-sync) read/
+// write through MetaStore/localStorage, while campaign fields (gameContext,
+// playstyle, playthroughType, campaignMode) live on `state` (or, for
+// playstyle, a raw localStorage key that rides the save envelope — see the
+// note at changePlaystyle()) and go through saveState(). Know which store a
+// given control targets before touching it.
 
 // ── WU-F1 SUSTAINED POWER CELL (Screen Wake Lock) ─────────────────────────
 // Keeps the display lit while the terminal is active, using the Screen Wake Lock
@@ -362,8 +369,11 @@ function renderModuleBay() {
     const el = document.getElementById(id);
     if (el) el.checked = MetaStore.get(BAY_CHECKBOX_SYNC_MAP[id]) === 'true';
   });
-  // B2c: SERVO CLICK RELAY uses INVERTED checkbox semantics (checked =
-  // installed = audible), so it can't ride the 1:1 BAY_CHECKBOX_SYNC_MAP above.
+  // PROTOCOL 25 (sanctioned-exception guardrail #5 — stored semantics must not
+  // change even when presentation inverts): B2c's SERVO CLICK RELAY uses
+  // INVERTED checkbox semantics (checked = installed = audible), so it can't
+  // ride the 1:1 BAY_CHECKBOX_SYNC_MAP above — it still writes the same
+  // robco_hardwaresfx_muted boolean the mute toggle always wrote.
   const hwSfxToggle = document.getElementById('hardwareSfxToggle');
   if (hwSfxToggle) hwSfxToggle.checked = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
   if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
@@ -402,9 +412,10 @@ function initModuleBay() {
   const opened = MetaStore.get('robco_bay_opened') === 'true';
   const hatch = document.getElementById('bayHatch');
   if (hatch) hatch.hidden = opened;
-  // FIX 4 (owner report — new standing rule, "everything remembers on reload"):
-  // restore whichever of Bay / Schematic View the technician was last looking
-  // at, via the registered robco_bay_view device pref.
+  // PROTOCOL UI-6 (Everything Remembers on Reload) / FIX 4 (owner report —
+  // this is the precedent example the protocol itself cites): restore
+  // whichever of Bay / Schematic View the technician was last looking at, via
+  // the registered robco_bay_view device pref.
   _applyBayView(MetaStore.get('robco_bay_view') === 'schematic' ? 'schematic' : 'bay');
 }
 window.initModuleBay = initModuleBay;
@@ -431,7 +442,8 @@ window.releaseBayHatch = releaseBayHatch;
 // Permanent light-touch fallback (LOCKED-3) — swaps the bay grid for a flat,
 // regenerated list of the same controls. Never a parallel wired set. Shared by
 // initModuleBay() (boot restore) and toggleBaySchematic() (user action) so the
-// two never drift (Protocol 22).
+// two never drift (Protocol 22) — PROTOCOL UI-6's mandated shape: one apply
+// function serving both the boot-restore path and the user-action path.
 function _applyBayView(view) {
   const bay = document.getElementById('bayContent');
   const schem = document.getElementById('baySchematic');
@@ -448,7 +460,7 @@ function toggleBaySchematic() {
   const schem = document.getElementById('baySchematic');
   if (!schem) return;
   const view = schem.hidden ? 'schematic' : 'bay';
-  // FIX 4: persist the view choice so it survives a reload.
+  // PROTOCOL UI-6 / FIX 4: persist the view choice so it survives a reload.
   MetaStore.set('robco_bay_view', view);
   _applyBayView(view);
 }
@@ -543,6 +555,7 @@ function renderBaySchematic() {
 }
 window.renderBaySchematic = renderBaySchematic;
 
+// ── SVC TRAY EXPORT/UTILITY ACTIONS ─────────────────────────────────────────
 // SVC Tray onclick wrappers — kept as tiny named functions (not inline multi-
 // statement onclick) so the diegetic log message is never embedded in an
 // index.html attribute value (avoids colliding with the Suite 59 inline-
@@ -584,6 +597,7 @@ function _svcInstallPwa() {
 }
 window._svcInstallPwa = _svcInstallPwa;
 
+// ── CAMPAIGN CONFIG STATE SETTERS (playthrough type, Complete RNG) ─────────
 // C5: Playthrough type handler — writes state field (Protocol 4).
 // Affects AI directive. Triggers saveState() so the change persists.
 // Valid combinations with Complete RNG are all supported.
@@ -618,6 +632,7 @@ function onCampaignModeChange(checked) {
   if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
 }
 
+// ── PWA INSTALL PROMPT ───────────────────────────────────────────────────────
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -638,6 +653,13 @@ async function installPwa() {
   }
 }
 
+// ── CAMPAIGN PROFILE STATE SETTERS (playstyle, game context) ───────────────
+// GOTCHA / PROTOCOL 23 (two-store boundary): unlike the wake-lock/high-lumen/
+// immersion prefs above, robco_playstyle is CAMPAIGN data, not a device pref
+// — it rides the save envelope (cloud push/pull, save slots, export/import;
+// see cloud.js and ui-saves.js) and is deliberately read/written via raw
+// localStorage rather than MetaStore for that reason. Do not "fix" this to
+// use MetaStore without moving it off the campaign-save round-trip first.
 function changePlaystyle(style) {
   if (style === 'melee') {
     let stateStr = JSON.stringify(state).toLowerCase();
@@ -713,10 +735,11 @@ window._confirmGameContextChange = _confirmGameContextChange;
 function _seatGameCartridge(ctx) {
   const sel = document.getElementById('gameContextSelect');
   if (sel) sel.value = ctx;
-  // M5 SEAT — fires the instant the cartridge is tapped (the physical
-  // "press it into the slot" moment), independent of whether the player
-  // then confirms or cancels the reload dialog below; never touches the
-  // reload path itself (zero boot risk).
+  // PROTOCOL UI-9 (Motion-Verb Grammar) — SEAT, introduced at Ceremony
+  // Moments Wave 1, M5: fires the instant the cartridge is tapped (the
+  // physical "press it into the slot" moment), independent of whether the
+  // player then confirms or cancels the reload dialog below; never touches
+  // the reload path itself (zero boot risk).
   const btn = document.getElementById('cart-' + String(ctx).toLowerCase());
   if (typeof _motionSeat === 'function') _motionSeat(btn);
   _confirmGameContextChange(ctx);

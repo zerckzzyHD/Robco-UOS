@@ -126,6 +126,7 @@ function toggleEquipItem(idx) {
   }
 }
 
+// ── DRAWER CHROME & FILTER STATE ─────────────────────────────────
 // Drawer bank labels + the state.inventory/state.ammo count each drawer badge
 // mirrors (Phase 3 · Piece 2 CARGO MANIFEST). Pure data — no game literal.
 const _DRAWER_LABELS = {

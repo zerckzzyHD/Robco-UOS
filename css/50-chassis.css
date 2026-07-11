@@ -17,6 +17,26 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Chassis [5] diagnostic maintenance bay + Chassis Living Core batch 2
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   50-chassis.css — cascade slot 50: the CHASSIS self-diagnostic
+   maintenance bay (BUS-22 Unit Power Plant + Living Core, BUS-23
+   plate/breakers, BUS-24 Service & Fault console) — the "living
+   core" shell shared between the full instrument and its casing-top
+   mini-mirror.
+   WHY HERE: reuses the same .bay-board/.bay-slot-tag/.bay-part-no/
+   .panel-substatus/.board-led vocabulary from 30-modulebay.css, so
+   it must load after that file. It also defines `.chassis-core-shape`
+   used together with the compound `#chassisCoreMini` selector noted
+   in 10-chrome.css (the CHASSIS mini-core readout window) — that
+   10-chrome.css rule is a COMPOUND selector specifically because a
+   bare `.chassis-core-mini` rule would tie in specificity with
+   `.chassis-core-shape` and the winner would depend on file order;
+   the compound form sidesteps that trap regardless of load order,
+   so this is not itself a hard ordering requirement, but is worth
+   noting as a nearby specificity trap this codebase already had to
+   design around. This file's position after 45-databank.css is
+   otherwise chronological (CHASSIS was Phase 3's last piece).
+   ══════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
    CHASSIS [5] — self-diagnostic maintenance bay (Design Overhaul,
    planning/mockups/chassis-diagnostic.html CORE variant). BUS-22/23/24.

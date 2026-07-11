@@ -1,3 +1,21 @@
+// ── api.js — AI NETWORK HUB (split from the original api.js, 2.8.5 U-A3) ────
+// The network-layer hub of the api*.js family: transmitMessage() and its full
+// request lifecycle (setup, fetch, retry/backoff, cancel/abort, UI dim/undim
+// via _resetTransmitUI), the in-memory AI comm-config cache (_commGet /
+// window._invalidateCommCache), fetchAuthorizedModels() (key validation +
+// model list), and saveApiKeySilent(). Global scope, static <script> tag —
+// api*.js family, loads late in the boot chain (right before cloud.js — see
+// index.html load order); api-directive.js, api-import.js, and
+// api-router.js load immediately after this file.
+// EXPOSES: transmitMessage(), fetchAuthorizedModels(), saveApiKeySilent(),
+// _resetTransmitUI(), _commGet(), window._invalidateCommCache().
+// GOTCHA: transmitMessage() calls getSystemDirective() (api-directive.js),
+// autoImportState() (api-import.js), and _routeNativeCommand()
+// (api-router.js) — all three load AFTER this file. That's safe only because
+// they're invoked later, from a user-triggered event, by which point every
+// script tag has run; none of it is called at this file's own parse time.
+// Do not assume this file is self-contained.
+
 // ── AI comm-config cache (QA-PROHIB-4/5) ─────────────────────────────────────
 // getSystemDirective() and transmitMessage() run on every AI message. Reading
 // playstyle / Gemini key / Gemini model straight from localStorage on each call
@@ -22,6 +40,12 @@ window._invalidateCommCache = function () {
   delete _commCache.geminiModel;
 };
 
+// ── Retry / Backoff Constants ────────────────────────────────────────────────
+// WHY these values: 3 attempts, 1s/2s/4s — a bounded exponential backoff used
+// for both 429 (rate limit) and transient 5xx/network failures in
+// transmitMessage()'s catch block below. Bounded so a persistently-failing
+// key/quota can't retry forever; if _attempt exceeds the array, the last
+// delay (4s) is reused rather than indexing out of bounds.
 const _AI_RETRY_MAX = 3;
 const _AI_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
@@ -30,6 +54,7 @@ function _validateTriNode(parsed) {
   return 'narrative' in parsed || 'state' in parsed || 'modal' in parsed;
 }
 
+// ── Model List Fetch & Key Validation ────────────────────────────────────────
 async function fetchAuthorizedModels(silent = false) {
   let rawKey = document.getElementById('apiKeyInput').value.trim();
   if (!rawKey) {
@@ -116,6 +141,7 @@ async function fetchAuthorizedModels(silent = false) {
   }
 }
 
+// ── API Key Persistence ──────────────────────────────────────────────────────
 function saveApiKeySilent() {
   const key = document.getElementById('apiKeyInput').value.trim();
   MetaStore.set('robco_gemini_key', key);
@@ -135,6 +161,7 @@ function saveApiKeySilent() {
   if (typeof window.refreshOverseerCarrier === 'function') window.refreshOverseerCarrier();
 }
 
+// ── TRANSMIT MESSAGE LIFECYCLE (setup → fetch → retry/abort → undim) ────────
 // Protocol 27 fix — the SINGLE place transmitMessage() undims the terminal
 // after a request-in-flight, called from BOTH the setup-phase catch (a local
 // failure before the network call ever starts) and the network try's own
@@ -222,6 +249,10 @@ async function transmitMessage(overrideText) {
     return;
   }
 
+  // PROTOCOL 32/33: the remote kill-switch check for this networked feature. Fail-safe by
+  // construction — if isFeatureEnabled is missing entirely (config unreachable/not yet
+  // loaded), the `typeof` guard short-circuits and AI chat stays enabled rather than
+  // silently blocking; only an explicit `false` from a successfully-read config disables it.
   if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('aiChat')) {
     appendToChat(
       '> DIRECTOR LINK TEMPORARILY DISABLED BY OPERATOR — LOCAL TERMINAL FULLY USABLE.',
@@ -474,6 +505,10 @@ async function transmitMessage(overrideText) {
         } else {
           transmitMessage._retryCount = 0;
           transmitMessage._inRetry = false;
+          // PROTOCOL 32/35: once the bounded backoff is exhausted, record the failure
+          // against the aiChat feature rather than retrying forever — this is the local
+          // half of the auto-flip-on-regression path (Protocol 35 flips the remote
+          // kill-switch off for everyone; this call only degrades the current session).
           if (typeof window._recordFeatureFailure === 'function')
             window._recordFeatureFailure(
               'aiChat',

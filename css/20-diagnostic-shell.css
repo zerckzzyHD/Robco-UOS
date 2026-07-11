@@ -17,6 +17,22 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Diagnostic Shell mobile overlay (dev-only tooling, U2)
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   20-diagnostic-shell.css — cascade slot 20: the Diagnostic Shell
+   dev-tooling overlay (the floating FAB, scrim, fixed drawer /
+   mobile bottom-sheet, tool-registry grid + nested sub-panel
+   styling), plus this file's OWN .modal-box/.modal-confirm-*
+   dialog base rules, the changelog viewer, the command-registry
+   card grid, and the ACCOUNT saves-list row styling.
+   WHY HERE: no confirmed same-selector cascade dependency on an
+   earlier file was found for this file's rules (its .modal-box
+   family is defined and consumed entirely within this file). Its
+   position — after chrome/overseer, before the panel-content-heavy
+   25-55 files — mirrors the original monolith's chronological build
+   order (this dev-only overlay was built before most of the OPERATOR/
+   Module-Bay/Databank panel content that follows), not a required
+   cross-file dependency. Stated honestly rather than invented.
+   ══════════════════════════════════════════════════════════════ */
 /* ══════════════════════════════════════════════════════════════════════
    DIAGNOSTIC SHELL — mobile overlay (U2, planning/DIAGNOSTIC_SHELL_PLAN.md
    §6). Replaces the U1 document-flow <details class="panel"> (which shoved

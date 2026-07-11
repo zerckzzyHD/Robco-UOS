@@ -17,6 +17,25 @@
    Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: DO-O Living Overseer / Director Uplink presence (Protocol UI-10)
 === SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   15-overseer.css — cascade slot 15: the DO-O Director Uplink /
+   Living Overseer chat presence (header, oscilloscope, transcript
+   recolor, composer, mobile carrier strip) — plus a grab-bag of
+   generic modal/tab-visibility/sub-panel/changelog-viewer/
+   Diagnostic-Shell-env-banner rules that share this stretch of the
+   original monolith but are not Overseer-specific.
+   WHY HERE: loads after 10-chrome (reads its --bezel-wire tokens).
+   At least one rule here has a CONFIRMED equal-specificity cascade
+   dependency on 05-base.css: `.panel h2` is declared once in
+   05-base.css (margin-top:0, padding-bottom:4px) and declared AGAIN
+   here (margin:-10px -10px 10px -10px, padding:10px) — same
+   specificity (0,1,1), so this file's version wins ONLY because it
+   loads later in source order. The rest of this file's position is
+   otherwise the original monolith's chronological build order — the
+   split cut the file top-to-bottom, it did not re-sequence by
+   dependency, so beyond the confirmed case above no further
+   deliberate ordering rationale is claimed.
+   ══════════════════════════════════════════════════════════════ */
 /* ════════════════════════════════════════════════════════════════════
    DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK presence (Protocol UI-10).
    A reskin OVER the existing Comm-Link (Protocol 22 — appendToChat()/

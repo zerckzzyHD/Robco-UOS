@@ -1,10 +1,19 @@
 // ── ui-core-cmd.js — COMMAND LAYER (split from ui-core.js, 2.8.5 U-A1) ──
-// HP/XP/Rad bar interactions, native stat/quick-log setters, COMMAND_REGISTRY,
+// HP/XP/Rad bar drag interactions, native stat/quick-log setters (the one
+// clamp/mirror/emit/save choke point per stat, Protocol 22), COMMAND_REGISTRY,
 // karma/skills UI, the core event-bus subscriber wiring (stat/quest/faction
 // feedback), the feedback echo system, the location card, SPECIAL fader drag,
 // operator telemetry, and Tool Deck D-pad routing. Global scope, static
-// <script> tag — see index.html load order.
+// <script> tag — loads last in the ui-core-*.js family (after
+// ui-core-modulebay.js, before js/dev/test-console.js — see index.html load
+// order). GOTCHA: every RobcoEvents.on(...) subscriber-wiring function here
+// (_wireCoreEventBusSubscribers, _wireFeedbackEchoSubscribers,
+// _wireLocationCardSubscriber) is called from window.onload, never run at
+// this file's top level — RobcoEvents may not exist yet when this static
+// <script> tag first executes (the U7 lesson, restated at each wiring
+// function below).
 
+// ── HP / XP / RAD BAR DRAG INTERACTIONS ──────────────────────────────────
 function setupHpBarInteraction() {
   const container = document.getElementById('hp_bar_container');
   if (!container) return;
@@ -185,6 +194,7 @@ function setupRadBarInteraction() {
   _wireRadDragSurface('opRadLineWrap'); // VITAL TELEMETRY trace (owner follow-up — was never wired)
 }
 
+// ── LEVEL & XP NATIVE EDIT HANDLERS ──────────────────────────────────────
 // C11: Level input change handler — when user edits the level field,
 // auto-set XP to the minimum XP required for that level (xpCur). Clamped to
 // MAX_PLAYER_LEVEL (owner batch item 3) — the number input's native stepper
@@ -281,6 +291,7 @@ function nativeLevelUp() {
   }
 }
 
+// ── NATIVE MAP / LOCATION COMMANDS ───────────────────────────────────────
 // AI→native survey Part C.1 — [GPS] / [MAP] compass grid. Previously a
 // free-text Director round-trip that returned an AI-drawn ASCII grid; now
 // opens/scrolls to the existing native CARTOGRAPHY TABLE (DATABANK tab) —
@@ -543,6 +554,7 @@ ${apSection}
 ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.</span>`;
 }
 
+// ── COMMAND_REGISTRY — [FEATURES] MODAL DATA ─────────────────────────────
 // WU-E3: the command registry is kept in lock-step with reality — every entry
 // resolves to a NATIVE_COMMAND_ROUTER token (api-router.js), a live panel/UI control, an
 // AI-directive-defined command (getSystemDirective), or a keyboard handler. The six
@@ -684,6 +696,7 @@ const COMMAND_REGISTRY = [
   },
 ];
 
+// ── STAT CLAMP HELPERS ────────────────────────────────────────────────────
 function capStatMax(el) {
   const n = parseInt(el.value, 10);
   if (!isNaN(n) && n > 10) el.value = '10';
@@ -716,6 +729,10 @@ function capRadsMax(el) {
 // matching DOM input's .value — the WU-N2 caps lesson: saveState() always runs
 // syncStateFromDom() first, which reads the DOM back into state, so an
 // in-memory-only write would be silently reverted on the very next save.
+// PROTOCOL 24 boundary: these are the deterministic NATIVE/player-driven
+// entry points, never reached by raw AI output — the AI-import path that
+// Protocol 24's validation governs is a separate choke point,
+// autoImportState() in js/services/api-import.js.
 function _nativeSetHp(v) {
   const hpMaxEl = document.getElementById('stat_hp_max');
   const hpMax = (hpMaxEl && parseInt(hpMaxEl.value, 10)) || state.hpMax || 0;
@@ -834,6 +851,7 @@ function commitStat(el) {
   if (isNaN(v)) v = (state && state[k]) || 5;
   _nativeSetSpecial(k, v);
 }
+// ── LIMB / BIO-HARNESS ZONE HANDLING ─────────────────────────────────────
 function toggleLimb(limb) {
   let wasOk = state[limb] === 'OK';
   state[limb] = wasOk ? 'CRIPPLED' : 'OK';
@@ -892,6 +910,7 @@ function _wireBioHarnessZones() {
   });
 }
 
+// ── KARMA ALIGNMENT (BUS-09) ─────────────────────────────────────────────
 // BUS-09 · KARMA ALIGNMENT (Phase 3 OPERATOR batch 3, ground-up reskin) —
 // the exact shipped 5-tier label logic (Protocol 22, unchanged breakpoints),
 // now also driving the EVIL/GOOD swing-needle rotation + tier-lamp strip +
@@ -967,6 +986,7 @@ function updateKarmaUI() {
   }
 }
 
+// ── SKILL MATRIX (BUS-05 SKILL VU ARRAY) ─────────────────────────────────
 const SKILL_LABELS = {
   barter: 'Barter',
   big_guns: 'Big Guns',
@@ -1141,6 +1161,12 @@ function onTimeInputChanged() {
   saveState();
 }
 
+// ── CORE EVENT-BUS SUBSCRIBERS — stat/limb/craft/trade feedback reactions ──
+// PROTOCOL 44: every RobcoEvents.emit(...) fired from this file (level.up,
+// location.current, stat.change, limb.state, karma.tier, weight.seized) has
+// a matching Diagnostic Shell trigger in js/dev/test-console.js's
+// DIAGNOSTIC_SHELL_TOOLS registry — verified against that file, not a gap.
+//
 // U7: HP-critical reaction (crit-hp-flash class + chassis buzz) — updateMath()
 // below only detects the >25%→≤25% crossing and emits; this is the subscriber.
 // Wiring is deferred to a function called from window.onload, NOT run at this
@@ -1856,6 +1882,7 @@ function _wireLocationCardSubscriber() {
   RobcoEvents.on('location.current', p => _locationCardShow((p && p.loc) || ''));
 }
 
+// ── S.P.E.C.I.A.L. FADER STEPPERS & DRAG (BUS-02) ────────────────────────
 // PHASE 3 · OPERATOR — S.P.E.C.I.A.L. fader steppers (BUS-02). Sets the
 // existing s_<key> input's value then routes through the EXACT SAME
 // commitStat(el) the raw number field already used (Protocol 22) — the
@@ -1924,6 +1951,7 @@ function _wireFaderDrag() {
   });
 }
 
+// ── OPERATOR TELEMETRY SYNC (BUS-01/02/03 INSTRUMENT READOUTS) ───────────
 // PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22/25 reskin).
 // Reads the exact same DOM/state updateMath() already reads for HP/rads/
 // SPECIAL; drives the NEW CRT-trace/fader-ladder/zone-plate/board-status
@@ -2085,6 +2113,7 @@ function _syncOperatorTelemetry() {
   }
 }
 
+// ── LOAD-CELL WEIGH BRIDGE (OPERATIONS BUS-10) ───────────────────────────
 // OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — a read-only mirror of the exact
 // curWt/maxWeight updateMath() already computed (Phase 3 · Piece 2). Drives a
 // physical load-beam SVG that bends continuously in proportion to real carry
@@ -2154,6 +2183,7 @@ function _paintWeighBridge(curWt, maxWeight) {
   }
 }
 
+// ── TOOL DECK / QUICK-DRAW HOLSTER D-PAD ROUTING ─────────────────────────
 function macroCommand(actionStr) {
   // Tool Deck unit: reads the deck's shared target field (#deckTarget) instead of the
   // retired #macroTarget. The D-Pad no longer routes through macroCommand() (the
