@@ -13,6 +13,7 @@
     "test": "node tests/robco-diagnostics.js",
     "gate": "node scripts/gate.js",
     "gate:fast": "node scripts/gate.js --fast",
+    "gate:iter": "node scripts/gate.js --iter",
     "prepare": "node scripts/install-hooks.js",
     "rollback": "sh scripts/rollback.sh",
     "a11y": "node tests/a11y-check.mjs"

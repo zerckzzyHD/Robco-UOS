@@ -1,6 +1,10 @@
 let attachedImageData = null;
 let attachedImageMimeType = null;
-let _invFilter = 'all';
+// Phase 3 · Piece 2 (CARGO MANIFEST drawer bank): default drawer before the
+// robco_cargo_drawer MetaStore pref is restored at boot (_restoreDevicePrefs).
+// No 'all' drawer exists in the physical pull-drawer design (each item type
+// is exactly one drawer away) — 'weapon' mirrors the approved mockup default.
+let _invFilter = 'weapon';
 
 // ── RENDER SIGNATURE CACHE (WU-A3) ────────────────────────────
 // Tracks the last-rendered state slice per panel. Module scope means the
@@ -22,24 +26,26 @@ function _isDirty(key, slice) {
 // ── AUDIO SETTINGS CACHE ──────────────────────────────────────
 // Read mute prefs once at startup — avoids localStorage reads on every audio tick
 const AudioSettings = {
-  typing: localStorage.getItem('robco_sfx_muted') === 'true',
-  hum: localStorage.getItem('robco_hum_muted') === 'true',
-  geiger: localStorage.getItem('robco_geiger_muted') === 'true',
-  tinnitus: localStorage.getItem('robco_tinnitus_muted') === 'true',
-  ambient: localStorage.getItem('robco_ambient_muted') === 'true',
-  wake: localStorage.getItem('robco_wake_muted') === 'true',
-  panelClick: localStorage.getItem('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
-  bootDrone: localStorage.getItem('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
-  levelUp: localStorage.getItem('robco_levelup_muted') === 'true', // H3: level up jingle
-  heartbeat: localStorage.getItem('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
-  questComplete: localStorage.getItem('robco_questcomplete_muted') === 'true', // quest complete chime
-  questFail: localStorage.getItem('robco_questfail_muted') === 'true', // quest fail tone
-  factionThreshold: localStorage.getItem('robco_factionthreshold_muted') === 'true', // faction standing alert
+  typing: MetaStore.get('robco_sfx_muted') === 'true',
+  hum: MetaStore.get('robco_hum_muted') === 'true',
+  geiger: MetaStore.get('robco_geiger_muted') === 'true',
+  tinnitus: MetaStore.get('robco_tinnitus_muted') === 'true',
+  ambient: MetaStore.get('robco_ambient_muted') === 'true',
+  wake: MetaStore.get('robco_wake_muted') === 'true',
+  panelClick: MetaStore.get('robco_panelclick_muted') === 'true', // H1: rotary dial clicks
+  bootDrone: MetaStore.get('robco_bootdrone_muted') === 'true', // H4-bonus: boot drone
+  levelUp: MetaStore.get('robco_levelup_muted') === 'true', // H3: level up jingle
+  heartbeat: MetaStore.get('robco_heartbeat_muted') === 'true', // H4: low health heartbeat
+  questComplete: MetaStore.get('robco_questcomplete_muted') === 'true', // quest complete chime
+  questFail: MetaStore.get('robco_questfail_muted') === 'true', // quest fail tone
+  factionThreshold: MetaStore.get('robco_factionthreshold_muted') === 'true', // faction standing alert
+  hardwareSfx: MetaStore.get('robco_hardwaresfx_muted') === 'true', // B2c: chip/board install-eject click
+  reactorHum: MetaStore.get('robco_reactorhum_muted') === 'true', // LIVING CORE #6: reactor hum
   // WU-F5 Pip-Boy Radio: ON semantics (true = playing), NOT a mute flag. Default
   // OFF (opt-in). initRadio() does the autoplay-safe first-gesture restore at boot;
   // this initialiser just reflects the saved preference into the cache.
-  radio: localStorage.getItem('robco_radio_on') === 'true',
-  masterMute: localStorage.getItem('robco_master_muted') === 'true',
+  radio: MetaStore.get('robco_radio_on') === 'true',
+  masterMute: MetaStore.get('robco_master_muted') === 'true',
 };
 
 // ── WU-F1 SUSTAINED POWER CELL (Screen Wake Lock) ─────────────────────────
@@ -61,7 +67,7 @@ function _wakeLockSupported() {
   );
 }
 function isWakeLockEnabled() {
-  return localStorage.getItem(WAKE_LOCK_KEY) === 'true';
+  return MetaStore.get(WAKE_LOCK_KEY) === 'true';
 }
 async function _acquireWakeLock() {
   if (!_wakeLockSupported() || _wakeLockSentinel) return false;
@@ -92,17 +98,39 @@ function _updateWakeLockUI() {
   if (!note) return;
   if (!_wakeLockSupported()) {
     note.textContent = '> POWER CELL UNAVAILABLE ON THIS UNIT';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   note.textContent = isWakeLockEnabled()
     ? '> DISPLAY SUSTAINED — SCREEN STAYS LIT'
     : '> POWER CELL IDLE — DISPLAY MAY DIM';
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
 }
+
+// Owner batch item 5: SLOT 03 (POWER CELL BAY) collapsed summary line — combines
+// the wake-lock + haptic states its own two status notes already show (reads the
+// same underlying booleans those notes read, Protocol 22 — never re-parses their
+// text) into one line so the board's state is visible collapsed too.
+function _updatePowerBoardStatus() {
+  const sum = document.getElementById('sum-slot03');
+  if (!sum) return;
+  const wakeOn =
+    typeof _wakeLockSupported === 'function' && _wakeLockSupported() && isWakeLockEnabled();
+  const hapticOn =
+    typeof _hapticSupported === 'function' && _hapticSupported() && isHapticEnabled();
+  sum.textContent =
+    'DISPLAY SUSTAIN ' + (wakeOn ? 'ON' : 'OFF') + ' · HAPTICS ' + (hapticOn ? 'ON' : 'OFF');
+}
+window._updatePowerBoardStatus = _updatePowerBoardStatus;
 async function toggleWakeLock(enabled) {
-  localStorage.setItem(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(WAKE_LOCK_KEY, enabled ? 'true' : 'false');
+  if (typeof playChipClick === 'function') playChipClick(enabled); // B2c: tactile install/eject click
   if (enabled) await _acquireWakeLock();
   else await _releaseWakeLock();
   _updateWakeLockUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'SUSTAINED POWER CELL INSTALLED' : 'SUSTAINED POWER CELL REMOVED');
+  }
 }
 function initWakeLock() {
   const toggle = document.getElementById('wakeLockToggle');
@@ -138,25 +166,34 @@ document.addEventListener('visibilitychange', () => {
 const OVERSEER_LOG_KEY = 'robco_overseer_log';
 let _overseerBaseMs = 0; // total power-on accumulated BEFORE this session
 let _overseerSessionStart = 0; // Date.now() when this session's logging began
-let _overseerFlushTimer = null;
 let _overseerBooted = false;
 function _readOverseerLog() {
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
   try {
-    const o = JSON.parse(localStorage.getItem(OVERSEER_LOG_KEY) || '{}');
+    const o = JSON.parse(MetaStore.get(OVERSEER_LOG_KEY) || '{}');
     return {
       bootCount: num(o.bootCount),
       totalPowerOnMs: num(o.totalPowerOnMs),
       longestSessionMs: num(o.longestSessionMs),
       firstBoot: num(o.firstBoot),
+      // M4 Long-Absence Recalibration (Ceremony Moments Wave 1) — additive
+      // field, zeroes-safe like every sibling above; 0 reads identically to
+      // "never flushed" (no prior session to compare against).
+      lastFlushAt: num(o.lastFlushAt),
     };
   } catch (_) {
-    return { bootCount: 0, totalPowerOnMs: 0, longestSessionMs: 0, firstBoot: 0 };
+    return {
+      bootCount: 0,
+      totalPowerOnMs: 0,
+      longestSessionMs: 0,
+      firstBoot: 0,
+      lastFlushAt: 0,
+    };
   }
 }
 function _writeOverseerLog(o) {
   try {
-    localStorage.setItem(OVERSEER_LOG_KEY, JSON.stringify(o));
+    MetaStore.set(OVERSEER_LOG_KEY, JSON.stringify(o));
   } catch (_) {
     /* quota / disabled storage — never let telemetry throw */
   }
@@ -171,6 +208,11 @@ function _flushOverseerLog() {
   const session = _overseerSessionMs();
   o.totalPowerOnMs = _overseerBaseMs + session;
   if (session > o.longestSessionMs) o.longestSessionMs = session;
+  // M4 Long-Absence Recalibration — stamped on every flush (30s tick,
+  // visibilitychange-hidden, pagehide), so the NEXT boot's runBootSequence()
+  // reads THIS session's last flush (initOverseerLog()'s own write, which
+  // runs earlier in the same window.onload, never touches this field).
+  o.lastFlushAt = Date.now();
   _writeOverseerLog(o);
   return o;
 }
@@ -184,6 +226,12 @@ function _fmtOverseerDuration(ms) {
   if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
   return `${s}s`;
 }
+// BUS-22 UNIT POWER PLANT reskin (CHASSIS): the same four telemetry figures,
+// now rendered as odo-tile industrial digit wheels — reusing the BUS-21
+// SERVICE TALLY's _odoTile() helper verbatim (ui-render.js, Protocol 22) rather
+// than a parallel drum-tile implementation. #chassisPlantStatus is the board's
+// collapsed one-line summary (Protocol 22 — the same pattern every other
+// bay-board's panel-substatus line already follows).
 function renderOverseerLog() {
   const el = document.getElementById('overseerLogDisplay');
   if (!el) return;
@@ -193,22 +241,144 @@ function renderOverseerLog() {
   const longest = Math.max(o.longestSessionMs, session);
   const hours = total / 3600000;
   const hoursStr = hours >= 10 ? hours.toFixed(0) : hours.toFixed(1);
+  const tile =
+    typeof _odoTile === 'function'
+      ? _odoTile
+      : (cap, v) => '<span style="opacity:0.65;">' + cap + '</span><span>' + v + '</span>';
   el.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">' +
-    '<span style="opacity:0.65;">CURRENT UPTIME</span><span>' +
-    _fmtOverseerDuration(session) +
-    '</span>' +
-    '<span style="opacity:0.65;">LONGEST SESSION</span><span>' +
-    _fmtOverseerDuration(longest) +
-    '</span>' +
-    '<span style="opacity:0.65;">TOTAL POWER-ON</span><span>' +
-    hoursStr +
-    'h</span>' +
-    '<span style="opacity:0.65;">BOOT COUNT</span><span>' +
-    o.bootCount +
-    '</span>' +
-    '</div>';
+    tile('CURRENT UPTIME', _fmtOverseerDuration(session), 'live — this sitting') +
+    tile('LONGEST SESSION', _fmtOverseerDuration(longest), 'record sitting') +
+    tile('TOTAL POWER-ON', hoursStr + 'H', 'lifetime hour meter') +
+    tile('BOOT COUNT', String(o.bootCount).padStart(4, '0'), 'ignitions — one per cold start');
+  const sum = document.getElementById('chassisPlantStatus');
+  if (sum) {
+    sum.textContent =
+      'SITTING ' +
+      _fmtOverseerDuration(session) +
+      ' · TOTAL ' +
+      hoursStr +
+      'H · ' +
+      o.bootCount +
+      ' IGNITIONS';
+  }
 }
+// ── SYSTEM STATUS (CHASSIS) — Step 2 v2.8.0 Settings-tab unit ───────────
+// Firmware/cache/carrier/feature-flag readout, merged beside the WU-F7 device
+// telemetry half of the former Overseer's Log. Reads the real active
+// Cache Storage key rather than duplicating the sw.js CACHE_NAME literal
+// (Protocol 22) — resolved once and cached, since it never changes mid-session.
+let _systemStatusCacheName = null;
+function _readActiveCacheName(cb) {
+  if (_systemStatusCacheName) {
+    cb(_systemStatusCacheName);
+    return;
+  }
+  if (!window.caches || typeof window.caches.keys !== 'function') {
+    cb(null);
+    return;
+  }
+  window.caches
+    .keys()
+    .then(keys => {
+      _systemStatusCacheName = keys.find(k => k.indexOf('robco-terminal-v') === 0) || null;
+      cb(_systemStatusCacheName);
+    })
+    .catch(() => cb(null));
+}
+const _SYSTEM_STATUS_FLAGS = [
+  'aiChat',
+  'cloudSync',
+  'googleSignIn',
+  'keySync',
+  'saveMigration',
+  'offlineQueue',
+];
+// BUS-23 IDENTITY PLATE & BREAKERS reskin (CHASSIS): the same firmware/cache/
+// carrier/feature-flag read-out, now rendered as a stamped serial plate (id-
+// plate/rivets/id-row) + a breaker-lever rack (one per remote kill-switch
+// flag, plus CARRIER) — read-outs only, the user never throws a lever
+// (Protocol 33/35: the flags are set by the remote kill-switch config).
+// #chassisIdentityStatus is the board's collapsed summary line.
+function _chassisIdRow(label, val) {
+  return (
+    '<div class="id-row"><b>' + escapeHtml(label) + '</b><span>' + escapeHtml(val) + '</span></div>'
+  );
+}
+function _chassisBreaker(label, on, wire, onWord, offWord) {
+  return (
+    '<div class="breaker' +
+    (wire ? ' wire' : '') +
+    ' ' +
+    (on ? 'on' : 'off') +
+    '">' +
+    '<span class="bk-cap">' +
+    escapeHtml(label) +
+    '</span>' +
+    '<span class="bk-slot" aria-hidden="true"><span class="bk-lever"></span></span>' +
+    '<span class="bk-led" aria-hidden="true"></span>' +
+    '<span class="bk-state">' +
+    (on ? onWord : offWord) +
+    '</span>' +
+    '</div>'
+  );
+}
+function renderSystemStatus() {
+  const el = document.getElementById('systemStatusDisplay');
+  if (!el) return;
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  const flags = _SYSTEM_STATUS_FLAGS.map(k => ({
+    key: k,
+    on: typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled(k) !== false,
+  }));
+  const enabledCount = flags.filter(f => f.on).length;
+  _readActiveCacheName(cacheName => {
+    const cacheRev = (cacheName || 'UNKNOWN').match(/-r\d+$/);
+    el.innerHTML =
+      '<div class="id-plate">' +
+      '<span class="rivet tl" aria-hidden="true"></span><span class="rivet tr" aria-hidden="true"></span>' +
+      '<span class="rivet bl" aria-hidden="true"></span><span class="rivet br" aria-hidden="true"></span>' +
+      '<div class="id-title">ROBCO INDUSTRIES — UNIT IDENTITY</div>' +
+      _chassisIdRow('MODEL', 'RIT-V300 DESK TERMINAL') +
+      _chassisIdRow('FIRMWARE', 'v' + APP_VERSION) +
+      _chassisIdRow('CACHE REV', cacheName || 'UNKNOWN') +
+      _chassisIdRow('STORAGE', 'LOCAL · PWA SERVICE WORKER ACTIVE') +
+      '</div>' +
+      '<div class="breaker-rack">' +
+      _chassisBreaker('CARRIER', connected, true, 'ONLINE', 'OFFLINE') +
+      flags
+        .map(f => _chassisBreaker(f.key.toUpperCase(), f.on, false, 'ENABLED', 'DISABLED'))
+        .join('') +
+      '</div>' +
+      '<div class="rack-note" style="text-align:center;opacity:0.4;font-size:8px;text-transform:none;margin-top:8px">' +
+      'breaker levers are read-outs of the remote kill-switch flags — the machine shows its own switchgear, users never throw these' +
+      '</div>';
+    const sum = document.getElementById('chassisIdentityStatus');
+    if (sum) {
+      sum.textContent =
+        'FW v' +
+        APP_VERSION +
+        ' · CACHE ' +
+        (cacheRev ? cacheRev[0].slice(1) : cacheName || 'UNKNOWN') +
+        ' · CARRIER ' +
+        (connected ? 'ONLINE' : 'OFFLINE') +
+        ' · ' +
+        enabledCount +
+        '/' +
+        flags.length +
+        ' SYSTEMS ENABLED';
+    }
+    // .wire (amber, --bezel-wire) and .red (--robco-danger) share equal CSS
+    // specificity — keep them mutually exclusive rather than stacking both,
+    // so a disconnected carrier reliably shows red regardless of source order.
+    const led = document.getElementById('carrierBoardLed');
+    if (led) {
+      led.classList.toggle('wire', connected);
+      led.classList.toggle('red', !connected);
+    }
+  });
+}
+window.renderSystemStatus = renderSystemStatus;
+
 function initOverseerLog() {
   // Boot-count increments exactly once per page load (window.onload), even though
   // renderOverseerLog() is re-run from loadUI on every tab switch.
@@ -225,12 +395,21 @@ function initOverseerLog() {
   _overseerSessionStart = Date.now();
   // Periodic flush (30s) so a crash / forced close loses at most one interval of
   // power-on time, and the live read-out stays fresh while the panel sits open.
-  if (!_overseerFlushTimer) {
-    _overseerFlushTimer = setInterval(() => {
+  // Phase 2 A2: this is now an Ambient Runtime observer instead of a standalone
+  // setInterval. It runs in ALL live states — INCLUDING STANDBY — because power-on
+  // accounting must keep ticking while the tab is blurred (matching the old
+  // never-cleared setInterval); tier 'minimal' so the dial never silences telemetry.
+  // Registered once (this boot-only path is guarded by _overseerBooted above).
+  AmbientRuntime.register({
+    id: 'overseer-flush',
+    states: ['READY', 'ACTIVE', 'IDLE', 'STANDBY'],
+    tier: 'minimal',
+    cadenceMs: 30000,
+    onTick: () => {
       _flushOverseerLog();
       renderOverseerLog();
-    }, 30000);
-  }
+    },
+  });
   renderOverseerLog();
 }
 // Persist the running totals on tab-hide / close so they survive a closed tab —
@@ -250,7 +429,7 @@ window.addEventListener('pagehide', _flushOverseerLog);
 // there is nothing to feature-detect — it is always available.
 const HIGH_LUMEN_KEY = 'robco_high_lumen';
 function isHighLumenEnabled() {
-  return localStorage.getItem(HIGH_LUMEN_KEY) === 'true';
+  return MetaStore.get(HIGH_LUMEN_KEY) === 'true';
 }
 function _applyHighLumen(on) {
   document.documentElement.classList.toggle('high-lumen', !!on);
@@ -263,9 +442,13 @@ function _updateHighLumenUI() {
     : '> STANDARD OPTICS — AMBIENT CONTRAST';
 }
 function toggleHighLumen(enabled) {
-  localStorage.setItem(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(HIGH_LUMEN_KEY, enabled ? 'true' : 'false');
   _applyHighLumen(enabled);
   _updateHighLumenUI();
+  if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'HIGH-LUMEN COIL INSTALLED' : 'HIGH-LUMEN COIL REMOVED');
+  }
 }
 function initHighLumen() {
   const toggle = document.getElementById('highLumenToggle');
@@ -275,19 +458,595 @@ function initHighLumen() {
   _updateHighLumenUI();
 }
 
+// ── GLOBAL IMMERSION DIAL — UI (P8) ──────────────────────────────
+// The gate helpers + pref live in state.js (getImmersionTier / immersionAllows /
+// setImmersionTier — the seam Phase 2 consumers read). This is only the DOM control:
+// the <select> value, the status readout, and the boot restore. No campaign state.
+// Module Bay SLOT 04 rotary dial (B2b) — knob rotation + position/description text
+// per tier. Presentation-only; the stored tier is still the single source of truth.
+const IMMERSION_DIAL = {
+  full: {
+    rot: -52,
+    desc: 'ALL AMBIENT SYSTEMS RUNNING — IDLE PHOSPHOR, STANDBY BREATHING, CRT POWER-DOWN, FULL SOUNDSCAPE.',
+  },
+  balanced: {
+    rot: 0,
+    desc: 'REDUCED AMBIENCE — ESSENTIAL EFFECTS ONLY, GENTLER IDLE BEHAVIOR.',
+  },
+  minimal: {
+    rot: 52,
+    desc: 'QUIET OPERATION — AMBIENT SYSTEMS DORMANT, TERMINAL STAYS OUT OF YOUR WAY.',
+  },
+};
+function _updateImmersionUI() {
+  const note = document.getElementById('immersionStatus');
+  const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  if (note) {
+    note.textContent =
+      tier === 'full'
+        ? '> FULL IMMERSION — all ambient systems active'
+        : tier === 'balanced'
+          ? '> BALANCED — reduced ambient activity'
+          : '> MINIMAL — ambient systems quiet';
+  }
+  // Owner batch item 5: mirror into SLOT 04's collapsed summary line (Protocol 22).
+  const sum04 = document.getElementById('sum-slot04');
+  if (sum04 && note) sum04.textContent = note.textContent.replace(/^>\s*/, '');
+  // Module Bay SLOT 04 legend — purely decorative, mirrors the real select's value.
+  document.querySelectorAll('.immersion-legend span').forEach(s => {
+    s.classList.toggle('on', s.dataset.tier === tier);
+  });
+  // The real #immersionSelect stays in the DOM (visually hidden) as the fully
+  // accessible control — keep its value synced regardless of which entry point
+  // (select, dial) last changed the stored tier (Protocol 42 drift guard, same
+  // pattern as BAY_CHECKBOX_SYNC_MAP for the boolean modules).
+  const sel = document.getElementById('immersionSelect');
+  if (sel) sel.value = tier;
+  const dial = IMMERSION_DIAL[tier] || IMMERSION_DIAL.full;
+  const knob = document.getElementById('immersionDialKnob');
+  if (knob) knob.style.transform = 'rotate(' + dial.rot + 'deg)';
+  const posEl = document.getElementById('immersionDialPos');
+  if (posEl) posEl.textContent = tier.toUpperCase();
+  const descEl = document.getElementById('immersionDialDesc');
+  if (descEl) descEl.textContent = dial.desc;
+  const dialBtn = document.querySelector('button.dial');
+  if (dialBtn) {
+    dialBtn.setAttribute(
+      'aria-label',
+      'Atmospheric regulator dial — currently ' +
+        tier.toUpperCase() +
+        '. Press to cycle to the next level.'
+    );
+  }
+}
+// Module Bay SLOT 04 adapter (B2b) — a native <select> can't be reshaped into a
+// dial, so this genuinely-custom control cycles the exact same 3 values through
+// the exact same onImmersionChange() setter the (now visually hidden) select
+// still uses — one truth, two entry points (Protocol 22/25).
+const IMMERSION_ORDER = ['full', 'balanced', 'minimal'];
+// FIX 2 (owner request, B2c unit): a suppress-click flag set by a genuine
+// drag (see _wireImmersionDialDrag below) so the trailing synthetic `click`
+// event a pointerup fires inside the button bounds doesn't re-cycle the tier
+// the drag already applied. Left false for a plain tap/keyboard activation,
+// which still falls through to the tap-to-cycle path below unchanged.
+let _dialDragSuppressClick = false;
+function _cycleImmersionDial() {
+  if (_dialDragSuppressClick) {
+    _dialDragSuppressClick = false;
+    return;
+  }
+  const cur = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const next = IMMERSION_ORDER[(IMMERSION_ORDER.indexOf(cur) + 1) % IMMERSION_ORDER.length];
+  onImmersionChange(next);
+}
+window._cycleImmersionDial = _cycleImmersionDial;
+function onImmersionChange(value) {
+  if (typeof setImmersionTier === 'function') setImmersionTier(value);
+  _updateImmersionUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc('ATMOSPHERIC GOVERNOR → ' + String(value).toUpperCase());
+  }
+  // DO-O: a dial change can flip _scopeShouldAnimate() live — re-arm so the
+  // oscilloscope starts/stops animating immediately, not on the next state change.
+  if (typeof _armScopeLoop === 'function') _armScopeLoop();
+  // CHASSIS LIVING CORE: a dial change can flip _coreShouldAnimate() live too.
+  if (typeof _coreRefresh === 'function') _coreRefresh();
+}
+
+// FIX 2 (owner request, B2c unit, best-effort): drag/slide-to-rotate for the
+// dial, layered ON TOP of the existing tap-to-cycle (onclick="_cycleImmersionDial()"
+// stays untouched) — never a forked control. A horizontal pointer drag steps
+// through the SAME 3-value IMMERSION_ORDER via the SAME onImmersionChange()
+// setter the tap and the real <select> both use (Protocol 22/25 — one truth,
+// three entry points). Keyboard activation is unaffected: it fires a `click`
+// with no preceding pointer drag, so _dialDragSuppressClick stays false and
+// the tap-to-cycle path runs exactly as before. Reduced-motion is unaffected
+// too — the knob's rotation still goes through the same CSS transform the
+// global prefers-reduced-motion block already neutralises (Suite 94).
+const DIAL_DRAG_STEP_PX = 46; // px of horizontal drag per tier step
+let _dialDrag = null; // { startX, startIndex, lastIndex } while a drag is active
+
+function _dialPointerMove(ev) {
+  if (!_dialDrag) return;
+  const dx = ev.clientX - _dialDrag.startX;
+  if (Math.abs(dx) > 6) _dialDrag.moved = true;
+  let idx = _dialDrag.startIndex + Math.round(dx / DIAL_DRAG_STEP_PX);
+  idx = Math.max(0, Math.min(IMMERSION_ORDER.length - 1, idx));
+  if (idx !== _dialDrag.lastIndex) {
+    _dialDrag.lastIndex = idx;
+    onImmersionChange(IMMERSION_ORDER[idx]);
+  }
+}
+function _dialPointerEnd(ev) {
+  if (!_dialDrag) return;
+  const btn = ev.currentTarget;
+  try {
+    btn.releasePointerCapture(ev.pointerId);
+  } catch (e) {
+    /* already released */
+  }
+  if (_dialDrag.moved) _dialDragSuppressClick = true;
+  _dialDrag = null;
+  btn.removeEventListener('pointermove', _dialPointerMove);
+  btn.removeEventListener('pointerup', _dialPointerEnd);
+  btn.removeEventListener('pointercancel', _dialPointerEnd);
+}
+function _dialPointerDown(ev) {
+  // Left button only for mouse; touch/pen have no `button` semantics (0 by spec).
+  if (ev.button !== 0) return;
+  const btn = ev.currentTarget;
+  const cur = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const startIndex = IMMERSION_ORDER.indexOf(cur);
+  _dialDrag = { startX: ev.clientX, startIndex, lastIndex: startIndex, moved: false };
+  try {
+    btn.setPointerCapture(ev.pointerId);
+  } catch (e) {
+    /* unsupported — drag still tracks via the listeners below */
+  }
+  btn.addEventListener('pointermove', _dialPointerMove);
+  btn.addEventListener('pointerup', _dialPointerEnd);
+  btn.addEventListener('pointercancel', _dialPointerEnd);
+}
+function _wireImmersionDialDrag() {
+  const btn = document.querySelector('button.dial');
+  if (!btn || typeof window.PointerEvent === 'undefined') return; // graceful fallback: tap-to-cycle still works
+  btn.addEventListener('pointerdown', _dialPointerDown);
+}
+
+function initImmersion() {
+  const sel = document.getElementById('immersionSelect');
+  if (sel && typeof getImmersionTier === 'function') sel.value = getImmersionTier();
+  _updateImmersionUI();
+  _wireImmersionDialDrag();
+}
+
+// ── MODULE BAY (Step 2 · Phase 2 · B2a) ─────────────────────────────────────
+// The Security & Configuration panel reframed as installable hardware boards.
+// ONE-TRUTH MODEL: the bay and the Schematic View are both PROJECTIONS of the
+// same stored device prefs — every control still calls the setter it always
+// called (Protocol 22/23); this section only (a) restores the bay's own
+// presentation-only bits at boot (hatch first-visit, the two combined status
+// lines that have no other owner), (b) re-syncs those bits after any bay
+// control fires, and (c) regenerates the Schematic View from current state
+// whenever it's opened — never a second wired control set, so it can never
+// drift from the bay (Protocol 25 sanctioned-exception guardrail).
+const BAY_SVC_LOG_CAP = 12;
+
+// Diegetic confirmation line in the SLOT-adjacent service log. Presentation
+// only — never persisted, never durable state.
+function _logBaySvc(msg) {
+  const body = document.getElementById('baySvcLogBody');
+  if (!body) return;
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const line = document.createElement('div');
+  line.textContent = '> ' + hh + ':' + mm + ' · ' + msg;
+  body.appendChild(line);
+  while (body.children.length > BAY_SVC_LOG_CAP) body.removeChild(body.firstChild);
+  body.parentElement.scrollTop = body.parentElement.scrollHeight;
+}
+window._logBaySvc = _logBaySvc;
+
+// Re-syncs every bay-owned presentation bit from the stored prefs. Safe to call
+// after ANY bay control fires (idempotent, cheap) — this is what keeps the bay
+// and the Schematic View from ever drifting apart (they read the same prefs).
+// Protocol 42 fix (found during this unit's manual verification): the bay's
+// own checkboxes and the Schematic View's mirrored checkboxes are two SEPARATE
+// DOM elements bound to the same MetaStore key — changing one didn't push its
+// new .checked state to the other. Re-syncing every boolean control's checked
+// state from MetaStore on every renderModuleBay() call (already fired after
+// every bay AND schematic control change) closes that gap in both directions.
+const BAY_CHECKBOX_SYNC_MAP = {
+  highLumenToggle: 'robco_high_lumen',
+  masterMuteToggle: 'robco_master_muted',
+  radioToggle: 'robco_radio_on',
+  wakeLockToggle: 'robco_wakelock_enabled',
+  hapticToggle: 'robco_haptic_enabled',
+  geminiKeySyncToggle: 'robco_gemini_key_sync',
+};
+function renderModuleBay() {
+  Object.keys(BAY_CHECKBOX_SYNC_MAP).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = MetaStore.get(BAY_CHECKBOX_SYNC_MAP[id]) === 'true';
+  });
+  // B2c: SERVO CLICK RELAY uses INVERTED checkbox semantics (checked =
+  // installed = audible), so it can't ride the 1:1 BAY_CHECKBOX_SYNC_MAP above.
+  const hwSfxToggle = document.getElementById('hardwareSfxToggle');
+  if (hwSfxToggle) hwSfxToggle.checked = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
+  if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
+  if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
+  if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
+  if (typeof _updateImmersionUI === 'function') _updateImmersionUI();
+  _updateModuleBaySummary(); // owner batch item 5: top-level collapsed summary line
+  const schem = document.getElementById('baySchematic');
+  if (schem && !schem.hidden) renderBaySchematic();
+}
+window.renderModuleBay = renderModuleBay;
+
+// Owner batch item 5: the SECURITY & CONFIGURATION (Module Bay) top-level panel's
+// own collapsed-summary line — a short, dynamically-accurate combination of the
+// same signals its SLOT boards already show (Protocol 22: reads the same
+// underlying state, never re-derives it), so the whole bay's status is visible
+// even before it's opened.
+function _updateModuleBaySummary() {
+  const sum = document.getElementById('sum-bay');
+  if (!sum) return;
+  const opticKey = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
+  const opticLabel =
+    typeof THEMES !== 'undefined' && THEMES[opticKey] ? THEMES[opticKey].label : opticKey;
+  const audioOn = !(window.AudioSettings && AudioSettings.masterMute);
+  const carrier =
+    typeof _isUplinkConnected === 'function' && _isUplinkConnected() ? 'CARRIER' : 'NO CARRIER';
+  sum.textContent = opticLabel + ' · AUDIO ' + (audioOn ? 'ON' : 'OFF') + ' · ' + carrier;
+}
+window._updateModuleBaySummary = _updateModuleBaySummary;
+
+// First-visit-only hatch ceremony (LOCKED-1). After the first-ever release the
+// bay just opens with the panel — this function only decides whether the
+// closed-hatch overlay is shown at all.
+function initModuleBay() {
+  const opened = MetaStore.get('robco_bay_opened') === 'true';
+  const hatch = document.getElementById('bayHatch');
+  if (hatch) hatch.hidden = opened;
+  // FIX 4 (owner report — new standing rule, "everything remembers on reload"):
+  // restore whichever of Bay / Schematic View the technician was last looking
+  // at, via the registered robco_bay_view device pref.
+  _applyBayView(MetaStore.get('robco_bay_view') === 'schematic' ? 'schematic' : 'bay');
+}
+window.initModuleBay = initModuleBay;
+
+function releaseBayHatch() {
+  MetaStore.set('robco_bay_opened', 'true');
+  const hatch = document.getElementById('bayHatch');
+  if (hatch) {
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    hatch.classList.add('bay-hatch--open');
+    setTimeout(
+      () => {
+        hatch.hidden = true;
+      },
+      reduced ? 0 : 900
+    );
+  }
+  _logBaySvc('HATCH RELEASED — TECHNICIAN ACCESS GRANTED');
+}
+window.releaseBayHatch = releaseBayHatch;
+
+// Permanent light-touch fallback (LOCKED-3) — swaps the bay grid for a flat,
+// regenerated list of the same controls. Never a parallel wired set. Shared by
+// initModuleBay() (boot restore) and toggleBaySchematic() (user action) so the
+// two never drift (Protocol 22).
+function _applyBayView(view) {
+  const bay = document.getElementById('bayContent');
+  const schem = document.getElementById('baySchematic');
+  if (!bay || !schem) return;
+  const toSchematic = view === 'schematic';
+  schem.hidden = !toSchematic;
+  bay.hidden = toSchematic;
+  if (toSchematic) renderBaySchematic();
+  else renderModuleBay();
+}
+window._applyBayView = _applyBayView;
+
+function toggleBaySchematic() {
+  const schem = document.getElementById('baySchematic');
+  if (!schem) return;
+  const view = schem.hidden ? 'schematic' : 'bay';
+  // FIX 4: persist the view choice so it survives a reload.
+  MetaStore.set('robco_bay_view', view);
+  _applyBayView(view);
+}
+window.toggleBaySchematic = toggleBaySchematic;
+
+function _schemSetGeminiSync(checked) {
+  if (window.setGeminiKeySync) window.setGeminiKeySync(checked);
+  renderModuleBay();
+}
+window._schemSetGeminiSync = _schemSetGeminiSync;
+
+// B2c: mirrors the bay's SERVO CLICK RELAY toggle — same INVERTED-checkbox
+// adapter shape as _schemSetGeminiSync above (Protocol 22/25).
+function _schemSetHardwareSfx(checked) {
+  toggleAudio('robco_hardwaresfx_muted', !checked);
+  renderModuleBay();
+}
+window._schemSetHardwareSfx = _schemSetHardwareSfx;
+
+// Regenerated from the SAME stored prefs the bay reads — every row calls the
+// SAME setter its bay counterpart calls, then re-syncs via renderModuleBay()
+// (which re-renders this very list while it's open, so it can never drift).
+function renderBaySchematic() {
+  const list = document.getElementById('baySchematicList');
+  if (!list) return;
+  const optic = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
+  const highLumen = typeof isHighLumenEnabled === 'function' && isHighLumenEnabled();
+  const masterMuted = MetaStore.get('robco_master_muted') === 'true';
+  const radioOn = MetaStore.get('robco_radio_on') === 'true';
+  const wakeOn = typeof isWakeLockEnabled === 'function' && isWakeLockEnabled();
+  const hapticOn = typeof isHapticEnabled === 'function' && isHapticEnabled();
+  const tier = typeof getImmersionTier === 'function' ? getImmersionTier() : 'full';
+  const keySync = MetaStore.get('robco_gemini_key_sync') === 'true';
+  const typerSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
+  const hwSfxOn = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
+
+  // FIX 2 (owner report): name/loc stacked ABOVE a full-width control row —
+  // the control can never be squeezed narrower than its own content (which
+  // was silently ellipsis-clipping the phosphor-tube <select>, e.g. "ROBCO
+  // GR…") regardless of label length or viewport width.
+  const row = (controlHtml, name, loc) =>
+    `<div class="schem-row"><div class="schem-row-head"><span class="sr-name">${escapeHtml(name)}</span><span class="sr-loc">${loc}</span></div><div class="schem-row-control">${controlHtml}</div></div>`;
+  const checkboxRow = (setter, checked, name, loc) =>
+    row(
+      `<input type="checkbox" ${checked ? 'checked' : ''} onchange="${setter}(this.checked); renderModuleBay();" aria-label="${escapeHtml(name)}" />`,
+      name,
+      loc
+    );
+  const themeOptions =
+    typeof THEMES === 'object' && THEMES
+      ? Object.keys(THEMES)
+          .map(
+            k =>
+              `<option value="${k}"${k === optic ? ' selected' : ''}>${escapeHtml(THEMES[k].label)}</option>`
+          )
+          .join('')
+      : '';
+
+  list.innerHTML = [
+    row(
+      `<select onchange="changeOpticsColor(this.value); renderModuleBay();" aria-label="Phosphor tube">${themeOptions}</select>`,
+      'PHOSPHOR TUBE',
+      'SLOT 01'
+    ),
+    checkboxRow('toggleHighLumen', highLumen, 'HIGH-LUMEN COIL', 'SLOT 01'),
+    checkboxRow('toggleMasterMute', masterMuted, 'SONIC PROCESSOR BOARD (MASTER MUTE)', 'SLOT 02'),
+    row(
+      '<span style="opacity:.6">13 rows</span>',
+      '13 CHANNEL CHIPS — manage individually in SLOT 02 above',
+      'SLOT 02'
+    ),
+    checkboxRow('_schemSetHardwareSfx', hwSfxOn, 'SERVO CLICK RELAY', 'SLOT 02'),
+    checkboxRow('toggleRadio', radioOn, 'RADIO RECEIVER MODULE', 'SLOT 02'),
+    row(
+      `<input type="range" min="0.25" max="3" step="0.25" value="${typerSpeed}" style="flex:1 1 90px;min-width:0" oninput="MetaStore.set('robco_typer_speed', this.value); renderModuleBay();" aria-label="Print-rate trim" />`,
+      'PRINT-RATE TRIM',
+      'SLOT 02'
+    ),
+    checkboxRow('toggleWakeLock', wakeOn, 'SUSTAINED POWER CELL', 'SLOT 03'),
+    checkboxRow('toggleHaptic', hapticOn, 'HAPTIC SOLENOID', 'SLOT 03'),
+    row(
+      `<select onchange="onImmersionChange(this.value); renderModuleBay();" aria-label="Atmospheric regulator">
+        <option value="full"${tier === 'full' ? ' selected' : ''}>FULL</option>
+        <option value="balanced"${tier === 'balanced' ? ' selected' : ''}>BALANCED</option>
+        <option value="minimal"${tier === 'minimal' ? ' selected' : ''}>MINIMAL</option>
+      </select>`,
+      'ATMOSPHERIC REGULATOR',
+      'SLOT 04'
+    ),
+    checkboxRow('_schemSetGeminiSync', keySync, 'KEY-SYNC JUMPER', 'SLOT 05'),
+  ].join('');
+}
+window.renderBaySchematic = renderBaySchematic;
+
+// SVC Tray onclick wrappers — kept as tiny named functions (not inline multi-
+// statement onclick) so the diegetic log message is never embedded in an
+// index.html attribute value (avoids colliding with the Suite 59 inline-
+// handler scanner, which treats any "Word(" it finds in an attribute as a
+// candidate function reference). Each wraps the SAME existing utility action.
+
+// Consolidated EJECT HOLOTAPE control (owner report): merges the four
+// previously-separate export buttons (EJECT HOLOTAPE / PRINT CAMPAIGN LOG /
+// EXPORT .MD / EXPORT .HTML) into one — a #holotapeFormatSelect format
+// choice plus this single action. Re-routes to the existing, UNFORKED
+// functions (Protocol 22): TXT keeps the original EJECT HOLOTAPE behavior
+// (ejectHolotape()'s share → clipboard → download fallback chain); MD/HTML
+// keep the original EXPORT .MD/.HTML behavior (exportCampaignLog(fmt)'s
+// download-only path) — neither function's own logic changes, only which
+// one this control calls.
+function _svcEjectHolotape() {
+  const sel = document.getElementById('holotapeFormatSelect');
+  const fmt = sel ? sel.value : 'txt';
+  if (fmt === 'txt') {
+    ejectHolotape();
+  } else {
+    exportCampaignLog(fmt);
+  }
+  _logBaySvc(
+    'CAMPAIGN LOG EXPORTED — .' + String(fmt).toUpperCase() + (fmt === 'txt' ? ' (SHARE)' : '')
+  );
+}
+window._svcEjectHolotape = _svcEjectHolotape;
+
+function _svcViewChangelog() {
+  showFullChangelog();
+  _logBaySvc('FIRMWARE REVISION LOG OPENED');
+}
+window._svcViewChangelog = _svcViewChangelog;
+
+function _svcInstallPwa() {
+  installPwa();
+  _logBaySvc('SYSTEM INSTALLER LAUNCHED');
+}
+window._svcInstallPwa = _svcInstallPwa;
+
 // ── CLIENT ERROR RING-BUFFER ──────────────────────────────────
 // Local-only diagnostic log — never transmitted. Cap 50 entries × 300 chars ≈ 15 KB max.
 const ERROR_LOG_KEY = 'robco_error_log';
 const ERROR_LOG_CAP = 50;
 let _sysModalTrigger = null;
+// Step 2 Phase 0 U12 (FP-SYS-8): callback fired the next time the shared #sysModal
+// closes (any path — CLOSE button, Escape, or a confirmAction() Yes/No click). Set
+// by openModal({onClose}) / confirmAction(); consumed once by closeModal().
+let _modalCloseCallback = null;
 function _recordError(type, msg) {
   try {
-    const log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    const log = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
     log.push({ t: Date.now(), type, msg: String(msg).slice(0, 300) });
     while (log.length > ERROR_LOG_CAP) log.shift();
-    localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(log));
+    MetaStore.set(ERROR_LOG_KEY, JSON.stringify(log));
   } catch (_) {} // never let logging throw
+  _updateFaultLamp();
 }
+
+// Shared reader (Protocol 22) — the casing FAULT lamp, the BUS-24 fault
+// annunciator, and the LIVING CORE's fault-strain signal (#6) all read the
+// SAME client error ring-buffer through this one function, so they can never
+// disagree on the buffered-fault count.
+function _readErrorLog() {
+  try {
+    return JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
+  } catch (_) {
+    return [];
+  }
+}
+
+// FEEDBACK ANIMATION WAVE 3 (#32 FAULT, polish tier) — the "did this
+// ACTUALLY change?" crossing cache (the _lastRadThreshold/_lastWeightSeized
+// precedent). Deliberately does NOT seed at boot.
+let _lastFaultHasErrors = null;
+// DO-N: the casing-top FAULT lamp reads the existing error ring-buffer
+// (read-only device telemetry, no new state) — lit whenever a client error
+// has been recorded this device, cleared by the existing [LOGS] CLEAR action.
+function _updateFaultLamp() {
+  const lamp = document.getElementById('lampFault');
+  const hasErrors = _readErrorLog().length > 0;
+  if (lamp) lamp.classList.toggle('fault', hasErrors);
+  // #32 FAULT — a one-shot flicker on the lamp + the BUS-24 counter, fired
+  // only on the genuine false->true crossing (a fresh fault, never every
+  // re-render while already lit); home-only — the always-present lamp is
+  // already the echo (build plan §8 Q6), no annunciator push needed.
+  const isNewFault = _lastFaultHasErrors === false && hasErrors === true;
+  _lastFaultHasErrors = hasErrors;
+  if (typeof renderServiceFaultConsole === 'function') renderServiceFaultConsole();
+  if (typeof _coreRefresh === 'function') _coreRefresh(); // LIVING CORE behavior #6: fault strain
+  if (isNewFault) {
+    [lamp, document.getElementById('svcFaultNum')].forEach(el => {
+      if (!el) return;
+      el.classList.remove('fault-flicker-in');
+      void el.offsetWidth;
+      el.classList.add('fault-flicker-in');
+      setTimeout(() => el.classList.remove('fault-flicker-in'), 700);
+    });
+  }
+}
+
+// BUS-24 SERVICE & FAULT CONSOLE (CHASSIS) — the fault-annunciator half; the
+// revision-log spool half is static markup (its one live value, #svcRevLine,
+// is stamped once at boot by initChassisCore()). Reads the SAME ring-buffer
+// _updateFaultLamp() already reads (Protocol 22) — never a second source of
+// truth for "how many faults are buffered."
+function renderServiceFaultConsole() {
+  const counter = document.getElementById('svcFaultCounter');
+  const numEl = document.getElementById('svcFaultNum');
+  const lastEl = document.getElementById('svcFaultLast');
+  const led = document.getElementById('svcBoardLed');
+  const sum = document.getElementById('chassisSvcStatus');
+  if (!counter && !sum) return;
+  const log = _readErrorLog();
+  const clear = log.length === 0;
+  if (counter) counter.classList.toggle('clear', clear);
+  if (numEl) numEl.textContent = String(Math.min(log.length, 99)).padStart(2, '0');
+  if (lastEl) {
+    if (clear) {
+      lastEl.textContent = 'NO FAULTS ON THE BUFFER — UNIT NOMINAL';
+    } else {
+      const last = log[log.length - 1];
+      const ts = new Date(last.t || Date.now()).toISOString().replace('T', ' ').slice(0, 19);
+      lastEl.textContent =
+        'LAST: [' +
+        (last.type || '?') +
+        '] ' +
+        (last.msg || '') +
+        ' · ' +
+        ts +
+        ' · buffered locally, never transmitted';
+    }
+  }
+  if (led) led.classList.toggle('red', !clear);
+  if (sum) {
+    sum.textContent = clear
+      ? 'REV LOG READY · NO FAULTS BUFFERED'
+      : 'REV LOG READY · ' + log.length + ' FAULT' + (log.length === 1 ? '' : 'S') + ' BUFFERED';
+  }
+}
+window.renderServiceFaultConsole = renderServiceFaultConsole;
+
+// ── Owner-report batch: casing lamps go from decorative to functional ──────
+// FIX 1: PWR lamp click → the existing AmbientRuntime SHUTDOWN path (Protocol
+// 22 — the exact same shutdown() the A3 shutdown-crt observer already uses;
+// #powerOnBtn/_powerOnFromShutdown() above remains the sole way back on).
+function _powerOffFromLamp() {
+  if (typeof AmbientRuntime === 'undefined' || !AmbientRuntime) return;
+  AmbientRuntime.shutdown();
+}
+window._powerOffFromLamp = _powerOffFromLamp;
+
+// PWR lamp reflects the real runtime power state — lit outside SHUTDOWN/OFF,
+// unlit while shut down. Wired from the shutdown-crt observer's onEnter/onExit
+// (Protocol 22 — no separate observer registered just for the lamp).
+function _updatePwrLamp(on) {
+  const lamp = document.getElementById('lampPwr');
+  if (lamp) lamp.classList.toggle('on', !!on);
+}
+
+// FIX 2/4/5: the ONE connection signal — reused by the UPLINK lamp, the
+// Overseer's own NO-CARRIER resting tag, the scope-tag click gate, and the
+// bezel VITALS-strip CARRIER field, so none of them can ever disagree
+// (Protocol 22). Deliberately the SAME hasKey/aiEnabled/online check
+// _overseerRestState/_overseerRestSignals already use — not the stricter
+// validated-key check SLOT 05's own board status uses (Suite 121/162).
+function _isUplinkConnected() {
+  return (
+    typeof _overseerRestState === 'function' &&
+    typeof _overseerRestSignals === 'function' &&
+    _overseerRestState(_overseerRestSignals()) === 'listening'
+  );
+}
+window._isUplinkConnected = _isUplinkConnected;
+
+// UPLINK lamp reflects the same connection signal.
+function _updateUplinkLamp() {
+  const lamp = document.getElementById('lampUplink');
+  if (lamp) lamp.classList.toggle('on', _isUplinkConnected());
+}
+
+// FIX 2/4a: shared navigation target for "go fix the AI connection" — used by
+// the UPLINK lamp click and the Overseer's NO CARRIER tag click. Reuses
+// selectSubsystem('settings') (Protocol 22) to route + sync the bezel nav —
+// the Module Bay (and its SLOT 05 AI Uplink board) lives under the SETTINGS
+// subsystem (Step 2 v2.8.0 Settings-tab unit), not CHASSIS — then opens/
+// scrolls the SLOT 05 sub-panel specifically.
+function _openAiUplinkSlot() {
+  if (typeof selectSubsystem === 'function') selectSubsystem('settings');
+  const slot = document.querySelector('details[data-sub-id="slot_05_uplink"]');
+  if (!slot) return;
+  if (!slot.open) slot.setAttribute('open', '');
+  slot.scrollIntoView({ block: 'center' });
+}
+window._openAiUplinkSlot = _openAiUplinkSlot;
 
 // ── GLOBAL ERROR NET ──────────────────────────────────────────
 // Catches uncaught JS errors and unhandled promise rejections and surfaces a
@@ -327,7 +1086,225 @@ let _lastRads = -1,
 let _chatSaveTimer = null;
 const CHAT_MAX = 200; // max messages kept in memory; last 50 written to localStorage
 
-window.onload = function () {
+// ── BOOT SEQUENCE (window.onload) ──────────────────────────────
+// Decomposed into named, order-preserving phases (Step 2 Phase 0 U2). Each
+// function below is a straight extraction of one contiguous section of the
+// former monolithic window.onload body — no logic was added, removed, or
+// reordered. window.onload (bottom of this section) calls them in the exact
+// original source order; do not reorder without re-auditing every boot/
+// lifecycle entry path in planning/STEP2_PHASE0_PLAN.md.
+
+// ── STANDBY MODE + AMBIENT-TIMER STATE ─────────────────────────
+// Module-scope because the standby coordinator (enterStandby/exitStandby) and the
+// ambient observers share `sessionStart`. Phase 2 A2 migrated the uptime clock and
+// memory-cycle flash off their own setIntervals onto the Ambient Runtime: they are
+// now runtime observers (registered in _startAmbientTimers) that tick only in the
+// awake states (['ACTIVE','IDLE']) — so the runtime pauses them on STANDBY and
+// restarts their cadence on wake automatically (byte-identical to the old
+// enterStandby-clears / exitStandby-restarts behavior), and their dial gate is the
+// runtime's tier check. enterStandby/exitStandby no longer manage those intervals.
+let _standbyActive = false;
+let sessionStart = 0;
+
+// Uptime-clock observer tick: refresh the HH:MM:SS since-boot readout. tier 'minimal'
+// (baseline telemetry — never dial-quieted), cadence 1000ms, awake states only.
+function _tickUptimeClock() {
+  let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+  let h = Math.floor(elapsed / 3600),
+    m = Math.floor((elapsed % 3600) / 60),
+    s = elapsed % 60;
+  let el = document.getElementById('uptimeClock');
+  if (el)
+    el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // LIVING CORE #8 uptime-milestone pulse — a one-shot celebratory flourish
+  // each time this session's uptime crosses a whole hour. h > 0 skips the
+  // (uninteresting) 0-hour mark; the in-memory _lastCoreUptimeMilestone guard
+  // (declared alongside the other LIVING CORE transient signals above) means
+  // this fires exactly once per crossed hour, never once per second.
+  if (h > _lastCoreUptimeMilestone) {
+    _lastCoreUptimeMilestone = h;
+    if (typeof _coreMilestonePulse === 'function') _coreMilestonePulse();
+  }
+}
+
+// Memory-cycle observer tick: the periodic ambient "memory cycle" flash. Registered
+// at tier 'balanced', so the RUNTIME enforces the Immersion dial (runs at Full/
+// Balanced, silent at Minimal) — the single enforcement point, no internal re-check.
+function _tickMemCycle() {
+  appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
+  document.body.style.filter = 'brightness(0.35)';
+  setTimeout(() => {
+    document.body.style.filter = '';
+  }, 150);
+}
+
+function enterStandby() {
+  if (_standbyActive) return;
+  _standbyActive = true;
+  document.body.classList.add('standby');
+  geigerRunning = false;
+  if (geigerTimeout) {
+    clearTimeout(geigerTimeout);
+    geigerTimeout = null;
+  }
+  _geigerCurrentRate = -1;
+  if (crtHumGain) {
+    crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  }
+  // The uptime + memory-cycle observers pause automatically (STANDBY ∉ their states);
+  // no manual interval clearing needed. Only the self-scheduling audio heartbeat has
+  // to be stopped explicitly here.
+  stopHeartbeat();
+}
+
+// A3 (Protocol 42): the standby "wake" sequence (tone + audio ramp + the
+// "COURIER RETURNED" chat line) is a return-to-active-use behavior — it must
+// fire ONLY when the terminal is genuinely coming back, never on a power-down.
+// STANDBY→SHUTDOWN is a legal runtime edge (forced via the Test Console
+// today), but a shutdown could also land AFTER a normal wake has already
+// started (mid-way through the 650ms window below). Rather than checking
+// once up front — which only catches the direct STANDBY→SHUTDOWN edge and
+// misses a shutdown landing during the delay — each half of the wake
+// sequence re-checks the runtime state at that HALF's own fire time: once,
+// synchronously, right before the tone (its fire time is now); again inside
+// the setTimeout, right before the ramp/chat/geiger-resync (its fire time is
+// 650ms later). Either check no-oping is enough on its own to stop the whole
+// sequence from completing — this is deliberately more robust than trying to
+// cancel the pending timer from elsewhere.
+function _isShuttingDown() {
+  return (
+    typeof AmbientRuntime !== 'undefined' &&
+    (AmbientRuntime.getState() === 'SHUTDOWN' || AmbientRuntime.getState() === 'OFF')
+  );
+}
+
+function exitStandby() {
+  if (!_standbyActive) return;
+  _standbyActive = false;
+  if (_isShuttingDown()) return; // fire time for the tone is now — skip it too
+  playWakeTone();
+  setTimeout(() => {
+    // Re-check AT THIS ACTION'S OWN FIRE TIME: a shutdown that landed sometime
+    // during the 650ms window (after the tone already played above) still
+    // must not surface the ramp/chat/geiger-resync — the shutdown-crt
+    // observer's own onEnter already force-clears the standby class, so
+    // nothing is left stuck either way.
+    if (_isShuttingDown()) return;
+    document.body.classList.remove('standby');
+    if (crtHumGain) {
+      crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+      crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.5);
+    }
+    appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
+    let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
+    setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
+    // The uptime + memory-cycle observers resume automatically on the ACTIVE re-entry
+    // (the runtime restarts their cadence clock), so no manual restart here.
+    updateMath();
+  }, 650);
+}
+
+// ── BOOT PHASE FUNCTIONS (called in order from window.onload) ───
+
+// ── P2: DEVICE-PREF BOOT HYDRATION / RECONCILIATION (Step 2 · Phase 1) ───────
+// The first read path to consult IndexedDB. On boot, reconcile the device-pref
+// ('meta') store against localStorage BEFORE the rest of boot reads any pref.
+//
+// AUTHORITY RULE — localStorage is the source of record. When localStorage HAS a
+// device key, it wins; IndexedDB never overwrites a present localStorage value.
+// The one exception (the durability payoff) is RECOVERY: a device key IndexedDB
+// has but localStorage is MISSING is restored to localStorage, so a preference
+// survives a localStorage clear/eviction that IndexedDB outlived — and only if
+// the record's stored checksum still verifies (a corrupt IDB record is skipped,
+// never restored). In the other direction, BACKFILL mirrors any device key
+// localStorage has but IDB lacks (e.g. a pre-P1 preference) into IDB so the
+// shadow becomes complete — IDB-only, never touching localStorage. Campaign data
+// is untouched: P2 reconciles only the 'meta' store (the 'campaign' store stays
+// for a later unit). Game-agnostic (Protocol 38) — operates on keys/values only.
+async function _reconcileMetaFromIdb() {
+  if (typeof window === 'undefined' || !window.IdbStore) return { recovered: 0, backfilled: 0 };
+  let idbKeys;
+  try {
+    idbKeys = await window.IdbStore.keys('meta');
+  } catch (_) {
+    return { recovered: 0, backfilled: 0 };
+  }
+  if (!Array.isArray(idbKeys)) idbKeys = [];
+  const idbSet = new Set(idbKeys);
+  let recovered = 0;
+  let backfilled = 0;
+
+  // Direction 1 — RECOVERY (IDB → localStorage, only when localStorage is missing).
+  // Gated on MetaStore.has so ONLY registered device keys are ever restored —
+  // symmetric with backfill, so a stray non-device key in the 'meta' store could
+  // never be resurrected into localStorage (defense-in-depth two-store boundary).
+  for (const key of idbKeys) {
+    if (!MetaStore.has(key)) continue; // registered device keys only
+    let lsV = null;
+    try {
+      lsV = localStorage.getItem(key);
+    } catch (_) {}
+    if (lsV !== null) continue; // localStorage present → localStorage wins
+    let rec = null;
+    try {
+      rec = await window.IdbStore.getRaw('meta', key);
+    } catch (_) {}
+    if (!rec || typeof rec.value !== 'string') continue;
+    // Integrity gate: never restore a corrupt IDB record.
+    if (
+      rec.checksum &&
+      typeof window.computeSaveChecksum === 'function' &&
+      window.computeSaveChecksum(rec.value, [], '') !== rec.checksum
+    ) {
+      continue;
+    }
+    // MetaStore.set restores localStorage AND re-shadows to IDB (idempotent).
+    MetaStore.set(key, rec.value);
+    recovered++;
+  }
+
+  // Direction 2 — BACKFILL (localStorage → IDB, only when IDB lacks the key).
+  // Restricted to REGISTERED device keys (MetaStore.has) so a campaign key can
+  // never leak into the 'meta' store (two-store boundary).
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || idbSet.has(key) || !MetaStore.has(key)) continue;
+      let v = null;
+      try {
+        v = localStorage.getItem(key);
+      } catch (_) {}
+      if (v === null) continue;
+      const p = window.IdbStore.set('meta', key, v); // IDB-only; never writes localStorage
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+      backfilled++;
+    }
+  } catch (_) {}
+
+  return { recovered, backfilled };
+}
+
+// Awaited boot phase. BOUNDED so a slow/hung IndexedDB can never delay boot:
+// normal boots resolve in ~0ms (idb.js opened the connection at page-parse time,
+// long before onload), and a pathological hang is capped at _META_HYDRATE_BUDGET_MS,
+// after which boot proceeds on localStorage exactly as today (fail-safe default —
+// a still-pending reconciliation may finish harmlessly in the background). Never
+// rejects; if IdbStore is absent it resolves immediately (byte-identical boot).
+const _META_HYDRATE_BUDGET_MS = 1000;
+function _hydrateMetaFromIdb() {
+  try {
+    if (typeof window === 'undefined' || !window.IdbStore) return Promise.resolve();
+    return Promise.race([
+      _reconcileMetaFromIdb().catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, _META_HYDRATE_BUDGET_MS)),
+    ]);
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
+
+function _hydrateStateFromStorage() {
   // Snapshot current state as rolling backup before any boot migration (Protocol: Rolling Backups)
   if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
   let v8Str = localStorage.getItem('robco_v8');
@@ -340,6 +1317,10 @@ window.onload = function () {
       let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
       state = { ...state, ...activeCampaign };
       state.gameContext = window.robco_v8.activeContext;
+      // P4: the v8 fast-path skips migrateState, so run the Terminal Record
+      // [T#]→eventLog migration here too — existing v8 saves migrate on load
+      // (idempotent + non-lossy; leaves manual notes in campaign_notes).
+      if (typeof window._migrateEventLog === 'function') window._migrateEventLog(state);
       loadedOk = true;
     } catch (e) {
       console.error('[RobCo] Corrupt robco_v8 — quarantined, booting fresh:', e);
@@ -400,16 +1381,18 @@ window.onload = function () {
   getFactionRegistry().forEach(f => {
     if (!state.factions[f.key]) state.factions[f.key] = { fame: 0, infamy: 0 };
   });
+}
 
-  if (localStorage.getItem('robco_gemini_key')) {
-    document.getElementById('apiKeyInput').value = localStorage.getItem('robco_gemini_key');
+function _restoreApiKeyAndChatHistory() {
+  if (MetaStore.get('robco_gemini_key')) {
+    document.getElementById('apiKeyInput').value = MetaStore.get('robco_gemini_key');
   }
-  if (localStorage.getItem('robco_gemini_key_sync') === 'true') {
+  if (MetaStore.get('robco_gemini_key_sync') === 'true') {
     const syncEl = document.getElementById('geminiKeySyncToggle');
     if (syncEl) syncEl.checked = true;
   }
-  if (localStorage.getItem('robco_gemini_model')) {
-    let savedModel = localStorage.getItem('robco_gemini_model');
+  if (MetaStore.get('robco_gemini_model')) {
+    let savedModel = MetaStore.get('robco_gemini_model');
     const safeModel = escapeHtml(savedModel);
     document.getElementById('apiModelInput').innerHTML =
       `<option value="${safeModel}">${safeModel} (Secured)</option>`;
@@ -427,112 +1410,1165 @@ window.onload = function () {
     localStorage.removeItem('robco_chat');
     appendToChat('> SYSTEM INITIALIZED. DIAGNOSTIC CORE ACTIVE...', 'sys', true);
   }
-  loadUI();
-  initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
-  setupHpBarInteraction();
-  setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
-  startCrtHum();
-  initRegistryAutocomplete();
-  initAmmoDatalist();
-  initLocationDatalist();
-  initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
-  initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
-  initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
-  initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
-  initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+}
 
+function _wireRotaryDialClick() {
   // H1: Rotary Dial Click — fire on any <details> panel toggle inside uiPanel
   const _uiPanel = document.getElementById('uiPanel');
   if (_uiPanel) {
     _uiPanel.addEventListener('toggle', () => playPanelClick(), true);
   }
+}
 
-  // ── TAB STANDBY MODE ───────────────────────────────────────────
-  // enterStandby/exitStandby are shared so blur+visibilitychange
-  // can both fire without doubling the wake tone or log message.
-  let _standbyActive = false;
-  let _uptimeInterval = null;
-  let _memCycleInterval = null;
+function _wireStandby() {
+  // ── TAB STANDBY MODE — driven by the Ambient Runtime (Phase 2 A2) ──────────
+  // A1 made the runtime own the blur / focus / visibilitychange → STANDBY / ACTIVE
+  // transitions. A2 folds the standby dim + audio ducking (formerly wired to those
+  // events directly) into the runtime's STANDBY on-enter / on-exit as a single
+  // coordinator observer — so the runtime is the ONE lifecycle driver and the old
+  // direct blur/focus/visibilitychange listeners are retired (no double-wiring, no
+  // double-dim). enterStandby / exitStandby are unchanged and keep their own
+  // idempotency guard (belt-and-suspenders; the runtime already single-fires
+  // onEnter/onExit per STANDBY crossing).
+  //
+  // tier 'minimal': standby response is ESSENTIAL feedback — the terminal must
+  // visibly/audibly react to tab-out/in at every immersion level — so it never
+  // quiets. (onEnter/onExit are lifecycle hooks and are not tier-gated regardless;
+  // 'minimal' documents the intent.)
+  AmbientRuntime.register({
+    id: 'standby',
+    states: ['STANDBY'],
+    tier: 'minimal',
+    onEnter: enterStandby,
+    onExit: exitStandby,
+  });
+}
 
-  // Shared interval starters (DUP-3/DUP-4). Both the boot path and exitStandby()
-  // restart these after standby clears them; the guard keeps a double-call from
-  // ever stacking a second timer.
-  function _startUptimeClock() {
-    if (_uptimeInterval) return;
-    _uptimeInterval = setInterval(() => {
-      let elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-      let h = Math.floor(elapsed / 3600),
-        m = Math.floor((elapsed % 3600) / 60),
-        s = elapsed % 60;
-      let el = document.getElementById('uptimeClock');
-      if (el)
-        el.innerText = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    }, 1000);
-  }
-  function _startMemCycle() {
-    if (_memCycleInterval) return;
-    _memCycleInterval = setInterval(() => {
-      appendToChat('> MEMORY CYCLE COMPLETE. 64K STABLE.', 'sys', true);
-      document.body.style.filter = 'brightness(0.35)';
-      setTimeout(() => {
-        document.body.style.filter = '';
-      }, 150);
-    }, 900000);
-  }
-
-  function enterStandby() {
-    if (_standbyActive) return;
-    _standbyActive = true;
-    document.body.classList.add('standby');
-    geigerRunning = false;
-    if (geigerTimeout) {
-      clearTimeout(geigerTimeout);
-      geigerTimeout = null;
-    }
-    _geigerCurrentRate = -1;
-    if (crtHumGain) {
-      crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
-      crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-    }
-    clearInterval(_uptimeInterval);
-    _uptimeInterval = null;
-    clearInterval(_memCycleInterval);
-    _memCycleInterval = null;
-    stopHeartbeat();
-  }
-
-  function exitStandby() {
-    if (!_standbyActive) return;
-    _standbyActive = false;
-    playWakeTone();
-    setTimeout(() => {
-      document.body.classList.remove('standby');
-      if (crtHumGain) {
-        crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
-        crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.5);
-      }
-      appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
-      let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
-      setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
-      _startUptimeClock();
-      _startMemCycle();
-      updateMath();
-    }, 650);
-  }
-
-  // blur fires while the tab is still compositing — best chance to see the dim on tab-out
-  window.addEventListener('blur', enterStandby);
-  window.addEventListener('focus', exitStandby);
-  // visibilitychange is the reliable fallback (keyboard tab-switch, mobile, etc.)
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) enterStandby();
-    else exitStandby();
+// ── A3: IDLE / STANDBY / SHUTDOWN AMBIENT EXPERIENCES ──────────────────────
+// The showcase consumers of the runtime states, layered on top of the A2
+// standby machine + timers (unchanged). Pure CSS-class toggles driven by
+// onEnter/onExit — the runtime does NOT tier-gate onEnter/onExit itself
+// (only onTick, re-checked every beat — see runtime.js's _beat()), so each
+// one-shot lifecycle hook below checks immersionAllows() itself, the same
+// convention _wireStandby documents for its own 'minimal' tier. Writes
+// NOTHING durable to the campaign anywhere here (Phase-2 invariant #1) —
+// body classList toggles only, never state/saveState/eventLog.
+function _wireAmbientExperiences() {
+  // IDLE — phosphor-preservation screensaver flourish (a gentle dim + a small
+  // diegetic corner note). tier 'balanced': quiet at Minimal, on at Balanced/
+  // Full. Reverts the instant any interaction fires (noteActivity() already
+  // transitions IDLE→ACTIVE, crossing this observer's onExit).
+  AmbientRuntime.register({
+    id: 'idle-phosphor',
+    states: ['IDLE'],
+    tier: 'balanced',
+    onEnter: () => {
+      if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return;
+      document.body.classList.add('rt-idle');
+    },
+    onExit: () => document.body.classList.remove('rt-idle'),
   });
 
+  // STANDBY (deepen) — an ADDITIONAL flourish layered over the A2 essential
+  // dim (which stays tier 'minimal', unchanged, in _wireStandby above). tier
+  // 'balanced': the essential .standby dim/text never quiets; this extra
+  // vignette pulse does, at Minimal.
+  AmbientRuntime.register({
+    id: 'standby-deepen',
+    states: ['STANDBY'],
+    tier: 'balanced',
+    onEnter: () => {
+      if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return;
+      document.body.classList.add('standby-deep');
+    },
+    onExit: () => document.body.classList.remove('standby-deep'),
+  });
+
+  // SHUTDOWN — a proper CRT power-down. tier 'full': the dramatic collapse-
+  // to-a-dot flourish only at Full; Balanced/Minimal degrade to a plain
+  // instant cut (rt-shutdown-plain) — the terminal is never left in a broken
+  // half-state at any tier.
+  //
+  // states includes OFF so the visual PERSISTS across the internal
+  // SHUTDOWN→OFF cascade (AmbientRuntime.shutdown() fires both transitions
+  // back-to-back, synchronously): onEnter only fires crossing INTO this
+  // observer's state set (not on the internal SHUTDOWN→OFF hop, since both
+  // states are members), so the animation triggers exactly once and holds
+  // until the terminal is cold-booted again (onExit fires only on leaving
+  // this set, e.g. OFF→COLD_BOOT).
+  //
+  // Any lingering standby/idle flourish loses to a genuine shutdown — cleared
+  // unconditionally here (including the A2 essential 'standby' class itself,
+  // bypassing its own delayed wake-fade so the power-down reads cleanly; see
+  // exitStandby()'s _shuttingDown guard for the matching audio/chat suppression).
+  AmbientRuntime.register({
+    id: 'shutdown-crt',
+    states: ['SHUTDOWN', 'OFF'],
+    tier: 'full',
+    onEnter: () => {
+      document.body.classList.remove('rt-idle', 'standby-deep', 'standby');
+      const full = typeof immersionAllows === 'function' ? immersionAllows('full') : true;
+      document.body.classList.add(full ? 'rt-shutdown' : 'rt-shutdown-plain');
+      // FIX 1 (owner report): the PWR lamp reflects real power state — never
+      // tier-gated (unlike the CRT flourish above), a genuine power-down always
+      // unlights it.
+      _updatePwrLamp(false);
+    },
+    onExit: () => {
+      document.body.classList.remove('rt-shutdown', 'rt-shutdown-plain');
+      _updatePwrLamp(true);
+    },
+  });
+
+  // Owner report: the CRT hum kept playing while the terminal was powered
+  // off. Reuses the exact SHUTDOWN/OFF state set the PWR lamp/shutdown-crt
+  // flourish above already key off (Protocol 22) — not tier-gated (mirrors
+  // 'overseer-scope' below: a functional power link, not a decorative
+  // ambient flourish), so it stops/resumes at every Immersion level. Volume
+  // (masterMute + the hum's own mute key) is still the only other gate,
+  // enforced inside startCrtHum()/setCrtHumIntensity() themselves.
+  AmbientRuntime.register({
+    id: 'crt-hum-power',
+    states: ['SHUTDOWN', 'OFF'],
+    onEnter: () => {
+      if (typeof stopCrtHum === 'function') stopCrtHum();
+    },
+    onExit: () => {
+      if (typeof startCrtHum !== 'function') return;
+      // Deferred to first gesture — this exit fires at boot too.
+      _armAmbientAudio(() => {
+        startCrtHum();
+        if (typeof setCrtHumIntensity !== 'function') return;
+        const rads = parseInt((document.getElementById('stat_rads') || {}).value) || 0;
+        const hasCrippled = ['la', 'ra', 'll', 'rl', 'hd'].some(l => state[l] !== 'OK');
+        setCrtHumIntensity(rads, hasCrippled);
+      });
+    },
+  });
+}
+
+// ── DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK (Protocol UI-10) ───────────
+// A presentation layer OVER the existing Comm-Link/AI pipeline (Protocol 22 —
+// appendToChat()/transmitMessage() are hooked, never forked). The oscilloscope
+// canvas reacts to the REAL AI lifecycle (thinking at the thermal-load window,
+// speaking during the typewriter, listening at rest, disabled/offline from the
+// key+flag+navigator.onLine signals). All per-game flavor text is read from
+// getIdentity().overseer (Protocol 38) with a generic fallback for a game that
+// hasn't authored one; trace colour is the existing --bezel-wire CSS token
+// (Protocol UI-7) — there is no JS colour branch anywhere in this block.
+// Writes NOTHING durable to the campaign: _scopeState is a transient module
+// var and the idle-blip observer below renders via appendToChat(...,true)
+// (never pushed to chatHistory/robco_chat).
+// ── DO-O START ──────────────────────────────────────────────────────────
+const OVERSEER_GENERIC_FALLBACK = {
+  title: 'COMM UPLINK',
+  relay: 'CARRIER LINK',
+  signalStrip: 'SIGNAL — · ENCRYPTION: TRI-NODE',
+  states: {
+    listening: '[ LISTENING ]',
+    thinking: '[ ESTABLISHING LINK ]',
+    speaking: '[ TRANSMITTING ]',
+    disabled: '[ NO CARRIER ]',
+    offline: '[ OFFLINE ]',
+  },
+  // M2 Director on the Wire (Ceremony Moments Wave 1) — generic fallback for
+  // an unauthored game (Protocol 38: never borrowed fiction).
+  greeting: '▸ CARRIER ESTABLISHED. Transmit when ready.',
+};
+const OVERSEER_STATES = ['listening', 'thinking', 'speaking', 'disabled', 'offline'];
+
+function _overseerIdentity() {
+  const id = typeof getIdentity === 'function' ? getIdentity() : null;
+  return (id && id.overseer) || OVERSEER_GENERIC_FALLBACK;
+}
+
+let _scopeState = 'listening';
+let _scopeAnimHandle = null;
+let _scopeT = 0;
+let _scopeScratchUntil = 0;
+let _runtimeAwake = true;
+// FIX 3 (owner report): a transient, one-shot amplitude bump for tapping the
+// [ LISTENING ] tag — decays to 0 by _scopePulseDurationMs after the tap, a
+// pure visual flourish that never touches _scopeState (the real state
+// machine is untouched).
+let _scopePulseUntil = 0;
+const _scopePulseDurationMs = 450;
+
+// _overseerRestState — PURE, vm-testable (Suite 162 behavioral test). Decides
+// the resting tag from the three live signals; never touches the DOM.
+function _overseerRestState({ hasKey, aiEnabled, online }) {
+  if (!online) return 'offline';
+  if (!hasKey || !aiEnabled) return 'disabled';
+  return 'listening';
+}
+window._overseerRestState = _overseerRestState; // exposed for api.js's finally hook + the Suite 162 behavioral test
+
+// _overseerRestSignals — reads the same key/flag/online signals transmitMessage()
+// itself gates on (api.js), so the scope's resting tag always matches reality.
+function _overseerRestSignals() {
+  const hasKey = !!(typeof MetaStore !== 'undefined' && MetaStore.get('robco_gemini_key'));
+  const aiEnabled =
+    typeof window.isFeatureEnabled !== 'function' || window.isFeatureEnabled('aiChat') !== false;
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  return { hasKey, aiEnabled, online };
+}
+window._overseerRestSignals = _overseerRestSignals; // exposed for api.js's finally hook
+
+function _scopeShouldAnimate() {
+  const reduced =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return false;
+  if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return false;
+  if (!_runtimeAwake) return false;
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  return true;
+}
+
+function _scopeColor() {
+  try {
+    return (
+      getComputedStyle(document.documentElement).getPropertyValue('--bezel-wire').trim() ||
+      '#ffb642'
+    );
+  } catch (_) {
+    return '#ffb642';
+  }
+}
+
+function _sizeOverseerScope(canvas) {
+  const r = canvas.getBoundingClientRect();
+  if (r.width === 0) return false;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
+  return true;
+}
+
+function drawScope() {
+  const canvas = document.getElementById('overseerScope');
+  if (!canvas) return;
+  if (!canvas.width && !_sizeOverseerScope(canvas)) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const W = canvas.width,
+    H = canvas.height,
+    mid = H / 2;
+  const dpr = window.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(20,253,206,0.10)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += W / 12) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y < H; y += H / 6) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+  const color = _scopeColor();
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6 * dpr;
+  ctx.lineWidth = 1.6 * dpr;
+  ctx.beginPath();
+  const scratching = performance.now() < _scopeScratchUntil;
+  // FIX 3: a tap-triggered pulse envelope — 1 right after the tap, decaying
+  // linearly to 0 by _scopePulseDurationMs later. Only listening's carrier
+  // wave reads it (thinking/speaking/disabled already have their own motion).
+  const pulseRemain = _scopePulseUntil - performance.now();
+  const pulseEnv = pulseRemain > 0 ? pulseRemain / _scopePulseDurationMs : 0;
+  for (let x = 0; x <= W; x += 2) {
+    let y;
+    if (_scopeState === 'thinking') {
+      y =
+        mid +
+        (Math.sin(x * 0.09 + _scopeT * 3.1) + Math.sin(x * 0.23 - _scopeT * 4.7)) * H * 0.11 +
+        (Math.random() - 0.5) * H * 0.34;
+    } else if (_scopeState === 'speaking') {
+      const env = 0.55 + 0.45 * Math.sin(_scopeT * 6);
+      y =
+        mid + Math.sin(x * 0.045 + _scopeT * 5) * H * 0.26 * env + (Math.random() - 0.5) * H * 0.05;
+    } else if (_scopeState === 'disabled' || _scopeState === 'offline') {
+      y = mid + (Math.random() - 0.5) * H * 0.02;
+    } else {
+      // listening — gentle carrier sine, occasional NV-persona scratch burst,
+      // amplified by the one-shot tap pulse while it decays
+      y =
+        mid +
+        Math.sin(x * 0.02 + _scopeT) * H * 0.14 * (1 + pulseEnv * 2.5) +
+        Math.sin(x * 0.006 - _scopeT * 0.4) * H * 0.05 +
+        (Math.random() - 0.5) * H * (scratching ? 0.22 : 0.02) * (1 + pulseEnv * 1.5);
+    }
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function _scopeLoop() {
+  _scopeT += 0.035;
+  if (_scopeState === 'listening' && Math.random() < 0.004) {
+    _scopeScratchUntil = performance.now() + 260 + Math.random() * 320;
+  }
+  drawScope();
+  if (_scopeShouldAnimate()) {
+    _scopeAnimHandle = requestAnimationFrame(_scopeLoop);
+  } else {
+    _scopeAnimHandle = null;
+  }
+}
+
+// _armScopeLoop — starts the rAF loop iff animation is currently allowed;
+// otherwise just paints the correct static frame for the current state
+// (reduced-motion / Minimal dial / standby / tab-hidden all degrade here).
+function _armScopeLoop() {
+  if (_scopeAnimHandle) return; // already running
+  if (!_scopeShouldAnimate()) {
+    drawScope();
+    return;
+  }
+  _scopeAnimHandle = requestAnimationFrame(_scopeLoop);
+}
+
+function getOverseerState() {
+  return _scopeState;
+}
+window.getOverseerState = getOverseerState;
+
+// setOverseerState(s) — the ONE state-setter. Always draws one frame
+// immediately (so reduced-motion/Minimal-dial users still see the correct
+// frame), then arms the loop iff animation is currently allowed.
+function setOverseerState(s) {
+  if (OVERSEER_STATES.indexOf(s) === -1) return;
+  _scopeState = s;
+  const ov = _overseerIdentity();
+  const tag = (ov.states && ov.states[s]) || OVERSEER_GENERIC_FALLBACK.states[s];
+  const tagEl = document.getElementById('scopeTag');
+  if (tagEl) {
+    tagEl.textContent = tag;
+    tagEl.classList.toggle('thinking', s === 'thinking');
+    // FIX 4a (owner report): only NO CARRIER (disabled/offline) has somewhere
+    // useful to route to. FIX 3 (owner report): LISTENING is ALSO actionable —
+    // a tap triggers a one-shot scope pulse (see _scopeTagClick/_scopePulse) —
+    // so only a mid-transaction tag (thinking/speaking) stays a pure readout.
+    if (tagEl.tagName === 'BUTTON') {
+      tagEl.disabled = s === 'thinking' || s === 'speaking';
+      tagEl.setAttribute(
+        'aria-label',
+        s === 'listening'
+          ? tag + ' — tap to pulse the scope'
+          : s === 'disabled' || s === 'offline'
+            ? tag + ' — tap to open the AI Uplink settings'
+            : tag
+      );
+    }
+  }
+  const csEl = document.getElementById('csState');
+  if (csEl) csEl.textContent = tag;
+  drawScope();
+  _armScopeLoop();
+  // CHASSIS LIVING CORE #2/#3 (AI revs / connection) — reuses this SAME
+  // choke point rather than re-instrumenting transmitMessage()/
+  // appendToChat() (Protocol 22).
+  if (typeof _coreRefresh === 'function') _coreRefresh();
+}
+window.setOverseerState = setOverseerState;
+
+// refreshOverseerCarrier — re-reads the per-game identity strings (title/
+// relay/status-strip) and, ONLY when the scope is genuinely at rest (never
+// mid-transaction), recomputes listening/disabled/offline from the live
+// key/flag/online signals. transmitMessage()'s own finally hook is the ONE
+// place that force-resets FROM 'thinking' (guarded there on
+// getOverseerState()==='thinking' — see api.js — since a blind reset here
+// would truncate a SPEAKING typewriter that starts asynchronously after
+// finally runs).
+function refreshOverseerCarrier() {
+  const ov = _overseerIdentity();
+  const titleEl = document.getElementById('ovsTitle');
+  if (titleEl) titleEl.textContent = ov.title;
+  const stripLabelEl = document.getElementById('carrierStripLabel');
+  if (stripLabelEl) stripLabelEl.textContent = ov.title;
+  const relayEl = document.getElementById('ovsRelay');
+  if (relayEl) relayEl.textContent = ov.relay;
+  const metaEl = document.getElementById('scopeStrip');
+  if (metaEl) metaEl.textContent = ov.signalStrip;
+  // FIX 2/5 (owner report): the casing UPLINK lamp + bezel VITALS strip read the
+  // exact same connection signal this function is about to recompute below —
+  // this is the ONE choke point every connection-change entry path (online/
+  // offline events, a key edit via saveApiKeySilent, initial boot) already
+  // routes through, so they live-update together and can never drift apart
+  // (Protocol 22).
+  if (typeof _updateUplinkLamp === 'function') _updateUplinkLamp();
+  if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
+  if (typeof renderSystemStatus === 'function') renderSystemStatus();
+  // SU-4: the ACCOUNT/REG PORT board's words read the same carrier signal as the
+  // lines above — routing it through this one choke point is what keeps it from
+  // ever disagreeing with the UPLINK lamp/bezel telemetry/SYSTEM STATUS carrier.
+  if (typeof renderAccount === 'function') renderAccount();
+  if (_scopeState === 'thinking' || _scopeState === 'speaking') {
+    drawScope();
+    return;
+  }
+  setOverseerState(_overseerRestState(_overseerRestSignals()));
+}
+window.refreshOverseerCarrier = refreshOverseerCarrier;
+
+// _scopePulse — FIX 3 (owner report): a fun one-shot flourish for tapping
+// [ LISTENING ]. Purely visual (transient module var only, Protocol UI-10's
+// zero-campaign-write rule); degrades to a no-op under the SAME gate every
+// other scope motion already obeys (reduced-motion / Minimal dial / hidden
+// tab / runtime STANDBY-SHUTDOWN-OFF), never a bespoke carve-out.
+function _scopePulse() {
+  if (_scopeState !== 'listening') return;
+  if (!_scopeShouldAnimate()) return;
+  _scopePulseUntil = performance.now() + _scopePulseDurationMs;
+  _armScopeLoop();
+}
+window._scopePulse = _scopePulse;
+
+// FIX 4a (owner report): the scope tag's click handler — only NO CARRIER
+// (disabled/offline) routes anywhere; the native `disabled` attribute above
+// already blocks the click in every other state, this is defense-in-depth.
+// FIX 3 (owner report): LISTENING routes to the pulse flourish instead.
+function _scopeTagClick() {
+  if (_scopeState === 'disabled' || _scopeState === 'offline') {
+    if (typeof _openAiUplinkSlot === 'function') _openAiUplinkSlot();
+  } else if (_scopeState === 'listening') {
+    _scopePulse();
+  }
+}
+window._scopeTagClick = _scopeTagClick;
+
+// initOverseerScope — boot wiring (called once from window.onload, A3
+// precedent). Registers the runtime pause/resume observer + the dial-gated
+// idle-life blip observer, wires resize/online/offline/visibilitychange/
+// reduced-motion listeners, and paints the initial resting frame.
+function initOverseerScope() {
+  const canvas = document.getElementById('overseerScope');
+  if (!canvas) return;
+  _sizeOverseerScope(canvas);
+  refreshOverseerCarrier();
+
+  window.addEventListener('resize', () => {
+    _sizeOverseerScope(canvas);
+    drawScope();
+  });
+  window.addEventListener('online', refreshOverseerCarrier);
+  window.addEventListener('offline', refreshOverseerCarrier);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) _armScopeLoop();
+  });
+  if (typeof window.matchMedia === 'function') {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onReducedMotionChange = () => setOverseerState(_scopeState);
+    if (typeof mq.addEventListener === 'function')
+      mq.addEventListener('change', onReducedMotionChange);
+  }
+
+  if (typeof AmbientRuntime !== 'undefined' && AmbientRuntime && AmbientRuntime.register) {
+    // Pause on real power-down (STANDBY/SHUTDOWN/OFF) — onEnter/onExit are NOT
+    // tier-gated by the runtime itself (A3 convention); the dial gate lives in
+    // _scopeShouldAnimate() via immersionAllows('balanced').
+    AmbientRuntime.register({
+      id: 'overseer-scope',
+      states: ['STANDBY', 'SHUTDOWN', 'OFF'],
+      onEnter: () => {
+        _runtimeAwake = false;
+        drawScope();
+      },
+      onExit: () => {
+        _runtimeAwake = true;
+        setOverseerState(_scopeState);
+      },
+    });
+
+    // Idle-life blips (owner-approved, locked decision): low-rate, dial-gated,
+    // NON-persisted device-template lines from identity.persona.blipBank —
+    // never AI output, never saved (appendToChat's isHistoryLoad=true keeps
+    // this out of chatHistory/robco_chat).
+    AmbientRuntime.register({
+      id: 'overseer-idle-blip',
+      states: ['ACTIVE', 'IDLE'],
+      tier: 'balanced',
+      cadenceMs: 35000,
+      onTick: () => {
+        if (_scopeState !== 'listening') return;
+        if (Math.random() > 0.6) return;
+        const id = typeof getIdentity === 'function' ? getIdentity() : null;
+        const bank = (id && id.persona && id.persona.blipBank) || [];
+        if (!bank.length) return;
+        const line = bank[Math.floor(Math.random() * bank.length)];
+        if (typeof appendToChat === 'function') appendToChat(line, 'sys', true);
+      },
+    });
+  }
+}
+window.initOverseerScope = initOverseerScope;
+// ── DO-O END ────────────────────────────────────────────────────────────
+
+// ── M2 · DIRECTOR ON THE WIRE (Ceremony Moments Wave 1) ────────────────────
+// Consumes the DO-K identity.overseer.greeting authored for all three games
+// (state.js) but rendered nowhere until now. Fires at most once per session,
+// the first time the UPLINK subsystem genuinely becomes active (a user tap/
+// hotkey/deep-link — never a boot-time bezel-highlight restore) with a live
+// carrier (_isUplinkConnected(), the same signal the UPLINK lamp/bezel
+// telemetry already share). Renders via appendToChat(...,true) — the DO-O
+// idle-blip precedent: a device-template ambient line, never persisted to
+// chatHistory/robco_v8, never AI output (Protocol UI-10). Writes NOTHING
+// durable to the campaign — _overseerGreeted is a transient module var.
+let _overseerGreeted = false;
+function _maybeGreetOverseer() {
+  if (_overseerGreeted) return;
+  if (typeof _isUplinkConnected !== 'function' || !_isUplinkConnected()) return;
+  _overseerGreeted = true; // gate first — a throw below must never re-arm this session
+  const ov = _overseerIdentity();
+  const greeting = (ov && ov.greeting) || OVERSEER_GENERIC_FALLBACK.greeting;
+  if (greeting && typeof appendToChat === 'function') appendToChat(greeting, 'sys', true);
+  if (typeof _scopePulse === 'function') _scopePulse();
+}
+window._maybeGreetOverseer = _maybeGreetOverseer;
+// ── M2 END ──────────────────────────────────────────────────────────────
+
+// ── M1 · CAMPAIGN IGNITION (Ceremony Moments Wave 1) ────────────────────────
+// Replaces wipeTerminal()'s two bare chat lines with a short (~2.5s),
+// skippable "commissioning" sequence — the new-campaign ceremony every RPG
+// opening has, but this app never had. Typed lines reuse the runBootSequence()
+// timed-reveal precedent, but as a self-rescheduling setTimeout chain rather
+// than setInterval — ui-core.js's standalone-timer retirement (Suite 148.6,
+// Phase 2 A2) makes the AmbientRuntime heartbeat the one setInterval-based
+// scheduler in this file; a one-shot, self-cancelling reveal like this one is
+// exactly what setTimeout chaining is for. The ignition flare reuses the
+// CHASSIS living core's existing _coreFlare() (Protocol 22); the closing line
+// reuses M2's greeting consumer (_overseerIdentity()/OVERSEER_GENERIC_FALLBACK)
+// directly — a wipe usually happens from SETTINGS, not UPLINK, so this does
+// not gate on carrier status the way _maybeGreetOverseer() does; it also sets
+// _overseerGreeted so a same-session UPLINK visit right after doesn't
+// re-greet redundantly. Any tap/keydown during the sequence fast-forwards to
+// the end frame (posting every remaining line at once, never silently
+// dropped) instead of blocking input. Writes NOTHING durable to the campaign
+// — every line is the normal un-persisted appendToChat(...,true) sys-line
+// convention wipeTerminal() already used; the dim is a toggled CSS class +
+// plain @keyframes (Protocol UI-9, auto-neutralized by the global
+// reduced-motion block).
+function _runCampaignIgnition(onComplete) {
+  const glass = document.querySelector('.glass-frame');
+  const lines = [
+    '> UNIT RE-COMMISSIONED',
+    '> REGISTERING NEW OPERATOR……… [OK]',
+    '> CALIBRATING S.P.E.C.I.A.L. BASELINE… [OK]',
+    '> DIRECTIVE REGISTRY: EMPTY — AWAITING ORDERS',
+  ];
+  let i = 0;
+  let finished = false;
+  let timer = null;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    document.removeEventListener('pointerdown', finish, true);
+    document.removeEventListener('keydown', finish, true);
+    if (glass) glass.classList.remove('ignition-dim');
+    // A skip mid-sequence posts every remaining line at once, in order —
+    // never silently dropped.
+    for (; i < lines.length; i++) {
+      if (typeof appendToChat === 'function') appendToChat(lines[i], 'sys', true);
+    }
+    if (typeof _coreFlare === 'function') _coreFlare();
+    const ov = typeof _overseerIdentity === 'function' ? _overseerIdentity() : null;
+    const greeting = (ov && ov.greeting) || OVERSEER_GENERIC_FALLBACK.greeting;
+    if (greeting && typeof appendToChat === 'function') appendToChat(greeting, 'sys', true);
+    _overseerGreeted = true; // M2: the ignition's own greeting counts for this session
+    if (onComplete) onComplete();
+  }
+  function tick() {
+    if (i < lines.length) {
+      if (typeof appendToChat === 'function') appendToChat(lines[i], 'sys', true);
+      i++;
+      timer = setTimeout(tick, 550);
+    } else {
+      finish();
+    }
+  }
+  if (glass) glass.classList.add('ignition-dim');
+  document.addEventListener('pointerdown', finish, true);
+  document.addEventListener('keydown', finish, true);
+  timer = setTimeout(tick, 550);
+}
+window._runCampaignIgnition = _runCampaignIgnition;
+// ── M1 END ──────────────────────────────────────────────────────────────
+
+// ── CHASSIS [5] — THE LIVING CORE (Protocol UI-10) ─────────────────────────
+// A decorative layer OVER real machine signals — the SAME pattern DO-O
+// establishes above, reused rather than forked (Protocol 22): the core hooks
+// setOverseerState()/_isUplinkConnected()/AmbientRuntime/RobcoEvents, never
+// re-instruments transmitMessage()/appendToChat() itself. _coreRefresh() is
+// the ONE choke point that recomputes every continuous signal and paints
+// BOTH the full BUS-22 instrument (#chassisCore) and the mini mirror in its
+// own casing-top readout window (#chassisCoreMini inside #chassisScreenMini)
+// from the SAME snapshot — one shared source, so the two views can never
+// drift (document.querySelectorAll keys off the shared .chassis-core-shape
+// class both elements carry). Continuous
+// motion (ring spin / heart pulse / flicker / fault ring / radio shimmer) is
+// a plain CSS `animation:`, gated as a GROUP by _coreShouldAnimate() via the
+// .core-still class; one-shot flourishes (level-up flare, save/sync pulse,
+// tap-to-poke) use `transition:` instead (css: .chassis-core-shape rules),
+// which the same global prefers-reduced-motion block also neutralises, so
+// they still settle to a correct frame even while .core-still is present.
+// Writes NOTHING durable to the campaign anywhere in this block — every
+// signal read here is transient/in-memory or MetaStore device telemetry,
+// never state.*/saveState()/robco_v8.
+// ── CHASSIS CORE START ──────────────────────────────────────────────────
+const CORE_POWER_CLASSES = ['core-boot', 'core-idle', 'core-standby', 'core-shutdown'];
+
+// ── LIVING CORE — 10 owner-approved new behaviors (batch 2) ────────────────
+// #1 THERMAL GLOW state — an in-memory-only "temperature" (0-100, never
+// persisted — a purely cosmetic running average of recent activity, not a
+// campaign stat). _coreThermalTick() (registered as an AmbientRuntime
+// observer below, mirroring the DO-O idle-blip timer pattern — Protocol 22)
+// is the ONLY place that mutates it; _coreRefresh() only ever READS it to
+// paint the current tier.
+let _coreTemp = 0;
+// #7 RECOVERY / #4 RECONNECT-RIPPLE edge detection — the previous call's
+// fault count / disconnected flag, so _coreRefresh() can tell a GENUINE
+// transition (fault cleared, carrier just came back) from "still zero" /
+// "still connected" and never fire the one-shot on every repaint.
+let _lastCoreFaultCount = 0;
+let _lastCoreDisconnected = false;
+// #8 UPTIME-MILESTONE PULSE — the last whole hour of session uptime already
+// celebrated this session (in-memory only, resets on reload — mirrors every
+// other transient LIVING CORE signal, never a saved/campaign value).
+let _lastCoreUptimeMilestone = 0;
+
+// #1 thermal accumulator tick — a real, activity-derived running value (busy
+// -> warms, idle -> cools), NOT a demo timer: the SAME three signals
+// _coreRefresh()'s own #12 overclock check already reads (thinking/radio/a
+// buffered fault). cadenceMs 4000 keeps the ramp "sustained load", not an
+// instant flicker.
+function _coreThermalTick() {
+  const thinking =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'thinking' || getOverseerState() === 'speaking');
+  const radioOn = typeof _radioPlaying === 'function' && _radioPlaying();
+  const faultCount = typeof _readErrorLog === 'function' ? _readErrorLog().length : 0;
+  const busy = thinking || radioOn || faultCount > 0;
+  _coreTemp = busy ? Math.min(100, _coreTemp + 8) : Math.max(0, _coreTemp - 5);
+  _coreRefresh();
+}
+
+// #1/#4/#5/#7 — idle heartbeat / standby dim / shutdown collapse / boot
+// ignition all derive from the ONE canonical Ambient Runtime state (no
+// separate observers registered — RobcoEvents' existing 'runtime.state'
+// broadcast, subscribed in _wireChassisCoreEventBusSubscribers() below, is
+// what actually triggers a repaint on every transition).
+function _corePowerClass() {
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'COLD_BOOT') return 'core-boot';
+  if (rt === 'IDLE' || rt === 'STANDBY') return 'core-standby';
+  if (rt === 'SHUTDOWN' || rt === 'OFF') return 'core-shutdown';
+  return 'core-idle';
+}
+
+// The gate (Protocol UI-10) — mirrors _scopeShouldAnimate()'s exact gate list
+// (Protocol 22): reduced-motion, the Immersion dial below Balanced,
+// document.hidden, and the runtime in STANDBY/SHUTDOWN/OFF each suppress the
+// continuous loop as one group — no bespoke per-behaviour carve-out.
+function _coreShouldAnimate() {
+  const reduced =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) return false;
+  if (typeof immersionAllows === 'function' && !immersionAllows('balanced')) return false;
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'STANDBY' || rt === 'SHUTDOWN' || rt === 'OFF') return false;
+  return true;
+}
+
+// The shared shell query — both #chassisCore (the real button) and
+// #chassisCoreMini (the decorative header mirror) carry this one class.
+function _coreShells() {
+  return Array.from(document.querySelectorAll('.chassis-core-shape'));
+}
+
+// _coreRefresh — recomputes every continuous signal and paints both shells
+// from the SAME snapshot. Call sites: setOverseerState() (#2 AI revs / #3
+// connection), _updateFaultLamp() (#6 fault strain), onImmersionChange() +
+// a reduced-motion/visibilitychange listener (the gate), and the
+// 'runtime.state' bus subscription (#1/#4/#5/#7). Never a polling loop.
+function _coreRefresh() {
+  const shells = _coreShells();
+  if (!shells.length) return;
+  const thinking =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'thinking' || getOverseerState() === 'speaking');
+  const disconnected =
+    typeof getOverseerState === 'function' &&
+    (getOverseerState() === 'disabled' || getOverseerState() === 'offline');
+  const faultCount = typeof _readErrorLog === 'function' ? _readErrorLog().length : 0;
+  const radioOn = typeof _radioPlaying === 'function' && _radioPlaying();
+  const power = _corePowerClass();
+  const animate = _coreShouldAnimate();
+  // #12 Overclock strain — several signals active at once works the core
+  // visibly harder. Recomputed live every call, no separate decay timer.
+  const overclock = [thinking, radioOn, faultCount > 0].filter(Boolean).length >= 2;
+  // #1 Thermal glow — _coreThermalTick() (an AmbientRuntime observer) is the
+  // only mutator of _coreTemp; this just reads the current tier to paint.
+  const tempWarm = _coreTemp >= 34 && _coreTemp < 67;
+  const tempHot = _coreTemp >= 67;
+  // #7 Recovery — a fault buffer that just emptied (was >0, now 0).
+  const justRecovered = _lastCoreFaultCount > 0 && faultCount === 0;
+  // #4 Reconnect ripple — the carrier just came back (was disconnected, now not).
+  const justReconnected = _lastCoreDisconnected && !disconnected;
+
+  shells.forEach(el => {
+    CORE_POWER_CLASSES.forEach(c => el.classList.toggle(c, c === power));
+    el.classList.toggle('core-thinking', thinking);
+    el.classList.toggle('core-disconnected', disconnected && !thinking);
+    el.classList.toggle('core-fault', faultCount > 0);
+    el.classList.toggle('core-radio', radioOn);
+    el.classList.toggle('core-overclock', overclock);
+    el.classList.toggle('core-temp-warm', tempWarm);
+    el.classList.toggle('core-temp-hot', tempHot);
+    el.classList.toggle('core-still', !animate);
+  });
+
+  const led = document.getElementById('corePowerLed');
+  if (led) led.classList.toggle('red', faultCount > 0);
+
+  // #7/#4 one-shot flourishes — fired AFTER the main paint above so
+  // core-fault is already off the element by the time core-recovering goes
+  // on (they can never coexist — see the CSS comment on .core-recovering::after).
+  if (justRecovered) _coreOneShot('core-recovering', 1200);
+  if (justReconnected) _coreOneShot('core-ripple', 900);
+  _lastCoreFaultCount = faultCount;
+  _lastCoreDisconnected = disconnected;
+
+  // #6 Reactor hum — the SAME activity signals this function already
+  // computed drive the hum's live intensity (Protocol 22, no re-derivation).
+  if (typeof _updateReactorHumLevel === 'function') {
+    _updateReactorHumLevel(thinking, radioOn, faultCount > 0);
+  }
+}
+window._coreRefresh = _coreRefresh;
+
+// One-shot flourishes (#8 level-up flare, #9 save/sync write-pulse, #13
+// tap-to-poke) — add-then-remove the reflow-restart pattern the OS Event Bus
+// subscribers already use elsewhere (Suite 135/162 precedent) so a repeated
+// trigger restarts cleanly. Skipped entirely when the gate is closed — a
+// suppressed flourish simply never fires, leaving the correct resting frame.
+const _coreOneShotTimers = {};
+function _coreOneShot(cls, ms) {
+  if (!_coreShouldAnimate()) return;
+  _coreShells().forEach(el => {
+    el.classList.remove(cls);
+    void el.offsetWidth; // force reflow so a repeated trigger restarts the transition
+    el.classList.add(cls);
+  });
+  clearTimeout(_coreOneShotTimers[cls]);
+  _coreOneShotTimers[cls] = setTimeout(() => {
+    _coreShells().forEach(el => el.classList.remove(cls));
+  }, ms);
+}
+function _coreFlare() {
+  _coreOneShot('core-flare', 900);
+}
+window._coreFlare = _coreFlare;
+function _coreDataPulse() {
+  _coreOneShot('core-datapulse', 700);
+}
+window._coreDataPulse = _coreDataPulse;
+
+// #4 Power-surge ripple — fired alongside the EXISTING flare/datapulse calls
+// (save-to-slot, cloud push/pull, level-up) plus the reconnect edge detected
+// inside _coreRefresh() itself (Protocol 22 — reuses data.write/level.up/
+// connection, never a new trigger).
+function _coreRipple() {
+  _coreOneShot('core-ripple', 900);
+}
+window._coreRipple = _coreRipple;
+
+// #8 Uptime-milestone pulse — a small celebratory flourish, distinct from
+// the brighter flare/datapulse/tap group.
+function _coreMilestonePulse() {
+  _coreOneShot('core-milestone', 1000);
+}
+window._coreMilestonePulse = _coreMilestonePulse;
+
+// #13 Tap-to-poke — the #chassisCore button's onclick. An optional short
+// synth kick via the EXISTING hardware-SFX channel (Protocol 7 —
+// playChipClick() already guards masterMute + the hardwareSfx pref; reused
+// as-is, never forked). Purely cosmetic — no campaign write. Suppressed once
+// (see #9 below) when the click follows a completed hold-to-overcharge —
+// a pointerup always fires a trailing click event regardless of how long the
+// button was held, so without this guard a charged release would fire BOTH
+// the overcharge burst AND a plain poke.
+let _coreSuppressNextTap = false;
+function _coreTapPoke() {
+  if (_coreSuppressNextTap) {
+    _coreSuppressNextTap = false;
+    return;
+  }
+  _coreOneShot('core-tap', 500);
+  if (typeof playChipClick === 'function') playChipClick(true);
+}
+window._coreTapPoke = _coreTapPoke;
+
+// #9 Tap-and-hold overcharge — extends tap-to-poke with a press-and-HOLD
+// gesture. Wired to #chassisCore's pointerdown/up/cancel/leave in
+// initChassisCore() below. Holding CORE_HOLD_MS ramps the ring spin via the
+// SAME --core-spin-mul-r1/-r3 inertia mechanism #3 uses (Protocol 22);
+// releasing AFTER the charge threshold fires a bigger burst (reusing the
+// #14 stat-change burst's own tumble keyframes) plus an optional heavier
+// synth kick via the EXISTING hardware-SFX board-thunk channel (Protocol 7 —
+// playBoardThunk() already guards masterMute + hardwareSfx). Gated the same
+// way every other flourish is: when _coreShouldAnimate() is closed, the
+// charging visual never starts, so a hold under reduced-motion/low-immersion/
+// hidden-tab/standby degrades to a no-op hold + a plain click — never a
+// broken half-state.
+const CORE_HOLD_MS = 850;
+let _coreHoldTimer = null;
+let _coreHeld = false; // true once THIS press reached the charge threshold
+function _coreHoldStart() {
+  _coreHeld = false;
+  clearTimeout(_coreHoldTimer);
+  _coreHoldTimer = null;
+  if (!_coreShouldAnimate()) return; // gate closed — no charge visual, plain tap still works
+  _coreShells().forEach(el => el.classList.add('core-charging'));
+  _coreHoldTimer = setTimeout(() => {
+    _coreHeld = true;
+    _coreShells().forEach(el => {
+      el.classList.remove('core-charging');
+      el.classList.add('core-charged');
+    });
+  }, CORE_HOLD_MS);
+}
+function _coreHoldEnd() {
+  clearTimeout(_coreHoldTimer);
+  _coreHoldTimer = null;
+  const wasCharged = _coreHeld;
+  _coreHeld = false;
+  _coreShells().forEach(el => el.classList.remove('core-charging', 'core-charged'));
+  if (wasCharged) {
+    _coreOneShot('core-overcharge', 1800);
+    if (typeof playBoardThunk === 'function') playBoardThunk(true);
+  }
+  _coreSuppressNextTap = wasCharged; // consume: the trailing click must not ALSO poke
+}
+window._coreHoldStart = _coreHoldStart;
+window._coreHoldEnd = _coreHoldEnd;
+
+// #14 3D ring burst on a real stat change (owner follow-up) — a genuine 3D
+// orbital tumble (rotateX/rotateY/rotateZ), distinct from the flat 2D
+// chassisCoreSpin the rings idle with, layered on via the same one-shot
+// add-then-reflow-then-remove pattern as every other flourish above. Fires
+// through _coreOneShot(), so it is already gated by _coreShouldAnimate() —
+// no bespoke reduced-motion carve-out. 1800ms matches the CSS
+// chassisCoreOrbitBurst1/2/3 animation-duration (owner follow-up: "a bit
+// slower" than the previous 1.4s, same 720deg double tumble, just more
+// graceful) so the class is removed right as the animation finishes.
+function _coreStatBurst() {
+  _coreOneShot('core-stat-burst', 1800);
+}
+window._coreStatBurst = _coreStatBurst;
+
+// _emitStatChangeIfDiffers(key, newVal) — the shared "did this ACTUALLY
+// change?" cache for the drag-style stat setters (HP/XP/RAD bars, the skill
+// VU meter), which are called on every mousemove/touchmove tick during a
+// drag and have no other "before this call" value to compare against
+// (unlike commitStat()'s onchange commit, which reads state[k] directly
+// before overwriting it). Deliberately does NOT seed from state at boot —
+// the FIRST edit to a given key each session only establishes the baseline
+// (no burst); every edit after that on the same key fires correctly. Purely
+// an in-memory comparison cache — writes nothing durable to the campaign.
+const _lastStatValues = {};
+function _emitStatChangeIfDiffers(key, newVal) {
+  const old = _lastStatValues[key];
+  _lastStatValues[key] = newVal;
+  if (old !== undefined && old !== newVal) {
+    RobcoEvents.emit('stat.change', { key, oldVal: old, newVal });
+  }
+}
+
+// The "?" explainer (Suite 103 showSaveHelpModal precedent, Protocol 22) —
+// plain, in-voice language describing what the cell is and what each
+// behaviour means. Game-agnostic (Protocol 38) — device fiction only.
+const CORE_HELP = [
+  {
+    cmd: 'IDLE HEARTBEAT',
+    desc: 'A slow, steady pulse — the cell sitting quietly while the terminal is powered and waiting.',
+  },
+  {
+    cmd: 'DIRECTOR UPLINK',
+    desc: 'The cell spins up and glows brighter while the Director composes a reply — the same moment the Uplink scope reads THINKING.',
+  },
+  {
+    cmd: 'CARRIER LINK',
+    desc: 'A steady glow means the carrier is connected. No key, a disabled uplink, or no connection at all and the cell flickers and dims.',
+  },
+  {
+    cmd: 'STANDBY',
+    desc: 'The cell dims and slows whenever the terminal sits idle or the tab loses focus — a power-saving state, not a fault.',
+  },
+  {
+    cmd: 'SHUTDOWN',
+    desc: 'A full power-down collapses the cell to a dark point. Use PRESS TO POWER ON to bring it back.',
+  },
+  {
+    cmd: 'FAULT STRAIN',
+    desc: 'A faint red ring appears whenever the client error log has something buffered — clear it from the FAULT ANNUNCIATOR on BUS-24.',
+  },
+  {
+    cmd: 'IGNITION',
+    desc: 'A cold boot spins the cell up fast before it settles into its normal idle rhythm.',
+  },
+  { cmd: 'LEVEL-UP FLARE', desc: 'A single bright flash marks a level committed.' },
+  {
+    cmd: 'DATA PULSE',
+    desc: 'A quick brighten marks a save written — to a local slot, or pushed to / pulled from the cloud.',
+  },
+  { cmd: 'RADIO SHIMMER', desc: 'A gentle shimmer plays while the Pip-Boy Radio station is on.' },
+  {
+    cmd: 'CELL COLOUR',
+    desc: 'The cell always glows in whatever optic colour is currently selected on this terminal.',
+  },
+  {
+    cmd: 'OVERCLOCK',
+    desc: 'Several of the above happening at once (the Director busy, the radio playing, a fault buffered) works the cell visibly harder.',
+  },
+  {
+    cmd: 'TAP TO PULSE',
+    desc: 'Tap the cell any time for a quick kick — purely cosmetic, changes nothing.',
+  },
+  {
+    cmd: '3D RING BURST',
+    desc: "The cell's rings tumble in a real 3D orbit for a moment whenever you actually change a stat — a S.P.E.C.I.A.L. attribute, a skill, your HP, XP, or radiation level — or level up.",
+  },
+  {
+    cmd: 'THERMAL GLOW',
+    desc: 'The cell warms from green toward amber and red the longer it stays busy, and cools back down once things quiet.',
+  },
+  {
+    cmd: 'ENERGY SPARKS',
+    desc: 'Small particles orbit the cell — more of them, brighter, while the cell is busy; just a faint one at rest.',
+  },
+  {
+    cmd: 'SPIN INERTIA',
+    desc: 'The rings ease smoothly into a new speed instead of snapping — a momentum feel, not an instant jump.',
+  },
+  {
+    cmd: 'POWER-SURGE RIPPLE',
+    desc: 'A ring ripples outward whenever the carrier reconnects, in addition to the data-pulse and level-up flourishes above.',
+  },
+  {
+    cmd: 'IDLE FLARES',
+    desc: 'Every so often during a long quiet stretch, the cell flares faintly — the reactor settling.',
+  },
+  {
+    cmd: 'REACTOR HUM',
+    desc: 'A synthesized hum tuned to blend with the CRT hum, rising with the cell’s activity and louder while you’re looking at CHASSIS.',
+  },
+  {
+    cmd: 'RECOVERY',
+    desc: 'When a buffered fault clears, the cell visibly stabilizes back to calm green instead of the fault ring just vanishing.',
+  },
+  {
+    cmd: 'UPTIME MILESTONE',
+    desc: 'A small celebratory pulse marks every hour the terminal has been powered on this session.',
+  },
+  {
+    cmd: 'HOLD TO OVERCHARGE',
+    desc: 'Press and HOLD the cell to spin it up, then release for a bigger burst than a plain tap.',
+  },
+];
+function showCoreHelpModal() {
+  openModal({
+    title: '> SUSTAINED CELL — FIELD MANUAL',
+    body:
+      '<div class="cmd-registry">' +
+      CORE_HELP.map(
+        c =>
+          '<div class="cmd-card"><span class="cmd-name">' +
+          escapeHtml(c.cmd) +
+          '</span><span class="cmd-desc">' +
+          escapeHtml(c.desc) +
+          '</span></div>'
+      ).join('') +
+      '</div>',
+  });
+}
+window.showCoreHelpModal = showCoreHelpModal;
+
+// Boot wiring — mirrors initOverseerScope()'s call shape (called once from
+// window.onload). Stamps the BUS-24 revision line, paints the fault console
+// + the core's initial frame, and re-arms the gate on the two live signals
+// that can flip it outside a runtime transition (a reduced-motion OS
+// preference change, and the tab visibility toggle).
+function initChassisCore() {
+  const svcRev = document.getElementById('svcRevLine');
+  if (svcRev) svcRev.textContent = 'CURRENT: v' + APP_VERSION;
+  if (typeof renderServiceFaultConsole === 'function') renderServiceFaultConsole();
+  _coreRefresh();
+  document.addEventListener('visibilitychange', () => _coreRefresh());
+  if (typeof window.matchMedia === 'function') {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (typeof mq.addEventListener === 'function')
+      mq.addEventListener('change', () => _coreRefresh());
+  }
+
+  // #9 Tap-and-hold overcharge — pointer wiring on the real button only (the
+  // mini core is a decorative, non-interactive aria-hidden mirror).
+  const coreBtn = document.getElementById('chassisCore');
+  if (coreBtn) {
+    coreBtn.addEventListener('pointerdown', _coreHoldStart);
+    coreBtn.addEventListener('pointerup', _coreHoldEnd);
+    coreBtn.addEventListener('pointercancel', _coreHoldEnd);
+    coreBtn.addEventListener('pointerleave', _coreHoldEnd);
+  }
+
+  if (typeof AmbientRuntime !== 'undefined' && AmbientRuntime && AmbientRuntime.register) {
+    // #1 Thermal glow accumulator — a real activity-derived running value,
+    // ticking only while the terminal is genuinely awake (ACTIVE/IDLE, never
+    // STANDBY/SHUTDOWN/OFF — those states are already gated off/dimmed).
+    AmbientRuntime.register({
+      id: 'core-thermal',
+      states: ['ACTIVE', 'IDLE'],
+      tier: 'balanced',
+      cadenceMs: 4000,
+      onTick: _coreThermalTick,
+    });
+
+    // #5 Idle flares — low-rate, dial-gated, non-persisted, mirrors the DO-O
+    // Overseer idle-blip timer exactly (Protocol 22): only during genuine
+    // idle, roughly half the ticks, a faint settling flare.
+    AmbientRuntime.register({
+      id: 'core-idle-flare',
+      states: ['IDLE'],
+      tier: 'balanced',
+      cadenceMs: 42000,
+      onTick: () => {
+        if (Math.random() > 0.5) return;
+        _coreOneShot('core-idle-flare', 1100);
+      },
+    });
+
+    // #6 Reactor hum power link — mirrors the SAME 'crt-hum-power' pattern
+    // (_wireAmbientExperiences() above) so the reactor hum stops on a genuine
+    // power-down and resumes (autoplay-safe, deferred to the first gesture)
+    // when the terminal comes back — a functional power link, not tier-gated,
+    // exactly like the CRT hum's own link.
+    AmbientRuntime.register({
+      id: 'reactor-hum-power',
+      states: ['SHUTDOWN', 'OFF'],
+      onEnter: () => {
+        if (typeof stopReactorHum === 'function') stopReactorHum();
+      },
+      onExit: () => {
+        if (typeof startReactorHum !== 'function') return;
+        _armAmbientAudio(() => startReactorHum());
+      },
+    });
+  }
+}
+window.initChassisCore = initChassisCore;
+
+// RobcoEvents subscriptions — deferred to a function called from
+// window.onload (the Suite 135 U7 boot-order lesson: ui-core.js is a static
+// <script> tag that can execute before state.js, which defines RobcoEvents,
+// finishes its dynamic context-conditional load; a top-level .on() call here
+// would throw "RobcoEvents is not defined" on some boots).
+function _wireChassisCoreEventBusSubscribers() {
+  // #1/#4/#5/#7 idle/standby/shutdown/boot — every Ambient Runtime
+  // transition already broadcasts here (runtime.js _emit()).
+  RobcoEvents.on('runtime.state', () => _coreRefresh());
+  // #8 level-up flare — the SAME event nativeLevelUp() already emits.
+  RobcoEvents.on('level.up', () => _coreFlare());
+  // #9 save/sync write-pulse — emitted by saveToSlot() (ui-saves.js) and
+  // saveCurrentToCloud()/loadCloudSave()/overwriteCloudSave() (cloud.js).
+  RobcoEvents.on('data.write', () => _coreDataPulse());
+  // #14 3D ring burst on a real stat change — level-up IS a stat change (in
+  // addition to its own heart flare above), plus every genuine SPECIAL/
+  // skill/HP/XP/RAD edit via the new 'stat.change' event.
+  RobcoEvents.on('level.up', () => _coreStatBurst());
+  RobcoEvents.on('stat.change', () => _coreStatBurst());
+  // #4 Power-surge ripple — the SAME data.write/level.up signals above, plus
+  // the reconnect edge detected separately inside _coreRefresh() itself
+  // (Protocol 22 — reuses existing signals, never a new trigger).
+  RobcoEvents.on('level.up', () => _coreRipple());
+  RobcoEvents.on('data.write', () => _coreRipple());
+}
+// ── CHASSIS CORE END ────────────────────────────────────────────────────
+
+// Power-on affordance (Protocol 42 fix): the #powerOnBtn click handler. Owner
+// bug — forcing SHUTDOWN/OFF left a fully black screen with no visible way
+// back on. Recovers using ONLY legal transition() edges (never forceState(),
+// which is a documented TEST-ONLY escape hatch reserved for the staging
+// Developer Console — Suite 146.15 guards that no production path forces a
+// state): SHUTDOWN's only legal edge is OFF, and OFF's legal edges include
+// COLD_BOOT, so a SHUTDOWN-only force (e.g. the Test Console's individual
+// "SHUTDOWN" button) is walked through OFF first, then to COLD_BOOT — the
+// exact same sequence AmbientRuntime.shutdown() used to get IN, run in
+// reverse. Once COLD_BOOT is reached the shutdown-crt observer's onExit fires
+// (clearing rt-shutdown/rt-shutdown-plain, which — via the CSS rule above —
+// also hides this very button) and the runtime's own _beat() auto-advances
+// COLD_BOOT -> READY -> ACTIVE on the next heartbeat, exactly as it does on a
+// real page load, since the boot screen is already long gone.
+function _powerOnFromShutdown() {
+  if (typeof AmbientRuntime === 'undefined' || !AmbientRuntime) return;
+  if (AmbientRuntime.getState() === 'SHUTDOWN') AmbientRuntime.transition('OFF');
+  AmbientRuntime.transition('COLD_BOOT');
+}
+window._powerOnFromShutdown = _powerOnFromShutdown;
+
+// Owner batch item 6: wires ONE dynamically-rendered <details data-sub-id>
+// element for open/closed persistence — for sub-panels that get replaced by
+// an innerHTML re-render (e.g. renderFactionRep()'s MINOR FACTIONS section),
+// since _wirePanelPersistence()'s boot-time querySelectorAll only ever sees
+// the DOM as it existed at boot and a later re-render would otherwise drop
+// both the restored state and the toggle listener. Mirrors the exact same
+// restore + toggle-persist logic as that boot-time loop (Protocol 22 — one
+// persistence mechanism, not a second one) — call this once, right after the
+// innerHTML assignment that (re)creates the element.
+function _wireDynamicSubPanel(details) {
+  if (!details) return;
+  const id = details.dataset.subId;
+  if (!id) return;
+  const saved = JSON.parse(MetaStore.get('robco_panel_state') || 'null');
+  if (saved && saved[id] !== undefined) {
+    if (saved[id]) details.setAttribute('open', '');
+    else details.removeAttribute('open');
+  }
+  details.addEventListener('toggle', () => {
+    try {
+      const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
+      ps[id] = details.open;
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
+    } catch (_) {}
+  });
+}
+
+function _wirePanelPersistence() {
   // #35 Panel Memory — restore previously open/closed panel states
   // On desktop, default-open still applies if no saved state exists
-  const savedPanelState = JSON.parse(localStorage.getItem('robco_panel_state') || 'null');
+  const savedPanelState = JSON.parse(MetaStore.get('robco_panel_state') || 'null');
   const panelEls = Array.from(document.querySelectorAll('details.panel'));
+  // FIX (owner report): a boot-time RESTORE of a persisted panel-open state
+  // must never be treated as a genuine user click. Without this, reloading
+  // with Security & Configuration left open from a prior session (hatch never
+  // released) silently re-fires the first-visit hatch ceremony at boot — and
+  // .bay-hatch is a position:fixed;inset:0 overlay that swallows every click
+  // on the page (not just the casing UPLINK lamp) until the user finds and
+  // releases it. `toggle` fires as a queued task (not synchronously), so this
+  // flag stays true through every restore-triggered toggle queued by the loop
+  // below and is cleared right after, before any real user click can occur.
+  let _restoringPanels = true;
   panelEls.forEach((d, idx) => {
     const id =
       d.id ||
@@ -548,22 +2584,47 @@ window.onload = function () {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');
     } else if (
+      id !== 'securityConfigPanel' &&
       window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches
     ) {
       // Default-open panels only on a real mouse-driven desktop — same gate as the desktop
       // CSS shell. matchMedia (not raw innerWidth) is viewport-aware + robust to a first-paint
       // width race, so a touch phone never boots into the desktop "all panels open" state
       // even if window.innerWidth momentarily mis-reports >=1000 (Protocol 42).
+      // securityConfigPanel is excluded (owner report): the Module Bay's service-hatch
+      // ceremony must only fire on a genuine first user-initiated open, never at boot —
+      // this panel stays closed by default on every viewport absent a saved user choice.
       d.setAttribute('open', '');
     }
     d.addEventListener('toggle', () => {
-      const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+      const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
       ps[id] = d.open;
-      localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
       if (d.id === 'worldMapPanel' && d.open && typeof renderWorldMap === 'function')
         renderWorldMap();
+      // Module Bay hatch ceremony (owner report): fires only on a genuine
+      // user-initiated toggle — never on the boot-time state restore above.
+      // A panel restored already-open has, by definition, been opened before
+      // in an earlier session, so the ceremony's purpose is already served —
+      // mark it released and just sync the bay content, rather than popping
+      // the full-viewport hatch overlay unprompted at boot (FIX).
+      if (d.id === 'securityConfigPanel' && d.open) {
+        if (_restoringPanels) {
+          if (MetaStore.get('robco_bay_opened') !== 'true')
+            MetaStore.set('robco_bay_opened', 'true');
+          if (typeof renderModuleBay === 'function') renderModuleBay();
+        } else if (typeof initModuleBay === 'function') {
+          initModuleBay();
+        }
+      }
     });
   });
+  // The 'toggle' events queued by the setAttribute/removeAttribute calls above
+  // fire as tasks, not synchronously — deferring this reset ensures the flag
+  // is still true for every one of those before any real user click can land.
+  setTimeout(() => {
+    _restoringPanels = false;
+  }, 0);
 
   // Sub-panel persistence — traits, collectibles sub-trackers (default: collapsed)
   // Reuses robco_panel_state; new sub-trackers default to closed on first ever load.
@@ -577,13 +2638,31 @@ window.onload = function () {
     // Default: no 'open' (collapsed) — new sub-trackers start closed until user expands
     d.addEventListener('toggle', () => {
       try {
-        const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+        const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
         ps[id] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+        MetaStore.set('robco_panel_state', JSON.stringify(ps));
       } catch (_) {}
     });
   });
 
+  // Owner batch item 4 (Protocol 42 fix, found while verifying full-reload restore):
+  // initTabs() (called earlier in window.onload) already restored the active
+  // subsystem's saved scroll offset, but that ran BEFORE this function applied
+  // every panel/sub-panel's saved open/closed state above — a panel opening or
+  // closing changes page height, which can silently invalidate the scroll offset
+  // initTabs() already set. Re-apply it now that every panel's final open/closed
+  // state is in place, so "exact scroll position" survives a full reload even
+  // when panel-state and scroll-state interact.
+  if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);
+}
+
+function _restoreOpticsPreference() {
+  // DO-K: keep the pre-paint data-game attribute in sync with the resolved game context. The
+  // index.html head script already sets it (best-effort) from raw localStorage before state.js
+  // loads (flash-free, same pattern as the optics/high-lumen pre-paint reads); this re-applies
+  // the authoritative value once state is live. No visible consumer yet — DO-N's bezel chrome
+  // is the first `[data-game]` CSS reader.
+  document.documentElement.dataset.game = getGameContext();
   // Per-game optics resolution — resolve THIS game's optic (its own remembered pick
   // robco_optic_<ctx> → the game's default optic → green) and apply it. A game switch reloads
   // (onGameContextChange), so each game re-resolves to its own remembered optic / default here.
@@ -591,53 +2670,92 @@ window.onload = function () {
   // game's default optic) to the active game.
   const _optic = _resolveOptic();
   _applyThemeVars(_optic);
-  const _opticSel = document.getElementById('opticsColorInput');
-  if (_opticSel) _opticSel.value = _optic;
+  const _rack = document.getElementById('opticsColorInput');
+  if (_rack) {
+    // WU-optics-picker: keep the green family cartridge collapsed and its representative
+    // repainted BEFORE the generic seated-class sync below, so the cartridge lights up
+    // correctly whenever the resolved optic is one of its members.
+    const _famSocket = document.getElementById('opticsFamilySocket');
+    const _famTube = document.getElementById('opticsFamilyTube');
+    if (_famSocket) _famSocket.classList.remove('expanded');
+    if (_famTube && typeof _resolveOpticsFamilyRepresentative === 'function') {
+      const _rep = _resolveOpticsFamilyRepresentative(_famTube.dataset.family);
+      if (_rep && typeof _updateOpticsFamilyRepresentative === 'function')
+        _updateOpticsFamilyRepresentative(_rep);
+    }
+    Array.from(_rack.querySelectorAll('.tube')).forEach(t => {
+      t.classList.toggle('seated', t.dataset.optic === _optic);
+    });
+  }
   _updateOpticsDefaultLabel();
+}
 
-  if (localStorage.getItem('robco_sfx_muted') === 'true') {
+function _restoreDevicePrefs() {
+  if (MetaStore.get('robco_sfx_muted') === 'true') {
     let el = document.getElementById('muteTypingToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_hum_muted') === 'true') {
+  if (MetaStore.get('robco_hum_muted') === 'true') {
     let el = document.getElementById('muteHumToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_geiger_muted') === 'true') {
+  if (MetaStore.get('robco_geiger_muted') === 'true') {
     let el = document.getElementById('muteGeigerToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_tinnitus_muted') === 'true') {
+  if (MetaStore.get('robco_tinnitus_muted') === 'true') {
     let el = document.getElementById('muteTinnitusToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_ambient_muted') === 'true') {
+  if (MetaStore.get('robco_ambient_muted') === 'true') {
     let el = document.getElementById('muteLimbToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_wake_muted') === 'true') {
+  if (MetaStore.get('robco_wake_muted') === 'true') {
     let el = document.getElementById('muteWakeToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_questcomplete_muted') === 'true') {
+  if (MetaStore.get('robco_questcomplete_muted') === 'true') {
     let el = document.getElementById('muteQuestCompleteToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_questfail_muted') === 'true') {
+  if (MetaStore.get('robco_questfail_muted') === 'true') {
     let el = document.getElementById('muteQuestFailToggle');
     if (el) el.checked = true;
   }
-  if (localStorage.getItem('robco_factionthreshold_muted') === 'true') {
+  if (MetaStore.get('robco_factionthreshold_muted') === 'true') {
     let el = document.getElementById('muteFactionThresholdToggle');
     if (el) el.checked = true;
   }
+  if (MetaStore.get('robco_reactorhum_muted') === 'true') {
+    let el = document.getElementById('muteReactorHumToggle');
+    if (el) el.checked = true;
+  }
   // Master mute restore
-  if (localStorage.getItem('robco_master_muted') === 'true') {
+  if (MetaStore.get('robco_master_muted') === 'true') {
     let el = document.getElementById('masterMuteToggle');
     if (el) el.checked = true;
   }
+  // B2c: SERVO CLICK RELAY — INVERTED checkbox semantics (checked = installed
+  // = audible), same as the master-mute board. Default checked in the HTML;
+  // only uncheck it when explicitly muted.
+  if (MetaStore.get('robco_hardwaresfx_muted') === 'true') {
+    let el = document.getElementById('hardwareSfxToggle');
+    if (el) el.checked = false;
+  }
+  // Phase 3 · Piece 2 (CARGO MANIFEST): restore the last-open drawer (UI-6).
+  // Only the button/tray visibility is synced here — renderInventory()/
+  // renderAmmo() (called later from loadUI()) do the actual data render, and
+  // _updateContextPanels() self-heals a stale 'mod' pick on a no-mods game.
+  {
+    const savedDrawer = MetaStore.get('robco_cargo_drawer');
+    if (savedDrawer && typeof _DRAWER_LABELS !== 'undefined' && _DRAWER_LABELS[savedDrawer]) {
+      _invFilter = savedDrawer;
+    }
+    if (typeof _syncDrawerButtons === 'function') _syncDrawerButtons(_invFilter);
+  }
   // Silently refresh model list 2s after boot if key is present
-  if (localStorage.getItem('robco_gemini_key')) {
+  if (MetaStore.get('robco_gemini_key')) {
     setTimeout(() => {
       try {
         fetchAuthorizedModels(true);
@@ -677,21 +2795,41 @@ window.onload = function () {
       cb.checked = locked || armed;
       cb.disabled = locked;
     }
-    const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = armed ? 'block' : 'none';
-    const lockedBanner = document.getElementById('rngLockedBanner');
-    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
+    // The armed/locked banners are painted by _syncInterlockUI() below (Protocol
+    // 22 — one repaint function owns the whole board, not a duplicate here too).
   }
+  // SU-3: paint the CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom controls from
+  // the state just restored above — cartridges/rocker/detents/dial/breaker/seq
+  // strip/summary lines/banners all start in sync with the hidden real controls.
+  if (typeof _syncCampaignProfileUI === 'function') _syncCampaignProfileUI();
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
+  if (typeof _wireTempoDialDrag === 'function') _wireTempoDialDrag(); // one-time listener attach, boot only
 
   // #34 Typewriter Speed — restore slider + label on load
   {
-    const savedSpeed = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
+    const savedSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
     const slider = document.getElementById('typerSpeedSlider');
     const label = document.getElementById('typerSpeedVal');
     if (slider) slider.value = savedSpeed;
     if (label) label.textContent = savedSpeed.toFixed(2) + '\u00d7';
   }
 
+  // Command-Line MODE (Step 2 Phase 2 B1): restore the pill/placeholder from
+  // the persisted device pref and wire the `/`/`@` hint reveal.
+  _renderModePill();
+  _wireModeHint();
+  _wireComposerAutoGrow();
+
+  // Owner batch item 5: populate every Module Bay SLOT board's (and the bay's
+  // own) collapsed summary line at boot regardless of whether the panel is
+  // open — without this, the summaries stayed blank until the user's first
+  // manual open, since renderModuleBay() otherwise only fires from a control
+  // change or from _wirePanelPersistence()'s restored-open branch. Already
+  // documented as safe to call anytime (idempotent, cheap).
+  if (typeof renderModuleBay === 'function') renderModuleBay();
+}
+
+function _wireKeyboardShortcuts() {
   // #15 Keyboard Shortcuts — Ctrl+1–6 toggle first 6 panels, Ctrl+/ focus chat
   document.addEventListener('keydown', e => {
     if (e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -704,10 +2842,10 @@ window.onload = function () {
           if (target.open) target.removeAttribute('open');
           else target.setAttribute('open', '');
           // persist new state
-          const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+          const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
           if (target.dataset.panelId) {
             ps[target.dataset.panelId] = target.open;
-            localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+            MetaStore.set('robco_panel_state', JSON.stringify(ps));
           }
         }
       } else if (e.key === '/') {
@@ -725,18 +2863,24 @@ window.onload = function () {
           activeEl.tagName === 'TEXTAREA' ||
           activeEl.tagName === 'SELECT');
       if (!inInput) {
-        if (e.key === '1') {
+        // DO-N bezel hotkeys: [1]-[5] select a subsystem, [0] opens the flat
+        // DIRECTORY fallback. [4]/[5] are new (UPLINK/CHASSIS were never
+        // gated by a tab); [1]-[3] keep routing through switchTab() exactly
+        // as before via selectSubsystem()'s _NAV_TAB_FOR map.
+        const hotkeyMap = {
+          1: 'operator',
+          2: 'operations',
+          3: 'databank',
+          4: 'uplink',
+          5: 'chassis',
+          6: 'settings',
+        };
+        if (hotkeyMap[e.key]) {
           e.preventDefault();
-          switchTab('stat');
-        } else if (e.key === '2') {
+          selectSubsystem(hotkeyMap[e.key]);
+        } else if (e.key === '0') {
           e.preventDefault();
-          switchTab('inv');
-        } else if (e.key === '3') {
-          e.preventDefault();
-          switchTab('data');
-        } else if (e.key === '4') {
-          e.preventDefault();
-          switchTab('campg');
+          openBezelDirectory();
         }
       }
     }
@@ -768,11 +2912,13 @@ window.onload = function () {
       if (modal && modal.style.display !== 'none') closeModal();
     }
   });
+}
 
+function _runBootSequenceAndBriefing() {
   // Defer changelog display until after boot sequence completes
   let needsChangelog = false;
-  if (localStorage.getItem('robco_version') !== APP_VERSION) {
-    localStorage.setItem('robco_version', APP_VERSION);
+  if (MetaStore.get('robco_version') !== APP_VERSION) {
+    MetaStore.set('robco_version', APP_VERSION);
     needsChangelog = true;
   }
 
@@ -846,13 +2992,45 @@ window.onload = function () {
       let undoBtn = document.getElementById('undoSyncBtn');
       if (undoBtn) undoBtn.style.display = 'block';
     }
+
+    // Owner batch item 4 (Protocol 42 fix, found while verifying full-reload restore):
+    // this callback's own appendToChat() briefing line above can grow the mobile
+    // carrier-strip (the persistent Overseer presence shown on every non-UPLINK
+    // subsystem, DO-O) — which changes page height AFTER window.onload's own
+    // post-_wirePanelPersistence() scroll re-restore already ran. Since this
+    // callback is the actual last deterministic point boot-time content gets
+    // added, re-apply the saved scroll offset once more here so it isn't left
+    // stale by a briefing line's effect on the carrier-strip's height.
+    if (_lastScrollSubsystem) _restoreScrollFor(_lastScrollSubsystem, false);
   });
+}
 
-  // Session Uptime Clock + Memory Cycle Event (every 15 minutes) — shared starters (DUP-3/4)
-  let sessionStart = Date.now();
-  _startUptimeClock();
-  _startMemCycle();
+function _startAmbientTimers() {
+  // Session Uptime Clock + Memory Cycle Event — now Ambient Runtime observers (A2).
+  // Both tick only in the awake states (['ACTIVE','IDLE']), so the runtime pauses them
+  // on STANDBY and restarts their cadence on wake (replacing the old enterStandby /
+  // exitStandby interval management). The dial is enforced by each observer's tier:
+  // the uptime clock is baseline telemetry (tier 'minimal', never quiets); the
+  // memory-cycle flash is an ambient flourish (tier 'balanced', silent at Minimal —
+  // exactly matching its former immersionAllows('balanced') gate).
+  sessionStart = Date.now();
+  AmbientRuntime.register({
+    id: 'uptime-clock',
+    states: ['ACTIVE', 'IDLE'],
+    tier: 'minimal',
+    cadenceMs: 1000,
+    onTick: _tickUptimeClock,
+  });
+  AmbientRuntime.register({
+    id: 'mem-cycle',
+    states: ['ACTIVE', 'IDLE'],
+    tier: 'balanced',
+    cadenceMs: 900000,
+    onTick: _tickMemCycle,
+  });
+}
 
+function _wireInputHistoryNav() {
   // #36 Input History — Up/Down arrows cycle through sent user commands
   // (history source is chatHistory filtered to user messages; _inputHistoryIdx is the nav cursor)
   let _inputHistoryIdx = -1;
@@ -879,7 +3057,9 @@ window.onload = function () {
       }
     });
   }
+}
 
+function _wireUnloadFlush() {
   // Flush any pending debounced save immediately on tab close
   window.addEventListener('beforeunload', () => {
     clearTimeout(_saveTimer);
@@ -893,8 +3073,61 @@ window.onload = function () {
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
     localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   });
+}
 
-  routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+window.onload = async function () {
+  try {
+    // U7: wire the OS Event Bus subscribers first (RobcoEvents is guaranteed loaded by onload).
+    _wireCoreEventBusSubscribers();
+    _wireAudioEventBusSubscribers();
+    _wireApiEventBusSubscribers();
+    _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
+    _wireFeedbackEchoSubscribers(); // FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR
+    _wireLocationCardSubscriber(); // LOCATION CONFIRMATION CARD: top-right arrival toast
+    // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
+    await _hydrateMetaFromIdb();
+    _hydrateStateFromStorage();
+    if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
+    _restoreApiKeyAndChatHistory();
+    loadUI();
+    initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
+    _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
+    setupHpBarInteraction();
+    setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+    setupRadBarInteraction(); // RAD bar click-drag (mirrors HP/XP bars, owner batch item 2)
+    _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
+    _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
+    _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
+    if (typeof startReactorHum === 'function') _armAmbientAudio(startReactorHum); // LIVING CORE #6: same autoplay-safe first-gesture arm
+    initRegistryAutocomplete();
+    initAmmoDatalist();
+    initLocationDatalist();
+    initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
+    initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
+    initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
+    initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+    initImmersion(); // P8: restore the Global Immersion dial (Full/Balanced/Minimal) device pref
+    initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+    _wireRotaryDialClick();
+    _wireStandby();
+    _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
+    initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
+    initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
+    initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
+    initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
+    _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
+    _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
+    _restoreOpticsPreference();
+    _restoreDevicePrefs();
+    _wireKeyboardShortcuts();
+    _runBootSequenceAndBriefing();
+    _startAmbientTimers();
+    _wireInputHistoryNav();
+    _wireUnloadFlush();
+    routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+  } catch (e) {
+    console.error('[RobCo] boot failed:', e);
+  }
 };
 
 function setupHpBarInteraction() {
@@ -908,6 +3141,7 @@ function setupHpBarInteraction() {
     const newHp = Math.round(pct * hpMax);
     document.getElementById('stat_hp_cur').value = newHp;
     state.hpCur = newHp;
+    _emitStatChangeIfDiffers('hp', newHp); // CHASSIS LIVING CORE #14
     updateMath();
   }
   let dragging = false;
@@ -957,6 +3191,7 @@ function setupXpBarInteraction() {
     const newXp = Math.round(xpCur + pct * (xpNext - xpCur - 1));
     document.getElementById('stat_xp').value = newXp;
     state.xp = newXp;
+    _emitStatChangeIfDiffers('xp', newXp); // CHASSIS LIVING CORE #14
     updateMath();
   }
   let dragging = false;
@@ -991,15 +3226,179 @@ function setupXpBarInteraction() {
   });
 }
 
+// Owner batch item 2: RAD EXPOSURE bar click-drag — mirrors setupHpBarInteraction()/
+// setupXpBarInteraction() exactly (Protocol 22), scaling to this game's RAD ceiling
+// (_resolveMaxRads(), the same GAME_DEFS[ctx].maxRads capRadsMax() already clamps to)
+// instead of a fixed max. Writes through the single real #stat_rads input — every
+// RAD surface (SKELETAL HARNESS + VITAL TELEMETRY) stays a read-only mirror of it
+// (updateMath() repaints all of them).
+//
+// Owner follow-up (Protocol 27 root cause, 2nd report): the owner drags the RAD
+// trace inside the VITAL TELEMETRY monitor (#opRadLineWrap, alongside the HP/GRADE
+// traces which already drag on real touch) — not the SKELETAL HARNESS bar
+// (#radDragTrack) the earlier fixes targeted. #opRadLineWrap never had ANY drag
+// wiring at all, on mouse or touch — it was a display-only readout painted by
+// _syncOperatorTelemetry(), unlike #hp_bar_container/#xp_bar_container in the same
+// monitor. _wireRadDragSurface() is the one drag mechanism (Protocol 22 — no
+// duplicated logic) now attached to BOTH RAD surfaces from setupRadBarInteraction().
+//
+// Owner follow-up (Protocol 27 root cause, 3rd report): both RAD fills still
+// visibly lagged behind a real drag while HP/XP tracked instantly, even after
+// the touch-action/transition-duration fixes above — because the fills'
+// width transition (needed so a PROGRAMMATIC change, e.g. an AI update or
+// resting, still animates smoothly) was also active DURING an interactive
+// drag, so every fast mousemove/touchmove retriggered a fresh 0.3s tween
+// toward the newest target instead of jumping straight to it — a visible
+// "chasing" trail that HP/XP never show because nothing here suppresses
+// their transition mid-drag. A 'dragging' class (added on
+// mousedown/touchstart, removed on mouseup/touchend, mirroring the tempo
+// dial's .knob2.dragging precedent) now sets transition:none on the fill
+// only while the container carries it, so the bar snaps to the pointer's
+// exact position on every move with zero animation lag, while the 0.3s
+// transition still applies to any width change made outside an active drag.
+function _wireRadDragSurface(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  function applyRad(e) {
+    const rect = container.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const maxRads = _resolveMaxRads();
+    const newRads = Math.round(pct * maxRads);
+    document.getElementById('stat_rads').value = newRads;
+    state.rads = newRads;
+    _emitStatChangeIfDiffers('rads', newRads); // CHASSIS LIVING CORE #14
+    updateMath();
+  }
+  let dragging = false;
+  container.addEventListener('mousedown', e => {
+    dragging = true;
+    container.classList.add('dragging');
+    applyRad(e);
+  });
+  document.addEventListener('mousemove', e => {
+    if (dragging) applyRad(e);
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+    container.classList.remove('dragging');
+  });
+  container.addEventListener(
+    'touchstart',
+    e => {
+      dragging = true;
+      container.classList.add('dragging');
+      applyRad(e);
+      e.preventDefault();
+    },
+    { passive: false }
+  );
+  document.addEventListener(
+    'touchmove',
+    e => {
+      if (dragging) applyRad(e);
+    },
+    { passive: false }
+  );
+  document.addEventListener('touchend', () => {
+    dragging = false;
+    container.classList.remove('dragging');
+  });
+}
+function setupRadBarInteraction() {
+  _wireRadDragSurface('radDragTrack'); // SKELETAL HARNESS bar
+  _wireRadDragSurface('opRadLineWrap'); // VITAL TELEMETRY trace (owner follow-up — was never wired)
+}
+
 // C11: Level input change handler — when user edits the level field,
-// auto-set XP to the minimum XP required for that level (xpCur).
+// auto-set XP to the minimum XP required for that level (xpCur). Clamped to
+// MAX_PLAYER_LEVEL (owner batch item 3) — the number input's native stepper
+// arrows fire the same oninput event as typing, so one clamp covers both.
+// MAX_PLAYER_LEVEL is declared later in this file as a module-scope const;
+// referencing it here is safe since this function only runs later, at user
+// interaction time, well after the whole script has parsed.
 function onLvlInputChanged() {
-  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const lvlEl = document.getElementById('stat_lvl');
+  const raw = Math.max(1, parseInt(lvlEl.value) || 1);
+  const lvl = Math.min(MAX_PLAYER_LEVEL, raw);
+  if (lvl !== raw) lvlEl.value = lvl;
   const xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
   document.getElementById('stat_xp').value = xpCur;
   state.lvl = lvl;
   state.xp = xpCur;
   updateMath();
+}
+
+// Owner batch item 3: XP-amount input caps at the current level's max XP —
+// xpNext(lvl) - 1, the same upper edge of the [xpCur, xpNext-1] band the XP
+// bar's own drag handler (setupXpBarInteraction()) already generates
+// (Protocol 22, same curve, never a second formula) — so typing (or using
+// the number input's native stepper, which fires the same oninput event)
+// can't push XP past what the current level actually allows. Scales per
+// level automatically since xpNext is a function of lvl.
+function onXpInputChanged() {
+  const xpEl = document.getElementById('stat_xp');
+  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
+  const raw = parseInt(xpEl.value, 10);
+  if (!isNaN(raw)) {
+    const capped = Math.max(0, Math.min(raw, xpNext - 1));
+    if (capped !== raw) xpEl.value = capped;
+  }
+  state.xp = parseInt(xpEl.value, 10) || 0;
+  updateMath();
+}
+window.onXpInputChanged = onXpInputChanged;
+
+// Owner report: no existing app-enforced level cap was found anywhere in the
+// codebase (only a display-only clamp in the XP bar's percentage math, and a
+// flavor-text trait description in reg_nv.js that isn't consumed as a real
+// constant). 50 is picked as a single, game-agnostic ceiling (Protocol 38 —
+// applied uniformly, never a per-game literal) — it matches the top of the
+// already-existing XP-curve display range (updateMath()'s XP bar previously
+// hardcoded this same 50 as "where the curve display stops mattering"), so
+// this reuses that same implicit ceiling as an explicit, named constant
+// instead of introducing a new, disconnected number.
+const MAX_PLAYER_LEVEL = 50;
+
+// Native LEVEL UP control (owner report): deterministic, player-controlled,
+// and completely ungated by XP — pressing it always applies exactly +1
+// level (until MAX_PLAYER_LEVEL), never requiring the XP bar to have
+// reached any threshold. XP can go out of sync with level (the AI doesn't
+// always keep it in lockstep) without ever blocking manual leveling. Fires
+// through the SAME RobcoEvents 'level.up' path the AI-driven
+// autoImportState() level-up already emits (Protocol 22) — so the jingle,
+// haptic, and auto-log subscribers all react identically to a manual
+// level-up, no forked logic. XP itself is left untouched by a manual
+// level-up (simplest, least surprising choice — the XP bar keeps showing
+// progress toward whatever level is current, exactly as it already did).
+function nativeLevelUp() {
+  const lvl = Math.max(1, parseInt(document.getElementById('stat_lvl').value) || 1);
+  if (lvl >= MAX_PLAYER_LEVEL) return;
+  const newLvl = Math.min(MAX_PLAYER_LEVEL, lvl + 1);
+  document.getElementById('stat_lvl').value = newLvl;
+  state.lvl = newLvl;
+  RobcoEvents.emit('level.up', { oldLvl: lvl, newLvl });
+  updateMath();
+  saveState();
+  // AI→native survey Part C.1 — skill-point allocation on level-up. The
+  // Director used to auto-award (10 + INT/2) skill points and pick the
+  // distribution itself; that pool is now just REPORTED here (same formula,
+  // computed offline) and the player allocates it themselves through the
+  // EXISTING skill setters — the SKILL MATRIX VU meters (_skillVuSet) or the
+  // TERMINAL "<skill> +N" grammar (Part B) — never auto-assigned here
+  // (Protocol 24, player-driven, deterministic). Native LEVEL UP jumps the
+  // view to SKILL MATRIX the same way [GPS]/[MAP] jumps to the map
+  // (Protocol 22 — expandPanelForCategory is the one panel-opening path).
+  const intScore = parseInt(state.i, 10) || 5;
+  const skillPoints = 10 + Math.floor(intScore / 2);
+  if (typeof appendToChat === 'function') {
+    appendToChat(
+      `> [LEVEL UP] Level ${newLvl} committed. ${skillPoints} skill point${skillPoints === 1 ? '' : 's'} available (10 + INT/2) — allocate via SKILL MATRIX.`,
+      'sys'
+    );
+  }
+  if (typeof expandPanelForCategory === 'function') expandPanelForCategory('skills');
 }
 
 // C5: Playthrough type handler — writes state field (Protocol 4).
@@ -1029,6 +3428,11 @@ function onCampaignModeChange(checked) {
   saveState();
   const banner = document.getElementById('rngModeBanner');
   if (banner) banner.style.display = checked ? 'block' : 'none';
+  // SU-3 (found during render-verify, Protocol 42): #completeRngToggle is a real,
+  // keyboard/AT-reachable control (.bay-visually-hidden-input) — a user toggling
+  // it DIRECTLY (never touching the fancy breaker button) must still repaint the
+  // well/cover/seal/title/desc/summary/sequence-legend, not just this banner.
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
 }
 
 let deferredPrompt;
@@ -1055,9 +3459,10 @@ function changePlaystyle(style) {
   if (style === 'melee') {
     let stateStr = JSON.stringify(state).toLowerCase();
     if (stateStr.includes('educated') || stateStr.includes('dead weight')) {
-      alert(
-        '>> CANNOT SWAP TO MELEE ONLY: Save state contains restricted perks (Educated/Dead Weight).'
-      );
+      openModal({
+        title: '> PLAYSTYLE',
+        body: '>> CANNOT SWAP TO MELEE ONLY: Save state contains restricted perks (Educated/Dead Weight).',
+      });
       document.getElementById('playstyleInput').value =
         localStorage.getItem('robco_playstyle') || 'any';
       return;
@@ -1068,15 +3473,481 @@ function changePlaystyle(style) {
 }
 
 function onGameContextChange(ctx) {
-  if (!GAME_DEFS[ctx]) return;
+  // DO-K: designOnly games (FO4) prove the N-game data abstraction but aren't selectable yet —
+  // #gameContextSelect already offers no FO4 <option>, this is the defensive second guard.
+  if (!GAME_DEFS[ctx] || GAME_DEFS[ctx].designOnly) return;
   if (!window.robco_v8) window.robco_v8 = { activeContext: 'FNV', campaigns: {} };
   window.robco_v8.campaigns[state.gameContext] = JSON.parse(JSON.stringify(state));
   window.robco_v8.activeContext = ctx;
   state.gameContext = ctx;
   window._contextSwitching = true;
+  // DO-K: flip the pre-paint attribute before the reload so a briefly-cached document (or a
+  // future non-full-reload switch path) never shows the outgoing game's identity chrome.
+  document.documentElement.dataset.game = ctx;
   localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
   window.location.reload();
 }
+
+// ── CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom-control wiring (SU-3) ──
+// The real controls (#gameContextSelect, #playstyleInput, #playthroughTypeSelect,
+// #completeRngToggle) stay in the DOM, visually hidden via .bay-visually-hidden-input
+// (the same technique already shipped for #immersionSelect — Protocol 17: a
+// keyboard/AT user can still reach any of them directly); the cartridge/rocker/
+// detent/breaker buttons below are the genuinely-custom visible controls, and both
+// entry points drive the EXACT SAME setters (Protocol 22 — one truth, many entries).
+
+// Owner decision: a cartridge swap reboots the terminal into a different game's
+// campaign, so it is gated behind a light confirm — confirm -> proceed (calls the
+// unchanged onGameContextChange), cancel -> stay (reverts the hidden select back to
+// the still-active game; onGameContextChange is never called, so nothing reloads).
+async function _confirmGameContextChange(ctx) {
+  const sel = document.getElementById('gameContextSelect');
+  const current = (state && state.gameContext) || 'FNV';
+  if (ctx === current) {
+    if (sel) sel.value = ctx;
+    return;
+  }
+  const label = (GAME_DEFS[ctx] && GAME_DEFS[ctx].label) || ctx;
+  const ok = await confirmAction({
+    title: '> SWAP PROGRAM CARTRIDGE',
+    warning:
+      'Seating the ' +
+      label +
+      " cartridge reboots the terminal into that game's campaign.\n\nEach game keeps its own separate campaign — nothing is lost.\n\nContinue?",
+    confirmLabel: 'SEAT CARTRIDGE',
+  });
+  if (!ok) {
+    if (sel) sel.value = current;
+    _syncCampaignProfileUI();
+    return;
+  }
+  onGameContextChange(ctx);
+}
+window._confirmGameContextChange = _confirmGameContextChange;
+
+// Cartridge button click — syncs the hidden select then routes through the exact
+// same confirm gate a direct select change uses.
+function _seatGameCartridge(ctx) {
+  const sel = document.getElementById('gameContextSelect');
+  if (sel) sel.value = ctx;
+  // M5 SEAT — fires the instant the cartridge is tapped (the physical
+  // "press it into the slot" moment), independent of whether the player
+  // then confirms or cancels the reload dialog below; never touches the
+  // reload path itself (zero boot risk).
+  const btn = document.getElementById('cart-' + String(ctx).toLowerCase());
+  if (typeof _motionSeat === 'function') _motionSeat(btn);
+  _confirmGameContextChange(ctx);
+}
+window._seatGameCartridge = _seatGameCartridge;
+
+// PLAYSTYLE doctrine rocker. changePlaystyle() itself reverts #playstyleInput's
+// value on the Educated/Dead-Weight melee lockout (unchanged) — re-syncing after
+// it returns always reflects the ACTUAL final value, lockout or not.
+function _setDoctrine(style) {
+  const sel = document.getElementById('playstyleInput');
+  if (sel) sel.value = style;
+  changePlaystyle(style);
+  _syncCampaignProfileUI();
+}
+window._setDoctrine = _setDoctrine;
+
+// PLAYTHROUGH TYPE tempo dial + 5 direct-pick detents — one tap per pick.
+function _setTempo(type) {
+  const sel = document.getElementById('playthroughTypeSelect');
+  if (sel) sel.value = type;
+  onPlaythroughTypeChange(type);
+  _syncCampaignProfileUI();
+}
+window._setTempo = _setTempo;
+
+const _TEMPO_ORDER = ['standard', 'minmaxed', 'completionist', 'casual', 'speedrun'];
+// SU-3 rework: the needle's rotation IS its index on the gauge arc — −84° …
+// +84°, 42° apart, 0° = up (matches the owner-approved mockup geometry).
+const _TEMPO_ARC_MIN = -84;
+const _TEMPO_ARC_STEP = 42;
+const _TEMPO_ARC_MAX = 84;
+const _TEMPO_ROT = [-84, -42, 0, 42, 84];
+const _TEMPO_LABELS = {
+  standard: 'STANDARD',
+  minmaxed: 'MIN-MAXED',
+  completionist: 'COMPLETIONIST',
+  casual: 'CASUAL',
+  speedrun: 'SPEEDRUN',
+};
+const _TEMPO_DESC = {
+  standard: 'balanced pacing — the default simulation',
+  minmaxed: 'the AI assumes optimized builds',
+  completionist: 'every side path surfaces',
+  casual: 'forgiving pacing, lighter bookkeeping',
+  speedrun: 'critical path only — aggressive clock',
+};
+
+// The seatable (non design-only) games, in GAME_DEFS declaration order — the
+// single source renderCartDeck() generates the cartridge stack from (Protocol
+// 38: a future seatable game needs only a new GAME_DEFS entry, never a markup
+// or stacking-logic rewrite).
+function _seatableGames() {
+  return Object.keys(GAME_DEFS).filter(k => !GAME_DEFS[k].designOnly);
+}
+
+// Renders the PROGRAM CARTRIDGE stack — a physical pile, active game on top
+// (stack-index 0, full legibility), every other seatable game piled beneath it
+// with a progressively larger peek offset driven by the CSS --stack-index/
+// --cart-stack-depth custom properties (css/terminal.css). Reuses the exact
+// pre-existing _seatGameCartridge(ctx) onclick wiring (Protocol 22) — tapping
+// a peeking cartridge still routes through the unchanged confirm-gated swap.
+function renderCartDeck() {
+  const deck = document.getElementById('cartDeck');
+  if (!deck) return;
+  const ctx = (state && state.gameContext) || 'FNV';
+  const games = _seatableGames();
+  const ordered = games.includes(ctx) ? [ctx, ...games.filter(g => g !== ctx)] : games;
+  deck.style.setProperty('--cart-stack-depth', String(ordered.length));
+  deck.innerHTML = ordered
+    .map((g, i) => {
+      const def = GAME_DEFS[g] || {};
+      const label = String(def.label || g);
+      const sub = (def.theme && def.theme.cartridgeTape) || '';
+      const seated = g === ctx;
+      return (
+        `<button type="button" class="cart${seated ? ' seated' : ''}" id="cart-${escapeHtml(g.toLowerCase())}" ` +
+        `style="--stack-index:${i}" onclick="_seatGameCartridge('${escapeHtml(g)}')" role="radio" ` +
+        `aria-checked="${seated}" aria-label="Seat the ${escapeHtml(label)} program cartridge — switches the active game campaign">` +
+        `<span class="spools" aria-hidden="true"><i></i><i></i></span>` +
+        `<span class="c-name">${escapeHtml(label.toUpperCase())}</span>` +
+        `<span class="c-sub">${escapeHtml(sub)}</span>` +
+        `</button>`
+      );
+    })
+    .join('');
+}
+window.renderCartDeck = renderCartDeck;
+
+// Re-paints the CAMPAIGN PROFILE board's custom controls from the real,
+// underlying state — cartridges/rocker/detents/dial/summary line. Called after
+// every profile change and once at boot; never drifts from the hidden real
+// controls, which stay the actual source of truth.
+function _syncCampaignProfileUI() {
+  const ctx = (state && state.gameContext) || 'FNV';
+  renderCartDeck();
+
+  const style = localStorage.getItem('robco_playstyle') || 'any';
+  const isMelee = style === 'melee';
+  const anyBtn = document.getElementById('rk-any');
+  const meleeBtn = document.getElementById('rk-melee');
+  if (anyBtn) {
+    anyBtn.classList.toggle('on', !isMelee);
+    anyBtn.setAttribute('aria-checked', String(!isMelee));
+  }
+  if (meleeBtn) {
+    meleeBtn.classList.toggle('on', isMelee);
+    meleeBtn.setAttribute('aria-checked', String(isMelee));
+  }
+  const doctrineStatus = document.getElementById('st-doctrine');
+  if (doctrineStatus)
+    doctrineStatus.textContent = '> DOCTRINE: ' + (isMelee ? 'MELEE / UNARMED ONLY' : 'ANY WEAPON');
+
+  const tempo = (state && state.playthroughType) || 'standard';
+  const tIdx = Math.max(0, _TEMPO_ORDER.indexOf(tempo));
+  const tKey = _TEMPO_ORDER[tIdx];
+  document.querySelectorAll('.detent2').forEach(d => {
+    const on = d.dataset.tempo === tKey;
+    d.classList.toggle('on', on);
+    d.setAttribute('aria-checked', String(on));
+  });
+  document.querySelectorAll('.tempo-tick').forEach(t => {
+    t.classList.toggle('lit', Number(t.dataset.i) === tIdx);
+  });
+  const knob = document.getElementById('tempoKnob');
+  if (knob) {
+    knob.style.transform = 'rotate(' + _TEMPO_ROT[tIdx] + 'deg)';
+    knob.setAttribute('aria-valuenow', String(tIdx));
+    knob.setAttribute('aria-valuetext', _TEMPO_LABELS[tKey] + ' — ' + _TEMPO_DESC[tKey]);
+  }
+  const readoutName = document.getElementById('tempoReadoutName');
+  if (readoutName) readoutName.textContent = _TEMPO_LABELS[tKey];
+  const readoutDesc = document.getElementById('tempoReadoutDesc');
+  if (readoutDesc) readoutDesc.textContent = _TEMPO_DESC[tKey];
+  const tempoStatus = document.getElementById('st-tempo');
+  if (tempoStatus) tempoStatus.textContent = '> TEMPO: ' + _TEMPO_LABELS[tKey];
+
+  const sum = document.getElementById('sum-profile');
+  if (sum) {
+    const gameLabel = String((GAME_DEFS[ctx] && GAME_DEFS[ctx].label) || ctx).toUpperCase();
+    const doctrineLabel = isMelee ? 'MELEE ONLY' : 'ANY WEAPON';
+    sum.textContent =
+      gameLabel +
+      ' CARTRIDGE · ' +
+      doctrineLabel +
+      ' · TEMPO: ' +
+      _TEMPO_LABELS[_TEMPO_ORDER[tIdx]];
+  }
+  _syncCampaignConfigTopSummary();
+}
+window._syncCampaignProfileUI = _syncCampaignProfileUI;
+
+// Owner batch item 5: the CAMPAIGN CONFIGS top-level panel's own collapsed
+// summary line — aggregates the CAMPAIGN PROFILE + RANDOMIZER INTERLOCK
+// boards' own summary text (Protocol 22, never re-derives their state) into
+// one line. Called from both boards' own sync functions so it can never go
+// stale regardless of which board last changed.
+function _syncCampaignConfigTopSummary() {
+  const sum = document.getElementById('sum-campaignConfig');
+  if (!sum) return;
+  const profile = document.getElementById('sum-profile');
+  const ilk = document.getElementById('sum-ilk');
+  const parts = [];
+  if (profile && profile.textContent) parts.push(profile.textContent);
+  if (ilk && ilk.textContent) parts.push(ilk.textContent);
+  sum.textContent = parts.join(' · ');
+}
+window._syncCampaignConfigTopSummary = _syncCampaignConfigTopSummary;
+
+// ── OPERATIONAL TEMPO rotary dial — drag-to-rotate (SU-3 rework) ───────────
+// Reuses the Immersion dial's drag PATTERN (pointerdown/move/up/cancel,
+// pointer capture, a "did this actually move" flag gating a real drag vs a
+// tap, listeners added on down and removed on up/cancel) but NOT its pixel-
+// step math: the Immersion dial steps 3 tiers off horizontal drag distance,
+// while this dial has 5 positions ringed on a real arc and the needle must
+// visually track the pointer's actual ANGLE while dragging (live needle-
+// follow), snapping to the nearest position only on release — a genuinely
+// different geometry gets its own angle-based handlers rather than force-
+// fitting the pixel-step function onto it (Protocol 22: same established
+// pattern, not a wholesale duplicate of unrelated math).
+//
+// Owner directive: tapping the knob body does NOTHING — unlike the
+// Immersion dial there is no tap-to-advance/cycle here, only a drag, a
+// direct .detent2 position tap, or the arrow keys change the value. The
+// knob has no click handler at all, so a real drag's trailing synthetic
+// click has nothing to do — the Immersion dial's own _dialDragSuppressClick
+// flag is untouched by any of this (there's nothing here for it to suppress).
+let _tempoDrag = null; // { startA, moved } while a genuine drag is in progress
+
+function _tempoPointerAngle(ev, knob) {
+  const r = knob.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  return (Math.atan2(ev.clientX - cx, cy - ev.clientY) * 180) / Math.PI; // 0° = up
+}
+function _tempoClampArc(a) {
+  return Math.max(_TEMPO_ARC_MIN, Math.min(_TEMPO_ARC_MAX, a));
+}
+function _tempoNearestIndex(a) {
+  return Math.max(
+    0,
+    Math.min(4, Math.round((_tempoClampArc(a) - _TEMPO_ARC_MIN) / _TEMPO_ARC_STEP))
+  );
+}
+function _tempoPointerMove(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  const a = _tempoPointerAngle(ev, knob);
+  if (!_tempoDrag.moved && Math.abs(a - _tempoDrag.startA) < 7) return; // wobble = still a tap
+  _tempoDrag.moved = true;
+  knob.classList.add('dragging'); // kill the transition for live needle-follow
+  const clamped = _tempoClampArc(a);
+  knob.style.transform = 'rotate(' + clamped + 'deg)';
+  // Live preview of the nearest position while dragging — not committed
+  // (onPlaythroughTypeChange) until pointerup, matching the mockup.
+  const near = _tempoNearestIndex(clamped);
+  document.querySelectorAll('.detent2').forEach(d => {
+    d.classList.toggle('on', Number(d.dataset.i) === near);
+  });
+  document.querySelectorAll('.tempo-tick').forEach(t => {
+    t.classList.toggle('lit', Number(t.dataset.i) === near);
+  });
+  // Owner report: the readout name/description used to only refresh on
+  // release (_setTempo -> _syncCampaignProfileUI), so the needle could point
+  // at CASUAL mid-drag while the readout still read COMPLETIONIST. Preview
+  // the readout (and the knob's own ARIA) at the nearest position live, on
+  // every drag frame — the actual value commit still only happens on
+  // pointerup (_tempoPointerUp -> _setTempo), unchanged.
+  const nearKey = _TEMPO_ORDER[near];
+  const readoutName = document.getElementById('tempoReadoutName');
+  if (readoutName) readoutName.textContent = _TEMPO_LABELS[nearKey];
+  const readoutDesc = document.getElementById('tempoReadoutDesc');
+  if (readoutDesc) readoutDesc.textContent = _TEMPO_DESC[nearKey];
+  knob.setAttribute('aria-valuenow', String(near));
+  knob.setAttribute('aria-valuetext', _TEMPO_LABELS[nearKey] + ' — ' + _TEMPO_DESC[nearKey]);
+}
+function _tempoPointerCleanup(knob) {
+  knob.classList.remove('dragging');
+  knob.removeEventListener('pointermove', _tempoPointerMove);
+  knob.removeEventListener('pointerup', _tempoPointerUp);
+  knob.removeEventListener('pointercancel', _tempoPointerCancel);
+}
+function _tempoPointerUp(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  try {
+    knob.releasePointerCapture(ev.pointerId);
+  } catch (e) {
+    /* already released */
+  }
+  const drag = _tempoDrag;
+  _tempoDrag = null;
+  _tempoPointerCleanup(knob);
+  if (drag.moved) {
+    const idx = _tempoNearestIndex(_tempoPointerAngle(ev, knob));
+    _setTempo(_TEMPO_ORDER[idx]); // real commit + repaint — the source of truth
+  }
+}
+function _tempoPointerCancel(ev) {
+  if (!_tempoDrag) return;
+  const knob = ev.currentTarget;
+  _tempoDrag = null;
+  _tempoPointerCleanup(knob);
+  _syncCampaignProfileUI(); // revert any live drag-preview back to the committed value
+}
+function _tempoPointerDown(ev) {
+  if (ev.button !== 0) return; // left button only for mouse; touch/pen have no `button` semantics
+  const knob = ev.currentTarget;
+  _tempoDrag = { startA: _tempoPointerAngle(ev, knob), moved: false };
+  try {
+    knob.setPointerCapture(ev.pointerId);
+  } catch (e) {
+    /* unsupported — drag still tracks via the listeners below */
+  }
+  knob.addEventListener('pointermove', _tempoPointerMove);
+  knob.addEventListener('pointerup', _tempoPointerUp);
+  knob.addEventListener('pointercancel', _tempoPointerCancel);
+}
+// Arrow-key stepping — the knob is role=slider, so ArrowLeft/Right/Up/Down +
+// Home/End are the expected native slider keymap.
+function _tempoKeyDown(ev) {
+  const tempo = (state && state.playthroughType) || 'standard';
+  const idx = Math.max(0, _TEMPO_ORDER.indexOf(tempo));
+  if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[Math.min(4, idx + 1)]);
+  } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[Math.max(0, idx - 1)]);
+  } else if (ev.key === 'Home') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[0]);
+  } else if (ev.key === 'End') {
+    ev.preventDefault();
+    _setTempo(_TEMPO_ORDER[4]);
+  }
+}
+function _wireTempoDialDrag() {
+  const knob = document.getElementById('tempoKnob');
+  if (!knob) return;
+  knob.addEventListener('keydown', _tempoKeyDown); // works with or without PointerEvent support
+  if (typeof window.PointerEvent === 'undefined') return; // graceful fallback: tap-position + arrows still work
+  knob.addEventListener('pointerdown', _tempoPointerDown);
+}
+window._wireTempoDialDrag = _wireTempoDialDrag;
+
+// ── RANDOMIZER INTERLOCK — the breaker/cover/seal fiction over
+// #completeRngToggle / state.campaignMode (mirrors the ARCHITECTURE.md-documented
+// SAFE/'standard' -> ARMED/'rng' (reversible) -> SEALED/'rng-locked' (permanent,
+// only via wipeTerminal() while armed) lifecycle — unchanged). Two deliberate
+// taps arm from SAFE (lift the cover, then throw the lever) so a stray tap can't
+// arm it; a single tap disarms/re-arms once the cover is already lifted.
+// _ilkCoverLifted is transient UI state only (never persisted) — a fresh render
+// always starts with the cover closed, matching SAFE.
+let _ilkCoverLifted = false;
+function _interlockLiftCover(ev) {
+  if (ev) ev.stopPropagation();
+  if (state.campaignMode === 'rng-locked') return;
+  _ilkCoverLifted = true;
+  const well = document.getElementById('ilkWell');
+  if (well) well.classList.add('lifted');
+}
+window._interlockLiftCover = _interlockLiftCover;
+
+function _interlockThrowBreaker() {
+  if (state.campaignMode === 'rng-locked') return;
+  const armed = state.campaignMode === 'rng';
+  if (!armed && !_ilkCoverLifted) {
+    _interlockLiftCover();
+    return;
+  }
+  const cb = document.getElementById('completeRngToggle');
+  const nextChecked = !armed;
+  if (cb) cb.checked = nextChecked;
+  onCampaignModeChange(nextChecked);
+  _ilkCoverLifted = nextChecked;
+  _syncInterlockUI();
+}
+window._interlockThrowBreaker = _interlockThrowBreaker;
+
+// Re-paints the RANDOMIZER INTERLOCK · PURGE board from state.campaignMode — the
+// well/lever/cover/seal, the sequence legend, the summary line, and the LED.
+// Called after every interlock change and once at boot.
+function _syncInterlockUI() {
+  const mode = (state && state.campaignMode) || 'standard';
+  const rngState = mode === 'rng' ? 'armed' : mode === 'rng-locked' ? 'locked' : 'safe';
+  const wrap = document.getElementById('interlockWrap');
+  if (wrap) wrap.dataset.rng = rngState;
+  const well = document.getElementById('ilkWell');
+  if (well) well.classList.toggle('lifted', rngState !== 'safe');
+  if (rngState === 'safe') _ilkCoverLifted = false;
+
+  const title = document.getElementById('ilkTitle');
+  if (title)
+    title.textContent =
+      'COMPLETE RNG — ' +
+      (rngState === 'safe' ? 'SAFE' : rngState === 'armed' ? 'ARMED' : 'SEALED');
+  const desc = document.getElementById('ilkDesc');
+  if (desc) {
+    desc.textContent =
+      rngState === 'safe'
+        ? 'Full randomisation of SPECIAL, traits, tag skills, skill points and perk picks — handed to the AI for a NEW campaign only. Arming changes nothing until the next terminal wipe, and never touches an existing save.'
+        : rngState === 'armed'
+          ? 'Breaker thrown. The NEXT new campaign will be fully randomised. This one is untouched. Throw the breaker back down to disarm — right up until the wipe.'
+          : 'This run was created with the breaker thrown. The interlock sealed at campaign creation and cannot be reopened — the seal is the fiction for: the toggle is disabled for this whole run.';
+  }
+  const actions = document.getElementById('ilkActions');
+  if (actions) actions.style.display = rngState === 'armed' ? '' : 'none';
+
+  // Protocol 22 consolidation (found during render-verify): _restoreDevicePrefs()/
+  // loadUI() already toggled these banners from the same state.campaignMode read
+  // before calling this function — folding it in here too means ANY future
+  // caller of _syncInterlockUI() repaints the WHOLE board, banners included,
+  // instead of depending on a caller-specific duplicate a few lines above it.
+  const armedBanner = document.getElementById('rngModeBanner');
+  if (armedBanner) armedBanner.style.display = rngState === 'armed' ? 'block' : 'none';
+  const lockedBanner = document.getElementById('rngLockedBanner');
+  if (lockedBanner) lockedBanner.style.display = rngState === 'locked' ? 'block' : 'none';
+
+  const safeStep = document.getElementById('sq-safe');
+  const armedStep = document.getElementById('sq-armed');
+  const lockedStep = document.getElementById('sq-locked');
+  if (safeStep) safeStep.classList.toggle('now', rngState === 'safe');
+  if (armedStep) armedStep.classList.toggle('now', rngState === 'armed');
+  if (lockedStep) lockedStep.classList.toggle('now', rngState === 'locked');
+
+  const sum = document.getElementById('sum-ilk');
+  if (sum)
+    sum.textContent =
+      rngState === 'safe'
+        ? 'RNG SAFE · PURGE KEY STOWED'
+        : rngState === 'armed'
+          ? 'RNG ARMED — COMMITS AT NEXT WIPE'
+          : 'RNG SEALED — PERMANENT THIS RUN';
+
+  const led = document.getElementById('ilkLed');
+  if (led)
+    led.className =
+      'bay-led ' + (rngState === 'safe' ? 'off' : rngState === 'armed' ? 'amber' : 'red');
+
+  const st = document.getElementById('st-ilk');
+  if (st) {
+    st.textContent =
+      rngState === 'safe'
+        ? '> INTERLOCK SAFE — STANDARD CAMPAIGN MODE'
+        : rngState === 'armed'
+          ? '> INTERLOCK ARMED — NOTHING CHANGES UNTIL THE NEXT WIPE'
+          : '> INTERLOCK SEALED — FULL RANDOMISATION ACTIVE, PERMANENT FOR THIS RUN';
+    st.className =
+      'board-status' + (rngState === 'armed' ? ' alert' : rngState === 'locked' ? ' danger' : '');
+  }
+  _syncCampaignConfigTopSummary();
+}
+window._syncInterlockUI = _syncInterlockUI;
 
 // ── CAMPAIGN LOG EXPORT ────────────────────────────────────────
 // format: 'txt' (default), 'html' (#41), 'md' (#27)
@@ -1119,27 +3990,27 @@ document.addEventListener('visibilitychange', _updateAppBadge);
 
 function _updatePanelBadges() {
   const badges = [
-    { h2text: '> PERKS', count: (state.perks || []).length },
+    { h2text: '> PERK LOADOUT', count: (state.perks || []).length },
     {
-      h2text: '> BACKPACK INVENTORY',
+      h2text: '> CARGO MANIFEST',
       // Combined: non-ammo inventory items + tracked ammo calibers
       count:
         (state.inventory || []).filter(it => (it.type || 'misc') !== 'ammo').length +
         Object.values(state.ammo || {}).filter(v => v > 0).length,
     },
-    { h2text: '> SQUAD STATUS', count: (state.squad || []).length },
+    { h2text: '> SQUAD ROSTER', count: (state.squad || []).length },
     { h2text: '> STATUS EFFECTS', count: (state.status || []).length },
-    { h2text: '> CAMPAIGN NOTES', count: (state.campaign_notes || []).length },
+    { h2text: '> FIELD NOTES', count: (state.campaign_notes || []).length },
     {
-      h2text: '> QUEST LOG',
+      h2text: '> DIRECTIVE REGISTRY',
       count: _pendingDirectivesCount(),
     },
     {
-      h2text: '> COLLECTIBLES',
+      h2text: '> CURIO ARCHIVE',
       count: (state.collectibles || []).length,
     },
     {
-      h2text: '> CRAFTING',
+      h2text: '> FIELD FABRICATION',
       count:
         typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
           ? FALLOUT_REGISTRY.recipes.filter(r =>
@@ -1165,8 +4036,11 @@ function _updatePanelBadges() {
     },
   ];
   badges.forEach(({ h2text, count, total }) => {
-    // Find the h2 with exactly this text (case-insensitive prefix match)
-    const h2 = Array.from(document.querySelectorAll('.panel h2')).find(el =>
+    // Find the heading with exactly this text (case-insensitive prefix match).
+    // SKILL BOOKS/SKILL MAGAZINES are top-level .panel h2 boards (BUS-05a/
+    // BUS-05b, Phase 3 OPERATOR batch 3) — the .sub-panel h3 half of this
+    // selector still covers any other nested sub-panel badge (Protocol 22).
+    const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
       el.textContent.trim().startsWith(h2text)
     );
     if (!h2) return;
@@ -1186,57 +4060,410 @@ function _updatePanelBadges() {
 
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────
 // ── TAB NAVIGATION ───────────────────────────────────────────────
-// Tabs: 'stat' | 'inv' | 'data'
-// Each panel has data-tab="stat|inv|data|campg". Panels with no data-tab always show.
-// Security & Configuration has no data-tab and is always visible.
-const TAB_NAMES = ['stat', 'inv', 'data', 'campg'];
+// Tabs: 'stat' | 'inv' | 'data' | 'campg' | 'chassis' | 'settings'
+// Each panel has data-tab="stat|inv|data|campg|chassis|settings". Panels with no
+// data-tab always show.
+const TAB_NAMES = ['stat', 'inv', 'data', 'campg', 'chassis', 'settings'];
+// DO-N: 'data' and 'campg' present together as the ONE bezel subsystem
+// (DATABANK) — selecting either tab shows both panel groups; STAT/INV stay
+// mutually exclusive. switchTab() itself keeps working standalone exactly
+// as before (routing/hotkey/deep-link contract preserved) — this only
+// widens which panels a 'data'/'campg' call reveals.
+const _DATABANK_TABS = ['data', 'campg'];
+const TAB_TO_SUBSYSTEM = {
+  stat: 'operator',
+  inv: 'operations',
+  data: 'databank',
+  campg: 'databank',
+  chassis: 'chassis',
+  settings: 'settings',
+};
 
 function switchTab(tab) {
   if (!TAB_NAMES.includes(tab)) return;
+  _saveOutgoingScroll(); // FIX 2: remember where the previous subsystem was scrolled to
   playPanelClick(); // H1: rotary dial click on tab switch
-  // Show panels for the active tab, hide others
+  // Show panels for the active tab (databank merges data+campg), hide others
+  const showTabs = _DATABANK_TABS.includes(tab) ? _DATABANK_TABS : [tab];
   document.querySelectorAll('.panel[data-tab]').forEach(el => {
-    if (el.dataset.tab === tab) {
+    if (showTabs.includes(el.dataset.tab)) {
       el.classList.add('tab-visible');
     } else {
       el.classList.remove('tab-visible');
     }
   });
-  // Update button active states
-  TAB_NAMES.forEach(t => {
-    const btn = document.getElementById('tab-btn-' + t);
-    if (btn) btn.classList.toggle('active', t === tab);
-  });
   // Store active tab so page reload restores it
-  try {
-    localStorage.setItem('robco_active_tab', tab);
-  } catch (_) {}
+  MetaStore.set('robco_active_tab', tab);
   // Re-render world map when switching to the DATA tab so it measures real panel width
   if (tab === 'data' && typeof renderWorldMap === 'function') renderWorldMap();
+  // DO-N: sync the bezel subsystem nav (LED/aria-selected/telemetry) to match —
+  // every entry path (hotkey, #go= deep-link, bezel click, AI auto-expand)
+  // stays visually consistent through this one call.
+  const subsystem = TAB_TO_SUBSYSTEM[tab] || 'operator';
+  _syncBezelNav(subsystem);
+  // FIX 2: restore this subsystem's remembered scroll offset (or the top of
+  // the column if it's never been visited) — covers the boot-time initial
+  // tab too, since initTabs() calls switchTab() directly.
+  _restoreScrollFor(subsystem, true);
+  _lastScrollSubsystem = subsystem;
 }
 
 // Initialize tab on page load (restores last used tab, defaults to 'stat')
 function initTabs() {
   let tab = 'stat';
-  try {
-    const saved = localStorage.getItem('robco_active_tab');
-    if (saved && TAB_NAMES.includes(saved)) tab = saved;
-  } catch (_) {}
+  const saved = MetaStore.get('robco_active_tab');
+  if (saved && TAB_NAMES.includes(saved)) tab = saved;
   switchTab(tab);
 }
 
-// PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
-const SHORTCUT_ROUTES = {
-  comm: () => {
+// ── DO-N: BEZEL SUBSYSTEM NAV ─────────────────────────────────────────
+// Illuminated keycap presentation over the existing tab/router system
+// (Protocol 25 owner-approved redesign). Every keycap routes through
+// switchTab() (stat/inv/data/campg unchanged) or, for the two subsystems
+// that were never gated by a tab (the always-visible Comm-Link column and
+// Security & Configuration/Module Bay), scrolls/focuses them directly —
+// mirroring the existing SHORTCUT_ROUTES.comm approach. Writes only the
+// MetaStore view preference (Protocol UI-6); no campaign state touched.
+const NAV_KEYS = ['operator', 'operations', 'databank', 'uplink', 'chassis', 'settings'];
+const _NAV_TAB_FOR = {
+  operator: 'stat',
+  operations: 'inv',
+  databank: 'data',
+  chassis: 'chassis',
+  settings: 'settings',
+};
+
+// ── PER-SUBSYSTEM SCROLL MEMORY (owner-report, casing/layout polish batch) ──
+// Each bezel subsystem remembers its own exact scroll offset across a switch
+// AND across a reload — a device pref (Protocol UI-6, MetaStore key
+// robco_scroll_positions), never campaign state. OPERATOR/OPERATIONS/DATABANK/
+// CHASSIS all live in the SAME scrollable column (#uiPanel on a real desktop;
+// the page itself on mobile, since .col-left has no overflow-y:auto there) —
+// switchTab()/selectSubsystem() only toggle which panels are visible inside
+// it, so persisting a per-subsystem offset is what makes "coming back" show
+// the expected view instead of whatever scrollTop the column happened to be
+// left at. UPLINK's own transcript panel (.panel.chat-panel) scrolls
+// independently at every breakpoint. _scrollElFor() is the single lookup both
+// the save and restore path read, so they can never disagree about which
+// element owns the offset. DIR isn't tracked — it opens a transient modal
+// (openBezelDirectory), not a persistent view.
+const SCROLL_POS_KEY = 'robco_scroll_positions';
+// Tracks whichever subsystem switchTab()/selectSubsystem() actually LAST
+// displayed (never the boot-time cosmetic bezel-highlight restore that
+// initBezelSubsystem() applies without moving anything) — resets to null on
+// every reload so the very first user-triggered switch has nothing stale to
+// save, and initTabs()'s boot-time switchTab() call is what fills it in for
+// "restore the initial tab's position" instead.
+let _lastScrollSubsystem = null;
+
+function _readScrollPositions() {
+  try {
+    const obj = JSON.parse(MetaStore.get(SCROLL_POS_KEY) || '{}');
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function _scrollElFor(subsystem) {
+  if (subsystem === 'uplink') return document.querySelector('.panel.chat-panel') || null;
+  const isDesktop =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches;
+  return isDesktop ? document.getElementById('uiPanel') : null;
+}
+
+// Saves the CURRENT scroll offset under `subsystem`'s key. null el = the page
+// itself scrolls (mobile).
+function _saveScrollFor(subsystem) {
+  if (!NAV_KEYS.includes(subsystem)) return;
+  const el = _scrollElFor(subsystem);
+  const positions = _readScrollPositions();
+  positions[subsystem] = el ? el.scrollTop : window.scrollY || 0;
+  MetaStore.set(SCROLL_POS_KEY, JSON.stringify(positions));
+}
+
+// Restores `subsystem`'s saved offset if one exists. Returns true when a
+// saved value was applied; false (no-op) when nothing was ever recorded, so
+// callers with an existing "jump to X" fallback (UPLINK/CHASSIS) can leave
+// that fallback in place on a genuine first visit, while switchTab()'s three
+// tab-gated subsystems (which have no such fallback today) can default to
+// the top of the column instead of an unrelated leftover scrollTop.
+function _restoreScrollFor(subsystem, fallbackToTop) {
+  if (!NAV_KEYS.includes(subsystem)) return false;
+  const el = _scrollElFor(subsystem);
+  const val = _readScrollPositions()[subsystem];
+  if (typeof val === 'number') {
+    if (el) el.scrollTop = val;
+    else window.scrollTo(0, val);
+    return true;
+  }
+  if (fallbackToTop) {
+    if (el) el.scrollTop = 0;
+    else window.scrollTo(0, 0);
+  }
+  return false;
+}
+
+// Called at the top of switchTab()/selectSubsystem(), before any visual
+// change, so it captures the offset of whatever the user was ACTUALLY just
+// looking at.
+function _saveOutgoingScroll() {
+  if (_lastScrollSubsystem) _saveScrollFor(_lastScrollSubsystem);
+}
+
+function _syncBezelNav(subsystem) {
+  if (!NAV_KEYS.includes(subsystem)) return;
+  NAV_KEYS.forEach(k => {
+    const btn = document.getElementById('navkey-' + k);
+    if (!btn) return;
+    const on = k === subsystem;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+  });
+  const lcd = document.getElementById('bezelTelemetry');
+  if (lcd) lcd.textContent = _bezelTelemetryText(subsystem);
+  MetaStore.set('robco_bezel_subsystem', subsystem);
+  // DO-O: the single choke point every subsystem change already routes through —
+  // drives the mobile UPLINK self-contained-view CSS (body[data-subsystem="uplink"]).
+  document.body.dataset.subsystem = subsystem;
+}
+
+function _bezelSubsystemLabel(subsystem) {
+  switch (subsystem) {
+    case 'operator':
+      return '▸ SUBSYSTEM: OPERATOR';
+    case 'operations': {
+      const n = Array.isArray(state.inventory) ? state.inventory.length : 0;
+      return '▸ SUBSYSTEM: OPERATIONS · ' + n + ' MANIFEST ENTRIES';
+    }
+    case 'databank':
+      return (
+        '▸ SUBSYSTEM: DATABANK · ' +
+        (typeof _pendingDirectivesCount === 'function' ? _pendingDirectivesCount() : 0) +
+        ' ACTIVE DIRECTIVES'
+      );
+    case 'uplink':
+      return '▸ SUBSYSTEM: UPLINK · DIRECTOR CHANNEL';
+    case 'chassis':
+      return '▸ SUBSYSTEM: CHASSIS · SELF-DIAGNOSTIC BAY';
+    case 'settings':
+      return '▸ SUBSYSTEM: SETTINGS · CONFIG + REGISTRY';
+    default:
+      return '▸ SUBSYSTEM: ' + subsystem.toUpperCase();
+  }
+}
+
+// FIX 5 (owner report): VITALS tier derived from HP% + crippled-limb count +
+// radiation tier (game-agnostic — reads the same la/ra/ll/rl/hd limb fields
+// and hpCur/hpMax/rads every game context already carries, Protocol 38).
+// Reads the DOM inputs first (falling back to state) so it stays live on
+// every keystroke exactly like updateMath()'s own HP bar read — never a
+// stale state value while the Courier is still typing.
+function _vitalsTier() {
+  const hpCurEl = document.getElementById('stat_hp_cur');
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  const hpCur = hpCurEl ? parseInt(hpCurEl.value) || 0 : state.hpCur || 0;
+  const hpMax = hpMaxEl ? Math.max(1, parseInt(hpMaxEl.value) || 1) : Math.max(1, state.hpMax || 1);
+  const hpPct = (Math.max(0, hpCur) / hpMax) * 100;
+  const crippled = ['hd', 'la', 'ra', 'll', 'rl'].some(
+    k => String(state[k] || 'OK').toUpperCase() === 'CRIPPLED'
+  );
+  if (crippled) return 'CRIPPLED';
+  if (hpPct <= 25) return 'CRITICAL';
+  if (hpPct <= 60) return 'WARNING';
+  return 'NOMINAL';
+}
+
+// Common VITALS/RAD/CARRIER suffix appended to every subsystem's telemetry
+// line (FIX 5) — CARRIER reuses the exact same connection signal as the
+// UPLINK lamp and the Overseer's own resting tag (Protocol 22, single source).
+function _bezelStatusSuffix() {
+  const radsEl = document.getElementById('stat_rads');
+  const rads = radsEl ? parseInt(radsEl.value) || 0 : state.rads || 0;
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  // Phase 3 · Piece 2: the OPERATIONS weigh bridge's SEIZED (over-encumbered)
+  // state also flags on the bezel telemetry strip, alongside every other
+  // subsystem's VITALS/RAD/CARRIER line — reads the same body.weight-over
+  // class updateMath() already toggles, never a second weight computation.
+  const overEncumbered = document.body.classList.contains('weight-over');
+  return (
+    ' · VITALS ' +
+    _vitalsTier() +
+    ' · RAD ' +
+    Math.max(0, rads) +
+    (overEncumbered ? ' · ⚠ CARGO SEIZED' : '') +
+    ' · CARRIER ' +
+    (connected ? 'ONLINE' : 'OFFLINE')
+  );
+}
+
+function _bezelTelemetryText(subsystem) {
+  return _bezelSubsystemLabel(subsystem) + _bezelStatusSuffix();
+}
+
+// FIX 5: re-render the strip in place, using whichever subsystem is currently
+// shown (document.body.dataset.subsystem — the same choke point _syncBezelNav
+// already writes) — called on every relevant state change (HP/rads/limb via
+// updateMath(), connection change via refreshOverseerCarrier()) without
+// touching the nav highlight/MetaStore pref themselves.
+function _refreshBezelTelemetry() {
+  const lcd = document.getElementById('bezelTelemetry');
+  if (lcd) lcd.textContent = _bezelTelemetryText(document.body.dataset.subsystem || 'operator');
+}
+window._refreshBezelTelemetry = _refreshBezelTelemetry;
+
+// SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.
+// Reduced-motion is handled by the existing global prefers-reduced-motion
+// CSS block, which zeroes the animation to an instant resting frame.
+function _bezelSweep() {
+  const wrap = document.querySelector('.glass-frame');
+  if (!wrap) return;
+  wrap.classList.remove('sweep');
+  void wrap.offsetWidth; // force reflow so the animation can restart
+  wrap.classList.add('sweep');
+}
+
+// SEAT (Ceremony Moments Wave 1, M5) — the Protocol UI-9 "component
+// physically installs" motion verb, mirroring _bezelSweep() above. Textured
+// per game via [data-game] CSS selectors reading identity.motionTexture.seat
+// (Protocol 38 — no JS branch here). Reduced-motion is handled by the same
+// existing global prefers-reduced-motion CSS block.
+function _motionSeat(el) {
+  if (!el) return;
+  el.classList.remove('seat');
+  void el.offsetWidth; // force reflow so a repeated trigger restarts cleanly
+  el.classList.add('seat');
+}
+window._motionSeat = _motionSeat;
+
+// selectSubsystem(view) — the bezel keycap click handler.
+function selectSubsystem(view) {
+  const tab = _NAV_TAB_FOR[view];
+  if (tab) {
+    switchTab(tab); // routes + syncs the nav in one call (saves/restores scroll too)
+    // Step 2 v2.8.0 Settings-tab unit: the Module Bay's first-visit hatch
+    // ceremony used to fire only via the CHASSIS scroll-to-bay branch; now
+    // that the bay lives inside the tab-gated SETTINGS subsystem, a genuine
+    // user-initiated [6]/SETTINGS visit re-opens it (setAttribute('open','')
+    // fires securityConfigPanel's own toggle listener, which is what
+    // actually runs the once-only ceremony — see _wirePanelPersistence()).
+    // A boot-time initTabs() restore never calls selectSubsystem(), so this
+    // never fires at page load (Protocol 42 — boot-restore must not
+    // re-trigger the hatch).
+    if (view === 'settings') {
+      // Owner report (Protocol 27 root cause): this used to force the panel
+      // open on EVERY SETTINGS visit, silently reopening it even after the
+      // user had deliberately collapsed it — the once-only hatch ceremony
+      // (robco_bay_opened) is the correct signal for "has this already fired
+      // at least once"; once it has, the panel's own persisted open/closed
+      // state (robco_panel_state, written by its toggle listener in
+      // _wirePanelPersistence()) is respected like every other panel instead
+      // of being overridden here.
+      const secPanel = document.getElementById('securityConfigPanel');
+      if (secPanel && !secPanel.open && MetaStore.get('robco_bay_opened') !== 'true') {
+        secPanel.setAttribute('open', '');
+      }
+    }
+  } else if (view === 'uplink') {
+    _saveOutgoingScroll(); // FIX 2
     const i = document.getElementById('chatInput');
     if (i) {
       i.scrollIntoView({ block: 'center' });
       i.focus();
     }
+    _syncBezelNav('uplink');
+    if (typeof _maybeGreetOverseer === 'function') _maybeGreetOverseer(); // M2
+    // FIX 2: a remembered offset overrides the jump-to-composer default above;
+    // a first-ever visit (nothing saved) keeps that default untouched.
+    _restoreScrollFor('uplink', false);
+    _lastScrollSubsystem = 'uplink';
+  } else {
+    return;
+  }
+  _bezelSweep();
+}
+
+// DIRECTORY fallback (Protocol 25) — a flat, plain-label list of every
+// subsystem, one tap away, reusing the shared #sysModal driver (Protocol 22)
+// rather than a bespoke dialog.
+function openBezelDirectory() {
+  const items = [
+    ['operator', 'OPERATOR', 'character stats', 'STAT · [1]'],
+    ['operations', 'OPERATIONS', 'inventory &amp; crafting', 'INV · [2]'],
+    ['databank', 'DATABANK', 'quests, map, campaign', 'DATA·CAMPG · [3]'],
+    ['uplink', 'UPLINK', 'the AI comm-link', 'COMM · [4]'],
+    ['chassis', 'CHASSIS', 'system status &amp; telemetry', 'SYSTEM · [5]'],
+    ['settings', 'SETTINGS', 'config &amp; account', 'CONFIG·ACCT · [6]'],
+  ];
+  const body =
+    '<div class="d-sub" style="font-size: 9px; opacity: 0.5; letter-spacing: 1px; margin-bottom: 10px">FLAT INDEX — EVERY SUBSYSTEM, PLAIN LABELS</div>' +
+    items
+      .map(
+        ([view, label, desc, sub]) =>
+          '<button type="button" class="blue-btn bezel-dir-item" onclick="selectSubsystem(\'' +
+          view +
+          '\'); closeModal();">' +
+          label +
+          ' — ' +
+          desc +
+          ' <span>' +
+          sub +
+          '</span></button>'
+      )
+      .join('');
+  openModal({ title: '> SUBSYSTEM DIRECTORY', body });
+}
+
+// AI→native survey Part C.1 — [GPS] / [MAP] compass grid. Previously a
+// free-text Director round-trip that returned an AI-drawn ASCII grid; now
+// opens/scrolls to the existing native CARTOGRAPHY TABLE (DATABANK tab) —
+// zero AI round-trip. Reuses the SAME expandPanelForCategory('map') path
+// the typed panel-nav aliases ("map"/"world"/"locations", PANEL_NAV_ALIASES
+// in api.js) already use (Protocol 22) — one panel-opening mechanism for
+// every route to the world map.
+function _nativeOpenMap() {
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof expandPanelForCategory === 'function') expandPanelForCategory('map');
+  if (typeof appendToChat === 'function')
+    appendToChat('> [GPS] Local grid fixed — CARTOGRAPHY TABLE displayed.', 'sys');
+}
+
+// Restore the last-focused non-tab subsystem (uplink) highlight on boot —
+// visual only, never scrolls/focuses anything on page load. chassis/settings
+// are now real tabs (Step 2 v2.8.0 Settings-tab unit) restored by initTabs()
+// via robco_active_tab, so re-highlighting them here would be redundant.
+function initBezelSubsystem() {
+  const saved = MetaStore.get('robco_bezel_subsystem');
+  if (saved === 'uplink') _syncBezelNav(saved);
+}
+
+// Single boot-phase entry point for the two DO-N bezel-chrome restores, so
+// window.onload gains one named call (Suite 132's slim-composition contract)
+// instead of two.
+function _initBezelChrome() {
+  initBezelSubsystem();
+  _updateFaultLamp();
+}
+
+// PWA app-shortcut deep-link routes. Keys are the only accepted #go= values (allow-list).
+const SHORTCUT_ROUTES = {
+  comm: () => {
+    _saveOutgoingScroll(); // FIX 2
+    const i = document.getElementById('chatInput');
+    if (i) {
+      i.scrollIntoView({ block: 'center' });
+      i.focus();
+    }
+    _syncBezelNav('uplink'); // DO-N: keep the bezel highlight consistent with this deep-link
+    if (typeof _maybeGreetOverseer === 'function') _maybeGreetOverseer(); // M2
+    _restoreScrollFor('uplink', false); // FIX 2: override the jump above if a memory exists
+    _lastScrollSubsystem = 'uplink';
   },
   inv: () => switchTab('inv'),
   stat: () => switchTab('stat'),
   data: () => switchTab('data'),
+  settings: () => switchTab('settings'),
   new: () => wipeTerminal(),
 };
 function routeLaunchShortcut() {
@@ -1257,9 +4484,15 @@ function routeLaunchShortcut() {
   action();
 }
 
-// Called by #stat_loc onchange: persists the new location and re-renders so the
-// current-zone highlight updates. View preference (state.mapView) is kept as-is.
-function onLocationChange() {
+// Called by #stat_loc onchange (no arg — reads the value the user just typed into the
+// input) AND by the quick-log "arrived <location>" TERMINAL verb (api.js, passes the new
+// location text explicitly since there's no onchange DOM event to read it from). One
+// function, not a forked quick-log-only setter (Protocol 22) — this is what makes
+// "arrived Primm" actually move [CURRENT] on the WORLD MAP instead of only adding Primm
+// to the visited list (the owner-reported live-update bug: quick-log used to call
+// markLocationVisited(), which records a discovery without ever changing state.loc).
+// View preference (state.mapView) is kept as-is.
+function onLocationChange(overrideLoc) {
   // Fog-of-war: the place we're leaving stays discovered, and the new place becomes
   // discovered too — so the previous location shows [VISITED] (not [UNKNOWN]) once the
   // Courier moves on. Capture the old location BEFORE syncStateFromDom() overwrites
@@ -1267,11 +4500,50 @@ function onLocationChange() {
   // saveState() persists the updated locationHistory in the same (debounced) write;
   // cloud sync stays manual (no auto-push).
   const prevLoc = state.loc;
+  if (overrideLoc) {
+    // Mirror the new value into #stat_loc BEFORE syncStateFromDom() reads it back — the
+    // same "mirror to DOM before saveState" idiom #c_caps uses (WU-N2), since
+    // syncStateFromDom() always re-reads state.loc from this element.
+    const locEl = document.getElementById('stat_loc');
+    if (locEl) locEl.value = overrideLoc;
+  }
   syncStateFromDom();
   recordLocationVisit(prevLoc);
   recordLocationVisit(state.loc);
   saveState();
   renderWorldMap();
+  // FEEDBACK ANIMATION WAVE 3 (#27 TRIANGULATE) — a direct reaction to this
+  // EXISTING arrival path (no new bus event — the build plan's "onLocation-
+  // Change path" signal), distinct from #26 SURVEY PING (new-discovery only,
+  // via location.visited). Fires on every arrival, including a revisit; a
+  // no-op when the WORLD GRID isn't currently painted (zoomed sector sheet,
+  // or the user elsewhere) — the direct annunciator push below covers that
+  // "elsewhere" case regardless.
+  const youGroup = document.querySelector('#worldMapDisplay .you');
+  if (youGroup) {
+    youGroup.classList.remove('you-triangulate');
+    void youGroup.offsetWidth;
+    youGroup.classList.add('you-triangulate');
+    setTimeout(() => youGroup.classList.remove('you-triangulate'), 700);
+  }
+  // LOCATION CONFIRMATION CARD (Suite 204) — the single location-change
+  // confirmation, fired only on a GENUINE change (never a same-value
+  // re-set) via a 'location.current' bus emit, consumed by the top-right
+  // toast subscriber (_wireLocationCardSubscriber() below). Retires the
+  // older inline "ARRIVED" annunciator push that used to live here (#27
+  // TRIANGULATE's echo half, Suite 199.25) so the player sees ONE clean
+  // location confirmation instead of two competing toasts; the "you"
+  // reticle pulse directly above (TRIANGULATE's home half) is untouched.
+  const locChanged =
+    String(prevLoc || '')
+      .trim()
+      .toLowerCase() !==
+    String(state.loc || '')
+      .trim()
+      .toLowerCase();
+  if (locChanged && state.loc) {
+    RobcoEvents.emit('location.current', { loc: state.loc });
+  }
 }
 
 // Called by autoImportState() after a state delta with the changed category key.
@@ -1299,56 +4571,80 @@ function expandPanelForCategory(categoryKey) {
     skills: 'stat',
     bio: 'stat',
     map: 'data',
-    log: 'data',
+    log: 'chassis',
     databank: 'data',
-    config: 'campg',
+    config: 'settings',
   };
   if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
   const map = {
-    squad: '> SQUAD STATUS',
+    squad: '> SQUAD ROSTER',
     status: '> STATUS EFFECTS',
-    inventory: '> BACKPACK INVENTORY',
-    campaign_notes: '> CAMPAIGN NOTES',
-    perks: '> PERKS',
+    inventory: '> CARGO MANIFEST',
+    campaign_notes: '> FIELD NOTES',
+    perks: '> PERK LOADOUT',
     factions: '> FACTION STANDING',
-    quests: '> QUEST LOG',
-    ammo: '> BACKPACK INVENTORY', // ammo lives in the sub-panel inside BACKPACK
+    quests: '> DIRECTIVE REGISTRY',
+    ammo: '> CARGO MANIFEST', // ammo now lives in the AMMO drawer, folded into the manifest board
     equipped: '> EQUIPPED',
-    collectibles: '> COLLECTIBLES',
-    craft: '> CRAFTING',
+    collectibles: '> CURIO ARCHIVE',
+    craft: '> FIELD FABRICATION',
     trade: '> BARTER UPLINK',
     skillBooks: '> SKILL BOOKS',
     magazines: '> SKILL MAGAZINES',
-    // WU-HF3 panel navigation targets (h2 prefixes, matched via startsWith)
-    special: '> BIO-METRICS',
+    // WU-HF3 panel navigation targets (h2 prefixes, matched via startsWith).
+    // PHASE 3 OPERATOR reskin (Suite 181): BIO-METRICS was split into its 3
+    // real boards (VITAL TELEMETRY/S.P.E.C.I.A.L. TUNING/CHRONO), and
+    // BIO-SCAN & LIMB STATUS was re-dressed as SKELETAL HARNESS — both
+    // targets updated to the new titles so "stats"/"special"/"biometrics"/
+    // "bio" keep landing on the right board instead of silently no-opping.
+    special: '> VITAL TELEMETRY',
     skills: '> SKILL MATRIX',
-    bio: '> BIO-SCAN',
-    map: '> WORLD MAP',
-    log: "> OVERSEER'S LOG",
-    databank: '> DATABANK',
-    config: '> CAMPAIGN CONFIGURATION',
+    bio: '> SKELETAL HARNESS',
+    map: '> CARTOGRAPHY TABLE',
+    // CHASSIS reskin: the former single SYSTEM STATUS panel split into BUS-22
+    // UNIT POWER PLANT + BUS-23 IDENTITY PLATE & BREAKERS + BUS-24 SERVICE &
+    // FAULT CONSOLE — "log" now lands on the device-telemetry board.
+    log: '> UNIT POWER PLANT',
+    databank: '> CATALOG QUERY',
+    config: '> CAMPAIGN CONFIGS',
   };
   const target = map[categoryKey];
   if (!target) return;
-  const h2 = Array.from(document.querySelectorAll('.panel h2')).find(el =>
-    el.textContent.trim().startsWith(target)
+  // SKILL BOOKS/SKILL MAGAZINES are top-level .panel h2 boards (BUS-05a/
+  // BUS-05b, Phase 3 OPERATOR batch 3) — the .sub-panel h3 half of this
+  // selector still covers any other nested sub-panel target (Protocol 22).
+  // Protocol 42 fix (found live while verifying the AI->native survey's
+  // native LEVEL UP jump-to-SKILL-MATRIX): many reskinned boards render
+  // their heading as `> <span class="board-led"></span> NAME` split across
+  // multiple lines, so raw textContent carries a doubled space and embedded
+  // newlines (e.g. "> \n  VITAL\n  TELEMETRY") that never matched the plain
+  // single-spaced target string below — collapsing all whitespace runs to a
+  // single space on both sides makes the match immune to that markup shape.
+  const norm = s => s.replace(/\s+/g, ' ').trim();
+  const normTarget = norm(target);
+  const h2 = Array.from(document.querySelectorAll('.panel h2, .sub-panel h3')).find(el =>
+    norm(el.textContent).startsWith(normTarget)
   );
   if (!h2) return;
   const details = h2.closest('details.panel');
   if (details && !details.open) {
     details.setAttribute('open', '');
     // Persist the newly opened state
-    const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
+    const ps = JSON.parse(MetaStore.get('robco_panel_state') || '{}');
     if (details.dataset.panelId) {
       ps[details.dataset.panelId] = true;
-      localStorage.setItem('robco_panel_state', JSON.stringify(ps));
+      MetaStore.set('robco_panel_state', JSON.stringify(ps));
     }
   }
-  // For ammo, also open the nested ammo sub-panel
+  // Ammo's visibility is drawer-gated (Phase 3 · Piece 2 CARGO MANIFEST
+  // reskin) rather than a collapsible <details> — pulling the AMMO drawer
+  // via setInvFilter() is what reveals it (also updates the drawer's active
+  // state + persists the choice, Protocol 22 single entry point). SKILL
+  // BOOKS/SKILL MAGAZINES are now top-level boards (BUS-05a/BUS-05b), so
+  // the generic details.open handling above already reveals them.
   if (categoryKey === 'ammo') {
-    const subPanel = document.getElementById('ammoSubPanel');
-    if (subPanel && !subPanel.open) subPanel.setAttribute('open', '');
+    if (typeof setInvFilter === 'function') setInvFilter('ammo');
   }
   // WU-HF1: bring the opened panel into view. Without this, opening a panel that sits
   // below the fold (e.g. BARTER UPLINK is beneath BACKPACK/EQUIPPED/AMMO/CRAFTING on the
@@ -1488,7 +4784,7 @@ function _showChangelogModal(text, title) {
   if (!versions.length) {
     content.innerHTML =
       '<div class="changelog-viewer"><p class="changelog-empty">&gt; [SYS-ALERT: NO REVISION DATA]</p></div>';
-    _openSysModal();
+    openModal();
     return;
   }
   const renderCats = v => {
@@ -1588,7 +4884,7 @@ function _showChangelogModal(text, title) {
       _syncToggleLabel();
     });
   }
-  _openSysModal();
+  openModal();
 }
 
 function showFullChangelog() {
@@ -1603,7 +4899,7 @@ function showFullChangelog() {
     .catch(() => {
       document.getElementById('modalTitle').innerText = '> SYSTEM CHANGELOG';
       document.getElementById('modalContent').innerText = '> [SYS-ALERT: CHANGELOG NOT FOUND]';
-      _openSysModal();
+      openModal();
     });
 }
 
@@ -1615,6 +4911,51 @@ function _openSysModal() {
   var closeBtn = modal.querySelector('.close-btn');
   if (closeBtn) closeBtn.focus();
 }
+
+// openModal({title, body, wide, onClose}) — Step 2 Phase 0 U12 (FP-SYS-8): the
+// single consolidated driver for the shared #sysModal. Every feature that opens
+// the system modal calls this — either bare (the caller already wrote
+// modalTitle/modalContent directly, matching the pre-U12 call shape) or with
+// {title, body} to have this function do the content-setting too. All callers
+// share the ONE focus-trap implementation already wired in _wireKeyboardShortcuts()
+// (Tab-cycle + Escape-close) — that part of D-2 was already unified pre-U12; this
+// adds the single named entry point + the optional onClose hook confirmAction()
+// needs. The index.html firmware-update dialog (_triggerUpdate) is a deliberate,
+// separately tested exception (Suite 65) — a non-dismissable blocking modal that
+// must never share this dismissable driver's Esc/close semantics, so it is not
+// folded in here.
+function openModal(opts) {
+  opts = opts || {};
+  const modal = document.getElementById('sysModal');
+  if (!modal) return;
+  if (opts.title !== undefined) {
+    const t = document.getElementById('modalTitle');
+    if (t) t.innerText = opts.title;
+  }
+  if (opts.body !== undefined) {
+    const c = document.getElementById('modalContent');
+    if (c) c.innerHTML = opts.body;
+  }
+  if (opts.wide !== undefined) {
+    const box = modal.querySelector('.modal-box');
+    if (box) box.classList.toggle('changelog-wide', !!opts.wide);
+  }
+  // Owner report: confirmAction() dialogs (WIPE TERMINAL and every other
+  // confirm-gated destructive action) carry their own labeled CANCEL button
+  // alongside the modal's always-present static "[ CLOSE INTERFACE ]" button
+  // — both just dismiss, a duplicate cancel. hideCloseBtn lets confirmAction()
+  // suppress the redundant static button (Protocol 22 — same class-toggle
+  // idiom as `wide` above) so a confirm dialog reads as exactly one CONTINUE
+  // + one CANCEL; every other openModal() caller (help, error log, changelog,
+  // save help) is unaffected and keeps its one CLOSE INTERFACE button.
+  if (opts.hideCloseBtn !== undefined) {
+    const box = modal.querySelector('.modal-box');
+    if (box) box.classList.toggle('confirm-mode', !!opts.hideCloseBtn);
+  }
+  _modalCloseCallback = typeof opts.onClose === 'function' ? opts.onClose : null;
+  _openSysModal();
+}
+
 function closeModal() {
   const modal = document.getElementById('sysModal');
   modal.style.display = 'none';
@@ -1622,12 +4963,83 @@ function closeModal() {
   // command reference, etc.) renders at the normal width (WU-C11).
   const box = modal.querySelector('.modal-box');
   if (box) box.classList.remove('changelog-wide');
+  // Restore the static CLOSE INTERFACE button for the next modal open — a
+  // confirmAction() dialog is the only caller that ever suppresses it.
+  if (box) box.classList.remove('confirm-mode');
   if (_sysModalTrigger && typeof _sysModalTrigger.focus === 'function') {
     _sysModalTrigger.focus();
   }
   _sysModalTrigger = null;
+  const cb = _modalCloseCallback;
+  _modalCloseCallback = null;
+  if (cb) cb();
 }
 
+// confirmAction({title, warning, confirmLabel, cancelLabel}) — Step 2 Phase 0 U12
+// (FP-SYS-10): the diegetic replacement for the blocking browser confirm(). Returns
+// a Promise<boolean> — true only if the CONFIRM button is explicitly clicked; every
+// other exit (CANCEL button, the modal's own CLOSE button, or Escape) resolves
+// false, exactly matching confirm()'s "anything but OK means cancel" contract so
+// call sites that do `if (!(await confirmAction(...))) return;` behave identically
+// to the old `if (!confirm(...)) return;` guard. Built on openModal()'s onClose
+// hook: the CANCEL button, the CLOSE button, and Escape all funnel through the
+// same closeModal() → onClose path, so there is exactly one resolution path for
+// every non-confirm exit (no duplicated cancel logic to drift out of sync).
+function confirmAction(opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let resolved = false;
+    const settle = val => {
+      if (resolved) return;
+      resolved = true;
+      resolve(val);
+    };
+    const warningHtml = String(opts.warning || 'Are you sure?')
+      .split('\n')
+      .map(line => '<p>' + escapeHtml(line) + '</p>')
+      .join('');
+    const confirmLabel = opts.confirmLabel || 'CONFIRM';
+    const cancelLabel = opts.cancelLabel || 'CANCEL';
+    const body =
+      '<div class="modal-confirm-body">' +
+      warningHtml +
+      '</div>' +
+      '<div class="modal-confirm-actions">' +
+      '<button type="button" id="modalConfirmYes" class="blue-btn">[ ' +
+      escapeHtml(confirmLabel) +
+      ' ]</button>' +
+      '<button type="button" id="modalConfirmNo" class="blue-btn">[ ' +
+      escapeHtml(cancelLabel) +
+      ' ]</button>' +
+      '</div>';
+    openModal({
+      title: opts.title || '> CONFIRM ACTION',
+      body,
+      hideCloseBtn: true,
+      onClose: () => settle(false),
+    });
+    const yesBtn = document.getElementById('modalConfirmYes');
+    const noBtn = document.getElementById('modalConfirmNo');
+    if (yesBtn)
+      yesBtn.addEventListener('click', () => {
+        settle(true);
+        closeModal();
+      });
+    if (noBtn)
+      noBtn.addEventListener('click', () => {
+        closeModal();
+      });
+    // Default focus on CANCEL — mirrors the safe default for a destructive-leaning
+    // confirmation dialog (an accidental Enter/Space never fires the confirm path).
+    if (noBtn) noBtn.focus();
+  });
+}
+
+function _clearErrorLog() {
+  MetaStore.remove(ERROR_LOG_KEY);
+  showErrorLog();
+  _updateFaultLamp();
+}
 function showErrorLog() {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');
@@ -1636,7 +5048,7 @@ function showErrorLog() {
   title.innerText = '> CLIENT ERROR LOG';
   let log = [];
   try {
-    log = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+    log = JSON.parse(MetaStore.get(ERROR_LOG_KEY) || '[]');
   } catch (_) {}
   if (log.length === 0) {
     content.innerHTML = '<pre style="color:var(--robco-dim)">No errors recorded.</pre>';
@@ -1661,12 +5073,10 @@ function showErrorLog() {
       '<div style="font-size:11px">' +
       rows +
       '<button class="action-btn" style="margin-top:6px;font-size:10px" ' +
-      'onclick="localStorage.removeItem(\'' +
-      ERROR_LOG_KEY +
-      '\');showErrorLog()">' +
+      'onclick="_clearErrorLog()">' +
       'CLEAR LOGS</button></div>';
   }
-  _openSysModal();
+  openModal();
 }
 
 // ── WU-N1: V.A.T.S. NATIVE CALCULATOR ────────────────────────────
@@ -1740,7 +5150,7 @@ function showVATSOverlay() {
 </div>`;
 
   recomputeVATS();
-  _openSysModal();
+  openModal();
 }
 
 // recomputeVATS — recompute and render the V.A.T.S. table from live state + the TARGET DT
@@ -1855,6 +5265,135 @@ ${apSection}
 ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.</span>`;
 }
 
+// ── COMMAND-LINE MODE — pill UI + placeholder + hint (Step 2 · Phase 2 · B1) ──
+// The inline mode pill inside the Comm-Link input toolbar (#modePill) plus the
+// per-mode placeholder text and the "/`/`@` override" hint reveal. Device-pref
+// backed (getInputMode/setInputMode/otherInputMode, js/state.js) — never
+// campaign state, so it does NOT reset on a new campaign (same as optics,
+// immersion, and every other MetaStore-backed device preference).
+function _modeLabel(mode) {
+  return mode === 'terminal' ? 'TERMINAL' : 'OVERSEER';
+}
+
+function _modePlaceholder(mode) {
+  return mode === 'terminal'
+    ? "TERM> ENTER A COMMAND OR QUICK-LOG (E.G. 'KILLED DEATHCLAW')…"
+    : "AI> ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…";
+}
+
+function _renderModePill() {
+  const pill = document.getElementById('modePill');
+  const input = document.getElementById('chatInput');
+  const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+  if (pill) {
+    pill.textContent = _modeLabel(mode);
+    pill.className = 'action-btn btn-sm mode-pill mode-pill--' + mode;
+    pill.setAttribute(
+      'aria-label',
+      'Command input mode: ' +
+        _modeLabel(mode) +
+        '. Tap to switch to ' +
+        _modeLabel(otherInputMode(mode)) +
+        '.'
+    );
+  }
+  if (input) input.placeholder = _modePlaceholder(mode);
+  _autoGrowComposer();
+}
+
+// Tapping the pill swaps the PERSISTED mode (device pref) — distinct from the
+// one-off `/`/`@` override, which never touches this persisted value.
+function toggleInputMode() {
+  const mode = typeof getInputMode === 'function' ? getInputMode() : 'overseer';
+  setInputMode(otherInputMode(mode));
+  _renderModePill();
+  _updateModeHint();
+  if (typeof playPanelClick === 'function') playPanelClick();
+  // FIX (owner report): a touch tap leaves the pill focused with no real
+  // pointerleave to clear it — blur it so no lingering focus ring survives
+  // the tap (belt-and-suspenders alongside the CSS hover-gate fix below).
+  const pill = document.getElementById('modePill');
+  if (pill && typeof pill.blur === 'function') pill.blur();
+}
+window.toggleInputMode = toggleInputMode;
+
+// Shows "→ TERMINAL" / "→ OVERSEER" the moment #chatInput's raw value starts
+// with `/` or `@` (first character only — matches the override-detection rule
+// exactly). Reuses _resolveCommandInput() (api.js) as the single source of the
+// actual routing target — `/` is FIXED to TERMINAL and `@` is FIXED to
+// OVERSEER regardless of the persisted mode — so the hint can never drift from
+// what submitCommandInput() will actually do. Implemented as a plain inline
+// reveal (not a floating overlay) so it can never overflow at 360/412px — it
+// just occupies its own row when visible.
+function _updateModeHint() {
+  const hint = document.getElementById('modeHintPopup');
+  const input = document.getElementById('chatInput');
+  if (!hint || !input) return;
+  if (typeof _resolveCommandInput !== 'function') {
+    hint.style.display = 'none';
+    return;
+  }
+  // resolved.override is true for a leading `/` (whole-line -> TERMINAL) OR a
+  // `@` appearing anywhere (inline ping -> OVERSEER) — the resolver is the
+  // single source of both WHETHER an override is active and WHERE it targets,
+  // so the hint can never drift from what submitCommandInput() will do.
+  const resolved = _resolveCommandInput(input.value);
+  if (resolved.override) {
+    hint.textContent = '→ ' + _modeLabel(resolved.mode);
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+window._updateModeHint = _updateModeHint;
+
+function _hideModeHint() {
+  const hint = document.getElementById('modeHintPopup');
+  if (hint) hint.style.display = 'none';
+}
+window._hideModeHint = _hideModeHint;
+
+// One-time wiring for the hint reveal (the pill itself is restored/rendered by
+// _restoreDevicePrefs(); the chat autocomplete extension is wired inside
+// initRegistryAutocomplete() in ui-saves.js — Protocol 22, same singleton).
+function _wireModeHint() {
+  const input = document.getElementById('chatInput');
+  if (input) input.addEventListener('input', _updateModeHint);
+}
+
+// Owner fix (small-UI-polish batch): #chatInput starts as small as possible
+// (sized to fit its own placeholder sentence — no dead space below the
+// text) and grows with typed content up to a cap, then scrolls internally.
+// Keep in sync with .composer-input's max-height (terminal.css).
+const COMPOSER_INPUT_MAX_HEIGHT_PX = 160;
+
+function _autoGrowComposer() {
+  const el = document.getElementById('chatInput');
+  if (!el) return;
+  el.style.height = 'auto';
+  if (!el.value) {
+    // scrollHeight only reflects real VALUE content, not placeholder text —
+    // briefly fill with the placeholder to measure the smallest box that
+    // fits the whole example sentence, then restore the empty value.
+    // Programmatic .value writes don't fire 'input', so no feedback loop.
+    el.value = el.placeholder;
+    el.style.height = Math.min(el.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX) + 'px';
+    el.value = '';
+  } else {
+    el.style.height = Math.min(el.scrollHeight, COMPOSER_INPUT_MAX_HEIGHT_PX) + 'px';
+  }
+}
+window._autoGrowComposer = _autoGrowComposer;
+
+// Boot-wired alongside _wireModeHint() (same #chatInput surface); re-measures
+// on every keystroke. The initial call sizes the box to the placeholder.
+function _wireComposerAutoGrow() {
+  const el = document.getElementById('chatInput');
+  if (!el) return;
+  el.addEventListener('input', _autoGrowComposer);
+  _autoGrowComposer();
+}
+
 // WU-E3: the command registry is kept in lock-step with reality — every entry
 // resolves to a NATIVE_COMMAND_ROUTER token (api.js), a live panel/UI control, an
 // AI-directive-defined command (getSystemDirective), or a keyboard handler. The six
@@ -1864,6 +5403,37 @@ ranged hit-% is an estimate (per-weapon spread is not in canon data). Read-only.
 // chained &&/-Q/-S flags, etc.) were removed because they no longer resolve anywhere.
 // Suite 113 guards this registry ↔ router ↔ help consistency so it can't drift again.
 const COMMAND_REGISTRY = [
+  {
+    group: 'COMMAND-LINE MODE',
+    cmds: [
+      {
+        cmd: '[MODE PILL]',
+        desc: 'Tap the pill above the input to swap between TERMINAL (native + quick-log, offline) and OVERSEER (AI narrator).',
+      },
+      { cmd: '/message', desc: 'One-off: send just this message to TERMINAL, regardless of mode.' },
+      {
+        cmd: 'text @message',
+        desc: 'Anywhere in a line, @ pings OVERSEER with just the text after it — the text before is dropped.',
+      },
+      {
+        cmd: 'killed <target>',
+        desc: 'Quick-log (TERMINAL): record a kill in the Terminal Record. Offline.',
+      },
+      { cmd: '+N caps / -N caps', desc: 'Quick-log (TERMINAL): adjust your caps. Offline.' },
+      {
+        cmd: 'arrived <location>',
+        desc: 'Quick-log (TERMINAL): record a location as visited. Offline.',
+      },
+      {
+        cmd: 'rep <faction> up/down',
+        desc: "Quick-log (TERMINAL): nudge a faction's reputation +/-5. Offline.",
+      },
+      {
+        cmd: 'action, action, action',
+        desc: 'Quick-log (TERMINAL): comma-separate multiple actions on one line to apply them all.',
+      },
+    ],
+  },
   {
     group: 'NATIVE TERMINALS — OFFLINE, NO AI',
     cmds: [
@@ -1891,26 +5461,57 @@ const COMMAND_REGISTRY = [
         cmd: '[LOOT] / [LT]',
         desc: 'Salvage terminal — add a database item to your pack at its value. Offline.',
       },
+      {
+        cmd: '[GPS] / [MAP]',
+        desc: 'Localized geographic compass grid — opens the CARTOGRAPHY TABLE. Offline.',
+      },
+      {
+        cmd: '[PERKS] / [PK]',
+        desc: 'Perks you qualify for at your current level — registry lookup. Offline.',
+      },
+    ],
+  },
+  {
+    group: 'STAT EDITS — TERMINAL, OFFLINE',
+    cmds: [
+      {
+        cmd: '<stat> <N>',
+        desc: 'Set any stat to an exact value: hp, rads, xp, level, karma, caps, a SPECIAL (str/per/end/cha/int/agi/lck), or a skill. Offline.',
+      },
+      {
+        cmd: '+N <stat> / <stat> +N',
+        desc: 'Nudge a stat up or down by N instead of setting it outright. Offline.',
+      },
+      {
+        cmd: 'level up / leveled up',
+        desc: 'Gain exactly one level, deterministic — no XP threshold required. Offline.',
+      },
     ],
   },
   {
     group: 'INVENTORY & PROGRESSION',
     cmds: [
       { cmd: '[CRAFT]', desc: 'Consume ingredients to build (craft panel).' },
-      { cmd: '[VISUAL UPLOAD: X]', desc: 'Parse a screenshot into inventory (Wpn / App / Msc).' },
-      { cmd: '[BIND: X, DIR]', desc: 'Assign gear to a D-Pad vector.' },
-      { cmd: '[PAD: DIR]', desc: 'Fire a D-Pad hotkey (the ◄ ▲ ▼ ► buttons).' },
+      {
+        cmd: '[+] VISUAL UPLOAD',
+        desc: 'Attach a screenshot — parsed on-device by optical scan (offline, primary), review & confirm, then apply. Falls back to Director vision only if the scan is unavailable.',
+      },
+      {
+        cmd: '[BIND: X, DIR]',
+        desc: 'Quick-Draw Holster — holster gear X to a vector socket. Offline.',
+      },
+      {
+        cmd: '[PAD: DIR]',
+        desc: 'Quick-Draw Holster — fire the gear holstered to that vector socket. Offline.',
+      },
       { cmd: '[ROADMAP]', desc: 'Perk roadmap toward your build goals.' },
     ],
   },
   {
     group: 'NAVIGATION & WORLD STATE',
     cmds: [
-      { cmd: '[GPS] / [MAP]', desc: 'Localized geographic compass grid.' },
       { cmd: '[WAIT: X Hrs]', desc: 'Advance the clock by X hours; restock.' },
       { cmd: '[SLEEP]', desc: 'Advance 8 hours; heal HP & limbs. Offline.' },
-      { cmd: '[TIMELINE]', desc: 'Projected narrative timeline.' },
-      { cmd: '[CROSSROADS]', desc: 'Point-of-no-return / butterfly-effect check. Offline.' },
     ],
   },
   {
@@ -1928,7 +5529,6 @@ const COMMAND_REGISTRY = [
   {
     group: 'SYSTEM',
     cmds: [
-      { cmd: '[TERMLINK] / [TL]', desc: 'Command console — launch any offline subsystem.' },
       { cmd: '[FEATURES]', desc: 'Show this command registry.' },
       { cmd: '[LOGS]', desc: 'Show client error log (local-only).' },
     ],
@@ -1961,7 +5561,7 @@ function showHelpModal() {
         '</div>'
     ).join('') +
     '</div><p style="font-size:9px;opacity:0.6;margin-top:8px;">Type any command in the Comm-Link input to execute.</p>';
-  _openSysModal();
+  openModal();
 }
 
 // SAVE & DATA field manual — diegetic, game-agnostic copy (Protocol 38: no
@@ -1970,6 +5570,10 @@ function showHelpModal() {
 // explain the whole panel. Rendered into the shared sysModal so it inherits the
 // WU-C4 focus-trap + ARIA dialog semantics for free.
 const SAVE_HELP = [
+  {
+    cmd: 'OVERWRITE',
+    desc: 'On the ALL SAVES list, replaces that specific save — local slot or cloud — with your current campaign while keeping its existing name. You always confirm first, and a local overwrite keeps its prior contents recoverable in VERSION HISTORY.',
+  },
   {
     cmd: 'EXPORT SAVE',
     desc: 'Writes your entire campaign to a downloadable archive file kept on your own device — your offline insurance against data loss. Store it anywhere.',
@@ -1981,6 +5585,10 @@ const SAVE_HELP = [
   {
     cmd: 'RESTORE BACKUP',
     desc: 'The terminal keeps several automatic rolling snapshots of recent states. Restore rewinds to the most recent intact snapshot if a save ever goes wrong.',
+  },
+  {
+    cmd: 'EXPORT FULL BACKUP',
+    desc: 'Bundles EVERYTHING at once — your live campaign, all three save slots, and their version history — into a single downloadable file. IMPORT SAVE restores this bundle the same way it restores a single save; just pick the file.',
   },
   {
     cmd: 'SAVE SLOTS (A / B / C)',
@@ -2021,26 +5629,166 @@ function showSaveHelpModal() {
         '</span></div>'
     ).join('') +
     '</div>';
-  _openSysModal();
+  openModal();
 }
 
 function capStatMax(el) {
   const n = parseInt(el.value, 10);
   if (!isNaN(n) && n > 10) el.value = '10';
 }
+// Single source for the per-game RAD ceiling (Protocol 22) — capRadsMax() and the
+// RAD bar drag handler (setupRadBarInteraction()) both resolve the same value the
+// same way, so a clamp and a drag scale can never disagree on what "full" means.
+function _resolveMaxRads() {
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
+  return typeof def.maxRads === 'number' ? def.maxRads : 1000;
+}
+window._resolveMaxRads = _resolveMaxRads;
+
+// Owner interactivity fold-in (Phase 3 OPERATOR follow-up): RAD EXPOSURE had no upper
+// bound. Mirrors capStatMax()'s upper-clamp-on-input pattern exactly, but reads the
+// per-game fatal threshold from GAME_DEFS[ctx].maxRads (Protocol 38) instead of a
+// hardcoded literal, so a future game can supply its own value.
+function capRadsMax(el) {
+  const n = parseInt(el.value, 10);
+  if (isNaN(n)) return;
+  const maxRads = _resolveMaxRads();
+  if (n > maxRads) el.value = String(maxRads);
+}
+// ── NATIVE STAT SETTERS (Native USE + TERMINAL stat edits) ──────────────────
+// The ONE clamp/mirror/emit/save choke point per stat (Protocol 22) — shared by
+// the native USE handler (nativeUseItem() in ui-render.js), the TERMINAL
+// stat-edit grammar (_resolveStatToken() in api.js), and commitStat()'s own DOM
+// onchange path just below. Each setter mirrors BOTH state.<field> AND the
+// matching DOM input's .value — the WU-N2 caps lesson: saveState() always runs
+// syncStateFromDom() first, which reads the DOM back into state, so an
+// in-memory-only write would be silently reverted on the very next save.
+function _nativeSetHp(v) {
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  const hpMax = (hpMaxEl && parseInt(hpMaxEl.value, 10)) || state.hpMax || 0;
+  const val = Math.max(0, Math.min(hpMax, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_hp_cur');
+  if (el) el.value = String(val);
+  state.hpCur = val;
+  _emitStatChangeIfDiffers('hp', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+function _nativeSetRads(v) {
+  const maxRads = _resolveMaxRads();
+  const val = Math.max(0, Math.min(maxRads, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_rads');
+  if (el) el.value = String(val);
+  state.rads = val;
+  _emitStatChangeIfDiffers('rads', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Clamp curve matches onXpInputChanged()'s xpNext formula exactly (Protocol 22
+// — never a second XP-band formula).
+function _nativeSetXp(v) {
+  const lvlEl = document.getElementById('stat_lvl');
+  const lvl = Math.max(1, (lvlEl && parseInt(lvlEl.value, 10)) || state.lvl || 1);
+  const xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
+  const val = Math.max(0, Math.min(xpNext - 1, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_xp');
+  if (el) el.value = String(val);
+  state.xp = val;
+  _emitStatChangeIfDiffers('xp', val); // CHASSIS LIVING CORE #14
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Same clamp + 'level.up' emit shape as nativeLevelUp() (Protocol 22) — this is
+// the "set to an exact level" sibling; nativeLevelUp()/the "level up" TERMINAL
+// phrase stay the "+1" entry point and are reused verbatim, not forked here.
+function _nativeSetLevel(v) {
+  const lvlEl = document.getElementById('stat_lvl');
+  const old = Math.max(1, (lvlEl && parseInt(lvlEl.value, 10)) || state.lvl || 1);
+  const val = Math.max(1, Math.min(MAX_PLAYER_LEVEL, parseInt(v, 10) || old));
+  if (lvlEl) lvlEl.value = String(val);
+  state.lvl = val;
+  if (val > old) RobcoEvents.emit('level.up', { oldLvl: old, newLvl: val });
+  updateMath();
+  saveState();
+  return val;
+}
+
+// SPECIAL setter — the exact clamp/emit/save commitStat(el) already did,
+// extracted so the DOM onchange path and the TERMINAL/USE paths share one
+// choke point (Protocol 22). commitStat() below now delegates to this.
+function _nativeSetSpecial(key, v) {
+  let val = parseInt(v, 10);
+  if (isNaN(val)) val = (state && state[key]) || 5;
+  val = Math.max(1, Math.min(10, val));
+  const el = document.getElementById('s_' + key);
+  if (el) el.value = String(val);
+  const old = state && state[key];
+  if (state) state[key] = val;
+  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — a genuine
+  // committed SPECIAL edit, not a re-render; RobcoEvents.emit is a no-op
+  // with zero subscribers if the core hasn't wired up yet (Protocol 22).
+  if (old !== undefined && old !== val)
+    RobcoEvents.emit('stat.change', { key, oldVal: old, newVal: val });
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Thin wrapper — _skillVuSet() (@5661) already clamps [0,100], mirrors
+// #sk_<key> + the VU fill/aria, emits 'stat.change' skill:<key>, and calls
+// saveState() (Protocol 22 — reused verbatim, never forked).
+function _nativeSetSkill(key, v) {
+  return _skillVuSet(key, v);
+}
+
+// Karma's own oninput handler (index.html #stat_karma) calls BOTH
+// updateKarmaUI() and updateMath() explicitly — updateMath() does not cascade
+// into updateKarmaUI() on its own, so this setter must call both too.
+function _nativeSetKarma(v) {
+  const val = Math.max(-1000, Math.min(1000, parseInt(v, 10) || 0));
+  const el = document.getElementById('stat_karma');
+  if (el) el.value = String(val);
+  state.karma = val;
+  updateKarmaUI();
+  updateMath();
+  saveState();
+  return val;
+}
+
+// Absolute-set sibling of the existing delta-only _quickLogCaps() (api.js) —
+// that function stays as-is for the "+/-N caps" quick-log pattern; this is the
+// new "set to an exact value" entry point USE/TERMINAL stat-edits need.
+function _nativeSetCaps(v) {
+  const val = Math.max(0, parseInt(v, 10) || 0);
+  const el = document.getElementById('c_caps');
+  if (el) el.value = String(val);
+  state.caps = val;
+  _logEvent('caps', 'Caps set to ' + val + '.');
+  updateMath();
+  saveState();
+  return val;
+}
+
 function commitStat(el) {
   const k = el.id.slice(2);
   let v = parseInt(el.value, 10);
   if (isNaN(v)) v = (state && state[k]) || 5;
-  v = Math.max(1, Math.min(10, v));
-  el.value = String(v);
-  if (state) state[k] = v;
-  updateMath();
-  saveState();
+  _nativeSetSpecial(k, v);
 }
 function toggleLimb(limb) {
   let wasOk = state[limb] === 'OK';
   state[limb] = wasOk ? 'CRIPPLED' : 'OK';
+  // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP): one
+  // additive emit at this existing setter (U7/U8 precedent) — the AI limb-set
+  // path in autoImportState() (js/api.js) emits the same event.
+  RobcoEvents.emit('limb.state', { limb, state: wasOk ? 'crippled' : 'ok' });
   if (wasOk) {
     if (limb === 'hd') {
       playHeadCrippleSound();
@@ -2065,14 +5813,106 @@ function toggleLimb(limb) {
   loadUI();
 }
 
+// PHASE 3 · OPERATOR BUS-03 — the SVG anatomical zone plate is a second,
+// purely visual projection of state.la/ra/ll/rl/hd (the same fields the
+// btn_l_* readout list above already reflects). Called from loadUI() so it
+// can never drift from the mirrored chip list (Protocol 22 single-apply,
+// the Module-Bay bay/schematic precedent).
+function _syncBioHarnessZones() {
+  ['hd', 'la', 'ra', 'll', 'rl'].forEach(limb => {
+    const zone = document.querySelector('.zone[data-limb="' + limb + '"]');
+    if (zone) zone.classList.toggle('crippled', state[limb] !== 'OK');
+  });
+}
+
+// Wires the SVG zone taps/keyboard activation to the EXACT SAME toggleLimb()
+// the mirrored chip buttons already call (Protocol 22 — one handler, two
+// input surfaces). Static markup, so this wires once at boot.
+function _wireBioHarnessZones() {
+  document.querySelectorAll('.zone[data-limb]').forEach(zone => {
+    zone.addEventListener('click', () => toggleLimb(zone.dataset.limb));
+    zone.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleLimb(zone.dataset.limb);
+      }
+    });
+  });
+}
+
+// BUS-09 · KARMA ALIGNMENT (Phase 3 OPERATOR batch 3, ground-up reskin) —
+// the exact shipped 5-tier label logic (Protocol 22, unchanged breakpoints),
+// now also driving the EVIL/GOOD swing-needle rotation + tier-lamp strip +
+// live value readout the reskin adds. No new state, no new tiers.
+const _KARMA_TIERS = [
+  { label: 'Very Evil', test: k => k <= -750 },
+  { label: 'Evil', test: k => k <= -250 },
+  { label: 'Neutral', test: k => k < 250 },
+  { label: 'Good', test: k => k < 750 },
+  { label: 'Messiah', test: () => true },
+];
+// FEEDBACK ANIMATION WAVE 3 (#16 SCALES TIP) — the "did this ACTUALLY
+// change?" cache for the tier crossing (the _emitStatChangeIfDiffers /
+// _lastRadThreshold precedent). Deliberately does NOT seed at boot — the
+// first evaluation each session only establishes the baseline (no bounce).
+let _lastKarmaTier = null;
 function updateKarmaUI() {
-  let k = parseInt(document.getElementById('stat_karma').value) || 0;
-  let label = 'Neutral';
-  if (k >= 750) label = 'Messiah';
-  else if (k >= 250) label = 'Good';
-  else if (k <= -750) label = 'Very Evil';
-  else if (k <= -250) label = 'Evil';
-  document.getElementById('karma_label').innerText = label;
+  const k = parseInt(document.getElementById('stat_karma').value) || 0;
+  const tier = _KARMA_TIERS.find(t => t.test(k)) || _KARMA_TIERS[2];
+  const label = tier.label;
+
+  const labelEl = document.getElementById('karma_label');
+  if (labelEl) {
+    labelEl.innerText = label;
+    labelEl.className = 'k-standing ' + (label === 'Neutral' ? 'neut' : k < 0 ? 'evil' : 'good');
+  }
+
+  const needle = document.getElementById('karmaNeedle');
+  if (needle) {
+    needle.style.transform = 'rotate(' + ((k / 1000) * 82).toFixed(1) + 'deg)';
+    needle.classList.toggle('evil', k < 0);
+  }
+
+  // FEEDBACK ANIMATION WAVE 3 (#16 SCALES TIP): new additive emit — reuses
+  // the SAME _KARMA_TIERS breakpoints already computed above, no new literal
+  // (Protocol 22/38). The needle double-bounce + a halo/horns glyph blink
+  // beside the standing word are applied directly here, at the crossing.
+  if (_lastKarmaTier !== null && _lastKarmaTier !== label) {
+    RobcoEvents.emit('karma.tier', { tier: label });
+    if (needle) {
+      needle.classList.remove('scales-tip');
+      void needle.offsetWidth;
+      needle.classList.add('scales-tip');
+      setTimeout(() => needle.classList.remove('scales-tip'), 700);
+    }
+    if (labelEl) {
+      const glyph = document.createElement('span');
+      glyph.className = 'karma-tier-glyph';
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.textContent = k < 0 ? '☠' : '☼';
+      labelEl.appendChild(glyph);
+      setTimeout(() => glyph.remove(), 900);
+    }
+  }
+  _lastKarmaTier = label;
+
+  const valEl = document.getElementById('karmaValReadout');
+  if (valEl) valEl.textContent = 'KARMA ' + (k >= 0 ? '+' : '') + k + ' OF ±1000';
+
+  const lampsEl = document.getElementById('karmaTierLamps');
+  if (lampsEl) {
+    lampsEl.innerHTML = _KARMA_TIERS
+      .map(t => {
+        const zone =
+          t.label === 'Very Evil' || t.label === 'Evil'
+            ? 't-evil'
+            : t.label === 'Neutral'
+              ? 't-neut'
+              : 't-good';
+        return `<span class="${zone}${t.label === label ? ' cur' : ''}">${t.label.toUpperCase()}</span>`;
+      })
+      .join('');
+  }
 }
 
 function seedNewCampaignInventory(ctx) {
@@ -2102,16 +5942,126 @@ const SKILL_LABELS = {
   unarmed: 'Unarmed',
 };
 
+// BUS-05 · SKILL VU ARRAY (Phase 3 OPERATOR batch 2, ground-up reskin) —
+// still emits the exact sk_<key> number inputs (Protocol 22); the VU track
+// is an ADDED drag/keyboard affordance over the same input, never a parallel
+// state path. .skill-row is kept alongside .vu-row so _applyChemHighlights()
+// (which targets .skill-row) needs no change. Channel count/order comes from
+// getSkillKeys() — never a hardcoded 13 (Protocol 38).
 function renderSkills() {
   const grid = document.getElementById('skillsGrid');
   if (!grid) return;
-  grid.innerHTML = getSkillKeys()
+  const rows = getSkillKeys()
     .map(sk => {
       const val = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
       const label = SKILL_LABELS[sk] || sk;
-      return `<div class="skill-row"><label for="sk_${sk}">${escapeHtml(label)}</label><input type="number" id="sk_${sk}" value="${val}" min="0" max="100" inputmode="numeric" oninput="saveState()"></div>`;
+      const labelSafe = escapeHtml(label);
+      return `<div class="skill-row vu-row" data-skill="${sk}">
+        <label for="sk_${sk}" class="vu-label" title="${labelSafe}">${labelSafe}</label>
+        <span class="vu-track" data-vu-track="${sk}" role="slider" tabindex="0"
+              aria-label="${labelSafe} signal level, drag or use arrow keys to set"
+              aria-valuemin="0" aria-valuemax="100" aria-valuenow="${val}">
+          <span class="vu-fill" data-vu-fill="${sk}" style="width:${val}%"></span>
+        </span>
+        <input type="number" id="sk_${sk}" class="vu-input" value="${val}" min="0" max="100"
+               inputmode="numeric" oninput="_onSkillVuInput('${sk}')" aria-label="${labelSafe} value, 0 to 100" />
+      </div>`;
     })
     .join('');
+  grid.innerHTML =
+    `<div class="vu-rows">${rows}</div>` +
+    '<div class="vu-legend"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
+  _wireSkillVuDrag(grid);
+}
+
+// Shared clamp/paint helper for both the drag surface and the arrow-key path —
+// mirrors syncStateFromDom()'s Math.min(100,Math.max(0,...)) skill clamp, then
+// calls the SAME saveState() the typed field's oninput already called.
+function _skillVuSet(key, rawVal) {
+  const v = Math.max(0, Math.min(100, Math.round(rawVal)));
+  const input = document.getElementById('sk_' + key);
+  if (input) input.value = v;
+  const fill = document.querySelector('[data-vu-fill="' + key + '"]');
+  if (fill) fill.style.width = v + '%';
+  const track = document.querySelector('[data-vu-track="' + key + '"]');
+  if (track) track.setAttribute('aria-valuenow', String(v));
+  // CHASSIS LIVING CORE #14 (3D ring burst on stat change) — the one committed
+  // skill setter (drag AND arrow-key path both call this); _onSkillVuInput()'s
+  // oninput live-preview deliberately does NOT hook this (fires every
+  // keystroke, never a settled value).
+  _emitStatChangeIfDiffers('skill:' + key, v);
+  saveState();
+  return v;
+}
+
+// Live-preview the fill as the user types, without rewriting the field
+// mid-keystroke — the actual clamp still happens in syncStateFromDom().
+function _onSkillVuInput(key) {
+  const input = document.getElementById('sk_' + key);
+  if (!input) {
+    saveState();
+    return;
+  }
+  const v = Math.max(0, Math.min(100, parseInt(input.value, 10) || 0));
+  const fill = document.querySelector('[data-vu-fill="' + key + '"]');
+  if (fill) fill.style.width = v + '%';
+  const track = document.querySelector('[data-vu-track="' + key + '"]');
+  if (track) track.setAttribute('aria-valuenow', String(v));
+  saveState();
+}
+
+// Pointer-drag-to-set on the VU track (same idiom as the Immersion/tempo dial
+// drags — pointer capture, delegated listeners on the stable #skillsGrid node
+// so re-renders never need to re-wire) + arrow-key/Home/End on the role=slider
+// track. Wired once (grid.dataset.vuWired guard) since renderSkills() rebuilds
+// only the grid's innerHTML, not the grid element itself.
+function _wireSkillVuDrag(grid) {
+  if (grid.dataset.vuWired) return;
+  grid.dataset.vuWired = '1';
+  let draggingKey = null;
+  const pctFromEvent = (track, ev) => {
+    const r = track.getBoundingClientRect();
+    return r.width > 0 ? ((ev.clientX - r.left) / r.width) * 100 : 0;
+  };
+  grid.addEventListener('pointerdown', ev => {
+    const track = ev.target.closest('.vu-track');
+    if (!track) return;
+    draggingKey = track.dataset.vuTrack;
+    try {
+      track.setPointerCapture(ev.pointerId);
+    } catch (_) {}
+    _skillVuSet(draggingKey, pctFromEvent(track, ev));
+  });
+  grid.addEventListener('pointermove', ev => {
+    if (!draggingKey) return;
+    const track = grid.querySelector('[data-vu-track="' + draggingKey + '"]');
+    if (track) _skillVuSet(draggingKey, pctFromEvent(track, ev));
+  });
+  grid.addEventListener('pointerup', () => {
+    draggingKey = null;
+  });
+  grid.addEventListener('pointercancel', () => {
+    draggingKey = null;
+  });
+  grid.addEventListener('keydown', ev => {
+    const track = ev.target.closest('.vu-track');
+    if (!track) return;
+    const key = track.dataset.vuTrack;
+    const cur = state.skills && state.skills[key] !== undefined ? state.skills[key] : 15;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') {
+      _skillVuSet(key, cur + 1);
+      ev.preventDefault();
+    } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') {
+      _skillVuSet(key, cur - 1);
+      ev.preventDefault();
+    } else if (ev.key === 'Home') {
+      _skillVuSet(key, 0);
+      ev.preventDefault();
+    } else if (ev.key === 'End') {
+      _skillVuSet(key, 100);
+      ev.preventDefault();
+    }
+  });
 }
 
 function loadUI() {
@@ -2170,6 +6120,10 @@ function loadUI() {
     btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
     btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));
   });
+  // PHASE 3 · OPERATOR BUS-03: sync the SVG zone plate — the "second
+  // projection" of the exact same state.la/ra/ll/rl/hd this loop already
+  // reads (Protocol 22 single-apply — never a second state source).
+  if (typeof _syncBioHarnessZones === 'function') _syncBioHarnessZones();
   updateKarmaUI();
   if (_isDirty('inv', { inv: state.inventory, f: _invFilter })) renderInventory();
   if (_isDirty('ammo', state.ammo)) renderAmmo();
@@ -2219,8 +6173,9 @@ function loadUI() {
     renderTrade();
   if (_isDirty('gamedate', { ticks: state.ticks, ctx: state.gameContext })) renderGameDate();
   // G6: Regional Zone Map — skip when DATA tab is not active (B-P1: map work is invisible off-tab;
-  // switchTab('data') at ui-core.js:891 re-renders when the user switches to it).
-  if (document.getElementById('tab-btn-data')?.classList.contains('active')) {
+  // switchTab('data') at ui-core.js:891 re-renders when the user switches to it). Checks panel
+  // visibility directly (DO-N: decoupled from which UI drives the tab — bezel keycap or otherwise).
+  if (document.querySelector('.panel[data-tab="data"].tab-visible')) {
     if (
       _isDirty('worldmap', {
         lh: state.locationHistory,
@@ -2240,12 +6195,14 @@ function loadUI() {
       f: state.factions,
       s: state.status,
       n: state.campaign_notes,
+      el: state.eventLog, // P4: Crossroads + Incident views read the Terminal Record
     })
   )
-    renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record
+    renderCampaignStatus(); // v2.0.1: Campaign Status + Crossroads Record + Incident Log
   renderAccount(); // always — reads Firebase auth state, not covered by state slice
   renderSavesList(); // always — reads localStorage/cloud saves, not covered by state slice
   if (typeof renderOverseerLog === 'function') renderOverseerLog(); // WU-F7: local device telemetry, not a state slice
+  if (typeof renderSystemStatus === 'function') renderSystemStatus(); // CHASSIS: firmware/cache/carrier/flags, not a state slice
   _updateContextPanels(); // G4: switch faction/karma panel visibility
   // C5/C11: Restore CAMPG dropdowns from state
   {
@@ -2259,11 +6216,14 @@ function loadUI() {
       cb.checked = locked || armed;
       cb.disabled = locked; // cannot uncheck when permanently active
     }
-    const banner = document.getElementById('rngModeBanner');
-    if (banner) banner.style.display = armed ? 'block' : 'none';
-    const lockedBanner = document.getElementById('rngLockedBanner');
-    if (lockedBanner) lockedBanner.style.display = locked ? 'block' : 'none';
+    // The armed/locked banners are painted by _syncInterlockUI() below (Protocol
+    // 22 — one repaint function owns the whole board, not a duplicate here too).
   }
+  // SU-3: keep the CAMPAIGN PROFILE / RANDOMIZER INTERLOCK custom controls (and
+  // the armed/locked banners) in sync with state on every loadUI() pass too
+  // (e.g. an AI-driven update, or wipeTerminal()'s post-wipe loadUI() call).
+  if (typeof _syncCampaignProfileUI === 'function') _syncCampaignProfileUI();
+  if (typeof _syncInterlockUI === 'function') _syncInterlockUI();
   updateMath();
   triggerPhosphorGhost();
   // Radiation SPECIAL debuff coloring (display-only, does not modify state)
@@ -2344,8 +6304,1033 @@ let _lastKarma = null,
 // Contextual terminal message gate variables
 // Each tracks the last-emitted threshold so we only fire once per crossing.
 let _lastRadThreshold = 0; // 0 / 200 / 400 / 600 / 1000
+// FEEDBACK ANIMATION WAVE 1: maps the threshold ladder above onto the SAME
+// NONE/MINOR/ADVANCED/SEVERE tier names _bioScanCompute() already uses
+// (Protocol 22 — no second breakpoint table).
+function _radTierName(threshold) {
+  return threshold >= 600
+    ? 'SEVERE'
+    : threshold >= 400
+      ? 'ADVANCED'
+      : threshold >= 200
+        ? 'MINOR'
+        : 'NONE';
+}
 let _lastGameHourBand = -1; // 0=night(20-5), 1=morning(6-11), 2=day(12-18), 3=evening(19)
 let _lastChemExpiry = new Set(); // names of chems we've already warned about
+
+// U7: HP-critical reaction (crit-hp-flash class + chassis buzz) — updateMath()
+// below only detects the >25%→≤25% crossing and emits; this is the subscriber.
+// Wiring is deferred to a function called from window.onload, NOT run at this
+// file's top level — ui-core.js is itself a static <script> tag that can execute
+// before state.js (which defines RobcoEvents) finishes its dynamic, context-
+// conditional load (see the boot-loader comment in index.html); a top-level
+// RobcoEvents.on(...) here would throw "RobcoEvents is not defined" on some boots.
+function _wireCoreEventBusSubscribers() {
+  RobcoEvents.on('hp.critical', () => {
+    document.body.classList.remove('crit-hp-flash');
+    void document.body.offsetWidth;
+    document.body.classList.add('crit-hp-flash');
+    setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
+    if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth'); // WU-F2 haptic
+    // FEEDBACK ANIMATION WAVE 1 (#1 FLATLINE WARNING) — a one-shot EKG
+    // stutter layered on the HP trace itself (add-class→reflow→remove, the
+    // _coreOneShot pattern), alongside the existing body flash/haptic above
+    // (Protocol 22, never forked). The continuous red vignette is a SEPARATE
+    // state-driven class toggled every updateMath() tick so it tracks HP
+    // staying critical, not just the crossing (see updateMath()).
+    const hpTrace = document.getElementById('opTraceHp');
+    if (hpTrace) {
+      hpTrace.classList.remove('flatline-stutter');
+      void hpTrace.offsetWidth;
+      hpTrace.classList.add('flatline-stutter');
+      setTimeout(() => hpTrace.classList.remove('flatline-stutter'), 1600);
+    }
+  });
+  // PHASE 3 · OPERATOR: the COMMIT LEVEL-UP key (#btnLevelUp) flashes its own
+  // label on a successful level-up — reacts to the SAME 'level.up' bus event
+  // nativeLevelUp() already emits (Protocol 22, never touches onclick or
+  // forks the handler). Purely cosmetic text swap; no state/campaign write.
+  RobcoEvents.on('level.up', p => {
+    const tag = document.getElementById('opLevelUpKeyText');
+    if (!tag) return;
+    const newLvl = p && typeof p.newLvl === 'number' ? p.newLvl : state.lvl;
+    tag.textContent = '▲ LEVEL ' + newLvl + ' COMMITTED';
+    clearTimeout(_levelUpKeyFlashTimer);
+    _levelUpKeyFlashTimer = setTimeout(() => {
+      tag.textContent = '▲ LEVEL UP';
+    }, 1200);
+  });
+  // FEEDBACK ANIMATION WAVE 1 (#9 VAULT-BOY LEVEL CARD, the flagship) — a
+  // static, always-in-DOM card (index.html, inside BUS-01) toggled by a
+  // one-shot 'show' class so it survives independent of any innerHTML
+  // re-render (Protocol 22, the mini-core static-element precedent). The XP
+  // bar gets a paired sweep-shimmer one-shot at the same trigger.
+  RobcoEvents.on('level.up', p => {
+    const card = document.getElementById('levelUpCard');
+    if (!card) return;
+    const textEl = document.getElementById('levelUpCardText');
+    const newLvl = p && typeof p.newLvl === 'number' ? p.newLvl : state.lvl;
+    if (textEl) textEl.textContent = 'LEVEL ' + newLvl;
+    card.classList.remove('show');
+    void card.offsetWidth;
+    card.classList.add('show');
+    clearTimeout(_levelUpCardTimer);
+    _levelUpCardTimer = setTimeout(() => card.classList.remove('show'), 2600);
+    const xpFill = document.getElementById('xp_bar_fill');
+    if (xpFill) {
+      xpFill.classList.remove('xp-sweep-shimmer');
+      void xpFill.offsetWidth;
+      xpFill.classList.add('xp-sweep-shimmer');
+      setTimeout(() => xpFill.classList.remove('xp-sweep-shimmer'), 1400);
+    }
+  });
+  // FEEDBACK ANIMATION WAVE 1 (#4 GEIGER SPIKE / #5 RADAWAY DRAIN) — the RAD
+  // trace chatters (up) or bubbles-drains (down); an amber ☢ film-grain
+  // flourish rides the escalating case only. Gated by nothing beyond the
+  // existing global prefers-reduced-motion block (Protocol UI-9) — a rad
+  // crossing is essential feedback, matching the rad-warning/-critical/-fatal
+  // classes already unconditional elsewhere in updateMath().
+  RobcoEvents.on('rad.tier', p => {
+    const radLine = document.getElementById('opRadLineWrap');
+    if (radLine) {
+      const cls = p && p.direction === 'down' ? 'rad-drain' : 'rad-spike';
+      radLine.classList.remove('rad-spike', 'rad-drain');
+      void radLine.offsetWidth;
+      radLine.classList.add(cls);
+      setTimeout(() => radLine.classList.remove(cls), 1100);
+    }
+    if (p && p.direction !== 'down' && p.tier !== 'NONE') {
+      document.body.classList.remove('geiger-film-grain');
+      void document.body.offsetWidth;
+      document.body.classList.add('geiger-film-grain');
+      setTimeout(() => document.body.classList.remove('geiger-film-grain'), 1000);
+    }
+  });
+  // FEEDBACK ANIMATION WAVE 1 (#6 X-RAY FLASH / #7 SPLINT WRAP) — a one-shot
+  // bone-white inversion across the whole zone-body silhouette plus a
+  // per-zone flash/wrap on the affected limb only.
+  RobcoEvents.on('limb.state', p => {
+    if (!p || !p.limb) return;
+    const zoneBody = document.querySelector('.zone-body');
+    if (zoneBody && p.state === 'crippled') {
+      zoneBody.classList.remove('zone-xray-flash');
+      void zoneBody.offsetWidth;
+      zoneBody.classList.add('zone-xray-flash');
+      setTimeout(() => zoneBody.classList.remove('zone-xray-flash'), 500);
+    }
+    const zone = document.querySelector('.zone[data-limb="' + p.limb + '"]');
+    if (zone) {
+      const cls = p.state === 'crippled' ? 'zone-fracture' : 'zone-splint-wrap';
+      zone.classList.remove('zone-fracture', 'zone-splint-wrap');
+      void zone.offsetWidth;
+      zone.classList.add(cls);
+      setTimeout(() => zone.classList.remove(cls), 900);
+    }
+  });
+
+  // ── FEEDBACK ANIMATION WAVE 2 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md,
+  // Tier-A) — home-panel reactions to signals already on the bus, plus the
+  // one new item.added additive emit (Protocol 22, add-class/reflow/remove
+  // one-shots throughout, never a forked handler).
+  RobcoEvents.on('stat.change', p => {
+    if (!p) return;
+    // #10 XP CHUNK FILL — only the genuine-increase case; the fill brightens
+    // 2x then settles and a floating "+N XP" ticker climbs and fades.
+    if (
+      p.key === 'xp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      const xpFill = document.getElementById('xp_bar_fill');
+      if (xpFill) {
+        xpFill.classList.remove('xp-chunk-fill');
+        void xpFill.offsetWidth;
+        xpFill.classList.add('xp-chunk-fill');
+        setTimeout(() => xpFill.classList.remove('xp-chunk-fill'), 700);
+      }
+      const wrap = document.getElementById('xp_bar_container');
+      if (wrap) {
+        const ticker = document.createElement('span');
+        ticker.className = 'xp-ticker';
+        ticker.textContent = '+' + (p.newVal - p.oldVal) + ' XP';
+        wrap.appendChild(ticker);
+        setTimeout(() => ticker.remove(), 1150);
+      }
+    }
+    // #11 SERVO RECALIBRATE — the changed SPECIAL channel's cap overshoots
+    // past its new seated position and settles; the letter flashes stencil-
+    // bright once; pairs with the existing chip-click SFX (Protocol 22, no
+    // new audio channel — the closest shipped "servo click" sound).
+    if (typeof p.key === 'string' && _SPECIAL_KEYS.includes(p.key)) {
+      const ladder = document.querySelector('[data-fd-ladder="' + p.key + '"]');
+      if (ladder) {
+        const cap = ladder.querySelector('.fd-cap');
+        if (cap) {
+          cap.classList.remove('servo-overshoot');
+          void cap.offsetWidth;
+          cap.classList.add('servo-overshoot');
+          setTimeout(() => cap.classList.remove('servo-overshoot'), 550);
+        }
+        const fader = ladder.closest('.fader');
+        const letter = fader ? fader.querySelector('.fd-letter') : null;
+        if (letter) {
+          letter.classList.remove('servo-flash');
+          void letter.offsetWidth;
+          letter.classList.add('servo-flash');
+          setTimeout(() => letter.classList.remove('servo-flash'), 550);
+        }
+      }
+      if (typeof playChipClick === 'function') playChipClick();
+    }
+    // #2 CRT FLINCH — HP damage taken: a one-shot horizontal tear across the
+    // BUS-01 monitor, distinct from the continuous #1 FLATLINE WARNING (which
+    // only plays once HP is actually critical).
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal < p.oldVal
+    ) {
+      const mon = document.querySelector('.crt-mon');
+      if (mon) {
+        mon.classList.remove('crt-flinch');
+        void mon.offsetWidth;
+        mon.classList.add('crt-flinch');
+        setTimeout(() => mon.classList.remove('crt-flinch'), 260);
+      }
+    }
+    // #17 CAPS ODOMETER SPIN — the readout digit-rolls on ANY caps change
+    // (manual/AI/trade); the trade case ALSO gets its own cap-glyph arc via
+    // the trade.bought/trade.sold subscriber below, composing with this.
+    if (p.key === 'caps') {
+      const capsEl = document.getElementById('c_caps');
+      if (capsEl) {
+        capsEl.classList.remove('caps-digit-roll');
+        void capsEl.offsetWidth;
+        capsEl.classList.add('caps-digit-roll');
+        setTimeout(() => capsEl.classList.remove('caps-digit-roll'), 500);
+      }
+    }
+    // FEEDBACK ANIMATION WAVE 3 (#3 STIM FLUSH) — HP genuinely healed: the
+    // trace refills with a bright leading edge; a small medical + blinks
+    // twice beside CONDITION.
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      const hpFillEl = document.getElementById('hp_bar_fill');
+      if (hpFillEl) {
+        hpFillEl.classList.remove('stim-flush');
+        void hpFillEl.offsetWidth;
+        hpFillEl.classList.add('stim-flush');
+        setTimeout(() => hpFillEl.classList.remove('stim-flush'), 700);
+      }
+      const condWord = document.getElementById('opCondWord');
+      if (condWord) {
+        const plus = document.createElement('span');
+        plus.className = 'stim-plus-blink';
+        plus.setAttribute('aria-hidden', 'true');
+        plus.textContent = '+';
+        condWord.appendChild(plus);
+        setTimeout(() => plus.remove(), 700);
+      }
+    }
+  });
+
+  // #17 CAPS ODOMETER SPIN (trade half) — a bottle-cap glyph arcs into the
+  // caps tile on a completed trade, layering on top of the digit-roll the
+  // accompanying stat.change(caps) above already fires.
+  const _playCapsArc = () => {
+    const tile = document.querySelector('.rb-tile.wire');
+    if (!tile) return;
+    const glyph = document.createElement('span');
+    glyph.className = 'caps-arc-glyph';
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.textContent = '◉'; // ◉
+    tile.appendChild(glyph);
+    setTimeout(() => glyph.remove(), 850);
+  };
+  RobcoEvents.on('trade.bought', _playCapsArc);
+  RobcoEvents.on('trade.sold', _playCapsArc);
+
+  // #18 MANIFEST PUNCH — the drawer's own count badge blips regardless of
+  // which drawer is currently open; the freight-tag row itself only animates
+  // when its drawer is the one actually rendered (a no-op elsewhere is
+  // correct — the row simply isn't in the DOM to animate).
+  //
+  // Deferred one tick (setTimeout 0): all three item.added call sites
+  // (addItem()/doLoot() in ui-render.js, the AI merge in autoImportState())
+  // emit BEFORE their own caller's renderInventory()/loadUI() paints the new
+  // row — a real gap caught live during Wave 2 verification (Protocol 42) —
+  // so a same-tick row lookup always misses. Deferring to the next tick lets
+  // that synchronous render finish first; the badge (always in static markup)
+  // doesn't strictly need the defer but is included for one consistent path.
+  RobcoEvents.on('item.added', p => {
+    if (!p) return;
+    setTimeout(() => {
+      const cat = p.type === 'ammo' ? 'ammo' : p.type || 'misc';
+      const badge = document.querySelector('[data-dcount="' + cat + '"]');
+      if (badge) {
+        badge.classList.remove('drawer-count-blip');
+        void badge.offsetWidth;
+        badge.classList.add('drawer-count-blip');
+        setTimeout(() => badge.classList.remove('drawer-count-blip'), 450);
+      }
+      const list = document.getElementById('invList');
+      if (list && p.name) {
+        const row = Array.from(list.querySelectorAll('.mrow .m-name')).find(
+          el => el.textContent === p.name
+        );
+        const li = row ? row.closest('.mrow') : null;
+        if (li) {
+          li.classList.remove('manifest-punch-in');
+          void li.offsetWidth;
+          li.classList.add('manifest-punch-in');
+          setTimeout(() => li.classList.remove('manifest-punch-in'), 450);
+        }
+      }
+    }, 0);
+  });
+
+  // #20 WELD SPARKS + TAG — home-only (the user crafts on-panel). A brief
+  // spark flicker on the bench's board LED, then a claim tag typewriter-
+  // prints the output name and tears off (a transient DOM node, never
+  // persisted markup — Protocol 22, no new index.html structure needed).
+  RobcoEvents.on('craft.completed', p => {
+    const panel = document.getElementById('craftPanel');
+    if (!panel) return;
+    panel.classList.remove('weld-spark-flash');
+    void panel.offsetWidth;
+    panel.classList.add('weld-spark-flash');
+    setTimeout(() => panel.classList.remove('weld-spark-flash'), 400);
+    const tag = document.createElement('div');
+    tag.className = 'craft-claim-tag';
+    tag.textContent = (p && p.name) || '';
+    panel.appendChild(tag);
+    setTimeout(() => tag.remove(), 1650);
+  });
+
+  // #30 CLOCK SPIN-DOZE — home-only. The scanline collapses to a bright
+  // line (micro power-nap) while the MISSION CLOCK's flip-card drums spin,
+  // then both re-wake/bloom back — the SAME sleep.completed event
+  // _nativeSleep() already emits (Protocol 22).
+  RobcoEvents.on('sleep.completed', () => {
+    document.body.classList.remove('sleep-doze');
+    void document.body.offsetWidth;
+    document.body.classList.add('sleep-doze');
+    setTimeout(() => document.body.classList.remove('sleep-doze'), 1450);
+  });
+
+  // #31 HOLOTAPE COMMIT — home-only, NO separate annunciator echo (owner
+  // decision — the existing mini-core write-pulse already signals off-panel).
+  // A holotape glyph slides into the SAVE ARCHIVE panel, reels spin ~1s; a
+  // cloud-kind write additionally gets a carrier ripple on the panel itself.
+  RobcoEvents.on('data.write', p => {
+    const panel = document.getElementById('savesPanel');
+    if (!panel) return;
+    const summary = panel.querySelector('summary');
+    if (summary) {
+      const badge = document.createElement('span');
+      badge.className = 'holotape-commit-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      badge.innerHTML = '<span class="htc-reel">◎</span> WRITTEN';
+      summary.appendChild(badge);
+      setTimeout(() => badge.remove(), 1050);
+    }
+    const kind = p && p.kind;
+    if (kind === 'cloud-push' || kind === 'cloud-pull') {
+      panel.classList.remove('carrier-ripple');
+      void panel.offsetWidth;
+      panel.classList.add('carrier-ripple');
+      setTimeout(() => panel.classList.remove('carrier-ripple'), 950);
+    }
+  });
+
+  // ── FEEDBACK ANIMATION WAVE 3 (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md,
+  // Tier-B/C) — the remaining home-panel reactions, plus the 5 new emits
+  // wired above at their existing setters (Protocol 22, add-class/reflow/
+  // remove one-shots throughout, never a forked handler).
+
+  // #19 IN-SERVICE STAMP — home-only; the emit site (toggleEquipItem) already
+  // gates unequip out, so this only ever fires on a genuine equip. Targets
+  // the freshly-equipped row via the SAME .equip-btn markup renderInventory()
+  // already paints — fired AFTER that render, so no defer is needed.
+  RobcoEvents.on('item.equipped', p => {
+    if (!p || !p.name) return;
+    const list = document.getElementById('invList');
+    if (!list) return;
+    const nameEl = Array.from(list.querySelectorAll('.mrow .m-name')).find(
+      el => el.textContent === p.name
+    );
+    const li = nameEl ? nameEl.closest('.mrow') : null;
+    const btn = li ? li.querySelector('.equip-btn') : null;
+    if (btn) {
+      btn.classList.remove('in-service-stamp');
+      void btn.offsetWidth;
+      btn.classList.add('in-service-stamp');
+      setTimeout(() => btn.classList.remove('in-service-stamp'), 500);
+    }
+  });
+
+  // #21 PART DROP — home-only reaction to the EXISTING craft.scrapped event;
+  // the item silhouette splits into 2-3 part glyphs that drop into the yield
+  // card with a settle bounce (transient DOM nodes, never persisted markup —
+  // the #20 WELD SPARKS + TAG precedent).
+  RobcoEvents.on('craft.scrapped', () => {
+    const card = document.getElementById('scrapItemCard');
+    if (!card) return;
+    ['⚙', '▪', '◆'].forEach((g, i) => {
+      const part = document.createElement('span');
+      part.className = 'scrap-part-drop';
+      part.style.animationDelay = i * 90 + 'ms';
+      part.setAttribute('aria-hidden', 'true');
+      part.textContent = g;
+      card.appendChild(part);
+      setTimeout(() => part.remove(), 750 + i * 90);
+    });
+  });
+}
+let _levelUpKeyFlashTimer = null;
+let _levelUpCardTimer = null;
+
+// ── STATUS ANNUNCIATOR (FEEDBACK ANIMATION WAVE 1 — planning/FEEDBACK_
+// ANIMATION_BUILD_PLAN.md §2) ────────────────────────────────────────────
+// A themed flagship animation plays on its HOME panel, but the triggering
+// event often fires while the user is on a DIFFERENT subsystem (above all
+// AI/autoImportState changes landing while the user is on UPLINK/chat) —
+// off-panel, the home animation is unseen. The annunciator generalizes the
+// mini-core dual-paint pattern: a compact, always-present casing-top readout
+// that surfaces the event regardless of the active subsystem.
+//
+// THE SUPPRESSION RULE (the viewability core): _echoPush(evt) fires IFF the
+// event's home subsystem != the currently active one (body.dataset.
+// subsystem, set by switchTab()). If the user is already on the home panel,
+// the home animation IS the feedback — no redundant echo.
+//
+// Purely presentational — transient module vars + DOM classes only, never
+// state.*/saveState()/robco_v8 (Protocol 22).
+const ECHO_QUEUE_CAP = 6;
+let _echoQueue = [];
+let _echoTimer = null;
+let _echoCurrent = null; // {tone, glyph, label, homeSubsystem, sig, count}
+
+// Visibility gate — DELIBERATELY narrower than _coreShouldAnimate(): the
+// readout is essential feedback and stays visible at every Immersion tier
+// and under reduced-motion (only the entrance/exit FLOURISH quiets there,
+// via the existing global prefers-reduced-motion block — automatic, no
+// bespoke carve-out). Fully suppressed only when there is truly no viewer:
+// a hidden tab or the runtime powered down (the standby-coordinator
+// STANDBY/SHUTDOWN/OFF precedent).
+function _echoShouldShow() {
+  if (typeof document !== 'undefined' && document.hidden) return false;
+  const rt =
+    typeof AmbientRuntime !== 'undefined' && AmbientRuntime ? AmbientRuntime.getState() : 'ACTIVE';
+  if (rt === 'STANDBY' || rt === 'SHUTDOWN' || rt === 'OFF') return false;
+  return true;
+}
+
+function _echoActiveSubsystem() {
+  return (document.body && document.body.dataset && document.body.dataset.subsystem) || '';
+}
+
+// tone: 'green' | 'amber' | 'red'. homeSubsystem: the subsystem key
+// (selectSubsystem()'s vocabulary) whose own animation already serves as
+// the feedback when the user is already there.
+function _echoPush(evt) {
+  if (!evt || !_echoShouldShow()) return;
+  const { tone, glyph, label, homeSubsystem } = evt;
+  if (homeSubsystem && _echoActiveSubsystem() === homeSubsystem) return; // on-panel: home animation IS the feedback
+  // Identical-consecutive collapse (never floods with repeats) — bump the
+  // count on whichever entry (currently showing, or queue tail) matches.
+  const sig = tone + '|' + glyph + '|' + label + '|' + homeSubsystem;
+  if (_echoCurrent && _echoCurrent.sig === sig) {
+    _echoCurrent.count++;
+    _echoRenderCurrent();
+    return;
+  }
+  const tail = _echoQueue[_echoQueue.length - 1];
+  if (tail && tail.sig === sig) {
+    tail.count++;
+    return;
+  }
+  _echoQueue.push({ tone, glyph, label, homeSubsystem, sig, count: 1 });
+  if (_echoQueue.length > ECHO_QUEUE_CAP) _echoQueue.shift(); // drop-oldest, never floods
+  if (!_echoTimer && !_echoCurrent) _echoAdvance();
+}
+window._echoPush = _echoPush;
+
+function _echoRenderCurrent() {
+  const el = document.getElementById('statusAnnunciator');
+  if (!el || !_echoCurrent) return;
+  const c = _echoCurrent;
+  el.classList.remove('tone-green', 'tone-amber', 'tone-red');
+  el.classList.add('tone-' + c.tone);
+  const safeLabel = typeof escapeHtml === 'function' ? escapeHtml(c.label) : c.label;
+  el.innerHTML =
+    '<span class="an-glyph" aria-hidden="true">' +
+    c.glyph +
+    '</span><span class="an-label">' +
+    safeLabel +
+    (c.count > 1 ? ' ×' + c.count : '') +
+    '</span>';
+  el.dataset.home = c.homeSubsystem || '';
+}
+
+// FIFO advance: shows the next queued item for ~2000ms, then advances — a
+// burst plays in sequence, oldest-first, nothing missed, one annunciation
+// visible at a time (never floods).
+function _echoAdvance() {
+  clearTimeout(_echoTimer);
+  _echoTimer = null;
+  const el = document.getElementById('statusAnnunciator');
+  const next = _echoQueue.shift();
+  if (!next) {
+    _echoCurrent = null;
+    if (el) el.classList.remove('show', 'hide');
+    return;
+  }
+  _echoCurrent = next;
+  if (el) {
+    el.classList.remove('hide');
+    _echoRenderCurrent();
+    void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly
+    el.classList.add('show');
+  }
+  _echoTimer = setTimeout(() => {
+    if (el) el.classList.add('hide');
+    setTimeout(_echoAdvance, 220); // matches the annunciator-out keyframe duration
+  }, 2000);
+}
+
+// TAP-TO-JUMP (owner-added): tapping the annunciator jumps to the reacting
+// panel via the SAME selectSubsystem()/switchTab() router every bezel keycap
+// already uses (Protocol 22 — no forked routing).
+function _echoJump() {
+  const el = document.getElementById('statusAnnunciator');
+  const home = el && el.dataset && el.dataset.home;
+  if (!home) return;
+  if (typeof selectSubsystem === 'function') selectSubsystem(home);
+}
+window._echoJump = _echoJump;
+
+// Subscribes the annunciator to every (b)-class WAVE 1 event — each also
+// drives one of the 8 Tier-S flagship animations, so the echo is exercised
+// across every subsystem from day one. Wiring is deferred to a function
+// called from window.onload (the U7 boot-order lesson), never run at this
+// file's top level.
+function _wireFeedbackEchoSubscribers() {
+  RobcoEvents.on('hp.critical', () =>
+    _echoPush({ tone: 'red', glyph: '☢', label: 'HP CRITICAL', homeSubsystem: 'operator' })
+  );
+  RobcoEvents.on('rad.tier', p =>
+    _echoPush({
+      tone: p && p.direction === 'down' ? 'green' : 'amber',
+      glyph: '☢',
+      label: 'RADS: ' + ((p && p.tier) || 'NONE'),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('limb.state', p =>
+    _echoPush({
+      tone: p && p.state === 'crippled' ? 'red' : 'green',
+      glyph: '⚠',
+      label:
+        ((p && p.limb) || '').toUpperCase() +
+        (p && p.state === 'crippled' ? ' CRIPPLED' : ' MENDED'),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('level.up', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '▲',
+      label: 'LEVEL ' + (p && typeof p.newLvl === 'number' ? p.newLvl : ''),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('faction.threshold', p =>
+    _echoPush({
+      tone: p && p.direction === 'vilified' ? 'red' : 'green',
+      glyph: '⚑',
+      label: ((p && p.name) || '').toUpperCase() + ' ' + ((p && p.direction) || '').toUpperCase(),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('quest.status', p =>
+    _echoPush({
+      tone: p && p.status === 'failed' ? 'red' : 'green',
+      glyph: p && p.status === 'failed' ? '✗' : '✓',
+      label: ((p && p.name) || '').toUpperCase() + ' ' + ((p && p.status) || '').toUpperCase(),
+      homeSubsystem: 'databank',
+    })
+  );
+  RobcoEvents.on('location.visited', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '⦿',
+      label: 'SURVEYED: ' + ((p && p.loc) || ''),
+      homeSubsystem: 'databank',
+    })
+  );
+  RobcoEvents.on('collectible.acquired', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '★',
+      label: ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operations',
+    })
+  );
+  // FEEDBACK ANIMATION WAVE 2 — echo wiring for the [home + echo] items only
+  // (INK STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
+  // owner decision and deliberately get no echo push here).
+  RobcoEvents.on('stat.change', p => {
+    if (!p) return;
+    if (
+      p.key === 'xp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      _echoPush({
+        tone: 'green',
+        glyph: '◆',
+        label: '+' + (p.newVal - p.oldVal) + ' XP',
+        homeSubsystem: 'operator',
+      });
+    }
+    if (typeof p.key === 'string' && _SPECIAL_KEYS.includes(p.key)) {
+      _echoPush({
+        tone: 'green',
+        glyph: '⚙',
+        label: p.key.toUpperCase() + ' RECALIBRATED: ' + p.newVal,
+        homeSubsystem: 'operator',
+      });
+    }
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal < p.oldVal
+    ) {
+      _echoPush({
+        tone: 'red',
+        glyph: '✕',
+        label: 'DAMAGE: ' + (p.oldVal - p.newVal),
+        homeSubsystem: 'operator',
+      });
+    }
+    if (p.key === 'caps') {
+      _echoPush({
+        tone: 'amber',
+        glyph: '◉',
+        label: 'CAPS: ' + p.newVal,
+        homeSubsystem: 'operations',
+      });
+    }
+    // FEEDBACK ANIMATION WAVE 3 (#3 STIM FLUSH) — the echo half; the home
+    // animation lives in _wireCoreEventBusSubscribers().
+    if (
+      p.key === 'hp' &&
+      typeof p.oldVal === 'number' &&
+      typeof p.newVal === 'number' &&
+      p.newVal > p.oldVal
+    ) {
+      _echoPush({
+        tone: 'green',
+        glyph: '✚',
+        label: 'HEALED: +' + (p.newVal - p.oldVal),
+        homeSubsystem: 'operator',
+      });
+    }
+  });
+  RobcoEvents.on('item.added', p =>
+    _echoPush({
+      tone: 'green',
+      glyph: '◈',
+      label: 'ADDED: ' + ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operations',
+    })
+  );
+
+  // ── FEEDBACK ANIMATION WAVE 3 — echo wiring for the [home + echo] items
+  // only (CARD SEAT/NEEDLE KICK/IN-SERVICE STAMP/PART DROP/DIRECTIVE FILED/
+  // FAULT/QTY DIGIT FLIP are home-only by the build plan's routing table and
+  // deliberately get no echo push here; #27 TRIANGULATE pushes directly from
+  // onLocationChange() rather than through this bus-subscriber function,
+  // since its signal is the existing onLocationChange path, not a new emit).
+  RobcoEvents.on('weight.seized', () =>
+    _echoPush({ tone: 'amber', glyph: '⚠', label: 'CARGO SEIZED', homeSubsystem: 'operations' })
+  );
+  RobcoEvents.on('karma.tier', p => {
+    const t = (p && p.tier) || '';
+    const tone = /evil/i.test(t) ? 'red' : t === 'Neutral' ? 'amber' : 'green';
+    _echoPush({ tone, glyph: '⚖', label: 'KARMA: ' + t.toUpperCase(), homeSubsystem: 'operator' });
+  });
+  RobcoEvents.on('effect.applied', p =>
+    _echoPush({
+      tone: p && p.type === 'DEBUFF' ? 'red' : 'green',
+      glyph: '✦',
+      label: 'APPLIED: ' + ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operator',
+    })
+  );
+  RobcoEvents.on('effect.expiring', p =>
+    _echoPush({
+      tone: 'amber',
+      glyph: '✦',
+      label: 'EXPIRING: ' + ((p && p.name) || '').toUpperCase(),
+      homeSubsystem: 'operator',
+    })
+  );
+}
+// ── STATUS ANNUNCIATOR END ────────────────────────────────────────────────
+
+// ══════════════════════════════════════════════════════════════════════
+// LOCATION CONFIRMATION CARD — top-right arrival toast (Suite 204). A
+// RobcoEvents subscriber driving a transient DOM element, matching the
+// STATUS ANNUNCIATOR's own architecture (Protocol 22) but shown regardless
+// of the active subsystem — unlike the annunciator's homeSubsystem
+// suppression, "where did I just go" is meaningful everywhere, including
+// while looking at the CARTOGRAPHY TABLE itself. Fired from the single
+// onLocationChange() choke point via 'location.current' (guarded there on
+// a genuine change). Purely presentational — a transient module timer +
+// DOM classes only, never state.*/saveState()/robco_v8.
+// ══════════════════════════════════════════════════════════════════════
+let _locCardTimer = null;
+let _locCardHideTimer = null;
+
+function _locationCardShow(loc) {
+  if (!_echoShouldShow()) return; // same hidden-tab/powered-down suppression as the annunciator
+  const el = document.getElementById('locationCard');
+  if (!el) return;
+  const labelEl = el.querySelector('.loc-card-label');
+  if (labelEl) {
+    labelEl.innerHTML = typeof escapeHtml === 'function' ? escapeHtml(String(loc)) : String(loc);
+  }
+  clearTimeout(_locCardTimer);
+  clearTimeout(_locCardHideTimer);
+  el.setAttribute('aria-hidden', 'false');
+  el.classList.remove('hide');
+  void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly on a rapid re-trigger
+  el.classList.add('show');
+  _locCardTimer = setTimeout(() => {
+    el.classList.remove('show');
+    el.classList.add('hide');
+    _locCardHideTimer = setTimeout(() => {
+      el.classList.remove('hide');
+      el.setAttribute('aria-hidden', 'true');
+    }, 240); // matches the location-card-out keyframe duration
+  }, 2200);
+}
+window._locationCardShow = _locationCardShow;
+
+// Wiring is deferred to a function called from window.onload (the U7
+// boot-order lesson), never a bare top-level RobcoEvents.on() call.
+function _wireLocationCardSubscriber() {
+  RobcoEvents.on('location.current', p => _locationCardShow((p && p.loc) || ''));
+}
+
+// PHASE 3 · OPERATOR — S.P.E.C.I.A.L. fader steppers (BUS-02). Sets the
+// existing s_<key> input's value then routes through the EXACT SAME
+// commitStat(el) the raw number field already used (Protocol 22) — the
+// stepper is a second way to reach the same clamp/state-write/save path,
+// never a parallel one.
+function _bumpSpecialStat(key, delta) {
+  const el = document.getElementById('s_' + key);
+  if (!el) return;
+  const cur = parseInt(el.value, 10);
+  const next = Math.max(1, Math.min(10, (isNaN(cur) ? 5 : cur) + delta));
+  el.value = String(next);
+  commitStat(el);
+}
+
+const _SPECIAL_KEYS = ['s', 'p', 'e', 'c', 'i', 'a', 'l'];
+
+// PHASE 3 follow-up (owner interactivity fold-in) -- the S.P.E.C.I.A.L. faders
+// must be draggable, not just typed/stepped. Drags the fader ladder track
+// directly to a 1-10 value from vertical pointer position, then routes
+// through the EXACT SAME commitStat(el) _bumpSpecialStat already uses --
+// one clamp/state-write/save path for the typed field, the steppers, AND
+// the drag (Protocol 22). Mirrors the existing setupHpBarInteraction()/
+// setupXpBarInteraction() mouse+touch pattern (this file, above).
+function _applyFaderDragValue(ladder, clientY) {
+  const key = ladder.dataset.fdLadder;
+  const el = document.getElementById('s_' + key);
+  if (!el) return;
+  const rect = ladder.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height));
+  const next = Math.max(1, Math.min(10, Math.round(pct * 9) + 1));
+  el.value = String(next);
+  commitStat(el);
+}
+function _wireFaderDrag() {
+  document.querySelectorAll('.fd-ladder[data-fd-ladder]').forEach(ladder => {
+    let dragging = false;
+    ladder.addEventListener('mousedown', e => {
+      dragging = true;
+      _applyFaderDragValue(ladder, e.clientY);
+    });
+    document.addEventListener('mousemove', e => {
+      if (dragging) _applyFaderDragValue(ladder, e.clientY);
+    });
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+    });
+    ladder.addEventListener(
+      'touchstart',
+      e => {
+        dragging = true;
+        _applyFaderDragValue(ladder, e.touches[0].clientY);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    document.addEventListener(
+      'touchmove',
+      e => {
+        if (dragging) _applyFaderDragValue(ladder, e.touches[0].clientY);
+      },
+      { passive: false }
+    );
+    document.addEventListener('touchend', () => {
+      dragging = false;
+    });
+  });
+}
+
+// PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22/25 reskin).
+// Reads the exact same DOM/state updateMath() already reads for HP/rads/
+// SPECIAL; drives the NEW CRT-trace/fader-ladder/zone-plate/board-status
+// visuals added around those unchanged ids. Called once at the end of
+// updateMath() — no new call sites elsewhere, no forked logic. Writes
+// nothing to state/campaign — display-only, mirroring existing DOM values.
+function _syncOperatorTelemetry() {
+  // BUS-01 — HP condition word + critical trace line
+  const hpCurEl = document.getElementById('stat_hp_cur');
+  const hpMaxEl = document.getElementById('stat_hp_max');
+  let hpPct = 100;
+  if (hpCurEl && hpMaxEl) {
+    const hpCur = parseInt(hpCurEl.value) || 0;
+    const hpMax = Math.max(1, parseInt(hpMaxEl.value) || 1);
+    hpPct = Math.min(100, Math.max(0, (hpCur / hpMax) * 100));
+  }
+  const hpCrit = hpPct <= 25;
+  const condWord = document.getElementById('opCondWord');
+  if (condWord) {
+    condWord.textContent = hpCrit ? 'CRITICAL' : hpPct <= 60 ? 'IMPAIRED' : 'NOMINAL';
+    condWord.classList.toggle('crit', hpCrit);
+  }
+  const traceHp = document.getElementById('opTraceHp');
+  if (traceHp) traceHp.classList.toggle('critline', hpCrit);
+  const vitalLed = document.getElementById('opVitalLed');
+  if (vitalLed) vitalLed.classList.toggle('red', hpCrit);
+
+  // BUS-01 RAD trace + BUS-03 mirrored readout — stat_rads' one real,
+  // editable input lives on BUS-01 (the owner-picked Option C placement);
+  // BUS-03 shows the same value read-only (Protocol 22 single source, never
+  // a second input sharing the id).
+  const radsEl = document.getElementById('stat_rads');
+  const rads = radsEl ? parseInt(radsEl.value) || 0 : 0;
+  const radPct = Math.min(100, rads / 10);
+  const radLine = document.getElementById('opRadLine');
+  if (radLine) radLine.style.width = radPct + '%';
+  const radBar = document.getElementById('opHarnessRadBar');
+  if (radBar) radBar.style.width = radPct + '%';
+  const radMirror = document.getElementById('opHarnessRadMirror');
+  if (radMirror) radMirror.textContent = String(rads);
+
+  // BUS-02 — seven-fader segment ladders (1-10 segments, amber top segment).
+  // Reads the DOM value directly (same "avoid stale state" approach the HP/
+  // XP bars above already use) so the ladder stays live while typing/
+  // stepping, not just after commitStat()'s own save.
+  let specialLine = '';
+  _SPECIAL_KEYS.forEach(k => {
+    const input = document.getElementById('s_' + k);
+    const raw = input ? parseInt(input.value, 10) : NaN;
+    const v = Math.max(1, Math.min(10, isNaN(raw) ? 5 : raw));
+    specialLine += (specialLine ? '·' : '') + v;
+    const ladder = document.querySelector('[data-fd-ladder="' + k + '"]');
+    if (!ladder) return;
+    const segs = ladder.querySelectorAll('i');
+    segs.forEach((seg, idx) => {
+      seg.classList.toggle('lit', idx < v);
+      seg.classList.toggle('top', idx === v - 1);
+    });
+    const cap = ladder.querySelector('.fd-cap');
+    if (cap) cap.style.bottom = ((v - 1) / 9) * 88 + 4 + '%';
+  });
+
+  // BUS-03 — crippled-limb fault count for the board status/LED (the SVG
+  // zone crippled-class sync itself lives in _syncBioHarnessZones(), called
+  // from loadUI() since toggleLimb() already re-renders the whole UI there).
+  const limbFaultCount = ['la', 'ra', 'll', 'rl', 'hd'].filter(l => state[l] !== 'OK').length;
+  const harnessLed = document.getElementById('opHarnessLed');
+  if (harnessLed) harnessLed.classList.toggle('red', limbFaultCount > 0);
+
+  // 0i one-line board status rows (Protocol 25 — never information-free).
+  const setStatus = (id, text, alert) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('alert', !!alert);
+  };
+  setStatus(
+    'opVitalStatus',
+    'HP ' +
+      Math.round(hpPct) +
+      '% · LVL ' +
+      (parseInt((document.getElementById('stat_lvl') || {}).value) || 1) +
+      ' · ' +
+      (parseInt((document.getElementById('c_caps') || {}).value) || 0) +
+      ' CAPS',
+    hpCrit
+  );
+  setStatus('opSpecialStatus', specialLine, false);
+  setStatus(
+    'opHarnessStatus',
+    (limbFaultCount
+      ? '⚠ ' + limbFaultCount + ' LIMB FAULT' + (limbFaultCount > 1 ? 'S' : '')
+      : 'ALL LIMBS OK') +
+      ' · RAD ' +
+      rads +
+      ' CPM',
+    limbFaultCount > 0
+  );
+  const locEl = document.getElementById('stat_loc');
+  const dateEl = document.getElementById('gameDateDisplay');
+  setStatus(
+    'opChronoStatus',
+    (locEl ? locEl.value : '—') +
+      (dateEl && dateEl.textContent !== '—' ? ' · ' + dateEl.textContent : ''),
+    false
+  );
+  setStatus(
+    'opSkillsStatus',
+    (typeof getSkillKeys === 'function' ? getSkillKeys().length : 0) + ' CHANNELS TRACKED',
+    false
+  );
+  {
+    const traitCount = Array.isArray(state.traits) ? state.traits.length : 0;
+    const traitSuffix =
+      typeof _activeDef === 'function' && _activeDef().hasTraits
+        ? ' · ' + traitCount + ' TRAIT' + (traitCount === 1 ? '' : 'S') + ' BURNED-IN'
+        : '';
+    setStatus(
+      'opPerksStatus',
+      (state.perks || []).length +
+        ' PERK' +
+        ((state.perks || []).length === 1 ? '' : 'S') +
+        ' SOCKETED' +
+        traitSuffix,
+      false
+    );
+  }
+  setStatus(
+    'opStatusStatus',
+    typeof _statusLampSummary === 'function' ? _statusLampSummary() : '— ACTIVE EFFECTS',
+    false
+  );
+  setStatus(
+    'opFactionStatus',
+    (typeof getFactionRegistry === 'function' ? getFactionRegistry().length : 0) +
+      ' FACTIONS TRACKED',
+    false
+  );
+  setStatus(
+    'opKarmaStatus',
+    (document.getElementById('karma_label') || {}).innerText || '—',
+    false
+  );
+  {
+    const bookDefs =
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
+        ? FALLOUT_REGISTRY.skillBooks
+        : [];
+    const bookRead = Array.isArray(state.skillBooks) ? state.skillBooks.length : 0;
+    setStatus('opBooksStatus', bookRead + '/' + bookDefs.length + ' READ', false);
+  }
+  if (typeof _activeDef === 'function' && _activeDef().hasMagazines) {
+    const magDefs =
+      typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
+        ? FALLOUT_REGISTRY.magazines
+        : [];
+    const magConsumed = Array.isArray(state.magazines) ? state.magazines.length : 0;
+    setStatus('opMagsStatus', magConsumed + '/' + magDefs.length + ' CONSUMED', false);
+  }
+}
+
+// OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — a read-only mirror of the exact
+// curWt/maxWeight updateMath() already computed (Phase 3 · Piece 2). Drives a
+// physical load-beam SVG that bends continuously in proportion to real carry
+// weight (never 4 discrete frames) via a plain CSS `transition: d`, which the
+// existing global prefers-reduced-motion block collapses to an instant snap
+// (transition-duration:0.01ms) with no bespoke carve-out. Zero new state —
+// source of truth stays curWt/maxWeight; this only paints a second projection.
+// FEEDBACK ANIMATION WAVE 3 (#8 BRIDGE CLANG) — the "did this ACTUALLY
+// change?" crossing cache (the _lastRadThreshold precedent). Deliberately
+// does NOT seed at boot — the first evaluation each session only
+// establishes the baseline (no clang on load with an already-heavy save).
+let _lastWeightSeized = null;
+function _paintWeighBridge(curWt, maxWeight) {
+  const path = document.getElementById('opsBeamPath');
+  if (!path) return; // OPERATIONS markup not present (e.g. a stripped test harness)
+  const pct = maxWeight > 0 ? (curWt / maxWeight) * 100 : 0;
+  const bendPct = Math.min(130, pct); // visual bend caps past ~130% so the SVG never inverts
+  const sag = 4 + bendPct * 0.48;
+  path.setAttribute('d', 'M30,36 Q150,' + (36 + sag).toFixed(1) + ' 270,36');
+  const block = document.getElementById('opsBeamBlock');
+  if (block) {
+    const midY = 36 + sag * 0.5;
+    block.setAttribute('y', (midY - 16).toFixed(1));
+  }
+  const seized = curWt >= maxWeight;
+  // FEEDBACK ANIMATION WAVE 3 (#8 BRIDGE CLANG): one additive emit on the
+  // false->true crossing (U7 hp.critical/rad.tier precedent); the shudder +
+  // rebound + dust-speck home animation is applied directly here since the
+  // crossing is already computed right above (Protocol 22 — no forked
+  // detection logic; body.weight-over's OWN continuous shudder is unchanged).
+  if (_lastWeightSeized === false && seized === true) {
+    RobcoEvents.emit('weight.seized', { seized: true });
+    const instrument = document.querySelector('.beam-instrument');
+    if (instrument) {
+      instrument.classList.remove('bridge-clang');
+      void instrument.offsetWidth;
+      instrument.classList.add('bridge-clang');
+      setTimeout(() => instrument.classList.remove('bridge-clang'), 500);
+    }
+  }
+  _lastWeightSeized = seized;
+  const heavy = !seized && curWt >= maxWeight * 0.75;
+  const tag = seized ? 'SEIZED — OVER-ENCUMBERED' : heavy ? 'heavy load' : 'nominal';
+  const pctText = document.getElementById('opsBeamPct');
+  if (pctText) pctText.textContent = 'LOAD ' + Math.round(pct) + '%' + (seized ? ' — OVER' : '');
+  const loadSub = document.getElementById('opsLoadSub');
+  if (loadSub) loadSub.textContent = 'load ' + Math.round(pct) + '% · ' + tag;
+  const stamp = document.getElementById('opsSeizedStamp');
+  if (stamp) stamp.style.display = seized ? '' : 'none';
+  const note = document.getElementById('opsSeizedNote');
+  if (note) note.style.display = seized ? '' : 'none';
+  const led = document.getElementById('opsBridgeLed');
+  if (led) led.classList.toggle('red', seized);
+  const caps = parseInt((document.getElementById('c_caps') || {}).value) || 0;
+  const status = document.getElementById('opsBridgeStatus');
+  if (status) {
+    status.textContent =
+      (seized ? '⚠ SEIZED · ' : '') +
+      'CARGO ' +
+      curWt.toFixed(1) +
+      ' / ' +
+      maxWeight +
+      ' LB · ' +
+      caps +
+      ' CAPS';
+    status.classList.toggle('alert', seized);
+  }
+}
 
 function updateMath() {
   let maxAp = 65 + state.a * 3;
@@ -2358,8 +7343,11 @@ function updateMath() {
     .filter(item => (item.type || 'misc') !== 'ammo')
     .reduce((acc, item) => acc + item.qty * item.wgt, 0);
   document.getElementById('display_weight').innerText = `${curWt.toFixed(1)} / ${maxWeight}`;
-  document.getElementById('display_weight').style.color =
-    curWt > maxWeight ? 'var(--robco-danger)' : 'var(--robco-green)';
+  // Color now rides the body.weight-heavy/-critical/-over classes (toggled
+  // below) via CSS instead of an inline style — the LOAD-CELL WEIGH BRIDGE
+  // (OPERATIONS BUS-10) needs the same 3-tier nominal/amber/red readout the
+  // bridge instrument itself uses, and a single CSS rule keeps both in sync
+  // (Phase 3 · Piece 2).
 
   // HP Bar update + Critical HP Flash (#37)
   let hpFill = document.getElementById('hp_bar_fill');
@@ -2371,19 +7359,24 @@ function updateMath() {
     if (pct > 60) hpFill.style.background = 'var(--robco-green)';
     else if (pct > 25) hpFill.style.background = 'var(--robco-alert)';
     else hpFill.style.background = 'var(--robco-danger)';
-    // Flash red when HP drops into critical territory
+    // Flash red when HP drops into critical territory — a state crossing,
+    // emitted through the bus (U7); the flash + haptic below is the subscriber.
     if (_lastHpPct !== null && _lastHpPct > 25 && pct <= 25) {
-      document.body.classList.remove('crit-hp-flash');
-      void document.body.offsetWidth;
-      document.body.classList.add('crit-hp-flash');
-      setTimeout(() => document.body.classList.remove('crit-hp-flash'), 750);
-      // WU-F2: one-shot chassis buzz on the critical-HP crossing (mirrors the flash)
-      if (typeof triggerHaptic === 'function') triggerHaptic('lowhealth');
+      RobcoEvents.emit('hp.critical', { pct });
     }
     _lastHpPct = pct;
+    // FEEDBACK ANIMATION WAVE 1 (#1 FLATLINE WARNING) — a continuous red
+    // glass-edge vignette for as long as HP stays critical (not just the
+    // crossing), breathing in time with the existing HEARTBEAT channel —
+    // both gated on the SAME pct<25 condition (Protocol 22), so they can
+    // never drift out of sync with each other.
+    document.body.classList.toggle('hp-critical-vignette', pct < 25 && hpMax > 0);
     // H4: Low Health Heartbeat — start when HP < 25%, stop when >= 25%
+    // Deferred to the first user gesture (_armAmbientAudio, ui-audio.js) — an
+    // existing save loaded already-critical spams blocked-autoplay warnings
+    // otherwise, since the heartbeat's own ~833ms interval keeps retrying.
     if (pct < 25 && hpMax > 0) {
-      startHeartbeat(pct / 100);
+      _armAmbientAudio(() => startHeartbeat(pct / 100));
     } else {
       stopHeartbeat();
     }
@@ -2396,8 +7389,15 @@ function updateMath() {
     let xp = parseInt(document.getElementById('stat_xp').value) || 0;
     let xpCur = lvl <= 1 ? 0 : 75 * (lvl * lvl) - 25 * lvl - 50;
     let xpNext = 75 * ((lvl + 1) * (lvl + 1)) - 25 * (lvl + 1) - 50;
-    let pct = lvl >= 50 ? 100 : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
+    let pct =
+      lvl >= MAX_PLAYER_LEVEL
+        ? 100
+        : Math.min(100, Math.max(0, ((xp - xpCur) / (xpNext - xpCur)) * 100));
     xpFill.style.width = pct + '%';
+    // Native LEVEL UP control (owner report): ungated by XP — only disabled
+    // once the player has actually reached MAX_PLAYER_LEVEL.
+    const levelUpBtn = document.getElementById('btnLevelUp');
+    if (levelUpBtn) levelUpBtn.disabled = lvl >= MAX_PLAYER_LEVEL;
   }
 
   // Karma Flash (#30) — flash when karma polarity changes or large delta
@@ -2413,6 +7413,15 @@ function updateMath() {
     }
   }
   _lastKarma = curKarma;
+
+  // FEEDBACK ANIMATION WAVE 2 (#17 CAPS ODOMETER SPIN) — caps has no
+  // dedicated drag setter like hp/xp/rads, so this reads the one real #c_caps
+  // field every updateMath() tick (the karma-flash pattern just above) and
+  // routes through the SAME shared _emitStatChangeIfDiffers() helper
+  // (Protocol 22) — covers manual edits, doBuy/doSell's caps mirror, and any
+  // AI caps write, since every one of those paths already calls updateMath().
+  const capsEl = document.getElementById('c_caps');
+  if (capsEl) _emitStatChangeIfDiffers('caps', parseInt(capsEl.value) || 0);
 
   // Day/Night Indicator (#12) — toggle class based on in-game hour
   const gameHour = Math.floor(((state.ticks || 0) % 240) / 10);
@@ -2450,7 +7459,10 @@ function updateMath() {
       _lastRads = rads;
       _lastCrippled = hasCrippled;
       setGeigerRate(rads >= 1000 ? 25 : rads >= 600 ? 12 : rads >= 200 ? 0.33 : 0);
-      if (rads >= 600 || state.hd === 'CRIPPLED') startTinnitus();
+      // Deferred to the first gesture (_armAmbientAudio) — same blocked-autoplay
+      // spam risk as the heartbeat above when an existing save already has high
+      // rads/a crippled head at boot.
+      if (rads >= 600 || state.hd === 'CRIPPLED') _armAmbientAudio(startTinnitus);
       else stopTinnitus();
       setCrtHumIntensity(rads, hasCrippled);
     }
@@ -2461,23 +7473,42 @@ function updateMath() {
   if (curWt >= maxWeight) document.body.classList.add('weight-over');
   else if (curWt >= maxWeight * 0.9) document.body.classList.add('weight-critical');
   else if (curWt >= maxWeight * 0.75) document.body.classList.add('weight-heavy');
+  // OPERATIONS BUS-10 LOAD-CELL WEIGH BRIDGE — read-only mirror of the same
+  // curWt/maxWeight this function already computed; painted from this one
+  // apply path so the bridge and OPERATOR's own display_weight can never
+  // disagree (Phase 3 · Piece 2, Protocol 22 single-apply).
+  if (typeof _paintWeighBridge === 'function') _paintWeighBridge(curWt, maxWeight);
 
-  // #25 Radiation Treatment Alert — compute how many RadAway doses needed
+  // #25 Radiation Treatment Alert — compute how many RadAway doses needed.
+  // PHASE 3: #radAwayAlert now wraps a lamp <i> + a #radAwayAlertText span
+  // (the .radaway-lamp reskin) instead of being a plain text node — the
+  // message goes on that inner span (never alertEl.textContent directly,
+  // which would wipe out the lamp <i>), and display flips to 'flex' to match
+  // the lamp's icon+text row layout. Same show/hide/color logic as before.
   {
     const rads = state.rads || 0;
     const alertEl = document.getElementById('radAwayAlert');
+    const alertTextEl = document.getElementById('radAwayAlertText');
     if (alertEl) {
       if (rads >= 200) {
         const dosesNeeded = Math.ceil(rads / 150);
         const hasRadAway = state.inventory.some(i => /radaway/i.test(i.name));
-        alertEl.textContent = `RAD TREATMENT: ~${dosesNeeded} RadAway needed${hasRadAway ? ' — RadAway in pack' : ' — NONE IN PACK'}`;
-        alertEl.style.display = 'block';
+        const msg = `RAD TREATMENT: ~${dosesNeeded} RadAway needed${hasRadAway ? ' — RadAway in pack' : ' — NONE IN PACK'}`;
+        if (alertTextEl) alertTextEl.textContent = msg;
+        else alertEl.textContent = msg; // fail-safe if the lamp markup isn't present
+        alertEl.style.display = 'flex';
         alertEl.style.color = hasRadAway ? 'var(--robco-alert)' : 'var(--robco-danger)';
       } else {
         alertEl.style.display = 'none';
       }
     }
   }
+
+  // PHASE 3 · OPERATOR hero-three instrument sync (Protocol 22 reskin) —
+  // reads the exact same DOM this function already updated above; drives the
+  // new CRT-trace/fader-ladder/zone-plate/board-status visuals. One new call
+  // site, no forked logic.
+  _syncOperatorTelemetry();
 
   // Notification Badges (#13) — update panel summary badges after all renders
   _updatePanelBadges();
@@ -2512,6 +7543,14 @@ function updateMath() {
         // De-escalating
         appendToChat('> RADIATION LEVELS DECLINING. DECONTAMINATION IN PROGRESS.', 'sys', true);
       }
+      // FEEDBACK ANIMATION WAVE 1 (#4 GEIGER SPIKE / #5 RADAWAY DRAIN): one
+      // additive emit at this EXISTING crossing detector (U7 hp.critical
+      // precedent) — reuses _bioScanCompute's own NONE/MINOR/ADVANCED/SEVERE
+      // breakpoints (200/400/600), never a new literal (Protocol 22/38).
+      RobcoEvents.emit('rad.tier', {
+        tier: _radTierName(radThreshold),
+        direction: radThreshold > _lastRadThreshold ? 'up' : 'down',
+      });
       _lastRadThreshold = radThreshold;
     }
 
@@ -2550,6 +7589,12 @@ function updateMath() {
       });
     }
   }
+
+  // FIX 5 (owner report): the bezel VITALS/RAD strip is HP/rads/limb-driven —
+  // updateMath() is the single choke point every HP/rads DOM edit and every
+  // limb toggle (via loadUI()) already runs through, so this keeps the strip
+  // live without a second listener (Protocol 22).
+  if (typeof _refreshBezelTelemetry === 'function') _refreshBezelTelemetry();
 
   saveState();
 }
@@ -2606,7 +7651,7 @@ function escapeAndFormat(text) {
 
 function getTypewriterSpeed(text) {
   // #34 Typewriter Speed Control: user-set multiplier (0.25×–2×) stored in localStorage
-  const speedMult = parseFloat(localStorage.getItem('robco_typer_speed') || '1');
+  const speedMult = parseFloat(MetaStore.get('robco_typer_speed') || '1');
   let base;
   if (/\b(dead|fatal|crit|ambush|explosion|killed|bleeding|dying)\b/i.test(text)) base = 2;
   else if (/\b(rest|wait|camp|safe|sleep|heal|recover)\b/i.test(text)) base = 40;
@@ -2621,11 +7666,39 @@ function appendToChat(text, sender, isHistoryLoad = false) {
   msgDiv.className = sender === 'user' ? 'msg-user' : sender === 'sys' ? 'msg-sys' : 'msg-ai';
   chatBox.appendChild(msgDiv);
 
+  // Owner batch: unified transcript source tag — AI/Overseer-side lines carry an
+  // OVERSEER tag, mirroring the existing [TERM] quick-log text prefix, so a shared
+  // transcript still shows at a glance which side (native TERMINAL vs Director
+  // OVERSEER) produced each line. Derived from `sender` every render (display-only,
+  // never written into `text`/chatHistory), so it can never double up on a history
+  // replay. A dedicated content span keeps the typewriter's textContent/innerHTML
+  // writes scoped to the message body — never wiping the tag (Protocol 22).
+  const msgContent = document.createElement('span');
+  msgContent.className = 'msg-content';
+  if (sender === 'ai') {
+    const tagEl = document.createElement('span');
+    tagEl.className = 'msg-tag msg-tag--overseer';
+    tagEl.textContent = 'OVERSEER';
+    msgDiv.appendChild(tagEl);
+  } else if (sender === 'user') {
+    // Style A cleanup (owner-approved mockup): the user side gets a matching
+    // phosphor TERMINAL tag above its lines, for symmetry with OVERSEER — the
+    // existing "> " chevron (baked into the text at the transmitMessage()
+    // call sites) is kept alongside it.
+    const tagEl = document.createElement('span');
+    tagEl.className = 'msg-tag msg-tag--terminal';
+    tagEl.textContent = 'TERMINAL';
+    msgDiv.appendChild(tagEl);
+  }
+  msgDiv.appendChild(msgContent);
+
   // Build safe HTML once — escapes first, then applies formatting
   const fullHtml = escapeAndFormat(text);
 
   const _prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (sender === 'ai' && !isHistoryLoad && !_prefersReduced) {
+    // DO-O: the Director is TRANSMITTING for the duration of the typewriter.
+    if (typeof window.setOverseerState === 'function') window.setOverseerState('speaking');
     // Typewriter: reveal plain text with textContent (no parse cost, no XSS risk),
     // then swap to fully formatted innerHTML only once at animation end.
     const plainText = String(text)
@@ -2638,20 +7711,29 @@ function appendToChat(text, sender, isHistoryLoad = false) {
     function typeWriter() {
       if (i < plainText.length) {
         i = Math.min(i + batchSize, plainText.length);
-        msgDiv.textContent = plainText.substring(0, i);
+        msgContent.textContent = plainText.substring(0, i);
         if (i % 3 === 0) playClack();
         chatBox.scrollTop = chatBox.scrollHeight;
         setTimeout(typeWriter, speed);
       } else {
         // Animation complete — apply full safe HTML formatting
-        msgDiv.innerHTML = fullHtml;
+        msgContent.innerHTML = fullHtml;
         chatBox.scrollTop = chatBox.scrollHeight;
+        // DO-O: the typewriter owns the SPEAKING → LISTENING reset (transmitMessage's
+        // finally hook only resets from 'thinking' — never truncates this).
+        if (typeof window.setOverseerState === 'function') window.setOverseerState('listening');
       }
     }
     typeWriter();
   } else {
-    msgDiv.innerHTML = fullHtml;
+    msgContent.innerHTML = fullHtml;
     chatBox.scrollTop = chatBox.scrollHeight;
+    // DO-O: reduced-motion / isHistoryLoad-false instant branch — the reply
+    // is already fully delivered, so SPEAKING → LISTENING fires immediately.
+    if (sender === 'ai' && !isHistoryLoad && typeof window.setOverseerState === 'function') {
+      window.setOverseerState('speaking');
+      window.setOverseerState('listening');
+    }
   }
 
   if (!isHistoryLoad) {
@@ -2669,11 +7751,15 @@ function appendToChat(text, sender, isHistoryLoad = false) {
 }
 
 function macroCommand(actionStr) {
-  let target = document.getElementById('macroTarget').value.trim();
+  // Tool Deck unit: reads the deck's shared target field (#deckTarget) instead of the
+  // retired #macroTarget. The D-Pad no longer routes through macroCommand() (the
+  // Quick-Draw Holster sockets call _nativePadFire()/_nativePadBind() directly), so the
+  // old "skip target if this is a PAD command" branch is dead and removed.
+  const targetEl = document.getElementById('deckTarget');
+  let target = targetEl ? targetEl.value.trim() : '';
   let finalCmd = actionStr;
 
-  // Append the target if present and it's not a D-PAD command
-  if (target && !actionStr.includes('PAD:')) {
+  if (target) {
     finalCmd = `${actionStr} ${target}`;
   }
 
@@ -2681,8 +7767,203 @@ function macroCommand(actionStr) {
   transmitMessage();
 }
 
-function clearChat() {
-  if (confirm('Purge Comm-Link history? This cannot be undone.')) {
+// ── TOOL DECK + QUICK-DRAW HOLSTER (Design Overhaul command-cluster overhaul) ──
+// The deck is a screen-local bottom-sheet anchored to .glass-frame — a distinct,
+// bespoke overlay surface, structurally different from the centered #sysModal
+// (Protocol 22/23: not a duplicate modal manager). Owner-approved redesign of the
+// command cluster (Protocol 25) — reuses every tool's existing handler unchanged.
+let _holsterBinding = false;
+
+function toggleToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  if (!deck) return;
+  if (deck.hidden) openToolDeck();
+  else closeToolDeck();
+}
+
+function openToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const key = document.getElementById('deckKey');
+  if (!deck || !scrim || !key) return;
+  deck.hidden = false;
+  scrim.hidden = false;
+  key.classList.add('open');
+  key.setAttribute('aria-expanded', 'true');
+  if (typeof renderHolster === 'function') renderHolster();
+  // M5 SEAT — targets the grip bar, not #toolDeck itself: the deck already
+  // owns its own `deckUp` slide-in `animation` (unchanged), and CSS
+  // `animation` is a single property — a second rule setting it on the same
+  // element would silently replace deckUp rather than run alongside it.
+  // The grip bar has no animation of its own, so SEAT lands there cleanly.
+  if (typeof _motionSeat === 'function') _motionSeat(deck.querySelector('.deck-grip'));
+  // Deliberately no autofocus on #deckTarget here (owner report — auto-popping the
+  // mobile keyboard on deck OPEN covered the Quick-Draw Holster sockets below it).
+  // The field still focuses itself when the user taps it, or via the BIND ▸ flow
+  // (see the bindKey listener in _wireToolDeck()), which specifically needs it.
+}
+
+function _disarmHolsterBind() {
+  _holsterBinding = false;
+  const holster = document.querySelector('.holster');
+  const bindKey = document.getElementById('bindKey');
+  const hint = document.getElementById('holsterHint');
+  if (holster) holster.classList.remove('binding');
+  if (bindKey) {
+    bindKey.classList.remove('armed');
+    bindKey.setAttribute('aria-pressed', 'false');
+  }
+  if (hint) hint.textContent = '';
+}
+
+function closeToolDeck() {
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const key = document.getElementById('deckKey');
+  if (!deck || !scrim || !key) return;
+  deck.hidden = true;
+  scrim.hidden = true;
+  key.classList.remove('open');
+  key.setAttribute('aria-expanded', 'false');
+  _disarmHolsterBind();
+  key.focus();
+}
+
+// Quick-Draw Holster — the sole writer of state.padBindings. Reached three ways
+// (socket BIND flow, typed [BIND: gear, DIR], and read-side _nativePadFire); the AI
+// never calls this (player-authority, Protocol 24 — see api.js autoImportState()).
+function _nativePadBind(gear, dir) {
+  const d = String(dir || '').toLowerCase();
+  if (!['up', 'down', 'left', 'right'].includes(d)) {
+    appendToChat('> ▸ INVALID VECTOR — USE UP, DOWN, LEFT, OR RIGHT', 'sys', true);
+    return;
+  }
+  const g = String(gear || '').trim();
+  if (!g) {
+    appendToChat('> ▸ TARGET FIELD IS EMPTY — TYPE THE GEAR TO HOLSTER FIRST', 'sys', true);
+    return;
+  }
+  state.padBindings[d] = g;
+  saveState();
+  if (typeof renderHolster === 'function') renderHolster();
+  appendToChat(
+    `> ▸ [BIND: ${g.toUpperCase()}, ${d.toUpperCase()}] — VECTOR HOLSTERED`,
+    'sys',
+    true
+  );
+}
+
+// Fires the gear holstered to a vector. An empty socket hints toward BIND ▸ and makes
+// no AI call; a bound socket hands the Director a resolved action — the app now knows
+// the gear name natively instead of the AI having to remember it.
+function _nativePadFire(dir) {
+  const d = String(dir || '').toLowerCase();
+  if (!['up', 'down', 'left', 'right'].includes(d)) {
+    appendToChat('> ▸ INVALID VECTOR — USE UP, DOWN, LEFT, OR RIGHT', 'sys', true);
+    return;
+  }
+  const gear = state.padBindings && state.padBindings[d];
+  if (!gear) {
+    appendToChat('> ▸ SOCKET EMPTY — HOLSTER GEAR FIRST (BIND ▸)', 'sys', true);
+    return;
+  }
+  transmitMessage(`Deploy ${gear}`);
+}
+
+// Boot-wired from window.onload alongside _wirePanelPersistence() (the tray it
+// replaces was wired there). Every listener here is addEventListener-based; only
+// #deckKey keeps its inline onclick (Suite 59 definition-anchored resolution).
+function _wireToolDeck() {
+  const key = document.getElementById('deckKey');
+  const deck = document.getElementById('toolDeck');
+  const scrim = document.getElementById('deckScrim');
+  const dx = document.getElementById('deckClose');
+  const bindKey = document.getElementById('bindKey');
+  if (!key || !deck || !scrim) return;
+
+  scrim.addEventListener('click', closeToolDeck);
+  if (dx) dx.addEventListener('click', closeToolDeck);
+  deck.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !deck.hidden) closeToolDeck();
+  });
+
+  deck.querySelectorAll('.tool-row[data-tool]').forEach(row => {
+    row.addEventListener('click', () => {
+      const targetEl = document.getElementById('deckTarget');
+      const val = targetEl ? targetEl.value.trim() : '';
+      switch (row.dataset.tool) {
+        case 'THREAT':
+          macroCommand('[THREAT]');
+          break;
+        case 'VATS SIM':
+          showVATSOverlay();
+          break;
+        case 'TRADE':
+          expandPanelForCategory('trade');
+          break;
+        case 'LOOT':
+          renderLoot(val);
+          break;
+        case 'CONSULT':
+          macroCommand('[CONSULT]');
+          break;
+        case 'VATS CALC':
+          showVATSOverlay();
+          break;
+      }
+      closeToolDeck();
+    });
+  });
+
+  if (bindKey) {
+    bindKey.addEventListener('click', () => {
+      _holsterBinding = !_holsterBinding;
+      const holster = document.querySelector('.holster');
+      const hint = document.getElementById('holsterHint');
+      if (holster) holster.classList.toggle('binding', _holsterBinding);
+      bindKey.classList.toggle('armed', _holsterBinding);
+      bindKey.setAttribute('aria-pressed', String(_holsterBinding));
+      if (hint) {
+        hint.textContent = _holsterBinding
+          ? 'TYPE GEAR IN THE TARGET FIELD, THEN TAP A SOCKET TO HOLSTER IT'
+          : '';
+      }
+      const targetEl = document.getElementById('deckTarget');
+      if (_holsterBinding && targetEl) targetEl.focus();
+    });
+  }
+
+  deck.querySelectorAll('.socket[data-dir]').forEach(socket => {
+    socket.addEventListener('click', () => {
+      const dir = socket.dataset.dir;
+      const targetEl = document.getElementById('deckTarget');
+      if (_holsterBinding) {
+        const gear = targetEl ? targetEl.value.trim() : '';
+        if (!gear) {
+          const hint = document.getElementById('holsterHint');
+          if (hint) hint.textContent = 'TARGET FIELD IS EMPTY — TYPE THE GEAR TO HOLSTER FIRST';
+          if (targetEl) targetEl.focus();
+          return;
+        }
+        _nativePadBind(gear, dir);
+        if (targetEl) targetEl.value = '';
+        _disarmHolsterBind();
+        return;
+      }
+      const bound = state.padBindings && state.padBindings[String(dir || '').toLowerCase()];
+      if (bound) closeToolDeck();
+      _nativePadFire(dir);
+    });
+  });
+}
+
+async function clearChat() {
+  const ok = await confirmAction({
+    title: '> PURGE COMM-LINK',
+    warning: 'Purge Comm-Link history? This cannot be undone.',
+    confirmLabel: 'PURGE',
+  });
+  if (ok) {
     chatHistory = [];
     localStorage.removeItem('robco_chat');
     document.getElementById('chatDisplay').innerHTML = '';
@@ -2693,19 +7974,30 @@ function clearChat() {
 // ── F6: WIPE TERMINAL — NEW CAMPAIGN ────────────────────────────────
 // Double-confirmation wipe: resets state to defaults, clears chat history,
 // re-presents game context selection screen.
-function wipeTerminal() {
-  if (
-    !confirm(
-      '> WIPE TERMINAL\n\nThis will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?'
-    )
-  )
-    return;
-  if (
-    !confirm(
-      '> FINAL CONFIRMATION\n\nAre you absolutely certain?\nType OK to confirm terminal wipe.\n\nThis will destroy all unsaved progress.'
-    )
-  )
-    return;
+async function wipeTerminal() {
+  let wipeWarning =
+    'This will erase ALL Courier data:\n- SPECIAL / Skills / Perks / Quests\n- Inventory / Factions / Status Effects\n- Campaign Notes / Collectibles / Squad\n- Chat History / Session Statistics\n\nSave slots are preserved.\n\nThis CANNOT be undone. Continue?';
+  // Owner report: Complete RNG is only ever PERMANENTLY locked in by a wipe
+  // performed while armed (see wasRngArmed below) — warn about that
+  // irreversible commitment right here, at the one moment it actually takes
+  // effect, rather than relying on the arm-time banner alone. Reuses the
+  // same state.campaignMode signal wasRngArmed reads later (Protocol 22).
+  if (state.campaignMode === 'rng') {
+    wipeWarning +=
+      '\n\n⚠ COMPLETE RNG is armed. Continuing will PERMANENTLY enable it for this save — it cannot be changed or disabled afterward.';
+  }
+  const gate1 = await confirmAction({
+    title: '> WIPE TERMINAL',
+    warning: wipeWarning,
+    confirmLabel: 'CONTINUE',
+  });
+  if (!gate1) return;
+  const gate2 = await confirmAction({
+    title: '> FINAL CONFIRMATION',
+    warning: 'Are you absolutely certain?\n\nThis will destroy all unsaved progress.',
+    confirmLabel: 'WIPE TERMINAL',
+  });
+  if (!gate2) return;
 
   // Reset state to defaults (preserves gameContext selection from boot)
   const wasRngArmed = state.campaignMode === 'rng';
@@ -2745,13 +8037,22 @@ function wipeTerminal() {
   // Save the wiped state (now that syncStateFromDom will see clean DOM)
   saveState();
 
-  // Show context selection prompt in chat
-  appendToChat('> TERMINAL WIPED. INITIATING NEW CAMPAIGN...', 'sys', true);
-  appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
-  Object.values(GAME_DEFS).forEach(d => {
-    appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
+  // M1 Campaign Ignition (Ceremony Moments Wave 1) — a short, skippable
+  // commissioning ceremony replaces the old two bare chat lines
+  // (_runCampaignIgnition(), above). The context-selection prompt below is
+  // unchanged functional copy, not ceremony, and always follows once
+  // ignition completes (or is skipped).
+  _runCampaignIgnition(() => {
+    appendToChat('> SELECT GAME CONTEXT:', 'sys', true);
+    // DO-K: skip designOnly entries (FO4) — advertising a context nothing can actually select
+    // would be a real, visible regression the moment GAME_DEFS grows a third game.
+    Object.values(GAME_DEFS)
+      .filter(d => !d.designOnly)
+      .forEach(d => {
+        appendToChat(`> Type [CONTEXT: ${d.id}] for ${d.label}`, 'sys', true);
+      });
+    appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
   });
-  appendToChat('> Or the AI will detect your game automatically.', 'sys', true);
 }
 
 // ── SAVE SLOTS (#6) ────────────────────────────────────────────────

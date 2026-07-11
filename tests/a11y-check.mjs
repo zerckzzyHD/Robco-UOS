@@ -16,7 +16,7 @@
  * CI:   called by npm run gate (non-fast block, after render-check)
  */
 
-import { chromium } from 'playwright';
+import { acquireBrowser } from './browser-shared.mjs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -74,7 +74,7 @@ const PORT = await new Promise((resolve, reject) => {
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 // ── Playwright + axe ─────────────────────────────────────────────────────────
-const browser = await chromium.launch();
+const browser = await acquireBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
 

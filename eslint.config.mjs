@@ -25,6 +25,7 @@ export default [
         Blob: 'readonly',
         File: 'readonly',
         FileReader: 'readonly',
+        Image: 'readonly',
         FormData: 'readonly',
         Headers: 'readonly',
         Request: 'readonly',
@@ -42,6 +43,7 @@ export default [
         history: 'readonly',
         crypto: 'readonly',
         performance: 'readonly',
+        getComputedStyle: 'readonly',
         AbortController: 'readonly',
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
@@ -72,6 +74,7 @@ export default [
         // Project cross-file globals (shared via <script> tags)
         state: 'writable',
         APP_VERSION: 'readonly',
+        MetaStore: 'readonly', // U5 device-preference key/value store (js/state.js)
         FACTION_REGISTRY: 'readonly',
         FACTION_REGISTRY_FO3: 'readonly',
         SKILL_KEYS: 'readonly',
@@ -81,6 +84,9 @@ export default [
         _activeDef: 'readonly',
         getFactionRegistry: 'readonly',
         getSkillKeys: 'readonly',
+        RobcoEvents: 'readonly', // U7 OS event bus (js/state.js)
+        _logEvent: 'readonly', // P4 Terminal Record structured-event writer (js/state.js)
+        _migrateEventLog: 'readonly', // P4 [T#]→eventLog migration helper (js/state.js)
         switchTab: 'readonly',
         initTabs: 'readonly',
         appendToChat: 'readonly',
@@ -91,22 +97,94 @@ export default [
         sanitizeImportedContainer: 'readonly',
         syncStateFromDom: 'readonly',
         recordLocationVisit: 'readonly',
+        // FEEDBACK ANIMATION WAVE 1 — pending vars declared in state.js
+        // (loaded by every environment, including tests/test.html's reduced
+        // boot chain — Protocol 27), set at an emit site (api.js / ui-render.js)
+        // and consumed+cleared by the render function that owns the home
+        // animation (ui-render.js)
+        _pendingSurveyPing: 'writable', // state.js -> ui-render.js (renderWorldMap, #26 SURVEY PING)
+        _pendingQuestStamp: 'writable', // state.js -> ui-render.js/api.js (#23/#24 quest stamp)
+        _pendingRepStamp: 'writable', // state.js -> ui-render.js/api.js (#14 REPUTATION STAMP)
+        _pendingExhibitLight: 'writable', // state.js -> ui-render.js/api.js (#22 EXHIBIT LIGHT-UP)
+        // FEEDBACK ANIMATION WAVE 3 — same state.js-declared pending-var
+        // pattern as WAVE 1 above.
+        _pendingQuestFiled: 'writable', // state.js -> ui-saves.js/ui-render.js (#25 DIRECTIVE FILED)
+        _pendingPerkSeat: 'writable', // state.js -> ui-render.js (#13 CARD SEAT)
+        _pendingEffectWarmup: 'writable', // state.js -> ui-render.js/api.js (#28 TUNGSTEN WARM-UP)
+        // Diagnostic Shell U3 TRIGGERS catalog (js/test-console.js) reads/writes
+        // these `let` bindings declared in ui-render.js/ui-core.js directly — the
+        // same shared classic-script-scope pattern as the _pendingXxx vars above.
+        _facChannel: 'writable', // ui-render.js -> test-console.js (fire-pending-rep-stamp)
+        setFactionChannel: 'readonly', // ui-render.js -> test-console.js
+        _mapActiveZone: 'writable', // ui-render.js -> test-console.js (fire-pending-survey-ping)
+        _overseerGreeted: 'writable', // ui-core.js -> test-console.js (ceremony-greet replay)
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',
         transmitMessage: 'readonly',
+        _wireApiEventBusSubscribers: 'readonly', // U7 OS event bus (api.js)
         fetchAuthorizedModels: 'readonly',
+        // Visual Upload OCR Unit 2 (js/api.js) — the shared stat-token resolver/
+        // clamp choke point (Native USE/TERMINAL stat edits), reused by the OCR
+        // parser (js/ocr.js) and the OCR apply path (js/ui-render.js)
+        _resolveStatToken: 'readonly',
+        _statTokenLabel: 'readonly',
+        _applyStatToken: 'readonly',
         lookupItemInDb: 'readonly',
         lookupWeaponStats: 'readonly',
         lookupBestiaryEntry: 'readonly',
+        getBestiaryNames: 'readonly', // content-aware quick-log autocomplete source (js/db_nv.js / js/db_fo3.js)
         getChemsTable: 'readonly',
+        getQuestItemDetail: 'readonly', // U9-4 CONSULT reserved-column surfacing (js/db_nv.js or js/db_fo3.js)
         renderThreat: 'readonly',
         renderConsult: 'readonly',
         renderDatabankPanel: 'readonly',
         renderBioScan: 'readonly',
+        renderEligiblePerks: 'readonly', // AI->native survey Part C.1 (ui-render.js), called from api.js's NATIVE_COMMAND_ROUTER
+        _nativeOpenMap: 'readonly', // AI->native survey Part C.1 [GPS]/[MAP] (ui-core.js), called from api.js's NATIVE_COMMAND_ROUTER
+        _nativePadBind: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
+        _nativePadFire: 'readonly', // Tool Deck + Quick-Draw Holster (ui-core.js), called from _routeNativeCommand (api.js)
         _openSysModal: 'readonly',
+        openModal: 'readonly', // Step 2 Phase 0 U12 consolidated modal driver (ui-core.js)
+        _readActiveCacheName: 'readonly', // SYSTEM STATUS active-cache-name lookup (ui-core.js), reused by ocr.js
+        _chassisIdRow: 'readonly', // SYSTEM STATUS labeled-row helper (ui-core.js), reused by the Diagnostic Shell U4a INSPECT readout (test-console.js)
+        _chassisBreaker: 'readonly', // SYSTEM STATUS breaker-row helper (ui-core.js), reused by the Diagnostic Shell U4a INSPECT readout (test-console.js)
+        confirmAction: 'readonly', // Step 2 Phase 0 U12 diegetic confirm() replacement (ui-core.js)
         _vatsIsMelee: 'readonly',
         getGameContext: 'readonly',
+        getIdentity: 'readonly', // DO-K identity keystone accessor (js/state.js)
+        // P8 Global Immersion dial — gate helpers + pref live in state.js, the UI in ui-core.js
+        getImmersionTier: 'readonly',
+        immersionAllows: 'readonly',
+        setImmersionTier: 'readonly',
+        // Step 2 Phase 2 B1 — Command-Line MODE: device-pref accessors (js/state.js),
+        // quick-log autocomplete source (js/api.js), quick-log setter reuse (js/ui-render.js)
+        getInputMode: 'readonly',
+        setInputMode: 'readonly',
+        otherInputMode: 'readonly',
+        _commandSuggestions: 'readonly',
+        _hideModeHint: 'readonly',
+        _resolveCommandInput: 'readonly',
+        // Small-UI-polish batch — composer auto-grow (js/ui-core.js), called from js/api.js
+        // after clearing #chatInput so the box resets to its small size after every send
+        _autoGrowComposer: 'readonly',
+        markLocationVisited: 'readonly',
+        // Native "travel here" — sets the tapped sector-sheet location as CURRENT
+        // (js/ui-render.js), routing through the shared onLocationChange() setter
+        travelToLocation: 'readonly',
+        // Step 2 Phase 2 A1 — Ambient Runtime (js/runtime.js): lifecycle state machine + observer scheduler
+        AmbientRuntime: 'readonly',
+        initAmbientRuntime: 'readonly',
+        initTestConsole: 'readonly', // staging/dev-only Test Console (js/test-console.js)
+        // Diagnostic Shell U4b (js/test-console.js) — STATE SETUP cheats read/write these
+        // existing native setters/mutators directly (ui-core.js/ui-render.js/ui-saves.js)
+        MAX_PLAYER_LEVEL: 'readonly',
+        _computeEligiblePerks: 'readonly',
+        _applyStatusEffect: 'readonly',
+        toggleLimb: 'readonly',
+        adjustAffinity: 'readonly',
+        _clearErrorLog: 'readonly',
+        resetSessionStats: 'readonly',
         getAmmoCalibers: 'readonly',
         getVendors: 'readonly',
         getTradeCatalog: 'readonly',
@@ -118,17 +196,31 @@ export default [
         doSell: 'readonly',
         renderLoot: 'readonly',
         renderLootList: 'readonly',
+        renderHolster: 'readonly', // Tool Deck + Quick-Draw Holster (ui-render.js), called from ui-core.js
+        _deckTargetSuggestions: 'readonly', // Tool Deck #deckTarget autocomplete source (ui-render.js), wired from ui-saves.js
         doLoot: 'readonly',
         _lootAdd: 'readonly',
+        renderVisualParsePreview: 'readonly', // Visual Upload OCR Unit 2 (ui-render.js), called from js/ocr.js's runVisualOcr
+        // Visual Upload OCR Unit 3 (js/ocr.js) — hybrid routing, called from
+        // js/ui-saves.js's handleImageSelection() and js/ui-render.js's
+        // renderVisualParsePreview() TRY AI VISION / onClose handlers
+        routeVisualUpload: 'readonly',
+        _tryAiVisionFallback: 'readonly',
+        _clearVisualUploadStash: 'readonly',
         expandPanelForCategory: 'readonly',
         closeModal: 'readonly',
         playSyncTone: 'readonly',
         playClack: 'readonly',
         playPanelClick: 'readonly',
         playLevelUpJingle: 'readonly',
+        playChipClick: 'readonly', // B2c Module Bay hardware SFX (ui-audio.js)
+        playBoardThunk: 'readonly', // B2c Module Bay hardware SFX (ui-audio.js)
+        toggleAudio: 'readonly', // ui-audio.js channel-mute setter (ui-core.js calls it via _schemSetHardwareSfx)
         triggerHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initHaptic: 'readonly', // WU-F2 Haptic Solenoid (ui-audio.js)
         initRadio: 'readonly', // WU-F5 Pip-Boy Radio (ui-audio.js)
+        _radioPlaying: 'readonly', // CHASSIS LIVING CORE #10 radio-reactive signal (ui-audio.js)
+        _wireAudioEventBusSubscribers: 'readonly', // U7 OS event bus (ui-audio.js)
         startHeartbeat: 'readonly',
         stopHeartbeat: 'readonly',
         playBootDrone: 'readonly',
@@ -139,6 +231,11 @@ export default [
         renderSavesList: 'readonly',
         listLocalSaves: 'readonly',
         undoLastSync: 'readonly',
+        _isUplinkConnected: 'readonly', // SU-4: renderAccount() reads the shared carrier signal (js/ui-core.js)
+        _coreRefresh: 'readonly', // CHASSIS LIVING CORE (Protocol UI-10) single choke point (js/ui-core.js), called from js/ui-audio.js's _updateRadioUI()
+        _scrollElFor: 'readonly', // per-subsystem scroll-position lookup (js/ui-core.js), reused by ui-render.js's map scroll-preserve fix
+        _motionSeat: 'readonly', // Ceremony Moments Wave 1, M5 SEAT verb trigger helper (js/ui-core.js), called from js/ui-audio.js's _seatOpticsTube()/toggleMasterMute()
+        _readOverseerLog: 'readonly', // WU-F7 Overseer's Log reader (js/ui-core.js), read by js/ui-audio.js's M4 _checkLongAbsence()
         // Saves module cross-file globals (js/ui-saves.js ↔ js/ui.js)
         CHAT_MAX: 'readonly',
         _chatSaveTimer: 'writable',
@@ -146,6 +243,9 @@ export default [
         restoreRollingBackup: 'readonly',
         // Render module cross-file globals (js/ui-render.js ↔ js/ui.js)
         _invFilter: 'writable',
+        setInvFilter: 'readonly',
+        _syncDrawerButtons: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer bank (ui-render.js)
+        _DRAWER_LABELS: 'readonly', // Phase 3 · Piece 2 CARGO MANIFEST drawer labels (ui-render.js)
         _updatePanelBadges: 'readonly',
         escapeHtml: 'readonly',
         emptyState: 'readonly',
@@ -154,6 +254,9 @@ export default [
         renderInventory: 'readonly',
         renderSquad: 'readonly',
         renderStatus: 'readonly',
+        _statusLampSummary: 'readonly', // Phase 3 OPERATOR batch 2 BUS-07 compound-lamp 0i summary (ui-render.js)
+        _syncOperatorTelemetry: 'readonly', // PHASE 3 OPERATOR telemetry sync (js/ui-core.js), called by toggleSkillBook/toggleMagazine (js/ui-render.js) for the owner batch item 2 live-count fix
+        _wireDynamicSubPanel: 'readonly', // owner batch item 6: dynamically-rendered sub-panel persistence helper (js/ui-core.js), called by renderFactionRep() (js/ui-render.js)
         renderCampaignNotes: 'readonly',
         renderFactionRep: 'readonly',
         renderPerks: 'readonly',
@@ -174,13 +277,47 @@ export default [
         _opticStorageKey: 'readonly',
         _resolveOptic: 'readonly',
         _updateOpticsDefaultLabel: 'readonly',
+        // WU-optics-picker: GREEN FAMILY cartridge cross-file globals
+        OPTIC_FAMILY_LABELS: 'readonly',
+        _themeFamilyMembers: 'readonly',
+        _resolveOpticsFamilyRepresentative: 'readonly',
+        _updateOpticsFamilyRepresentative: 'readonly',
+        _expandOpticsFamily: 'readonly',
+        _collapseOpticsFamily: 'readonly',
+        // Module Bay (Step 2 · Phase 2 · B2a) cross-file globals
+        isHighLumenEnabled: 'readonly',
+        isHapticEnabled: 'readonly',
+        isWakeLockEnabled: 'readonly',
+        _hapticSupported: 'readonly', // owner batch item 5 (js/ui-audio.js), read by _updatePowerBoardStatus() (js/ui-core.js)
+        _seatOpticsTube: 'readonly',
+        _updateOpticsBoardStatus: 'readonly',
+        _updateSonicBoardStatus: 'readonly',
+        _updateUplinkBoardStatus: 'readonly',
+        _updatePowerBoardStatus: 'readonly', // owner batch item 5 (js/ui-core.js), called from ui-audio.js's wake-lock/haptic status setters
+        renderModuleBay: 'readonly',
+        initModuleBay: 'readonly',
+        releaseBayHatch: 'readonly',
+        toggleBaySchematic: 'readonly',
+        renderBaySchematic: 'readonly',
+        _schemSetGeminiSync: 'readonly',
+        _logBaySvc: 'readonly',
+        exportCampaignLog: 'readonly',
+        ejectHolotape: 'readonly',
+        _svcEjectHolotape: 'readonly',
+        _svcViewChangelog: 'readonly',
+        _svcInstallPwa: 'readonly',
         playHeadCrippleSound: 'readonly',
         playLimbCrippleSound: 'readonly',
         playLimbRestoreSound: 'readonly',
         playWakeTone: 'readonly',
         setCrtHumIntensity: 'readonly',
         setGeigerRate: 'readonly',
+        _armAmbientAudio: 'readonly',
         startCrtHum: 'readonly',
+        stopCrtHum: 'readonly',
+        startReactorHum: 'readonly', // LIVING CORE #6 (ui-audio.js)
+        stopReactorHum: 'readonly', // LIVING CORE #6 (ui-audio.js)
+        _updateReactorHumLevel: 'readonly', // LIVING CORE #6 (ui-audio.js)
         startTinnitus: 'readonly',
         stopTinnitus: 'readonly',
         runBootSequence: 'readonly',
@@ -197,6 +334,20 @@ export default [
         showErrorLog: 'readonly',
         updateMath: 'readonly',
         wipeTerminal: 'readonly',
+        _fmtOverseerDuration: 'readonly', // WU-F7 duration formatter, reused by U9-2 CURRENT SITTING (js/ui-core.js)
+        _odoTile: 'readonly', // BUS-21 SERVICE TALLY digit-wheel helper (js/ui-render.js), reused by CHASSIS BUS-22 renderOverseerLog()
+        // Native USE + TERMINAL stat-edits (js/ui-core.js A.2 shared setters) --
+        // called cross-file from js/ui-render.js (nativeUseItem) and js/api.js
+        // (_applyStatToken/QUICK_LOG_PATTERNS' levelup handler).
+        _nativeSetHp: 'readonly',
+        _nativeSetRads: 'readonly',
+        _nativeSetXp: 'readonly',
+        _nativeSetLevel: 'readonly',
+        _nativeSetSpecial: 'readonly',
+        _nativeSetSkill: 'readonly',
+        _nativeSetKarma: 'readonly',
+        _nativeSetCaps: 'readonly',
+        nativeLevelUp: 'readonly',
         attachedImageData: 'writable',
         attachedImageMimeType: 'writable',
         _buildFactions: 'readonly',
@@ -286,6 +437,9 @@ export default [
         playSyncTone: 'readonly',
         state: 'writable',
         APP_VERSION: 'readonly',
+        // ui-core.js globals (Step 2 Phase 0 U12 modal driver)
+        openModal: 'readonly',
+        confirmAction: 'readonly',
       },
     },
   },
@@ -301,8 +455,11 @@ export default [
       'tests/boot-smoke.mjs',
       'tests/a11y-check.mjs',
       'tests/test-html-check.mjs',
+      'tests/browser-server.mjs',
+      'tests/browser-shared.mjs',
       'tests/_diag*.mjs',
       'scripts/cf-staging-build.mjs',
+      'js/vendor/', // vendored third-party dependency (Visual Upload OCR, Unit 1) — not our code
     ],
   },
 ];

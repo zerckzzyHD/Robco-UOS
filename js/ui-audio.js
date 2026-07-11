@@ -10,6 +10,42 @@ function ensureAudioCtx() {
   return audioCtx;
 }
 
+// ── FIRST-GESTURE AMBIENT-AUDIO ARM ───────────────────────────────────────
+// One-shot SFX (level-up jingle, chip clicks, etc.) always fire from a real
+// user action, so they naturally land after a gesture. But CONTINUOUS ambient
+// starters — the CRT hum (always started at boot) and the Geiger/tinnitus/
+// heartbeat loops (started at boot when an existing save already has high
+// rads/crippled limbs/critical HP) — were calling ensureAudioCtx() straight
+// out of window.onload/updateMath(), long before any gesture. Each blocked
+// resume()/node-start attempt logs "AudioContext was not allowed to start",
+// and a self-rescheduling loop (Geiger ticks, the ~833ms heartbeat) repeats
+// that every cycle until the user's first click/keydown — dozens of warnings
+// for a single boot. This defers those starters to the first gesture instead,
+// mirroring playBootDrone's (H4) own arming pattern, generalized to a shared
+// queue so multiple starters queued before that gesture all fire once, in
+// order, off ONE pair of listeners (no stacked duplicate listeners).
+let _firstGestureSeen = false;
+let _pendingAmbientAudio = [];
+function _onFirstAmbientGesture() {
+  document.removeEventListener('click', _onFirstAmbientGesture);
+  document.removeEventListener('keydown', _onFirstAmbientGesture);
+  _firstGestureSeen = true;
+  const pending = _pendingAmbientAudio;
+  _pendingAmbientAudio = [];
+  pending.forEach(fn => fn());
+}
+function _armAmbientAudio(fn) {
+  if (_firstGestureSeen) {
+    fn();
+    return;
+  }
+  if (_pendingAmbientAudio.length === 0) {
+    document.addEventListener('click', _onFirstAmbientGesture, { once: true });
+    document.addEventListener('keydown', _onFirstAmbientGesture, { once: true });
+  }
+  _pendingAmbientAudio.push(fn);
+}
+
 // ── WU-F2 HAPTIC SOLENOID (Vibration API) ─────────────────────────────────
 // Brief chassis buzz on key events (level-up, faction-threshold alert, critical
 // HP) via navigator.vibrate. Free, offline, no AI, game-agnostic (Protocol 38)
@@ -40,7 +76,7 @@ function _hapticReducedMotion() {
   );
 }
 function isHapticEnabled() {
-  return localStorage.getItem(HAPTIC_KEY) === 'true';
+  return MetaStore.get(HAPTIC_KEY) === 'true';
 }
 // Core fire helper. Accepts a named pattern key or a raw vibrate() argument.
 // Returns true only if a real vibration was actually dispatched.
@@ -61,21 +97,28 @@ function _updateHapticUI() {
   if (!note) return;
   if (!_hapticSupported()) {
     note.textContent = '> SOLENOID UNAVAILABLE ON THIS UNIT';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   if (_hapticReducedMotion()) {
     note.textContent = '> SOLENOID HELD — REDUCED-MOTION ACTIVE';
+    if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
     return;
   }
   note.textContent = isHapticEnabled()
     ? '> SOLENOID ARMED — CHASSIS PULSES ON ALERTS'
     : '> SOLENOID IDLE — NO CHASSIS FEEDBACK';
+  if (typeof _updatePowerBoardStatus === 'function') _updatePowerBoardStatus();
 }
 function toggleHaptic(enabled) {
-  localStorage.setItem(HAPTIC_KEY, enabled ? 'true' : 'false');
+  MetaStore.set(HAPTIC_KEY, enabled ? 'true' : 'false');
+  if (typeof playChipClick === 'function') playChipClick(enabled); // B2c: tactile install/eject click
   // Confirmation buzz on enable so the user feels it works immediately.
   if (enabled) triggerHaptic('tick');
   _updateHapticUI();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(enabled ? 'HAPTIC SOLENOID INSTALLED' : 'HAPTIC SOLENOID REMOVED');
+  }
 }
 function initHaptic() {
   const toggle = document.getElementById('hapticToggle');
@@ -157,7 +200,7 @@ function setGeigerRate(rate) {
   }
   if (rate > 0) {
     geigerRunning = true;
-    scheduleGeiger(rate);
+    _armAmbientAudio(() => scheduleGeiger(rate));
   }
 }
 
@@ -221,7 +264,18 @@ function startCrtHum() {
   crtHumLfoGain = audioCtx.createGain();
   crtHumNode.type = 'sine';
   crtHumNode.frequency.value = 60;
-  crtHumGain.gain.value = 0.007;
+  // M4 Long-Absence Recalibration (Ceremony Moments Wave 1) — a returning-
+  // after-a-while boot ramps the hum in marginally slower instead of the
+  // usual instant snap, a tiny audio-only "warming back up" nicety gated
+  // behind the existing first-gesture autoplay policy exactly like every
+  // other boot audio cue. Every other boot is completely unchanged (the
+  // same instant gain assignment as before this unit).
+  if (_longAbsenceBoot && audioCtx) {
+    crtHumGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 2.2);
+  } else {
+    crtHumGain.gain.value = 0.007;
+  }
   crtHumLfo.type = 'sine';
   crtHumLfo.frequency.value = 0.08;
   crtHumLfoGain.gain.value = 1.2;
@@ -231,6 +285,36 @@ function startCrtHum() {
   crtHumGain.connect(audioCtx.destination);
   crtHumNode.start();
   crtHumLfo.start();
+}
+
+// Owner report: the CRT hum kept playing while the terminal was powered off.
+// Mirrors stopTinnitus()'s full-teardown pattern (stop+disconnect+null every
+// node) rather than just zeroing gain, so a subsequent startCrtHum() call
+// (guarded on `if (crtHumNode ...) return`) is free to recreate the graph
+// instead of finding stale nodes already in place.
+function stopCrtHum() {
+  if (crtHumLfo) {
+    try {
+      crtHumLfo.stop();
+    } catch (e) {}
+    crtHumLfo.disconnect();
+    crtHumLfo = null;
+  }
+  if (crtHumLfoGain) {
+    crtHumLfoGain.disconnect();
+    crtHumLfoGain = null;
+  }
+  if (crtHumNode) {
+    try {
+      crtHumNode.stop();
+    } catch (e) {}
+    crtHumNode.disconnect();
+    crtHumNode = null;
+  }
+  if (crtHumGain) {
+    crtHumGain.disconnect();
+    crtHumGain = null;
+  }
 }
 
 function setCrtHumIntensity(rads, hasCrippled) {
@@ -266,6 +350,91 @@ function stopThermalLoad() {
   crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
   crtHumGain.gain.linearRampToValueAtTime(baseGain, audioCtx.currentTime + 0.5);
 }
+
+// ── CHASSIS LIVING CORE #6: REACTOR HUM ─────────────────────────
+// A second, distinct synthesized WebAudio tone for the LIVING CORE (a
+// cross-game reactor voice, unlike the CRT hum — which becomes NV-specific
+// once FO3 gets its own Pip-Boy skin). Tuned to sit a PERFECT FIFTH above
+// the CRT hum's 60Hz fundamental (60 * 1.5 = 90Hz) — a 3:2 frequency ratio
+// is the most consonant interval after the octave, so the two tones
+// reinforce rather than beat/clash. Its own LFO drift rate (0.05Hz) is
+// deliberately different from the CRT hum's own (0.08Hz) so the two drifts
+// never lock into a repeating beat pattern. Own audio channel per Protocol 7:
+// AudioSettings.reactorHum (a MUTE flag, same semantics as every sibling
+// chip) + masterMute guard, routed through the same toggleAudio()/
+// toggleMasterMute() choke points every other channel already uses.
+let reactorHumNode = null,
+  reactorHumGain = null,
+  reactorHumLfo = null,
+  reactorHumLfoGain = null;
+
+function startReactorHum() {
+  if (reactorHumNode || AudioSettings.masterMute || AudioSettings.reactorHum) return;
+  ensureAudioCtx();
+  reactorHumNode = audioCtx.createOscillator();
+  reactorHumGain = audioCtx.createGain();
+  reactorHumLfo = audioCtx.createOscillator();
+  reactorHumLfoGain = audioCtx.createGain();
+  reactorHumNode.type = 'sine';
+  reactorHumNode.frequency.value = 90; // perfect fifth above the CRT hum's 60Hz fundamental
+  reactorHumGain.gain.value = 0.0001; // near-silent — _updateReactorHumLevel() drives the real target
+  reactorHumLfo.type = 'sine';
+  reactorHumLfo.frequency.value = 0.05; // distinct drift rate from the CRT hum's own 0.08Hz LFO
+  reactorHumLfoGain.gain.value = 0.8;
+  reactorHumLfo.connect(reactorHumLfoGain);
+  reactorHumLfoGain.connect(reactorHumNode.frequency);
+  reactorHumNode.connect(reactorHumGain);
+  reactorHumGain.connect(audioCtx.destination);
+  reactorHumNode.start();
+  reactorHumLfo.start();
+  if (typeof _updateReactorHumLevel === 'function') _updateReactorHumLevel();
+}
+
+// Mirrors stopCrtHum()'s full-teardown pattern (stop+disconnect+null every
+// node) so a subsequent startReactorHum() call is free to recreate the graph.
+function stopReactorHum() {
+  if (reactorHumLfo) {
+    try {
+      reactorHumLfo.stop();
+    } catch (e) {}
+    reactorHumLfo.disconnect();
+    reactorHumLfo = null;
+  }
+  if (reactorHumLfoGain) {
+    reactorHumLfoGain.disconnect();
+    reactorHumLfoGain = null;
+  }
+  if (reactorHumNode) {
+    try {
+      reactorHumNode.stop();
+    } catch (e) {}
+    reactorHumNode.disconnect();
+    reactorHumNode = null;
+  }
+  if (reactorHumGain) {
+    reactorHumGain.disconnect();
+    reactorHumGain = null;
+  }
+}
+
+// Reactor hum intensity — called from _coreRefresh() (ui-core.js), the SAME
+// choke point that already computes the core's activity signals, so this is
+// never a second polling loop. Louder while the CHASSIS subsystem is the
+// active bezel view (document.body.dataset.subsystem, the same choke point
+// DO-O's mobile self-contained view already reads), quieter elsewhere.
+function _updateReactorHumLevel(thinking, radioOn, hasFault) {
+  if (!reactorHumGain || !reactorHumNode || !audioCtx) return;
+  const busy = [!!thinking, !!radioOn, !!hasFault].filter(Boolean).length;
+  const onChassis =
+    typeof document !== 'undefined' &&
+    document.body &&
+    document.body.dataset.subsystem === 'chassis';
+  let target = 0.006 + busy * 0.004;
+  target *= onChassis ? 1.6 : 0.6;
+  reactorHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
+  reactorHumGain.gain.linearRampToValueAtTime(target, audioCtx.currentTime + 1.5);
+}
+window._updateReactorHumLevel = _updateReactorHumLevel;
 
 // ── LIMB TRAUMA SOUNDS ─────────────────────────────────────────
 function playLimbCrippleSound(limb) {
@@ -437,12 +606,12 @@ function _opticStorageKey(ctx) {
 function _resolveOptic() {
   try {
     const key = _opticStorageKey();
-    let saved = localStorage.getItem(key);
+    let saved = MetaStore.get(key);
     if (!saved) {
-      const legacy = localStorage.getItem('robco_optics');
+      const legacy = MetaStore.get('robco_optics');
       if (legacy && typeof THEMES !== 'undefined' && THEMES[legacy]) {
-        localStorage.setItem(key, legacy);
-        localStorage.removeItem('robco_optics');
+        MetaStore.set(key, legacy);
+        MetaStore.remove('robco_optics');
         saved = legacy;
       }
     }
@@ -453,16 +622,21 @@ function _resolveOptic() {
   return _resolveDefaultOptics();
 }
 
-// Dynamic "(Default)" label — tag whichever OPTICS <select> option matches the ACTIVE game's
+// Dynamic "(Default)" label — tag whichever phosphor-tube button matches the ACTIVE game's
 // default optic (GAME_DEFS[ctx].theme.defaultOptics), stripping the tag from all the others.
-// Data-driven + game-agnostic: a new game's default option is labelled with no code change.
+// Data-driven + game-agnostic: a new game's default tube is labelled with no code change.
+// (Step 2 · Phase 2 · B2a: the OPTICS <select> was replaced by the Module Bay tube rack —
+// same container id `opticsColorInput`, now a <div> of `.tube` buttons instead of <option>s.)
+// The GREEN FAMILY cartridge (WU-optics-picker) is skipped — it carries its own "N TYPES"
+// tag instead, and the fan-tray variant sharing its data-optic still gets tagged normally.
 function _updateOpticsDefaultLabel() {
-  const sel = document.getElementById('opticsColorInput');
-  if (!sel) return;
+  const rack = document.getElementById('opticsColorInput');
+  if (!rack) return;
   const def = _resolveDefaultOptics();
-  Array.from(sel.options).forEach(opt => {
-    const base = opt.textContent.replace(/\s*\(Default\)\s*$/, '');
-    opt.textContent = opt.value === def ? base + ' (Default)' : base;
+  Array.from(rack.querySelectorAll('.tube')).forEach(btn => {
+    if (btn.classList.contains('family')) return;
+    const tag = btn.querySelector('.t-default');
+    if (tag) tag.textContent = btn.dataset.optic === def ? '(DEFAULT)' : '';
   });
 }
 
@@ -470,13 +644,189 @@ function _updateOpticsDefaultLabel() {
 // (per-game key), so each game remembers its own optic independently.
 function changeOpticsColor(color) {
   _applyThemeVars(color);
-  try {
-    localStorage.setItem(_opticStorageKey(), color);
-  } catch (_) {}
+  MetaStore.set(_opticStorageKey(), color);
 }
 
+// WU-optics-picker: every THEMES key sharing the given family tag, in THEMES declaration
+// order. Data-driven (Protocol 38) — reads THEMES[k].family rather than a hardcoded colour
+// list, so a future second family works by tagging its rows, not by editing this function.
+function _themeFamilyMembers(familyKey) {
+  if (!familyKey || typeof THEMES === 'undefined') return [];
+  return Object.keys(THEMES).filter(k => THEMES[k].family === familyKey);
+}
+
+// The family cartridge's representative member: the currently seated optic if it's IN the
+// family; else the active game's default optic if that's in the family; else the family's
+// first declared member. Pure derivation — no new persistence (Protocol UI-6 n/a: this is a
+// momentary picker gesture, not a view mode).
+function _resolveOpticsFamilyRepresentative(familyKey) {
+  const members = _themeFamilyMembers(familyKey);
+  if (!members.length) return null;
+  const seated = typeof _resolveOptic === 'function' ? _resolveOptic() : null;
+  if (seated && members.includes(seated)) return seated;
+  const def = typeof _resolveDefaultOptics === 'function' ? _resolveDefaultOptics() : null;
+  if (def && members.includes(def)) return def;
+  return members[0];
+}
+
+// Repaints the family cartridge (glass colour, name, ghost ring, aria-label) to represent
+// the given member key. UI-only — never persists; changeOpticsColor() remains the single
+// writer (Protocol 22).
+function _updateOpticsFamilyRepresentative(key) {
+  const fam = document.getElementById('opticsFamilyTube');
+  if (!fam || typeof THEMES === 'undefined' || !THEMES[key]) return;
+  const familyKey = fam.dataset.family;
+  const t = THEMES[key];
+  fam.dataset.optic = key;
+  fam.style.setProperty('--tube', t.hex);
+  const nameEl = fam.querySelector('.t-name');
+  if (nameEl) nameEl.textContent = t.label;
+  const members = _themeFamilyMembers(familyKey);
+  const others = members.filter(k => k !== key);
+  const ghosts = fam.querySelectorAll('.ghost');
+  ghosts.forEach((g, i) => {
+    const ok = others[i];
+    if (ok && THEMES[ok]) g.style.setProperty('--g', THEMES[ok].hex);
+  });
+  const familyLabel =
+    (typeof OPTIC_FAMILY_LABELS !== 'undefined' && OPTIC_FAMILY_LABELS[familyKey]) ||
+    familyKey.toUpperCase();
+  fam.setAttribute(
+    'aria-label',
+    familyLabel +
+      ' family — currently ' +
+      t.label +
+      '. Activate to open cartridge and choose between ' +
+      members.length +
+      ' ' +
+      familyKey +
+      ' types.'
+  );
+}
+
+// Cartridge tap → fans the family out into its variant tubes (mockup: "the cartridge ejects
+// its tubes"). Lights whichever variant is currently seated so the choice reads at a glance.
+function _expandOpticsFamily(btnEl) {
+  if (!btnEl) return;
+  const socket = btnEl.closest('.family-socket');
+  if (!socket) return;
+  socket.classList.add('expanded');
+  btnEl.setAttribute('aria-expanded', 'true');
+  const seated = typeof _resolveOptic === 'function' ? _resolveOptic() : null;
+  const tray = socket.querySelector('.fan-tray');
+  if (tray) {
+    Array.from(tray.querySelectorAll('.tube')).forEach(t =>
+      t.classList.toggle('seated', t.dataset.optic === seated)
+    );
+  }
+  const note = document.getElementById('opticsStatus');
+  if (note) {
+    const familyLabel =
+      (typeof OPTIC_FAMILY_LABELS !== 'undefined' && OPTIC_FAMILY_LABELS[btnEl.dataset.family]) ||
+      String(btnEl.dataset.family).toUpperCase();
+    note.textContent =
+      '> ' +
+      familyLabel +
+      ' CARTRIDGE OPEN — ' +
+      _themeFamilyMembers(btnEl.dataset.family).length +
+      ' PHOSPHOR TYPES EXPOSED';
+  }
+}
+window._expandOpticsFamily = _expandOpticsFamily;
+
+// Shell tap (escape hatch, no change) OR the post-pick collapse (reseat=true plays the
+// tubeSeat re-latch flourish — a plain CSS animation, neutralized to its final frame by the
+// app's global prefers-reduced-motion block, Protocol UI-9).
+function _collapseOpticsFamily(reseat) {
+  const socket = document.getElementById('opticsFamilySocket');
+  const fam = document.getElementById('opticsFamilyTube');
+  if (!socket || !fam) return;
+  socket.classList.remove('expanded');
+  fam.setAttribute('aria-expanded', 'false');
+  if (reseat) {
+    fam.classList.remove('reseat');
+    void fam.offsetWidth; // restart the seat animation cleanly on repeated picks
+    fam.classList.add('reseat');
+  }
+  if (!reseat && typeof _updateOpticsBoardStatus === 'function') {
+    const note = document.getElementById('opticsStatus');
+    if (note) note.textContent = '> GREEN CARTRIDGE LATCHED — NO CHANGE';
+  } else if (typeof _updateOpticsBoardStatus === 'function') {
+    _updateOpticsBoardStatus();
+  }
+}
+window._collapseOpticsFamily = _collapseOpticsFamily;
+
+// Module Bay tube-rack adapter (Step 2 · Phase 2 · B2a) — UI-only: seats the tapped tube
+// (visual .seated state), then calls the SAME setter every other optics entry point uses
+// (Protocol 22). No new persistence path — changeOpticsColor() remains the single writer.
+// WU-optics-picker: a family-member pick also repaints the cartridge to represent it and
+// collapses the fan-tray with the reseat flourish (mockup: "tap a green variant → seated,
+// tray collapses, cartridge reappears showing the chosen green").
+function _seatOpticsTube(btnEl) {
+  if (!btnEl || !btnEl.dataset) return;
+  const key = btnEl.dataset.optic;
+  const t = typeof THEMES !== 'undefined' ? THEMES[key] : null;
+  const isFamilyMember = !!(t && t.family);
+  if (isFamilyMember) _updateOpticsFamilyRepresentative(key);
+  const rack = document.getElementById('opticsColorInput');
+  if (rack) {
+    Array.from(rack.querySelectorAll('.tube')).forEach(el =>
+      el.classList.toggle('seated', el.dataset.optic === key)
+    );
+  }
+  changeOpticsColor(key);
+  if (isFamilyMember) _collapseOpticsFamily(true);
+  if (typeof renderModuleBay === 'function') renderModuleBay();
+  // M5 SEAT (Ceremony Moments Wave 1) — the tapped tube physically installs.
+  if (typeof _motionSeat === 'function') _motionSeat(btnEl);
+}
+window._seatOpticsTube = _seatOpticsTube;
+
+// Module Bay SLOT 01 status line — combines the seated tube's label with the high-lumen
+// coil state into one diegetic readout. Pure presentation; reads MetaStore, writes nothing.
+function _updateOpticsBoardStatus() {
+  const note = document.getElementById('opticsStatus');
+  if (!note) return;
+  const key = _resolveOptic();
+  const label =
+    typeof THEMES !== 'undefined' && THEMES[key] ? THEMES[key].label : key.toUpperCase();
+  const coilOn = typeof isHighLumenEnabled === 'function' && isHighLumenEnabled();
+  note.textContent =
+    '> TUBE SEATED: ' + label + (coilOn ? ' · HIGH-LUMEN COIL ACTIVE' : ' · COIL SOCKET EMPTY');
+  // Owner batch item 5: mirror the same live text into the collapsed-board summary
+  // line (the same .panel-substatus pattern the CAMPAIGN PROFILE/ACCOUNT boards
+  // already use, Protocol 22) so SLOT 01's state is visible collapsed too.
+  const sum = document.getElementById('sum-slot01');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
+}
+window._updateOpticsBoardStatus = _updateOpticsBoardStatus;
+
+// Module Bay SLOT 05 status line (owner report fix): reflects the REAL AI Uplink
+// connection — a validated Gemini key + selected engine — instead of a hardcoded
+// NO CARRIER string. "Validated" reuses robco_gemini_validated_key (set only inside
+// fetchAuthorizedModels()'s live 200-response success path, api.js), never a bare
+// "a key string is present" check, so pasting garbage into the key field can't show a
+// false CARRIER ESTABLISHED. Pure presentation; reads MetaStore, writes nothing.
+function _updateUplinkBoardStatus() {
+  const note = document.getElementById('uplinkStatus');
+  if (!note) return;
+  const key = MetaStore.get('robco_gemini_key');
+  const validatedKey = MetaStore.get('robco_gemini_validated_key');
+  const model = MetaStore.get('robco_gemini_model');
+  if (key && model && validatedKey && validatedKey === key) {
+    note.textContent = '> CARRIER ESTABLISHED — UPLINK LOCKED · ' + String(model).toUpperCase();
+  } else {
+    note.textContent = '> NO CARRIER — TERMINAL FULLY OPERATIONAL OFFLINE';
+  }
+  // Owner batch item 5: mirror into SLOT 05's collapsed summary line (Protocol 22).
+  const sum = document.getElementById('sum-slot05');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
+}
+window._updateUplinkBoardStatus = _updateUplinkBoardStatus;
+
 function toggleAudio(key, isMuted) {
-  localStorage.setItem(key, isMuted);
+  MetaStore.set(key, isMuted);
   // Keep in-memory cache in sync so audio functions don't need localStorage reads
   const keyMap = {
     robco_sfx_muted: 'typing',
@@ -492,8 +842,15 @@ function toggleAudio(key, isMuted) {
     robco_questcomplete_muted: 'questComplete', // quest complete chime
     robco_questfail_muted: 'questFail', // quest fail tone
     robco_factionthreshold_muted: 'factionThreshold', // faction standing alert
+    robco_hardwaresfx_muted: 'hardwareSfx', // B2c: chip/board install-eject click
+    robco_reactorhum_muted: 'reactorHum', // LIVING CORE #6: reactor hum
   };
   if (keyMap[key] !== undefined) AudioSettings[keyMap[key]] = isMuted;
+
+  // B2c: tactile confirmation click for pulling/inserting a chip — gated by
+  // the hardwareSfx channel itself, not by the specific channel being
+  // toggled, so it fires the same way regardless of which chip was touched.
+  playChipClick(!isMuted);
 
   // Immediately stop/start ambient systems based on their specific key
   if (key === 'robco_hum_muted') {
@@ -530,12 +887,39 @@ function toggleAudio(key, isMuted) {
       if (rads >= 600) startTinnitus();
     }
   }
+  if (key === 'robco_reactorhum_muted') {
+    if (isMuted) {
+      if (reactorHumGain) {
+        reactorHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+      }
+    } else {
+      if (!reactorHumNode) {
+        startReactorHum();
+      } else if (typeof _updateReactorHumLevel === 'function') {
+        _updateReactorHumLevel();
+      }
+    }
+  }
+  if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
 }
 
 // ── MASTER MUTE ────────────────────────────────────────────
 function toggleMasterMute(isMuted) {
-  localStorage.setItem('robco_master_muted', isMuted);
+  // B2c: the board's own physical thunk must be audible for the eject/reseat
+  // ACTION itself even though "master mute = zero audio" governs everything
+  // else — so it's played at the instant AudioSettings.masterMute is still on
+  // the OLD (audible) side of the flip: before the flag flips true on eject
+  // (heard leaving), after the flag flips back false on reseat (heard
+  // arriving). Never bypasses the guard — playBoardThunk() still checks
+  // AudioSettings.masterMute itself, this just calls it at the right moment.
+  if (isMuted) playBoardThunk(false);
+  MetaStore.set('robco_master_muted', isMuted);
   AudioSettings.masterMute = isMuted;
+  if (!isMuted) {
+    playBoardThunk(true);
+    // M5 SEAT (Ceremony Moments Wave 1) — the Sonic Processor board reseats.
+    if (typeof _motionSeat === 'function') _motionSeat(document.getElementById('chipGrid'));
+  }
   if (isMuted) {
     geigerRunning = false;
     if (geigerTimeout) {
@@ -548,6 +932,9 @@ function toggleMasterMute(isMuted) {
     if (crtHumGain) {
       crtHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
     }
+    if (reactorHumGain) {
+      reactorHumGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+    }
   } else {
     let rads = parseInt(document.getElementById('stat_rads').value) || 0;
     setGeigerRate(rads >= 1000 ? 25 : rads >= 600 ? 12 : rads >= 200 ? 0.33 : 0);
@@ -556,8 +943,25 @@ function toggleMasterMute(isMuted) {
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.3);
     }
     if (AudioSettings.radio) startRadio(); // WU-F5: resume the radio if it was on
+    if (!reactorHumNode && !AudioSettings.reactorHum) {
+      startReactorHum(); // LIVING CORE #6: resume if it was never started (e.g. muted at boot)
+    } else if (
+      reactorHumGain &&
+      !AudioSettings.reactorHum &&
+      typeof _updateReactorHumLevel === 'function'
+    ) {
+      _updateReactorHumLevel();
+    }
   }
   _updateRadioUI();
+  _updateSonicBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(
+      isMuted
+        ? 'SONIC PROCESSOR REMOVED — MASTER MUTE'
+        : 'SONIC PROCESSOR RESEATED — AUDIO RESTORED'
+    );
+  }
 }
 
 // ── WU-F5 PIP-BOY RADIO (synthesized — zero-byte WebAudio station) ──────────
@@ -585,7 +989,7 @@ function _radioPlaying() {
   return !!radioNodes;
 }
 function isRadioOn() {
-  return localStorage.getItem(RADIO_KEY) === 'true';
+  return MetaStore.get(RADIO_KEY) === 'true';
 }
 
 // Schedule the next short tonal motif/beep over the static bed, then re-arm.
@@ -693,6 +1097,11 @@ function stopRadio() {
 }
 
 function _updateRadioUI() {
+  // CHASSIS LIVING CORE #10 (radio-reactive) — this is the one choke point
+  // both startRadio()/stopRadio() already call, so hooking here covers every
+  // entry path (the toggle, the boot first-gesture arm, and master-mute
+  // stopping/resuming the station) without a second call site.
+  if (typeof _coreRefresh === 'function') _coreRefresh();
   const note = document.getElementById('radioStatus');
   if (!note) return;
   if (AudioSettings.masterMute) {
@@ -704,15 +1113,117 @@ function _updateRadioUI() {
     : '> RADIO OFFLINE — NO CARRIER';
 }
 
+// Module Bay SLOT 02 status line (Step 2 · Phase 2 · B2a) — combines the master-mute
+// state with the live active-channel count and the radio module state into one
+// diegetic readout. Pure presentation; reads MetaStore/AudioSettings, writes nothing.
+function _updateSonicBoardStatus() {
+  // FIX 1 (owner report, B2c unit): visually pull EVERY chip while the board
+  // itself is ejected (master mute) — the individual .chip-input checkboxes
+  // and their robco_*_muted keys are untouched, only the CSS class flips, so
+  // reseating the board restores each chip to its own preserved state.
+  const grid = document.getElementById('chipGrid');
+  if (grid) grid.classList.toggle('sonic-board--ejected', !!AudioSettings.masterMute);
+  const note = document.getElementById('sonicStatus');
+  const sum = document.getElementById('sum-slot02');
+  if (!note) return;
+  if (AudioSettings.masterMute) {
+    note.textContent = '> BOARD REMOVED — ALL AUDIO OFFLINE (CHANNEL CHIPS PRESERVED FOR RESEAT)';
+    // Owner batch item 5: mirror into SLOT 02's collapsed summary line (Protocol 22).
+    if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
+    return;
+  }
+  const keys = [
+    'robco_sfx_muted',
+    'robco_hum_muted',
+    'robco_geiger_muted',
+    'robco_tinnitus_muted',
+    'robco_ambient_muted',
+    'robco_wake_muted',
+    'robco_panelclick_muted',
+    'robco_bootdrone_muted',
+    'robco_levelup_muted',
+    'robco_heartbeat_muted',
+    'robco_questcomplete_muted',
+    'robco_questfail_muted',
+    'robco_factionthreshold_muted',
+    'robco_reactorhum_muted',
+  ];
+  const total = keys.length;
+  const active = keys.filter(k => MetaStore.get(k) !== 'true').length;
+  note.textContent =
+    '> BOARD SEATED · ' +
+    active +
+    '/' +
+    total +
+    ' CHANNELS ACTIVE · RECEIVER ' +
+    (AudioSettings.radio ? 'INSTALLED — STATION CARRIER LIVE' : 'SOCKET EMPTY');
+  if (sum) sum.textContent = note.textContent.replace(/^>\s*/, '');
+}
+window._updateSonicBoardStatus = _updateSonicBoardStatus;
+
+// ── B2c: MODULE BAY HARDWARE SFX (chip click + board thunk) ────────────────
+// Tactile install/eject feedback for physically handling Module Bay hardware:
+// the 13 SLOT-02 channel chips, the SERVO CLICK RELAY toggle that gates this
+// whole channel, and the other bay-module toggles (radio, power cell, haptic
+// solenoid — wired at their own call sites below/in ui-core.js). ONE audio
+// source per Protocol 7 (one AudioSettings.hardwareSfx flag / one
+// robco_hardwaresfx_muted key) covers every trigger site, mirroring the
+// existing "ambient"/"panelClick" precedent of a single channel gating
+// several related call sites rather than one flag per call site.
+function playChipClick(installing) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.hardwareSfx) return;
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'square';
+  const f0 = installing ? 900 : 700;
+  const f1 = installing ? 1300 : 350;
+  osc.frequency.setValueAtTime(f0, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(f1, audioCtx.currentTime + 0.03);
+  g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.035);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.04);
+}
+
+// A heavier percussive thunk for the Sonic Processor board itself (SLOT 02's
+// own eject/reseat), distinct in weight from the lighter chip click above.
+function playBoardThunk(installing) {
+  if (AudioSettings.masterMute) return;
+  if (AudioSettings.hardwareSfx) return;
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  const f0 = installing ? 70 : 140;
+  const f1 = installing ? 130 : 45;
+  osc.frequency.setValueAtTime(f0, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(f1, audioCtx.currentTime + 0.12);
+  g.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(g);
+  g.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.16);
+}
+
 // User-facing play/stop toggle (diegetic `> PIP-BOY RADIO`). Persists the device
 // preference and starts/stops the station. The onchange fires from a real click,
 // satisfying the autoplay policy.
 function toggleRadio(on) {
-  localStorage.setItem(RADIO_KEY, on ? 'true' : 'false');
+  MetaStore.set(RADIO_KEY, on ? 'true' : 'false');
   AudioSettings.radio = on;
+  playChipClick(on); // B2c: tactile install/eject confirmation
   if (on) startRadio();
   else stopRadio();
   _updateRadioUI();
+  _updateSonicBoardStatus();
+  if (typeof _logBaySvc === 'function') {
+    _logBaySvc(on ? 'RADIO RECEIVER MODULE INSTALLED' : 'RADIO RECEIVER MODULE REMOVED');
+  }
 }
 
 // Boot restore. The saved preference cannot auto-start audio (no gesture yet), so
@@ -897,6 +1408,20 @@ function playLevelUpJingle() {
   });
 }
 
+// U7: level-up is detected in autoImportState() (api.js) and emitted through
+// RobcoEvents — the jingle + haptic are a pure reaction, subscribed here. Wiring
+// is deferred to a function called from window.onload (ui-core.js), NOT run at
+// this file's top level — ui-audio.js is a static <script> tag that can execute
+// before state.js (which defines RobcoEvents) finishes its dynamic, context-
+// conditional load (see the boot-loader comment in index.html); a top-level
+// RobcoEvents.on(...) here would throw "RobcoEvents is not defined" on some boots.
+function _wireAudioEventBusSubscribers() {
+  RobcoEvents.on('level.up', () => {
+    playLevelUpJingle();
+    triggerHaptic('levelup'); // WU-F2 haptic
+  });
+}
+
 // ── H4: LOW HEALTH HEARTBEAT ─────────────────────────────────────
 // Activates when HP < 25% (checked in updateMath()).
 // Sine pulse ~1.2Hz. When concurrent with tinnitus (crippled head),
@@ -972,7 +1497,7 @@ function _pickBootFlavor() {
   // Degraded variant first — deliberately NOT gated to the first boot (owner pref).
   if (Math.random() < DEGRADED_BOOT_CHANCE) return 'degraded';
   // First-ever power-on → the longer cold-start POST (once only).
-  if (typeof localStorage !== 'undefined' && !localStorage.getItem('robco_booted_before')) {
+  if (!MetaStore.get('robco_booted_before')) {
     return 'cold';
   }
   return 'normal';
@@ -1020,6 +1545,65 @@ function _bootLinesFor(flavor) {
   ];
 }
 
+// ── M3 · FIRMWARE FLASH (Ceremony Moments Wave 1) ──────────────────────────
+// Detects a post-update first boot by comparing MetaStore
+// robco_last_seen_version against the live APP_VERSION — read/compared/set
+// right here, next to the existing robco_booted_before write. Absent (a
+// device that predates this unit, or the very first boot after it ships)
+// is treated as "already seen" so no existing device fires the flash on the
+// commit that introduces the key — only a REAL version change on a device
+// that has already recorded one fires it (the WU-F6 cold-boot gating
+// precedent). Returns the previously-seen version string, or null.
+// MetaStore.set never throws (private mode / quota fails soft).
+function _checkFirmwareFlash() {
+  const lastSeen = MetaStore.get('robco_last_seen_version');
+  const flashedFrom = lastSeen && lastSeen !== APP_VERSION ? lastSeen : null;
+  MetaStore.set('robco_last_seen_version', APP_VERSION);
+  return flashedFrom;
+}
+
+// One-shot amber glint on the casing serial plate + a REV LOG button pulse,
+// acknowledging a completed update — fires once boot completes (both
+// elements sit behind the boot overlay but are always in the DOM). Toggled
+// classes only (Protocol UI-9 — the CSS keyframes are auto-neutralized by
+// the existing global reduced-motion block); purely decorative, never
+// blocks anything.
+function _fireFirmwareFlashFlourish() {
+  const serial = document.querySelector('.serial');
+  const revBtn = document.getElementById('btnViewChangelog');
+  if (serial) {
+    serial.classList.remove('firmware-glint');
+    void serial.offsetWidth; // force reflow so a repeated trigger restarts cleanly
+    serial.classList.add('firmware-glint');
+    setTimeout(() => serial.classList.remove('firmware-glint'), 1600);
+  }
+  if (revBtn) {
+    revBtn.classList.remove('firmware-pulse');
+    void revBtn.offsetWidth;
+    revBtn.classList.add('firmware-pulse');
+    setTimeout(() => revBtn.classList.remove('firmware-pulse'), 1600);
+  }
+}
+
+// ── M4 · LONG-ABSENCE RECALIBRATION (Ceremony Moments Wave 1) ──────────────
+// Reads the Overseer's Log lastFlushAt — an additive field on the existing
+// robco_overseer_log MetaStore JSON blob (_flushOverseerLog() is the one
+// writer, ui-core.js) — BEFORE this session's own initOverseerLog() call
+// (which runs earlier in the same window.onload but only ever touches
+// bootCount/firstBoot, never lastFlushAt), so the value read here is still
+// the PREVIOUS session's last flush. Absent (first-ever session, or a
+// device that predates this unit) never fires — silence under the threshold
+// is deliberate. Returns whole days idle, or null.
+const LONG_ABSENCE_DAYS = 3;
+let _longAbsenceBoot = false; // read by startCrtHum()'s gentle-ramp nicety below
+function _checkLongAbsence() {
+  if (typeof _readOverseerLog !== 'function') return null;
+  const lastFlushAt = _readOverseerLog().lastFlushAt;
+  if (!lastFlushAt) return null;
+  const days = Math.floor((Date.now() - lastFlushAt) / 86400000);
+  return days >= LONG_ABSENCE_DAYS ? days : null;
+}
+
 function runBootSequence(onComplete) {
   const bootScreen = document.getElementById('bootScreen');
   if (!bootScreen) {
@@ -1031,11 +1615,9 @@ function runBootSequence(onComplete) {
   playBootDrone(); // H4: boot sequence drone
   const flavor = _pickBootFlavor();
   // Record that the unit has booted so the first-power-on 'cold' POST never repeats.
-  try {
-    localStorage.setItem('robco_booted_before', 'true');
-  } catch (_) {
-    /* private mode / quota — fall through, worst case the cold POST repeats */
-  }
+  // MetaStore.set never throws (private mode / quota fails soft — worst case the
+  // cold POST repeats).
+  MetaStore.set('robco_booted_before', 'true');
   if (flavor === 'degraded') bootScreen.classList.add('boot-degraded');
   const lines = _bootLinesFor(flavor);
   // WU-T3: per-game identity line (Pip-Boy model + wasteland uplink) sourced from
@@ -1047,6 +1629,35 @@ function runBootSequence(onComplete) {
   const _t3flavor = String(_t3theme.bootFlavor || 'WASTELAND UPLINK').toUpperCase();
   // Place it just before the final "SECURE LINK ESTABLISHED…" line.
   lines.splice(Math.max(0, lines.length - 1), 0, '> ' + _t3model + ' — ' + _t3flavor);
+  // M3 Firmware Flash — one extra POST line acknowledging a completed update,
+  // spliced the same "just before the final line" way as the WU-T3 line above.
+  const _flashFromVersion = _checkFirmwareFlash();
+  if (_flashFromVersion) {
+    lines.splice(
+      Math.max(0, lines.length - 1),
+      0,
+      '> FIRMWARE FLASH DETECTED — U.O.S. v' +
+        _flashFromVersion +
+        ' → v' +
+        APP_VERSION +
+        ' ...... [OK]'
+    );
+  }
+  // M4 Long-Absence Recalibration — one extra POST line when the unit has
+  // been idle a while; under the threshold, silence is deliberate.
+  const _idleDays = _checkLongAbsence();
+  _longAbsenceBoot = !!_idleDays;
+  if (_idleDays) {
+    lines.splice(
+      Math.max(0, lines.length - 1),
+      0,
+      '> UNIT IDLE ' +
+        _idleDays +
+        ' DAY' +
+        (_idleDays === 1 ? '' : 'S') +
+        ' — RE-CALIBRATING PHOSPHOR ...... [OK]'
+    );
+  }
   let i = 0;
   const iv = setInterval(() => {
     if (i < lines.length) {
@@ -1061,6 +1672,9 @@ function runBootSequence(onComplete) {
           bootScreen.style.display = 'none';
           bootScreen.classList.remove('boot-degraded'); // hygiene for any re-entry
           _bootActive = false; // WU-B10: boot window closed — suppress any stale drone
+          if (_flashFromVersion && typeof _fireFirmwareFlashFlourish === 'function') {
+            _fireFirmwareFlashFlourish();
+          }
           if (onComplete) onComplete();
         }, 400);
       }, 200);

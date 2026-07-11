@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icon.png" alt="RobCo U.O.S." width="120" />
+<img src="assets/icon.png" alt="RobCo U.O.S." width="120" />
 
 # RobCo U.O.S.
 
@@ -22,11 +22,11 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 ![Gemini](https://img.shields.io/badge/gemini-AI_engine-14fdce?style=flat-square&logo=google&logoColor=14fdce&labelColor=010a07)
 
 **A full CRT terminal emulation that turns a browser tab into a living Pip-Boy companion —**
-**now with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
+**a physical RobCo device that reacts to your character's condition, with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
 
 [Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
-**Current version: 2.7.0 — "Native Systems & Two Wastelands"**
+**Current version: 2.8.0 — "The Physical Machine"**
 
 ---
 
@@ -50,7 +50,7 @@ Both games are first-class and fully data-driven. A single `GAME_DEFS` table plu
 
 ### 🛠️ Native Offline Tools (no AI, deterministic, free)
 
-Six in-terminal tools compute their results **on-device from the game's own data** — zero network, zero AI, the same answer every time. Reachable from the Comm-Link macro buttons, typed commands, or the TERMLINK console.
+Six in-terminal tools compute their results **on-device from the game's own data** — zero network, zero AI, the same answer every time. Reachable from the Tool Deck (a small button beside the Comm-Link message box) or typed commands.
 
 | Tool                      | What it does                                                                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -61,11 +61,11 @@ Six in-terminal tools compute their results **on-device from the game's own data
 | **BIO-SCAN**              | Medical advisory — HP tier, radiation, per-limb OK/CRIPPLED, addiction flags, and the right healing/rad/cure items (sourced from the game's own chem data)   |
 | **LOOT**                  | Salvage intake — search the item database and add anything to your pack at its canonical value (additive + confirm-gated)                                    |
 
-A **TERMLINK command console** launches all six from one menu; a `[FEATURES]` command registry lists every command the terminal supports and is kept honest by the build gate.
+A `[FEATURES]` command registry lists every command the terminal supports and is kept honest by the build gate.
 
 ### 📟 Device Capabilities
 
-Nine progressive capabilities, each with a graceful fallback when the device/browser doesn't support it:
+Nine capabilities, each with a graceful fallback when the device/browser doesn't support it:
 
 - **Sustained Power Cell** — Screen Wake Lock (keep the display awake while reading)
 - **Haptic Solenoid** — Vibration feedback on level-up, faction flips, and critical HP (honours reduced-motion)
@@ -75,7 +75,7 @@ Nine progressive capabilities, each with a graceful fallback when the device/bro
 - **Cold-Start / Degraded-Tube Boot** — a first-ever full POST plus a rare (~1 in 100) glitchy boot variant, reduced-motion-safe
 - **Overseer's Log** — local device telemetry (uptime, longest session, total power-on, boot count) merged with your campaign statistics
 - **High-Lumen Optics** — a high-contrast display mode (auto-on under `prefers-contrast`)
-- **TERMLINK Console** — the native command surface above
+- **Immersion dial** — a Full/Balanced/Minimal control for how much ambient atmosphere the terminal runs; a per-device preference (never rides your saves), defaulting to Full. A born-compliant seam the ambient layer will subscribe to
 
 ### 🎮 Character, Combat & World
 
@@ -113,7 +113,10 @@ Nine progressive capabilities, each with a graceful fallback when the device/bro
 ### 💾 Saves & Cloud
 
 - **Auto-save** (debounced localStorage), **A/B/C slots**, **file export/import** with version migration, **rolling backups** with FNV-1a checksums.
+- **Save version history** — each slot retains up to 5 prior revisions in IndexedDB (riding its headroom, never the localStorage ceiling); view and restore any earlier version from the saves list. Restoring is confirm-gated and takes a rolling backup first; if IndexedDB is unavailable the feature is simply not offered and save/load is unchanged.
+- **Full backup bundle** — a one-file "EXPORT FULL BACKUP" of your entire history (live campaign + all slots with their version rings + rolling backups + chat + playstyle), version-stamped and checksummed. IMPORT SAVE auto-detects a bundle and restores it — confirm-gated, integrity-checked (a bad or edited file is refused with no partial apply), and a rolling backup of your current state is taken first. Campaign/save data only — device preferences are never included (the two-store boundary holds).
 - **Cloud sync** via Firebase Firestore — additive writes only (never a blind overwrite), confirm-gated destructive actions, Google sign-in (popup-only), anonymous boot, and a Gemini-key sync option.
+- **Offline cloud-push queue** — a manual "Save to Cloud" pressed while offline (or that fails on network) is queued device-locally and flushed automatically on reconnect. Retry-only: it _never_ auto-pushes on a state change — cloud sync stays a manual button. Bounded + contentHash-deduped (no duplicate cloud saves), uid-scoped, kill-switch-gated, and fully fail-safe (no IndexedDB / flag off → the button behaves exactly as before).
 - **Remote kill-switch** — a fail-open feature-flag config that can disable a networked feature remotely, always defaulting to last-known-good / features-enabled so it can never black-screen the app.
 
 ### ♿ Accessibility & PWA
@@ -136,17 +139,18 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### Technology Stack
 
-| Layer           | Technology                                       | Purpose                                                      |
-| --------------- | ------------------------------------------------ | ------------------------------------------------------------ |
-| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)    |
-| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                    |
-| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                        |
-| **AI**          | Google Gemini API                                | Optional structured-JSON game master                         |
-| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags        |
-| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update           |
-| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging              |
-| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                              |
-| **Testing**     | Node + PowerShell + Playwright                   | 1557-test gate at parity + boot-smoke / render / a11y checks |
+| Layer           | Technology                                       | Purpose                                                                     |
+| --------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                   |
+| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                   |
+| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                       |
+| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                        |
+| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback) |
+| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                       |
+| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
+| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
+| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
+| **Testing**     | Node + PowerShell + Playwright                   | 2938-test gate at parity + boot-smoke / render / a11y checks                |
 
 ### Per-game data system
 
@@ -160,6 +164,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── js/
 │   ├── db_nv.js            FNV game CSV data + lookups
 │   ├── db_fo3.js           FO3 game CSV data + lookups
+│   ├── idb.js              Async IndexedDB durability engine (device-pref write-through shadow)
 │   ├── state.js            State, persistence, migration, GAME_DEFS, THEMES, _activeDef()
 │   ├── reg_nv.js           FNV Fallout Data Registry (read-only)
 │   ├── reg_fo3.js          FO3 Fallout Data Registry (read-only)
@@ -168,20 +173,23 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 │   ├── ui-render.js        render*() functions, CRUD helpers, map/faction/time utilities
 │   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
 │   ├── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
+│   ├── runtime.js          Ambient Runtime — lifecycle state machine + heartbeat + observer registry
 │   ├── ui-core.js          UI lifecycle, COMMAND_REGISTRY, native command surfaces, badges
 │   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
-│   └── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
+│   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
+│   ├── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
+│   └── vendor/             Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (1557 tests, 130 suites)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (2938 tests, 219 suites)
 │   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
 ├── scripts/gate.js         The full local gate (lint, format, both runners, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
-└── icon.png                PWA icon
+└── assets/                 PWA icon + app-shortcut icons, ocr/ (vendored OCR language data)
 ```
 
 ### Script Load Order
@@ -189,6 +197,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 Global-scope `<script>` tags load in strict order (per-game db/reg pair is chosen by the boot manifest):
 
 ```
+0. idb.js                →  window.IdbStore (async IndexedDB engine; loaded before the boot manifest)
 1. db_nv.js / db_fo3.js  →  databaseCSVs, lookupItemInDb (active game)
 2. state.js              →  state, APP_VERSION, GAME_DEFS, THEMES, saveState, migrateState
 3. reg_nv.js / reg_fo3.js→  FALLOUT_REGISTRY (active game, read-only)
@@ -197,9 +206,10 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 6. ui-render.js          →  render*() functions, CRUD helpers, map/faction/time
 7. ui-saves.js           →  save slots, file import/export, autocomplete
 8. ui-account.js         →  renderAccount, renderSavesList, undoLastSync
-9. ui-core.js            →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
-10. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
-11. cloud.js             →  window.pushToCloud / pullFromCloud (ES module)
+9. runtime.js            →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
+10. ui-core.js           →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
+11. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
+12. cloud.js             →  window.pushToCloud / pullFromCloud (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
@@ -232,7 +242,7 @@ npm run dev        # Vite dev server with hot reload (typically http://localhost
 1. Open the terminal and let the boot sequence finish.
 2. Pick your game (New Vegas or Fallout 3).
 3. _(Optional)_ Paste a Gemini key in Configuration → **VALIDATE KEY & FETCH ENGINES**, then pick a model — only needed for the AI Director.
-4. Start playing: type commands or free text in the Comm-Link, or use the native tools (TERMLINK, VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) with no key at all.
+4. Start playing: type commands or free text in the Comm-Link, or use the native tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) with no key at all.
 
 ### Hosting & Release Flow
 
@@ -253,6 +263,7 @@ npm run format      # Prettier
 npm run dev         # Vite dev server
 npm run gate        # FULL gate: lint + format + both runners + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
+npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
 ```
 
 ### Quality Gate
@@ -261,7 +272,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 1557-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2938-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -293,22 +304,39 @@ Procedural audio, CRT visual effects, the 14-faction network, the save envelope 
 
 The browser-native era: a second game (**Fallout 3**) added as a first-class, fully data-driven context; the six heavy tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) converted to **offline native calculators**; nine device capabilities; per-game theming + identity; a comprehensive accessibility pass; cloud auth + a remote kill-switch; a hardened PWA auto-update flow; and a self-improving test gate.
 
+### Phase 5 — The Physical Machine (v2.8)
+
+The device made physical: the whole UI reframed as a reactive RobCo terminal — an illuminated bezel subsystem selector in place of the tab bar, hardware-styled OPERATOR / OPERATIONS / DATABANK / CHASSIS screens, a living Director Uplink, and a reactive power core with tactile feedback animations across the terminal. Deeper offline self-reliance (native item **USE**, TERMINAL-mode stat edits, native GPS/PERKS/level-up, travel-here), on-device **Visual Upload OCR** with an AI-vision fallback, ceremony moments, tighter mobile density, and a staging-only Diagnostic Shell.
+
 </details>
 
-### Current State (v2.7.0)
+### Current State (v2.8.0)
 
 A **production-quality, two-game browser application** with:
 
 - **Both Fallout: New Vegas and Fallout 3** as fully data-driven game contexts (`GAME_DEFS`, per-game registries/databases/theming/identity)
-- **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a TERMLINK console and a self-checked command registry
-- **Nine device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics, TERMLINK)
+- **Six native offline tools** (V.A.T.S., TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) — deterministic, no AI, plus a self-checked command registry
+- **Eight device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics)
 - **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
+- **Device bezel chrome** — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS/SETTINGS + a flat DIRECTORY fallback) that routes through the same underlying tab router; CHASSIS hosts device telemetry + firmware/carrier/feature-flag status, and SETTINGS is the one home for Account, the Module Bay, Save Archive, and Campaign Configs
+- **Director Uplink — the living Overseer** — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
+- **Tool Deck + Quick-Draw Holster** — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
+- **OPERATIONS — the quartermaster's freight console** — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
+- **OPERATOR — SKILL MATRIX / STATUS EFFECTS / FACTION STANDING reskins** — your skills show as a 13-channel drag-to-set VU meter array, active status effects light up as color-coded compound lamps (buff/debuff/neutral) with a tick countdown and purge key, and faction standing is one shared INFAMY◂▸FAME reputation console with a per-faction channel selector and an all-faction mini-pin strip so nothing is hidden
+- **DATABANK — The Records Bay** — your world map is a real spatial "Phosphor Cartography" chart: surveyed locations glow as connected nodes tracing a known-route trail, a radar sweep and a blinking "YOU ARE HERE" marker bring it to life, and uncollected snow globes/bobbleheads/Lincoln memorabilia show as distinct signal-return glyphs; your quest log is a numbered directive rack with status lamps, a filterable status drawer bank, and a native CYCLE key to advance a quest's status yourself; the databank search, campaign record, campaign notes, and session stats all match with an amber query terminal, a tape-spool chronicle, a filterable field-notes ledger, and a mechanical odometer counter bank
 - **Full character/world systems** — SPECIAL, per-game skills, limbs, perks, quests, factions, world-grid map with mark-visited, and trackers (collectibles, Lincoln memorabilia, traits, skill books, magazines) + a crafting panel
+- **Native USE + TERMINAL stat edits** — using an aid item now applies its real effect (heal, rads, limb repair, a timed buff, clearing an addiction or poison) instantly and offline, with no AI round-trip; typing straight into the TERMINAL command line can set or nudge any stat, SPECIAL attribute, or skill, or grant a level, all deterministic and fully offline
+- **[GPS]/[MAP] and eligible-perks lookup — native, no AI** — the compass-grid command now jumps straight to the CARTOGRAPHY TABLE instead of round-tripping to the AI; leveling up reports your real skill-point pool (10 + INT/2) and jumps to SKILL MATRIX so you allocate it yourself; and a new `[PERKS]`/`[PK]` command lists every perk you already qualify for at your current level, straight from the registry
+- **TRAVEL HERE on the world map — native, no AI** — tapping a location's sector sheet on the CARTOGRAPHY TABLE now offers a TRAVEL HERE button beside MARK SURVEYED, instantly setting that location as your CURRENT position (and marking it visited) with no AI round-trip
+- **Visual Upload — native on-device OCR, AI-vision fallback** — attaching a screenshot now scans it right on your device by default (self-hosted, lazy-loaded Tesseract.js), works fully offline after first use, and shows a review screen you confirm before anything is added; if the on-device scan is unavailable or fails, it hands off to the existing Gemini-vision path automatically, or on request via a TRY AI VISION button — both are remotely kill-switched with a graceful "add items manually" fallback if neither is available
+- **Ceremony Moments** — starting a new campaign runs a short, skippable commissioning sequence instead of two bare reset lines; the Director now greets you the first time you open the Uplink each session; a post-update boot calls out the update with a POST line, a casing glint, and a highlighted revision-log button; returning after a few days away gets a quiet "recalibrating" boot line; and Module Bay/cartridge/Tool Deck installs now get a consistent physical settle flourish (SEAT, the third Protocol UI-9 motion verb)
+- **Tighter mobile boards** — on narrow phones, board spacing, faction/status/perk/skill tiles, and the Director Uplink transcript all sit a little closer together, trimming a noticeable amount of scrolling with every tap target still comfortably above the minimum touch size
+- **Diagnostic Shell** _(dev/staging-only)_ — the developer console is re-founded on a data-driven tool registry with a two-signal environment gate, so a future non-destructive sandbox and an owner-only toolbench can share one panel without ever leaking a destructive tool to a live player; every existing dev control still works exactly as before
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
-- **Saves & cloud** — auto-save, A/B/C slots, export/import + migration, rolling checksummed backups, additive Firestore sync, Google sign-in, remote kill-switch
+- **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **1557 tests across 130 suites**, mirrored in the Node and PowerShell runners at exact parity, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **2938 tests across 219 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

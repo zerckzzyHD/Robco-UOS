@@ -36,10 +36,9 @@ mkdirSync(OUT, { recursive: true });
 
 // 2. Stage served files (mirrors .github/workflows/deploy.yml)
 const FILES = ['index.html', 'sw.js', 'manifest.json', 'CHANGELOG.md'];
-const DIRS = ['css', 'js', 'docs'];
-const rootPngs = readdirSync(ROOT).filter(f => f.toLowerCase().endsWith('.png'));
+const DIRS = ['assets', 'css', 'js', 'docs'];
 
-for (const f of [...FILES, ...rootPngs]) {
+for (const f of FILES) {
   if (existsSync(join(ROOT, f))) cpSync(join(ROOT, f), join(OUT, f));
 }
 for (const d of DIRS) {
@@ -82,7 +81,7 @@ const DEV_BADGE =
   'DEV BUILD</div>';
 let html = readFileSync(join(OUT, 'index.html'), 'utf8')
   .replace(
-    '<link rel="icon" type="image/png" href="icon.png" />',
+    '<link rel="icon" type="image/png" href="assets/icon.png" />',
     '<link rel="icon" type="image/svg+xml" href="icon-dev.svg" />'
   )
   .replace(

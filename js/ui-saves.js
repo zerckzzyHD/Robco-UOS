@@ -1,6 +1,7 @@
 function exportCampaignLog(format = 'txt') {
   if (!chatHistory || chatHistory.length === 0) {
-    alert('> ERROR: COMM-LINK LOGS EMPTY.');
+    if (typeof openModal === 'function')
+      openModal({ title: '> EXPORT LOG', body: 'ERROR: COMM-LINK LOGS EMPTY.' });
     return;
   }
 
@@ -98,7 +99,11 @@ function _clipboardSupported() {
 }
 async function ejectHolotape() {
   if (!chatHistory || chatHistory.length === 0) {
-    alert('> ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.');
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> EJECT HOLOTAPE',
+        body: 'ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.',
+      });
     return;
   }
   const text = _buildHolotapeText();
@@ -156,10 +161,16 @@ function _slotLabel(n) {
 }
 
 // ── Local save list (synchronous) ────────────────────────────────────────────
-// Returns an array of {id, label, isActive|isSlot, n} for the active save + slots 1-3.
-// Co-located with the slot-schema helpers (_slotKey/_slotLabel) so a slot-key or
-// slot-count change touches only this file (DUP-2). Consumed by ui-account.js's
-// renderSavesList() as a global.
+// Returns an array of {id, label, isActive|isSlot, n, gameContext} for the active
+// save + slots 1-3. Co-located with the slot-schema helpers (_slotKey/_slotLabel)
+// so a slot-key or slot-count change touches only this file (DUP-2). Consumed by
+// ui-account.js's renderSavesList() as a global.
+//
+// gameContext is UNFILTERED here — each slot just carries whatever it recorded at
+// save time (or undefined for a pre-WU-F5 slot that never recorded one). The
+// per-game filter itself lives centrally in renderSavesList(), which merges this
+// list with the IDB-only supplement before deciding what to hide, so a slot that
+// exists in BOTH localStorage and IDB is judged exactly once (Protocol 22).
 function listLocalSaves() {
   const saves = [];
   const v8raw = localStorage.getItem('robco_v8');
@@ -182,14 +193,32 @@ function listLocalSaves() {
         label: slotName + (savedDate ? ': ' + savedDate : ''),
         isSlot: true,
         n,
+        gameContext: slot.gameContext || null,
       });
     } catch (_) {}
   }
   return saves;
 }
 
-function saveToSlot(slotNum) {
+// P3: async — the slot is written IDB-PRIMARY (js/state.js _coldWriteObj: IDB
+// 'campaign' store, no ~5MB ceiling) with a best-effort localStorage mirror. A
+// localStorage quota failure is no longer fatal: the save persists to IDB, so a
+// slot too large for localStorage is now saved instead of lost (ceiling relief).
+async function saveToSlot(slotNum) {
   syncStateFromDom();
+  // P5: capture the slot's CURRENT contents as a retained prior revision BEFORE it
+  // is overwritten (per-slot version ring, IDB-only — rides the P3 IndexedDB
+  // headroom, never the localStorage ceiling). Best-effort + fail-safe: no IDB or
+  // an empty slot → nothing captured and the save below is byte-identical to today.
+  if (window.IdbStore && typeof window.pushSlotVersion === 'function') {
+    try {
+      const _prior =
+        typeof window._coldReadObj === 'function'
+          ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+          : null;
+      if (_prior) await window.pushSlotVersion(slotNum, _prior);
+    } catch (_) {}
+  }
   const _slotState = JSON.parse(JSON.stringify(state));
   const _slotChat = chatHistory.slice(-200);
   const _slotPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
@@ -206,75 +235,286 @@ function saveToSlot(slotNum) {
   if (typeof window.computeSaveChecksum === 'function') {
     envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
   }
-  try {
-    localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+  const ok =
+    typeof window._coldWriteObj === 'function'
+      ? await window._coldWriteObj(_slotKey(slotNum), 'slot_' + slotNum, envelope)
+      : (function () {
+          try {
+            localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+            return true;
+          } catch (_) {
+            return false;
+          }
+        })();
+  if (ok) {
     const el = document.getElementById('slotStatus');
     const ts = new Date(envelope.savedAt).toLocaleTimeString();
     const ctx = envelope.gameContext;
     if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
     appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
-  } catch (e) {
-    appendToChat('> [ERROR] Save slot write failed — storage quota exceeded.', 'sys', true);
+    // Owner report: the SAVES LIST (VER badge + slot row) didn't live-update after a
+    // save — it only refreshed once loadUI() next ran (e.g. on an unrelated LOAD
+    // click). saveToSlot is the one write path for every slot save (quicksave button
+    // AND the OVERWRITE control below), so refreshing here covers both (Protocol 22).
+    if (typeof renderSavesList === 'function') renderSavesList();
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — saveToSlot is the one
+    // write path for every local slot save (the quicksave button AND the
+    // OVERWRITE control below), so emitting here covers both (Protocol 22 —
+    // an event, not a direct call into the core, matching the U8 auto-log
+    // emit convention elsewhere in this file).
+    RobcoEvents.emit('data.write', { kind: 'local-save' });
+  } else {
+    appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
   }
 }
 
-function loadFromSlot(slotNum) {
-  const raw = localStorage.getItem(_slotKey(slotNum));
-  if (!raw) {
+// ── OVERWRITE (local slot) — confirm-gated, keeps the slot's existing name ───
+// The unified SAVES LIST already offers LOAD/VER per slot; OVERWRITE lets the
+// technician deliberately replace a NAMED slot's contents with the current
+// campaign without ever prompting for a rename (the slot name is always the
+// fixed _slotLabel(n), never user-entered — Protocol 34 destructive-op gate).
+// Reuses saveToSlot() verbatim (Protocol 22) — the P5 version ring already
+// retains the slot's prior contents before this overwrite, so it's recoverable.
+async function confirmOverwriteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> OVERWRITE ' + _slotLabel(slotNum),
+    warning: `Overwrite ${_slotLabel(slotNum)} with your current campaign?\n\nThis replaces its contents but keeps its name. The prior contents are preserved in VERSION HISTORY (VER) if you need to recover them.`,
+    confirmLabel: 'OVERWRITE',
+  });
+  if (!ok) return;
+  await saveToSlot(slotNum);
+}
+
+// ── DELETE (local slot) — confirm-gated, permanent ───────────────────────────
+// The unified SAVES LIST previously offered no way to clear a named local slot
+// (LOAD/OVERWRITE/VER only) — the owner asked for parity with cloud rows, which
+// already had DEL. Confirm-gated (Protocol 34 destructive-op gate) via the
+// diegetic confirmAction(), never the blocking confirm(). Clears BOTH the
+// localStorage mirror and the IDB-primary copy (P3) plus that slot's retained
+// version ring (P5) — a deleted slot leaves no orphaned version history behind.
+async function confirmDeleteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> DELETE ' + _slotLabel(slotNum),
+    warning: `Permanently delete ${_slotLabel(slotNum)}?\n\nThis cannot be undone. Any saved version history for this slot is erased too.`,
+    confirmLabel: 'DELETE',
+  });
+  if (!ok) return;
+  await _deleteSlotApply(slotNum);
+}
+
+// _deleteSlotApply(slotNum) — the synchronous-flow erase core, separated from the
+// confirm gate so it is directly testable without mocking confirmAction() (mirrors
+// the _restoreBackupApply / _craftPrepare+Apply split — Step 2 Phase 0 U12 pattern).
+async function _deleteSlotApply(slotNum) {
+  try {
+    localStorage.removeItem(_slotKey(slotNum));
+    if (window.IdbStore) {
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum);
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum + '_versions');
+    }
+    appendToChat(`> [DELETE] ${_slotLabel(slotNum)} erased.`, 'sys', true);
+  } catch (_) {
+    appendToChat('> [ERROR] Slot delete failed.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+
+async function loadFromSlot(slotNum) {
+  // P3: IDB-PRIMARY read — the newer of {IDB 'campaign' slot, localStorage} wins
+  // (_coldReadObj), so an oversized slot saved only to IDB still loads, and a
+  // partial-write divergence can never surface a stale save.
+  let env =
+    typeof window._coldReadObj === 'function'
+      ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+      : null;
+  if (!env) {
+    const raw = localStorage.getItem(_slotKey(slotNum));
+    if (raw) {
+      try {
+        env = JSON.parse(raw);
+      } catch (_) {}
+    }
+  }
+  if (!env) {
     appendToChat(`> [LOAD] ${_slotLabel(slotNum)} is empty.`, 'sys', true);
     return;
   }
   try {
-    let env = JSON.parse(raw);
-    // Integrity + forward-compat check before applying
-    if (typeof window.verifySaveEnvelope === 'function') {
-      const integrity = window.verifySaveEnvelope(env);
-      if (integrity.status === 'future_version') {
-        if (
-          !confirm(
-            `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-          )
-        )
-          return;
-      } else if (integrity.status === 'checksum_mismatch') {
-        if (
-          !confirm(
-            '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-          )
-        )
-          return;
-      }
-    }
-    // F5: Warn on gameContext mismatch between slot and current session
-    const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
-    const curCtx = state.gameContext || 'FNV';
-    if (slotCtx !== curCtx) {
-      const ok = confirm(
-        `> CONTEXT MISMATCH\n\nThis save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`
-      );
-      if (!ok) return;
-    }
-    // Snapshot current state as rolling backup before replacing
-    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
-    if (typeof migrateState === 'function')
-      env.state = migrateState(env.version || '1.0', env.state);
-    state = { ...state, ...env.state };
-    if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
-    if (env.playstyle) {
-      localStorage.setItem('robco_playstyle', env.playstyle);
-      if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
-      let el = document.getElementById('playstyleInput');
-      if (el) el.value = env.playstyle;
-    }
-    loadUI();
-    const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
-    const ctx = slotCtx;
-    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] restored. Saved: ${ts}`, 'sys', true);
-    const statusEl = document.getElementById('slotStatus');
-    if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+    await _applySlotEnvelope(env, slotNum);
   } catch (e) {
     appendToChat('> [ERROR] Save slot corrupted or unreadable.', 'sys', true);
   }
+}
+
+// _applySlotEnvelope(env, slotNum, opts) — the SHARED verify → context-check →
+// snap → migrate → apply → loadUI core for a slot-shaped save envelope. Extracted
+// verbatim from loadFromSlot so that loadFromSlot AND restoreSlotVersion (P5) run
+// the EXACT same state-replacing path (Protocol 22 — one apply implementation, no
+// parallel copy). Returns true when applied, false if the user cancelled at an
+// integrity or context confirm gate (matching loadFromSlot's original early
+// returns — nothing ran after the apply block, so behavior is unchanged). The
+// optional opts.verb customises only the closing status wording.
+async function _applySlotEnvelope(env, slotNum, opts) {
+  opts = opts || {};
+  // Integrity + forward-compat check before applying
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const integrity = window.verifySaveEnvelope(env);
+    if (integrity.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+        confirmLabel: 'FORCE-LOAD',
+      });
+      if (!ok) return false;
+    } else if (integrity.status === 'checksum_mismatch') {
+      const ok = await confirmAction({
+        title: '> SAVE INTEGRITY WARNING',
+        warning:
+          'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+        confirmLabel: 'LOAD ANYWAY',
+      });
+      if (!ok) return false;
+    }
+  }
+  // F5: Warn on gameContext mismatch between slot and current session
+  const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
+  const curCtx = state.gameContext || 'FNV';
+  if (slotCtx !== curCtx) {
+    const ok = await confirmAction({
+      title: '> CONTEXT MISMATCH',
+      warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
+      confirmLabel: 'SWITCH & LOAD',
+    });
+    if (!ok) return false;
+  }
+  // Snapshot current state as rolling backup before replacing
+  if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+  if (typeof migrateState === 'function') env.state = migrateState(env.version || '1.0', env.state);
+  state = { ...state, ...env.state };
+  if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
+  if (env.playstyle) {
+    localStorage.setItem('robco_playstyle', env.playstyle);
+    if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
+    let el = document.getElementById('playstyleInput');
+    if (el) el.value = env.playstyle;
+  }
+  loadUI();
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ctx = slotCtx;
+  const verb = opts.verb || 'restored';
+  appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] ${verb}. Saved: ${ts}`, 'sys', true);
+  const statusEl = document.getElementById('slotStatus');
+  if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+  return true;
+}
+
+// ── SAVE VERSION HISTORY VIEWER + RESTORE (P5) ───────────────────────
+// viewSlotVersions() lists a slot's retained prior revisions in the shared modal;
+// each row RESTORES that revision. IDB-only + fail-safe — never offered when
+// IndexedDB is absent (readSlotVersions returns []). Restoring a prior version is
+// DESTRUCTIVE to the live campaign → confirm-gated (Protocol 34) and routed through
+// the SAME _applySlotEnvelope core as loadFromSlot (verifySaveEnvelope integrity
+// check + snapRollingBackup-before-apply + migrateState). Bounded render (cap
+// SLOT_VERSION_CAP), single innerHTML (no flash), escapeHtml on every dynamic
+// field. Game-agnostic (Protocol 38) — labels come from the envelope, no literals.
+async function viewSlotVersions(slotNum) {
+  if (typeof window.readSlotVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const ts = v && v.savedAt ? new Date(v.savedAt).toLocaleString() : 'unknown';
+      const ctx = String((v && (v.gameContext || (v.state && v.state.gameContext))) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="restoreSlotVersion(' +
+        slotNum +
+        ',' +
+        i +
+        ')" aria-label="Restore this saved version of ' +
+        escapeHtml(_slotLabel(slotNum)) +
+        '">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+    body: '<div>' + rows + '</div>',
+  });
+}
+
+async function restoreSlotVersion(slotNum, index) {
+  if (typeof window.readSlotVersions !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  const env = versions[index];
+  if (!env) {
+    appendToChat('> [LOAD] That version is no longer available.', 'sys', true);
+    return;
+  }
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> RESTORE VERSION',
+    warning: `Restore ${_slotLabel(slotNum)} to the version saved ${ts}?\n\nThis REPLACES your current campaign state. A rolling backup of the current state is taken first, so this can be undone.`,
+    confirmLabel: 'RESTORE VERSION',
+  });
+  if (!ok) return;
+  try {
+    await _applySlotEnvelope(env, slotNum, { verb: 'version restored' });
+  } catch (_) {
+    appendToChat('> [ERROR] Version restore failed — data unreadable.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+
+// ── CLOUD SAVE VERSION HISTORY VIEWER ────────────────────────────────────────
+// viewCloudSaveVersions() mirrors viewSlotVersions() exactly, but lists a cloud
+// save's retained revisions (window.listCloudSaveVersions, cloud.js) instead of a
+// local slot's. Each row restores that revision into the LIVE local campaign via
+// window.restoreCloudSaveVersion — the cloud doc itself is untouched (Protocol 22:
+// same modal shape, same escapeHtml discipline, no parallel viewer implementation).
+async function viewCloudSaveVersions(docId) {
+  if (typeof window.listCloudSaveVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.listCloudSaveVersions(docId);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — CLOUD SAVE',
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const d = v.data;
+      const ts = d && d.archivedAt ? new Date(d.archivedAt).toLocaleString() : 'unknown';
+      const ctx = String((d && d.gameContext) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="window.restoreCloudSaveVersion(\'' +
+        docId +
+        "','" +
+        v.id +
+        '\')" aria-label="Restore this saved cloud version">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — CLOUD SAVE',
+    body: '<div>' + rows + '</div>',
+  });
 }
 
 // ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────
@@ -285,6 +525,9 @@ function addQuest() {
   const obj = (document.getElementById('newQuestObjective') || {}).value?.trim() || null;
   if (!state.quests) state.quests = [];
   state.quests.push({ name, status, objective: obj });
+  // FEEDBACK ANIMATION WAVE 3 (#25 DIRECTIVE FILED) — a transient module var
+  // (never state.*), consumed by renderQuests() the next time it paints.
+  _pendingQuestFiled = name;
   document.getElementById('newQuestName').value = '';
   document.getElementById('newQuestObjective').value = '';
   renderQuests();
@@ -324,11 +567,14 @@ function triggerFileInput() {
 // ── RESTORE ROLLING BACKUP ─────────────────────────────────────────
 // Presents the rolling backup ring and lets the user restore one — confirm-gated,
 // routed through sanitizeImportedContainer + migrateState (Protocol 34).
-function restoreRollingBackup() {
-  if (typeof window.getRollingBackups !== 'function') return;
-  const backups = window.getRollingBackups();
+async function restoreRollingBackup() {
+  if (typeof window.getRollingBackupsAsync !== 'function') return;
+  // IDB-primary union — surfaces a backup that survives in IndexedDB even if the
+  // localStorage ring dropped it under quota (P3 ceiling relief).
+  const backups = await window.getRollingBackupsAsync();
   if (!backups.length) {
-    alert('>> NO BACKUP SAVES AVAILABLE <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'NO BACKUP SAVES AVAILABLE' });
     return;
   }
   const listStr = backups.map((b, i) => `${i + 1}. ${b.label}`).join('\n');
@@ -338,16 +584,24 @@ function restoreRollingBackup() {
   if (!choice) return;
   const n = parseInt(choice);
   if (isNaN(n) || n < 1 || n > backups.length) {
-    alert('>> INVALID SELECTION <<');
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'INVALID SELECTION' });
     return;
   }
   const backup = backups[n - 1];
-  if (
-    !confirm(
-      `>> RESTORE BACKUP FROM ${backup.label}?\n\nThis replaces your current campaign state.`
-    )
-  )
-    return;
+  const ok = await confirmAction({
+    title: '> RESTORE BACKUP',
+    warning: `Restore backup from ${backup.label}?\n\nThis replaces your current campaign state.`,
+    confirmLabel: 'RESTORE',
+  });
+  if (!ok) return;
+  _restoreBackupApply(backup);
+}
+
+// _restoreBackupApply(backup) — the synchronous sanitize → migrate → write core,
+// separated from the confirm gate so it is directly testable without mocking
+// confirmAction() (Step 2 Phase 0 U12 split — mirrors _craftPrepare/_craftApply).
+function _restoreBackupApply(backup) {
   try {
     const data = backup.data;
     const sanitized =
@@ -365,8 +619,9 @@ function restoreRollingBackup() {
     if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
     // Guard the impending reload's beforeunload flush (clobber regression).
     window._loadingSave = true;
-    alert('>> BACKUP RESTORED. REBOOTING SYSTEM... <<');
-    window.location.reload();
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'BACKUP RESTORED. REBOOTING SYSTEM...' });
+    setTimeout(() => window.location.reload(), 2000);
   } catch (_) {
     appendToChat('> [SYS-ALERT: BACKUP RESTORE FAILED]', 'sys');
   }
@@ -385,43 +640,48 @@ function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const parsed = JSON.parse(e.target.result);
+      if (parsed.bundle === true) {
+        // P6 full-backup bundle — its own confirm-gated whole-history restore.
+        await importBundle(parsed);
+        return;
+      }
       if (parsed.robco_v8) {
         // v8 Container payload — integrity check + rolling backup before applying
         if (typeof window.verifySaveEnvelope === 'function') {
           const _fi = window.verifySaveEnvelope(parsed);
           if (_fi.status === 'future_version') {
-            if (
-              !confirm(
-                `> VERSION MISMATCH\n\nThis save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`
-              )
-            )
-              return;
+            const ok = await confirmAction({
+              title: '> VERSION MISMATCH',
+              warning: `This save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+              confirmLabel: 'FORCE-LOAD',
+            });
+            if (!ok) return;
           } else if (_fi.status === 'checksum_mismatch') {
-            if (
-              !confirm(
-                '> SAVE INTEGRITY WARNING\n\nThis save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)'
-              )
-            )
-              return;
+            const ok = await confirmAction({
+              title: '> SAVE INTEGRITY WARNING',
+              warning:
+                'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+              confirmLabel: 'LOAD ANYWAY',
+            });
+            if (!ok) return;
           }
         }
         if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
-        const _sanitized =
-          typeof sanitizeImportedContainer === 'function'
-            ? sanitizeImportedContainer(parsed.robco_v8)
-            : parsed.robco_v8;
-        localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
-        if (parsed.chat && Array.isArray(parsed.chat))
-          localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));
-        if (parsed.playstyle) localStorage.setItem('robco_playstyle', parsed.playstyle);
+        // Shared container-write core (state.js) — reused by the P6 bundle import
+        // (Protocol 22 — one container-apply path).
+        window._writeImportedContainer(parsed);
         // Guard the impending reload's beforeunload flush so stale in-memory state
         // can't overwrite the robco_v8 we just imported (clobber regression).
         window._loadingSave = true;
-        alert('>> HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM... <<');
-        window.location.reload();
+        if (typeof openModal === 'function')
+          openModal({
+            title: '> IMPORT SAVE',
+            body: 'HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM...',
+          });
+        setTimeout(() => window.location.reload(), 2000);
       } else if (parsed.version && parsed.state) {
         // Envelope format (v1.6.3+): contains state, chat, playstyle
         autoImportState(JSON.stringify(parsed.state));
@@ -431,11 +691,13 @@ function handleFileUpload(event) {
           let el = document.getElementById('playstyleInput');
           if (el) el.value = parsed.playstyle;
         }
-        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
       } else {
         // Legacy: bare state JSON
         autoImportState(e.target.result);
-        alert('>> LEGACY BACKUP RESTORED SUCCESSFULLY <<');
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
       }
     } catch (err) {
       appendToChat('> [SYS-ALERT: SAVE FILE CORRUPTED OR UNREADABLE]', 'sys');
@@ -444,9 +706,99 @@ function handleFileUpload(event) {
   reader.readAsText(file);
 }
 
+// ── FULL BACKUP BUNDLE (P6) — UI layer ───────────────────────────────
+// exportFullBundle writes the whole-history bundle (state.js buildFullBundle) to a
+// file on a DELIBERATE button press. importBundle restores it — DESTRUCTIVE, so it
+// is confirm-gated (Protocol 34) and rejects a bad-shape / bad-checksum / (with
+// confirm) future-version bundle with a clear in-terminal error and NO partial
+// apply. The actual storage restore routes through state.js applyBundleData →
+// _writeImportedContainer, the SAME container-apply path handleFileUpload uses
+// (Protocol 22). Bundle metadata shown in the modal is escaped via confirmAction's
+// per-line escapeHtml. Game-agnostic (Protocol 38).
+async function exportFullBundle() {
+  if (typeof window.buildFullBundle !== 'function') return;
+  const bundle = await window.buildFullBundle();
+  _downloadBlob(
+    JSON.stringify(bundle, null, 2),
+    'application/json',
+    'robco_full_backup_' + new Date().toISOString().split('T')[0] + '.json'
+  );
+  appendToChat(
+    '> [BUNDLE] Full backup exported (' +
+      (bundle.slots ? bundle.slots.length : 0) +
+      ' slot(s), ' +
+      (bundle.backups ? bundle.backups.length : 0) +
+      ' backup(s)).',
+    'sys',
+    true
+  );
+}
+
+async function importBundle(parsed) {
+  const _bad = msg => {
+    if (typeof openModal === 'function') openModal({ title: '> IMPORT FULL BACKUP', body: msg });
+  };
+  // 1) SHAPE — reject anything that isn't a well-formed bundle (no partial apply).
+  if (typeof window.isValidBundleShape !== 'function' || !window.isValidBundleShape(parsed)) {
+    _bad('&#9888; NOT A VALID FULL BACKUP FILE. No changes were made.');
+    return;
+  }
+  // 2) FUTURE VERSION — reuse verifySaveEnvelope's version logic (confirm to force).
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const vi = window.verifySaveEnvelope(parsed);
+    if (vi.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This backup was made on a newer version of RobCo (v${vi.version}).\nYour app is on v${APP_VERSION}.\n\nRestoring may cause data loss — update the app first.\n\nForce-restore anyway?`,
+        confirmLabel: 'FORCE-RESTORE',
+      });
+      if (!ok) return;
+    }
+  }
+  // 3) CHECKSUM — reject a bundle whose integrity seal doesn't verify (no apply).
+  if (typeof window.verifyBundleChecksum !== 'function' || !window.verifyBundleChecksum(parsed)) {
+    _bad(
+      '&#9888; BACKUP FAILED ITS INTEGRITY CHECK. It may be corrupt or was edited outside the app. No changes were made.'
+    );
+    return;
+  }
+  // 4) CONFIRM — destructive whole-history restore (Protocol 34).
+  const _exp = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> IMPORT FULL BACKUP',
+    warning: `Restore your ENTIRE history from this backup?\n\nExported: ${_exp}\nContains ${parsed.slots.length} save slot(s) plus your live campaign.\n\nThis REPLACES your current campaign and overwrites saved slots. A rolling backup of your current state is taken first, so it can be undone.`,
+    confirmLabel: 'RESTORE ALL',
+  });
+  if (!ok) return;
+  // 5) APPLY — snap the current state as the undo point FIRST, then restore all
+  //    storage via the shared data-layer path (state.js applyBundleData).
+  try {
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+    await window.applyBundleData(parsed);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> IMPORT FULL BACKUP',
+        body: 'FULL BACKUP RESTORED. REBOOTING SYSTEM...',
+      });
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: FULL BACKUP RESTORE FAILED]', 'sys');
+  }
+}
+
 function triggerImageUpload() {
   document.getElementById('imageInput').click();
 }
+// Visual Upload OCR Unit 3 (planning/VISUAL_UPLOAD_OCR_PLAN.md §4): the stash
+// of attachedImageData/attachedImageMimeType + the #imagePreview thumbnail is
+// UNCHANGED (Protocol 22 — the AI-vision fallback still needs both globals
+// set verbatim). What changes is what happens next — routeVisualUpload(file)
+// (js/ocr.js) now runs the on-device OCR pipeline as the PRIMARY path the
+// instant a screenshot is picked, falling back to the existing AI-vision
+// pipeline only when OCR is unavailable/failing or the player explicitly
+// requests it from the preview modal.
 function handleImageSelection(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -457,6 +809,7 @@ function handleImageSelection(event) {
     const preview = document.getElementById('imagePreview');
     preview.src = attachedImageData;
     preview.style.display = 'block';
+    if (typeof routeVisualUpload === 'function') routeVisualUpload(file);
   };
   reader.readAsDataURL(file);
 }
@@ -497,13 +850,31 @@ function initRegistryAutocomplete() {
     _acCurrentInput = null;
   }
 
+  // The composer (#chatInput) has its own toolbar row (+/pill/?/send) docked
+  // directly BELOW the textarea inside the same bordered box — a drop-down
+  // panel there covers the send button. Drop UP instead for that one input
+  // (Protocol 22 — same singleton panel/logic, just flipped vertically for
+  // the composer context); every other registry-backed input keeps dropping
+  // down as before.
+  function acDropsUp(inputEl) {
+    return inputEl && inputEl.id === 'chatInput';
+  }
+
   function acPosition(inputEl) {
     var rect = inputEl.getBoundingClientRect();
-    panel.style.top = rect.bottom + 2 + 'px';
-    panel.style.left = rect.left + 'px';
     // Clamp to viewport right edge
     var panelW = Math.min(340, Math.max(220, rect.width));
     panel.style.width = panelW + 'px';
+    if (acDropsUp(inputEl)) {
+      // panel.offsetHeight only reflects real content once visible — callers
+      // add 'ac-visible' before invoking acPosition() so this measures the
+      // just-rendered result list, not a stale/zero height.
+      var panelH = panel.offsetHeight || 0;
+      panel.style.top = Math.max(4, rect.top - panelH - 2) + 'px';
+    } else {
+      panel.style.top = rect.bottom + 2 + 'px';
+    }
+    panel.style.left = rect.left + 'px';
   }
 
   function acRender(results, inputEl) {
@@ -553,8 +924,11 @@ function initRegistryAutocomplete() {
       });
     }
 
-    acPosition(inputEl);
+    // Make it visible BEFORE positioning — acPosition() needs a real
+    // offsetHeight to drop-up correctly for the composer, and a panel with
+    // display:none always measures 0.
     panel.classList.add('ac-visible');
+    acPosition(inputEl);
   }
 
   function acSetActive(idx) {
@@ -569,10 +943,19 @@ function initRegistryAutocomplete() {
     _acActiveIdx = idx;
   }
 
-  function wireInput(inputId, category) {
+  // categoryOrFn: a registry category string (existing behavior, unchanged —
+  // results come from registrySearch(category, q)) OR a resolver function
+  // (Step 2 Phase 2 B1 — results come from fn(q) instead; used to wire
+  // #chatInput to _commandSuggestions in api.js without a second singleton).
+  function wireInput(inputId, categoryOrFn) {
     var el = document.getElementById(inputId);
     if (!el) return;
-    if (typeof registrySearch !== 'function') return;
+    var isFn = typeof categoryOrFn === 'function';
+    if (!isFn && typeof registrySearch !== 'function') return;
+
+    function fetchResults(q) {
+      return isFn ? categoryOrFn(q) || [] : registrySearch(categoryOrFn, q);
+    }
 
     el.addEventListener('input', function () {
       clearTimeout(_acTimer);
@@ -583,8 +966,7 @@ function initRegistryAutocomplete() {
       }
       _acCurrentInput = el;
       _acTimer = setTimeout(function () {
-        var results = registrySearch(category, q);
-        acRender(results, el);
+        acRender(fetchResults(q), el);
       }, 150);
     });
 
@@ -619,7 +1001,7 @@ function initRegistryAutocomplete() {
       var q = el.value;
       if (q.length >= 2) {
         _acCurrentInput = el;
-        var results = registrySearch(category, q);
+        var results = fetchResults(q);
         if (results.length) acRender(results, el);
       }
     });
@@ -629,6 +1011,16 @@ function initRegistryAutocomplete() {
   wireInput('newQuestName', 'quests');
   wireInput('newItemName', 'items');
   wireInput('newPerkName', 'perks');
+  // Step 2 Phase 2 B1: TERMINAL-mode command/quick-log suggestions for the
+  // Comm-Link input (suppressed entirely when the message resolves to OVERSEER).
+  if (typeof _commandSuggestions === 'function') {
+    wireInput('chatInput', _commandSuggestions);
+  }
+  // Tool Deck: the shared #deckTarget field (TARGET/ITEM/TOPIC) gets
+  // creature/item/location/topic suggestions (_deckTargetSuggestions, ui-render.js).
+  if (typeof _deckTargetSuggestions === 'function') {
+    wireInput('deckTarget', _deckTargetSuggestions);
+  }
 
   // Reposition on scroll/resize so the panel doesn't orphan
   window.addEventListener(

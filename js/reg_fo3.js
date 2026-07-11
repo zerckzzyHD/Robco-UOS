@@ -677,12 +677,16 @@ const FALLOUT_REGISTRY = {
   // 9 artifacts for the "Head of State" quest (Museum of History, Washington DC).
   // buyers: which NPCs will purchase — hannibal=Hannibal Hamlin (Temple of the Union),
   //         leroy=Leroy Walker (Lincoln Memorial), washington=Abraham Washington (Rivet City).
+  // shape: the Curio Archive typed-artifact CSS class _curioObjectIconHtml() renders
+  //        this item as (rifle/hat/cylinder/figure/poster/book/coin) — per-item, since
+  //        (unlike collectibleCategory) Lincoln relics are NOT one uniform object type.
   // Data source: https://fallout.wiki/wiki/Lincoln%27s_Profit_Margins
   lincolnMemorabilia: [
     {
       name: "Lincoln's Repeater",
       location: 'MUSEUM OFFICES — ARCHIVE ROOM DISPLAY CASE',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'rifle',
       gridRow: 4,
       gridCol: 2,
     },
@@ -690,6 +694,7 @@ const FALLOUT_REGISTRY = {
       name: "Lincoln's Hat",
       location: 'MUSEUM 1ST FLOOR OFFICES — COLLAPSED-CEILING ROOM (ON FLOOR)',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'hat',
       gridRow: 4,
       gridCol: 2,
     },
@@ -697,6 +702,7 @@ const FALLOUT_REGISTRY = {
       name: "Lincoln's Voice",
       location: 'MUSEUM 2ND FLOOR OFFICES — 2ND DESK LEFT AT TOP OF STAIRS',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'cylinder',
       gridRow: 4,
       gridCol: 2,
     },
@@ -704,6 +710,7 @@ const FALLOUT_REGISTRY = {
       name: 'Action Abe Action Figure',
       location: 'MUSEUM OFFICES — VERY HARD LOCKED ARCHIVE DOOR, DESK SW CORNER',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'figure',
       gridRow: 4,
       gridCol: 2,
     },
@@ -711,6 +718,7 @@ const FALLOUT_REGISTRY = {
       name: 'Civil War Draft Poster',
       location: 'MUSEUM OFFICES — SE CORNER TOP SHELF (CAN FALL TO FLOOR)',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'poster',
       gridRow: 4,
       gridCol: 2,
     },
@@ -718,6 +726,7 @@ const FALLOUT_REGISTRY = {
       name: "Lincoln's Diary",
       location: 'MUSEUM LOWER HALLS — FIRST DISPLAY ROOM UP THE STEPS',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'book',
       gridRow: 4,
       gridCol: 2,
     },
@@ -725,6 +734,7 @@ const FALLOUT_REGISTRY = {
       name: 'Antique Lincoln Coin Collection',
       location: 'MUSEUM 2ND FLOOR OFFICES — BOOKSHELF',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'coin',
       gridRow: 4,
       gridCol: 2,
     },
@@ -732,6 +742,7 @@ const FALLOUT_REGISTRY = {
       name: 'John Wilkes Booth Wanted Poster',
       location: 'MUSEUM OFFICES — SW CORNER, LAST BOOKSHELF 3RD SHELF',
       buyers: ['hannibal', 'leroy', 'washington'],
+      shape: 'poster',
       gridRow: 4,
       gridCol: 2,
     },
@@ -739,6 +750,7 @@ const FALLOUT_REGISTRY = {
       name: 'Lincoln Memorial Poster',
       location: 'MUSEUM 2ND FLOOR — WALL BEHIND FIRST DESK (spawns after Head of State started)',
       buyers: ['leroy'],
+      shape: 'poster',
       gridRow: 4,
       gridCol: 2,
     },

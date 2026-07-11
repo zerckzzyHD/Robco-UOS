@@ -2,38 +2,82 @@
 // (co-located with the slot-schema helpers _slotKey/_slotLabel). renderSavesList()
 // below calls it as a global. (DUP-2 consolidation, WU-B7.)
 
+// SU-4 (Step 2 v2.8.0 Settings-tab unit): the REG PORT / Operator Registry board's
+// diegetic status words are driven entirely by real auth + connection state — never
+// hardcoded to one story. Four conditions (Protocol 22 — reuses the exact same
+// signals as everywhere else, no parallel connection check):
+//   1. signed out, googleSignIn ON   -> NO OPERATOR ON RECORD, REG PORT VACANT,
+//                                        CLOUD ARCHIVE SYNC OFFLINE, sign-in button
+//   2. signed out, googleSignIn OFF  -> LOCAL ARCHIVES ACTIVE, no button
+//   3. signed in, carrier connected  -> OPERATOR VERIFIED, CLOUD ARCHIVES + CIPHER-
+//                                        KEY SYNC AVAILABLE, sever-uplink button
+//   4. signed in, carrier disconnected -> OPERATOR VERIFIED, CLOUD ARCHIVE SYNC
+//                                        OFFLINE (NO CARRIER), sever-uplink button
+// _isUplinkConnected() is the SAME carrier signal the UPLINK lamp, the bezel
+// telemetry CARRIER suffix, and the SYSTEM STATUS panel already use — reusing it
+// here (rather than a second navigator.onLine check) is what keeps every one of
+// those readouts in agreement (they're all driven by refreshOverseerCarrier(),
+// which calls this function — see ui-core.js).
 function renderAccount() {
   const body = document.getElementById('accountBody');
+  const summaryEl = document.getElementById('acctSummaryStatus');
   if (!body) return;
   const acct =
     typeof window.getAccountState === 'function'
       ? window.getAccountState()
       : { uid: null, isAnonymous: true, email: null, displayName: null };
-  if (acct.isAnonymous || !acct.uid) {
-    if (typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn')) {
-      body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
-        '<div style="font-size:11px;opacity:0.5;padding:6px 0;">UPLINK TEMPORARILY UNAVAILABLE — LOCAL ARCHIVES ACTIVE.</div>';
+  const signedIn = !acct.isAnonymous && !!acct.uid;
+  const googleSignInOff =
+    typeof window.isFeatureEnabled === 'function' && !window.isFeatureEnabled('googleSignIn');
+  const connected = typeof _isUplinkConnected === 'function' ? _isUplinkConnected() : false;
+  const name = acct.displayName ? escapeHtml(acct.displayName) : '';
+  const email = acct.email ? escapeHtml(acct.email) : '';
+  // Protocol 42 fix (found during render-verify): '·' is a literal Unicode
+  // character, NOT the HTML entity '&middot;' — `summary` is assigned via
+  // .textContent below (never parsed as HTML), so an entity there would show
+  // up as the literal text "&middot;" instead of a dot. Using the real
+  // character here keeps it correct in both the innerHTML board AND the
+  // textContent summary from a single shared value.
+  const idBits = [name, email].filter(Boolean).join(' · ');
+
+  let summary, board;
+  if (!signedIn) {
+    if (googleSignInOff) {
+      summary = 'UPLINK TEMPORARILY UNAVAILABLE';
+      board =
+        '<div style="font-size:11px;margin-bottom:4px;">NO OPERATOR ON RECORD</div>' +
+        '<div style="font-size:11px;opacity:0.7;">&gt; LOCAL ARCHIVES ACTIVE</div>';
     } else {
-      body.innerHTML =
-        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">UPLINK OFFLINE — ARCHIVES STORED LOCALLY</div>' +
+      summary = 'UPLINK OFFLINE — ARCHIVES STORED LOCALLY';
+      board =
+        '<div style="font-size:11px;margin-bottom:4px;">NO OPERATOR ON RECORD</div>' +
+        '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; REG PORT VACANT — LOCAL ARCHIVES ACTIVE · CLOUD ARCHIVE SYNC OFFLINE</div>' +
         '<button class="action-btn" style="width:100%" onclick="if(window.signInWithGoogle)window.signInWithGoogle()">' +
-        '> ESTABLISH GOOGLE UPLINK — SYNC TELEMETRY ACROSS TERMINALS</button>';
+        '&gt; ESTABLISH GOOGLE UPLINK — SYNC TELEMETRY ACROSS TERMINALS</button>';
     }
-  } else {
-    const name = acct.displayName ? escapeHtml(acct.displayName) : '';
-    const email = acct.email ? escapeHtml(acct.email) : '';
-    body.innerHTML =
-      '<div style="font-size:11px;margin-bottom:4px;">UPLINK ACTIVE</div>' +
-      (name
-        ? '<div style="font-size:11px;opacity:0.85;margin-bottom:2px;">' + name + '</div>'
+  } else if (connected) {
+    summary = 'UPLINK ACTIVE' + (idBits ? ' · ' + idBits : '');
+    board =
+      '<div style="font-size:11px;margin-bottom:2px;">UPLINK ACTIVE · OPERATOR VERIFIED</div>' +
+      (idBits
+        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:4px;">' + idBits + '</div>'
         : '') +
-      (email
-        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:8px;">' + email + '</div>'
-        : '') +
+      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; CLOUD ARCHIVES + CIPHER-KEY SYNC AVAILABLE</div>' +
       '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
-      '> SEVER UPLINK</button>';
+      '&gt; SEVER UPLINK</button>';
+  } else {
+    summary = 'UPLINK ACTIVE — CLOUD UNREACHABLE';
+    board =
+      '<div style="font-size:11px;margin-bottom:2px;">OPERATOR VERIFIED</div>' +
+      (idBits
+        ? '<div style="font-size:11px;opacity:0.6;margin-bottom:4px;">' + idBits + '</div>'
+        : '') +
+      '<div style="font-size:11px;opacity:0.7;margin-bottom:8px;">&gt; CLOUD ARCHIVE SYNC OFFLINE (NO CARRIER)</div>' +
+      '<button class="action-btn" style="width:100%" onclick="if(window.signOutAccount)window.signOutAccount()">' +
+      '&gt; SEVER UPLINK</button>';
   }
+  body.innerHTML = board;
+  if (summaryEl) summaryEl.textContent = summary;
 }
 
 // ── Unified Saves List (Phase 6 Task 7) ──────────────────────────────────────
@@ -68,6 +112,60 @@ async function renderSavesList() {
 
   const localSaves = listLocalSaves();
 
+  // P3: supplement the localStorage list with any save slot that lives ONLY in
+  // IndexedDB (an oversized save localStorage couldn't hold). Runs before the
+  // single innerHTML paint below, so the list is complete with no flash of empty.
+  if (window.IdbStore) {
+    const haveN = new Set(localSaves.filter(s => s.isSlot).map(s => s.n));
+    for (let n = 1; n <= 3; n++) {
+      if (haveN.has(n)) continue;
+      try {
+        const slot = await window.IdbStore.get('campaign', 'slot_' + n);
+        if (slot && (slot.savedAt || slot.slotName)) {
+          const savedDate = slot.savedAt ? new Date(slot.savedAt).toLocaleDateString() : '';
+          localSaves.push({
+            id: 'slot_' + n,
+            label: (slot.slotName || 'Slot ' + n) + (savedDate ? ': ' + savedDate : ''),
+            isSlot: true,
+            n,
+            gameContext: slot.gameContext || null,
+          });
+        }
+      } catch (_) {}
+    }
+    localSaves.sort((a, b) => (a.n || 0) - (b.n || 0));
+  }
+
+  // FIX 3 (owner report): saves are per-game — only show the ACTIVE game's saves.
+  // A slot with no recorded gameContext predates WU-F5 and is shown regardless
+  // (can't attribute it to a game, so degrade to showing rather than hiding data).
+  // The always-visible "Active" row is exempt — it always reflects whatever game
+  // is currently live, so it is per-game by construction.
+  const curCtx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const localHiddenCount = localSaves.filter(
+    s => s.isSlot && s.gameContext && s.gameContext !== curCtx
+  ).length;
+  const localSavesShown = localSaves.filter(
+    s => !s.isSlot || !s.gameContext || s.gameContext === curCtx
+  );
+
+  // P5: per-slot version-history availability. The VERS affordance is offered ONLY
+  // when IndexedDB is present AND that slot has ≥1 retained prior revision — so no
+  // IDB means no button and save/load is unchanged (fail-safe). Computed before the
+  // single innerHTML paint below, so rows render complete with no flash.
+  const versionCounts = {};
+  if (window.IdbStore && typeof window.readSlotVersions === 'function') {
+    for (const s of localSavesShown) {
+      if (!s.isSlot) continue;
+      try {
+        const vs = await window.readSlotVersions(s.n);
+        if (vs.length) versionCounts[s.n] = vs.length;
+      } catch (_) {}
+    }
+  }
+
+  const summaryEl = document.getElementById('sum-saves');
+
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
     body.innerHTML = emptyState('RETRIEVING ARCHIVES…');
@@ -75,54 +173,113 @@ async function renderSavesList() {
       cloudSaves = await window.listCloudSaves();
     } catch (_) {
       body.innerHTML = emptyState('⚠ ARCHIVE LINK FAILED');
+      if (summaryEl) summaryEl.textContent = 'ARCHIVE LINK FAILED';
       return;
     }
   }
 
-  if (!localSaves.length && !cloudSaves.length) {
-    body.innerHTML = _archiveHeader + emptyState('NO ARCHIVES ON FILE');
+  // FIX 3: same per-game filter, cloud side — a doc with no recorded gameContext
+  // predates the field and is shown regardless (same graceful degrade as local).
+  const cloudHiddenCount = cloudSaves.filter(
+    s => s.data.gameContext && s.data.gameContext !== curCtx
+  ).length;
+  const cloudSavesShown = cloudSaves.filter(
+    s => !s.data.gameContext || s.data.gameContext === curCtx
+  );
+
+  if (!localSavesShown.length && !cloudSavesShown.length) {
+    const hidden = localHiddenCount + cloudHiddenCount;
+    body.innerHTML =
+      _archiveHeader +
+      emptyState(
+        hidden
+          ? `NO ARCHIVES FOR ACTIVE GAME (${hidden} archived under other games)`
+          : 'NO ARCHIVES ON FILE'
+      );
+    if (summaryEl) summaryEl.textContent = 'NO ARCHIVES ON FILE';
     return;
   }
 
   const rows = [];
 
-  localSaves.forEach(ls => {
+  localSavesShown.forEach(ls => {
     rows.push(
-      '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
-        '<span style="font-size:9px;opacity:0.5;flex-shrink:0;margin-right:2px;">[LOCAL]</span>' +
-        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+      '<div class="save-row">' +
+        '<div class="save-row-label">' +
+        '<span class="save-row-tag">[LOCAL]</span>' +
+        '<span class="save-row-name">' +
         escapeHtml(ls.label) +
         '</span>' +
+        '</div>' +
         (ls.isSlot
-          ? '<span style="flex-shrink:0;"><button class="btn-sm" onclick="loadFromSlot(' +
+          ? '<div class="save-row-actions">' +
+            '<button class="btn-sm" onclick="loadFromSlot(' +
             ls.n +
-            ')">LOAD</button></span>'
+            ')">LOAD</button>' +
+            '<button class="btn-sm" onclick="confirmOverwriteSlot(' +
+            ls.n +
+            ')" aria-label="Overwrite ' +
+            escapeHtml(String(ls.label)) +
+            ' with your current campaign">OVERWRITE</button>' +
+            (versionCounts[ls.n]
+              ? '<button class="btn-sm" onclick="viewSlotVersions(' +
+                ls.n +
+                ')" aria-label="View saved version history for ' +
+                escapeHtml(String(ls.label)) +
+                '">VER ' +
+                versionCounts[ls.n] +
+                '</button>'
+              : '') +
+            '<button class="btn-sm delete-btn" onclick="confirmDeleteSlot(' +
+            ls.n +
+            ')" aria-label="Delete ' +
+            escapeHtml(String(ls.label)) +
+            '">DEL</button>' +
+            '</div>'
           : '') +
         '</div>'
     );
   });
 
-  cloudSaves.forEach(s => {
+  cloudSavesShown.forEach(s => {
     const d = s.data;
     const docId = s.id;
     const label = escapeHtml(d.label || (docId === 'main' ? 'Quick Save' : 'Untitled'));
     rows.push(
-      '<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;">' +
-        '<span style="font-size:9px;opacity:0.5;flex-shrink:0;margin-right:2px;">[CLOUD]</span>' +
-        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+      '<div class="save-row">' +
+        '<div class="save-row-label">' +
+        '<span class="save-row-tag">[CLOUD]</span>' +
+        '<span class="save-row-name">' +
         label +
         '</span>' +
-        '<span style="flex-shrink:0;display:flex;gap:2px;">' +
+        '</div>' +
+        '<div class="save-row-actions">' +
         '<button class="btn-sm" onclick="window.loadCloudSave(\'' +
         docId +
         '\')">LOAD</button>' +
+        '<button class="btn-sm" onclick="window.overwriteCloudSave(\'' +
+        docId +
+        '\')" aria-label="Overwrite ' +
+        label +
+        ' with your current campaign">OVERWRITE</button>' +
+        (d.versionCount
+          ? '<button class="btn-sm" onclick="viewCloudSaveVersions(\'' +
+            docId +
+            '\')" aria-label="View saved cloud version history for ' +
+            label +
+            '">VER ' +
+            d.versionCount +
+            '</button>'
+          : '') +
         '<button class="btn-sm" onclick="(function(){var l=prompt(\'Rename:\');if(l)window.renameCloudSave(\'' +
         docId +
         '\',l);})()">NAME</button>' +
         '<button class="btn-sm delete-btn" onclick="window.deleteCloudSave(\'' +
         docId +
-        '\')">DEL</button>' +
-        '</span>' +
+        '\')" aria-label="Delete ' +
+        label +
+        '">DEL</button>' +
+        '</div>' +
         '</div>'
     );
   });
@@ -134,6 +291,10 @@ async function renderSavesList() {
   }
 
   body.innerHTML = _archiveHeader + rows.join('');
+  if (summaryEl) {
+    summaryEl.textContent =
+      localSavesShown.length + ' LOCAL · ' + cloudSavesShown.length + ' CLOUD ARCHIVES';
+  }
 }
 
 function undoLastSync() {

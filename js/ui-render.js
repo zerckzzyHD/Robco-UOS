@@ -38,6 +38,11 @@ function addItem() {
     if (ex.val === 0 && v > 0) ex.val = v;
     if (ex.type === 'misc' && t !== 'misc') ex.type = t;
   } else state.inventory.push({ name: n, qty: q, wgt: w, val: v, type: t });
+  // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — new additive emit
+  // (Protocol 13 regression test covers it), fired for every manual add
+  // regardless of whether it created a new row or bumped an existing one —
+  // the home animation itself no-ops gracefully if the row isn't visible.
+  RobcoEvents.emit('item.added', { name: n, qty: q, source: 'manual', type: t });
   document.getElementById('newItemName').value = '';
   document.getElementById('newItemQty').value = '';
   document.getElementById('newItemWeight').value = '';
@@ -50,22 +55,384 @@ function delItem(idx) {
   renderInventory();
   updateMath();
 }
-function setInvFilter(cat) {
-  _invFilter = cat;
+
+// Phase 3 · Piece 2 (CARGO MANIFEST): per-row quantity ± stepper. Clamped >=0;
+// hitting 0 removes the row entirely (mirrors delItem's "gone" semantics —
+// there is no such thing as a zero-quantity cargo tag). A new native write
+// path (Protocol 13 regression test covers it), reusing the exact same
+// render/save calls every other inventory mutator already makes.
+function adjItemQty(idx, delta) {
+  const it = state.inventory[idx];
+  if (!it) return;
+  const next = Math.max(0, (parseInt(it.qty) || 0) + delta);
+  if (next === 0) {
+    state.inventory.splice(idx, 1);
+  } else {
+    it.qty = next;
+  }
+  renderInventory();
+  updateMath();
+  saveState();
+  // FEEDBACK ANIMATION WAVE 3 (#33 QTY DIGIT FLIP) — home-only; a one-shot
+  // digit-flip on the freshly-painted quantity readout, skipped when the row
+  // was removed entirely (next === 0, nothing left to flip).
+  if (next > 0) {
+    const list = document.getElementById('invList');
+    const stepBtn = list ? list.querySelector('[data-qtyidx="' + idx + '"]') : null;
+    const qEl = stepBtn ? stepBtn.parentElement.querySelector('.q') : null;
+    if (qEl) {
+      qEl.classList.remove('qty-digit-flip');
+      void qEl.offsetWidth;
+      qEl.classList.add('qty-digit-flip');
+      setTimeout(() => qEl.classList.remove('qty-digit-flip'), 400);
+    }
+  }
+}
+
+// Phase 3 · Piece 2: native EQUIP control, closing the U10 audit gap
+// (state.equipped was previously AI-write-only — see api.js autoImportState,
+// which keeps validating/applying the AI's own equipped writes unchanged).
+// One equipped item per slot family: 'weapon'-typed items occupy
+// state.equipped.weapon, 'armor'-typed items occupy state.equipped.armor.
+// Headgear has no distinct inventory item type, so it stays AI-write-only.
+// Tapping the equipped item's own button unequips it; tapping a different
+// item of the same family replaces it (single-apply per slot).
+function toggleEquipItem(idx) {
+  const it = state.inventory[idx];
+  if (!it) return;
+  const cat = (it.type || 'misc').toLowerCase();
+  const slot = cat === 'weapon' ? 'weapon' : cat === 'armor' ? 'armor' : null;
+  if (!slot) return;
+  if (!state.equipped) state.equipped = { weapon: null, armor: null, headgear: null };
+  const wasEquipped = state.equipped[slot] === it.name;
+  state.equipped[slot] = state.equipped[slot] === it.name ? null : it.name;
+  renderEquipped();
+  renderInventory();
+  saveState();
+  // FEEDBACK ANIMATION WAVE 3 (#19 IN-SERVICE STAMP) — new additive emit,
+  // fired only on an EQUIP (never an unequip — a stamp physically landing
+  // only makes sense once, the #12 INK STAMP precedent). Fires AFTER
+  // renderInventory() has already repainted, so the home-panel subscriber's
+  // row lookup is never stale (no defer needed, unlike item.added).
+  if (!wasEquipped) {
+    RobcoEvents.emit('item.equipped', { slot, name: it.name });
+  }
+}
+
+// Drawer bank labels + the state.inventory/state.ammo count each drawer badge
+// mirrors (Phase 3 · Piece 2 CARGO MANIFEST). Pure data — no game literal.
+const _DRAWER_LABELS = {
+  weapon: 'WEAPONS',
+  armor: 'APPAREL',
+  aid: 'AID',
+  mod: 'MODS',
+  misc: 'MISC',
+  ammo: 'AMMO',
+};
+function _drawerCount(cat) {
+  if (cat === 'ammo') return Object.values(state.ammo || {}).filter(n => n > 0).length;
+  return state.inventory.filter(it => (it.type || 'misc') === cat).length;
+}
+// Live per-drawer count badges + the CARGO MANIFEST board's 0i summary line —
+// called from both renderInventory() and renderAmmo() so it never goes stale
+// regardless of which one last mutated state.
+function _updateManifestChrome() {
+  const bar = document.getElementById('invFilterBar');
+  if (bar) {
+    bar.querySelectorAll('[data-dcount]').forEach(el => {
+      el.textContent = String(_drawerCount(el.dataset.dcount));
+    });
+  }
+  const label = _DRAWER_LABELS[_invFilter] || String(_invFilter).toUpperCase();
+  const title = document.getElementById('opsDrawerTitle');
+  if (title) title.textContent = label + ' DRAWER';
+  const total =
+    state.inventory.filter(it => (it.type || 'misc') !== 'ammo').length +
+    Object.values(state.ammo || {}).filter(n => n > 0).length;
+  const status = document.getElementById('opsManifestStatus');
+  if (status) status.textContent = total + ' ITEMS · ' + label + ' DRAWER OPEN';
+}
+
+// Syncs the drawer bank's visual "pulled" state + which tray is visible for
+// the given category — split out from setInvFilter() so boot restore
+// (_restoreDevicePrefs, ui-core.js) can apply a persisted drawer choice
+// before state/renderInventory are necessarily ready, without re-persisting
+// or re-rendering prematurely.
+function _syncDrawerButtons(cat) {
   const bar = document.getElementById('invFilterBar');
   if (bar) {
     bar.querySelectorAll('.inv-filter-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.filter === cat);
+      const isActive = btn.dataset.filter === cat;
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('pulled', isActive);
     });
   }
+  // AMMO folds the AMMO RESERVES tray in place of the item list — every other
+  // drawer shows the manifest list instead (same ammoList/ammoSubPanel ids,
+  // just display-toggled by the drawer choice, Protocol 22).
+  const invListWrap = document.getElementById('invListWrap');
+  const ammoTray = document.getElementById('ammoSubPanel');
+  if (invListWrap) invListWrap.style.display = cat === 'ammo' ? 'none' : '';
+  if (ammoTray) ammoTray.style.display = cat === 'ammo' ? '' : 'none';
+}
+
+function setInvFilter(cat) {
+  _invFilter = cat;
+  _syncDrawerButtons(cat);
+  MetaStore.set('robco_cargo_drawer', cat); // UI-6 — remember the last-open drawer
   renderInventory();
+  renderAmmo();
+}
+
+// ── NATIVE USE (deterministic item consumption, no AI) ──────────────────────
+// Deterministic default for a bare "Restore HP" clause — the CSV literally
+// carries no number for these rows (FNV Stimpak/Caravan Lunch/etc.), so this is
+// a named, documented constant rather than an AI guess (Protocol 3/24).
+const _AID_DEFAULT_HEAL = 20;
+
+// Converts a CHEMS.CSV Duration string ("4m"/"1h"/"30s"/"0"/"") to the app's
+// canonical 6-minute tick scale (_nativeSleep()/_nativeWait(): 1 hour = 10
+// ticks, so 1 tick = 6 minutes). Any sub-tick duration still rounds UP to at
+// least 1 tick — a real, if brief, buff — rather than rounding down to 0 and
+// silently discarding it. "0"/blank/unparseable → 0 (no timed effect).
+function _durationToTicks(durStr) {
+  const s = String(durStr || '')
+    .trim()
+    .toLowerCase();
+  if (!s || s === '0') return 0;
+  const m = s.match(/^(\d+(?:\.\d+)?)\s*(h|m|s)$/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  if (!n) return 0;
+  if (m[2] === 'h') return Math.round(n * 10);
+  if (m[2] === 'm') return Math.max(1, Math.round(n / 6));
+  return 1; // seconds — always at least 1 tick
+}
+
+// Pure, side-effect-free compute core (like _bioScanCompute) — parses a
+// getChemsTable() row's Effect column into a structured, deterministic result.
+// Clauses are delimited by " / " (SLASH bounded by whitespace on both sides),
+// never a bare "/" — several FNV foods carry an un-spaced "/" inside a clause
+// itself ("+2 HP/s for 10s"), which a naive split-on-"/" would tear in half.
+// Every real multi-clause CHEMS.CSV row (both games) uses spaced " / " between
+// clauses, so this delimiter is exact, not a heuristic.
+function _computeAidUse(chemEntry) {
+  const result = {
+    heal: 0,
+    radDelta: 0,
+    healLimbs: null,
+    clearAddiction: false,
+    clearPoison: false,
+    buff: null,
+    recognized: false,
+    summary: [],
+  };
+  if (!chemEntry || !chemEntry.effect) return result;
+  const clauses = String(chemEntry.effect)
+    .split(/\s+\/\s+/)
+    .map(c => c.trim())
+    .filter(Boolean);
+  const leftover = [];
+  clauses.forEach(clause => {
+    let m;
+    if ((m = clause.match(/^restore\s+(\d+)\s*hp$/i))) {
+      result.heal += parseInt(m[1], 10);
+      result.summary.push('+' + m[1] + ' HP');
+      return;
+    }
+    if ((m = clause.match(/^\+(\d+)\s*hp$/i))) {
+      result.heal += parseInt(m[1], 10);
+      result.summary.push('+' + m[1] + ' HP');
+      return;
+    }
+    if ((m = clause.match(/^\+(\d+(?:\.\d+)?)\s*hp\/s\s+for\s+(\d+)\s*s$/i))) {
+      const total = Math.round(parseFloat(m[1]) * parseInt(m[2], 10));
+      result.heal += total;
+      result.summary.push('+' + total + ' HP');
+      return;
+    }
+    if (/^restore\s+hp$/i.test(clause)) {
+      result.heal += _AID_DEFAULT_HEAL;
+      result.summary.push('+' + _AID_DEFAULT_HEAL + ' HP');
+      return;
+    }
+    if ((m = clause.match(/^remove\s+(\d+)\s*rads?$/i))) {
+      result.radDelta -= parseInt(m[1], 10);
+      result.summary.push('-' + m[1] + ' RAD');
+      return;
+    }
+    if ((m = clause.match(/^\+(\d+)\s*rads?$/i))) {
+      result.radDelta += parseInt(m[1], 10);
+      result.summary.push('+' + m[1] + ' RAD');
+      return;
+    }
+    if (/^restore\s+all\s+crippled\s+limbs$/i.test(clause) || /^heal\s+limbs$/i.test(clause)) {
+      result.healLimbs = 'all';
+      result.summary.push('LIMBS HEALED (ALL)');
+      return;
+    }
+    if (/^restore\s+crippled\s+limb$/i.test(clause)) {
+      if (result.healLimbs !== 'all') result.healLimbs = 'one';
+      result.summary.push('LIMB HEALED');
+      return;
+    }
+    if (/^remove\s+addiction$/i.test(clause)) {
+      result.clearAddiction = true;
+      result.summary.push('ADDICTION CLEARED');
+      return;
+    }
+    if (/^remove\s+poison$/i.test(clause)) {
+      result.clearPoison = true;
+      result.summary.push('POISON CLEARED');
+      return;
+    }
+    // Not a recognized heal/rad/limb/addiction/poison shape — a candidate
+    // modifier clause (+N STR, +25 DR, Night Vision, Slow time, a crafting-
+    // ingredient note, etc). Only becomes a timed BUFF if the row's OWN
+    // Duration column is > 0 — a zero-duration leftover (any crafting-
+    // ingredient row) stays inert rather than being guessed at.
+    leftover.push(clause);
+  });
+  const ticks = _durationToTicks(chemEntry.duration);
+  if (leftover.length > 0 && ticks > 0) {
+    result.buff = { name: chemEntry.name, ticks, type: 'BUFF' };
+    result.summary.push(chemEntry.name.toUpperCase() + ' EFFECT ACTIVE');
+  }
+  result.recognized =
+    result.heal > 0 ||
+    result.radDelta !== 0 ||
+    !!result.healLimbs ||
+    result.clearAddiction ||
+    result.clearPoison ||
+    !!result.buff;
+  return result;
+}
+
+// Executor — replaces the old free-text "> [USE] <name>" round-trip to the AI
+// (Protocol 24: deterministic, offline, no AI on this path — grep-guarded by
+// Suite 200). Applies through the shared A.2 native setters (ui-core.js) and
+// _applyStatusEffect() (Protocol 22), decrementing qty by exactly 1 only when
+// at least one effect was genuinely applied (Protocol 27 edge case: a
+// limb-heal item used with nothing crippled applies nothing and is not spent).
+function nativeUseItem(idx) {
+  const item = state.inventory[idx];
+  if (!item) return;
+  const name = item.name;
+  if (String(item.type || '').toLowerCase() !== 'aid') {
+    appendToChat('> [USE] ' + name + ' is not a consumable.', 'sys');
+    return;
+  }
+  const chems = typeof getChemsTable === 'function' ? getChemsTable() : [];
+  const chemEntry = chems.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (!chemEntry) {
+    appendToChat('> [USE] No effect data for ' + name + '.', 'sys');
+    return;
+  }
+  const r = _computeAidUse(chemEntry);
+  if (!r.recognized) {
+    appendToChat('> [USE] ' + name + ' has no usable effect (' + chemEntry.effect + ').', 'sys');
+    return;
+  }
+
+  let applied = false;
+  let statusChanged = false;
+  let limbsChanged = false;
+
+  if (r.heal > 0) {
+    _nativeSetHp(state.hpCur + r.heal);
+    applied = true;
+  }
+  if (r.radDelta !== 0) {
+    _nativeSetRads(state.rads + r.radDelta);
+    applied = true;
+  }
+  if (r.healLimbs) {
+    const limbKeys = ['hd', 'la', 'ra', 'll', 'rl'];
+    if (r.healLimbs === 'all') {
+      const anyCrippled = limbKeys.some(k => state[k] !== 'OK');
+      if (anyCrippled) {
+        limbKeys.forEach(k => {
+          state[k] = 'OK';
+        });
+        applied = true;
+        limbsChanged = true;
+      }
+    } else {
+      const target = limbKeys.find(k => state[k] !== 'OK');
+      if (target) {
+        state[target] = 'OK';
+        applied = true;
+        limbsChanged = true;
+      }
+    }
+  }
+  if (r.buff) {
+    _applyStatusEffect(r.buff.name, r.buff.ticks, r.buff.type);
+    applied = true;
+    statusChanged = true;
+  }
+  if (r.clearAddiction) {
+    const before = (state.status || []).length;
+    state.status = (state.status || []).filter(eff => {
+      const en = String((eff && eff.name) || '').toLowerCase();
+      return !chems.some(
+        c =>
+          _bioChemHasRisk(c) &&
+          (en.includes(c.name.toLowerCase()) || (c.family && en.includes(c.family.toLowerCase())))
+      );
+    });
+    if ((state.status || []).length !== before) {
+      applied = true;
+      statusChanged = true;
+    }
+  }
+  if (r.clearPoison) {
+    const before = (state.status || []).length;
+    state.status = (state.status || []).filter(
+      eff =>
+        !String((eff && eff.name) || '')
+          .toLowerCase()
+          .includes('poison')
+    );
+    if ((state.status || []).length !== before) {
+      applied = true;
+      statusChanged = true;
+    }
+  }
+
+  if (!applied) {
+    appendToChat('> [USE] ' + name + ' has no effect right now.', 'sys');
+    return;
+  }
+
+  const remainingQty = (parseInt(item.qty, 10) || 1) - 1;
+  if (remainingQty <= 0) {
+    state.inventory.splice(idx, 1);
+  } else {
+    item.qty = remainingQty;
+  }
+
+  if (statusChanged) renderStatus();
+  renderInventory();
+  if (limbsChanged) loadUI();
+  updateMath();
+  saveState();
+
+  appendToChat(
+    '> [USE] ' +
+      r.summary.join(' · ') +
+      ' — ' +
+      name +
+      (remainingQty > 0 ? ' (' + remainingQty + ' remaining).' : ' (depleted).'),
+    'sys'
+  );
 }
 
 function renderInventory() {
   const lst = document.getElementById('invList');
   if (!lst) return;
   // #23 Consumable Quick-Use + #32 Item Category Tags
-  // Each row shows: [TYPE] qty x Name (weight · value) [USE] [X]
+  // Each row shows: [TYPE] name (qty · weight · value) [EQUIP] [-/qty/+] [USE] [X]
   const typeColors = {
     weapon: 'var(--robco-danger)',
     armor: 'var(--robco-blue)',
@@ -74,34 +441,52 @@ function renderInventory() {
     ammo: 'var(--robco-alert)',
     misc: 'var(--robco-alert)',
   };
-  // Filter ammo-typed items — they render in the ammo sub-panel
-  // Map with original index FIRST so data-idx and data-use stay correct after filter
+  const searchEl = document.getElementById('invDrawerSearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  // Filter ammo-typed items — they render in the AMMO drawer instead.
+  // Map with original index FIRST so data-idx/data-use/data-equip/data-qtyidx
+  // stay correct after filtering.
   const displayItems = state.inventory
     .map((it, idx) => ({ ...it, _origIdx: idx }))
     .filter(it => {
       const type = it.type || 'misc';
       if (type === 'ammo') return false;
-      if (_invFilter === 'all') return true;
-      return type === _invFilter;
+      if (type !== _invFilter) return false;
+      if (q && !it.name.toLowerCase().includes(q)) return false;
+      return true;
     });
+  _updateManifestChrome();
   if (displayItems.length === 0) {
-    const label =
-      _invFilter === 'all'
-        ? 'INVENTORY ITEMS'
-        : _invFilter === 'armor'
-          ? 'APPAREL'
-          : _invFilter === 'ammo'
-            ? 'AMMO — SEE AMMO RESERVES BELOW'
-            : _invFilter.toUpperCase() + ' ITEMS';
-    lst.innerHTML = emptyState('NO ' + label);
+    const label = _DRAWER_LABELS[_invFilter] || String(_invFilter).toUpperCase();
+    lst.innerHTML = emptyState('NO ' + label + (q ? ' MATCHES' : ' ITEMS'));
     lst.onclick = null;
     return;
   }
+  const eq = state.equipped || {};
   lst.innerHTML = displayItems
     .map(it => {
       const cat = (it.type || 'misc').toLowerCase();
       const typeTag = `<span class="tag" style="color:${typeColors[cat] || 'inherit'};">[${cat.toUpperCase()}]</span>`;
-      return `<li><button class="use-btn" data-use="${it._origIdx}" title="Quick-use: send [USE] ${escapeHtml(it.name)}" aria-label="Use item: ${escapeHtml(it.name)}">USE</button>${typeTag}<span class="inv-name">${parseInt(it.qty) || 0}x ${escapeHtml(it.name)} (${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' · ' + parseInt(it.val) + 'c' : ''})</span><button class="delete-btn" data-idx="${it._origIdx}" aria-label="Remove ${escapeHtml(it.name)} from inventory">X</button></li>`;
+      const slot = cat === 'weapon' ? 'weapon' : cat === 'armor' ? 'armor' : null;
+      const isEq = !!(slot && eq[slot] === it.name);
+      const equipBtn = slot
+        ? `<button class="equip-btn${isEq ? ' equip-btn--on' : ''}" data-equip="${it._origIdx}" aria-label="${isEq ? 'Unequip' : 'Equip'} ${escapeHtml(it.name)}">${isEq ? '● EQUIPPED' : 'EQUIP'}</button>`
+        : '';
+      return (
+        `<li class="mrow${isEq ? ' iseq' : ''}">` +
+        `<span class="hole" aria-hidden="true"></span>` +
+        // Native USE (Part A): gated to consumables — weapons/armor already have
+        // EQUIP, ammo/mod/misc have no consume semantics. Removes the confusing
+        // "USE a rifle -> AI narration" path entirely.
+        `${cat === 'aid' ? `<button class="use-btn" data-use="${it._origIdx}" title="Use ${escapeHtml(it.name)}" aria-label="Use item: ${escapeHtml(it.name)}">USE</button>` : ''}${typeTag}` +
+        `<span class="m-id"><span class="inv-name m-name">${escapeHtml(it.name)}</span>` +
+        `<span class="m-meta">${parseInt(it.qty) || 0}x &middot; ${parseFloat(it.wgt) || 0} lb${parseInt(it.val) ? ' &middot; ' + parseInt(it.val) + 'c' : ''}</span></span>` +
+        `<span class="m-ctrl">${equipBtn}` +
+        `<span class="qtybox"><button class="qty-btn" data-qtyidx="${it._origIdx}" data-qtydelta="-1" aria-label="Decrease ${escapeHtml(it.name)} quantity">−</button>` +
+        `<span class="q">${parseInt(it.qty) || 0}</span>` +
+        `<button class="qty-btn" data-qtyidx="${it._origIdx}" data-qtydelta="1" aria-label="Increase ${escapeHtml(it.name)} quantity">+</button></span>` +
+        `<button class="delete-btn" data-idx="${it._origIdx}" aria-label="Remove ${escapeHtml(it.name)} from inventory">X</button></span></li>`
+      );
     })
     .join('');
   lst.onclick = e => {
@@ -112,37 +497,42 @@ function renderInventory() {
     }
     const use = e.target.closest('[data-use]');
     if (use) {
-      const item = state.inventory[+use.dataset.use];
-      if (!item) return;
-      document.getElementById('chatInput').value = `> [USE] ${item.name}`;
-      transmitMessage();
+      nativeUseItem(+use.dataset.use);
+      return;
+    }
+    const eqBtn = e.target.closest('[data-equip]');
+    if (eqBtn) {
+      toggleEquipItem(+eqBtn.dataset.equip);
+      return;
+    }
+    const qtyBtn = e.target.closest('[data-qtyidx]');
+    if (qtyBtn) {
+      adjItemQty(+qtyBtn.dataset.qtyidx, +qtyBtn.dataset.qtydelta);
+      return;
     }
   };
 }
 
-// ── AMMO RESERVES ──────────────────────────────────────────────
+// ── AMMO RESERVES (folded into the CARGO MANIFEST's AMMO drawer) ───────
 function renderAmmo() {
   const ammoDiv = document.getElementById('ammoList');
   if (!ammoDiv) return;
   const ammoObj = state.ammo || {};
   const entries = Object.entries(ammoObj).filter(([, count]) => count > 0);
+  _updateManifestChrome();
   if (entries.length === 0) {
     ammoDiv.innerHTML = emptyState('NO AMMO TRACKED');
     return;
   }
   // Sort alphabetically by caliber name
   entries.sort((a, b) => a[0].localeCompare(b[0]));
-  ammoDiv.innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;">' +
-    entries
-      .map(
-        ([caliber, count]) =>
-          `<span style="opacity:0.8;">${escapeHtml(caliber)}</span>` +
-          `<span style="text-align:right;">${count}</span>` +
-          `<button class="delete-btn" style="font-size:9px;padding:0 4px;" onclick="removeAmmo('${escapeHtml(caliber).replace(/'/g, '&#39;')}')" title="Remove">X</button>`
-      )
-      .join('') +
-    '</div>';
+  ammoDiv.innerHTML = entries
+    .map(
+      ([caliber, count]) =>
+        `<div class="arow"><b>${escapeHtml(caliber)}</b><span class="a-count">&times;${count}</span>` +
+        `<button class="delete-btn" onclick="removeAmmo('${escapeHtml(caliber).replace(/'/g, '&#39;')}')" aria-label="Remove ${escapeHtml(caliber)} reserve">X</button></div>`
+    )
+    .join('');
 }
 
 function addAmmo() {
@@ -167,45 +557,71 @@ function removeAmmo(caliber) {
   updateMath();
 }
 
+// Phase 3 \u00b7 Piece 2 (SQUAD ROSTER, BUS-14): registry-driven ENLIST options,
+// replacing the hardcoded 8-FNV-companion <select> (a Protocol 38 game-literal
+// bug \u2014 FO3 campaigns previously showed FNV companion names). Reads the SAME
+// FALLOUT_REGISTRY the active game boot already swapped in (Protocol 22,
+// mirrors renderCollectibles()'s FALLOUT_REGISTRY.collectibles pattern) \u2014
+// already-enlisted companions are filtered out of the picker.
+function _populateSquadEnlistOptions() {
+  const sel = document.getElementById('newSquadName');
+  if (!sel) return;
+  const companions =
+    typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.companions)
+      ? FALLOUT_REGISTRY.companions
+      : [];
+  const enlisted = new Set((state.squad || []).map(m => m.name.toLowerCase()));
+  sel.innerHTML =
+    '<option disabled selected value="">SELECT COMPANION\u2026</option>' +
+    companions
+      .filter(c => !enlisted.has(c.name.toLowerCase()))
+      .map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`)
+      .join('');
+}
+
 function renderSquad() {
   const squadDiv = document.getElementById('squadList');
   if (!squadDiv) return;
+  _populateSquadEnlistOptions();
+  const status = document.getElementById('opsSquadStatus');
   if (!state.squad || state.squad.length === 0) {
     squadDiv.innerHTML = emptyState('NO ACTIVE COMPANIONS');
+    if (status) status.textContent = 'NO ACTIVE COMPANIONS';
     return;
+  }
+  if (status) {
+    const affs = state.squad.map(m => Math.min(100, Math.max(0, parseInt(m.affinity) || 0)));
+    const avg = Math.round(affs.reduce((a, b) => a + b, 0) / affs.length);
+    status.textContent = state.squad.length + ' ACTIVE \u00b7 AVG AFFINITY ' + avg + '%';
   }
   squadDiv.innerHTML = state.squad
     .map((member, i) => {
       const hpRatio = member.hp / (member.hpMax || 100);
-      const pBars = Math.ceil(hpRatio * 10);
-      const barStr = '['.padEnd(pBars + 1, '\u2588').padEnd(11, '\u2591') + ']';
-      // #11 Companion Affinity: render affinity bar if present
-      let affinityStr = '';
-      if (member.affinity !== undefined) {
-        const aff = Math.min(100, Math.max(0, parseInt(member.affinity) || 0));
-        const affBars = Math.round(aff / 10);
-        const affBar = '['.padEnd(affBars + 1, '\u25a0').padEnd(11, '\u25a1') + ']';
-        const affColor =
-          aff >= 75
-            ? 'var(--robco-green)'
-            : aff >= 40
-              ? 'var(--robco-alert)'
-              : 'var(--robco-danger)';
-        affinityStr = `<div style="font-size:10px;margin-top:2px;color:${affColor};">AFF: ${affBar} ${aff}%</div>`;
-      }
-      return `<div style="margin-bottom: 5px; border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3); padding-bottom: 4px;">
-            <div style="font-weight:bold;display:flex;justify-content:space-between;align-items:center;">
-                <span>${barStr} ${escapeHtml(member.name)}</span>
-                <button class="delete-btn" onclick="removeSquadMember(${i})">X</button>
-            </div>
-            <div style="font-size: 11px; display:flex; justify-content:space-between; margin-top:2px;">
-                <span style="color: var(--robco-green)">HP: ${parseInt(member.hp) || 0}/${parseInt(member.hpMax) || 0}</span>
-                <span style="color: var(--robco-alert)">AMMO: ${parseInt(member.ammo) || 0}</span>
-                <span style="color: var(--robco-danger)">CND: ${escapeHtml(String(member.condition))}</span>
-            </div>
-            ${member.weapon ? `<div style="font-size:10px;opacity:0.6;margin-top:1px;">WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' | DT: ' + (parseInt(member.dt) || 0) : ''}</div>` : ''}
-            ${affinityStr}
-        </div>`;
+      const pBars = Math.max(0, Math.min(100, Math.round(hpRatio * 100)));
+      // #11 Companion Affinity \u2014 U10: always rendered with native [+]/[-] nudge
+      // buttons (previously AI-write-only via autoImportState; the affinity bar
+      // stayed invisible until the AI happened to set it, with no player-facing
+      // way to ever initialize it). Missing affinity defaults to 0, same fallback
+      // adjustAffinity() uses.
+      const aff = Math.min(100, Math.max(0, parseInt(member.affinity) || 0));
+      return (
+        `<div class="sq-card">` +
+        `<div class="sq-head"><span class="sq-name">${escapeHtml(member.name)}</span>` +
+        `<button class="delete-btn" aria-label="Dismiss ${escapeHtml(member.name)}" onclick="removeSquadMember(${i})">\u2715 DISMISS</button></div>` +
+        `<div class="sq-bar"><i style="width:${pBars}%"></i></div>` +
+        `<div class="sq-stats"><span>HP ${parseInt(member.hp) || 0}/${parseInt(member.hpMax) || 0}</span>` +
+        `<span>AMMO ${parseInt(member.ammo) || 0}</span>` +
+        `<span>CND ${escapeHtml(String(member.condition))}</span>` +
+        (member.weapon
+          ? `<span>WPN: ${escapeHtml(member.weapon)}${member.dt !== undefined ? ' \u00b7 DT ' + (parseInt(member.dt) || 0) : ''}</span>`
+          : '') +
+        `</div>` +
+        `<div class="aff-row"><span class="a-cap">AFFINITY ${aff}%</span>` +
+        `<span class="aff-meter"><i style="width:${aff}%"></i></span>` +
+        `<button aria-label="Lower ${escapeHtml(member.name)} affinity" onclick="adjustAffinity(${i},-5)">\u2212</button>` +
+        `<button aria-label="Raise ${escapeHtml(member.name)} affinity" onclick="adjustAffinity(${i},5)">+</button></div>` +
+        `</div>`
+      );
     })
     .join('');
 }
@@ -216,6 +632,17 @@ function removeSquadMember(idx) {
     renderSquad();
     updateMath();
   }
+}
+
+// U10 (FP-AI-5/FP-FEAT-3): native affinity control \u2014 companion affinity was
+// previously AI-write-only (autoImportState, api.js). Nudges by delta, clamped
+// 0-100, defaulting an unset member.affinity to 0 (mirrors the render fallback).
+function adjustAffinity(idx, delta) {
+  if (!state.squad || !state.squad[idx]) return;
+  const cur = Math.max(0, Math.min(100, parseInt(state.squad[idx].affinity) || 0));
+  state.squad[idx].affinity = Math.max(0, Math.min(100, cur + delta));
+  saveState();
+  renderSquad();
 }
 
 function addSquadMember() {
@@ -237,6 +664,7 @@ function addSquadMember() {
     weapon: 'Unarmed',
     ammo: 0,
     condition: 'OK',
+    affinity: 0,
   });
 
   nameInput.value = '';
@@ -415,38 +843,103 @@ function getFactionStanding(key, fame, infamy) {
   return { label, color };
 }
 
+// BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2, ground-up reskin) — each
+// active status effect becomes a lit lamp tile, color-coded by type (BUFF
+// phosphor / DEBUFF red / NEUTRAL amber), with a tick countdown + pip meter
+// and a ✕ purge key that still calls the unchanged removeStatusEffect(i)
+// (Protocol 22). Empty state shows dark standby lamps instead of a bare
+// empty-state line, so the board is never information-free (Protocol 25).
+const _STLAMP_PIP_TOTAL = 6;
+function _stlampPips(ticks, maxTicks) {
+  const m = maxTicks > 0 ? maxTicks : Math.max(ticks, 1);
+  const lit = Math.max(0, Math.min(_STLAMP_PIP_TOTAL, Math.round((ticks / m) * _STLAMP_PIP_TOTAL)));
+  return '▮'.repeat(lit) + '▯'.repeat(_STLAMP_PIP_TOTAL - lit);
+}
 function renderStatus() {
   const statusDiv = document.getElementById('statusList');
   if (!statusDiv) return;
-  if (!state.status || state.status.length === 0) {
-    statusDiv.innerHTML = emptyState('NO ACTIVE EFFECTS');
+  const effects = state.status || [];
+  if (effects.length === 0) {
+    statusDiv.innerHTML =
+      '<div class="stlamp-grid">' +
+      ['STIMULANT', 'ANALGESIC', 'PROPHYLACTIC']
+        .map(
+          n =>
+            `<div class="stlamp-tile dark"><div class="stlamp-head"><span class="stlamp-led" aria-hidden="true"></span><span class="stlamp-name">${n} — DARK</span></div><div class="stlamp-sub"><span class="stlamp-type">STANDBY</span></div></div>`
+        )
+        .join('') +
+      '</div><div class="stlamp-empty-note">ALL LAMPS DARK — NO COMPOUNDS IN THE BLOODSTREAM</div>';
+    // G3: Apply chem boost highlights to Skill Matrix rows
+    _applyChemHighlights();
     return;
   }
-  statusDiv.innerHTML = state.status
-    .map((eff, i) => {
-      const ticks = eff.ticks || 0;
-      let typeClass =
-        eff.type === 'BUFF'
-          ? 'effect-buff'
-          : eff.type === 'DEBUFF'
-            ? 'effect-debuff'
-            : 'effect-neutral';
-      let tickInfo = ticks > 0 ? ` [${ticks}t]` : '';
-      // Expiry warning: 1–2 ticks remaining on a timed effect
-      let expiryBadge = '';
-      let itemCls = 'effect-item';
-      if (ticks > 0 && ticks <= 2) {
-        itemCls += ' effect-item--expiring';
-        expiryBadge = `<span class="effect-expiring-badge">[EXPIRING]</span>`;
-      } else if (ticks === 0 && eff.type !== 'NEUTRAL') {
-        // permanent effects get a subtle marker
-        tickInfo = ' [∞]';
-      }
-      return `<div class="${itemCls}"><span class="${typeClass}">${escapeHtml(eff.name || '')}${tickInfo}${expiryBadge}</span><div><span class="effect-type" style="margin-right:8px;">${escapeHtml(eff.type || 'BUFF')}</span><button class="delete-btn" onclick="removeStatusEffect(${i})">X</button></div></div>`;
-    })
-    .join('');
+  // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP) — consume the pending
+  // list exactly once (the _pendingRepStamp/_pendingQuestStamp deferred-
+  // consumption pattern), applying the warm-up class to every matching tile.
+  const warmupNames = (_pendingEffectWarmup || []).map(n => String(n).toLowerCase());
+  _pendingEffectWarmup = [];
+  statusDiv.innerHTML =
+    '<div class="stlamp-grid">' +
+    effects
+      .map((eff, i) => {
+        const ticks = eff.ticks || 0;
+        const type = (eff.type || 'BUFF').toUpperCase();
+        const typeCls = type === 'DEBUFF' ? 'debuff' : type === 'NEUTRAL' ? 'neutral' : 'buff';
+        const name = escapeHtml(eff.name || '');
+        const ticksLine = ticks > 0 ? `${ticks} TICKS LEFT` : 'PERMANENT';
+        const pips =
+          ticks > 0
+            ? `<span class="stlamp-pips" aria-hidden="true">${_stlampPips(ticks, ticks)}</span>`
+            : '';
+        const isWarmup = warmupNames.includes(String(eff.name || '').toLowerCase());
+        // #29 GUTTERING LAMP — a continuous, state-driven flicker for as long
+        // as the effect is genuinely expiring soon (never a one-shot; the
+        // slate calls for "slow distress flicker UNTIL it expires"), so no
+        // separate cleanup timer is needed — the next render simply drops
+        // the class once ticks hits 0 and the row is removed.
+        const isGuttering = ticks > 0 && ticks <= 2;
+        const tileCls =
+          typeCls + (isWarmup ? ' tungsten-warmup' : '') + (isGuttering ? ' lamp-guttering' : '');
+        return `<div class="stlamp-tile ${tileCls}">
+          <div class="stlamp-head">
+            <span class="stlamp-led" aria-hidden="true"></span>
+            <span class="stlamp-name">${name}</span>
+            <button class="stlamp-purge" aria-label="Purge ${name}" onclick="removeStatusEffect(${i})">✕</button>
+          </div>
+          <div class="stlamp-sub">
+            <span class="stlamp-type">${type}</span>
+            <span class="stlamp-ticks">${ticksLine}</span>
+            ${pips}
+          </div>
+        </div>`;
+      })
+      .join('') +
+    '</div>';
+  if (warmupNames.length) {
+    setTimeout(() => {
+      statusDiv
+        .querySelectorAll('.tungsten-warmup')
+        .forEach(el => el.classList.remove('tungsten-warmup'));
+    }, 950);
+  }
   // G3: Apply chem boost highlights to Skill Matrix rows
   _applyChemHighlights();
+}
+
+// Single-source live 0i summary for BUS-07's board-status row (called from
+// ui-core.js's _syncOperatorTelemetry(), the existing board-status choke
+// point) — "N LAMPS LIT · N DEBUFF · NEXT EXPIRY: name (N TICKS)".
+function _statusLampSummary() {
+  const effects = state.status || [];
+  if (effects.length === 0) return 'ALL LAMPS DARK · NO ACTIVE COMPOUNDS';
+  const debuffCount = effects.filter(e => (e.type || '').toUpperCase() === 'DEBUFF').length;
+  const timed = effects.filter(e => (e.ticks || 0) > 0);
+  let expiry = '';
+  if (timed.length) {
+    const next = timed.slice().sort((a, b) => (a.ticks || 0) - (b.ticks || 0))[0];
+    expiry = ' · NEXT EXPIRY: ' + (next.name || '?').toUpperCase() + ' (' + next.ticks + ' TICKS)';
+  }
+  return effects.length + ' LAMPS LIT · ' + debuffCount + ' DEBUFF' + expiry;
 }
 
 // G3: Active Chem Visualizer ─────────────────────────────────────────────────
@@ -494,24 +987,42 @@ function removeStatusEffect(idx) {
   }
 }
 
+// Effect-push core extracted from addStatusEffect() (Protocol 22) — reused by
+// both the DOM add-form below and nativeUseItem()'s deterministic USE parser
+// (Native USE, Part A), so the dedup rule and the single 'effect.applied' emit
+// site (Wave 3 #28 TUNGSTEN WARM-UP) can never drift between the two callers.
+function _applyStatusEffect(name, ticks, type) {
+  if (!state.status) state.status = [];
+  const nm = String(name || '').trim();
+  if (!nm) return;
+  const tk = parseInt(ticks, 10) || 0;
+  const tp = String(type || 'BUFF').toUpperCase();
+  const existing = state.status.find(e => e.name.toLowerCase() === nm.toLowerCase());
+  if (existing) {
+    existing.ticks = tk;
+    existing.type = tp;
+  } else {
+    state.status.push({ name: nm, ticks: tk, type: tp });
+    // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP) — new additive emit,
+    // fired only for a genuinely NEW compound (never a re-application — the
+    // #12 INK STAMP "lands once" precedent); the AI status-set path in
+    // autoImportState() (api.js) emits the same event.
+    RobcoEvents.emit('effect.applied', { name: nm, type: tp });
+    _pendingEffectWarmup.push(nm);
+  }
+}
+
 function addStatusEffect() {
   const nameInput = document.getElementById('newStatusName');
   const ticksInput = document.getElementById('newStatusTicks');
   const typeSelect = document.getElementById('newStatusType');
   if (!nameInput || !nameInput.value.trim()) return;
-  if (!state.status) state.status = [];
 
   const ticks = parseInt(ticksInput.value) || 0;
   const name = nameInput.value.trim();
   const type = (typeSelect ? typeSelect.value : 'BUFF').toUpperCase();
 
-  const existing = state.status.find(e => e.name.toLowerCase() === name.toLowerCase());
-  if (existing) {
-    existing.ticks = ticks;
-    existing.type = type;
-  } else {
-    state.status.push({ name, ticks, type });
-  }
+  _applyStatusEffect(name, ticks, type);
 
   nameInput.value = '';
   if (ticksInput) ticksInput.value = '';
@@ -519,22 +1030,73 @@ function addStatusEffect() {
   updateMath();
 }
 
+// BUS-06 · PERK LOADOUT (Phase 3 OPERATOR batch 3, ground-up reskin) — a
+// numbered loadout-slot rack rendered inside the shared CARGO MANIFEST
+// drawer scroll+search pattern (.tray-scrollwrap/.tray-list, Protocol 22 —
+// the registry carries 90+ perks, so the list is a bounded in-panel scroll
+// region with an optional search filter, never a render cap). Still emits
+// the exact #perksList container + removePerk(i)/addPerk() handlers.
 function renderPerks() {
   const perksDiv = document.getElementById('perksList');
   if (!perksDiv) return;
-  if (!state.perks || state.perks.length === 0) {
+  const perks = state.perks || [];
+  if (perks.length === 0) {
     perksDiv.innerHTML = emptyState('NO PERKS ON FILE');
     return;
   }
-  perksDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.perks
-      .map(
-        (p, i) =>
-          `<li><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(p.name)}${p.rank > 1 ? ' (Rank ' + p.rank + ')' : ''}${p.level_taken ? ' — Lv.' + p.level_taken : ''}</span><button class="delete-btn" onclick="removePerk(${i})">X</button></li>`
-      )
-      .join('') +
-    '</ul>';
+  const searchEl = document.getElementById('perkSearch');
+  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const displayPerks = perks
+    .map((p, i) => ({ ...p, _origIdx: i }))
+    .filter(p => !q || p.name.toLowerCase().includes(q));
+
+  if (displayPerks.length === 0) {
+    perksDiv.innerHTML = emptyState('NO PERK MATCHES');
+    return;
+  }
+  // FEEDBACK ANIMATION WAVE 3 (#13 CARD SEAT) — consume the pending marker
+  // exactly once (the _pendingQuestStamp deferred-consumption pattern).
+  const seatName = _pendingPerkSeat ? String(_pendingPerkSeat).toLowerCase() : null;
+  _pendingPerkSeat = null;
+  const rows = displayPerks
+    .map(p => {
+      const rank = Math.max(1, parseInt(p.rank) || 1);
+      const pips = '&#9679;'.repeat(Math.min(6, rank));
+      const levelTag = p.level_taken
+        ? `<span class="s-meta">REQ LVL ${parseInt(p.level_taken)}</span>`
+        : '';
+      const isSeated = seatName && p.name.toLowerCase() === seatName;
+      return (
+        `<div class="slot-row${isSeated ? ' slot-row--seated' : ''}">` +
+        `<span class="s-idx">SLOT ${String(p._origIdx + 1).padStart(2, '0')}</span>` +
+        `<span class="s-name">${escapeHtml(p.name)}</span>` +
+        `<span class="s-rank" title="Rank ${rank}">${pips}</span>` +
+        levelTag +
+        `<button class="delete-btn pk-x" onclick="removePerk(${p._origIdx})" aria-label="Remove ${escapeHtml(p.name)}">✕</button>` +
+        `</div>`
+      );
+    })
+    .join('');
+  // Pad with dashed VACANT rows only when the real count is small (never
+  // pads a search result — matches the mockup's small-loadout look without
+  // absurdly listing dozens of vacant slots for a big roster).
+  const vacantCount = q ? 0 : Math.max(0, 6 - perks.length);
+  const vacantRows = Array.from(
+    { length: vacantCount },
+    (_, i) =>
+      `<div class="slot-row vacant">SLOT ${String(perks.length + i + 1).padStart(2, '0')} — VACANT</div>`
+  ).join('');
+  perksDiv.innerHTML = rows + vacantRows;
+  // The seat is a one-shot CSS animation ending on a correct static final
+  // frame (Protocol UI-9) — remove it after it plays so a later re-render
+  // (e.g. a search keystroke) doesn't replay it.
+  if (seatName) {
+    setTimeout(() => {
+      perksDiv
+        .querySelectorAll('.slot-row--seated')
+        .forEach(el => el.classList.remove('slot-row--seated'));
+    }, 700);
+  }
 }
 
 function removePerk(idx) {
@@ -556,6 +1118,9 @@ function addPerk() {
     ex.rank = Math.max(ex.rank, rank);
   } else {
     state.perks.push({ name, rank, level_taken: levelTaken || null });
+    // FEEDBACK ANIMATION WAVE 3 (#13 CARD SEAT) — a transient module var
+    // (never state.*), consumed by renderPerks() the next time it paints.
+    _pendingPerkSeat = name;
   }
   document.getElementById('newPerkName').value = '';
   document.getElementById('newPerkRank').value = '';
@@ -564,32 +1129,182 @@ function addPerk() {
   updateMath();
 }
 
-// #1 Quest Log — renders state.quests[] as a filterable list
+// ── BUS-17 · DIRECTIVE REGISTRY (Phase 3 · Piece 3) — quests as numbered
+// directive slots inside a bounded tray-scrollwrap, with a status drawer
+// bank (ALL/ACTIVE/COMPLETE/FAILED — a display-only filter, one open at a
+// time, the OPERATIONS CARGO drawer mechanic reused, Protocol 22) and an
+// in-tray search. The drawer bank's last-open choice persists via the
+// registered robco_databank_qdrawer MetaStore pref (Protocol UI-6).
+let _qDrawer = null;
+function _qDrawerGet() {
+  if (_qDrawer === null)
+    _qDrawer =
+      (typeof MetaStore !== 'undefined' && MetaStore.get('robco_databank_qdrawer')) || 'all';
+  return _qDrawer;
+}
+// Called by the drawer-bank keycaps — a pure display filter, no state change.
+function setQuestDrawer(k) {
+  _qDrawer = k;
+  if (typeof MetaStore !== 'undefined') MetaStore.set('robco_databank_qdrawer', k);
+  renderQuests();
+}
+
+// The ⟳ CYCLE key — owner-approved (databank-notes.md Q3) the ONE new native
+// write path this build adds: advances a directive's status ACTIVE→COMPLETE→
+// FAILED→ACTIVE with no AI involved. autoImportState()'s own AI-write quest-
+// status path (Protocol 14/24) is untouched — this is a second, native entry
+// point onto the SAME state.quests[i].status field, exactly like the
+// existing native affinity/mark-visited setters (Protocol 22 pattern).
+const _QUEST_CYCLE = { active: 'complete', complete: 'failed', failed: 'active' };
+// _pendingQuestStamp (FEEDBACK ANIMATION WAVE 1, #23 CASE-CLOSED STAMP / #24
+// FILAMENT DIE) — a transient module var, never state.*, declared in
+// state.js (loaded by test.html's reduced boot chain too — Protocol 27),
+// consumed by renderQuests() the next time it paints (mirrors
+// _pendingSurveyPing — the innerHTML-rebuild-survives-the-race pattern).
+function cycleQuestStatus(idx) {
+  if (!state.quests || !state.quests[idx]) return;
+  const cur = String(state.quests[idx].status || 'active').toLowerCase();
+  const next = _QUEST_CYCLE[cur] || 'active';
+  state.quests[idx].status = next;
+  if (next === 'complete' || next === 'failed') {
+    RobcoEvents.emit('quest.status', {
+      name: state.quests[idx].name,
+      status: next,
+      prevStatus: cur,
+    });
+    _pendingQuestStamp = { name: state.quests[idx].name, status: next };
+  }
+  saveState();
+  renderQuests();
+  updateMath();
+}
+
+// #1 Quest Log — renders state.quests[] as numbered directive slots, filtered
+// by the active status drawer + the optional in-tray search.
 function renderQuests() {
   const questsDiv = document.getElementById('questsList');
   if (!questsDiv) return;
-  if (!state.quests || state.quests.length === 0) {
+  const all = state.quests || [];
+  const norm = q => {
+    const s = String((q && q.status) || 'active').toLowerCase();
+    return ['active', 'complete', 'failed'].includes(s) ? s : 'active';
+  };
+  const counts = {
+    all: all.length,
+    active: all.filter(q => norm(q) === 'active').length,
+    complete: all.filter(q => norm(q) === 'complete').length,
+    failed: all.filter(q => norm(q) === 'failed').length,
+  };
+  const drawer = ['all', 'active', 'complete', 'failed'].includes(_qDrawerGet())
+    ? _qDrawerGet()
+    : 'all';
+
+  const bank = document.getElementById('questDrawerBank');
+  if (bank) {
+    bank.innerHTML = [
+      ['all', 'ALL'],
+      ['active', 'ACTIVE'],
+      ['complete', 'COMPLETE'],
+      ['failed', 'FAILED'],
+    ]
+      .map(
+        ([k, label]) =>
+          `<button class="drawer${k === drawer ? ' pulled' : ''}" onclick="setQuestDrawer('${k}')" aria-label="${label} directives drawer — ${counts[k]} entries">${label}<span class="d-count">${counts[k]}</span></button>`
+      )
+      .join('');
+  }
+
+  const searchEl = document.getElementById('questSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  const shown = all
+    .map((quest, i) => ({ quest, i }))
+    .filter(({ quest }) => drawer === 'all' || norm(quest) === drawer)
+    .filter(
+      ({ quest }) =>
+        !q ||
+        String(quest.name || '')
+          .toLowerCase()
+          .includes(q) ||
+        String(quest.objective || '')
+          .toLowerCase()
+          .includes(q)
+    );
+
+  const titleEl = document.getElementById('questDrawerTitle');
+  if (titleEl)
+    titleEl.textContent =
+      drawer === 'all' ? 'ALL DIRECTIVES' : drawer.toUpperCase() + ' DIRECTIVES';
+  const countEl = document.getElementById('questDrawerCount');
+  if (countEl) countEl.textContent = `${shown.length} SHOWN · SCROLLS ▾`;
+  const statusEl = document.getElementById('dbQuestStatus');
+  if (statusEl) {
+    statusEl.textContent = `${counts.active} ACTIVE · ${counts.complete} DONE · ${counts.failed} FAILED`;
+  }
+
+  if (!all.length) {
     questsDiv.innerHTML = emptyState('NO ACTIVE DIRECTIVES');
     return;
   }
-  const statusColors = {
-    active: 'var(--robco-alert)',
-    complete: 'var(--robco-green)',
-    failed: 'var(--robco-danger)',
-  };
-  questsDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.quests
-      .map((q, i) => {
-        const st = (q.status || 'active').toLowerCase();
-        const color = statusColors[st] || 'inherit';
-        const factions = q.factions
-          ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(q.factions))}]</span>`
-          : '';
-        return `<li style="color:${color};"><span class="list-row-prefix">> </span><div class="list-row-content">[${escapeHtml(st.toUpperCase())}] ${escapeHtml(q.name)}${factions}${q.objective ? '<div style="font-size:10px;opacity:0.7;margin-left:10px;">' + escapeHtml(q.objective) + '</div>' : ''}</div><button class="delete-btn" onclick="removeQuest(${i})">X</button></li>`;
-      })
-      .join('') +
-    '</ul>';
+  if (!shown.length) {
+    questsDiv.innerHTML = emptyState('NO DIRECTIVES MATCH THIS FILTER');
+    return;
+  }
+
+  // FEEDBACK ANIMATION WAVE 1 (#23/#24) — consume the pending stamp exactly
+  // once, only for the row it names, then clear it (never state.*).
+  const stampName = _pendingQuestStamp ? String(_pendingQuestStamp.name || '').toLowerCase() : null;
+  const stampStatus = _pendingQuestStamp ? _pendingQuestStamp.status : null;
+  _pendingQuestStamp = null;
+  // FEEDBACK ANIMATION WAVE 3 (#25 DIRECTIVE FILED) — same deferred-
+  // consumption pattern, set by addQuest() (ui-saves.js). A freshly-filed
+  // quest is never simultaneously stamped, so the two markers can't collide.
+  const filedName = _pendingQuestFiled ? String(_pendingQuestFiled).toLowerCase() : null;
+  _pendingQuestFiled = null;
+
+  questsDiv.innerHTML = shown
+    .map(({ quest: qq, i }) => {
+      const st = norm(qq);
+      const factions = qq.factions
+        ? ` <span style="font-size:9px;opacity:0.6;">[${escapeHtml(String(qq.factions))}]</span>`
+        : '';
+      const isStamped = stampName && String(qq.name || '').toLowerCase() === stampName;
+      const stampHtml = isStamped
+        ? `<span class="dir-stamp dir-stamp--${stampStatus}" aria-hidden="true">${stampStatus === 'failed' ? 'FAILED' : 'COMPLETE'}</span>`
+        : '';
+      const isFiled = filedName && String(qq.name || '').toLowerCase() === filedName;
+      return `<div class="dir-slot ${st}${isStamped ? ' dir-slot--stamped' : ''}${isFiled ? ' dir-slot--filed' : ''}">
+        <span class="s-idx">SLOT ${String(i + 1).padStart(2, '0')}</span>
+        <span class="dir-lamp" aria-hidden="true"></span>
+        <span class="dir-main">
+          <span class="d-name">${escapeHtml(qq.name)}${factions}</span>
+          ${qq.objective ? `<span class="d-obj">${escapeHtml(qq.objective)}</span>` : ''}
+        </span>
+        <span class="dir-keys">
+          <span class="d-st">${escapeHtml(st.toUpperCase())}</span>
+          <button class="cyc" onclick="cycleQuestStatus(${i})" aria-label="Cycle ${escapeHtml(qq.name)} status (now ${st})">&#8635; CYCLE</button>
+          <button class="del" onclick="removeQuest(${i})" aria-label="Remove ${escapeHtml(qq.name)}">&#10005;</button>
+        </span>
+        ${stampHtml}
+      </div>`;
+    })
+    .join('');
+  // The stamp is a one-shot CSS animation that ends on a correct static
+  // final frame (Protocol UI-9) — clear the marker class after it plays so a
+  // later re-render (e.g. a search/filter keystroke) doesn't replay it.
+  if (stampName) {
+    setTimeout(() => {
+      questsDiv
+        .querySelectorAll('.dir-slot--stamped')
+        .forEach(el => el.classList.remove('dir-slot--stamped'));
+    }, 1500);
+  }
+  if (filedName) {
+    setTimeout(() => {
+      questsDiv
+        .querySelectorAll('.dir-slot--filed')
+        .forEach(el => el.classList.remove('dir-slot--filed'));
+    }, 900);
+  }
 }
 function removeQuest(idx) {
   state.quests.splice(idx, 1);
@@ -598,11 +1313,29 @@ function removeQuest(idx) {
 }
 
 // #8 Session Statistics — renders state.stats
+// Builds one BUS-21 mechanical odometer tile — the value is rendered as
+// individual digit/character cells (works for both a zero-padded number and
+// a formatted duration string like "3:12").
+function _odoTile(cap, valueStr, sub) {
+  const digits = String(valueStr)
+    .split('')
+    .map(ch => `<b>${escapeHtml(ch)}</b>`)
+    .join('');
+  return `<div class="odo-tile"><span class="odo-cap">${escapeHtml(cap)}</span><span class="odo-digits">${digits}</span><span class="odo-sub">${escapeHtml(sub)}</span></div>`;
+}
+
+// ── BUS-21 · SERVICE TALLY (Phase 3 · Piece 3) — session stats as a
+// mechanical odometer/counter bank (Protocol 22 — resetSessionStats/
+// state.stats reads untouched).
 function renderSessionStats() {
   const statsDiv = document.getElementById('sessionStatsList');
   if (!statsDiv) return;
   const s = state.stats || {};
-  const elapsed = Math.round((Date.now() - (s.sessionStart || Date.now())) / 60000);
+  const sittingMs = Date.now() - (s.sessionStart || Date.now());
+  const sittingStr =
+    typeof _fmtOverseerDuration === 'function'
+      ? _fmtOverseerDuration(sittingMs)
+      : `${Math.round(sittingMs / 60000)}m`;
   // I2: Collectibles count for session stats
   const collectDefs =
     typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.collectibles
@@ -610,20 +1343,35 @@ function renderSessionStats() {
       : [];
   const collectAcquired = (state.collectibles || []).length;
   const collectTotal = collectDefs.length;
-  const collectLine =
-    collectTotal > 0
-      ? `<span style="opacity:0.65;">COLLECTIBLES</span><span>${collectAcquired}/${collectTotal}</span>`
-      : '';
-  statsDiv.innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;">
-            <span style="opacity:0.65;">KILLS</span><span>${s.kills || 0}</span>
-            <span style="opacity:0.65;">CAPS EARNED</span><span>${s.capsEarned || 0}</span>
-            <span style="opacity:0.65;">DMG DEALT</span><span>${s.damageDealt || 0}</span>
-            <span style="opacity:0.65;">CAMPAIGN TIME</span><span>${elapsed}m</span>
-            <span style="opacity:0.65;">TICKS</span><span>${state.ticks || 0}</span>
-            <span style="opacity:0.65;">LOCATION VISITS</span><span>${(state.locationHistory || []).length}</span>
-            ${collectLine}
-        </div>`;
+  const collectLabel = String(_activeDef().collectibleLabel || 'CURIOS').toLowerCase();
+
+  const tiles = [
+    _odoTile('CONFIRMED KILLS', String(s.kills || 0).padStart(4, '0'), 'campaign total'),
+    _odoTile('CAPS EARNED', String(s.capsEarned || 0).padStart(4, '0'), 'gross intake'),
+    _odoTile('DAMAGE DEALT', String(s.damageDealt || 0).padStart(4, '0'), 'cumulative'),
+    _odoTile('CURRENT SITTING', sittingStr, 'live duration'),
+    _odoTile('TICKS ELAPSED', String(state.ticks || 0).padStart(4, '0'), 'game time'),
+    _odoTile(
+      'LOCATIONS FIXED',
+      String((state.locationHistory || []).length).padStart(4, '0'),
+      'survey count'
+    ),
+  ];
+  if (collectTotal > 0) {
+    tiles.push(
+      _odoTile(
+        'CURIOS FOUND',
+        String(collectAcquired).padStart(2, '0'),
+        `of ${collectTotal} ${collectLabel}`
+      )
+    );
+  }
+  statsDiv.innerHTML = `<div class="tally-bank">${tiles.join('')}</div>`;
+
+  const statusEl = document.getElementById('dbTallyStatus');
+  if (statusEl) {
+    statusEl.textContent = `${s.kills || 0} KILLS · ${s.capsEarned || 0}c EARNED · ${sittingStr} SITTING`;
+  }
 }
 
 // #2 Equipped Item Tracking — renders state.equipped in bio-metrics
@@ -643,9 +1391,32 @@ function renderEquipped() {
     : '<span style="opacity:0.4;">Nothing equipped</span>';
 }
 
-// ── COLLECTIBLES PANEL ────────────────────────────────────────────
+// ── CURIO ARCHIVE (BUS-15 COLLECTIBLES) ─────────────────────────────
+// Owner-approved themed-object redesign (Protocol 25): every collectible
+// renders as its recognizable Fallout object instead of a plain [ACQUIRED]/
+// [MISSING] text row, displayed inside one sealed glass display case with
+// plank shelves mounted inside it (owner clarification — a display case
+// naturally has shelves inside it, so this is ONE unified vitrine, not a
+// switchable view). Object CLASS is category-driven (Protocol 38) — never
+// a JS ctx branch: GAME_DEFS[ctx].collectibleCategory picks the uniform
+// object every collectible in that game renders as (snowglobe/bobblehead);
+// each Lincoln relic carries its OWN registry `shape` field instead, since
+// (unlike collectibles) Lincoln relics are not one uniform object type.
+function _curioObjectIconHtml(kind) {
+  if (kind === 'bobblehead') {
+    return '<span class="curio-bob" aria-hidden="true"><span class="cb-head"></span><span class="cb-body"></span><span class="cb-base"></span></span>';
+  }
+  if (typeof kind === 'string' && kind.indexOf('lincoln-') === 0) {
+    const shape = kind.slice(8).replace(/[^a-z]/gi, '') || 'book';
+    return `<span class="curio-linc curio-linc--${shape}" aria-hidden="true"><i></i></span>`;
+  }
+  // Default/fallback: snowglobe (also what a future game with no authored
+  // collectibleCategory degrades to — a safe generic, never a thrown error).
+  return '<span class="curio-globe" aria-hidden="true"><span class="cg-dome"></span><span class="cg-base"></span></span>';
+}
+
 // Reads FALLOUT_REGISTRY.collectibles (game-specific list) and state.collectibles
-// (flat array of collected item names). Renders terminal-style [ACQUIRED]/[MISSING] list.
+// (flat array of collected item names). Renders the themed curio grid.
 function renderCollectibles() {
   const container = document.getElementById('collectiblesDisplay');
   if (!container) return;
@@ -665,38 +1436,61 @@ function renderCollectibles() {
   }
 
   const typeLabel = _activeDef().collectibleLabel;
+  const category = _activeDef().collectibleCategory || 'snowglobe';
 
   // Update sub-panel summary label with game-specific type and count
   const collectiblesH3 = document.querySelector('#collectiblesSubPanel > summary > h3');
   if (collectiblesH3) collectiblesH3.textContent = `> ${typeLabel} [${acquiredCount}/${total}]`;
+  // BUS-15 CURIO ARCHIVE board-level 0i status (Phase 3 · Piece 2)
+  const curioStatus = document.getElementById('opsCurioStatus');
+  if (curioStatus) curioStatus.textContent = `${acquiredCount}/${total} ${typeLabel} ACQUIRED`;
+  const curioPn = document.querySelector('#curioPanel .bay-part-no');
+  if (curioPn)
+    curioPn.innerHTML = `PN RBC-FRT-15 &middot; DISPLAY CASE — ${escapeHtml(typeLabel)} <span class="real-label">(COLLECTIBLES — toggleCollectible unchanged)</span>`;
+  const plaque = document.getElementById('curioMainPlaque');
+  if (plaque) plaque.textContent = `◈ ${acquiredCount} OF ${total} ${typeLabel} ON DISPLAY`;
 
-  let html = '';
+  // FEEDBACK ANIMATION WAVE 1 (#22 EXHIBIT LIGHT-UP) — consume the pending
+  // list exactly once, only for the objects it names, then clear it.
+  const lightNames = new Set(_pendingExhibitLight.map(n => n.toLowerCase()));
+  _pendingExhibitLight = [];
 
-  // Acquired items first
-  const acquiredDefs = defs.filter(d => acquired.has(d.name.toLowerCase()));
-  const missingDefs = defs.filter(d => !acquired.has(d.name.toLowerCase()));
-
-  acquiredDefs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    html += `<div class="tracker-row"><button class="tracker-toggle tracker-toggle--active" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} missing">[ACQUIRED]</button> ${escapeHtml(d.name.toUpperCase())}</div>`;
-  });
-
-  if (acquiredDefs.length > 0 && missingDefs.length > 0) {
-    html +=
-      '<div style="border-top:1px dashed rgba(var(--robco-green-rgb),0.2);margin:4px 0;"></div>';
+  const icon = _curioObjectIconHtml(category);
+  container.innerHTML = defs
+    .map(d => {
+      const isAcq = acquired.has(d.name.toLowerCase());
+      const safeAttr = escapeHtml(d.name);
+      const word = isAcq
+        ? 'acquired; tap to mark missing'
+        : 'missing; tap to mark acquired' +
+          (d.location ? ` — last known location ${escapeHtml(d.location)}` : '');
+      const isLighting = lightNames.has(d.name.toLowerCase());
+      const cls =
+        'curio-obj tracker-row tracker-toggle ' +
+        (isAcq ? 'tracker-toggle--active' : 'tracker-toggle--inactive') +
+        (isLighting ? ' curio-lightup' : '');
+      return (
+        `<div class="curio-cell"><button class="${cls}" data-name="${safeAttr}" ` +
+        `onclick="toggleCollectible(this.dataset.name)" aria-label="${escapeHtml(d.name)} — ${word}">` +
+        `${icon}<span class="c-plate">${escapeHtml(d.name.toUpperCase())}</span>` +
+        `<span class="c-chip">${isAcq ? '◈ ACQUIRED' : '◇ MISSING'}</span></button></div>`
+      );
+    })
+    .join('');
+  if (lightNames.size) {
+    setTimeout(() => {
+      container
+        .querySelectorAll('.curio-lightup')
+        .forEach(el => el.classList.remove('curio-lightup'));
+    }, 1600);
   }
-
-  missingDefs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    const locHint = d.location
-      ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
-      : '';
-    html += `<div class="tracker-row" style="opacity:0.75;"><button class="tracker-toggle tracker-toggle--inactive" onclick="toggleCollectible('${safeName}')" aria-label="Mark ${safeName} acquired">[MISSING]</button> ${escapeHtml(d.name.toUpperCase())}${locHint}</div>`;
-  });
-
-  container.innerHTML = html;
 }
 
+// _pendingExhibitLight (FEEDBACK ANIMATION WAVE 1, #22 EXHIBIT LIGHT-UP) — an
+// array of newly-acquired names, never state.*, declared in state.js (loaded
+// by test.html's reduced boot chain too — Protocol 27), consumed by
+// renderCollectibles() the next time it paints (the same deferred-consumption
+// pattern as _pendingSurveyPing/_pendingQuestStamp).
 function toggleCollectible(name) {
   if (!state.collectibles) state.collectibles = [];
   const lowerName = name.toLowerCase();
@@ -705,11 +1499,14 @@ function toggleCollectible(name) {
     state.collectibles.splice(idx, 1);
   } else {
     state.collectibles.push(name);
+    RobcoEvents.emit('collectible.acquired', { name }); // U8 auto-log
+    _pendingExhibitLight.push(name);
   }
   renderCollectibles();
   renderSessionStats();
   updateMath();
 }
+
 function renderLincolnMemorabilia() {
   const subPanel = document.getElementById('lincolnSubPanel');
   const container = document.getElementById('lincolnMemorabiliaDisplay');
@@ -729,7 +1526,7 @@ function renderLincolnMemorabilia() {
 
   // Update sub-panel summary label with current count
   const summaryH3 = subPanel?.querySelector('summary > h3');
-  if (summaryH3) summaryH3.textContent = `> LINCOLN MEMORABILIA [${foundCount}/9]`;
+  if (summaryH3) summaryH3.textContent = `> LINCOLN MEMORABILIA [${foundCount}/${defs.length}]`;
 
   const dispTally = { hannibal: 0, leroy: 0, washington: 0, undecided: 0 };
   defs.forEach(d => {
@@ -740,48 +1537,51 @@ function renderLincolnMemorabilia() {
     else if (disp === 'found') dispTally.undecided++;
   });
 
-  let html = `<div style="font-size:10px;opacity:0.65;margin-bottom:2px;letter-spacing:0.5px;">`;
-  html += `HANNIBAL ${dispTally.hannibal} &middot; LEROY ${dispTally.leroy} &middot; WASHINGTON ${dispTally.washington} &middot; UNDECIDED ${dispTally.undecided}`;
-  html += `</div>`;
+  const tally = document.getElementById('lincolnTally');
+  if (tally)
+    tally.textContent = `HANNIBAL ${dispTally.hannibal} · LEROY ${dispTally.leroy} · WASHINGTON ${dispTally.washington} · UNDECIDED ${dispTally.undecided}`;
+  const plaque = document.getElementById('lincolnPlaque');
+  if (plaque) plaque.textContent = `◈ ${foundCount} OF ${defs.length} RELICS RECOVERED`;
 
-  defs.forEach(d => {
-    const safeName = escapeHtml(d.name);
-    const disp = items[d.name];
-    const isFound = !!disp;
-    if (isFound) {
-      html += `<div class="tracker-row">`;
-      html += `<button class="tracker-toggle tracker-toggle--active" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} missing">[ACQUIRED]</button> `;
-      html += `${escapeHtml(d.name.toUpperCase())} `;
-      html += `<select data-lname="${safeName}" onchange="setLincolnDisposition(this.dataset.lname,this.value)" style="font-size:11px;background:transparent;color:inherit;border:1px solid var(--robco-green);min-height:28px;cursor:pointer;">`;
-      const opts = [
-        ['found', 'UNDECIDED'],
-        ['hannibal', 'HANNIBAL (FREE SLAVES)'],
-        ['leroy', 'LEROY WALKER (SLAVERS)'],
-        ['washington', 'WASHINGTON (MUSEUM)'],
-      ];
-      opts.forEach(([val, label]) => {
-        if (val !== 'leroy' || d.buyers.includes('leroy')) {
-          if (val !== 'hannibal' || d.buyers.includes('hannibal')) {
-            if (val !== 'washington' || d.buyers.includes('washington')) {
-              html += `<option value="${val}"${disp === val ? ' selected' : ''}>${label}</option>`;
-            }
-          }
-        }
-      });
-      html += `</select>`;
-      html += `</div>`;
-    } else {
-      const locHint = d.location
-        ? ` &mdash; <span class="tracker-meta">LOC: ${escapeHtml(d.location)}</span>`
-        : '';
-      html += `<div class="tracker-row" style="opacity:0.75;">`;
-      html += `<button class="tracker-toggle tracker-toggle--inactive" data-lname="${safeName}" onclick="toggleLincolnItem(this.dataset.lname)" aria-label="Mark ${escapeHtml(d.name)} acquired">[MISSING]</button> `;
-      html += `${escapeHtml(d.name.toUpperCase())}${locHint}`;
-      html += `</div>`;
-    }
-  });
+  const OPTS = [
+    ['found', 'UNDECIDED'],
+    ['hannibal', 'HANNIBAL (FREE SLAVES)'],
+    ['leroy', 'LEROY WALKER (SLAVERS)'],
+    ['washington', 'WASHINGTON (MUSEUM)'],
+  ];
 
-  container.innerHTML = html;
+  container.innerHTML = defs
+    .map(d => {
+      const safeName = escapeHtml(d.name);
+      const disp = items[d.name];
+      const isFound = !!disp;
+      const icon = _curioObjectIconHtml('lincoln-' + (d.shape || 'book'));
+      const word = isFound ? 'recovered; tap to mark missing' : 'missing; tap to mark recovered';
+      const cls =
+        'curio-obj tracker-row tracker-toggle ' +
+        (isFound ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+      let dispositionSelect = '';
+      if (isFound) {
+        const optsHtml = OPTS.filter(([val]) => val === 'found' || d.buyers.includes(val))
+          .map(
+            ([val, label]) =>
+              `<option value="${val}"${disp === val ? ' selected' : ''}>${label}</option>`
+          )
+          .join('');
+        dispositionSelect =
+          `<select class="curio-linc-disposition" data-lname="${safeName}" ` +
+          `onchange="setLincolnDisposition(this.dataset.lname,this.value)" ` +
+          `aria-label="${escapeHtml(d.name)} disposition">${optsHtml}</select>`;
+      }
+      return (
+        `<div class="curio-cell"><button class="${cls}" data-lname="${safeName}" ` +
+        `onclick="toggleLincolnItem(this.dataset.lname)" aria-label="${escapeHtml(d.name)} — ${word}">` +
+        `${icon}<span class="c-plate">${escapeHtml(d.name.toUpperCase())}</span>` +
+        `<span class="c-chip">${isFound ? '◈ RECOVERED' : '◇ MISSING'}</span></button>` +
+        `${dispositionSelect}</div>`
+      );
+    })
+    .join('');
 }
 
 function toggleLincolnItem(name) {
@@ -836,23 +1636,31 @@ function renderTraits() {
   const selectedDefs = visibleDefs.filter(d => selected.includes(d.name));
   const unselectedDefs = visibleDefs.filter(d => !selected.includes(d.name));
 
+  // Owner report fix: each row used to be a wrapper DIV (class tracker-row)
+  // around a small inner toggle BUTTON (class tracker-toggle) — only that
+  // inner [SEL]/[---] bracket-text button actually toggled, and
+  // .trait-chips' width:auto sized each row to its OWN content, so
+  // short-effect traits (Skilled, Small Frame) rendered as narrow/indented
+  // chips next to the full-width ones. Fixed to match the SAME single-button
+  // pattern every other tracker (skill books/magazines/curios — see
+  // _renderReadTracker above) already uses: the row IS the toggle (a single
+  // combined button.tracker-row.tracker-toggle, Protocol UI-3/UI-5), so the
+  // whole chip is clickable, and a lit/dim ●/○ glyph replaces the dated
+  // [SEL]/[---] bracket text while keeping identical toggle semantics.
   const renderRow = d => {
-    const safeName = escapeHtml(d.name);
+    const safeAttr = escapeHtml(d.name);
     const isSel = selected.includes(d.name);
     const dlcBadge =
       d.dlc === 'owb' ? ' <span style="font-size:9px;opacity:0.5;">[OWB]</span>' : '';
-    const effectSpan = `<span class="tracker-meta"> &mdash; ${escapeHtml(d.effect)}</span>`;
-    if (isSel) {
-      html += `<div class="tracker-row">`;
-      html += `<button class="tracker-toggle tracker-toggle--active" onclick="toggleTrait('${safeName}')" aria-label="Deselect trait ${safeName}">[SEL]</button>`;
-      html += `<strong>${escapeHtml(d.name.toUpperCase())}${dlcBadge}</strong>${effectSpan}`;
-      html += `</div>`;
-    } else {
-      html += `<div class="tracker-row" style="opacity:0.7;">`;
-      html += `<button class="tracker-toggle tracker-toggle--inactive" onclick="toggleTrait('${safeName}')" aria-label="Select trait ${safeName}">[---]</button>`;
-      html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}${effectSpan}`;
-      html += `</div>`;
-    }
+    const cls =
+      'tracker-row tracker-toggle ' +
+      (isSel ? 'tracker-toggle--active' : 'tracker-toggle--inactive');
+    const glyph = isSel ? '&#9679;' : '&#9675;'; // ● / ○
+    const word = isSel ? 'Deselect trait' : 'Select trait';
+    html += `<button class="${cls}" data-name="${safeAttr}" onclick="toggleTrait(this.dataset.name)" aria-label="${word} ${safeAttr}">`;
+    html += `<span class="trait-lamp" aria-hidden="true">${glyph}</span>`;
+    html += `${escapeHtml(d.name.toUpperCase())}${dlcBadge}<span class="tracker-meta"> &mdash; ${escapeHtml(d.effect)}</span>`;
+    html += `</button>`;
   };
 
   if (filterQ && visibleDefs.length === 0) {
@@ -886,21 +1694,28 @@ function toggleTrait(name) {
   saveState();
 }
 
-// ── Shared READ/UNREAD tracker renderer (QA-DUP-1 / WU-B8) ──────────
-// Drives the Skill Books and Skill Magazines panels (and any future binary
-// read-tracker) from one config object so the row markup, READ/UNREAD
-// sub-panel split, empty states, and collapse-persistence live in exactly
-// one place. Fully data-driven — no game literals (Protocol 38).
+// ── Shared SHELF/RACK tracker renderer (Phase 3 OPERATOR batch 3 — ground-
+// up reskin of the WU-B8 shared helper) ─────────────────────────────────
+// Drives the BUS-05a SKILL BOOKS reference shelf and BUS-05b SKILL MAGAZINES
+// periodical rack from one config object — the row markup, empty state, and
+// toggle wiring live in exactly one place (Protocol 22 — no duplicated
+// render logic). Each row is a SINGLE <button> carrying BOTH the Protocol
+// UI-3 .tracker-row and .tracker-toggle classes (the spine/cover IS its own
+// toggle) — read = upright/lit/ribbon (books) or consumed = matte+stamped
+// (magazines), the undone state leaning/dashed/dim. Fully data-driven — no
+// game literals (Protocol 38).
 //
 // opts: {
-//   containerId,                // required: where the sub-panels mount
-//   panelId?, visible?,         // optional: hide panelId when visible() is false
-//   defs,                       // registry array of {name, skill}
-//   read,                       // state array of read names
-//   subIdRead, subIdUnread,     // data-sub-id keys (persistence)
-//   toggleFn,                   // name of the global toggle function
-//   meta,                       // (d) => inner HTML for the .tracker-meta span
-//   emptyRead, emptyUnread,     // empty-state strings
+//   containerId,                     // required: shelf/rack mount point
+//   panelId?, visible?,              // optional: hide panelId when visible() is false
+//   defs,                            // registry array of {name, skill}
+//   read,                            // state array of read/consumed names
+//   toggleFn,                        // name of the global toggle function
+//   meta,                            // (d) => plain-text sub-label (skill name)
+//   itemClass,                       // 'spine' | 'mag' — row CSS variant
+//   doneModifier, undoneModifier,    // extra class applied per state
+//   doneWord, undoneWord,            // aria-label phrasing
+//   emptyBoard,                      // empty-state text when defs.length === 0
 // }
 function _renderReadTracker(opts) {
   const container = document.getElementById(opts.containerId);
@@ -914,59 +1729,28 @@ function _renderReadTracker(opts) {
 
   const defs = Array.isArray(opts.defs) ? opts.defs : [];
   const read = Array.isArray(opts.read) ? opts.read : [];
-  const readDefs = defs.filter(d => read.includes(d.name));
-  const unreadDefs = defs.filter(d => !read.includes(d.name));
 
-  let ps = {};
-  try {
-    ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-  } catch (_) {}
-  const readOpen = ps[opts.subIdRead] !== false;
-  const unreadOpen = ps[opts.subIdUnread] !== false;
-
-  const rowHtml = (d, isRead) => {
+  const rowHtml = d => {
     const safeAttr = escapeHtml(d.name);
-    const tag = isRead
-      ? `<button class="tracker-toggle tracker-toggle--active" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} unread">[READ]</button>`
-      : `<button class="tracker-toggle tracker-toggle--inactive" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" aria-label="Mark ${safeAttr} read">[----]</button>`;
-    const nameHtml = isRead
-      ? `<strong>${escapeHtml(d.name.toUpperCase())}</strong>`
-      : escapeHtml(d.name.toUpperCase());
+    const isRead = read.includes(d.name);
+    const modifier = isRead ? opts.doneModifier : opts.undoneModifier;
+    const word = isRead ? opts.doneWord : opts.undoneWord;
+    const metaText = opts.meta(d);
+    const cls =
+      'tracker-row tracker-toggle ' +
+      (isRead ? 'tracker-toggle--active' : 'tracker-toggle--inactive') +
+      ' ' +
+      opts.itemClass +
+      (modifier ? ' ' + modifier : '');
     return (
-      `<div class="tracker-row"${isRead ? '' : ' style="opacity:0.7;"'}>` +
-      tag +
-      nameHtml +
-      ` <span class="tracker-meta">&mdash; ${opts.meta(d)}</span>` +
-      `</div>`
+      `<button class="${cls}" data-name="${safeAttr}" onclick="${opts.toggleFn}(this.dataset.name)" ` +
+      `aria-label="${escapeHtml(d.name)} (${escapeHtml(metaText)}) — ${word}">` +
+      `${escapeHtml(d.name)}<span class="tracker-meta">${escapeHtml(metaText)}</span>` +
+      `</button>`
     );
   };
 
-  const readRows = readDefs.length
-    ? readDefs.map(d => rowHtml(d, true)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyRead}</div>`;
-  const unreadRows = unreadDefs.length
-    ? unreadDefs.map(d => rowHtml(d, false)).join('')
-    : `<div style="font-size:11px;opacity:0.5;padding:2px 0 4px;">${opts.emptyUnread}</div>`;
-
-  container.innerHTML =
-    `<details class="sub-panel" data-sub-id="${opts.subIdRead}"${readOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; READ [${readDefs.length}]</h3></summary>` +
-    readRows +
-    `</details>` +
-    `<details class="sub-panel" data-sub-id="${opts.subIdUnread}"${unreadOpen ? ' open' : ''}>` +
-    `<summary><h3>&gt; UNREAD [${unreadDefs.length}]</h3></summary>` +
-    unreadRows +
-    `</details>`;
-
-  container.querySelectorAll('details[data-sub-id]').forEach(d => {
-    d.addEventListener('toggle', () => {
-      try {
-        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-        p[d.dataset.subId] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(p));
-      } catch (_) {}
-    });
-  });
+  container.innerHTML = defs.length ? defs.map(rowHtml).join('') : emptyState(opts.emptyBoard);
 }
 
 function renderSkillBooks() {
@@ -977,24 +1761,55 @@ function renderSkillBooks() {
         ? FALLOUT_REGISTRY.skillBooks
         : [],
     read: Array.isArray(state.skillBooks) ? state.skillBooks : [],
-    subIdRead: 'skill_books_read',
-    subIdUnread: 'skill_books_unread',
     toggleFn: 'toggleSkillBook',
-    meta: d => escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase()),
-    emptyRead: 'NO BOOKS READ',
-    emptyUnread: 'ALL BOOKS READ',
+    meta: d => (d.skill || '').replace(/_/g, ' ').toUpperCase(),
+    itemClass: 'spine',
+    doneModifier: '',
+    undoneModifier: 'unread',
+    doneWord: 'read; tap to mark unread',
+    undoneWord: 'unread; tap to mark read',
+    emptyBoard: 'NO SKILL BOOKS IN THE REGISTRY',
   });
+}
+
+// FEEDBACK ANIMATION WAVE 2 (#12 INK STAMP) — plays only on the unread→read/
+// consumed transition (never the reverse un-mark, since a rubber stamp
+// physically LANDING only makes sense once); shared by the skill-book spine
+// rack and the magazine cover rack (Protocol 22 — one helper, two callers),
+// since both use the identical button[data-name] row shape. Looked up AFTER
+// the container's full re-render (both toggles rebuild innerHTML), so the
+// class is applied to the freshly-painted button, not a stale reference.
+function _playInkStamp(containerId, name) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const btn = Array.from(container.querySelectorAll('button[data-name]')).find(
+    b => b.dataset.name === name
+  );
+  if (!btn) return;
+  btn.classList.remove('ink-stamp-land');
+  void btn.offsetWidth;
+  btn.classList.add('ink-stamp-land');
+  setTimeout(() => btn.classList.remove('ink-stamp-land'), 900);
 }
 
 function toggleSkillBook(name) {
   if (!Array.isArray(state.skillBooks)) state.skillBooks = [];
   const idx = state.skillBooks.indexOf(name);
+  const wasUnread = idx === -1;
   if (idx !== -1) {
     state.skillBooks.splice(idx, 1);
   } else {
     state.skillBooks.push(name);
   }
   renderSkillBooks();
+  if (wasUnread) _playInkStamp('skillBooksDisplay', name);
+  // Owner batch item 2: the "n/13 READ" #opBooksStatus summary (BUS-05a's
+  // <summary> line, doubling as the collapsed-state readout) is painted by
+  // _syncOperatorTelemetry() — previously only reached via the next unrelated
+  // updateMath() call, so the count lagged a shelve/unshelve tap by a full
+  // render cycle. Calling the same sync function directly here (Protocol 22 —
+  // no new counting logic) refreshes it immediately.
+  if (typeof _syncOperatorTelemetry === 'function') _syncOperatorTelemetry();
   saveState();
 }
 
@@ -1008,47 +1823,71 @@ function renderMagazines() {
         ? FALLOUT_REGISTRY.magazines
         : [],
     read: Array.isArray(state.magazines) ? state.magazines : [],
-    subIdRead: 'magazines_read',
-    subIdUnread: 'magazines_unread',
     toggleFn: 'toggleMagazine',
     meta: d =>
       d.skill === 'Critical Chance'
-        ? '(Critical Chance)'
-        : `(boosts ${escapeHtml((d.skill || '').replace(/_/g, ' ').toUpperCase())})`,
-    emptyRead: 'NO MAGAZINES READ',
-    emptyUnread: 'ALL MAGAZINES READ',
+        ? 'CRITICAL CHANCE +10 (TEMP)'
+        : (d.skill || '').replace(/_/g, ' ').toUpperCase() + ' +10 (TEMP)',
+    itemClass: 'mag',
+    doneModifier: 'consumed',
+    undoneModifier: '',
+    doneWord: 'consumed; tap to restore',
+    undoneWord: 'unread; tap to mark consumed',
+    emptyBoard: 'NO SKILL MAGAZINES IN THE REGISTRY',
   });
 }
 
 function toggleMagazine(name) {
   if (!Array.isArray(state.magazines)) state.magazines = [];
   const idx = state.magazines.indexOf(name);
+  const wasUnread = idx === -1;
   if (idx !== -1) {
     state.magazines.splice(idx, 1);
   } else {
     state.magazines.push(name);
   }
   renderMagazines();
+  if (wasUnread) _playInkStamp('magazinesDisplay', name);
+  // Same #opMagsStatus live-count fix as toggleSkillBook() (Protocol 22 — the
+  // identical root cause, same fix, same sync function).
+  if (typeof _syncOperatorTelemetry === 'function') _syncOperatorTelemetry();
   saveState();
 }
 
+// ── BUS-20 · FIELD NOTES (Phase 3 · Piece 3) — courier's field ledger:
+// bounded tray-scrollwrap + an optional in-tray search filter (display-only,
+// Protocol 22 — removeCampaignNote/addCampaignNote untouched). The auto-log
+// [T…] dimming distinction is preserved.
 function renderCampaignNotes() {
   const notesDiv = document.getElementById('campaignNotesList');
   if (!notesDiv) return;
-  if (!state.campaign_notes || state.campaign_notes.length === 0) {
+  const all = state.campaign_notes || [];
+  const searchEl = document.getElementById('notesSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  const shown = all
+    .map((note, i) => ({ note, i }))
+    .filter(({ note }) => !q || String(note).toLowerCase().includes(q));
+
+  const statusEl = document.getElementById('dbNotesStatus');
+  if (statusEl) {
+    const autoCount = all.filter(n => /^\[T\d+\]/.test(n)).length;
+    statusEl.textContent = `${all.length} ON FILE · ${autoCount} AUTO-LOGGED`;
+  }
+
+  if (!all.length) {
     notesDiv.innerHTML = emptyState('NO ENTRIES IN MEMORY');
     return;
   }
-  notesDiv.innerHTML =
-    '<ul class="notes-list">' +
-    state.campaign_notes
-      .map((note, i) => {
-        const isAutoLog = /^\[T\d+\]/.test(note);
-        const opacity = isAutoLog ? '0.65' : '1';
-        return `<li style="opacity:${opacity};"><span class="list-row-prefix">> </span><span class="list-row-content">${escapeHtml(String(note))}</span><button class="delete-btn" onclick="removeCampaignNote(${i})">X</button></li>`;
-      })
-      .join('') +
-    '</ul>';
+  if (!shown.length) {
+    notesDiv.innerHTML = emptyState('NO NOTES MATCH THIS FILTER');
+    return;
+  }
+  notesDiv.innerHTML = shown
+    .map(({ note, i }) => {
+      const isAutoLog = /^\[T\d+\]/.test(note);
+      return `<div class="note-row${isAutoLog ? ' autolog' : ''}"><span class="n-txt">${escapeHtml(String(note))}</span><button class="n-x" onclick="removeCampaignNote(${i})" aria-label="Remove note">&#10005;</button></div>`;
+    })
+    .join('');
 }
 
 function removeCampaignNote(idx) {
@@ -1069,25 +1908,34 @@ function addCampaignNote() {
   updateMath();
 }
 
+// P4: format a Terminal Record event { t, rt, type, text } as a display line.
+// Owner report: the raw [T<ticks>] tick prefix was too cryptic. The stored
+// tick value (ev.t) is unchanged — only the DISPLAY now runs it through the
+// same formatGameTime() every other player-visible time stamp already uses
+// (Protocol 22), so Crossroads Record/Incident Log read a real in-game
+// date/time instead of a bare tick count.
+function _recordLine(ev) {
+  if (!ev || typeof ev !== 'object') return String(ev == null ? '' : ev);
+  return `[${formatGameTime(ev.t || 0)}] ${ev.text || ''}`;
+}
+
 // ── CAMPAIGN STATUS PANEL (v2.0.1) ───────────────────────────────
 // Reads existing state fields — no new state fields, no Protocol 4 required.
 // Displays: quest summary, top faction standings, active effects, and campaign notes count.
 // Crossroads Record tab reads campaign_notes for auto-logged quest/faction events.
+// ── BUS-18 · CAMPAIGN CHRONICLE (Phase 3 · Piece 3) — the tape-spool
+// chronicle/ledger dress over the SAME campaignStatusDisplay/crossroadsDisplay
+// /incidentDisplay reads (Protocol 22 — no state field or handler changed).
 function renderCampaignStatus() {
   const display = document.getElementById('campaignStatusDisplay');
   const crossroads = document.getElementById('crossroadsDisplay');
 
-  // ── Campaign Status ──────────────────────────────────────
+  // ── Status readout head ──────────────────────────────────
   if (display) {
     const quests = state.quests || [];
-    const completed = quests.filter(
-      q => q.status === 'completed' || q.status === 'complete'
-    ).length;
     const active = quests.filter(q => q.status === 'in progress' || q.status === 'active').length;
-    const failed = quests.filter(q => q.status === 'failed').length;
-    const total = quests.length;
 
-    // Top 3 faction standings by absolute net rep
+    // Notable faction standings by absolute net rep
     const factions = state.factions || {};
     const factionReg = typeof getFactionRegistry === 'function' ? getFactionRegistry() : [];
     const topFactions = factionReg
@@ -1097,80 +1945,117 @@ function renderCampaignStatus() {
           typeof getFactionStanding === 'function'
             ? getFactionStanding(f.key, data.fame || 0, data.infamy || 0)
             : { label: 'NEUTRAL', color: 'var(--robco-green)' };
-        return { name: f.name, label: s.label, color: s.color };
+        return {
+          name: f.name,
+          label: s.label,
+          color: s.color,
+          bad: s.color === 'var(--robco-danger)',
+        };
       })
       .filter(f => f.label !== 'Neutral' && f.label !== 'NEUTRAL')
-      .slice(0, 4);
+      .slice(0, 6);
 
-    // Active effects summary
     const activeEffects = (state.status || []).length;
-    const expiringEffects = (state.status || []).filter(
-      e => (e.ticks || 0) > 0 && (e.ticks || 0) <= 2
-    ).length;
+    const eventCount = (state.eventLog || []).length;
 
-    // Build the HTML
-    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
-      <div class="campg-stat-box">
-        <div class="campg-stat-label">QUESTS</div>
-        <div class="campg-stat-value">${total}</div>
-        <div class="campg-stat-sub">${completed} done · ${active} active · ${failed} failed</div>
-      </div>
-      <div class="campg-stat-box">
-        <div class="campg-stat-label">EFFECTS</div>
-        <div class="campg-stat-value">${activeEffects}</div>
-        <div class="campg-stat-sub">${expiringEffects > 0 ? expiringEffects + ' expiring' : 'none expiring'}</div>
-      </div>
+    let html = `<div class="stat-head">
+      <div class="cs-box"><span class="c-cap">DIRECTIVES ACTIVE</span><span class="c-val">${active}</span></div>
+      <div class="cs-box"><span class="c-cap">COMPOUNDS LIVE</span><span class="c-val">${activeEffects}</span></div>
+      <div class="cs-box"><span class="c-cap">EVENTS LOGGED</span><span class="c-val">${eventCount}</span></div>
     </div>`;
 
     if (topFactions.length > 0) {
-      html += `<div style="margin-bottom:6px;font-size:9px;opacity:0.5;letter-spacing:0.5px;">NOTABLE STANDINGS</div>`;
-      html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">`;
-      topFactions.forEach(f => {
-        html += `<span style="font-size:9px;border:1px dashed rgba(var(--robco-green-rgb),0.25);padding:2px 6px;color:${f.color};">${escapeHtml(f.name.toUpperCase())}: ${f.label}</span>`;
-      });
+      html += `<div class="standing-chips">`;
+      html += topFactions
+        .map(
+          f =>
+            `<span class="stch${f.bad ? ' bad' : ''}">${escapeHtml(f.name.toUpperCase())} &mdash; ${escapeHtml(f.label.toUpperCase())}</span>`
+        )
+        .join('');
       html += `</div>`;
     } else {
-      html += `<div style="font-size:9px;opacity:0.4;margin-bottom:6px;">No notable faction standings</div>`;
+      html += `<div class="rack-note" style="text-align:center;opacity:0.5">NO NOTABLE STANDINGS ON FILE</div>`;
     }
-
-    // Recent campaign note count
-    const noteCount = (state.campaign_notes || []).length;
-    html += `<div style="font-size:9px;opacity:0.5;">${noteCount} campaign log entr${noteCount === 1 ? 'y' : 'ies'}</div>`;
 
     display.innerHTML = html;
   }
 
-  // ── Crossroads Record ────────────────────────────────────
-  // Reads campaign_notes that were auto-logged by quest/faction transitions.
-  // Auto-logged entries start with [T<ticks>].
+  // ── The record spool (CROSSROADS RECORD) ─────────────────
+  // Reads the structured Terminal Record (state.eventLog) — the canonical
+  // campaign history. Shows the most recent events across all types.
   if (crossroads) {
-    const autoLogs = (state.campaign_notes || [])
-      .filter(n => /^\[T\d+\]/.test(String(n)))
-      .slice(-20) // last 20 events
-      .reverse(); // newest first
-
-    if (autoLogs.length === 0) {
+    const recent = (state.eventLog || []).slice(-20).reverse(); // newest first
+    if (recent.length === 0) {
       crossroads.innerHTML = emptyState(
         'NO DECISIONS RECORDED — CROSSROADS EVENTS WILL APPEAR HERE'
       );
     } else {
-      crossroads.innerHTML = autoLogs
-        .map(
-          note =>
-            `<div style="border-bottom:1px solid rgba(var(--robco-green-rgb),0.1);padding:4px 0;font-size:10px;opacity:0.75;">${escapeHtml(String(note))}</div>`
-        )
+      crossroads.innerHTML =
+        `<div class="spool-wrap"><div class="reels" aria-hidden="true"><span class="reel"></span><span class="reel"></span></div><div class="spool-list">` +
+        recent
+          .map(ev => {
+            const line = escapeHtml(_recordLine(ev));
+            const bracket = line.match(/^(\[[^\]]*\])\s*(.*)$/);
+            return `<div class="rec-line">${bracket ? `<span class="rt">${bracket[1]}</span> ${bracket[2]}` : line}</div>`;
+          })
+          .join('') +
+        `</div></div>`;
+    }
+  }
+
+  // ── Stamped milestone entries (INCIDENT LOG) ──────────────
+  // A milestone view over the Terminal Record: the "big moments" only
+  // (level-ups, faction standing shifts, quest outcomes) — the chatter
+  // (trades/crafts/sleeps) is filtered out, leaving the incidents that matter.
+  const incident = document.getElementById('incidentDisplay');
+  const MILESTONES = ['level', 'faction', 'quest'];
+  const incidents = (state.eventLog || [])
+    .filter(ev => ev && MILESTONES.includes(ev.type))
+    .slice(-20)
+    .reverse();
+  if (incident) {
+    if (incidents.length === 0) {
+      incident.innerHTML = emptyState('NO INCIDENTS ON RECORD — MILESTONES WILL APPEAR HERE');
+    } else {
+      incident.innerHTML = incidents
+        .map(ev => {
+          const line = escapeHtml(_recordLine(ev));
+          const bracket = line.match(/^(\[[^\]]*\])\s*(.*)$/);
+          const bad = ev && ev.type === 'faction' && /vilified|hated|shunned/i.test(ev.text || '');
+          return `<div class="incident${bad ? ' milestone-fac bad' : ''}"><span>${bracket ? bracket[2] : line}</span><span class="in-t">${bracket ? bracket[1] : ''}</span></div>`;
+        })
         .join('');
     }
   }
+
+  // Board 0i summary line (BUS-18's collapsed-state status row).
+  const chronStatusEl = document.getElementById('dbChronStatus');
+  if (chronStatusEl) {
+    const eventCount = (state.eventLog || []).length;
+    chronStatusEl.textContent = `${eventCount} EVENTS ON THE SPOOL · ${incidents.length} INCIDENT STAMPS`;
+  }
 }
 
-// ── G6: REGIONAL ZONE MAP (WORLD MAP) ────────────────────────────
-// Registry-driven 6×6 CSS grid. Markers:
-//   CURRENT — bright border, on zone matching state.loc (fuzzy match against zone.locations[])
-//   VISITED — dashed muted border, on zones in locationHistory
-//   [?] pip  — on zones containing uncollected collectibles
-// Compass strip labels orientation. Narrow viewports get a 4×4 core-zone fallback.
+// ── BUS-16 · CARTOGRAPHY TABLE — "Phosphor Cartography" spatial node map ──
+// (Phase 3 · Piece 3, replacing the boxed 6×6 CSS grid). One inline SVG built
+// with map().join('') and assigned ONCE to #worldMapDisplay.innerHTML — a
+// single bulk assignment, never repeated-innerHTML concatenation inside a
+// loop (Prohibited Patterns). Nodes plot at each zone's REAL
+// gridRow/gridCol (zero new data, registry stays read-only — Protocol 23);
+// status classes reuse the existing --current/--visited/fog semantics. Same
+// fog-of-war single-source (recordLocationVisit) and same zoomMapToZone/
+// resetMapZoom/setMapView/markLocationVisited ids/handlers as before
+// (Protocol 22) — only the presentation layer is rebuilt as vector graphics.
 let _mapActiveZone = null;
+// Last-rendered node list (index-aligned to FALLOUT_REGISTRY.zones), kept for
+// arrow-key nearest-neighbor traversal (_mapNodeKeyNav) without re-deriving
+// zone status on every keystroke.
+let _mapLastNodes = [];
+// The panel's viewport position captured right before zooming INTO a node,
+// so resetMapZoom() can restore to that exact pre-zoom position (not just
+// whatever the short sector-sheet's own scroll happened to be) — see the
+// _rerenderMapPreservingScroll() comment for why this is needed.
+let _mapPreZoomAnchor = null;
 
 function setMapView(v) {
   state.mapView = v;
@@ -1178,35 +2063,75 @@ function setMapView(v) {
   renderWorldMap();
 }
 
-function zoomMapToZone(zoneName) {
-  _mapActiveZone = zoneName;
+// Owner report fix: renderWorldMap() replaces #worldMapDisplay's entire
+// innerHTML — going into or out of the zoomed sector sheet destroys whatever
+// DOM node currently holds focus (the tapped node's <g>, or the
+// "< SURVEY CHART" back button), and losing focus to <body> like that is a
+// well-known trigger for browsers to auto-scroll the page to an unrelated
+// position.
+//
+// Root cause of the "backing out shows only the top half" re-fix (Protocol
+// 27, live-reproduced): the FIRST attempt captured/restored a raw scrollTop
+// PIXEL VALUE. The full grid view (.table-frame + SVG + legend) and the
+// zoomed sector sheet (.sheet) are very different heights — tapping a node
+// CONDENSES the panel to the short sheet, so the captured scrollVal is small
+// (clamped to the short document). Backing out re-expands the panel back to
+// its full height, and blindly restoring that small pixel value lands the
+// viewport far short of where the panel now sits (showing only its top
+// portion) instead of where the user was actually looking.
+//
+// Fixed by anchoring on the PANEL's own viewport position instead of an
+// absolute pixel offset: capture #worldMapPanel's getBoundingClientRect().top
+// before the re-render, then nudge whichever element actually scrolls (the
+// SAME _scrollElFor() lookup switchTab()'s per-subsystem scroll memory
+// already uses — Protocol 22, no second scroll-detection path) by exactly
+// the delta needed to put the panel back at that same viewport position.
+// This is immune to the panel's own height changing (unlike a raw scrollTop)
+// and still absorbs the browser's own focus-loss auto-scroll, since that
+// shows up as the same before/after rect delta.
+//
+// One more real wrinkle (Protocol 27, live-reproduced): switching TO the
+// short sector sheet SHRINKS the document, and the browser auto-clamps the
+// current scroll position down to the new (smaller) max scroll — a side
+// effect that happens BEFORE this function's own correction ever runs, and
+// which the correction then can't undo (there's nowhere to scroll TO in a
+// document that's still short). That clamp silently eats however much
+// scroll the zoom-in used up. Fixed by having zoomMapToZone() capture the
+// panel's PRE-ZOOM position into _mapPreZoomAnchor and passing it back in as
+// `anchor` when resetMapZoom() zooms back OUT — restoring relative to the
+// position from before the trip into the sheet, not the clamped position
+// the sheet was left at.
+function _rerenderMapPreservingScroll(anchor) {
+  const el = typeof _scrollElFor === 'function' ? _scrollElFor('databank') : null;
+  const panel = document.getElementById('worldMapPanel');
+  const before = anchor != null ? anchor : panel ? panel.getBoundingClientRect().top : null;
   renderWorldMap();
+  if (panel && before !== null) {
+    const delta = panel.getBoundingClientRect().top - before;
+    if (delta) {
+      if (el) el.scrollTop += delta;
+      else window.scrollTo(0, (window.scrollY || 0) + delta);
+    }
+  } else {
+    // Fallback (panel not found — shouldn't happen on static markup): the
+    // old absolute-offset behavior is still better than not restoring at all.
+    const scrollVal = el ? el.scrollTop : window.scrollY || 0;
+    if (el) el.scrollTop = scrollVal;
+    else window.scrollTo(0, scrollVal);
+  }
+}
+
+function zoomMapToZone(zoneName) {
+  const panel = document.getElementById('worldMapPanel');
+  _mapPreZoomAnchor = panel ? panel.getBoundingClientRect().top : null;
+  _mapActiveZone = zoneName;
+  _rerenderMapPreservingScroll();
 }
 
 function resetMapZoom() {
   _mapActiveZone = null;
-  renderWorldMap();
-}
-
-// Abbreviation map for long zone names in the 6×6 grid display.
-// Full names are always available via the title tooltip.
-const _MAP_ABBREV = {
-  'Ranger Station Foxtrot': 'R.S. Foxtrot',
-  'Ranger Station Alpha': 'R.S. Alpha',
-  'Ranger Station Bravo': 'R.S. Bravo',
-  'Ranger Station Charlie': 'R.S. Charlie',
-  'Ranger Station Delta': 'R.S. Delta',
-  'Ranger Station Echo': 'R.S. Echo',
-  'Camp Forlorn Hope': 'Forlorn Hope',
-  'Camp Searchlight': 'Searchlight',
-  'Camp McCarran': 'McCarran',
-  '188 Trading Post': '188 Post',
-  'Mount Charleston': 'Mt. Charleston',
-  'Searchlight Airport': 'S.L. Airport',
-};
-
-function _mapAbbrev(name) {
-  return _MAP_ABBREV[name] || name;
+  _rerenderMapPreservingScroll(_mapPreZoomAnchor);
+  _mapPreZoomAnchor = null;
 }
 
 // WU-F11: native "mark visited" — flags a WORLD GRID location as discovered directly from
@@ -1219,7 +2144,68 @@ function markLocationVisited(loc) {
   if (!loc) return;
   recordLocationVisit(loc);
   if (typeof saveState === 'function') saveState();
-  renderWorldMap();
+  _rerenderMapPreservingScroll();
+}
+
+// Native "travel here" — sets a sector-sheet location as CURRENT (moves the [CURRENT]
+// marker there), unlike markLocationVisited() above which only flags a place discovered
+// without ever touching state.loc. Routes through the SAME shared onLocationChange
+// (overrideLoc) setter the #stat_loc field itself uses (Protocol 22 — never a forked
+// setter): it mirrors the new value into #stat_loc, syncs state, records BOTH the left
+// and arrived location visited via recordLocationVisit(), saves, and re-renders. No AI,
+// no transmitMessage — fully offline and player-authored (Protocol 24).
+//
+// onLocationChange() re-renders via its own bare renderWorldMap() call (it also fires
+// from the unrelated #stat_loc onchange on OPERATOR, far from the map, where scroll-
+// preserving would make no sense there), so calling it from inside the zoomed sector
+// sheet hits the exact same innerHTML-replaces-the-focused-node scroll jump that
+// _rerenderMapPreservingScroll() exists to fix (WU-F11 / Suite 196 / Suite 198). Since
+// onLocationChange() already owns that one render call, this can't delegate to
+// _rerenderMapPreservingScroll() itself (that would render the map twice) — instead it
+// captures/restores the same panel-anchor delta around the call, reusing the identical
+// _scrollElFor('databank') lookup (Protocol 22 — still one scroll-detection path).
+function travelToLocation(loc) {
+  if (!loc) return;
+  const panel = document.getElementById('worldMapPanel');
+  const before = panel ? panel.getBoundingClientRect().top : null;
+  onLocationChange(loc);
+  if (panel && before !== null) {
+    const el = typeof _scrollElFor === 'function' ? _scrollElFor('databank') : null;
+    const delta = panel.getBoundingClientRect().top - before;
+    if (delta) {
+      if (el) el.scrollTop += delta;
+      else window.scrollTo(0, (window.scrollY || 0) + delta);
+    }
+  }
+}
+
+// Arrow-key traversal between rendered SVG nodes (nearest node in the pressed
+// direction, by real grid coordinate) + Enter/Space pulls the sector sheet.
+// Reads _mapLastNodes (set by renderWorldMap's strategic-view branch) so it
+// never has to re-walk the registry on every keystroke.
+function _mapNodeKeyNav(e, zoneName) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    zoomMapToZone(zoneName);
+    return;
+  }
+  const dir = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  }[e.key];
+  if (!dir) return;
+  e.preventDefault();
+  const from = _mapLastNodes.find(n => n.name === zoneName);
+  if (!from) return;
+  const cand = _mapLastNodes
+    .map(n => ({ n, dx: n.gridCol - from.gridCol, dy: n.gridRow - from.gridRow }))
+    .filter(o => o.n !== from && o.dx * dir[0] + o.dy * dir[1] > 0)
+    .sort((a, b) => a.dx * a.dx + a.dy * a.dy - (b.dx * b.dx + b.dy * b.dy))[0];
+  if (!cand) return;
+  const el = document.getElementById('mapNode-' + cand.n.idx);
+  if (el) el.focus();
 }
 
 function renderWorldMap() {
@@ -1301,7 +2287,7 @@ function renderWorldMap() {
     return false;
   }
 
-  // ── ZOOM LEVEL 2: DETAILED REGIONAL VIEW ─────────────────────────
+  // ── SECTOR SHEET — pulled by tapping/Entering a node ─────────────
   if (_mapActiveZone) {
     const activeZone = zones.find(z => z.name === _mapActiveZone);
     if (!activeZone) {
@@ -1313,11 +2299,11 @@ function renderWorldMap() {
       ? `<span class="map-collectible-badge badge">[?]</span>`
       : '';
     let html = `
-      <div class="map-detail-header">
-        <button class="action-btn map-back-btn" onclick="resetMapZoom()">&lt; WORLD GRID</button>
-        <span style="font-weight:bold; font-size:11px; letter-spacing:1px;">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>${zoneBadge}
-      </div>
-      <div class="map-detail-list">
+      <div class="sheet">
+        <div class="sheet-head">
+          <button class="action-btn map-back-btn" onclick="resetMapZoom()">&#9668; SURVEY CHART</button>
+          <span class="sheet-title">${escapeHtml(activeZone.name).toUpperCase()} REGION</span>${zoneBadge}
+        </div>
     `;
 
     const locs = activeZone.locations || [];
@@ -1344,33 +2330,49 @@ function renderWorldMap() {
         const isYou = i === currentLocIdx;
         const wasVisited = locVisited(loc);
 
-        let statusText = '<span style="opacity:0.4;">[UNKNOWN]</span>';
-        let rowCls = 'map-detail-row';
+        let statusText = '<span class="loc-st st-unk">UNSURVEYED</span>';
+        let rowCls = 'loc-row';
         if (isYou) {
-          statusText = '<span class="map-you-marker">[CURRENT]</span>';
-          rowCls += ' map-detail-row--current';
+          statusText = '<span class="loc-st st-cur">&#9673; CURRENT</span>';
         } else if (wasVisited) {
-          statusText = '<span style="opacity:0.8;">[VISITED]</span>';
-          rowCls += ' map-detail-row--visited';
+          statusText = '<span class="loc-st st-vis">SURVEYED</span>';
+        } else {
+          rowCls += ' unknown';
         }
 
         // WU-F11: native "mark visited" affordance — only on undiscovered rows (not the
-        // current location, not already visited). Add-only: tapping LOG VISIT flags the place
-        // as discovered (permanent, no un-mark) directly, with NO AI.
+        // current location, not already visited). Add-only: tapping MARK SURVEYED flags the
+        // place as discovered (permanent, no un-mark) directly, with NO AI.
         const markBtn =
           isYou || wasVisited
             ? ''
-            : `<button class="map-mark-visited" data-loc="${escapeHtml(
+            : `<button class="mark" data-loc="${escapeHtml(
                 loc
               )}" onclick="markLocationVisited(this.dataset.loc)" aria-label="Mark ${escapeHtml(
                 loc
-              )} as visited">LOG VISIT</button>`;
+              )} as surveyed">&#9656; MARK SURVEYED</button>`;
+
+        // Native "travel here" affordance — sets this location as CURRENT (moves the
+        // [CURRENT] marker), distinct from MARK SURVEYED which only flags a place
+        // discovered. Suppressed only on the already-current row (no-op there); shown on
+        // both surveyed and unsurveyed rows, since fast-traveling to a known OR a freshly-
+        // charted location is the whole point. No AI, no network — travelToLocation() routes
+        // through the same shared onLocationChange(overrideLoc) setter the #stat_loc field
+        // itself uses (Protocol 22).
+        const travelBtn = isYou
+          ? ''
+          : `<button class="mark" data-loc="${escapeHtml(
+              loc
+            )}" onclick="travelToLocation(this.dataset.loc)" aria-label="Travel to ${escapeHtml(
+              loc
+            )} — set as current location">&#8594; TRAVEL HERE</button>`;
 
         html += `
           <div class="${rowCls}">
-            <span class="map-detail-name">- ${escapeHtml(loc)}</span>
+            <b>${escapeHtml(loc)}</b>
+            ${statusText}
             ${markBtn}
-            <span style="font-size:9px;white-space:nowrap;">${statusText}</span>
+            ${travelBtn}
           </div>
         `;
       });
@@ -1381,97 +2383,250 @@ function renderWorldMap() {
     return;
   }
 
-  // ── ZOOM LEVEL 1: STRATEGIC WORLD VIEW ───────────────────────────
-  // Size is a pure function of state.mapView (persisted) — no width measurement.
-  // 'full' → 6×6 grid; 'auto' and 'core' → 4×4 core grid (rows 2–5, cols 2–5).
+  // ── PHOSPHOR CARTOGRAPHY — the spatial node map ──────────────────
+  // 'full' state.mapView = STRATEGIC (whole chart); anything else = CORE, a
+  // tighter viewBox CROP over the exact same node set — no zone is ever
+  // excluded from the DOM, only the visible window changes (unlike the old
+  // grid, which physically dropped off-crop zones). setMapView/state.mapView
+  // unchanged (Protocol 22).
   const mv = state.mapView || 'auto';
   const useFull = mv === 'full';
+  const MARGIN = 30;
+  const STEP = 48;
+  const nx = z => MARGIN + (z.gridCol - 1) * STEP;
+  const ny = z => MARGIN + (z.gridRow - 1) * STEP;
+  const maxRow = Math.max(...zones.map(z => z.gridRow));
+  const maxCol = Math.max(...zones.map(z => z.gridCol));
+  const fullSize = MARGIN * 2 + Math.max(maxRow - 1, maxCol - 1) * STEP;
+  const CORE_LO = 2,
+    CORE_HI = 5,
+    CORE_PAD = 30;
+  const coreOrigin = MARGIN + (CORE_LO - 1) * STEP - CORE_PAD;
+  const coreSize = (CORE_HI - CORE_LO) * STEP + 2 * CORE_PAD;
+  const viewBox = useFull
+    ? `0 0 ${fullSize} ${fullSize}`
+    : `${coreOrigin} ${coreOrigin} ${coreSize} ${coreSize}`;
 
-  const rowMin = useFull ? 1 : 2;
-  const rowMax = useFull ? 6 : 5;
-  const colMin = useFull ? 1 : 2;
-  const colMax = useFull ? 6 : 5;
-  const cols = colMax - colMin + 1;
-
-  // Build zone lookup by grid position
-  const gridMap = {};
-  zones.forEach(z => {
-    gridMap[`${z.gridRow},${z.gridCol}`] = z;
-  });
-
-  // Compute ONE winning grid key for current location to prevent multi-highlight
-  let currentZoneKey = null;
+  // Compute ONE winning current zone (unchanged fuzzy-match logic — a fixed
+  // per-zone identity, not per-cell — Protocol 22).
+  let currentZone = null;
   if (currentLoc) {
     let bestScore = 0,
       bestLen = 0;
-    Object.entries(gridMap).forEach(([key, zone]) => {
+    zones.forEach(zone => {
       const score = scoreZoneForLoc(zone, currentLoc);
       if (score > bestScore || (score > 0 && score === bestScore && zone.name.length > bestLen)) {
         bestScore = score;
         bestLen = zone.name.length;
-        currentZoneKey = score >= 50 ? key : null;
+        currentZone = score >= 50 ? zone : null;
       }
     });
-    if (bestScore < 50) currentZoneKey = null;
+    if (bestScore < 50) currentZone = null;
   }
 
-  // Compass column labels (W → E)
-  const compassCols = [];
-  for (let c = colMin; c <= colMax; c++) {
-    if (c === colMin) compassCols.push('W');
-    else if (c === colMax) compassCols.push('E');
-    else compassCols.push('·');
+  // Typed signal glyph — ★ this game's primary collectible (SNOW GLOBE/
+  // BOBBLEHEAD, driven by the existing per-game collectibleLabel field, never
+  // a hardcoded game literal — Protocol 38) or ▲ Lincoln memorabilia
+  // (lincolnMemorabilia is simply empty for a game without tracksLincoln).
+  const collectiblesLbl = String(_activeDef().collectibleLabel || 'SIGNAL').replace(/S$/, '');
+  const sigGlyphChar = /BOBBLEHEAD/.test(String(_activeDef().collectibleLabel || '')) ? '◆' : '★';
+  const lincolnDefs =
+    typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.lincolnMemorabilia
+      ? FALLOUT_REGISTRY.lincolnMemorabilia
+      : [];
+  const lincolnAcquired = state.lincolnItems || {};
+  function zoneSignal(zone) {
+    const hasCollectible = collectDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (collected.has((def.name || '').toLowerCase())) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
+    });
+    if (hasCollectible) return { glyph: sigGlyphChar, label: collectiblesLbl + ' SIGNAL' };
+    const hasLincoln = lincolnDefs.some(def => {
+      if (typeof def.gridRow !== 'number' || typeof def.gridCol !== 'number') return false;
+      if (lincolnAcquired[def.name]) return false;
+      return def.gridRow === zone.gridRow && def.gridCol === zone.gridCol;
+    });
+    if (hasLincoln) return { glyph: '▲', label: 'LINCOLN SIGNAL' };
+    return null;
   }
 
-  let html = `<div style="display:grid; grid-template-columns:14px repeat(${cols},minmax(0,1fr)); gap:2px; font-size:9px; letter-spacing:0.3px; margin:4px 0; max-width:100%;">`;
-
-  // Compass header row
-  html += `<div></div>`; // corner spacer
-  compassCols.forEach(lbl => {
-    html += `<div style="text-align:center;font-size:8px;opacity:0.35;line-height:1.4;">${lbl}</div>`;
+  // Known-route trail — turns state.locationHistory into a visible
+  // exploration path: connect each CONSECUTIVE DISTINCT zone in actual
+  // discovery order (self-loops within one zone collapse away). Capped at
+  // the most recent 25 zone-transitions so a long campaign never clutters
+  // the chart — the map stays fixed-size by construction (Protocol 17).
+  const zoneByLoc = {};
+  zones.forEach(z => {
+    [z.name, ...(z.locations || [])].forEach(s => {
+      zoneByLoc[String(s).toLowerCase()] = z;
+    });
+  });
+  const trailZones = [];
+  (state.locationHistory || []).forEach(loc => {
+    const z = zoneByLoc[String(loc || '').toLowerCase()];
+    if (z && trailZones[trailZones.length - 1] !== z) trailZones.push(z);
   });
 
-  for (let r = rowMin; r <= rowMax; r++) {
-    // Row N/S label
-    let rowLbl = '·';
-    if (r === rowMin) rowLbl = 'N';
-    else if (r === rowMax) rowLbl = 'S';
-    html += `<div style="display:flex;align-items:center;justify-content:center;font-size:8px;opacity:0.35;">${rowLbl}</div>`;
+  // FEEDBACK ANIMATION WAVE 1 (#26 SURVEY PING, §5 of the build plan) —
+  // consumed ONLY here, on the WORLD GRID paint (never the zoomed sector
+  // sheet, which returns early above) so the ping is always actually seen:
+  // marking from the zoomed sheet waits until the user taps < WORLD GRID; an
+  // AI discovery while off-map waits until the user next opens the map.
+  // Moved ABOVE routeSegs (was built after it) so the route-line-draw fix
+  // below can identify the newly-added segment using the SAME pingZone/
+  // consumption gate the ping ring itself already uses.
+  const pingZone = _pendingSurveyPing ? zoneByLoc[String(_pendingSurveyPing).toLowerCase()] : null;
+  _pendingSurveyPing = null;
 
-    for (let c = colMin; c <= colMax; c++) {
-      const zone = gridMap[`${r},${c}`] || null;
-      if (!zone) {
-        html += `<div class="map-cell map-cell--empty"></div>`;
-        continue;
-      }
+  const routeSegs = [];
+  const seenSeg = new Set();
+  trailZones.slice(-25).forEach((z, i, arr) => {
+    if (i === 0) return;
+    const a = arr[i - 1],
+      b = z;
+    if (a === b) return;
+    const key = a.gridRow + ',' + a.gridCol + '-' + b.gridRow + ',' + b.gridCol;
+    const keyRev = b.gridRow + ',' + b.gridCol + '-' + a.gridRow + ',' + a.gridCol;
+    if (seenSeg.has(key) || seenSeg.has(keyRev)) return;
+    seenSeg.add(key);
+    routeSegs.push([a, b]);
+  });
 
-      const isYou = currentZoneKey === `${r},${c}`;
-      const wasVisited = zoneVisited(zone);
-      const hasUncollected = zoneHasUncollectedCollectible(zone);
-
-      let cellCls = 'map-cell';
-      if (isYou) cellCls += ' map-cell--current';
-      else if (wasVisited) cellCls += ' map-cell--visited';
-
-      const collectiblePip = hasUncollected ? `<span class="map-cell-pip">[?]</span>` : '';
-      const displayName = escapeHtml(_mapAbbrev(zone.name));
-
-      html += `<div class="${cellCls}" onclick="zoomMapToZone('${escapeHtml(zone.name.replace(/'/g, "\\'"))}')" title="${escapeHtml(zone.name)}">
-        <span class="map-cell-name">${displayName}</span>
-        ${collectiblePip}
-      </div>`;
-    }
+  // Owner report fix: the route segment leading to a freshly-surveyed node
+  // used to render already fully drawn by the time the (correctly-deferred)
+  // ping ring showed — the user never watched the line draw itself. Deferred
+  // by the SAME pingZone/consumption gate as the ping ring (never a second
+  // mechanism, Protocol 22): only the LAST segment arriving at pingZone (the
+  // one just added to the trail) gets the one-shot stroke-dashoffset "draw
+  // itself" reveal; every other segment, and this same one on any later
+  // render, keeps the plain static dashed look.
+  let newRouteSegIdx = -1;
+  if (pingZone) {
+    routeSegs.forEach(([, b], i) => {
+      if (b === pingZone) newRouteSegIdx = i;
+    });
   }
 
-  html += '</div>';
+  const rings = [0.35, 0.68, 1]
+    .map(
+      k =>
+        `<circle class="rangering" cx="${fullSize / 2}" cy="${fullSize / 2}" r="${(fullSize / 2 - MARGIN * 0.4) * k}"/>`
+    )
+    .join('');
+  const routesSvg = routeSegs
+    .map(([a, b], i) => {
+      const x1 = nx(a),
+        y1 = ny(a),
+        x2 = nx(b),
+        y2 = ny(b);
+      if (i !== newRouteSegIdx) {
+        return `<line class="route" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+      }
+      const len = Math.hypot(x2 - x1, y2 - y1).toFixed(2);
+      return `<line class="route route-draw-in" style="--route-len:${len}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    })
+    .join('');
 
-  // Legend + toggle button (shown on all widths; persists view preference via state.mapView)
-  const toggleBtn = useFull
-    ? `<button class="map-toggle-btn" onclick="setMapView('core')">CORE VIEW</button>`
-    : `<button class="map-toggle-btn" onclick="setMapView('full')">FULL MAP</button>`;
+  _mapLastNodes = [];
+  let signalCount = 0;
+  const nodesSvg = zones
+    .map((z, i) => {
+      const x = nx(z),
+        y = ny(z);
+      const isCur = z === currentZone;
+      const isVisited = !isCur && zoneVisited(z);
+      const fog = !isCur && !isVisited;
+      _mapLastNodes.push({ idx: i, name: z.name, gridRow: z.gridRow, gridCol: z.gridCol, fog });
+      const signal = zoneSignal(z);
+      if (signal) signalCount++;
+      const sigSvg = signal
+        ? `<text class="sig-glyph" x="${x + 11}" y="${y - 7}">${signal.glyph}</text>`
+        : '';
+      const label = fog
+        ? ''
+        : `<text class="lbl" x="${x}" y="${y + 17}">${escapeHtml(z.name.toUpperCase())}</text>`;
+      const statusWord = isCur
+        ? 'current position'
+        : fog
+          ? 'unsurveyed signal return'
+          : 'surveyed node';
+      const safeName = escapeHtml(z.name.replace(/'/g, "\\'"));
+      const isPingTarget = pingZone === z;
+      const pingSvg = isPingTarget
+        ? `<circle class="survey-ping-ring" cx="${x}" cy="${y}" r="8.5"/>`
+        : '';
+      return `<g class="node${fog ? ' fog' : ''}${isPingTarget ? ' survey-ping' : ''}" id="mapNode-${i}" tabindex="0" role="button"
+        aria-label="${escapeHtml(z.name)} — ${statusWord}${signal ? ', ' + signal.label.toLowerCase() : ''}; Enter pulls the sector sheet"
+        onclick="zoomMapToZone('${safeName}')"
+        onkeydown="_mapNodeKeyNav(event, '${safeName}')">
+        <circle class="hit" cx="${x}" cy="${y}" r="17"/>
+        <circle class="focusring" cx="${x}" cy="${y}" r="13"/>
+        <circle class="halo" cx="${x}" cy="${y}" r="8.5"/>
+        <circle class="dot" cx="${x}" cy="${y}" r="${fog ? 4 : 4.4}"/>
+        ${pingSvg}${label}${sigSvg}
+      </g>`;
+    })
+    .join('');
 
-  html += `<div class="map-legend">N=CURRENT &nbsp;·=VISITED &nbsp;[?]=COLLECTIBLE &nbsp;TAP=ZOOM ${toggleBtn}</div>`;
-  display.innerHTML = html;
+  let youSvg = '';
+  if (currentZone) {
+    const cx = nx(currentZone),
+      cy = ny(currentZone);
+    youSvg = `<g class="you" aria-hidden="true">
+      <circle cx="${cx}" cy="${cy}" r="9.5"/>
+      <line x1="${cx - 15}" y1="${cy}" x2="${cx - 10}" y2="${cy}"/>
+      <line x1="${cx + 10}" y1="${cy}" x2="${cx + 15}" y2="${cy}"/>
+      <line x1="${cx}" y1="${cy - 15}" x2="${cx}" y2="${cy - 10}"/>
+      <line x1="${cx}" y1="${cy + 10}" x2="${cx}" y2="${cy + 15}"/>
+      <text x="${cx}" y="${cy - 19}">[YOU]</text>
+    </g>`;
+  }
+
+  // Per-game map caption (identity.databank, Protocol 38 — a generic fallback
+  // for a game that hasn't authored the facet yet).
+  const dbId = (typeof getIdentity === 'function' ? getIdentity() : null) || {};
+  const dbFacet = dbId.databank || {};
+  const caption = escapeHtml(dbFacet.mapCaption || 'SURVEY GRID');
+  const captionSub = escapeHtml(dbFacet.mapCaptionSub || 'SURVEY GRID');
+
+  // Board 0i summary line (BUS-16's collapsed-state status row).
+  const totalLocs = zones.reduce((a, z) => a + (z.locations || []).length, 0);
+  const chartedLocs = Math.min((state.locationHistory || []).length, totalLocs);
+  const fixLabel = currentZone ? currentZone.name.toUpperCase() + ' FIX' : 'NO FIX';
+  const mapStatusEl = document.getElementById('dbMapStatus');
+  if (mapStatusEl) {
+    mapStatusEl.textContent =
+      `${chartedLocs}/${totalLocs} CHARTED · ${fixLabel}` +
+      (signalCount ? ` · ${signalCount} SIGNAL RETURN${signalCount === 1 ? '' : 'S'}` : '');
+  }
+
+  display.innerHTML = `
+    <div class="map-caption">${caption}<span class="mc-sub">${captionSub}</span></div>
+    <div class="chart-scale">
+      <button class="${useFull ? 'cur' : ''}" onclick="setMapView('full')">&#9700; STRATEGIC</button>
+      <button class="${!useFull ? 'cur' : ''}" onclick="setMapView('core')">&#9701; CORE</button>
+      <span class="real-label" style="align-self:center">(setMapView &middot; state.mapView)</span>
+    </div>
+    <div class="table-frame">
+      <span class="compass n">N</span><span class="compass s">S</span>
+      <span class="compass w">W</span><span class="compass e">E</span>
+      <div class="sweep-radar" aria-hidden="true"></div>
+      <div class="map-svg-wrap">
+        <svg viewBox="${viewBox}" role="application"
+             aria-label="Survey chart — arrow keys traverse surveyed nodes, Enter pulls the sector sheet">
+          ${rings}${routesSvg}${nodesSvg}${youSvg}
+        </svg>
+      </div>
+    </div>
+    <div class="survey-legend">
+      <span>&#9673; [YOU] &mdash; PLOT FIX</span>
+      <span>&#9679; SURVEYED &middot; KNOWN ROUTE</span>
+      <span class="lg-fog">&#9711; UNSURVEYED RETURN</span>
+      <span class="lg-sig">${sigGlyphChar} ${escapeHtml(collectiblesLbl)} SIGNAL${lincolnDefs.length ? ' &middot; &#9650; LINCOLN SIGNAL' : ''}</span>
+    </div>
+    <div class="kbd-hint">&#9668; &#9658; &#9650; &#9660; arrow keys traverse surveyed nodes &middot; ENTER pulls the sector sheet &middot; tap any node</div>
+  `;
 }
 
 // ── FACTION REPUTATION — inline editing (Implementation 3) ─────────
@@ -1486,95 +2641,196 @@ function adjustFaction(key, field, delta) {
   saveState();
   renderFactionRep();
   _updatePanelBadges();
+  // FEEDBACK ANIMATION WAVE 3 (#15 NEEDLE KICK) — home-only; renderFactionRep()
+  // just repainted synchronously above for THIS key (the button that calls
+  // adjustFaction always targets the currently-selected channel), so the pin
+  // is looked up directly, no defer needed.
+  const pin = document.querySelector('.facon-pin');
+  if (pin) {
+    pin.classList.remove('needle-kick');
+    void pin.offsetWidth;
+    pin.classList.add('needle-kick');
+    setTimeout(() => pin.classList.remove('needle-kick'), 500);
+  }
 }
 
+// BUS-08 · REPUTATION CONSOLE (Phase 3 OPERATOR batch 2, ground-up reskin) —
+// a single shared dual-scale INFAMY◂▸FAME meter driven by a channel keycap
+// selector (every faction from getFactionRegistry(), major+minor together —
+// nothing hidden behind a collapsed sub-panel, Protocol 25 no-added-taps),
+// plus an all-faction mini-pin strip so no faction's standing is hidden
+// behind the selector. The ±5 adjust keys still call the unchanged
+// adjustFaction(key, field, delta) (Protocol 22). Last-picked channel
+// persists via the registered robco_faction_channel device pref
+// (Protocol UI-6).
+let _facChannel = null;
+
+// setFactionChannel(key) — selects the meter's active faction channel and
+// persists the choice; re-renders through the same single render function
+// so the selector/meter/strip can never drift from each other.
+function setFactionChannel(key) {
+  _facChannel = key;
+  if (typeof MetaStore !== 'undefined') MetaStore.set('robco_faction_channel', key);
+  renderFactionRep();
+}
+
+// Net fame/infamy position on the shared 0-100 scale (50 = balanced center
+// detent), same fame/(fame+infamy) ratio the old bar chart used.
+function _facPinPct(data) {
+  const fam = data.fame || 0;
+  const inf = data.infamy || 0;
+  const total = fam + inf || 1;
+  return Math.min(100, Math.max(0, (fam / total) * 100));
+}
+
+// _pendingRepStamp (FEEDBACK ANIMATION WAVE 1, #14 REPUTATION STAMP) — a
+// transient module var, never state.*, declared in state.js (loaded by
+// test.html's reduced boot chain too — Protocol 27), consumed by
+// renderFactionRep() the next time it paints (the same deferred-consumption
+// pattern as _pendingSurveyPing/_pendingQuestStamp). Only shows when the
+// affected faction is the currently-SELECTED channel (a mismatch just means
+// no on-panel stamp that render; the echo still fires regardless).
 function renderFactionRep() {
   const container = document.getElementById('factionContainer');
   if (!container) return;
   const factions = state.factions || {};
-
-  // Build faction card with inline [+]/[-] fame/infamy nudges.
-  // Net standing label shown prominently; reputation trend bar and threshold
-  // markers (Vilified/Idolized) give at-a-glance progress context.
-  // Mobile-friendly: buttons have min 28×28px touch targets via CSS class.
-  function factionCard(f) {
-    const data = factions[f.key] || { fame: 0, infamy: 0 };
-    const s = getFactionStanding(f.key, data.fame, data.infamy);
-    const famVal = data.fame || 0;
-    const infamyVal = data.infamy || 0;
-
-    // Net rep for bar: ranges -100 (pure infamy) to +100 (pure fame).
-    // bar fill = fame fraction; threshold markers at ±75 standing.
-    const total = famVal + infamyVal || 1;
-    const netPct = Math.min(100, Math.max(0, (famVal / total) * 100));
-    // Vilified threshold marker = 25% (infamy dominant), Idolized = 75%
-    const barHtml = `
-      <div class="faction-rep-bar-track" title="Fame ${famVal} / Infamy ${infamyVal}">
-        <div class="faction-rep-bar-fill" style="width:${netPct}%;background:${s.color};"></div>
-        <div class="faction-rep-bar-marker" style="left:25%;" title="Vilified threshold"></div>
-        <div class="faction-rep-bar-marker" style="left:75%;" title="Idolized threshold"></div>
-      </div>`;
-
-    return `<div class="faction-card">
-      <span class="faction-card-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name).toUpperCase()}</span>
-      <span class="faction-card-standing" style="color:${s.color};">${s.label}</span>
-      <span class="faction-card-counts">F:${famVal} / I:${infamyVal}</span>
-      ${barHtml}
-      <div class="faction-card-btns">
-        <button class="faction-btn faction-btn--fame" aria-label="Fame +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',5)">F+</button>
-        <button class="faction-btn faction-btn--fame" aria-label="Fame -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','fame',-5)">F-</button>
-        <button class="faction-btn faction-btn--infamy" aria-label="Infamy +5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',5)">I+</button>
-        <button class="faction-btn faction-btn--infamy" aria-label="Infamy -5 for ${escapeHtml(f.name)}" onclick="adjustFaction('${f.key}','infamy',-5)">I-</button>
-      </div>
-    </div>`;
+  const registry = getFactionRegistry();
+  if (!registry.length) {
+    container.innerHTML = emptyState('NO FACTIONS TRACKED');
+    return;
   }
 
-  const major = getFactionRegistry().filter(f => f.tier === 'major');
-  const minor = getFactionRegistry().filter(f => f.tier === 'minor');
+  if (!_facChannel || !registry.some(f => f.key === _facChannel)) {
+    const persisted =
+      typeof MetaStore !== 'undefined' ? MetaStore.get('robco_faction_channel') : null;
+    _facChannel = registry.some(f => f.key === persisted) ? persisted : registry[0].key;
+  }
 
-  // Save open state from DOM (re-render collapse fix) and localStorage (reload persistence)
-  const minorDetails = container.querySelector('details[data-sub-id="minor_factions"]');
-  const minorWasOpen = minorDetails ? minorDetails.open : false;
-  let minorPersisted = false;
-  try {
-    const ps = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-    if (typeof ps['minor_factions'] === 'boolean') minorPersisted = ps['minor_factions'];
-  } catch (_) {}
-  const minorOpen = minorWasOpen || minorPersisted;
+  const dataFor = key => factions[key] || { fame: 0, infamy: 0 };
+  const standingOf = f => {
+    const d = dataFor(f.key);
+    return getFactionStanding(f.key, d.fame || 0, d.infamy || 0);
+  };
+
+  // Owner follow-up: the pre-reskin card grid grouped factions into MAJOR
+  // FACTIONS / MINOR FACTIONS sections — restore that grouping on the
+  // console's keycap selector, sourced from the SAME data-driven f.tier
+  // field the retired grid used (getFactionRegistry(), Protocol 38), never a
+  // hardcoded key list. A faction with no recognized tier still renders (an
+  // "OTHER FACTIONS" fallback bucket) rather than silently vanishing.
+  //
+  // Owner batch item 6: MINOR FACTIONS is now a collapsible sub-panel sitting
+  // directly under MAJOR FACTIONS (Protocol UI-2 — data-sub-id + the shared
+  // robco_panel_state persistence, same mechanism as every other sub-panel),
+  // styled to blend into the .facon-section look rather than read as a
+  // separate boxed sub-panel (see the .facon-section.sub-panel CSS override).
+  const chanBtn = f => {
+    const cur = f.key === _facChannel;
+    return `<button class="facon-chan${cur ? ' cur' : ''}" onclick="setFactionChannel('${f.key}')" aria-label="Select ${escapeHtml(f.name)} channel" aria-pressed="${cur}">${escapeHtml(f.name).toUpperCase()}</button>`;
+  };
+  const selectorSection = (list, label) =>
+    list.length
+      ? `<div class="facon-section"><div class="facon-section-label">${escapeHtml(label)}</div><div class="facon-selector">${list.map(chanBtn).join('')}</div></div>`
+      : '';
+  const minorSelectorSection = list =>
+    list.length
+      ? `<details class="facon-section sub-panel" data-sub-id="minor_factions_channel"><summary><h3>&gt; MINOR FACTIONS</h3></summary><div class="facon-selector">${list.map(chanBtn).join('')}</div></details>`
+      : '';
+  const majorFactions = registry.filter(f => f.tier === 'major');
+  const minorFactions = registry.filter(f => f.tier === 'minor');
+  const otherFactions = registry.filter(f => f.tier !== 'major' && f.tier !== 'minor');
+  const selectorHtml =
+    selectorSection(majorFactions, 'MAJOR FACTIONS') +
+    minorSelectorSection(minorFactions) +
+    selectorSection(otherFactions, 'OTHER FACTIONS');
+
+  const sel = registry.find(f => f.key === _facChannel) || registry[0];
+  const selData = dataFor(sel.key);
+  const selStanding = standingOf(sel);
+  const selPinPct = _facPinPct(selData);
+
+  // FEEDBACK ANIMATION WAVE 1 (#14) — consume the pending stamp exactly
+  // once, only when the affected channel is the one being painted.
+  let repStampHtml = '';
+  if (_pendingRepStamp && _pendingRepStamp.key === sel.key) {
+    const dir = _pendingRepStamp.direction === 'vilified' ? 'vilified' : 'idolized';
+    repStampHtml = `<span class="facon-stamp facon-stamp--${dir}" aria-hidden="true">${dir === 'vilified' ? 'VILIFIED' : 'IDOLIZED'}</span>`;
+  }
+  _pendingRepStamp = null;
+
+  const stripHtml = registry
+    .map(f => {
+      const st = standingOf(f);
+      const pinPct = _facPinPct(dataFor(f.key));
+      return `<div class="facon-strip-row"><b class="facon-strip-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</b><span class="facon-mini"><i style="left:${pinPct}%"></i></span><span class="facon-standing" style="color:${st.color}">${st.label}</span></div>`;
+    })
+    .join('');
 
   container.innerHTML = `
-    <div style="font-size:9px;opacity:0.45;margin-bottom:4px;letter-spacing:0.5px;">F+/F- = Fame ±5 &nbsp; I+/I- = Infamy ±5 &nbsp; BAR = F/(F+I) ratio</div>
-    <div class="faction-grid">
-      ${major.map(factionCard).join('')}
-    </div>
-    <details class="sub-panel" data-sub-id="minor_factions"${minorOpen ? ' open' : ''}>
-      <summary class="config-summary" style="font-size:11px;opacity:0.6;padding:2px 0;">MINOR FACTIONS</summary>
-      <div class="faction-grid" style="margin-top:5px;">
-        ${minor.map(factionCard).join('')}
+    <div class="facon-groups">${selectorHtml}</div>
+    <div class="facon-meter-wrap">
+      ${repStampHtml}
+      <div class="facon-title">
+        <span class="facon-name">${escapeHtml(sel.name).toUpperCase()}</span>
+        <span class="facon-standing" style="color:${selStanding.color}">${selStanding.label.toUpperCase()}</span>
       </div>
-    </details>
+      <div class="facon-scale">
+        <div class="facon-pin" style="left:${selPinPct}%"></div>
+      </div>
+      <div class="facon-ends"><span>&#9668; INFAMY</span><span>CENTER DETENT</span><span>FAME &#9658;</span></div>
+      <div class="facon-nums"><span>FAME ${selData.fame || 0}</span><span>INFAMY ${selData.infamy || 0}</span></div>
+      <div class="facon-keys">
+        <button aria-label="Fame plus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','fame',5)">F +5</button>
+        <button aria-label="Fame minus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','fame',-5)">F -5</button>
+        <button class="ikey" aria-label="Infamy plus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','infamy',5)">I +5</button>
+        <button class="ikey" aria-label="Infamy minus 5 for ${escapeHtml(sel.name)}" onclick="adjustFaction('${sel.key}','infamy',-5)">I -5</button>
+      </div>
+      <div style="font-size:9px;opacity:0.45;margin-top:8px;letter-spacing:0.5px;text-align:center;">F +5/-5 = FAME ±5 &nbsp; I +5/-5 = INFAMY ±5</div>
+    </div>
+    <div class="facon-strip">${stripHtml}</div>
   `;
-
-  // Wire sub-panel persistence for minor factions
-  container.querySelectorAll('details[data-sub-id]').forEach(d => {
-    d.addEventListener('toggle', () => {
-      try {
-        const p = JSON.parse(localStorage.getItem('robco_panel_state') || '{}');
-        p[d.dataset.subId] = d.open;
-        localStorage.setItem('robco_panel_state', JSON.stringify(p));
-      } catch (_) {}
-    });
-  });
+  // MINOR FACTIONS is rendered fresh every call (innerHTML replacement), which
+  // would otherwise drop its open/closed state and toggle listener — wire it
+  // the same way every OTHER dynamically-rendered sub-panel must (Protocol
+  // UI-2), reusing the one persistence helper rather than a second mechanism.
+  if (typeof _wireDynamicSubPanel === 'function') {
+    _wireDynamicSubPanel(container.querySelector('[data-sub-id="minor_factions_channel"]'));
+  }
+  // The stamp is a one-shot CSS animation ending on a correct static final
+  // frame (Protocol UI-9) — remove it after it plays so a later re-render
+  // (e.g. switching channels back) doesn't replay it.
+  if (repStampHtml) {
+    setTimeout(() => {
+      const el = container.querySelector('.facon-stamp');
+      if (el) el.remove();
+    }, 1600);
+  }
 }
 
 // ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────
-// When gameContext === 'FO3': Karma Center shown, Faction Standing hidden.
-// When gameContext === 'FNV' (or default): Faction Standing shown, Karma Center hidden.
+// When gameContext === 'FO3': Karma Center appendix shown inside BUS-09
+// KARMA ALIGNMENT (Phase 3 OPERATOR batch 3 — the board itself is now
+// universal; only this nested block is FO3-only, per usesKarmaCenter).
 // Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750).
 // Differentiated by text labels and brightness — no multi-color.
+//
+// Owner fix (FO3 duplicate-readout report): a game either presents karma via
+// the swing-needle readout (#karmaNeedleReadout — NV, and any future non-
+// KarmaCenter game) OR the Karma Center appendix (usesKarmaCenter — FO3),
+// never both. The stat_karma slider itself is NEVER hidden — it's the one
+// editable control for every game (Protocol 22); only the READOUT half is
+// gated, purely on the existing usesKarmaCenter flag (Protocol 38, no game
+// literal). karma_label/updateKarmaUI keep writing into the needle readout's
+// DOM regardless of its visibility, so the FO3 slider still updates state
+// and the Karma Center title/readout below (both driven off state.karma).
 function renderKarmaCenter() {
+  const block = document.getElementById('karmaCenterBlock');
+  const needleReadout = document.getElementById('karmaNeedleReadout');
   const display = document.getElementById('karmaCenterDisplay');
   if (!display) return;
+  const usesKarmaCenter = _activeDef().usesKarmaCenter;
+  if (block) block.style.display = usesKarmaCenter ? '' : 'none';
+  if (needleReadout) needleReadout.style.display = usesKarmaCenter ? 'none' : '';
 
   const karma = state.karma || 0;
   let label, opacity, hitSquad;
@@ -1691,13 +2947,22 @@ function renderCraftCard() {
     skillHtml = `<span style="font-size:10px;color:${col};white-space:nowrap;">(${escapeHtml(lbl)} ${req.level} ${met ? '✓' : '✗'})</span>`;
   }
   let maxBatch = MAX_CAP;
+  // Phase 3 · Piece 2 (FIELD FABRICATION): per-ingredient HAVE/NEED meter bars
+  // — same have/need numbers as before, now with a fill bar (short = red).
   const ingHtml = recipe.ingredients
     .map(ing => {
       const haveN = _craftGetHave(ing.item);
       const canMake = ing.qty > 0 ? Math.floor(haveN / ing.qty) : MAX_CAP;
       if (canMake < maxBatch) maxBatch = canMake;
-      const col = haveN >= ing.qty ? 'var(--robco-green)' : 'var(--robco-danger)';
-      return `<span style="color:${col};font-size:10px;margin-right:5px;">${escapeHtml(ing.item)} ${haveN}/${ing.qty}</span>`;
+      const short = haveN < ing.qty;
+      const fillPct = ing.qty > 0 ? Math.min(100, Math.round((haveN / ing.qty) * 100)) : 100;
+      return (
+        `<div class="ing${short ? ' short' : ''}">` +
+        `<b>${escapeHtml(ing.item)}</b>` +
+        `<span class="hn-meter"><i style="width:${fillPct}%"></i></span>` +
+        `<span class="hn-txt">HAVE ${haveN} / NEED ${ing.qty}</span>` +
+        `</div>`
+      );
     })
     .join('');
   const allMet = recipe.ingredients.every(ing => _craftGetHave(ing.item) >= ing.qty);
@@ -1764,6 +3029,9 @@ function renderCraft() {
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
       ? FALLOUT_REGISTRY.breakdowns
       : [];
+  const fabStatus = document.getElementById('opsFabStatus');
+  if (fabStatus)
+    fabStatus.textContent = recipes.length + ' RECIPES · ' + breakdowns.length + ' BREAKDOWNS';
 
   // ── Recipe picker ──────────────────────────────────────────────
   if (recipes.length === 0) {
@@ -1821,36 +3089,29 @@ function renderCraft() {
   }
 }
 
-function doCraft(recipeIdx) {
+// _craftPrepare(recipeIdx) — pure lookup/validation step shared by doCraft() and
+// tests: resolves the recipe + requested qty + missing-ingredient check without
+// mutating anything. Returns null if the recipe index is invalid.
+function _craftPrepare(recipeIdx) {
   const recipes =
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.recipes)
       ? FALLOUT_REGISTRY.recipes
       : [];
   const recipe = recipes[recipeIdx];
-  if (!recipe) return;
+  if (!recipe) return null;
 
   const qtyEl = document.getElementById('craftQty_' + recipeIdx);
   const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
-
   const missing = recipe.ingredients.filter(ing => _craftGetHave(ing.item) < ing.qty * qty);
-  if (missing.length > 0) {
-    if (typeof appendToChat === 'function')
-      appendToChat(
-        '> [CRAFT] FAILED — Missing: ' + missing.map(i => i.item).join(', ') + '.',
-        'sys'
-      );
-    return;
-  }
-
   const consumeList = recipe.ingredients.map(ing => `${ing.qty * qty}× ${ing.item}`).join(', ');
   const outputQty = recipe.output.qty * qty;
-  if (
-    !confirm(
-      `Craft ${qty}× ${recipe.name}?\n\nConsumes: ${consumeList}\nProduces: ${outputQty}× ${recipe.output.item}`
-    )
-  )
-    return;
+  return { recipe, qty, missing, consumeList, outputQty };
+}
 
+// _craftApply(recipe, qty, outputQty) — the synchronous mutation core (consume
+// ingredients, add output), separated from the confirm gate so it is directly
+// testable without mocking confirmAction() (Step 2 Phase 0 U12 split).
+function _craftApply(recipe, qty, outputQty) {
   recipe.ingredients.forEach(ing => _craftConsume(ing.item, ing.qty * qty));
 
   if (recipe.output.ammo) {
@@ -1881,31 +3142,55 @@ function doCraft(recipeIdx) {
   if (typeof updateMath === 'function') updateMath();
   renderCraft();
   saveState();
+  RobcoEvents.emit('craft.completed', { name: recipe.output.item, qty: outputQty }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [CRAFT] Built ${qty}× ${recipe.name}.`, 'sys');
 }
 
-function doScrap(bdIdx) {
+async function doCraft(recipeIdx) {
+  const prep = _craftPrepare(recipeIdx);
+  if (!prep) return;
+  const { recipe, qty, missing, consumeList, outputQty } = prep;
+
+  if (missing.length > 0) {
+    if (typeof appendToChat === 'function')
+      appendToChat(
+        '> [CRAFT] FAILED — Missing: ' + missing.map(i => i.item).join(', ') + '.',
+        'sys'
+      );
+    return;
+  }
+
+  const ok = await confirmAction({
+    title: '> CONFIRM CRAFT',
+    warning: `Craft ${qty}× ${recipe.name}?\n\nConsumes: ${consumeList}\nProduces: ${outputQty}× ${recipe.output.item}`,
+    confirmLabel: 'CRAFT',
+  });
+  if (!ok) return;
+
+  _craftApply(recipe, qty, outputQty);
+}
+
+// _scrapPrepare(bdIdx) — pure lookup/validation step shared by doScrap() and
+// tests (Step 2 Phase 0 U12 split — mirrors _craftPrepare).
+function _scrapPrepare(bdIdx) {
   const breakdowns =
     typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.breakdowns)
       ? FALLOUT_REGISTRY.breakdowns
       : [];
   const breakdown = breakdowns[bdIdx];
-  if (!breakdown) return;
+  if (!breakdown) return null;
 
   const qtyEl = document.getElementById('scrapQty_' + bdIdx);
   const qty = Math.max(1, parseInt(qtyEl ? qtyEl.value : '1') || 1);
   const have = _craftGetHave(breakdown.item);
-
-  if (have < qty) {
-    if (typeof appendToChat === 'function')
-      appendToChat(`> [SCRAP] FAILED — Need ${qty}× ${breakdown.item}, have ${have}.`, 'sys');
-    return;
-  }
-
   const yieldStr = breakdown.yields.map(y => `${y.qty * qty}× ${y.item}`).join(', ');
-  if (!confirm(`Scrap ${qty}× ${breakdown.item}?\n\nProduces: ${yieldStr}`)) return;
+  return { breakdown, qty, have, yieldStr };
+}
 
+// _scrapApply(breakdown, qty, yieldStr) — the synchronous mutation core, separated
+// from the confirm gate so it is directly testable (Step 2 Phase 0 U12 split).
+function _scrapApply(breakdown, qty, yieldStr) {
   _craftConsume(breakdown.item, qty);
 
   breakdown.yields.forEach(y => {
@@ -1930,8 +3215,30 @@ function doScrap(bdIdx) {
   if (typeof updateMath === 'function') updateMath();
   renderCraft();
   saveState();
+  RobcoEvents.emit('craft.scrapped', { name: breakdown.item, qty }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [SCRAP] Scrapped ${qty}× ${breakdown.item} → ${yieldStr}.`, 'sys');
+}
+
+async function doScrap(bdIdx) {
+  const prep = _scrapPrepare(bdIdx);
+  if (!prep) return;
+  const { breakdown, qty, have, yieldStr } = prep;
+
+  if (have < qty) {
+    if (typeof appendToChat === 'function')
+      appendToChat(`> [SCRAP] FAILED — Need ${qty}× ${breakdown.item}, have ${have}.`, 'sys');
+    return;
+  }
+
+  const ok = await confirmAction({
+    title: '> CONFIRM SCRAP',
+    warning: `Scrap ${qty}× ${breakdown.item}?\n\nProduces: ${yieldStr}`,
+    confirmLabel: 'SCRAP',
+  });
+  if (!ok) return;
+
+  _scrapApply(breakdown, qty, yieldStr);
 }
 
 // ── WU-N2: TRADE — native barter terminal ────────────────────────────────
@@ -1993,6 +3300,14 @@ function _renderTradeStats() {
     `<span>CAPS: <b>${state.caps || 0}</b></span>` +
     `<span>VENDOR PURSE: <b>${v ? v.baseCaps : 0}</b></span>` +
     `<span>BARTER: <b>${_tradeBarterSkill()}</b></span>`;
+  const boardStatus = document.getElementById('opsBarterStatus');
+  if (boardStatus && v)
+    boardStatus.textContent =
+      v.name.toUpperCase() +
+      (v.location ? ' — ' + v.location.toUpperCase() : '') +
+      ' · PURSE ' +
+      v.baseCaps +
+      ' CAPS';
 }
 
 function renderTrade() {
@@ -2005,6 +3320,8 @@ function renderTrade() {
     header.innerHTML = '<span class="empty-state">No vendor data for this game.</span>';
     if (buyList) buyList.innerHTML = '';
     if (sellList) sellList.innerHTML = '';
+    const boardStatus = document.getElementById('opsBarterStatus');
+    if (boardStatus) boardStatus.textContent = 'NO VENDOR DATA';
     return;
   }
   if (_tradeVendorIdx < 0 || _tradeVendorIdx >= vendors.length) _tradeVendorIdx = 0;
@@ -2079,7 +3396,7 @@ function renderTradeSellList() {
     .join('');
 }
 
-function doBuy(name) {
+async function doBuy(name) {
   const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
   const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
   if (!item) return;
@@ -2093,7 +3410,12 @@ function doBuy(name) {
       );
     return;
   }
-  if (!confirm(`Buy ${item.name} for ${price} caps?\n\nCaps: ${caps} → ${caps - price}`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM PURCHASE',
+    warning: `Buy ${item.name} for ${price} caps?\n\nCaps: ${caps} → ${caps - price}`,
+    confirmLabel: 'BUY',
+  });
+  if (!ok) return;
   state.caps = caps - price;
   // Mirror to the #c_caps field — it is the sync source-of-truth that saveState() reads back
   // via syncStateFromDom(); without this the deduction is reverted on the next save (WU-N2 fix).
@@ -2117,11 +3439,12 @@ function doBuy(name) {
   if (typeof updateMath === 'function') updateMath();
   renderTrade();
   saveState();
+  RobcoEvents.emit('trade.bought', { name: item.name, price }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [TRADE] Bought ${item.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
 
-function doSell(name) {
+async function doSell(name) {
   const idx = (state.inventory || []).findIndex(
     i => i.name.toLowerCase() === String(name).toLowerCase()
   );
@@ -2141,7 +3464,12 @@ function doSell(name) {
     return;
   }
   const caps = state.caps || 0;
-  if (!confirm(`Sell ${it.name} for ${price} caps?\n\nCaps: ${caps} → ${caps + price}`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM SALE',
+    warning: `Sell ${it.name} for ${price} caps?\n\nCaps: ${caps} → ${caps + price}`,
+    confirmLabel: 'SELL',
+  });
+  if (!ok) return;
   state.caps = caps + price;
   // Mirror to the #c_caps field (sync source-of-truth) so the gain survives saveState (WU-N2 fix).
   const _capsSellEl = document.getElementById('c_caps');
@@ -2152,6 +3480,7 @@ function doSell(name) {
   if (typeof updateMath === 'function') updateMath();
   renderTrade();
   saveState();
+  RobcoEvents.emit('trade.sold', { name: it.name, price }); // U8 auto-log
   if (typeof appendToChat === 'function')
     appendToChat(`> [TRADE] Sold ${it.name} for ${price}c. Caps: ${state.caps}.`, 'sys');
 }
@@ -2188,6 +3517,36 @@ function _lootAdd(inventory, item, qty, db) {
   return inv;
 }
 
+// Quick-Draw Holster (Tool Deck unit) — renders the four gear-vector sockets from
+// state.padBindings. Idempotent + safe to call while the deck is hidden (the socket
+// elements exist in the DOM, just not visible). Gear names go through textContent /
+// setAttribute only (never innerHTML), so an arbitrary player-typed gear name has no
+// HTML-injection surface — no escapeHtml needed for this render path.
+function renderHolster() {
+  const DIRS = [
+    { dir: 'UP', glyph: 'up' },
+    { dir: 'LEFT', glyph: 'left' },
+    { dir: 'RIGHT', glyph: 'right' },
+    { dir: 'DOWN', glyph: 'down' },
+  ];
+  const pb = state.padBindings || {};
+  DIRS.forEach(({ dir, glyph }) => {
+    const socket = document.querySelector(`.socket[data-dir="${dir}"]`);
+    if (!socket) return;
+    const gear = pb[glyph];
+    const gearEl = socket.querySelector('.socket-gear');
+    if (gear) {
+      socket.classList.add('bound');
+      if (gearEl) gearEl.textContent = gear.toUpperCase();
+      socket.setAttribute('aria-label', `Fire gear vector ${glyph} — ${gear}`);
+    } else {
+      socket.classList.remove('bound');
+      if (gearEl) gearEl.textContent = 'EMPTY';
+      socket.setAttribute('aria-label', `Gear vector ${glyph} — empty socket`);
+    }
+  });
+}
+
 function renderLoot(arg) {
   const modal = document.getElementById('sysModal');
   const title = document.getElementById('modalTitle');
@@ -2203,7 +3562,7 @@ function renderLoot(arg) {
     '<div id="lootList" class="loot-list"></div>' +
     '<div class="loot-hint">Values from the active database. Adds are additive and confirm-gated.</div>';
   renderLootList();
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
 }
 
 function renderLootList() {
@@ -2235,7 +3594,7 @@ function renderLootList() {
       : '');
 }
 
-function doLoot(name) {
+async function doLoot(name) {
   const catalog = typeof getTradeCatalog === 'function' ? getTradeCatalog() : [];
   const item = catalog.find(i => i.name.toLowerCase() === String(name).toLowerCase());
   if (!item) return;
@@ -2245,8 +3604,21 @@ function doLoot(name) {
   if (qty > 999) qty = 999;
   const db = typeof lookupItemInDb === 'function' ? lookupItemInDb(item.name) : null;
   const unitVal = Math.max(0, Math.round(Number(db && db.val != null ? db.val : item.value) || 0));
-  if (!confirm(`Add ${qty}× ${item.name} (${unitVal}c each) to inventory?`)) return;
+  const ok = await confirmAction({
+    title: '> CONFIRM ADD',
+    warning: `Add ${qty}× ${item.name} (${unitVal}c each) to inventory?`,
+    confirmLabel: 'ADD',
+  });
+  if (!ok) return;
   state.inventory = _lootAdd(state.inventory, item, qty, db);
+  // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — same additive item.added
+  // emit as addItem()'s manual path (Protocol 22, one signal, two setters).
+  RobcoEvents.emit('item.added', {
+    name: item.name,
+    qty,
+    source: 'loot',
+    type: db ? db.type : item.type,
+  });
   if (typeof renderInventory === 'function') renderInventory();
   if (typeof updateMath === 'function') updateMath();
   renderLootList();
@@ -2256,6 +3628,261 @@ function doLoot(name) {
       `> [LOOT] Added ${qty}× ${item.name} (${unitVal * qty}c total) to inventory.`,
       'sys'
     );
+}
+
+// ── VISUAL UPLOAD OCR Unit 2: preview / confirm / additive apply ──────────
+// planning/VISUAL_UPLOAD_OCR_PLAN.md §3.4/3.5. js/ocr.js's pure _parseOcrText()
+// hands off a structured { inventory, stats, unparsed } object here; this
+// section owns the confirm-gated modal and the validated write path. Nothing
+// in js/ocr.js ever touches state — the ONLY writes anywhere in this feature
+// happen inside _confirmVisualParse(), and only after the player taps CONFIRM
+// & APPLY (Protocol 24 — OCR is a suggestion, the player is the authority).
+
+// Pure additive merge for a single OCR-detected inventory row — mirrors
+// addItem()'s find-or-increment idiom (backfill wgt/val from 0, backfill type
+// from 'misc') as a pure, testable function, the same shape as the existing
+// _lootAdd() (Protocol 22 — new call site, since OCR rows are programmatic
+// rather than DOM-input-driven, not a forked merge algorithm). Never deletes
+// or touches any other row — additive-only (Protocol 34), which is what
+// enforces the AI directive's old "never delete un-pictured items" rule in
+// code rather than only in a prompt.
+function _visualParseInventoryMerge(inventory, row) {
+  const inv = Array.isArray(inventory) ? inventory.map(i => ({ ...i })) : [];
+  const name = String((row && row.name) || '').trim();
+  if (!name) return inv;
+  const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+  const wgt = Number(row.wgt) || 0;
+  const val = Number(row.val) || 0;
+  const type = row.type || 'misc';
+  const ex = inv.find(i => String(i.name).toLowerCase() === name.toLowerCase());
+  if (ex) {
+    ex.qty = (ex.qty || 0) + qty;
+    if ((!ex.wgt || ex.wgt === 0) && wgt) ex.wgt = wgt;
+    if ((!ex.val || ex.val === 0) && val) ex.val = val;
+    if (ex.type === 'misc' && type !== 'misc') ex.type = type;
+  } else {
+    inv.push({ name, qty, wgt, val, type });
+  }
+  return inv;
+}
+
+// applyVisualParse(parsed) — the validated, additive, confirm-gated write
+// path (§3.5). `parsed` is the ALREADY keep/discard-filtered + edited row set
+// (built by _confirmVisualParse() from the live preview DOM) — this function
+// itself does not read any DOM, so it is directly unit-testable the same way
+// _lootAdd()/_threatCompute() are. Inventory rows route through
+// _visualParseInventoryMerge() (additive, no-clobber); stat rows route
+// through the SAME _resolveStatToken()/_applyStatToken() choke point Native
+// USE and TERMINAL stat edits already use (js/api.js, Protocol 22) — those
+// setters already clamp (SPECIAL 1–10, skill 0–100, HP≤max, rads≤maxRads,
+// level≤MAX_PLAYER_LEVEL) and call saveState() themselves, so an OCR
+// misread (e.g. "S: 99") can never exceed a real limit (Protocol 24). No new
+// campaign-state field — everything rides state.inventory / the existing
+// native setters, already covered by sanitizeImportedContainer()/
+// migrateState() and the cloud save (Protocol 34 serialized-whole).
+function applyVisualParse(parsed) {
+  parsed = parsed && typeof parsed === 'object' ? parsed : {};
+  const inventoryRows = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+  const statRows = Array.isArray(parsed.stats) ? parsed.stats : [];
+
+  let itemsApplied = 0;
+  inventoryRows.forEach(row => {
+    const name = String((row && row.name) || '').trim();
+    if (!name) return;
+    state.inventory = _visualParseInventoryMerge(state.inventory, row);
+    const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+    // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — same additive
+    // item.added signal the manual/LOOT paths already emit (Protocol 22).
+    if (typeof RobcoEvents !== 'undefined' && RobcoEvents.emit) {
+      RobcoEvents.emit('item.added', { name, qty, source: 'ocr', type: row.type || 'misc' });
+    }
+    itemsApplied++;
+  });
+
+  let statsApplied = 0;
+  statRows.forEach(row => {
+    if (!row || !row.kind || !row.key) return;
+    if (typeof _applyStatToken !== 'function') return;
+    _applyStatToken({ kind: row.kind, key: row.key }, row.value);
+    statsApplied++;
+  });
+
+  if (itemsApplied > 0 && typeof renderInventory === 'function') renderInventory();
+  if (typeof updateMath === 'function') updateMath();
+  saveState();
+  if (typeof appendToChat === 'function') {
+    appendToChat(
+      `> [OPTICAL SCAN] Applied ${itemsApplied} item(s), ${statsApplied} stat edit(s).`,
+      'sys'
+    );
+  }
+  return { itemsApplied, statsApplied };
+}
+
+// Module-scope handle to whatever screenshot/parse the preview modal is
+// currently showing — read only by _confirmVisualParse() (below) and cleaned
+// up on modal close. Transient only; never persisted.
+let _pendingVisualParse = null;
+let _pendingVisualScanUrl = null;
+// Set true ONLY by the TRY AI VISION button (Unit 3) for the one closeModal()
+// call it makes itself, so the modal's onClose below can tell "closing to
+// hand off to the AI-vision fallback" apart from every other close reason
+// (CONFIRM/CANCEL/MANUAL ENTRY/Escape/X) — the former must NOT clear the
+// image stash (transmitMessage() still needs it), the latter all must.
+let _visualParseRoutingToAiVision = false;
+
+// renderVisualParsePreview(parsed, file) — the confirm-gated preview modal
+// (§3.4), built on the SAME openModal()/#sysModal shell every other native
+// terminal (LOOT, THREAT, CONSULT) already uses. Two keep/discard-toggled,
+// editable sections (DETECTED INVENTORY / DETECTED STATS); a "NOTHING
+// DETECTED" empty state offers MANUAL ENTRY (jumps to the native CARGO
+// MANIFEST add-item form — no AI). The hybrid "TRY AI VISION" fallback
+// (planning/VISUAL_UPLOAD_OCR_PLAN.md §4) is Unit 3 scope and is
+// deliberately NOT wired here. Mobile-first (Protocol 17): ≥16px inputs,
+// ≥28px tap targets, no horizontal overflow at 360/412 (verified live).
+function renderVisualParsePreview(parsed, file) {
+  parsed =
+    parsed && typeof parsed === 'object' ? parsed : { inventory: [], stats: [], unparsed: [] };
+  const inventory = Array.isArray(parsed.inventory) ? parsed.inventory : [];
+  const stats = Array.isArray(parsed.stats) ? parsed.stats : [];
+
+  if (_pendingVisualScanUrl) {
+    URL.revokeObjectURL(_pendingVisualScanUrl);
+    _pendingVisualScanUrl = null;
+  }
+  let thumbHtml = '';
+  if (file && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    try {
+      _pendingVisualScanUrl = URL.createObjectURL(file);
+      thumbHtml = `<img src="${_pendingVisualScanUrl}" alt="Scanned screenshot" class="visparse-thumb" />`;
+    } catch (_) {
+      /* the thumbnail is cosmetic only — never block the preview on it */
+    }
+  }
+
+  const invRowsHtml = inventory
+    .map((row, i) => {
+      const qty = Math.max(1, Math.min(999, Math.floor(Number(row.qty) || 1)));
+      return (
+        `<div class="visparse-row" data-idx="${i}">` +
+        `<input type="checkbox" class="visparse-keep" id="visKeepInv${i}" checked aria-label="Keep ${escapeHtml(row.name)}" />` +
+        `<input type="number" class="visparse-qty" id="visQtyInv${i}" value="${qty}" min="1" max="999" aria-label="Quantity for ${escapeHtml(row.name)}" />` +
+        `<span class="visparse-name">${escapeHtml(row.name)}</span>` +
+        `<span class="visparse-meta">${escapeHtml(row.type || 'misc')} &middot; ${Number(row.wgt) || 0} wgt &middot; ${Number(row.val) || 0}c</span>` +
+        (row.matched ? '' : '<span class="visparse-unmatched">UNMATCHED</span>') +
+        `</div>`
+      );
+    })
+    .join('');
+
+  const statRowsHtml = stats
+    .map((row, i) => {
+      const val = Math.round(Number(row.value) || 0);
+      return (
+        `<div class="visparse-row visparse-stat-row" data-idx="${i}">` +
+        `<input type="checkbox" class="visparse-stat-keep" id="visKeepStat${i}" checked aria-label="Keep ${escapeHtml(row.label)}" />` +
+        `<span class="visparse-name">${escapeHtml(row.label)}</span>` +
+        `<input type="number" class="visparse-stat-value" id="visValStat${i}" value="${val}" aria-label="Value for ${escapeHtml(row.label)}" />` +
+        `</div>`
+      );
+    })
+    .join('');
+
+  const nothingDetected = !inventory.length && !stats.length;
+  const body =
+    thumbHtml +
+    (nothingDetected
+      ? '<div class="empty-state">NOTHING DETECTED — the optical scan found no recognizable items or stats in this image.</div>' +
+        '<div class="visparse-hint">Try a clearer, closer screenshot, ask Director vision instead, or add items directly.</div>' +
+        '<div class="modal-confirm-actions">' +
+        '<button type="button" id="visTryAiBtn" class="blue-btn">[ TRY AI VISION ]</button>' +
+        '<button type="button" id="visManualEntryBtn" class="blue-btn">[ MANUAL ENTRY ]</button>' +
+        '</div>'
+      : (inventory.length
+          ? `<div class="visparse-section-label">DETECTED INVENTORY (${inventory.length})</div>${invRowsHtml}`
+          : '') +
+        (stats.length
+          ? `<div class="visparse-section-label">DETECTED STATS (${stats.length})</div>${statRowsHtml}`
+          : '') +
+        '<div class="visparse-hint">Uncheck a row to discard it, or edit the value before confirming. Nothing is saved until CONFIRM &amp; APPLY.</div>' +
+        '<div class="modal-confirm-actions">' +
+        '<button type="button" id="visConfirmBtn" class="blue-btn">[ CONFIRM &amp; APPLY ]</button>' +
+        '<button type="button" id="visCancelBtn" class="blue-btn">[ CANCEL ]</button>' +
+        '</div>');
+
+  _pendingVisualParse = { inventory, stats };
+
+  openModal({
+    title: '> OPTICAL SCAN — REVIEW & CONFIRM',
+    body,
+    // Unit 3: every close reason EXCEPT "routing to AI vision" releases the
+    // image stash (attachedImageData/attachedImageMimeType) — the TRY AI
+    // VISION handler below is the one call site that sets the flag right
+    // before its own closeModal() so this callback skips the clear and lets
+    // transmitMessage() own (and later release) the stash instead.
+    onClose: () => {
+      if (_pendingVisualScanUrl) {
+        URL.revokeObjectURL(_pendingVisualScanUrl);
+        _pendingVisualScanUrl = null;
+      }
+      _pendingVisualParse = null;
+      if (_visualParseRoutingToAiVision) {
+        _visualParseRoutingToAiVision = false;
+      } else if (typeof _clearVisualUploadStash === 'function') {
+        _clearVisualUploadStash();
+      }
+    },
+  });
+
+  const confirmBtn = document.getElementById('visConfirmBtn');
+  if (confirmBtn) confirmBtn.addEventListener('click', _confirmVisualParse);
+  const cancelBtn = document.getElementById('visCancelBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => closeModal());
+  const manualBtn = document.getElementById('visManualEntryBtn');
+  if (manualBtn)
+    manualBtn.addEventListener('click', () => {
+      closeModal();
+      if (typeof expandPanelForCategory === 'function') expandPanelForCategory('inventory');
+    });
+  const tryAiBtn = document.getElementById('visTryAiBtn');
+  if (tryAiBtn)
+    tryAiBtn.addEventListener('click', () => {
+      _visualParseRoutingToAiVision = true;
+      closeModal();
+      if (typeof _tryAiVisionFallback === 'function') {
+        _tryAiVisionFallback('> [SYS] ROUTING TO DIRECTOR VISION…');
+      }
+    });
+}
+
+// _confirmVisualParse() — reads the LIVE preview DOM (keep checkboxes +
+// edited qty/value inputs), builds the final row set, and is the ONLY call
+// site anywhere in this feature that invokes applyVisualParse(). Nothing is
+// written before this fires (Protocol 24 — the confirm gate).
+function _confirmVisualParse() {
+  const pending = _pendingVisualParse;
+  if (!pending) return;
+
+  const keptInventory = [];
+  (pending.inventory || []).forEach((row, i) => {
+    const keepEl = document.getElementById('visKeepInv' + i);
+    if (keepEl && !keepEl.checked) return;
+    const qtyEl = document.getElementById('visQtyInv' + i);
+    const qty = qtyEl ? parseInt(qtyEl.value, 10) : row.qty;
+    keptInventory.push({ ...row, qty: Number.isFinite(qty) && qty > 0 ? qty : row.qty });
+  });
+
+  const keptStats = [];
+  (pending.stats || []).forEach((row, i) => {
+    const keepEl = document.getElementById('visKeepStat' + i);
+    if (keepEl && !keepEl.checked) return;
+    const valEl = document.getElementById('visValStat' + i);
+    const value = valEl ? parseInt(valEl.value, 10) : row.value;
+    keptStats.push({ ...row, value: Number.isFinite(value) ? value : row.value });
+  });
+
+  applyVisualParse({ inventory: keptInventory, stats: keptStats });
+  closeModal();
 }
 
 // ── WU-N3: THREAT — native bestiary assessment + TTK ──────────────────────
@@ -2327,7 +3954,7 @@ function renderThreat(target) {
         ? 'NO ENTRY IN BESTIARY: ' + escapeHtml(q)
         : 'SPECIFY A TARGET — e.g. &gt; [THREAT] Deathclaw') +
       '</pre>';
-    if (typeof _openSysModal === 'function') _openSysModal();
+    if (typeof openModal === 'function') openModal();
     if (typeof appendToChat === 'function')
       appendToChat(
         '> [THREAT] ' + (q ? 'No bestiary entry found for that target.' : 'No target specified.'),
@@ -2378,7 +4005,16 @@ function renderThreat(target) {
     } else {
       html += `<div class="threat-ammo">AMMO BURN EST.: ${m.ammoBurn} round${m.ammoBurn === 1 ? '' : 's'} (${m.shotsToKill} hit${m.shotsToKill === 1 ? '' : 's'})</div>`;
       const at = (weapon.ammoType || '').trim();
-      if (at) html += `<div class="threat-weapon">AMMO TYPE: ${escapeHtml(at)}</div>`;
+      if (at) {
+        html += `<div class="threat-weapon">AMMO TYPE: ${escapeHtml(at)}</div>`;
+        // Reserve check: compare the projected burn against ammo actually on hand
+        // (Protocol 22 — reuses the craft-panel case-insensitive lookup).
+        const reserve = typeof _craftGetHave === 'function' ? _craftGetHave(at) : null;
+        if (reserve !== null) {
+          const short = reserve < m.ammoBurn;
+          html += `<div class="threat-ammo-advisory${short ? ' threat-ammo-advisory--low' : ''}">${short ? '⚠ INSUFFICIENT RESERVES' : 'RESERVES SUFFICIENT'}: ${reserve}/${m.ammoBurn} ${escapeHtml(at)} on hand</div>`;
+        }
+      }
     }
     html += `<div class="threat-weapon">VS ${escapeHtml(weapon.name)} &mdash; DPS ${Math.round(m.weaponDPS)} / EFF ${Math.round(m.effectiveDPS)} after DT</div>`;
   } else {
@@ -2387,7 +4023,7 @@ function renderThreat(target) {
   html += '</div></div>';
 
   content.innerHTML = html;
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function')
     appendToChat(
       `> [THREAT] ${enemy.name} assessed${m.hasWeapon ? ` — TTK ${m.ttk}s, ${m.ammoBurn} rounds` : ''}.`,
@@ -2402,18 +4038,31 @@ function renderThreat(target) {
 // Shows NO ENTRY IN DATABANK when nothing matches (Protocol 3 — never invents records).
 // Game-agnostic (Protocol 38): FALLOUT_REGISTRY + databaseCSVs are the active game's data.
 // The user topic is always run through escapeHtml before it reaches innerHTML (XSS-safe).
+// U9-4: extended to also search the tracker registries (collectibles/skillBooks/
+// magazines/traits/lincolnMemorabilia). registrySearch() already no-ops on a
+// category absent from the active game's FALLOUT_REGISTRY (Protocol 38 — no
+// per-game branching needed here; FNV lacks lincolnMemorabilia, FO3 lacks
+// traits/magazines, and both cases just yield zero hits for that category).
 const _CONSULT_CATS = [
   { key: 'items', label: 'ITEMS' },
   { key: 'perks', label: 'PERKS' },
   { key: 'quests', label: 'QUESTS' },
   { key: 'locations', label: 'LOCATIONS' },
   { key: 'companions', label: 'COMPANIONS' },
+  { key: 'collectibles', label: 'COLLECTIBLES' },
+  { key: 'skillBooks', label: 'SKILL BOOKS' },
+  { key: 'magazines', label: 'SKILL MAGAZINES' },
+  { key: 'traits', label: 'TRAITS' },
+  { key: 'lincolnMemorabilia', label: 'LINCOLN MEMORABILIA' },
 ];
 
 function _consultDetail(cat, e) {
   if (cat === 'quests') return [e.type, e.dlc].filter(Boolean).join(' · ');
   if (cat === 'perks') return [e.type, e.level ? 'Lvl ' + e.level : ''].filter(Boolean).join(' · ');
   if (cat === 'companions') return e.location || e.fullName || '';
+  if (cat === 'collectibles' || cat === 'lincolnMemorabilia') return e.location || '';
+  if (cat === 'skillBooks' || cat === 'magazines') return e.skill ? 'Skill: ' + e.skill : '';
+  if (cat === 'traits') return e.effect || '';
   return e.type || '';
 }
 
@@ -2432,6 +4081,7 @@ function _consultSearch(topic) {
       creature: null,
       weapon: null,
       dbItem: null,
+      questItem: null,
     };
   const groups = [];
   if (typeof registrySearch === 'function') {
@@ -2443,8 +4093,48 @@ function _consultSearch(topic) {
   const creature = typeof lookupBestiaryEntry === 'function' ? lookupBestiaryEntry(q) : null;
   const weapon = typeof lookupWeaponStats === 'function' ? lookupWeaponStats(q) : null;
   const dbItem = typeof lookupItemInDb === 'function' ? lookupItemInDb(q) : null;
-  const empty = groups.length === 0 && !creature && !weapon && !dbItem;
-  return { q, noQuery: false, empty, groups, creature, weapon, dbItem };
+  // U9-4: surface the QUEST_ITEMS.CSV Associated_Quest/Special_Property columns
+  // lookupItemInDb() doesn't expose (Protocol 22 — same accessor pattern as getChemsTable).
+  const questItem = typeof getQuestItemDetail === 'function' ? getQuestItemDetail(q) : null;
+  const empty = groups.length === 0 && !creature && !weapon && !dbItem && !questItem;
+  return { q, noQuery: false, empty, groups, creature, weapon, dbItem, questItem };
+}
+
+// Autocomplete source for the Tool Deck's shared #deckTarget field (wired via
+// wireInput() in ui-saves.js, Protocol 22 — the same registry-autocomplete
+// singleton every other input already uses, no new mechanism). One field feeds
+// several tools (THREAT/VATS = creature, TRADE/LOOT = item, CONSULT = any
+// topic), so suggestions combine the same sources CONSULT already searches
+// (_CONSULT_CATS via registrySearch) plus bestiary creature names — reusing,
+// never forking, the existing lookups. Read-only, no state write. Game-agnostic
+// (Protocol 38): every source is registry/DB-driven, never a hardcoded name.
+function _deckTargetSuggestions(q) {
+  const query = String(q || '').trim();
+  if (query.length < 2) return [];
+  const out = [];
+  if (typeof getBestiaryNames === 'function') {
+    const ql = query.toLowerCase();
+    getBestiaryNames()
+      .filter(n => n.toLowerCase().includes(ql))
+      .slice(0, 5)
+      .forEach(n => out.push({ name: n, type: 'creature' }));
+  }
+  if (typeof registrySearch === 'function') {
+    _CONSULT_CATS.forEach(c => {
+      registrySearch(c.key, query).forEach(entry => {
+        out.push({ name: entry.name, type: c.label.toLowerCase() });
+      });
+    });
+  }
+  const seen = new Set();
+  return out
+    .filter(entry => {
+      const k = entry.name.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, 8);
 }
 
 // Shared CONSULT renderer (Protocol 22) — builds the escaped DATABANK result HTML
@@ -2466,6 +4156,8 @@ function _consultRenderHTML(res) {
     statRows.push(['HP / DT', `${res.creature.hp} / ${res.creature.dt}`]);
     if (res.creature.weakness && String(res.creature.weakness).toLowerCase() !== 'none')
       statRows.push(['WEAKNESS', escapeHtml(res.creature.weakness)]);
+    // U9-4: XP_Yield is parsed by lookupBestiaryEntry() but was never surfaced anywhere.
+    if (res.creature.xpYield) statRows.push(['XP YIELD', String(res.creature.xpYield)]);
   }
   if (res.weapon) {
     statRows.push(['WEAPON', escapeHtml(res.weapon.name)]);
@@ -2475,6 +4167,14 @@ function _consultRenderHTML(res) {
   if (res.dbItem && !res.weapon && !res.creature) {
     statRows.push(['TYPE', escapeHtml(String(res.dbItem.type || 'misc'))]);
     statRows.push(['WEIGHT / VALUE', `${res.dbItem.wgt} / ${res.dbItem.val}`]);
+  }
+  // U9-4: QUEST_ITEMS.CSV Associated_Quest/Special_Property — authored data that
+  // previously had no consumer anywhere in the app.
+  if (res.questItem) {
+    if (res.questItem.associatedQuest)
+      statRows.push(['ASSOCIATED QUEST', escapeHtml(res.questItem.associatedQuest)]);
+    if (res.questItem.specialProperty)
+      statRows.push(['SPECIAL PROPERTY', escapeHtml(res.questItem.specialProperty)]);
   }
   if (statRows.length) {
     html += '<div class="consult-stats">';
@@ -2510,7 +4210,7 @@ function renderConsult(topic) {
   title.innerText = '> DATABANK QUERY';
   const res = _consultSearch(topic);
   content.innerHTML = _consultRenderHTML(res);
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function') {
     if (res.noQuery) appendToChat('> [CONSULT] No query specified.', 'sys');
     else if (res.empty) appendToChat(`> [CONSULT] No databank entry found for "${res.q}".`, 'sys');
@@ -2518,15 +4218,89 @@ function renderConsult(topic) {
   }
 }
 
-// DATABANK panel path (DATA tab) — persistent inline lookup. Reads #databankSearch
-// and renders the SAME shared CONSULT engine into #databankResults, so the user can
-// leave the panel open and keep searching without reopening a modal. Read-only, no AI.
+// ── Native [PERKS] / [PK] — eligible-perks lookup (AI→native survey Part C.1) ──
+// Deterministic, read-only, offline lookup of the perks the Courier qualifies
+// for RIGHT NOW at their current level, sourced from the active game's
+// FALLOUT_REGISTRY.perks. Only level-gated "regular" perks are considered —
+// "special" (condition-gated) perks carry level:0 and are earned through other
+// means, never a level threshold. Never auto-grants a perk (state.perks is
+// untouched) — a pure query, mirroring CONSULT's read-only contract. Replaces
+// the Director's old "eligible perks at your level" free-text answer; the AI's
+// generative build-goal-aware [ROADMAP] is untouched (still AI — a different,
+// hybrid feature per the survey). Game-agnostic (Protocol 38): reads
+// FALLOUT_REGISTRY, never a hardcoded perk name.
+function _computeEligiblePerks() {
+  const registry = (typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.perks) || [];
+  const lvl = Math.max(1, parseInt(state.lvl, 10) || 1);
+  const owned = new Set((state.perks || []).map(p => String(p.name || '').toLowerCase()));
+  return registry
+    .filter(p => p.type === 'regular' && (parseInt(p.level, 10) || 0) <= lvl)
+    .filter(p => !owned.has(String(p.name || '').toLowerCase()))
+    .slice()
+    .sort(
+      (a, b) =>
+        (parseInt(a.level, 10) || 0) - (parseInt(b.level, 10) || 0) || a.name.localeCompare(b.name)
+    );
+}
+
+function renderEligiblePerks() {
+  const modal = document.getElementById('sysModal');
+  const title = document.getElementById('modalTitle');
+  const content = document.getElementById('modalContent');
+  if (!modal || !title || !content) return;
+  title.innerText = '> ELIGIBLE PERKS';
+  const lvl = Math.max(1, parseInt(state.lvl, 10) || 1);
+  const eligible = _computeEligiblePerks();
+  if (!eligible.length) {
+    content.innerHTML =
+      '<pre class="threat-empty" style="white-space:pre-wrap;font-family:inherit;margin:0;color:var(--robco-dim);">' +
+      `NO UNCLAIMED PERKS AT LEVEL ${lvl}.` +
+      '</pre>';
+  } else {
+    content.innerHTML =
+      '<div class="consult-card">' +
+      `<div class="consult-query">ELIGIBLE AT LEVEL ${lvl}</div>` +
+      eligible
+        .map(
+          p =>
+            `<div class="consult-hit"><span class="consult-hit-name">${escapeHtml(p.name)}</span>` +
+            `<span class="consult-hit-meta">REQ LVL ${parseInt(p.level, 10) || 0}</span></div>`
+        )
+        .join('') +
+      '</div>';
+  }
+  if (typeof openModal === 'function') openModal();
+  if (typeof appendToChat === 'function')
+    appendToChat(
+      `> [PERKS] ${eligible.length} eligible perk${eligible.length === 1 ? '' : 's'} at level ${lvl}.`,
+      'sys'
+    );
+}
+
+// BUS-19 · CATALOG QUERY (Phase 3 · Piece 3) — DATABANK panel path (DATA tab):
+// persistent inline lookup. Reads #databankSearch and renders the SAME shared
+// CONSULT engine into #databankResults (Protocol 22 — _consultSearch/
+// _consultRenderHTML are byte-identical to the CONSULT modal path), so the
+// user can leave the panel open and keep searching without reopening a
+// modal. Read-only, no AI. The amber "wireboard" skin is CSS-only, scoped to
+// #databankPanel — this function only adds the board's 0i status line.
 function renderDatabankPanel() {
   const out = document.getElementById('databankResults');
   if (!out) return;
   const inp = document.getElementById('databankSearch');
   const res = _consultSearch(inp ? inp.value : '');
   out.innerHTML = _consultRenderHTML(res);
+  const statusEl = document.getElementById('dbCatalogStatus');
+  if (statusEl) {
+    const hitCount =
+      res.groups.reduce((a, g) => a + g.hits.length, 0) +
+      (res.creature || res.weapon || res.dbItem || res.questItem ? 1 : 0);
+    statusEl.textContent = res.noQuery
+      ? 'INDEX READY — TYPE TO QUERY THE ARCHIVE'
+      : res.empty
+        ? `NO CATALOG MATCH — "${res.q}"`
+        : `${hitCount} RESULT${hitCount === 1 ? '' : 'S'} — "${res.q}"`;
+  }
 }
 
 // ── WU-N5: BIO-SCAN — native medical advisory ────────────────────────────
@@ -2665,7 +4439,7 @@ function renderBioScan() {
   html += '</div></div>';
 
   content.innerHTML = html;
-  if (typeof _openSysModal === 'function') _openSysModal();
+  if (typeof openModal === 'function') openModal();
   if (typeof appendToChat === 'function')
     appendToChat(
       `> [BIO-SCAN] ${r.crippled.length} limb(s) crippled, HP ${r.hpPct}% — ${r.advisories.length} advisor${r.advisories.length === 1 ? 'y' : 'ies'}.`,
@@ -2677,13 +4451,23 @@ function renderBioScan() {
 function _updateContextPanels() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;
   const factionPanel = document.getElementById('factionPanel');
-  const karmaPanel = document.getElementById('karmaPanel');
   if (factionPanel) {
     // Let the tab system control visibility via tab-visible; just toggle display
     factionPanel.style.display = usesKarmaCenter ? 'none' : '';
   }
-  if (karmaPanel) {
-    // Only show if on stat tab and FO3 mode; otherwise hide
-    karmaPanel.style.display = usesKarmaCenter ? '' : 'none';
+  // BUS-09 KARMA ALIGNMENT (Phase 3 OPERATOR batch 3): the needle gauge +
+  // stat_karma slider are UNIVERSAL — every game tracks karma — so the board
+  // itself is no longer hidden per-game (Protocol 22, reskin only). Only the
+  // nested FO3 KARMA CENTER appendix stays conditional on usesKarmaCenter;
+  // renderKarmaCenter() owns that inner toggle.
+  // U9-5: FO3 has no weapon-mod system/data — hide the MODS drawer so it never
+  // advertises a category that can never have entries (Protocol 38 reverse leak).
+  const hasWeaponMods = _activeDef().hasWeaponMods;
+  const modsFilterBtn = document.getElementById('invFilterMods');
+  if (modsFilterBtn) {
+    modsFilterBtn.style.display = hasWeaponMods ? '' : 'none';
+    if (!hasWeaponMods && typeof _invFilter !== 'undefined' && _invFilter === 'mod') {
+      setInvFilter('weapon'); // the drawer bank has no "All" drawer to fall back to
+    }
   }
 }

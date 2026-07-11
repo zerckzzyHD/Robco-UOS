@@ -21,7 +21,7 @@
     or the canonical suites change, update this file in the SAME commit and bump
     the suite count marker. The gate fails on drift.
 
-    Suites: 10
+    Suites: 22
 -->
 <html lang="en">
   <head>
@@ -163,12 +163,16 @@
     </script>
 
     <!-- Boot chain — same files, same order as the live FNV boot in index.html:
-         db → state → reg → registry-core, then api. -->
+         idb → db → state → reg → registry-core, then api. idb.js loads before
+         state.js so MetaStore's P1 write-through has window.IdbStore. -->
+    <script src="../js/idb.js"></script>
     <script src="../js/db_nv.js"></script>
     <script src="../js/state.js"></script>
     <script src="../js/reg_nv.js"></script>
     <script src="../js/registry-core.js"></script>
     <script src="../js/api.js"></script>
+    <script src="../js/runtime.js"></script>
+    <script src="../js/test-console.js"></script>
   </head>
   <body>
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
@@ -281,6 +285,7 @@
           'inventory',
           'squad',
           'campaign_notes',
+          'eventLog',
           'perks',
           'quests',
           'equipped',
@@ -296,6 +301,7 @@
           'campaignMode',
           'playthroughType',
           'mapView',
+          'padBindings',
         ]);
         const discovered = Object.keys(state);
         const unknown = discovered.filter(k => !KNOWN_KEYS.has(k));
@@ -465,8 +471,9 @@
           JSON.stringify(state.quests[0])
         );
         assert(
-          eq(state.campaign_notes, ['Left Goodsprings.', 'Benny sighted in New Vegas.']),
-          'campaign_notes preserved'
+          state.eventLog.some(e => e.text === 'Left Goodsprings.' && e.type === 'log') &&
+            state.eventLog.some(e => e.text === 'Benny sighted in New Vegas.'),
+          'P4: AI campaign_notes route to the eventLog as log events (manual notebook not overwritten)'
         );
         assert(
           eq(state.ammo, { '5.56mm': 120, '10mm': 45 }),
@@ -592,6 +599,7 @@
               magazines: ['Pugilism Illustrated'],
               lincolnItems: { "Lincoln's Hat": 'other', 'Bad Item': 'bogus' }, // 'other'→found, unknown→found
               factions: { ncr: { fame: '15', infamy: -3, rep: 7 } }, // fame/infamy → non-negative ints
+              padBindings: { up: '  Stimpak  ', down: 42, left: null, weird: 'Molotov' }, // Quick-Draw Holster: trimmed string|null, extras dropped
             },
           },
         };
@@ -638,6 +646,18 @@
           'faction fame/infamy coerced to non-negative ints; other fields preserved',
           JSON.stringify(camp.factions.ncr)
         );
+        // Quick-Draw Holster: padBindings rebuilt to the fixed 4-key {up,down,left,right}
+        // map — trimmed strings, non-string coerced to null, extras dropped, missing
+        // keys default null.
+        assert(
+          camp.padBindings.up === 'Stimpak' &&
+            camp.padBindings.down === null &&
+            camp.padBindings.left === null &&
+            camp.padBindings.right === null &&
+            !('weird' in camp.padBindings),
+          'padBindings sanitized to {up,down,left,right} string|null, extras dropped',
+          JSON.stringify(camp.padBindings)
+        );
 
         // Boot-merge: state = { ...defaults, ...campaigns[activeContext] } (ui-core.js boot).
         const stored = JSON.parse(JSON.stringify(sanitized));
@@ -657,35 +677,1180 @@
         section('Suite 9 — Game-agnostic registry dispatch');
 
         const savedCtx = state.gameContext;
-        Object.values(GAME_DEFS).forEach(def => {
-          state.gameContext = def.id;
-          const sk = getSkillKeys();
-          const fac = getFactionRegistry();
-          assert(
-            sk === def.skillKeys && fac === def.factions && sk.length > 0 && fac.length > 0,
-            `${def.id}: getSkillKeys()/getFactionRegistry() resolve to GAME_DEFS.${def.id} (${sk.length} skills, ${fac.length} factions)`
-          );
-        });
+        // DO-K: skip designOnly entries (FO4) — the Step 2 Phase 0 U11 skill-less
+        // (FO4-class) audit locks skillKeys/factions to [] for a designOnly game (never
+        // omitted, so getSkillKeys()/getFactionRegistry() degrade to [] instead of
+        // throwing), so a live/selectable game is the only kind this dispatch check can
+        // assert ">0" against. FO4's identity/contract completeness is proven separately
+        // by Suite 20 below.
+        Object.values(GAME_DEFS)
+          .filter(def => !def.designOnly)
+          .forEach(def => {
+            state.gameContext = def.id;
+            const sk = getSkillKeys();
+            const fac = getFactionRegistry();
+            assert(
+              sk === def.skillKeys && fac === def.factions && sk.length > 0 && fac.length > 0,
+              `${def.id}: getSkillKeys()/getFactionRegistry() resolve to GAME_DEFS.${def.id} (${sk.length} skills, ${fac.length} factions)`
+            );
+          });
         state.gameContext = savedCtx;
       } catch (err) {
         assert(false, 'FATAL: audit threw an exception', String((err && err.stack) || err));
       }
 
       // ══════════════════════════════════════════════════════════════
-      //  Summary
+      //  Suite 10 (async) + Summary — the P1 IndexedDB behavioral proof needs
+      //  await, so it runs in an async runner that writes the summary only after
+      //  it settles (test-html-check.mjs waits for data-failed to appear).
       // ══════════════════════════════════════════════════════════════
-      const summary = document.getElementById('summary');
-      if (failed === 0) {
-        summary.className = 'all-pass';
-        summary.textContent = `ALL ${passed} TESTS PASSED across ${suiteCount} suites — persistence contract verified.`;
-      } else {
-        summary.className = 'has-fail';
-        summary.textContent = `${failed} TEST(S) FAILED (${passed} passed, ${suiteCount} suites) — import contract drift detected.`;
-      }
-      // Machine-readable markers for the headless gate runner (test-html-check.mjs).
-      summary.setAttribute('data-passed', String(passed));
-      summary.setAttribute('data-failed', String(failed));
-      summary.setAttribute('data-suites', String(suiteCount));
+      (async function () {
+        // ── Suite 10 — P1 IndexedDB durability shadow (REAL IndexedDB) ────────
+        // This is the behavioral half of canonical Suite 138: Chromium has a
+        // native IndexedDB (Node/PowerShell do not), so this proves the real
+        // round-trip, the no-read-flip invariant, the two-store boundary, and
+        // fail-safe resolve-soft behavior — not just the source shape.
+        try {
+          section('Suite 10 — P1 IndexedDB durability shadow (real IndexedDB)');
+
+          const wait = ms => new Promise(r => setTimeout(r, ms));
+          // Poll IdbStore.get until it matches (write-through is fire-and-forget).
+          async function eventually(store, key, want, tries = 60) {
+            for (let i = 0; i < tries; i++) {
+              if ((await window.IdbStore.get(store, key)) === want) return true;
+              await wait(10);
+            }
+            return false;
+          }
+
+          assert(
+            typeof window.IdbStore === 'object' && window.IdbStore !== null,
+            'IdbStore is published on window'
+          );
+          assert(await window.IdbStore.ready(), 'IdbStore opens a real IndexedDB in the browser');
+
+          // 1) Engine round-trip on the 'meta' store.
+          const rtOk = await window.IdbStore.set('meta', '__rt_probe__', 'engine-rt');
+          assert(
+            rtOk === true && (await window.IdbStore.get('meta', '__rt_probe__')) === 'engine-rt',
+            'engine round-trip: IdbStore.set then get returns the stored value'
+          );
+
+          // 2) Write-through: a MetaStore.set mirrors into the 'meta' store.
+          MetaStore.set('__wt_probe__', 'through-value');
+          assert(
+            await eventually('meta', '__wt_probe__', 'through-value'),
+            'write-through: MetaStore.set mirrors the value into IndexedDB (meta store)'
+          );
+
+          // 3) NO READ FLIP: seed IDB only, leave localStorage empty — MetaStore.get
+          //    must return the localStorage value (null), never the IDB value.
+          await window.IdbStore.set('meta', '__flip_probe__', 'IDB_ONLY');
+          try {
+            localStorage.removeItem('__flip_probe__');
+          } catch (_) {}
+          assert(
+            MetaStore.get('__flip_probe__') === null,
+            'no read flip: MetaStore.get reads localStorage only (ignores an IDB-only value)'
+          );
+
+          // 4) TWO-STORE BOUNDARY: the device write never touched the campaign store.
+          assert(
+            (await window.IdbStore.get('campaign', '__wt_probe__')) === null &&
+              (await window.IdbStore.keys('campaign')).length === 0,
+            "two-store boundary: the device write-through never wrote the 'campaign' store"
+          );
+
+          // 5) FAIL-SAFE resolve-soft: a missing key returns null, collections
+          //    return arrays — no op ever rejects.
+          const missing = await window.IdbStore.get('meta', '__does_not_exist__');
+          const allKeys = await window.IdbStore.keys('meta');
+          assert(
+            missing === null && Array.isArray(allKeys),
+            'resolve-soft: missing get returns null and keys() returns an array (no rejection)'
+          );
+
+          // Tidy up the probes (never awaited elsewhere).
+          window.IdbStore.remove('meta', '__rt_probe__');
+          window.IdbStore.remove('meta', '__wt_probe__');
+          window.IdbStore.remove('meta', '__flip_probe__');
+        } catch (err) {
+          assert(false, 'FATAL: IDB behavioral suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 11 — P2 device-pref boot reconciliation (REAL IndexedDB) ────
+        // The behavioral half of canonical Suite 139. The real reconcile lives in
+        // js/ui-core.js, which test.html cannot load without its full app DOM (it
+        // would fire window.onload against a page that lacks the app shell). So
+        // this drives a behavioral TWIN with the EXACT reconciliation logic
+        // against real IndexedDB + the real IdbStore / MetaStore / checksum
+        // primitives (all loaded), proving: RECOVERY (restore when localStorage
+        // missing), localStorage-present WINS (no overwrite), CORRUPT records are
+        // skipped (checksum gate), BACKFILL (localStorage-only device key mirrored
+        // to IDB), and the two-store boundary (campaign store untouched). Probe
+        // keys use the registered robco_optic_ device-key family so MetaStore.has
+        // is true without touching a real singleton preference.
+        try {
+          section('Suite 11 — P2 device-pref boot reconciliation (real IndexedDB)');
+
+          // Write a raw envelope (bypassing IdbStore.set) so we can plant a
+          // deliberately CORRUPT record whose checksum will not verify.
+          function putRawMeta(key, record) {
+            return new Promise(resolve => {
+              const req = indexedDB.open('robco-uos', 1);
+              req.onsuccess = e => {
+                const db = e.target.result;
+                const tx = db.transaction('meta', 'readwrite');
+                tx.objectStore('meta').put(record, key);
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+              };
+              req.onerror = () => resolve(false);
+            });
+          }
+
+          // Behavioral twin — byte-for-byte the js/ui-core.js _reconcileMetaFromIdb
+          // logic, exercised against the real loaded primitives.
+          async function reconcileMetaTwin() {
+            const idbKeys = (await window.IdbStore.keys('meta')) || [];
+            const idbSet = new Set(idbKeys);
+            let recovered = 0;
+            let backfilled = 0;
+            for (const key of idbKeys) {
+              if (!MetaStore.has(key)) continue;
+              if (localStorage.getItem(key) !== null) continue;
+              const rec = await window.IdbStore.getRaw('meta', key);
+              if (!rec || typeof rec.value !== 'string') continue;
+              if (rec.checksum && computeSaveChecksum(rec.value, [], '') !== rec.checksum) continue;
+              MetaStore.set(key, rec.value);
+              recovered++;
+            }
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (!key || idbSet.has(key) || !MetaStore.has(key)) continue;
+              const v = localStorage.getItem(key);
+              if (v !== null) {
+                window.IdbStore.set('meta', key, v);
+                backfilled++;
+              }
+            }
+            return { recovered, backfilled };
+          }
+
+          // 1) RECOVERY: IDB has a valid record, localStorage is missing it → restore.
+          localStorage.removeItem('robco_optic_ZZTEST');
+          await window.IdbStore.set('meta', 'robco_optic_ZZTEST', 'recovered-green');
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_ZZTEST') === 'recovered-green',
+            'recovery: a device key IDB has but localStorage lacks is restored to localStorage'
+          );
+
+          // 2) NO OVERWRITE: localStorage present → localStorage wins over a differing IDB value.
+          localStorage.setItem('robco_optic_YYTEST', 'ls-wins');
+          await window.IdbStore.set('meta', 'robco_optic_YYTEST', 'idb-value');
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_YYTEST') === 'ls-wins',
+            'no overwrite: a present localStorage value wins over a differing IndexedDB value'
+          );
+
+          // 3) CORRUPT SKIP: an IDB record whose checksum does not verify is never restored.
+          localStorage.removeItem('robco_optic_CORRUPT');
+          await putRawMeta('robco_optic_CORRUPT', {
+            value: 'corrupt-val',
+            schemaVersion: '',
+            checksum: '0badc0de',
+            mt: 1,
+          });
+          await reconcileMetaTwin();
+          assert(
+            localStorage.getItem('robco_optic_CORRUPT') === null,
+            'corrupt skip: a checksum-mismatched IDB record is not restored (integrity gate)'
+          );
+
+          // 4) BACKFILL: a registered device key localStorage has but IDB lacks is mirrored to IDB.
+          await window.IdbStore.remove('meta', 'robco_optic_BACKFILL');
+          localStorage.setItem('robco_optic_BACKFILL', 'from-ls');
+          await reconcileMetaTwin();
+          // write-through/backfill is fire-and-forget — poll until it lands.
+          let backfilled = false;
+          for (let i = 0; i < 60; i++) {
+            if ((await window.IdbStore.get('meta', 'robco_optic_BACKFILL')) === 'from-ls') {
+              backfilled = true;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 10));
+          }
+          assert(
+            backfilled,
+            'backfill: a localStorage-only registered device key is mirrored into IndexedDB'
+          );
+
+          // 5) TWO-STORE BOUNDARY: none of the recovered/backfilled keys touched the campaign store.
+          const campZ = await window.IdbStore.get('campaign', 'robco_optic_ZZTEST');
+          const campB = await window.IdbStore.get('campaign', 'robco_optic_BACKFILL');
+          assert(
+            campZ === null && campB === null,
+            'two-store boundary: reconciliation never wrote device keys into the campaign store'
+          );
+
+          // Tidy up.
+          ['ZZTEST', 'YYTEST', 'CORRUPT', 'BACKFILL'].forEach(s => {
+            localStorage.removeItem('robco_optic_' + s);
+            window.IdbStore.remove('meta', 'robco_optic_' + s);
+          });
+        } catch (err) {
+          assert(false, 'FATAL: P2 reconciliation suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 12 — P3 cold-store IDB-primary (REAL IndexedDB) ─────────────
+        // Real behavioral proof of the js/state.js cold-store accessors — all
+        // loaded here (unlike the P2 reconcile which lives in ui-core.js): drives
+        // _coldWriteObj / _coldReadObj / _migrateColdStoreToIdb / snapRollingBackup
+        // / getRollingBackupsAsync against the browser's native IndexedDB, proving
+        // round-trip, IDB-primary fallback (ceiling relief), newest-wins, additive
+        // idempotent migration, the two-store boundary, and the backup round-trip.
+        try {
+          section('Suite 12 — P3 cold-store IDB-primary (real IndexedDB)');
+          const env = t => ({
+            savedAt: t,
+            slotName: 'PROBE',
+            state: { lvl: t },
+            chat: [],
+            playstyle: 'any',
+          });
+
+          // 1) ROUND-TRIP: write cold-store → read back; IDB campaign holds it.
+          await window._coldWriteObj('robco_slot_probe', 'slot_probe', env(100));
+          const rt = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          const idbCopy = await window.IdbStore.get('campaign', 'slot_probe');
+          assert(
+            rt && rt.savedAt === 100 && idbCopy && idbCopy.savedAt === 100,
+            'round-trip: _coldWriteObj persists to the IDB campaign store and _coldReadObj reads it back'
+          );
+
+          // 2) CEILING RELIEF / FALLBACK: remove the localStorage mirror → still loads from IDB.
+          localStorage.removeItem('robco_slot_probe');
+          const fromIdb = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          assert(
+            fromIdb && fromIdb.savedAt === 100,
+            'IDB-primary fallback: a save survives localStorage removal and still loads from IndexedDB (ceiling relief)'
+          );
+
+          // 3) NEWEST-WINS: IDB newer → IDB wins; then localStorage newer → it wins.
+          await window.IdbStore.set('campaign', 'slot_probe', env(300));
+          localStorage.setItem('robco_slot_probe', JSON.stringify(env(200)));
+          const nw1 = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          localStorage.setItem('robco_slot_probe', JSON.stringify(env(500)));
+          const nw2 = await window._coldReadObj('robco_slot_probe', 'slot_probe');
+          assert(
+            nw1 && nw1.savedAt === 300 && nw2 && nw2.savedAt === 500,
+            'newest-wins: the newer of {IDB, localStorage} by savedAt is returned (IDB wins ties)'
+          );
+
+          // 4) MIGRATION: a localStorage-only slot is copied to IDB; idempotent; localStorage retained.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          localStorage.setItem('robco_slot_2', JSON.stringify(env(42)));
+          await window._migrateColdStoreToIdb();
+          const migrated = await window.IdbStore.get('campaign', 'slot_2');
+          await window._migrateColdStoreToIdb(); // idempotent re-run
+          const stillThere = await window.IdbStore.get('campaign', 'slot_2');
+          assert(
+            migrated &&
+              migrated.savedAt === 42 &&
+              stillThere &&
+              stillThere.savedAt === 42 &&
+              localStorage.getItem('robco_slot_2') !== null,
+            'migration: a localStorage-only slot is copied to IDB, idempotently, and the localStorage copy is retained (additive)'
+          );
+
+          // 5) TWO-STORE BOUNDARY: a cold-store key never lands in the device 'meta' store.
+          const metaLeak = await window.IdbStore.get('meta', 'slot_probe');
+          assert(
+            metaLeak === null,
+            "two-store boundary: a cold-store key never appears in the device 'meta' store"
+          );
+
+          // 6) BACKUP round-trip: snapRollingBackup mirrors to IDB; getRollingBackupsAsync surfaces it.
+          localStorage.setItem(
+            'robco_v8',
+            JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { lvl: 9 } } })
+          );
+          ['robco_backup_1', 'robco_backup_2', 'robco_backup_3'].forEach(k =>
+            localStorage.removeItem(k)
+          );
+          await window.IdbStore.remove('campaign', 'backup_1');
+          localStorage.setItem('robco_backup_ptr', '0');
+          window.snapRollingBackup();
+          let backupInIdb = false;
+          for (let i = 0; i < 60; i++) {
+            if (await window.IdbStore.get('campaign', 'backup_1')) {
+              backupInIdb = true;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 10));
+          }
+          const ring = await window.getRollingBackupsAsync();
+          assert(
+            backupInIdb && ring.length >= 1,
+            'backup round-trip: snapRollingBackup mirrors into IDB and getRollingBackupsAsync surfaces the union'
+          );
+
+          // Tidy up.
+          [
+            'robco_slot_probe',
+            'robco_slot_2',
+            'robco_backup_1',
+            'robco_backup_2',
+            'robco_backup_3',
+            'robco_backup_ptr',
+            'robco_v8',
+          ].forEach(k => localStorage.removeItem(k));
+          ['slot_probe', 'slot_2', 'backup_1'].forEach(k => window.IdbStore.remove('campaign', k));
+        } catch (err) {
+          assert(false, 'FATAL: P3 cold-store suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 13 — P4 Terminal Record ([T#] migration + AI re-point) ──────
+        // Exercises the REAL migrateState / autoImportState / sanitizeImportedContainer
+        // (all loaded here) to prove: the [T#] split is non-lossy (auto-log moves
+        // to eventLog, manual notes stay), it is idempotent, the AI can no longer
+        // overwrite the manual notebook (its notes route to eventLog, deduped),
+        // and eventLog survives the sanitize round-trip.
+        try {
+          section('Suite 13 — P4 Terminal Record ([T#] migration + AI re-point)');
+
+          // 1) [T#] MIGRATION: mixed campaign_notes → auto-log MOVES to eventLog,
+          //    manual note STAYS. Manual-note preservation is the key invariant.
+          resetState();
+          state.eventLog = [];
+          state.campaign_notes = [
+            '[T5] Level Up: 3 → 4',
+            'my manual note',
+            '[T9] Quest: "Ghost People" → COMPLETE',
+          ];
+          migrateState('2.7.0', state);
+          assert(
+            state.eventLog.length === 2 &&
+              state.eventLog[0].type === 'level' &&
+              state.eventLog[0].t === 5 &&
+              state.eventLog[0].text === 'Level Up: 3 → 4' &&
+              state.eventLog[1].type === 'quest' &&
+              state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'my manual note',
+            '[T#] migration: auto-log strings move to eventLog (typed); the manual note stays in campaign_notes (non-lossy)'
+          );
+
+          // 2) IDEMPOTENT: re-running migrateState moves nothing more.
+          migrateState('2.7.0', state);
+          assert(
+            state.eventLog.length === 2 &&
+              state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'my manual note',
+            '[T#] migration is idempotent: a second migrateState pass moves no further entries'
+          );
+
+          // 3) AI RE-POINT: the AI cannot overwrite the manual notebook — its
+          //    campaign_notes route into eventLog as 'log' events.
+          resetState();
+          state.eventLog = [];
+          state.campaign_notes = ['keep me'];
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(JSON.stringify({ campaign_notes: ['event A', 'event B'] }));
+          assert(
+            state.campaign_notes.length === 1 &&
+              state.campaign_notes[0] === 'keep me' &&
+              state.eventLog.some(e => e.text === 'event A' && e.type === 'log') &&
+              state.eventLog.some(e => e.text === 'event B'),
+            'AI re-point: the AI notes land in eventLog and the manual notebook is NOT overwritten (player authority)'
+          );
+
+          // 4) AI DEDUP: resending overlapping notes does not duplicate history.
+          const beforeLen = state.eventLog.length;
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(JSON.stringify({ campaign_notes: ['event A', 'event C'] }));
+          const aCount = state.eventLog.filter(e => e.text === 'event A').length;
+          assert(
+            aCount === 1 &&
+              state.eventLog.length === beforeLen + 1 &&
+              state.eventLog.some(e => e.text === 'event C'),
+            'AI re-point dedup: a resent note is not duplicated; only the new note is appended'
+          );
+
+          // 5) SANITIZE round-trip: eventLog is coerced to typed records, malformed dropped.
+          const dirty = {
+            activeContext: 'FNV',
+            campaigns: {
+              FNV: {
+                eventLog: [
+                  { t: 7, rt: 0, type: 'faction', text: 'NCR: fame +5' },
+                  'not an object',
+                  { text: 'no type is fine' },
+                ],
+              },
+            },
+          };
+          const clean = sanitizeImportedContainer(dirty);
+          const el = clean.campaigns.FNV.eventLog;
+          assert(
+            Array.isArray(el) &&
+              el.length === 2 &&
+              el[0].type === 'faction' &&
+              el[0].t === 7 &&
+              el[1].type === 'log',
+            'sanitize: eventLog is coerced to typed {t,rt,type,text} records and malformed entries are dropped (Protocol 4)'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: P4 Terminal Record suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 13b — Quick-Draw Holster (padBindings) ───────────────────────
+        // Exercises the REAL migrateState()/autoImportState() against padBindings:
+        // a bogus (non-object) shape normalizes to the all-empty default, and an AI
+        // response can NEVER alter a binding (Protocol 24 player-authority + the
+        // Protocol 14 AI-contract regression this unit requires).
+        try {
+          section('Suite 13b — Quick-Draw Holster (padBindings)');
+
+          // 1) Bogus shape (array) normalizes to the {up,down,left,right} all-null default.
+          resetState();
+          state.padBindings = ['not', 'an', 'object'];
+          migrateState('2.7.0', state);
+          assert(
+            state.padBindings &&
+              state.padBindings.up === null &&
+              state.padBindings.down === null &&
+              state.padBindings.left === null &&
+              state.padBindings.right === null,
+            'migrateState: a bogus (array) padBindings normalizes to the all-null default',
+            JSON.stringify(state.padBindings)
+          );
+
+          // 2) Missing field (older save) is added by migration.
+          resetState();
+          delete state.padBindings;
+          migrateState('2.7.0', state);
+          assert(
+            state.padBindings &&
+              Object.keys(state.padBindings).sort().join(',') === 'down,left,right,up',
+            'migrateState: a save with no padBindings migrates to the 4-key all-null default'
+          );
+
+          // 3) Protocol 14: autoImportState NEVER writes padBindings, even when the
+          //    parsed AI response includes one — parsed.padBindings is never referenced.
+          resetState();
+          state.padBindings = { up: 'Stimpak', down: null, left: null, right: null };
+          window._lastStateBeforeSync = JSON.stringify(state);
+          autoImportState(
+            JSON.stringify({ padBindings: { up: 'AI-INJECTED', down: 'Nuka-Cola' } })
+          );
+          assert(
+            state.padBindings.up === 'Stimpak' && state.padBindings.down === null,
+            'Protocol 14: autoImportState cannot alter padBindings — the AI-authored payload is ignored (player authority)',
+            JSON.stringify(state.padBindings)
+          );
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: Quick-Draw Holster (padBindings) suite threw',
+            String((err && err.stack) || err)
+          );
+        }
+
+        // ── Suite 14 — P5 save version history (REAL IndexedDB) ───────────────
+        // Node/PowerShell have no IndexedDB, so the real per-slot revision-ring
+        // behavior is proven HERE against the browser's native IndexedDB and the
+        // real state.js accessors (readSlotVersions / pushSlotVersion): a push→read
+        // round-trip, newest-first ordering, the SLOT_VERSION_CAP bound, the
+        // two-store boundary (versions never land in 'meta'), the IDB-only invariant
+        // (never mirrored to localStorage), and the fail-safe (no IDB → [] / no-op,
+        // never throws).
+        try {
+          section('Suite 14 — P5 save version history (real IndexedDB)');
+          const env14 = t => ({ savedAt: t, slotName: 'PROBE', state: { lvl: t } });
+
+          // Clean slate for a probe slot.
+          await window.IdbStore.remove('campaign', 'slot_9_versions');
+
+          // 1) ROUND-TRIP + NEWEST-FIRST: three pushes surface newest-first.
+          await window.pushSlotVersion(9, env14(100));
+          await window.pushSlotVersion(9, env14(200));
+          await window.pushSlotVersion(9, env14(300));
+          const ring = await window.readSlotVersions(9);
+          assert(
+            ring.length === 3 &&
+              ring[0].savedAt === 300 &&
+              ring[1].savedAt === 200 &&
+              ring[2].savedAt === 100,
+            'round-trip + newest-first: pushSlotVersion prepends and readSlotVersions returns the ring newest-first'
+          );
+
+          // 2) CAP: pushing beyond SLOT_VERSION_CAP keeps only the newest cap.
+          for (let t = 400; t <= 900; t += 100) await window.pushSlotVersion(9, env14(t));
+          const capped = await window.readSlotVersions(9);
+          assert(
+            capped.length === 5 && capped[0].savedAt === 900 && capped[4].savedAt === 500,
+            'bounded ring: the revision ring is capped at SLOT_VERSION_CAP (5), retaining the newest revisions'
+          );
+
+          // 3) TWO-STORE BOUNDARY: the versions key never appears in the 'meta' store.
+          const metaLeak14 = await window.IdbStore.get('meta', 'slot_9_versions');
+          assert(
+            metaLeak14 === null,
+            "two-store boundary: the version ring key never appears in the device 'meta' store"
+          );
+
+          // 4) IDB-ONLY: the versions key is never mirrored to localStorage.
+          assert(
+            localStorage.getItem('slot_9_versions') === null &&
+              localStorage.getItem('robco_slot_9_versions') === null,
+            'IDB-only: the version ring is never written to localStorage (rides IDB headroom, not the ceiling)'
+          );
+
+          // 5) FAIL-SAFE: with IndexedDB removed, read → [] and push no-ops, no throw.
+          const realIdb14 = window.IdbStore;
+          window.IdbStore = undefined;
+          let failSafe14 = false;
+          try {
+            const r = await window.readSlotVersions(9);
+            await window.pushSlotVersion(9, env14(1)); // must no-op, not throw
+            failSafe14 = Array.isArray(r) && r.length === 0;
+          } catch (_) {
+            failSafe14 = false;
+          }
+          window.IdbStore = realIdb14;
+          assert(
+            failSafe14,
+            'fail-safe: with IndexedDB unavailable, readSlotVersions returns [] and pushSlotVersion no-ops without throwing'
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'slot_9_versions');
+        } catch (err) {
+          assert(false, 'FATAL: P5 version-history suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 15 — P6 full backup bundle (REAL IndexedDB) ─────────────────
+        // Proves the whole-history bundle round-trips through the browser's native
+        // IndexedDB using the real state.js data layer (buildFullBundle /
+        // verifyBundleChecksum / isValidBundleShape / applyBundleData) + the real
+        // api.js sanitizeImportedContainer: gather → checksum verify → tamper-reject
+        // → restore, with the slot restored VERBATIM and its version ring intact.
+        try {
+          section('Suite 15 — P6 full backup bundle (real IndexedDB)');
+
+          // Seed a slot + version ring + a live container.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+          localStorage.setItem(
+            'robco_v8',
+            JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { lvl: 50 } } })
+          );
+          window.robco_v8 = JSON.parse(localStorage.getItem('robco_v8'));
+          localStorage.setItem('robco_playstyle', 'combat');
+          const slotEnv15 = {
+            version: '2.7.0',
+            schemaVersion: '2.7.0',
+            state: { lvl: 20, gameContext: 'FNV' },
+            chat: [],
+            playstyle: 'any',
+            savedAt: 2000,
+            slotName: 'SLOT B',
+            gameContext: 'FNV',
+          };
+          await window._coldWriteObj('robco_slot_2', 'slot_2', slotEnv15);
+          await window.pushSlotVersion(2, {
+            ...slotEnv15,
+            savedAt: 1500,
+            state: { lvl: 19, gameContext: 'FNV' },
+          });
+
+          // 1) BUILD: buildFullBundle gathers container + the slot (with its ring) + checksum.
+          const bundle15 = await window.buildFullBundle();
+          const s2 = bundle15.slots.find(s => s.n === 2);
+          assert(
+            bundle15.bundle === true &&
+              !!bundle15.checksum &&
+              !!s2 &&
+              s2.envelope.state.lvl === 20 &&
+              s2.versions.length === 1,
+            'build: buildFullBundle gathers the live container + the slot with its P5 version ring + a checksum (real IDB reads)'
+          );
+
+          // 2) VERIFY + TAMPER: a clean bundle verifies; a mutated one is rejected.
+          const tampered15 = JSON.parse(JSON.stringify(bundle15));
+          tampered15.slots[tampered15.slots.findIndex(s => s.n === 2)].envelope.state.lvl = 999;
+          assert(
+            window.verifyBundleChecksum(bundle15) === true &&
+              window.verifyBundleChecksum(tampered15) === false &&
+              window.isValidBundleShape(bundle15) === true &&
+              window.isValidBundleShape({ nope: 1 }) === false,
+            'verify: a clean bundle passes checksum + shape; a tampered bundle and a malformed object are both rejected'
+          );
+
+          // 3) RESTORE ROUND-TRIP: clear the slot, applyBundleData, re-read from IDB.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+          await window.applyBundleData(bundle15);
+          const restored2 = await window._coldReadObj('robco_slot_2', 'slot_2');
+          const restoredRing = await window.readSlotVersions(2);
+          assert(
+            restored2 &&
+              restored2.state.lvl === 20 &&
+              JSON.stringify(restored2) === JSON.stringify(slotEnv15) &&
+              restoredRing.length === 1 &&
+              restoredRing[0].state.lvl === 19,
+            'restore: applyBundleData rewrites the slot VERBATIM (checksum-preserving) and restores its version ring to IndexedDB'
+          );
+
+          // 4) TWO-STORE BOUNDARY: nothing bundle-related leaks into the 'meta' store.
+          const metaLeak15 = await window.IdbStore.get('meta', 'slot_2');
+          const metaRingLeak15 = await window.IdbStore.get('meta', 'slot_2_versions');
+          assert(
+            metaLeak15 === null && metaRingLeak15 === null,
+            "two-store boundary: bundle restore never writes campaign/save data into the device 'meta' store"
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'slot_2');
+          await window.IdbStore.remove('campaign', 'slot_2_versions');
+          localStorage.removeItem('robco_slot_2');
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: P6 full-backup bundle suite threw',
+            String((err && err.stack) || err)
+          );
+        }
+
+        // ── Suite 16 — P7 offline cloud-push queue storage (REAL IndexedDB) ───
+        // Proves the device-local queue's storage layer round-trips through the
+        // browser's native IndexedDB using the real state.js accessors
+        // (readCloudQueue / enqueueCloudPush / writeCloudQueue): enqueue+read,
+        // contentHash dedup, the CLOUD_QUEUE_CAP bound, replace-write, the two-store
+        // boundary (never 'meta'), and the fail-safe (no IDB → [] / false / no-op).
+        // The flush orchestration lives in cloud.js (not loaded here) and is covered
+        // structurally by the canonical runners' Suite 144.
+        try {
+          section('Suite 16 — P7 offline cloud-push queue storage (real IndexedDB)');
+          const mkItem = (h, uid) => ({
+            label: 'S' + h,
+            contentHash: h,
+            uid: uid || 'userA',
+            robco_v8: { x: h },
+            chat: [],
+            playstyle: 'any',
+            gameContext: 'FNV',
+          });
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+
+          // 1) ENQUEUE + READ + DEDUP: two distinct queue; a repeat contentHash no-ops.
+          await window.enqueueCloudPush(mkItem('aaa'));
+          await window.enqueueCloudPush(mkItem('bbb'));
+          await window.enqueueCloudPush(mkItem('aaa'));
+          const q1 = await window.readCloudQueue();
+          assert(
+            q1.length === 2 && q1[0].contentHash === 'aaa' && q1[1].contentHash === 'bbb',
+            'enqueue+read+dedup: distinct pushes queue oldest-first; the same push queued twice is deduped by contentHash'
+          );
+
+          // 2) BOUND: 25 distinct pushes retain only the newest CLOUD_QUEUE_CAP (20).
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+          for (let i = 0; i < 25; i++) await window.enqueueCloudPush(mkItem('h' + i));
+          const q2 = await window.readCloudQueue();
+          assert(
+            q2.length === 20 && q2[0].contentHash === 'h5' && q2[19].contentHash === 'h24',
+            'bounded: the queue caps at CLOUD_QUEUE_CAP (20), dropping the oldest pending pushes'
+          );
+
+          // 3) REPLACE-WRITE: writeCloudQueue swaps the whole queue (flush persists remaining).
+          await window.writeCloudQueue([mkItem('z1'), mkItem('z2')]);
+          const q3 = await window.readCloudQueue();
+          assert(
+            q3.length === 2 && q3[0].contentHash === 'z1' && q3[1].contentHash === 'z2',
+            'writeCloudQueue replaces the queue wholesale (used by the flush to persist the remaining items)'
+          );
+
+          // 4) TWO-STORE BOUNDARY: the queue never lands in the device 'meta' store.
+          const metaLeak16 = await window.IdbStore.get('meta', 'cloud_queue');
+          assert(
+            metaLeak16 === null,
+            "two-store boundary: the cloud-push queue lives in the 'campaign' store only, never the device 'meta' store"
+          );
+
+          // 5) FAIL-SAFE: with IndexedDB removed, read → [], enqueue/write → false, no throw.
+          const realIdb16 = window.IdbStore;
+          window.IdbStore = undefined;
+          let failSafe16 = false;
+          try {
+            const r = await window.readCloudQueue();
+            const e = await window.enqueueCloudPush(mkItem('x'));
+            const w = await window.writeCloudQueue([mkItem('x')]);
+            failSafe16 = Array.isArray(r) && r.length === 0 && e === false && w === false;
+          } catch (_) {
+            failSafe16 = false;
+          }
+          window.IdbStore = realIdb16;
+          assert(
+            failSafe16,
+            'fail-safe: with IndexedDB unavailable, the queue accessors return [] / false and never throw (a manual push degrades to today)'
+          );
+
+          // Tidy up.
+          await window.IdbStore.remove('campaign', 'cloud_queue');
+        } catch (err) {
+          assert(
+            false,
+            'FATAL: P7 cloud-queue storage suite threw',
+            String((err && err.stack) || err)
+          );
+        }
+
+        // ── Suite 17 — P8 global immersion dial (device pref + gate helper) ───
+        // Exercises the REAL state.js gate helpers (getImmersionTier /
+        // immersionAllows / setImmersionTier) against the live MetaStore: the pref
+        // round-trips, the tier thresholds are correct, an unknown value/requirement
+        // fails safe, and — the key boundary — the pref is a DEVICE key (MetaStore),
+        // never a campaign `state` field (so it can't ride the save/cloud).
+        try {
+          section('Suite 17 — P8 global immersion dial (device pref + gate helper)');
+          const _prevImm = MetaStore.get('robco_immersion');
+
+          // 1) DEFAULT + ROUND-TRIP: absent → 'full'; set persists + reads back.
+          MetaStore.remove('robco_immersion');
+          const def = window.getImmersionTier();
+          window.setImmersionTier('balanced');
+          const rt = window.getImmersionTier();
+          assert(
+            def === 'full' && rt === 'balanced',
+            "round-trip: getImmersionTier defaults to 'full' when unset and reflects a setImmersionTier write"
+          );
+
+          // 2) THRESHOLDS: immersionAllows is a correct rank compare at each level.
+          window.setImmersionTier('minimal');
+          const minRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          window.setImmersionTier('balanced');
+          const balRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          window.setImmersionTier('full');
+          const fullRow = [
+            window.immersionAllows('minimal'),
+            window.immersionAllows('balanced'),
+            window.immersionAllows('full'),
+          ];
+          assert(
+            eq(minRow, [true, false, false]) &&
+              eq(balRow, [true, true, false]) &&
+              eq(fullRow, [true, true, true]),
+            'thresholds: immersionAllows(required) = rank(current) >= rank(required) at minimal / balanced / full'
+          );
+
+          // 3) FAIL-SAFE: an unknown level coerces to 'full'; an unknown requirement fails open.
+          window.setImmersionTier('nonsense');
+          const coerced = window.getImmersionTier();
+          window.setImmersionTier('minimal');
+          const unknownReq = window.immersionAllows('bogus');
+          assert(
+            coerced === 'full' && unknownReq === true,
+            "fail-safe: an unknown level coerces to 'full'; an unrecognised requirement fails open (true)"
+          );
+
+          // 4) BOUNDARY: the dial is a DEVICE pref (MetaStore) — never a campaign state field.
+          window.setImmersionTier('balanced');
+          const inMeta = MetaStore.get('robco_immersion') === 'balanced';
+          const notInState = !('robco_immersion' in state) && !('immersion' in state);
+          assert(
+            inMeta && notInState,
+            "two-store boundary: robco_immersion lives in MetaStore (device pref) and never appears in campaign `state` (so it can't ride the save/cloud)"
+          );
+
+          // Restore whatever was there before (leave no side effect for later suites).
+          if (_prevImm === null || _prevImm === undefined) MetaStore.remove('robco_immersion');
+          else MetaStore.set('robco_immersion', _prevImm);
+        } catch (err) {
+          assert(false, 'FATAL: P8 immersion-dial suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 18 — A1 Ambient Runtime (behavioral: state machine + observer
+        //    gating + LIVE dial enforcement) ────────────────────────────────────
+        // Drives window.AmbientRuntime directly (initAmbientRuntime is NOT called
+        // here — no ui-core — so there is no heartbeat/listener interference and the
+        // machine is exercised deterministically via transition() + _beat()).
+        try {
+          section('Suite 18 — A1 Ambient Runtime (state machine + observer gating + live dial)');
+          const RT = window.AmbientRuntime;
+          const _prevTier18 = MetaStore.get('robco_immersion');
+          const _ls18 = localStorage.getItem('robco_v8'); // snapshot for the no-write boundary
+
+          // 1) API surface + starts OFF with the 7 canonical states.
+          assert(
+            RT &&
+              typeof RT.getState === 'function' &&
+              typeof RT.register === 'function' &&
+              typeof RT.transition === 'function' &&
+              typeof RT.shutdown === 'function' &&
+              RT.getState() === 'OFF' &&
+              Array.isArray(RT.STATES) &&
+              RT.STATES.length === 7,
+            'API surface present; getState() starts OFF; 7 canonical states'
+          );
+
+          // 2) transition() walks OFF→COLD_BOOT→READY→ACTIVE, is idempotent, rejects illegal edges.
+          const okBoot = RT.transition('COLD_BOOT') && RT.getState() === 'COLD_BOOT';
+          const okReady = RT.transition('READY') && RT.getState() === 'READY';
+          const okActive = RT.transition('ACTIVE') && RT.getState() === 'ACTIVE';
+          const idempotent = RT.transition('ACTIVE') === false; // to === from → no-op
+          const illegal = RT.transition('COLD_BOOT') === false && RT.getState() === 'ACTIVE';
+          assert(
+            okBoot && okReady && okActive && idempotent && illegal,
+            'transition() walks OFF→COLD_BOOT→READY→ACTIVE, is idempotent (to===from), and rejects an illegal edge (ACTIVE→COLD_BOOT)'
+          );
+
+          // 3) an observer ticks only while the runtime is in one of its declared states.
+          window.setImmersionTier('full');
+          RT.noteActivity(); // keep ACTIVE (reset idle)
+          let tickA = 0;
+          const unregA = RT.register({
+            id: 't-active',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickA++;
+            },
+          });
+          RT._beat();
+          const afterActive = tickA; // 1 — in ACTIVE
+          RT.transition('IDLE'); // ACTIVE→IDLE
+          RT._beat();
+          const afterIdle = tickA; // still 1 — not in IDLE
+          unregA();
+          assert(
+            afterActive === 1 && afterIdle === 1,
+            'an observer ticks only while the runtime is in one of its declared states (ACTIVE tick counts; IDLE beat does not)'
+          );
+
+          // 4) LIVE dial gate: at Minimal only minimal-tier observers tick; raising to Full
+          //    lets a balanced-tier observer tick on the very next beat (re-evaluated live).
+          RT.transition('ACTIVE'); // IDLE→ACTIVE
+          RT.noteActivity();
+          let tickMin = 0,
+            tickBal = 0;
+          const unregMin = RT.register({
+            id: 'd-min',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickMin++;
+            },
+          });
+          const unregBal = RT.register({
+            id: 'd-bal',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'balanced',
+            onTick: () => {
+              tickBal++;
+            },
+          });
+          window.setImmersionTier('minimal');
+          RT._beat();
+          const minRow = [tickMin, tickBal]; // [1, 0]
+          window.setImmersionTier('full');
+          RT._beat();
+          const fullRow = [tickMin, tickBal]; // [2, 1]
+          unregMin();
+          unregBal();
+          assert(
+            eq(minRow, [1, 0]) && eq(fullRow, [2, 1]),
+            'dial gate enforced LIVE: at Minimal only the minimal-tier observer ticks; raising to Full lets the balanced-tier observer tick next beat'
+          );
+
+          // 5) onEnter(to)/onExit(from) fire when crossing into/out of an observer's state set.
+          let entered = null,
+            exited = null;
+          const unregE = RT.register({
+            id: 'e-test',
+            states: ['STANDBY'],
+            tier: 'minimal',
+            onEnter: to => {
+              entered = to;
+            },
+            onExit: from => {
+              exited = from;
+            },
+          });
+          RT.transition('STANDBY'); // ACTIVE→STANDBY — enters the set → onEnter
+          const enteredOk = entered === 'STANDBY';
+          RT.transition('ACTIVE'); // STANDBY→ACTIVE — leaves the set → onExit
+          const exitedOk = exited === 'STANDBY';
+          unregE();
+          assert(
+            enteredOk && exitedOk,
+            "onEnter(to)/onExit(from) fire when the runtime crosses into and out of an observer's state set"
+          );
+
+          // 6) unregister() removes an observer so it stops ticking.
+          let tickU = 0;
+          const unregU = RT.register({
+            id: 'u-test',
+            cadenceMs: 0,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickU++;
+            },
+          });
+          RT.noteActivity();
+          RT._beat();
+          const beforeUnreg = tickU; // 1
+          unregU();
+          RT._beat();
+          const afterUnreg = tickU; // still 1
+          assert(
+            beforeUnreg === 1 && afterUnreg === 1,
+            'unregister() removes an observer so it stops ticking'
+          );
+
+          // 8) A2 setInterval parity: a cadenceMs>0 observer does NOT fire on the first
+          //    beat after registration (seeded _lastTick), nor on the first beat right
+          //    after (re-)entering its state (cadence restarts on entry) — matching a
+          //    freshly (re)started setInterval, so the migrated timers keep exact timing.
+          RT.transition('ACTIVE');
+          RT.noteActivity();
+          let tickP = 0;
+          const unregP = RT.register({
+            id: 'parity',
+            cadenceMs: 999999,
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onTick: () => {
+              tickP++;
+            },
+          });
+          RT._beat(); // registered while ACTIVE, ~0ms elapsed → no tick (seeded)
+          const afterReg = tickP; // 0
+          RT.transition('STANDBY'); // leave the observer's state set
+          RT.transition('ACTIVE'); // re-enter → cadence clock reset to now
+          RT._beat(); // ~0ms since re-entry → no tick (reset-on-entry)
+          const afterReentry = tickP; // 0
+          unregP();
+          assert(
+            afterReg === 0 && afterReentry === 0,
+            'setInterval parity: a cadence>0 observer does not fire immediately after registration or after re-entering its state (seeded _lastTick + reset-on-entry)'
+          );
+
+          // 9) shutdown() → OFF, and the whole A1 run wrote NOTHING durable to the campaign
+          //    (robco_v8 unchanged across the suite) — the hard atmosphere/save boundary.
+          RT.transition('ACTIVE');
+          RT.shutdown(); // ACTIVE→SHUTDOWN→OFF
+          const shutdownOk = RT.getState() === 'OFF';
+          const noWrite = localStorage.getItem('robco_v8') === _ls18;
+          assert(
+            shutdownOk && noWrite,
+            'shutdown() drives the machine to OFF, and driving the entire runtime never wrote the campaign save (robco_v8 unchanged) — atmosphere/save boundary'
+          );
+
+          // 10) forceState() TEST-ONLY escape hatch bypasses the LEGAL adjacency map:
+          //     it reaches a state the validated transition() rejects as illegal,
+          //     still running the full onEnter/onExit machinery — while transition()
+          //     (no force) keeps rejecting that exact edge unchanged. Guards the
+          //     RobCo U.O.S. Test Console force-transition fix (all 7 state buttons
+          //     must be able to force ANY state, not just a legal neighbor).
+          let forceEntered = null,
+            forceExited = null;
+          const unregForce = RT.register({
+            id: 'force-test',
+            states: ['ACTIVE'],
+            tier: 'minimal',
+            onEnter: to => {
+              forceEntered = to;
+            },
+            onExit: from => {
+              forceExited = from;
+            },
+          });
+          const rejectedByValidated = RT.transition('ACTIVE') === false && RT.getState() === 'OFF'; // OFF→ACTIVE is illegal
+          const forcedOk = RT.forceState('ACTIVE') === true && RT.getState() === 'ACTIVE'; // force bypasses it, firing onEnter
+          const forcedExitOk = RT.forceState('STANDBY') === true && RT.getState() === 'STANDBY'; // force away, firing onExit
+          unregForce();
+          assert(
+            rejectedByValidated &&
+              forcedOk &&
+              forcedExitOk &&
+              forceEntered === 'ACTIVE' &&
+              forceExited === 'ACTIVE',
+            'forceState() bypasses the LEGAL adjacency map to reach a state transition() rejects as illegal (OFF→ACTIVE), still firing onEnter/onExit — while the validated transition() keeps rejecting that exact edge unchanged'
+          );
+
+          // Restore the dial to whatever it was before this suite (no side effects).
+          if (_prevTier18 === null || _prevTier18 === undefined)
+            MetaStore.remove('robco_immersion');
+          else MetaStore.set('robco_immersion', _prevTier18);
+        } catch (err) {
+          assert(false, 'FATAL: A1 Ambient Runtime suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Suite 19 — Developer Console (the canonical dev/debug console)
+        //    fail-safe + runtime introspection (behavioral, real browser) ──────
+        // This page never loads ui-core.js (no DOM to host it), so
+        // window._isStagingEnv is undefined here and #testConsoleMount /
+        // #testConsoleTemplate don't exist either — exactly the fail-safe
+        // "uncertain signal" case production also hits. initTestConsole() must
+        // still run cleanly with ZERO DOM or campaign side effects. The
+        // "staging shows / production hides" both-sides proof lives in the
+        // Node runners (extraction + eval of _devConsoleUnlocked(), mirroring
+        // the Suite 62.5 changelog-viewer technique) since it needs a mocked
+        // window._isStagingEnv this page's real environment doesn't have.
+        try {
+          section('Suite 19 — Developer Console fail-safe + runtime introspection');
+          const _ls19 = localStorage.getItem('robco_v8'); // snapshot for the no-write boundary
+
+          // 1) initTestConsole() is defined and callable with no environment signal.
+          assert(
+            typeof window.initTestConsole === 'function',
+            'window.initTestConsole is defined (js/test-console.js loaded)'
+          );
+
+          // 2) With no _isStagingEnv and no template/mount DOM present, calling it
+          //    never throws and mounts NOTHING — the fail-safe-to-hidden path.
+          let threw = null;
+          try {
+            window.initTestConsole();
+          } catch (err) {
+            threw = err;
+          }
+          assert(
+            threw === null && !document.getElementById('testConsolePanel'),
+            'initTestConsole() never throws and mounts no panel when the staging signal is absent (fail-safe to hidden)' +
+              (threw ? ' — ' + String(threw.message || threw) : '')
+          );
+
+          // 3) No durable campaign write occurred (robco_v8 unchanged).
+          assert(
+            localStorage.getItem('robco_v8') === _ls19,
+            'initTestConsole() wrote nothing to the campaign save (robco_v8 unchanged) — atmosphere/save boundary'
+          );
+
+          // 4) AmbientRuntime.listObservers() — real behavioral proof of the
+          //    read-only introspection API the console's observer read-out uses.
+          const RT19 = window.AmbientRuntime;
+          const before19 = RT19.listObservers().length;
+          const unreg19 = RT19.register({
+            id: 'suite19-probe',
+            cadenceMs: 1234,
+            states: ['ACTIVE'],
+            tier: 'balanced',
+            onTick: () => {},
+          });
+          const list19 = RT19.listObservers();
+          const found19 = list19.find(o => o.id === 'suite19-probe');
+          unreg19();
+          const after19 = RT19.listObservers().length;
+          assert(
+            list19.length === before19 + 1 &&
+              found19 &&
+              eq(found19.states, ['ACTIVE']) &&
+              found19.tier === 'balanced' &&
+              found19.cadenceMs === 1234 &&
+              typeof found19.onTick === 'undefined' &&
+              after19 === before19,
+            'listObservers() returns a plain-data snapshot (id/states/tier/cadenceMs, no onTick closure) that reflects register()/unregister() live'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: Developer Console suite threw', String((err && err.stack) || err));
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        //  Suite 20 — DO-K identity keystone (GAME_DEFS.identity + data-game)
+        // ══════════════════════════════════════════════════════════════
+        try {
+          section('Suite 20 — DO-K identity keystone (GAME_DEFS.identity + data-game)');
+
+          assert(
+            typeof window.getIdentity === 'function',
+            'getIdentity() is available (js/state.js)'
+          );
+
+          const FIELDS20 = [
+            'machine',
+            'material',
+            'structuralMode',
+            'theme',
+            'persona',
+            'ceremony',
+            'motionTexture',
+            'cursor',
+            'audio',
+            'voice',
+            'ambient',
+          ];
+          Object.values(GAME_DEFS).forEach(def => {
+            const id = def.identity;
+            const missing = FIELDS20.filter(f => id == null || id[f] == null);
+            assert(
+              id && missing.length === 0,
+              `${def.id}: GAME_DEFS.${def.id}.identity carries every contract field` +
+                (missing.length ? ' — MISSING: ' + missing.join(', ') : '')
+            );
+          });
+
+          // identity.theme aliases the SAME object as the game's existing theme facet
+          // (Protocol 22 — widened, never forked).
+          assert(
+            getIdentity('FNV').theme === GAME_DEFS.FNV.theme,
+            'FNV: identity.theme === the existing theme facet (same object, no fork)'
+          );
+          assert(
+            getIdentity('FO3').theme === GAME_DEFS.FO3.theme,
+            'FO3: identity.theme === the existing theme facet (same object, no fork)'
+          );
+
+          // FO4 is design-only and carries the skill-less (FO4-class) empty-array contract.
+          assert(
+            GAME_DEFS.FO4 && GAME_DEFS.FO4.designOnly === true,
+            'GAME_DEFS.FO4 exists and is flagged designOnly (unreachable this cycle)'
+          );
+
+          // data-game is a real, settable DOM attribute driven by getGameContext() — the exact
+          // assignment index.html's pre-paint script and _restoreOpticsPreference() perform.
+          // test.html doesn't load index.html/ui-core.js (so neither call site runs here), so
+          // this proves the DOM mechanic itself rather than re-deriving a value nothing wrote;
+          // both write sites are structurally guarded in the canonical runners (Suite 157).
+          document.documentElement.dataset.game = getGameContext();
+          assert(
+            document.documentElement.dataset.game === getGameContext(),
+            'document.documentElement.dataset.game round-trips the active game context'
+          );
+        } catch (err) {
+          assert(false, 'FATAL: DO-K identity suite threw', String((err && err.stack) || err));
+        }
+
+        // ── Summary ──────────────────────────────────────────────────────────
+        const summary = document.getElementById('summary');
+        if (failed === 0) {
+          summary.className = 'all-pass';
+          summary.textContent = `ALL ${passed} TESTS PASSED across ${suiteCount} suites — persistence contract verified.`;
+        } else {
+          summary.className = 'has-fail';
+          summary.textContent = `${failed} TEST(S) FAILED (${passed} passed, ${suiteCount} suites) — import contract drift detected.`;
+        }
+        // Machine-readable markers for the headless gate runner (test-html-check.mjs).
+        summary.setAttribute('data-passed', String(passed));
+        summary.setAttribute('data-failed', String(failed));
+        summary.setAttribute('data-suites', String(suiteCount));
+      })();
     </script>
   </body>
 </html>

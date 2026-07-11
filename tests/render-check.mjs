@@ -14,7 +14,7 @@
  *           npx playwright install chromium
  */
 
-import { chromium } from 'playwright';
+import { acquireBrowser } from './browser-shared.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -41,7 +41,7 @@ function fail(msg) {
   failed++;
 }
 
-const browser = await chromium.launch();
+const browser = await acquireBrowser();
 
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({ viewport: vp });
@@ -370,6 +370,39 @@ for (const vp of VIEWPORTS) {
           if (el.tagName === 'SUMMARY') return false;
           const cls = (el.className || '').toString();
           if (cls.includes('faction-card-name') || cls.includes('phosphor-ghost')) return false;
+          // OPERATOR reskin (Design Overhaul Phase-3): the BUS-01 CRT trace glow-dot
+          // (::after on .hp-bar-fill / #opRadLine, positioned via a negative offset so
+          // it visually bleeds past the trace's own tip) and the BUS-02 fader cap
+          // (intentionally wider than its .fd-ladder track) are the same harmless
+          // decorative-overflow category as .phosphor-ghost above — clipped visually
+          // by their .crt-mon/.fd-ladder ancestor, no page-level overflow.
+          if (el.closest && (el.closest('.crt-mon') || cls.includes('fd-ladder'))) return false;
+          // Phase 3 OPERATOR batch 2 (BUS-05/08 ground-up reskin): .vu-label
+          // (the skill-channel name) and .facon-strip-name (the reputation
+          // console's per-faction mini-strip label) are the same
+          // nowrap+overflow:hidden+text-overflow:ellipsis truncation pattern
+          // as the retired .faction-card-name — a long name (e.g. "Energy
+          // Weapons", "Followers of the Apocalypse") intentionally clips
+          // inside its own fixed-width label, never causing page overflow.
+          if (cls.includes('vu-label') || cls.includes('facon-strip-name')) return false;
+          // The BUS-08 reputation console's pin markers (.facon-pin in the
+          // wide meter, .facon-mini i in the all-faction strip) are
+          // position:absolute + translateX(-50%) at a 0%/100% extreme (e.g.
+          // a faction at pure fame or pure infamy) — a couple px of
+          // decorative bleed past their own track, same harmless, visually-
+          // contained category as the BUS-02 fader cap above. No page-level
+          // overflow (the SAVE_VIEWPORTS page-overflow check already covers
+          // that separately).
+          if (cls.includes('facon-scale') || cls.includes('facon-mini')) return false;
+          // CHASSIS LIVING CORE (Protocol UI-10): the ring/heart children are
+          // positioned via percentage inset + a border, and at the mini
+          // core's compact size that combination can round to a couple of
+          // stray px past the shape's own box — the same harmless,
+          // visually-contained decorative-bleed category as the entries
+          // above (the shape already clips its own rendering via
+          // overflow:hidden; this is purely a scrollWidth measurement
+          // artifact, never a page-level overflow).
+          if (cls.includes('chassis-core-shape')) return false;
           return true;
         })
         .map(
@@ -398,6 +431,299 @@ for (const vp of VIEWPORTS) {
 
     await ctx.close();
   }
+}
+
+// ── DATABANK CARTOGRAPHY TABLE — legend z-order + node-back scroll (owner
+// re-fix, Protocol 27 root-cause). The existing Suite 196.30 static test only
+// regexes the CSS text for position:relative+z-index:10000 — it can't catch a
+// real paint-order regression (e.g. a future overlapping element). These are
+// genuine behavioral proofs: elementFromPoint hit-testing for z-order, and a
+// real tap-a-node-then-back flow for the scroll-preserve fix.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  await page.evaluate(() => {
+    if (typeof switchTab === 'function') switchTab('data');
+    const panel = document.getElementById('worldMapPanel');
+    if (panel) panel.open = true;
+  });
+  await page.waitForTimeout(200);
+
+  // z-order: the legend/hint text must paint ABOVE the app-wide CRT overlay,
+  // at both a moderate and a deep scroll position (the overlay spans the
+  // full scrollable glass-frame height, not just one screen).
+  for (const scrollY of [0, 900, 3000]) {
+    const hit = await page.evaluate(sy => {
+      window.scrollTo(0, sy);
+      const overlay = document.querySelector('.crt-overlay');
+      const legend = document.querySelector('.survey-legend');
+      const kbd = document.querySelector('.kbd-hint');
+      if (!overlay || !legend || !kbd) return null;
+      const wasPE = overlay.style.pointerEvents;
+      overlay.style.pointerEvents = 'auto'; // probe only — CSS default is none
+      const probe = el => {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return 'not-visible';
+        const cx = r.left + r.width / 2,
+          cy = r.top + r.height / 2;
+        if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)
+          return 'off-screen';
+        const el2 = document.elementFromPoint(cx, cy);
+        return el2 === overlay ? 'COVERED-BY-OVERLAY' : 'ok';
+      };
+      const result = { legend: probe(legend), kbd: probe(kbd) };
+      overlay.style.pointerEvents = wasPE;
+      return result;
+    }, scrollY);
+    if (!hit) {
+      pass(
+        `map legend z-order @scrollY=${scrollY} — elements not present (game may lack a map), skipped`
+      );
+    } else if (hit.legend !== 'COVERED-BY-OVERLAY' && hit.kbd !== 'COVERED-BY-OVERLAY') {
+      pass(
+        `map legend z-order @scrollY=${scrollY} — legend/kbd-hint paint above .crt-overlay (${JSON.stringify(hit)})`
+      );
+    } else {
+      fail(
+        `map legend z-order @scrollY=${scrollY} — the CRT overlay covers the legend! (${JSON.stringify(hit)})`
+      );
+    }
+  }
+
+  // Owner re-fix (moving cyan line, confirmed on real mobile hardware — never
+  // reproduced in headless desktop testing, but the mechanism was confirmed
+  // live): .sweep-radar rotates via `transform` with no clipping ancestor, so
+  // its rotated bounding box measurably grows past .table-frame's own edges
+  // for most of its 8s rotation (a rotated square's bbox grows up to sqrt(2)x)
+  // — geometrically reaching .survey-legend's own bounding box. Desktop-engine
+  // z-index/DOM-order happened to still protect the text in every test run,
+  // but mix-blend-mode:screen with no isolation:isolate boundary is a
+  // documented class of cross-device/GPU compositing inconsistency this
+  // couldn't rule out. Fixed defensively: .table-frame now clips
+  // (overflow:hidden) so the sweep can never visually escape its own board
+  // regardless of engine, and isolation:isolate gives the blend mode an
+  // unambiguous compositing boundary. This proof forces the sweep to its
+  // worst-case 45° bleed angle and asserts nothing paints outside the board.
+  {
+    const clipCheck = await page.evaluate(() => {
+      const tf = document.querySelector('.table-frame');
+      const sweep = document.querySelector('.sweep-radar');
+      const legend = document.querySelector('.survey-legend');
+      const kbd = document.querySelector('.kbd-hint');
+      if (!tf || !sweep || !legend || !kbd) return null;
+      const cs = getComputedStyle(tf);
+      // legend/kbd must sit OUTSIDE the clipped container (later DOM siblings,
+      // never descendants) — the clip alone is what keeps the sweep off them.
+      const legendIsDescendant = tf.contains(legend);
+      const kbdIsDescendant = tf.contains(kbd);
+
+      sweep.style.animation = 'none';
+      sweep.style.transform = 'rotate(45deg)'; // the measured worst-case bleed angle
+      const wasPE = sweep.style.pointerEvents;
+      sweep.style.pointerEvents = 'auto'; // probe only — CSS default is none
+      const probe = el => {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2,
+          cy = r.top + r.height / 2;
+        const el2 = document.elementFromPoint(cx, cy);
+        return el2 === sweep ? 'COVERED-BY-SWEEP' : 'ok';
+      };
+      const result = { legend: probe(legend), kbd: probe(kbd) };
+      sweep.style.pointerEvents = wasPE;
+      sweep.style.animation = '';
+      sweep.style.transform = '';
+      return {
+        overflow: cs.overflow,
+        isolation: cs.isolation,
+        legendIsDescendant,
+        kbdIsDescendant,
+        ...result,
+      };
+    });
+    if (!clipCheck) {
+      pass('map sweep-radar containment — elements not present (game may lack a map), skipped');
+    } else {
+      if (clipCheck.overflow === 'hidden') {
+        pass('map sweep-radar containment — .table-frame clips (overflow:hidden)');
+      } else {
+        fail(
+          `map sweep-radar containment — .table-frame overflow is "${clipCheck.overflow}", expected "hidden"`
+        );
+      }
+      if (clipCheck.isolation === 'isolate') {
+        pass(
+          'map sweep-radar containment — .table-frame isolates blend-mode compositing (isolation:isolate)'
+        );
+      } else {
+        fail(
+          `map sweep-radar containment — .table-frame isolation is "${clipCheck.isolation}", expected "isolate"`
+        );
+      }
+      if (!clipCheck.legendIsDescendant && !clipCheck.kbdIsDescendant) {
+        pass(
+          'map sweep-radar containment — .survey-legend/.kbd-hint sit outside the clipped .table-frame'
+        );
+      } else {
+        fail(
+          'map sweep-radar containment — .survey-legend/.kbd-hint are descendants of the clipped .table-frame (should be later siblings)'
+        );
+      }
+      if (clipCheck.legend !== 'COVERED-BY-SWEEP' && clipCheck.kbd !== 'COVERED-BY-SWEEP') {
+        pass(
+          `map sweep-radar containment — at the worst-case 45° bleed angle, nothing paints over legend/kbd-hint (${JSON.stringify(clipCheck)})`
+        );
+      } else {
+        fail(
+          `map sweep-radar containment — the sweep covers the legend/kbd-hint at 45°! ${JSON.stringify(clipCheck)}`
+        );
+      }
+    }
+  }
+
+  // node-back scroll preservation: tap a node deep in a long scroll, back out,
+  // and assert the panel's own viewport position is unchanged (Protocol 27 —
+  // a raw scrollTop restore breaks because the full-grid vs sector-sheet
+  // views are very different heights).
+  const scrollResult = await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    const panel = document.getElementById('worldMapPanel');
+    panel.scrollIntoView({ block: 'center' });
+    const before = panel.getBoundingClientRect().top;
+    const zone =
+      typeof FALLOUT_REGISTRY !== 'undefined' && FALLOUT_REGISTRY.zones && FALLOUT_REGISTRY.zones[0]
+        ? FALLOUT_REGISTRY.zones[0].name
+        : null;
+    if (!zone || typeof zoomMapToZone !== 'function') return null;
+    zoomMapToZone(zone);
+    resetMapZoom();
+    const after = panel.getBoundingClientRect().top;
+    return { before, after, delta: after - before };
+  });
+  if (!scrollResult) {
+    pass('map node-back scroll preservation — zones/functions not present, skipped');
+  } else if (Math.abs(scrollResult.delta) <= 2) {
+    pass(
+      `map node-back scroll preservation — panel stays at the same viewport position (delta ${scrollResult.delta}px)`
+    );
+  } else {
+    fail(
+      `map node-back scroll preservation — panel jumped ${scrollResult.delta}px after tapping a node then backing out! ${JSON.stringify(scrollResult)}`
+    );
+  }
+
+  await ctx.close();
+}
+
+// ── PATCH NOTES auto-open gate (owner report investigation — Protocol 42:
+// verified harness-only, not a bug, locking the invariant with a permanent
+// regression guard). _runBootSequenceAndBriefing() (ui-core.js) shows the
+// changelog modal automatically after boot ONLY when
+// MetaStore.get('robco_version') !== APP_VERSION, then immediately persists
+// APP_VERSION via MetaStore.set() — an intentional, once-per-version "what's
+// new" feature (WU-C11/Suite 62), not a per-boot popup. Confirmed live: with
+// robco_version pre-seeded to the CURRENT APP_VERSION (simulating a device
+// that has already seen this version's patch notes), the modal correctly
+// stays closed through boot. This proof locks that gate so a future
+// regression (e.g. the version stamp landing after the read, or a duplicate
+// call site) can't silently turn this into an every-reload popup.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  const appVersion = await page.evaluate(() =>
+    typeof APP_VERSION !== 'undefined' ? APP_VERSION : null
+  );
+  if (!appVersion) {
+    pass('PATCH NOTES auto-open gate — APP_VERSION not present, skipped');
+  } else {
+    await page.evaluate(v => localStorage.setItem('robco_version', v), appVersion);
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(4500); // past the ~3.9s post-boot changelog-fetch window
+    const modalDisplay = await page.evaluate(() => {
+      const m = document.getElementById('sysModal');
+      return m ? getComputedStyle(m).display : 'no-element';
+    });
+    if (modalDisplay === 'none') {
+      pass(
+        `PATCH NOTES auto-open gate — with robco_version already matching APP_VERSION (${appVersion}), the modal stays closed through boot`
+      );
+    } else {
+      fail(
+        `PATCH NOTES auto-open gate — the changelog modal opened even though robco_version already matched APP_VERSION (${appVersion})! This would make it a per-reload popup instead of a once-per-version one.`
+      );
+    }
+  }
+  await ctx.close();
+}
+
+// ── OPERATOR TRAITS (FNV) — uniform chip size + full-row clickability
+// (owner report). Every trait chip must render at the SAME width and the
+// whole chip (not just its inner toggle glyph) must be clickable.
+{
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+  await page.waitForTimeout(1000);
+  const traitInfo = await page.evaluate(() => {
+    if (typeof switchTab === 'function') switchTab('stat');
+    document.querySelectorAll('details').forEach(d => (d.open = true));
+    if (typeof renderTraits === 'function') renderTraits();
+    const rows = Array.from(document.querySelectorAll('#traitsDisplay .tracker-row'));
+    if (rows.length === 0) return null;
+    const widths = rows.map(r => Math.round(r.getBoundingClientRect().width));
+    // Click the far-right edge of an unselected row (away from the toggle
+    // glyph) and confirm the trait toggles — proves whole-row clickability.
+    const target = rows.find(r => !r.classList.contains('tracker-toggle--active'));
+    let toggled = false;
+    if (target) {
+      const name = target.dataset.name;
+      const before = Array.isArray(state.traits) ? state.traits.slice() : [];
+      const rect = target.getBoundingClientRect();
+      target.dispatchEvent(
+        new MouseEvent('click', {
+          bubbles: true,
+          clientX: rect.right - 4,
+          clientY: rect.top + rect.height / 2,
+        })
+      );
+      const after = Array.isArray(state.traits) ? state.traits.slice() : [];
+      toggled = !before.includes(name) && after.includes(name);
+      if (toggled) toggleTrait(name); // revert
+    }
+    return {
+      widths,
+      uniform: new Set(widths).size === 1,
+      toggled,
+      allButtons: rows.every(r => r.tagName === 'BUTTON'),
+    };
+  });
+  if (!traitInfo) {
+    pass('OPERATOR traits chip uniformity — no traits registry for this game, skipped');
+  } else {
+    if (traitInfo.uniform) {
+      pass(
+        `OPERATOR traits — every chip renders at the same width (${traitInfo.widths[0]}px, n=${traitInfo.widths.length})`
+      );
+    } else {
+      fail(`OPERATOR traits — chip widths are NOT uniform: ${JSON.stringify(traitInfo.widths)}`);
+    }
+    if (traitInfo.allButtons) {
+      pass('OPERATOR traits — every chip is a real <button> (Protocol UI-5)');
+    } else {
+      fail('OPERATOR traits — a chip is not a <button> element');
+    }
+    if (traitInfo.toggled) {
+      pass('OPERATOR traits — clicking the far edge of a chip (not the toggle glyph) toggles it');
+    } else {
+      fail(
+        'OPERATOR traits — clicking the far edge of a chip did NOT toggle it (not fully clickable)'
+      );
+    }
+  }
+  await ctx.close();
 }
 
 await browser.close();

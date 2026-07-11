@@ -11,13 +11,13 @@
   "categories": ["games", "utilities"],
   "icons": [
     {
-      "src": "icon.png",
+      "src": "assets/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon.png",
+      "src": "assets/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -31,7 +31,7 @@
       "url": "./#go=comm",
       "icons": [
         {
-          "src": "comm-link-icon.png",
+          "src": "assets/comm-link-icon.png",
           "sizes": "192x192",
           "type": "image/png",
           "purpose": "any maskable"
@@ -45,7 +45,7 @@
       "url": "./#go=inv",
       "icons": [
         {
-          "src": "inventory-icon.png",
+          "src": "assets/inventory-icon.png",
           "sizes": "192x192",
           "type": "image/png",
           "purpose": "any maskable"
@@ -59,7 +59,7 @@
       "url": "./#go=stat",
       "icons": [
         {
-          "src": "stats-icon.png",
+          "src": "assets/stats-icon.png",
           "sizes": "192x192",
           "type": "image/png",
           "purpose": "any maskable"
@@ -73,7 +73,7 @@
       "url": "./#go=new",
       "icons": [
         {
-          "src": "new-campaign-icon.png",
+          "src": "assets/new-campaign-icon.png",
           "sizes": "192x192",
           "type": "image/png",
           "purpose": "any maskable"

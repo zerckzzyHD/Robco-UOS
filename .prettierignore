@@ -5,3 +5,14 @@ package-lock.json
 *.min.css
 scripts/rollback.sh
 scripts/pre-commit
+
+# Vendored third-party dependency (Visual Upload OCR, Unit 1) — pinned, minified/generated
+# files committed byte-for-byte as downloaded. Never reformatted (Prettier reflowing the
+# emscripten-generated wasm glue bloats it and risks corrupting the pinned build).
+js/vendor/
+
+# Private AI-agent guides — tracked (the test gate reads them) but hand-authored,
+# not Prettier-managed. They were formerly skipped via .gitignore; keep them skipped
+# here now that they are un-ignored so Prettier does not churn their tables.
+CLAUDE.md
+RULES.md

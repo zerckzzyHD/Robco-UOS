@@ -1,6 +1,33 @@
 // Localized Database String — Fallout: New Vegas canonical data (fallout.wiki, CC-BY-SA 4.0)
 // v1.6.7: Expanded to ~170 weapons, ~70 armors, ~45 chems.
 // databaseCSVs is injected via systemInstruction in api.js for guaranteed model attention.
+//
+// ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
+// Columns below are authored (fallout.wiki-sourced) but have no current code
+// consumer — never read by any lookup*()/get*() accessor, or parsed but never
+// rendered downstream. Each is tagged with its intended future consumer, or
+// PARKED if none is scoped yet. Full evidence in ARCHITECTURE.md → "Per-Game
+// Data Parity & Reserved-Column Ledger". These are reserved, not dead — do
+// not delete as "unused" unless marked PARKED-FOR-REMOVAL.
+//   WEAPONS.CSV      Crit_Damage/Crit_Multiplier      → PARKED (no crit calculator built)
+//                     Req_Unarmed/Req_STR/Reach        → PARKED (VATS v2 melee/STR gating)
+//                     Special_Attack_AP/Special_Rules  → PARKED (per-weapon VATS AP variance;
+//                       same unsourceable-precision gap as WU-D4a-RANGED-GAP, Suite 104)
+//   AMMO.CSV          DMG_Multiplier/DT_Modifier       → PARKED (per-subtype ammo effects)
+//                     Condition_Degradation             → PARKED (weapon-condition system)
+//   ARMOR.CSV         Type/DT/Effects/Min_CND_Threshold → PARKED — no lookupArmorStats()
+//                       sibling to lookupWeaponStats()/lookupBestiaryEntry() exists; DT is
+//                       the highest-priority target (armor DT is looked up nowhere today)
+//   CHEMS.CSV         Duration                          → PARKED (BIO-SCAN expiry countdown)
+//   RECIPES.CSV       ALL COLUMNS                        → PARKED-FOR-REMOVAL — doCraft/doScrap
+//                       read reg_nv.js recipes[]/breakdowns[] instead; this table has zero
+//                       consumers (not merely reserved — Protocol 22 duplicate-source flag)
+//   QUEST_ITEMS.CSV   Tradeable                          → PARKED (TRADE v2 quest-item filter)
+//   VENDORS.CSV       Repair_Skill                        → PARKED (vendor repair action)
+//                     Restock_Days/Accepted_Currencies    → target: TRADE v2 (FP-DATA-8)
+//   WEAPON_MODS.CSV   Effect                              → PARKED (mod effect readout)
+//   BESTIARY.CSV      Perception/Speed_Factor              → target: v2.9.0 ENCOUNTER +
+//                       BESTIARY BROWSER (FP-GP-4)
 const databaseCSVs = `
 [WEAPONS.CSV]
 Weapon_Name,Base_Damage,Crit_Damage,Crit_Multiplier,Attacks_Per_Second,Weight,Value,Req_Unarmed,Req_STR,Reach,Special_Attack_AP,Special_Rules,Ammo_Type
@@ -805,6 +832,42 @@ function lookupItemInDb(name) {
   return best;
 }
 
+// ── U9-4: QUEST ITEM DETAIL (CONSULT reserved-column surfacing) ───────────
+// Returns the QUEST_ITEMS.CSV columns that lookupItemInDb() does not expose
+// (Associated_Quest / Special_Property) — authored data that previously had
+// no consumer. Read-only, parsed once and cached. Game-agnostic: reads
+// whatever databaseCSVs the active game loaded (Protocol 38); the same parse
+// exists in db_fo3.js.
+let _questItemCache = null;
+function getQuestItemDetail(name) {
+  if (!name) return null;
+  if (!_questItemCache) {
+    _questItemCache = new Map();
+    const start = databaseCSVs.indexOf('[QUEST_ITEMS.CSV]');
+    if (start !== -1) {
+      const nextSection = databaseCSVs.indexOf('\n[', start + 18);
+      const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+      const h = (lines[0] || '').split(',');
+      const ix = n => h.indexOf(n);
+      const iName = ix('Name');
+      const iQuest = ix('Associated_Quest');
+      const iProp = ix('Special_Property');
+      for (let i = 1; i < lines.length; i++) {
+        const c = lines[i].split(',');
+        const nm = (c[iName] || '').trim();
+        if (!nm) continue;
+        _questItemCache.set(nm.toLowerCase(), {
+          name: nm,
+          associatedQuest: iQuest >= 0 ? (c[iQuest] || '').trim() : '',
+          specialProperty: iProp >= 0 ? (c[iProp] || '').trim() : '',
+        });
+      }
+    }
+  }
+  return _questItemCache.get(name.toLowerCase().trim()) || null;
+}
+
 // ── WU-N5: CHEMS TABLE (BIO-SCAN advisory) ────────────────────────────────
 // Returns the active game's CHEMS.CSV rows with the addiction columns that
 // lookupItemInDb() does not expose (Addiction_Risk / Addiction_Debuff / Effect /
@@ -824,6 +887,7 @@ function getChemsTable() {
   const headers = lines[0].split(',').map(h => h.trim());
   const ni = headers.indexOf('Name');
   const ei = headers.indexOf('Effect');
+  const di = headers.indexOf('Duration');
   const ari = headers.indexOf('Addiction_Risk');
   const adi = headers.indexOf('Addiction_Debuff');
   const fi = headers.indexOf('Chem_Family');
@@ -835,6 +899,11 @@ function getChemsTable() {
     _chemsTableCache.push({
       name,
       effect: ei >= 0 ? (cols[ei] || '').trim() : '',
+      // Native USE (Part A): the raw Duration column ("4m"/"1h"/"30s"/"0"), needed to
+      // decide whether a leftover modifier clause becomes a timed BUFF status effect
+      // (see _durationToTicks() in ui-render.js). Previously unexposed — BIO-SCAN never
+      // needed it, but the deterministic USE parser does (Protocol 3 — data authority).
+      duration: di >= 0 ? (cols[di] || '').trim() : '',
       addictionRisk: ari >= 0 ? (cols[ari] || '').trim() : '',
       addictionDebuff: adi >= 0 ? (cols[adi] || '').trim() : '',
       family: fi >= 0 ? (cols[fi] || '').trim() : '',
@@ -908,42 +977,48 @@ function lookupWeaponStats(name) {
 // / lookupWeaponStats). Returns null if the name isn't a known foe (Protocol 3:
 // the caller shows NO ENTRY IN BESTIARY rather than inventing stats).
 let _bestiaryCache = null;
-function lookupBestiaryEntry(name) {
-  if (!name) return null;
-  if (!_bestiaryCache) {
-    _bestiaryCache = new Map();
-    const start = databaseCSVs.indexOf('[BESTIARY.CSV]');
-    if (start !== -1) {
-      const nextSection = databaseCSVs.indexOf('\n[', start + 14);
-      const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
-      const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
-      const h = (lines[0] || '').split(',');
-      const ix = n => h.indexOf(n);
-      const iName = ix('Name');
-      const numCols = {
-        dt: ix('DT'),
-        hp: ix('HP'),
-        baseDamage: ix('Base_Damage'),
-        attackRate: ix('Attack_Rate'),
-        xpYield: ix('XP_Yield'),
-      };
-      const iWeak = ix('Weakness_Weapon');
-      const iResist = ix('Resistances');
-      const iAttackType = ix('Attack_Type');
-      for (let i = 1; i < lines.length; i++) {
-        const c = lines[i].split(',');
-        const nm = (c[iName] || '').trim();
-        if (!nm) continue;
-        const entry = { name: nm };
-        for (const [k, idx] of Object.entries(numCols))
-          entry[k] = idx >= 0 ? parseFloat(c[idx]) || 0 : 0;
-        entry.weakness = iWeak >= 0 ? (c[iWeak] || '').trim() : '';
-        entry.resistances = iResist >= 0 ? (c[iResist] || '').trim() : '';
-        entry.attackType = iAttackType >= 0 ? (c[iAttackType] || '').trim() : '';
-        _bestiaryCache.set(nm.toLowerCase(), entry);
-      }
+// Lazily builds _bestiaryCache from BESTIARY.CSV. Extracted from
+// lookupBestiaryEntry() (behavior-preserving) so getBestiaryNames() — the
+// content-aware quick-log autocomplete source, Step 2 Phase 2 B1 upgrade —
+// can warm the same cache without a second CSV parse (Protocol 22).
+function _ensureBestiaryCache() {
+  if (_bestiaryCache) return;
+  _bestiaryCache = new Map();
+  const start = databaseCSVs.indexOf('[BESTIARY.CSV]');
+  if (start !== -1) {
+    const nextSection = databaseCSVs.indexOf('\n[', start + 14);
+    const block = databaseCSVs.substring(start, nextSection === -1 ? undefined : nextSection);
+    const lines = block.split('\n').filter(l => l.trim() && !l.startsWith('['));
+    const h = (lines[0] || '').split(',');
+    const ix = n => h.indexOf(n);
+    const iName = ix('Name');
+    const numCols = {
+      dt: ix('DT'),
+      hp: ix('HP'),
+      baseDamage: ix('Base_Damage'),
+      attackRate: ix('Attack_Rate'),
+      xpYield: ix('XP_Yield'),
+    };
+    const iWeak = ix('Weakness_Weapon');
+    const iResist = ix('Resistances');
+    const iAttackType = ix('Attack_Type');
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      const nm = (c[iName] || '').trim();
+      if (!nm) continue;
+      const entry = { name: nm };
+      for (const [k, idx] of Object.entries(numCols))
+        entry[k] = idx >= 0 ? parseFloat(c[idx]) || 0 : 0;
+      entry.weakness = iWeak >= 0 ? (c[iWeak] || '').trim() : '';
+      entry.resistances = iResist >= 0 ? (c[iResist] || '').trim() : '';
+      entry.attackType = iAttackType >= 0 ? (c[iAttackType] || '').trim() : '';
+      _bestiaryCache.set(nm.toLowerCase(), entry);
     }
   }
+}
+function lookupBestiaryEntry(name) {
+  if (!name) return null;
+  _ensureBestiaryCache();
   const key = name.toLowerCase().trim();
   const exact = _bestiaryCache.get(key);
   if (exact) return exact;
@@ -957,6 +1032,14 @@ function lookupBestiaryEntry(name) {
     }
   }
   return best;
+}
+
+// Enumerate every known bestiary name (content-aware quick-log autocomplete
+// source — Step 2 Phase 2 B1 upgrade, api.js's _commandSuggestions()). Reuses
+// the same lazy cache lookupBestiaryEntry() builds; never re-parses the CSV.
+function getBestiaryNames() {
+  _ensureBestiaryCache();
+  return Array.from(_bestiaryCache.values()).map(e => e.name);
 }
 
 // ── WU-N2: VENDOR + TRADE-CATALOG LOOKUPS ─────────────────────────────────

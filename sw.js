@@ -1,24 +1,25 @@
 // ⚠ PROTOCOL: Bump CACHE_NAME on commits that touch a served/precached file:
-// index.html, sw.js, manifest.json, icon*.png, css/, or js/.
+// index.html, sw.js, manifest.json, assets/icon*.png, css/, or js/.
 // Format: 'robco-terminal-v{APP_VERSION}-r{N}'  (N starts at 1, increments each served-file change)
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.7.0-r6';
+const CACHE_NAME = 'robco-terminal-v2.8.0-r1';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.png',
-  './comm-link-icon.png',
-  './inventory-icon.png',
-  './stats-icon.png',
-  './new-campaign-icon.png',
+  './assets/icon.png',
+  './assets/comm-link-icon.png',
+  './assets/inventory-icon.png',
+  './assets/stats-icon.png',
+  './assets/new-campaign-icon.png',
   './css/terminal.css',
   './js/api.js',
   './js/cloud.js',
   './js/db_nv.js',
   './js/db_fo3.js',
+  './js/idb.js',
   './js/state.js',
   './js/ui-audio.js',
   './js/ui-render.js',
@@ -28,6 +29,17 @@ const ASSETS = [
   './js/reg_nv.js',
   './js/reg_fo3.js',
   './js/registry-core.js',
+  './js/runtime.js',
+  './js/test-console.js',
+  // Visual Upload OCR Unit 1 (planning/VISUAL_UPLOAD_OCR_PLAN.md) — small, safe shims only.
+  // The heavy Tesseract core+lang (~9.5MB: js/vendor/tesseract-core-lstm.wasm(.js) +
+  // assets/ocr/eng.traineddata.gz) are DELIBERATELY excluded here: cache.addAll below is
+  // all-or-nothing, so putting multi-MB files in the install-time precache would bloat
+  // and risk install failure. They are cached at runtime, best-effort, on first OCR use
+  // (js/ocr.js _cacheOcrAssetsBestEffort) instead — offline works only AFTER first use.
+  './js/ocr.js',
+  './js/vendor/tesseract.min.js',
+  './js/vendor/worker.min.js',
 ];
 
 self.addEventListener('install', event => {
