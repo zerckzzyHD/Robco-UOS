@@ -4,7 +4,7 @@
 // Changing this string is the ONLY thing that triggers the "REBOOT TERMINAL" update
 // prompt for users who already have the site cached. Forgetting to bump means cached
 // users silently run the old UI until they manually clear their browser cache.
-const CACHE_NAME = 'robco-terminal-v2.8.0-r6';
+const CACHE_NAME = 'robco-terminal-v2.8.0-r7';
 const ASSETS = [
   './',
   './index.html',
@@ -14,18 +14,18 @@ const ASSETS = [
   './assets/inventory-icon.png',
   './assets/stats-icon.png',
   './assets/new-campaign-icon.png',
-  './css/terminal-01-base.css',
-  './css/terminal-02-chrome.css',
-  './css/terminal-03-overseer.css',
-  './css/terminal-04-diagnostic-shell.css',
-  './css/terminal-05-toolbar.css',
-  './css/terminal-06-modulebay.css',
-  './css/terminal-07-operator-boards.css',
-  './css/terminal-08-curio-operations.css',
-  './css/terminal-09-databank.css',
-  './css/terminal-10-chassis.css',
-  './css/terminal-11-feedback-animations.css',
-  './css/terminal-12-mobile.css',
+  './css/05-base.css',
+  './css/10-chrome.css',
+  './css/15-overseer.css',
+  './css/20-diagnostic-shell.css',
+  './css/25-toolbar.css',
+  './css/30-modulebay.css',
+  './css/35-operator-boards.css',
+  './css/40-curio-operations.css',
+  './css/45-databank.css',
+  './css/50-chassis.css',
+  './css/55-feedback-animations.css',
+  './css/99-mobile.css',
   './js/services/api.js',
   './js/services/cloud.js',
   './js/data/db_nv.js',

@@ -270,22 +270,22 @@ for (const doc of ['CLAUDE.md', 'ARCHITECTURE.md']) {
 // ── CHECK I/J/K: css/terminal-*.css split order (2.8.5 U-A2) ───────────────
 // terminal.css was split into 12 files as a PURE ORDERED CUT — CSS cascade
 // resolves equal-specificity ties by source order, so the <link> order in
-// index.html is not cosmetic, it's load-bearing (terminal-12-mobile.css in
+// index.html is not cosmetic, it's load-bearing (99-mobile.css in
 // particular MUST be last). This is the CSS analogue of CHECK A/B/C/D/F/G
 // above, newly added for the split.
 const CANONICAL_CSS_ORDER = [
-  'terminal-01-base.css',
-  'terminal-02-chrome.css',
-  'terminal-03-overseer.css',
-  'terminal-04-diagnostic-shell.css',
-  'terminal-05-toolbar.css',
-  'terminal-06-modulebay.css',
-  'terminal-07-operator-boards.css',
-  'terminal-08-curio-operations.css',
-  'terminal-09-databank.css',
-  'terminal-10-chassis.css',
-  'terminal-11-feedback-animations.css',
-  'terminal-12-mobile.css',
+  '05-base.css',
+  '10-chrome.css',
+  '15-overseer.css',
+  '20-diagnostic-shell.css',
+  '25-toolbar.css',
+  '30-modulebay.css',
+  '35-operator-boards.css',
+  '40-curio-operations.css',
+  '45-databank.css',
+  '50-chassis.css',
+  '55-feedback-animations.css',
+  '99-mobile.css',
 ];
 {
   const cssLinkOrder = [];

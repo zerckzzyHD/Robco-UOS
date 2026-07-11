@@ -75,23 +75,23 @@ function Read-Src($rel) {
 }
 
 # CSS split read helper (2.8.5 U-A2) -- terminal.css was split into 12 files
-# as a pure ordered cut (cascade is order-sensitive -- terminal-12-mobile.css
+# as a pure ordered cut (cascade is order-sensitive -- 99-mobile.css
 # must load last). CSS_SPLIT_FILES is the ONE canonical list. Read-Css()
 # replaces every old Read-Css call site with the exact
 # same concatenated text the browser cascade actually sees.
 $CSS_SPLIT_FILES = @(
-    'terminal-01-base.css',
-    'terminal-02-chrome.css',
-    'terminal-03-overseer.css',
-    'terminal-04-diagnostic-shell.css',
-    'terminal-05-toolbar.css',
-    'terminal-06-modulebay.css',
-    'terminal-07-operator-boards.css',
-    'terminal-08-curio-operations.css',
-    'terminal-09-databank.css',
-    'terminal-10-chassis.css',
-    'terminal-11-feedback-animations.css',
-    'terminal-12-mobile.css'
+    '05-base.css',
+    '10-chrome.css',
+    '15-overseer.css',
+    '20-diagnostic-shell.css',
+    '25-toolbar.css',
+    '30-modulebay.css',
+    '35-operator-boards.css',
+    '40-curio-operations.css',
+    '45-databank.css',
+    '50-chassis.css',
+    '55-feedback-animations.css',
+    '99-mobile.css'
 )
 function Read-Css {
     return (($CSS_SPLIT_FILES | ForEach-Object { Read-Src "css/$_" }) -join "`n")

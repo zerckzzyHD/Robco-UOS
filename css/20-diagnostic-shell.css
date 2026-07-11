@@ -1,11 +1,19 @@
 /* === SPLIT-FILE-HEADER-START ===
-   terminal-04-diagnostic-shell.css — part 4/12 of the css/terminal.css ordered split (2.8.5 U-A2).
+   css/20-diagnostic-shell.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
    Original lines 1822-2601. Pure ordered cut: content below is verbatim,
-   byte-identical to that line range in the pre-split terminal.css. Do NOT
-   reorder this file relative to its siblings in index.html <link> tags —
-   CSS cascade resolves equal-specificity ties by source order, and several
-   rules across this split rely on the original relative order (see
-   terminal-12-mobile.css, which must always load last).
+   byte-identical to that line range in the pre-split terminal.css.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
    Contents: Diagnostic Shell mobile overlay (dev-only tooling, U2)
 === SPLIT-FILE-HEADER-END === */
 /* ══════════════════════════════════════════════════════════════════════

@@ -47,21 +47,23 @@
 
 ## File Map
 
+**Why `css/` is flat with numbered names but `js/` got subfolders (2.8.5 U-A2):** different problems, different fixes. In CSS, file ORDER is semantics — equal-specificity ties resolve by source order, which is exactly the hazard this split has to stay safe against. Subfoldering the split (`css/base/`, `css/panels/`, …) would fragment and hide the one property that must stay obvious: what loads after what. A flat directory with a gapped numeric prefix (05, 10, 15, … 99) makes the cascade order visible in the file listing itself, with no config to read — and `99-mobile.css` sitting alone at the end says "always last" without anyone needing to know why. The gaps (multiples of 5) let a future file be inserted between two existing ones without renumbering the set. `js/` has no such constraint — a function defined later still resolves correctly when called — so its files group into subfolders by responsibility instead, which is the more useful axis there.
+
 ```
 ├── index.html          ~55KB  DOM structure + all inline event handlers
 ├── css/                       terminal.css split by section (2.8.5 U-A2), pure ordered cut
-│   ├── terminal-01-base.css              Tokens, reset, layout, app-shell
-│   ├── terminal-02-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
-│   ├── terminal-03-overseer.css          Director Uplink / Overseer presence
-│   ├── terminal-04-diagnostic-shell.css  Diagnostic Shell mobile overlay (dev-only)
-│   ├── terminal-05-toolbar.css           Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
-│   ├── terminal-06-modulebay.css         Module Bay (Security & Configuration)
-│   ├── terminal-07-operator-boards.css   Phase 3 Operator boards (batches 1-3)
-│   ├── terminal-08-curio-operations.css  Curio Archive + Operations console
-│   ├── terminal-09-databank.css          Databank / Records Bay
-│   ├── terminal-10-chassis.css           Chassis diagnostic bay + Living Core
-│   ├── terminal-11-feedback-animations.css Feedback Animation Waves 1-3
-│   └── terminal-12-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
+│   ├── 05-base.css              Tokens, reset, layout, app-shell
+│   ├── 10-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
+│   ├── 15-overseer.css          Director Uplink / Overseer presence
+│   ├── 20-diagnostic-shell.css  Diagnostic Shell mobile overlay (dev-only)
+│   ├── 25-toolbar.css           Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
+│   ├── 30-modulebay.css         Module Bay (Security & Configuration)
+│   ├── 35-operator-boards.css   Phase 3 Operator boards (batches 1-3)
+│   ├── 40-curio-operations.css  Curio Archive + Operations console
+│   ├── 45-databank.css          Databank / Records Bay
+│   ├── 50-chassis.css           Chassis diagnostic bay + Living Core
+│   ├── 55-feedback-animations.css Feedback Animation Waves 1-3
+│   └── 99-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
 ├── js/                        Reorganized into subfolders by responsibility (2.8.5 U-A2)
 │   ├── data/                  Fallout game content: item DBs + registries
 │   │   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()

@@ -158,21 +158,23 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### File Structure
 
+`css/` is flat with a gapped numeric prefix (not subfoldered like `js/`) because in CSS the file order is load-bearing — equal-specificity ties resolve by source order, so the listing itself has to show what loads after what. `99-mobile.css` sits alone at the end on purpose.
+
 ```
 ├── index.html              DOM, inline handlers, GAME_FILES boot manifest, SW registration
 ├── css/                    terminal.css split by section (2.8.5 U-A2), pure ordered cut —
-│   ├── terminal-01-base.css            Tokens, reset, layout, app-shell
-│   ├── terminal-02-chrome.css          Device chrome (bezel/casing/glass) + per-game identity
-│   ├── terminal-03-overseer.css        Director Uplink / Overseer presence
-│   ├── terminal-04-diagnostic-shell.css Diagnostic Shell mobile overlay (dev-only)
-│   ├── terminal-05-toolbar.css         Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
-│   ├── terminal-06-modulebay.css       Module Bay (Security & Configuration)
-│   ├── terminal-07-operator-boards.css Phase 3 Operator boards (batches 1-3)
-│   ├── terminal-08-curio-operations.css Curio Archive + Operations console
-│   ├── terminal-09-databank.css        Databank / Records Bay
-│   ├── terminal-10-chassis.css         Chassis diagnostic bay + Living Core
-│   ├── terminal-11-feedback-animations.css Feedback Animation Waves 1-3
-│   └── terminal-12-mobile.css          Mobile Density Standard — MUST stay last (cascade order)
+│   ├── 05-base.css            Tokens, reset, layout, app-shell
+│   ├── 10-chrome.css          Device chrome (bezel/casing/glass) + per-game identity
+│   ├── 15-overseer.css        Director Uplink / Overseer presence
+│   ├── 20-diagnostic-shell.css Diagnostic Shell mobile overlay (dev-only)
+│   ├── 25-toolbar.css         Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
+│   ├── 30-modulebay.css       Module Bay (Security & Configuration)
+│   ├── 35-operator-boards.css Phase 3 Operator boards (batches 1-3)
+│   ├── 40-curio-operations.css Curio Archive + Operations console
+│   ├── 45-databank.css        Databank / Records Bay
+│   ├── 50-chassis.css         Chassis diagnostic bay + Living Core
+│   ├── 55-feedback-animations.css Feedback Animation Waves 1-3
+│   └── 99-mobile.css          Mobile Density Standard — MUST stay last (cascade order)
 ├── js/                     Reorganized into subfolders by responsibility (2.8.5 U-A2)
 │   ├── data/               Fallout game content: item DBs + registries
 │   │   ├── db_nv.js            FNV game CSV data + lookups
