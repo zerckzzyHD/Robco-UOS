@@ -16,7 +16,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Canonical protocol & gate rules** | this file (`CLAUDE.md`) |
 | **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
 | **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/api.js`) — design rationale in `ARCHITECTURE.md` |
-| **Boot lifecycle** — `window.onload`'s call order, the boot-phase functions, the event-bus subscriber wiring order | `library/CODE_MAP.md` § Boot Lifecycle (`js/ui-core.js`) |
+| **Boot lifecycle** — `window.onload`'s call order, the boot-phase functions, the event-bus subscriber wiring order | `library/CODE_MAP.md` § Boot Lifecycle (`js/ui-core*.js` — the hub + the 2.8.5 U-A1 split family) |
 | **State shape** — `let state = {…}`, `GAME_DEFS`, `migrateState()`, the save envelope | `library/CODE_MAP.md` § State (`js/state.js`) |
 | **Event bus** — `RobcoEvents`, every emitted event name, every subscriber-wiring function and which file owns it | `library/CODE_MAP.md` § Event Bus |
 | **Native command router** — `NATIVE_COMMAND_ROUTER`, the quick-log grammar, the native stat-token setters | `library/CODE_MAP.md` § Native Command Router (`js/api.js`) |
@@ -746,10 +746,15 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 8. `js/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
 9. `js/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
 10. `js/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
-11. `js/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()`
-12. `js/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
-13. `js/api.js` → `autoImportState()`, `transmitMessage()`, `getSystemDirective()`
-14. `js/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
+11. `js/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
+12. `js/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
+13. `js/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
+14. `js/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
+15. `js/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
+16. `js/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
+17. `js/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
+18. `js/api.js` → `autoImportState()`, `transmitMessage()`, `getSystemDirective()`
+19. `js/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
 
 <!-- LOAD-ORDER-GUARD:END -->
 

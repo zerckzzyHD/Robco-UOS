@@ -139,8 +139,8 @@ function Get-SkillKeys($source) {
 $stateSrc  = Read-Group "state"
 $apiSrc    = Read-Group "api"
 $cloudSrc  = Read-Group "cloud"
-$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js','js\ui-core.js')
-$uiSrc     = ($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) }) -join "`n"
+$uiFiles   = @('js\ui-audio.js','js\ui-render.js','js\ui-saves.js','js\ui-account.js')
+$uiSrc     = (@(($uiFiles | Where-Object { Test-Path (Join-Path $Root $_) } | ForEach-Object { [IO.File]::ReadAllText((Join-Path $Root $_)) })) + @(Read-Group "ui-core")) -join "`n"
 
 Write-Host "`n==  RobCo Persistence Audit  ==============================`n"
 
@@ -218,7 +218,7 @@ try {
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
-const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js'];
+const UI_FILES = ['js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js','js/ui-core.js','js/ui-core-nav.js','js/ui-core-overseer.js','js/ui-core-chassis.js','js/ui-core-modulebay.js','js/ui-core-cmd.js'];
 const uiSource = UI_FILES.filter(f => fs.existsSync(path.join('$repoRootNode', f))).map(f => fs.readFileSync(path.join('$repoRootNode', f), 'utf8')).join('\n');
 const threshMatch = uiSource.match(/const FACTION_THRESHOLDS\s*=\s*\{[\s\S]*?\};\s*\/\/ Default/);
 const defaultMatch = uiSource.match(/const _DEFAULT_THRESHOLDS\s*=\s*\{[^}]+\};/);
@@ -3525,7 +3525,9 @@ Check (-not ($recSlice58  -match 'fetch\(') -and -not ($recSlice58  -match 'XMLH
 Sep "Suite 59 -- Inline Handler Integrity"
 $htmlSrc59   = Read-Src "index.html"
 $jsFiles59   = @('js/ui-audio.js','js/ui-render.js','js/ui-saves.js','js/ui-account.js',
-                  'js/ui-core.js','js/api.js','js/cloud.js','js/state.js',
+                  'js/ui-core.js','js/ui-core-nav.js','js/ui-core-overseer.js',
+                  'js/ui-core-chassis.js','js/ui-core-modulebay.js','js/ui-core-cmd.js',
+                  'js/api.js','js/cloud.js','js/state.js',
                   'js/reg_nv.js','js/reg_fo3.js')
 $allJsSrc59  = ($jsFiles59 | ForEach-Object { Read-Src $_ }) -join "`n"
 
@@ -6067,7 +6069,7 @@ Check (-not $clBad) 'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake
 Sep "Suite 91 -- loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS"
 # Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
 # Static assertions -- no DOM required.
-$uiCore91ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-core.js'), [System.Text.Encoding]::UTF8)
+$uiCore91ps = Read-Group "ui-core"
 
 # 91.1  _renderSig module-level cache exists
 Check ($uiCore91ps.Contains('const _renderSig = {}')) `
@@ -6217,7 +6219,7 @@ Check ($fo393ps.Contains("'Galaxy News Radio'") -or $fo393ps.Contains('"Galaxy N
 Sep "Suite 94 -- Accessibility Guards"
 $css94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'css/terminal.css'), [System.Text.Encoding]::UTF8)
 $idx94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'index.html'), [System.Text.Encoding]::UTF8)
-$uiCore94ps = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-core.js'), [System.Text.Encoding]::UTF8)
+$uiCore94ps = Read-Group "ui-core"
 
 # 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7)
 Check ($css94ps.Contains(':focus-visible')) `
@@ -6269,7 +6271,7 @@ Check ([System.Text.RegularExpressions.Regex]::IsMatch($uiCore94ps, 'function\s+
 # debounced flush while it is set. These guards must never be removed.
 # ===========================================================
 Sep "Suite 95 -- Save-Load Reload Guard (import clobber regression)"
-$uiCore95 = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-core.js'), [System.Text.Encoding]::UTF8)
+$uiCore95 = Read-Group "ui-core"
 $state95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/state.js'), [System.Text.Encoding]::UTF8)
 $saves95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/ui-saves.js'), [System.Text.Encoding]::UTF8)
 $cloud95  = [System.IO.File]::ReadAllText((Join-Path $Root 'js/cloud.js'), [System.Text.Encoding]::UTF8)
@@ -13054,10 +13056,11 @@ Check (
 try {
     $nodeCheck162 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck162) {
-        $corePathNode162 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $jsDirNode162 = (Join-Path $Root "js").Replace('\', '/')
         $testScript162 = @"
 const fs = require('fs');
-const src = fs.readFileSync('$corePathNode162', 'utf8');
+const path = require('path');
+const src = fs.readdirSync('$jsDirNode162').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode162', f), 'utf8')).join('\n');
 function extractFullFn(src, fnName) {
   const idx = src.indexOf('function ' + fnName + '(');
   if (idx === -1) return '';
@@ -13627,14 +13630,15 @@ try {
         $apiPathNode164 = (Join-Path $Root "js/api.js").Replace('\', '/')
         $statePathNode164 = (Join-Path $Root "js/state.js").Replace('\', '/')
         $regPathNode164 = (Join-Path $Root "js/reg_nv.js").Replace('\', '/')
-        $coreCoreNode164 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $jsDirNode164 = (Join-Path $Root "js").Replace('\', '/')
         $testScript164 = @"
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
 const apiSource = fs.readFileSync('$apiPathNode164', 'utf8');
 const stateSource = fs.readFileSync('$statePathNode164', 'utf8');
 const regSource = fs.readFileSync('$regPathNode164', 'utf8');
-const uiCoreSource = fs.readFileSync('$coreCoreNode164', 'utf8');
+const uiCoreSource = fs.readdirSync('$jsDirNode164').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode164', f), 'utf8')).join('\n');
 function extractFunctionBody(source, fnName) {
   const idx = source.indexOf('function ' + fnName);
   const braceStart = source.indexOf('{', source.indexOf('(', idx));
@@ -16184,11 +16188,12 @@ $labels182 = @(
 try {
     $nodeCheck182 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck182) {
-        $uiCorePathNode182 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $jsDirNode182 = (Join-Path $Root "js").Replace('\', '/')
         $testScript182 = @"
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
-const uiCoreSource = fs.readFileSync('$uiCorePathNode182', 'utf8');
+const uiCoreSource = fs.readdirSync('$jsDirNode182').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode182', f), 'utf8')).join('\n');
 function extractFunctionBody(source, fnName) {
   const idx = source.indexOf('function ' + fnName);
   const braceStart = source.indexOf('{', source.indexOf('(', idx));
@@ -16511,11 +16516,12 @@ $labels184 = @(
 try {
     $nodeCheck184 = Get-Command node -ErrorAction SilentlyContinue
     if ($nodeCheck184) {
-        $uiCorePathNode184 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+        $jsDirNode184 = (Join-Path $Root "js").Replace('\', '/')
         $testScript184 = @"
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
-const uiCoreSource = fs.readFileSync('$uiCorePathNode184', 'utf8');
+const uiCoreSource = fs.readdirSync('$jsDirNode184').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode184', f), 'utf8')).join('\n');
 function extractFunctionBody(source, fnName) {
   const idx = source.indexOf('function ' + fnName);
   const braceStart = source.indexOf('{', source.indexOf('(', idx));
@@ -17654,11 +17660,12 @@ Check (
 
 # 190.4  BEHAVIORAL -- dragging #opRadLineWrap to 50% of its width sets
 #        #stat_rads/state.rads to ~half of the ACTIVE game's maxRads.
-$uiCorePathNode190 = (Join-Path $Root "js/ui-core.js").Replace('\', '/')
+$jsDirNode190 = (Join-Path $Root "js").Replace('\', '/')
 $testScript190a = @"
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
-const uiCoreSource = fs.readFileSync('$uiCorePathNode190', 'utf8');
+const uiCoreSource = fs.readdirSync('$jsDirNode190').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode190', f), 'utf8')).join('\n');
 function extractFunctionBody(source, fnName) {
   const idx = source.indexOf('function ' + fnName);
   const braceStart = source.indexOf('{', source.indexOf('(', idx));
@@ -17772,8 +17779,9 @@ Check (
 #         MetaStore, proving the round trip.
 $testScript190b = @"
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
-const uiCoreSource = fs.readFileSync('$uiCorePathNode190', 'utf8');
+const uiCoreSource = fs.readdirSync('$jsDirNode190').filter(f => f === 'ui-core.js' || f.startsWith('ui-core-')).sort().map(f => fs.readFileSync(path.join('$jsDirNode190', f), 'utf8')).join('\n');
 function extractFunctionBody(source, fnName) {
   const idx = source.indexOf('function ' + fnName);
   const braceStart = source.indexOf('{', source.indexOf('(', idx));
@@ -20574,8 +20582,9 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode200';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 const renderSrc = rd('js/ui-render.js');
-const coreSrc = rd('js/ui-core.js');
+const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -20824,8 +20833,9 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode201';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 const apiSrc = rd('js/api.js');
-const coreSrc = rd('js/ui-core.js');
+const coreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -21114,8 +21124,9 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode202';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 const uiRenderSrc = rd('js/ui-render.js');
-const uiCoreSrc = rd('js/ui-core.js');
+const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -21230,7 +21241,8 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode202b';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-const uiCoreSrc = rd('js/ui-core.js');
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -21385,6 +21397,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode203';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 const uiRenderSrc = rd('js/ui-render.js');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -21518,7 +21531,8 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode204a';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-const uiCoreSrc = rd('js/ui-core.js');
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -21614,7 +21628,8 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode204b';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
-const uiCoreSrc = rd('js/ui-core.js');
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
+const uiCoreSrc = rdGroup('ui-core');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -21858,6 +21873,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode205a';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 const ocrSrc = rd('js/ocr.js');
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
@@ -22134,6 +22150,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode206';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22168,7 +22185,7 @@ function declareConstObj(src, name) {
 
 const ocrSrc = rd('js/ocr.js');
 const apiSrc = rd('js/api.js');
-const coreSrc = rd('js/ui-core.js');
+const coreSrc = rdGroup('ui-core');
 const renderSrc = rd('js/ui-render.js');
 
 var results = [];
@@ -22560,6 +22577,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode207';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22853,6 +22871,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -22865,7 +22884,7 @@ function extractBody(src, name) {
   }
   throw new Error('unclosed ' + name);
 }
-var coreSrc = rd('js/ui-core.js');
+var coreSrc = rdGroup('ui-core');
 var results = [];
 try {
   var ignitionBody = extractBody(coreSrc, '_runCampaignIgnition');
@@ -23017,6 +23036,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23029,7 +23049,7 @@ function extractBody(src, name) {
   }
   throw new Error('unclosed ' + name);
 }
-var coreSrc = rd('js/ui-core.js');
+var coreSrc = rdGroup('ui-core');
 var results = [];
 try {
   var greetBody = extractBody(coreSrc, '_maybeGreetOverseer');
@@ -23115,6 +23135,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23245,6 +23266,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode208';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23611,6 +23633,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode210';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23807,6 +23830,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = '$repoRootNode210b';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -23935,6 +23959,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode211';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -24188,6 +24213,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode212';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -24753,6 +24779,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode214';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -25141,6 +25168,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode215';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);
@@ -25752,6 +25780,7 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = '$repoRootNode216';
 function rd(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function rdGroup(stem) { var d = path.join(ROOT, 'js'); return fs.readdirSync(d).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort().map(function(f){ return fs.readFileSync(path.join(d, f), 'utf8'); }).join('\n'); }
 function extractBody(src, name) {
   var idx = src.indexOf('function ' + name);
   if (idx === -1) throw new Error('missing ' + name);

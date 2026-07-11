@@ -174,7 +174,12 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 │   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
 │   ├── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
 │   ├── runtime.js          Ambient Runtime — lifecycle state machine + heartbeat + observer registry
-│   ├── ui-core.js          UI lifecycle, COMMAND_REGISTRY, native command surfaces, badges
+│   ├── ui-core.js          UI lifecycle hub — AudioSettings, loadUI, updateMath, window.onload boot orchestrator
+│   ├── ui-core-nav.js      Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES
+│   ├── ui-core-overseer.js Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   ├── ui-core-chassis.js  THE LIVING CORE + CHASSIS panel — _coreRefresh, System Status, Service & Fault Console
+│   ├── ui-core-modulebay.js Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   ├── ui-core-cmd.js      Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
 │   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
 │   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
 │   ├── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
@@ -208,10 +213,15 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 8. ui-account.js         →  renderAccount, renderSavesList, undoLastSync
 9. ocr.js                →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
 10. runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
-11. ui-core.js           →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
-12. test-console.js      →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
-13. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
-14. cloud.js             →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
+11. ui-core.js           →  appendToChat, loadUI, updateMath (the ui-core spine hub)
+12. ui-core-nav.js       →  selectSubsystem, switchTab, SHORTCUT_ROUTES (2.8.5 U-A1 split)
+13. ui-core-overseer.js  →  setOverseerState, the Director Uplink scope canvas (2.8.5 U-A1 split)
+14. ui-core-chassis.js   →  _coreRefresh, initChassisCore, System Status (2.8.5 U-A1 split)
+15. ui-core-modulebay.js →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
+16. ui-core-cmd.js       →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
+17. test-console.js      →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
+18. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
+19. cloud.js             →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).

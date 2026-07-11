@@ -4275,6 +4275,15 @@
     <script src="js/ocr.js"></script>
     <script src="js/runtime.js"></script>
     <script src="js/ui-core.js"></script>
+    <!-- ui-core-*.js (2.8.5 U-A1): the ui-core.js spine split by responsibility.
+         Global scope, static tags — intra-group order is flexible (nothing
+         reads these until window.onload, itself defined in ui-core.js above),
+         but they must all load before api.js/test-console.js like ui-core.js did. -->
+    <script src="js/ui-core-nav.js"></script>
+    <script src="js/ui-core-overseer.js"></script>
+    <script src="js/ui-core-chassis.js"></script>
+    <script src="js/ui-core-modulebay.js"></script>
+    <script src="js/ui-core-cmd.js"></script>
     <script src="js/test-console.js"></script>
     <script src="js/api.js"></script>
     <script type="module" src="js/cloud.js"></script>

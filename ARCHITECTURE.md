@@ -59,7 +59,12 @@
 │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
 │   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
 │   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
-│   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
+│   ├── ui-core.js      ~111KB Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
+│   ├── ui-core-nav.js  ~21KB  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
+│   ├── ui-core-overseer.js ~34KB Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   ├── ui-core-chassis.js ~42KB THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
+│   ├── ui-core-modulebay.js ~51KB Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   ├── ui-core-cmd.js  ~95KB  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
 │   ├── test-console.js ~5KB   Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
 │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
 │   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
@@ -267,12 +272,25 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        loads Tesseract.js itself at boot; see Visual Upload OCR below)
 9. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
-10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
-11. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
+                       ui-core spine hub; the ui-core-*.js split below leans on this file)
+11. js/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
+                       #go= routing, hotkeys, the DIRECTORY modal (2.8.5 U-A1 split)
+12. js/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
+                       composer wiring, the Tool Deck launcher (2.8.5 U-A1 split)
+13. js/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
+                       initChassisCore, System Status, the Service & Fault Console
+                       (2.8.5 U-A1 split)
+14. js/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
+                       wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
+15. js/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
+                       event-bus subscriber wiring for stat/quest/faction feedback
+                       (2.8.5 U-A1 split)
+16. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
                        _isStagingEnv; gated by _devConsoleUnlocked(), no-ops until unlocked —
                        see Developer Console below)
-12. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-13. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+17. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
+18. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
                        attaches: window.saveCurrentToCloud, window.loadCloudSave (plus the auth /
                        feature-flag / save-version helpers) — the manual cloud push/pull entry
                        points; the old pushToCloud/pullFromCloud names were never real, and are retired

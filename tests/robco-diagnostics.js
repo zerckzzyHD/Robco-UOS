@@ -245,15 +245,10 @@ function extractSkillKeys(source) {
 const stateSource = readGroup('state');
 const apiSource = readGroup('api');
 const cloudSource = readGroup('cloud');
-const uiSource = [
-  'js/ui-audio.js',
-  'js/ui-render.js',
-  'js/ui-saves.js',
-  'js/ui-account.js',
-  'js/ui-core.js',
-]
+const uiSource = ['js/ui-audio.js', 'js/ui-render.js', 'js/ui-saves.js', 'js/ui-account.js']
   .filter(f => fs.existsSync(path.join(ROOT, f)))
   .map(f => readFile(f))
+  .concat([readGroup('ui-core')]) // 2.8.5 U-A1: ui-core.js + its ui-core-*.js split family
   .join('\n');
 
 console.log('\n══ RobCo Persistence Audit ════════════════════════════════════\n');
@@ -6111,6 +6106,11 @@ header('Suite 59 — Inline Handler Integrity');
     'js/ui-saves.js',
     'js/ui-account.js',
     'js/ui-core.js',
+    'js/ui-core-nav.js',
+    'js/ui-core-overseer.js',
+    'js/ui-core-chassis.js',
+    'js/ui-core-modulebay.js',
+    'js/ui-core-cmd.js',
     'js/api.js',
     'js/cloud.js',
     'js/state.js',
