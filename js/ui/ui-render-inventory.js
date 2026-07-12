@@ -418,6 +418,7 @@ function nativeUseItem(idx) {
   const remainingQty = (parseInt(item.qty, 10) || 1) - 1;
   if (remainingQty <= 0) {
     state.inventory.splice(idx, 1);
+    if (reconcileEquipped(state)) renderEquipped();
   } else {
     item.qty = remainingQty;
   }

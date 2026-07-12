@@ -365,6 +365,13 @@ function _hydrateStateFromStorage() {
       // [T#]→eventLog migration here too — existing v8 saves migrate on load
       // (idempotent + non-lossy; leaves manual notes in campaign_notes).
       if (typeof window._migrateEventLog === 'function') window._migrateEventLog(state);
+      // Same reason: a save already carrying a stale state.equipped reference
+      // (from before the reconciliation fix, or a hand-edited import) would
+      // otherwise never heal on a plain reload, since this fast-path is the
+      // one that skips migrateState() (which is where reconcileEquipped()
+      // normally runs). No re-render needed here — loadUI() paints fresh
+      // right after boot finishes.
+      if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
       loadedOk = true;
     } catch (e) {
       console.error('[RobCo] Corrupt robco_v8 — quarantined, booting fresh:', e);

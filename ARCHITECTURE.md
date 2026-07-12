@@ -105,8 +105,8 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2997-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2997-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    3002-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    3002-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1727,12 +1727,20 @@ gear the Courier no longer carried (confirmed live before the fix — the equipp
 showing a deleted item). `reconcileEquipped(s)` (`js/core/state.js`) is the one shared reconciler
 (Protocol 22): it clears a `weapon`/`armor` slot whose named item is no longer in `s.inventory`, leaving
 `headgear` untouched (it has no inventory item type backing it — AI-write-only). Every removal path calls
-it — `delItem()`/`adjItemQty()` (`js/ui/ui-render-inventory.js`), `_craftConsume()` (shared by CRAFT
-ingredient consumption and SCRAP) and `doSell()` (`js/ui/ui-render-economy.js`), and `autoImportState()`
-(`js/services/api-import.js`, validating the AI's equipped slots against whatever inventory it just
-replaced wholesale, even when the AI omits `equipped` that turn) — and `migrateState()` also calls it on
-every load, so a save already in the stale state from before this fix self-heals. Protocol 13-regression-
-tested (Suite 221 + Suite 12 additions).
+it — `delItem()`/`adjItemQty()`/`nativeUseItem()` (`js/ui/ui-render-inventory.js`), `_craftConsume()`
+(shared by CRAFT ingredient consumption and SCRAP) and `doSell()` (`js/ui/ui-render-economy.js`), and
+`autoImportState()` (`js/services/api-import.js`, validating the AI's equipped slots against whatever
+inventory it just replaced wholesale, even when the AI omits `equipped` that turn) — and `migrateState()`
+also calls it on every load. An independent audit (`planning/AUDIT_U9_bugfixes.md`) found two follow-ups
+after the first pass: `nativeUseItem()` (consuming an aid item to depletion) was a missed removal path
+(closed above — benign in practice, since USE only ever removes `'aid'`-type rows and only `weapon`/`armor`
+types can be equipped, so a stale reference here needs a contrived same-name collision), and the claim
+that a pre-existing stale save "self-heals on load" was only true for cloud-pull/file-import/save-slot-load
+— the normal **v8 boot fast-path** (`_hydrateStateFromStorage()`, `js/ui/ui-core.js`) deliberately skips
+`migrateState()` for performance, so a plain reload never actually ran the reconciler. The fast-path now
+calls `reconcileEquipped(state)` directly, right beside the `_migrateEventLog` targeted-migration call it
+already runs for the same reason, so the claim is true for every load path, including a plain reload.
+Protocol 13-regression-tested (Suite 221, expanded 11→16 tests to cover both follow-ups; Suite 12).
 
 **Karma Center companion roster (Protocol 38 fix):** `renderKarmaCenter()`'s (`js/ui/ui-render-factions.js`)
 companion-availability text used to hardcode the FO3 companion names per karma tier directly in feature
@@ -3157,7 +3165,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2997-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3002-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

@@ -32448,6 +32448,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       _emitStatChangeIfDiffers: () => {},
       _resolveMaxRads: () => 1000,
       _pendingEffectWarmup: [],
+      // Suite 221 fix (F1): nativeUseItem() now calls reconcileEquipped(state)
+      // when a depleted item is spliced out — this suite doesn't exercise
+      // equipped, so a no-op stub is correct (real behavioral proof is 221.13).
+      reconcileEquipped: () => false,
+      renderEquipped: () => {},
       Math,
       parseInt,
       String,
@@ -40424,13 +40429,20 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  WHY: state.equipped stores an item NAME per slot, not a reference. Every
 //  path that can remove an inventory item (delItem, adjItemQty draining to
 //  0, _craftConsume — shared by CRAFT ingredient consumption and SCRAP,
-//  doSell, and autoImportState's wholesale AI inventory replace) used to
-//  leave a stale state.equipped entry pointing at gear the Courier no
-//  longer carries — reproduced live (browser) before this fix landed.
-//  reconcileEquipped() in state.js is the ONE shared fix (Protocol 22); this
-//  suite locks that every removal path actually calls it, and behaviorally
-//  proves the real functions (not stubs) clear the stale reference.
-//  11 tests.
+//  doSell, nativeUseItem draining a consumable to 0, and autoImportState's
+//  wholesale AI inventory replace) used to leave a stale state.equipped
+//  entry pointing at gear the Courier no longer carries — reproduced live
+//  (browser) before this fix landed. reconcileEquipped() in state.js is the
+//  ONE shared fix (Protocol 22); this suite locks that every removal path
+//  actually calls it, and behaviorally proves the real functions (not
+//  stubs) clear the stale reference. It also locks that the v8 BOOT
+//  fast-path (js/ui/ui-core.js _hydrateStateFromStorage(), which
+//  deliberately skips migrateState()) reconciles too — an independent
+//  audit (planning/AUDIT_U9_bugfixes.md, F1/F2) found nativeUseItem was a
+//  missed removal path, and that a plain reload of an existing save did
+//  NOT actually self-heal a stale reference as the original commit claimed
+//  (the v8 fast-path skipped migrateState, where the heal lived).
+//  16 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)');
@@ -40680,6 +40692,193 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     /reconcileEquipped\(s\);/.test(migrateBody221),
     '221.11: migrateState() calls reconcileEquipped(s) so a pre-existing stale save self-heals on load'
   );
+
+  // 221.12  MISSED REMOVAL PATH (independent audit F1): nativeUseItem() also
+  //         calls reconcileEquipped(state) when a consumed item's qty drains
+  //         to 0 and is spliced out of inventory — closing the enumeration
+  //         gap the original commit's implementer didn't know about.
+  const nativeUseBody221 = extractFunctionBody(uiSource, 'nativeUseItem');
+  assert(
+    /state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);/.test(
+      nativeUseBody221
+    ),
+    '221.12: nativeUseItem() calls reconcileEquipped(state) after splicing a depleted consumable out of inventory'
+  );
+
+  // 221.13  Behavioral (VM sandbox, REAL source): nativeUseItem only removes
+  //         'aid'-type items, so a stale reference here needs the contrived
+  //         audit F1 scenario (a weapon/armor named identically to an aid
+  //         item) to actually produce a dangling state.equipped entry.
+  //         Proves the REAL nativeUseItem clears it anyway.
+  {
+    const vm = require('vm');
+    let after221e = null;
+    let renderEquippedCalls221e = 0;
+    let errMsg221e = '';
+    try {
+      const computeAidBody221 = extractFunctionBody(uiSource, '_computeAidUse');
+      const sandbox = {
+        window: {},
+        state: {},
+        getChemsTable: () => [{ name: 'Ghost Aid', effect: 'restore 20 hp', duration: '0' }],
+        _durationToTicks: () => 0,
+        _nativeSetHp: () => {},
+        _nativeSetRads: () => {},
+        _applyStatusEffect: () => {},
+        appendToChat: () => {},
+        renderStatus: () => {},
+        renderInventory: () => {},
+        renderEquipped: () => {
+          renderEquippedCalls221e++;
+        },
+        loadUI: () => {},
+        updateMath: () => {},
+        saveState: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      // stateSource declares its OWN real saveState()/syncStateFromDom() (Suite
+      // 221.7 precedent), which reads real DOM fields unconditionally — override
+      // it back to a no-op AFTER loading stateSource, not before.
+      sandbox.saveState = () => {};
+      vm.runInContext('function _computeAidUse(chemEntry)' + computeAidBody221, sandbox);
+      vm.runInContext('function nativeUseItem(idx)' + nativeUseBody221, sandbox);
+      vm.runInContext(
+        // A weapon "Ghost Aid" was equipped, then removed some other way,
+        // but the name lives on as a separate 'aid' item (the only real-world
+        // way nativeUseItem's splice can strand an equipped slot).
+        "state.inventory = [{name:'Ghost Aid',qty:1,wgt:1,val:1,type:'aid'}];" +
+          "state.equipped = {weapon:'Ghost Aid',armor:null,headgear:null};" +
+          'state.hpCur = 50; state.hpMax = 100;' +
+          'state.status = [];' +
+          'nativeUseItem(0);',
+        sandbox
+      );
+      after221e = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221e = e && e.message;
+    }
+    assert(
+      after221e && after221e.weapon === null && renderEquippedCalls221e === 1,
+      '221.13: [behavioral] the REAL nativeUseItem() clears a dangling state.equipped.weapon reference and calls renderEquipped() when the depleted consumable shared its name' +
+        (errMsg221e ? ' — error: ' + errMsg221e : '')
+    );
+  }
+
+  // 221.14  OVERSTATED CLAIM FIX (independent audit F2): the v8 BOOT
+  //         fast-path (_hydrateStateFromStorage in js/ui/ui-core.js)
+  //         deliberately skips migrateState() (see the P4 comment right
+  //         above it), so it must call reconcileEquipped(state) directly —
+  //         otherwise a plain reload of an existing save never actually
+  //         self-heals a stale equipped reference, despite the code
+  //         comment/commit/CHANGELOG having claimed it does.
+  const hydrateBody221 = extractFunctionBody(uiSource, '_hydrateStateFromStorage');
+  assert(
+    /_migrateEventLog\(state\);[\s\S]{0,600}reconcileEquipped\(state\);/.test(hydrateBody221),
+    '221.14: the v8 boot fast-path (_hydrateStateFromStorage) calls reconcileEquipped(state) directly, since it skips migrateState()'
+  );
+
+  // 221.15  Behavioral (VM sandbox, REAL source): the REAL
+  //         _hydrateStateFromStorage(), given an existing robco_v8 save
+  //         whose equipped.weapon names an item no longer in inventory,
+  //         actually clears it on a plain reload — WITHOUT migrateState()
+  //         ever running (proves the fast-path claim is literally true, not
+  //         just present in the source text).
+  {
+    const vm = require('vm');
+    let afterBoot221 = null;
+    let errMsg221f = '';
+    try {
+      const stalePayload221 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            gameContext: 'FNV',
+            inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+            equipped: { weapon: 'Ghost Rifle', armor: null, headgear: null },
+          },
+        },
+      };
+      const store221 = { robco_v8: JSON.stringify(stalePayload221) };
+      const sandbox = {
+        window: {},
+        console: { error: () => {} },
+        localStorage: {
+          getItem: k => (Object.prototype.hasOwnProperty.call(store221, k) ? store221[k] : null),
+          setItem: (k, v) => {
+            store221[k] = v;
+          },
+          removeItem: k => {
+            delete store221[k];
+          },
+        },
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _hydrateStateFromStorage()' + hydrateBody221, sandbox);
+      // migrateState is intentionally NOT stubbed to a spy that would mask a
+      // real call — it's the REAL migrateState from stateSource. If the
+      // fast-path ever regressed to calling it, this test would still pass
+      // (migrateState also reconciles) — 221.14's static call-site guard is
+      // what specifically locks the fast-path's OWN direct call.
+      vm.runInContext('_hydrateStateFromStorage();', sandbox);
+      afterBoot221 = vm.runInContext('state', sandbox);
+    } catch (e) {
+      errMsg221f = e && e.message;
+    }
+    assert(
+      afterBoot221 && afterBoot221.equipped && afterBoot221.equipped.weapon === null,
+      '221.15: [behavioral] the REAL v8 boot fast-path self-heals a stale state.equipped.weapon reference on a plain reload (no migrateState involved)' +
+        (errMsg221f ? ' — error: ' + errMsg221f : '')
+    );
+  }
+
+  // 221.16  Behavioral (VM sandbox, REAL source, false-positive guard): the
+  //         v8 boot fast-path must NOT clear a slot naming an item the
+  //         Courier still legitimately carries.
+  {
+    const vm = require('vm');
+    let afterBoot221b = null;
+    let errMsg221g = '';
+    try {
+      const validPayload221 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            gameContext: 'FNV',
+            inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+            equipped: { weapon: 'Real Rifle', armor: null, headgear: null },
+          },
+        },
+      };
+      const store221b = { robco_v8: JSON.stringify(validPayload221) };
+      const sandbox = {
+        window: {},
+        console: { error: () => {} },
+        localStorage: {
+          getItem: k => (Object.prototype.hasOwnProperty.call(store221b, k) ? store221b[k] : null),
+          setItem: (k, v) => {
+            store221b[k] = v;
+          },
+          removeItem: k => {
+            delete store221b[k];
+          },
+        },
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _hydrateStateFromStorage()' + hydrateBody221, sandbox);
+      vm.runInContext('_hydrateStateFromStorage();', sandbox);
+      afterBoot221b = vm.runInContext('state', sandbox);
+    } catch (e) {
+      errMsg221g = e && e.message;
+    }
+    assert(
+      afterBoot221b && afterBoot221b.equipped && afterBoot221b.equipped.weapon === 'Real Rifle',
+      '221.16: [behavioral] the v8 boot fast-path does not clear a still-legitimately-equipped item (no false-positive reconciliation on boot)' +
+        (errMsg221g ? ' — error: ' + errMsg221g : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

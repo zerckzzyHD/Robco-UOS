@@ -1959,12 +1959,15 @@ window.applyBundleData = applyBundleData;
 // goes stale and keeps showing gear the Courier no longer carries. Every
 // inventory-removal path calls this after mutating inventory (Protocol 22 —
 // one shared reconciler, not a guard duplicated per-caller); migrateState()
-// below also calls it on every load so a save already in the stale state
-// from before this fix self-heals. 'headgear' is excluded on purpose — it
-// has no inventory item type backing it (AI-write-only, see the toggleEquipItem
-// comment in ui-render-inventory.js), so there is nothing to reconcile it
-// against. Returns true if a slot was cleared, so callers know whether to
-// re-render the equipped-gear readout.
+// below also calls it on every load, and the v8 boot fast-path (which
+// deliberately skips migrateState — see js/ui/ui-core.js
+// _hydrateStateFromStorage()) calls it directly for the same reason — so a
+// save already in the stale state from before this fix self-heals the next
+// time it's loaded, including a plain reload. 'headgear' is excluded on
+// purpose — it has no inventory item type backing it (AI-write-only, see
+// the toggleEquipItem comment in ui-render-inventory.js), so there is
+// nothing to reconcile it against. Returns true if a slot was cleared, so
+// callers know whether to re-render the equipped-gear readout.
 function reconcileEquipped(s) {
   if (!s || !s.equipped) return false;
   const inv = Array.isArray(s.inventory) ? s.inventory : [];

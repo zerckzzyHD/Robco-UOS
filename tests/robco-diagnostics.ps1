@@ -20931,6 +20931,11 @@ try {
     _emitStatChangeIfDiffers: function () {},
     _resolveMaxRads: function () { return 1000; },
     _pendingEffectWarmup: [],
+    // Suite 221 fix (F1): nativeUseItem() now calls reconcileEquipped(state)
+    // when a depleted item is spliced out -- this suite doesn't exercise
+    // equipped, so a no-op stub is correct (real behavioral proof is 221.13).
+    reconcileEquipped: function () { return false; },
+    renderEquipped: function () {},
     Math: Math, parseInt: parseInt, String: String
   };
   vm.createContext(sb4);
@@ -26959,12 +26964,20 @@ if ($nonManifestFiles220.Count -gt 0) {
 # WHY: state.equipped stores an item NAME per slot, not a reference. Every
 # path that can remove an inventory item (delItem, adjItemQty draining to 0,
 # _craftConsume -- shared by CRAFT ingredient consumption and SCRAP, doSell,
-# and autoImportState's wholesale AI inventory replace) used to leave a stale
-# state.equipped entry pointing at gear the Courier no longer carries --
-# reproduced live (browser) before this fix landed. reconcileEquipped() in
-# state.js is the ONE shared fix (Protocol 22); this suite locks that every
-# removal path actually calls it, and behaviorally proves the real functions
-# (not stubs) clear the stale reference. Mirrors JS Suite 221. 11 tests.
+# nativeUseItem draining a consumable to 0, and autoImportState's wholesale AI
+# inventory replace) used to leave a stale state.equipped entry pointing at
+# gear the Courier no longer carries -- reproduced live (browser) before this
+# fix landed. reconcileEquipped() in state.js is the ONE shared fix (Protocol
+# 22); this suite locks that every removal path actually calls it, and
+# behaviorally proves the real functions (not stubs) clear the stale
+# reference. It also locks that the v8 BOOT fast-path
+# (_hydrateStateFromStorage in js/ui/ui-core.js, which deliberately skips
+# migrateState()) reconciles too -- an independent audit
+# (planning/AUDIT_U9_bugfixes.md, F1/F2) found nativeUseItem was a missed
+# removal path, and that a plain reload of an existing save did NOT actually
+# self-heal a stale reference as the original commit claimed (the v8
+# fast-path skipped migrateState, where the heal lived). Mirrors JS Suite
+# 221. 16 tests.
 # ===========================================================
 Sep "Suite 221 -- Equipped/Inventory Reconciliation (Protocol 13 regression)"
 
@@ -27023,6 +27036,7 @@ function readGroupNode(dir, stem) {
 }
 const uiDir221 = path.join('$repoRootNode221', 'js', 'ui');
 const uiSource221 = readGroupNode(uiDir221, 'ui-render');
+const uiCoreSource221 = readGroupNode(uiDir221, 'ui-core');
 const stateDir221 = path.join('$repoRootNode221', 'js', 'core');
 const stateSource221 = readGroupNode(stateDir221, 'state');
 const apiDir221 = path.join('$repoRootNode221', 'js', 'services');
@@ -27091,6 +27105,70 @@ try {
   const after = vm.runInContext('state.equipped', sandbox);
   results.push(after.weapon === null);
 } catch (e) { results.push(false); }
+// 221.13 nativeUseItem (audit F1: a contrived name-collision -- a weapon
+// equipped by name, later removed some other way, while a separate 'aid'
+// item shares its exact name -- is the only real way nativeUseItem's own
+// splice can strand an equipped slot, since it only ever removes 'aid' rows)
+try {
+  const sandbox = {
+    window: {}, state: {},
+    getChemsTable: () => [{ name: 'Ghost Aid', effect: 'restore 20 hp', duration: '0' }],
+    _durationToTicks: () => 0,
+    _nativeSetHp: () => {}, _nativeSetRads: () => {}, _applyStatusEffect: () => {},
+    appendToChat: () => {}, renderStatus: () => {}, renderInventory: () => {},
+    renderEquipped: () => { sandbox.__calls2 = (sandbox.__calls2||0)+1; },
+    loadUI: () => {}, updateMath: () => {}, saveState: () => {}
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  sandbox.saveState = () => {}; // override the REAL saveState() stateSource221 just declared
+  vm.runInContext('function _computeAidUse(chemEntry)' + extractFunctionBody(uiSource221, '_computeAidUse'), sandbox);
+  vm.runInContext('function nativeUseItem(idx)' + extractFunctionBody(uiSource221, 'nativeUseItem'), sandbox);
+  vm.runInContext("state.inventory = [{name:'Ghost Aid',qty:1,wgt:1,val:1,type:'aid'}]; state.equipped = {weapon:'Ghost Aid',armor:null,headgear:null}; state.hpCur = 50; state.hpMax = 100; state.status = []; nativeUseItem(0);", sandbox);
+  const after = vm.runInContext('state.equipped', sandbox);
+  results.push(after.weapon === null && sandbox.__calls2 === 1);
+} catch (e) { results.push(false); }
+// 221.15 the REAL v8 boot fast-path (_hydrateStateFromStorage) self-heals a
+// stale state.equipped.weapon reference on a plain reload, with migrateState
+// never involved (audit F2 -- proves the fast-path claim is literally true)
+try {
+  const stalePayload221 = { activeContext: 'FNV', campaigns: { FNV: { gameContext: 'FNV', inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }], equipped: { weapon: 'Ghost Rifle', armor: null, headgear: null } } } };
+  const store221 = { robco_v8: JSON.stringify(stalePayload221) };
+  const sandbox = {
+    window: {}, console: { error: () => {} },
+    localStorage: {
+      getItem: function(k) { return Object.prototype.hasOwnProperty.call(store221, k) ? store221[k] : null; },
+      setItem: function(k, v) { store221[k] = v; },
+      removeItem: function(k) { delete store221[k]; }
+    }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  vm.runInContext('function _hydrateStateFromStorage()' + extractFunctionBody(uiCoreSource221, '_hydrateStateFromStorage'), sandbox);
+  vm.runInContext('_hydrateStateFromStorage();', sandbox);
+  const after = vm.runInContext('state', sandbox);
+  results.push(!!(after && after.equipped && after.equipped.weapon === null));
+} catch (e) { results.push(false); }
+// 221.16 false-positive guard: the v8 boot fast-path must NOT clear a slot
+// naming an item the Courier still legitimately carries
+try {
+  const validPayload221 = { activeContext: 'FNV', campaigns: { FNV: { gameContext: 'FNV', inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }], equipped: { weapon: 'Real Rifle', armor: null, headgear: null } } } };
+  const store221b = { robco_v8: JSON.stringify(validPayload221) };
+  const sandbox = {
+    window: {}, console: { error: () => {} },
+    localStorage: {
+      getItem: function(k) { return Object.prototype.hasOwnProperty.call(store221b, k) ? store221b[k] : null; },
+      setItem: function(k, v) { store221b[k] = v; },
+      removeItem: function(k) { delete store221b[k]; }
+    }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  vm.runInContext('function _hydrateStateFromStorage()' + extractFunctionBody(uiCoreSource221, '_hydrateStateFromStorage'), sandbox);
+  vm.runInContext('_hydrateStateFromStorage();', sandbox);
+  const after = vm.runInContext('state', sandbox);
+  results.push(!!(after && after.equipped && after.equipped.weapon === 'Real Rifle'));
+} catch (e) { results.push(false); }
 console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
 "@
         $tmpScript221 = [System.IO.Path]::GetTempFileName() + '.js'
@@ -27100,16 +27178,19 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
         } finally {
             Remove-Item -Path $tmpScript221 -Force -ErrorAction SilentlyContinue
         }
-        $rm221 = [regex]::Match($out221, 'RESULT:([01]{4})')
+        $rm221 = [regex]::Match($out221, 'RESULT:([01]{7})')
         $behavioralLabels221 = @(
             "221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted",
             "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched",
             "221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item",
-            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely"
+            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely",
+            "221.13: [behavioral] the REAL nativeUseItem() clears a dangling state.equipped.weapon reference and calls renderEquipped() when the depleted consumable shared its name",
+            "221.15: [behavioral] the REAL v8 boot fast-path self-heals a stale state.equipped.weapon reference on a plain reload (no migrateState involved)",
+            "221.16: [behavioral] the v8 boot fast-path does not clear a still-legitimately-equipped item (no false-positive reconciliation on boot)"
         )
         if ($rm221.Success) {
             $bits221 = $rm221.Groups[1].Value
-            for ($bi221 = 0; $bi221 -lt 4; $bi221++) { Check ($bits221.Substring($bi221, 1) -eq '1') $behavioralLabels221[$bi221] }
+            for ($bi221 = 0; $bi221 -lt 7; $bi221++) { Check ($bits221.Substring($bi221, 1) -eq '1') $behavioralLabels221[$bi221] }
         } else {
             $err221 = if ([string]::IsNullOrWhiteSpace($out221)) { "No output from node" } else { $out221.Trim() }
             foreach ($lbl in $behavioralLabels221) { Fail "$lbl  (runtime error: $err221)" }
@@ -27119,7 +27200,10 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
             "221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted",
             "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched",
             "221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item",
-            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely"
+            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely",
+            "221.13: [behavioral] the REAL nativeUseItem() clears a dangling state.equipped.weapon reference and calls renderEquipped() when the depleted consumable shared its name",
+            "221.15: [behavioral] the REAL v8 boot fast-path self-heals a stale state.equipped.weapon reference on a plain reload (no migrateState involved)",
+            "221.16: [behavioral] the v8 boot fast-path does not clear a still-legitimately-equipped item (no false-positive reconciliation on boot)"
         )
         foreach ($lbl in $behavioralLabels221) { Fail "$lbl  (node not found)" }
     }
@@ -27149,6 +27233,25 @@ Check (($reconcileDefCount221 -eq 1) -and ([bool]($stateSrc -match "function rec
 $migrateBody221 = Get-FunctionBody $stateSrc 'migrateState'
 Check ([bool]($migrateBody221 -match "reconcileEquipped\(s\);")) `
     '221.11: migrateState() calls reconcileEquipped(s) so a pre-existing stale save self-heals on load'
+
+# 221.12  MISSED REMOVAL PATH (independent audit F1): nativeUseItem() also
+#         calls reconcileEquipped(state) when a consumed item's qty drains to
+#         0 and is spliced out of inventory -- closing the enumeration gap
+#         the original commit's implementer didn't know about.
+$nativeUseBody221 = Get-FunctionBody $uiSrc 'nativeUseItem'
+Check ([bool]([regex]::IsMatch($nativeUseBody221, "state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);"))) `
+    '221.12: nativeUseItem() calls reconcileEquipped(state) after splicing a depleted consumable out of inventory'
+
+# 221.14  OVERSTATED CLAIM FIX (independent audit F2): the v8 BOOT fast-path
+#         (_hydrateStateFromStorage in js/ui/ui-core.js) deliberately skips
+#         migrateState() (see the P4 comment right above it), so it must call
+#         reconcileEquipped(state) directly -- otherwise a plain reload of an
+#         existing save never actually self-heals a stale equipped
+#         reference, despite the code comment/commit/CHANGELOG having claimed
+#         it does.
+$hydrateBody221 = Get-FunctionBody $uiSrc '_hydrateStateFromStorage'
+Check ([bool]([regex]::IsMatch($hydrateBody221, "_migrateEventLog\(state\);[\s\S]{0,600}reconcileEquipped\(state\);"))) `
+    '221.14: the v8 boot fast-path (_hydrateStateFromStorage) calls reconcileEquipped(state) directly, since it skips migrateState()'
 
 # ===========================================================
 # Results
