@@ -51,7 +51,7 @@
 
 ```
 ├── index.html          ~55KB  DOM structure + all inline event handlers
-├── css/                       terminal.css split by section (2.8.5 U-A2), pure ordered cut
+├── css/                       12 order-prefixed files (2.8.5 U-A2 split), source order = cascade order
 │   ├── 05-base.css              Tokens, reset, layout, app-shell
 │   ├── 10-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
 │   ├── 15-overseer.css          Director Uplink / Overseer presence
@@ -482,7 +482,7 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
   drawn to show WHERE to click. `#powerOnBtn` (`index.html`, a real `<button>`, `▶ PRESS TO POWER
 ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.rt-shutdown` /
   `body.rt-shutdown-plain` classes the observer above already toggles (`body.rt-shutdown
-.power-on-btn { display: block; }` in `terminal.css` — Protocol 22, no separate JS visibility
+.power-on-btn { display: block; }` in `css/` — Protocol 22, no separate JS visibility
   bookkeeping that could drift), and sits at `z-index:100002`, above the cover's `100001`, so it is
   always visible over the black overlay. Its click handler, `_powerOnFromShutdown()` (`ui-core.js`,
   defined immediately after the `shutdown-crt` observer), recovers using **only legal**
@@ -543,7 +543,7 @@ Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durabl
 - **FIX 2 — draggable FAB.** `_wireFabDrag()` mirrors the Immersion dial's tap-vs-drag pointer pattern (`ui-core.js` `_dialPointerDown`/`_dialPointerMove`/`_dialPointerEnd`) in two dimensions, gated by `_dshIsMobile()` so desktop's bubble stays click-only. A genuine drag (past a 6px threshold) repositions `#dshFab` via inline `left`/`top`, clamped to the viewport, and persists the final position through a new registered MetaStore device pref (`robco_dsh_fab_pos`, `state.js` `META_MANIFEST`, Protocol 4/UI-6) — `_restoreFabPosition()` re-clamps it to the current viewport on every mount, also mobile-gated.
 - **FIX 3 — highlight keys off an open-state class, not `:hover`.** `_openShell()`/`_closeShell()` toggle a new `.dsh-fab--open` class, and the mobile-only CSS rule for it (never applied outside the mobile block) is what drives the bubble's amber highlight there — replacing the touch-sticky-`:hover`-prone reliance desktop's untouched `[aria-expanded='true']` rule still uses. `.dsh-fab:hover`'s fill is also reset unconditionally then re-gated behind `(hover: hover) and (pointer: fine)` (the same mode-pill fix pattern, Suite 129's signal), so a touch tap can never leave it visually stuck lit.
 - **FIX 4 — glyph centering (all breakpoints).** `.dsh-fab span` gets its own `line-height: 1` plus a small `translateY` nudge, correcting a font-metrics offset present at every screen size — the only one of the five fixes not mobile-gated.
-- **FIX 5 — constant-size bezel dock (`terminal.css` only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
+- **FIX 5 — constant-size bezel dock (CSS only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
 
 Guarded by Suite 213 (both runners, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
 
@@ -800,7 +800,7 @@ write sites.
 
 ---
 
-## Bezel Chrome + Subsystem Nav (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` — Design Overhaul DO-N)
+## Bezel Chrome + Subsystem Nav (`index.html` + `css/` (12 order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul DO-N)
 
 The vertical slice's first _visible_ unit (`planning/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-N).
 Replaces the flat `.tab-bar`/`.tab-btn` webpage nav with a physical-terminal bezel — a
@@ -1002,7 +1002,7 @@ horizontal overflow, and the active keycap's pressed-in look (r120) is untouched
 
 ---
 
-## Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/terminal-*.css` — Design Overhaul DO-O)
+## Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/` (12 order-prefixed files) — Design Overhaul DO-O)
 
 Reskins the Comm-Link (`.col-right`) into the mockup's **DIRECTOR UPLINK**: a phosphor
 oscilloscope `<canvas id="overseerScope">` whose waveform reacts to the **real** AI/chat
@@ -1217,7 +1217,7 @@ custom property that falls back to `--bezel-wire`; the save-menu button sets it 
 
 ---
 
-## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)
+## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/` (12 order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)
 
 Rebuilds the CHASSIS `[5]` tab from one flat SYSTEM STATUS panel into three real
 `.panel.bay-board` boards, and adds THE LIVING CORE — a decorative reactor glyph driven entirely
@@ -1397,7 +1397,7 @@ despite reading as "moved further." The final offset was computed precisely
 (not eyeballed) so the button's nearest corner clears the ring radius with
 margin (~55px).
 
-All three fixes are CSS-only (`css/terminal-*.css`), shared by both cores
+All three fixes are CSS-only (`css/` (12 order-prefixed files)), shared by both cores
 from the same `.chassis-core-shape`/`.chassis-core-mini` selectors with
 zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui/ui-core.js`
 or `js/ui/ui-audio.js`, write nothing durable to the campaign, and leave the
@@ -1423,7 +1423,7 @@ future edit reverts to the bare, cascade-dead selector.
 
 ---
 
-## OPERATOR Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)
+## OPERATOR Screen Hardware Dressing (`index.html` + `css/` (12 order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)
 
 The STAT tab's panels are reskinned into the same labeled-hardware-board language as the Module
 Bay and Director Uplink, per the owner-approved `planning/mockups/operator-combined.html` mockup.
@@ -1660,7 +1660,7 @@ fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
 
 ---
 
-## OPERATIONS Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
+## OPERATIONS Screen Hardware Dressing (`index.html` + `css/` (12 order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
 
 The INV tab's five panels (BACKPACK INVENTORY, COLLECTIBLES, CRAFTING, TRADE, SQUAD STATUS) are
 reskinned into six `bay-board` panels — BUS-10 through BUS-15, continuing the OPERATOR BUS-01…09
@@ -1842,7 +1842,7 @@ Protocol 17 tap-target floor, and the bezel-telemetry SEIZED flag.
 
 ---
 
-## DATABANK Screen Hardware Dressing (`index.html` + `css/terminal-*.css` + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
+## DATABANK Screen Hardware Dressing (`index.html` + `css/` (12 order-prefixed files) + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
 
 The DATA/CAMPG tab's six panels (WORLD MAP, QUEST LOG, DATABANK search, CAMPAIGN NOTES, CAMPAIGN LOG,
 CAMPAIGN RECORD) are reskinned into six `bay-board` panels — BUS-16 through BUS-21, continuing the
@@ -1965,7 +1965,7 @@ and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new rend
 
 ---
 
-## Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/terminal-*.css` — Suite 208)
+## Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/` (12 order-prefixed files) — Suite 208)
 
 Five small transition/ceremony beats picked from `planning/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
 slate — none touch campaign state (Protocol 4 not triggered); every write is a transient module
@@ -2024,7 +2024,7 @@ invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavo
 
 ---
 
-## Mobile Density Standard, Tier-1 (`css/terminal-*.css` — planning/MOBILE_DENSITY_PLAN.md §2/§3)
+## Mobile Density Standard, Tier-1 (`css/` (12 order-prefixed files) — planning/MOBILE_DENSITY_PLAN.md §2/§3)
 
 Owner-approved Tier-1 mobile spacing tightening. The plan measured every board's spacing (padding,
 inter-board gap, header subtitle, tile padding) as using its base, desktop-shared value on mobile —
@@ -2051,10 +2051,12 @@ controls, the signature fader/karma instruments, default-collapsing boards) are 
 owner-declined and out of scope for this unit.
 
 **Cascade-order placement (Protocol 42):** the whole density block is deliberately placed at the
-true end of `terminal.css`, after every one of its own selectors' earlier, unconditional base rule.
-CSS resolves equal-specificity ties by source order, so an override block placed _before_ its own
-base rule would be silently beaten by it — a real footgun caught before shipping. Living at the end
-of the file guarantees the block always wins the `≤480px` cascade regardless of where a future edit
+true end of the CSS cascade — in `css/99-mobile.css`, the last-loaded stylesheet (2.8.5 U-A2 split
+`terminal.css` into 12 order-prefixed files; `99-mobile.css` must stay last), after every one of its
+own selectors' earlier, unconditional base rule. CSS resolves equal-specificity ties by source
+order, so an override block placed _before_ its own base rule would be silently beaten by it — a real
+footgun caught before shipping. Living at the end of the cascade guarantees the block always wins the
+`≤480px` cascade regardless of where a future edit
 adds a same-selector rule earlier in the file.
 
 Guarded by Suite 209 (both runners at parity, 10 tests): the token scale (base + mobile-tuned
@@ -3103,7 +3105,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 **Bump `CACHE_NAME` in `sw.js` whenever a commit stages a served/precached file.** Doc-only, config-only, and test-only commits do not require a bump. The following always qualify and must never ship without a bump:
 
 - `index.html` (any UI change, new panel, new button, layout tweak)
-- `css/terminal-*.css` (any style change)
+- `css/` (12 order-prefixed files) (any style change)
 - `js/*.js` (any logic change the user will see or interact with)
 - `sw.js` itself
 

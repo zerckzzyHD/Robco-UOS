@@ -162,7 +162,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ```
 ├── index.html              DOM, inline handlers, GAME_FILES boot manifest, SW registration
-├── css/                    terminal.css split by section (2.8.5 U-A2), pure ordered cut —
+├── css/                    12 order-prefixed files (2.8.5 U-A2 split), source order = cascade order —
 │   ├── 05-base.css            Tokens, reset, layout, app-shell
 │   ├── 10-chrome.css          Device chrome (bezel/casing/glass) + per-game identity
 │   ├── 15-overseer.css        Director Uplink / Overseer presence
