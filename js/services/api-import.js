@@ -507,6 +507,13 @@ function autoImportState(jsonString) {
       if ('armor' in e) state.equipped.armor = e.armor || null;
       if ('headgear' in e) state.equipped.headgear = e.headgear || null;
     }
+    // The AI can resend the whole inventory array without a matching 'equipped'
+    // update, or omit 'equipped' entirely after an item leaves inventory
+    // narratively — never trust the AI's equipped slots without validating them
+    // against the inventory it (possibly) just replaced (Protocol 24). loadUI()'s
+    // existing _isDirty('equipped', ...) dirty-check picks up the change and
+    // repaints the readout — no direct render call needed here.
+    if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
 
     // Session Stats (#8) — AI can update kills, capsEarned, damageDealt
     if (parsed.stats && typeof parsed.stats === 'object') {

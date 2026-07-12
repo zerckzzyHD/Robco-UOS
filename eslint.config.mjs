@@ -93,6 +93,7 @@ export default [
         loadUI: 'readonly',
         saveState: 'readonly',
         migrateState: 'readonly',
+        reconcileEquipped: 'readonly', // state.js — reconciles state.equipped against state.inventory (Protocol 22 shared helper)
         autoImportState: 'readonly',
         sanitizeImportedContainer: 'readonly',
         syncStateFromDom: 'readonly',

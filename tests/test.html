@@ -427,6 +427,10 @@
             inventory: [
               { name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'weapon' },
               { name: 'Stimpak', qty: 8, wgt: 0.5, val: 75, type: 'aid' },
+              // Combat Armor must be present for the equipped.armor assertion below to
+              // survive reconcileEquipped() (js/core/state.js) — it clears any equipped
+              // slot naming an item that isn't actually in inventory (Protocol 13 fix).
+              { name: 'Combat Armor', qty: 1, wgt: 12, val: 500, type: 'armor' },
             ],
             squad: [
               { name: 'Boone', hp: 80, hpMax: 100, ammo: 30, condition: 'Good', weapon: null },
@@ -446,7 +450,7 @@
           })
         );
         assert(
-          state.inventory.length === 2 &&
+          state.inventory.length === 3 &&
             eq(state.inventory[0], {
               name: 'Plasma Rifle',
               qty: 1,
@@ -488,6 +492,22 @@
         assert(
           eq(state.equipped, { weapon: 'Plasma Rifle', armor: 'Combat Armor', headgear: null }),
           'equipped slots preserved (null headgear via "key in obj")',
+          JSON.stringify(state.equipped)
+        );
+
+        // Protocol 13 regression: an equipped slot naming an item that is NOT in the
+        // just-imported inventory is reconciled away (reconcileEquipped(), state.js) —
+        // headgear is left alone (no inventory item type backs it, AI-write-only).
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            inventory: [{ name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'weapon' }],
+            equipped: { weapon: 'Ghost Rifle', armor: 'Ghost Armor', headgear: 'Ghost Hat' },
+          })
+        );
+        assert(
+          eq(state.equipped, { weapon: null, armor: null, headgear: 'Ghost Hat' }),
+          'equipped slots naming an item absent from inventory are reconciled to null; headgear is untouched (Protocol 13)',
           JSON.stringify(state.equipped)
         );
 

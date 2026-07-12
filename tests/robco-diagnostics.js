@@ -974,6 +974,39 @@ try {
     migrated.equipped && migrated.equipped.weapon === null,
     'Migrated state added equipped object'
   );
+
+  // Regression (equipped/inventory dangling-reference bug): a save already in
+  // the stale state — state.equipped names an item that isn't in
+  // state.inventory (deleted/sold/scrapped before this fix, or a hand-edited
+  // import) — self-heals on migration, the same way any other structural
+  // migration runs on load (Protocol 34 "a save could already be in the bad
+  // state" concern). 'headgear' is untouched — it has no inventory item type
+  // backing it (AI-write-only).
+  const staleEquippedPayload = {
+    inventory: [{ name: 'Real Item', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+    equipped: { weapon: 'Ghost Rifle', armor: 'Ghost Armor', headgear: 'Ghost Hat' },
+  };
+  const migratedStale = sandbox.migrateState('2.8.0', staleEquippedPayload);
+  assert(
+    migratedStale.equipped.weapon === null && migratedStale.equipped.armor === null,
+    'migrateState() self-heals a stale equipped reference — weapon/armor slots naming an item no longer in inventory are cleared'
+  );
+  assert(
+    migratedStale.equipped.headgear === 'Ghost Hat',
+    'migrateState() leaves state.equipped.headgear untouched (no inventory item type backs it — AI-write-only)'
+  );
+
+  // No false positive: a VALID equipped reference (the item is still in
+  // inventory) must survive migration unchanged.
+  const validEquippedPayload = {
+    inventory: [{ name: 'Laser Rifle', qty: 1, wgt: 5, val: 100, type: 'weapon' }],
+    equipped: { weapon: 'Laser Rifle', armor: null, headgear: null },
+  };
+  const migratedValid = sandbox.migrateState('2.8.0', validEquippedPayload);
+  assert(
+    migratedValid.equipped.weapon === 'Laser Rifle',
+    'migrateState() does not clear a VALID equipped reference still present in inventory (no false-positive reconciliation)'
+  );
 } catch (e) {
   fail(`Runtime test failed: ${e.message}`);
 }
@@ -3901,6 +3934,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           '\n' +
           _decl(stateSource, '_migrateEventLog') +
           '\n' +
+          _decl(stateSource, 'reconcileEquipped') +
+          '\n' +
           _decl(stateSource, 'migrateState'),
         sandbox
       );
@@ -3989,6 +4024,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           _decl(stateSource, '_inferEventType') +
           '\n' +
           _decl(stateSource, '_migrateEventLog') +
+          '\n' +
+          _decl(stateSource, 'reconcileEquipped') +
           '\n' +
           _decl(stateSource, 'migrateState'),
         sandbox
@@ -5181,6 +5218,8 @@ header('Suite 51 — Save Integrity + Rolling Backups');
           _declFn(stateSrc51, '_inferEventType') +
           '\n' +
           _declFn(stateSrc51, '_migrateEventLog') +
+          '\n' +
+          _declFn(stateSrc51, 'reconcileEquipped') +
           '\n' +
           _declFn(stateSrc51, 'migrateState') +
           '\n' +
@@ -9545,6 +9584,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         lookupItemInDb: () => null,
         SKILL_LABELS: { repair: 'Repair' },
         RobcoEvents: { emit: () => {} }, // U7 — doCraft/doScrap emit craft.completed/craft.scrapped
+        reconcileEquipped: () => false, // Suite 221 fix — _craftConsume's new equipped-reconciliation call; this suite doesn't exercise equipped, so a no-op stub is correct
       };
       vm84.createContext(sb);
       vm84.runInContext(craftCode84, sb);
@@ -27676,7 +27716,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  scroll+search + FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma
 //  gauge (now a universal board with a nested FO3-only KARMA CENTER
 //  appendix). id/handler-preservation + game-agnostic + no-new-campaign-
-//  state + centering + reduced-motion guards. 20 tests.
+//  state + centering + reduced-motion guards. 23 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
@@ -27867,6 +27907,96 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       fo3Ok && fnvOk,
       '187.9c: [behavioral] renderKarmaCenter() run against a real DOM stub — usesKarmaCenter=true shows ONLY Karma Center (needle hidden), usesKarmaCenter=false shows ONLY the needle (Karma Center hidden)' +
         (errMsg187 ? ' — error: ' + errMsg187 : '')
+    );
+  }
+
+  // 187.9d  Protocol 38 fix: the Karma Center's companion-availability roster
+  //         is per-game DATA (GAME_DEFS.FO3.karmaCompanions), never a
+  //         hardcoded literal in feature code. renderKarmaCenter()'s body
+  //         must read _activeDef().karmaCompanions and must NOT contain any
+  //         of the FO3 companion names as string literals.
+  assert(
+    /_activeDef\(\)\.karmaCompanions/.test(karmaCenterBody187) &&
+      !/Dogmeat|Fawkes|Star Paladin Cross|Clover|Jericho|Charon|Sergeant RL-3/.test(
+        karmaCenterBody187
+      ),
+    '187.9d: renderKarmaCenter() reads companion names from _activeDef().karmaCompanions, not a hardcoded FO3 literal (Protocol 38)'
+  );
+
+  // 187.9e  GAME_DEFS.FO3.karmaCompanions carries the real roster as data
+  //         (good/evil/neutral tiers), and the field lives on state.js's
+  //         FO3 def specifically — this is a per-game DEFINITION entry
+  //         (GAME_DEFS), not a Protocol 4 `state` field.
+  const fo3DefBlockM187 = stateSource.match(/FO3:\s*\{[\s\S]*?\n {2}FO4:/);
+  const fo3DefBlock187 = fo3DefBlockM187 ? fo3DefBlockM187[0] : '';
+  assert(
+    /karmaCompanions:\s*\{[\s\S]*?good:\s*'Dogmeat, Fawkes, Star Paladin Cross'[\s\S]*?evil:\s*'Clover, Jericho'[\s\S]*?neutral:\s*'Charon, Sergeant RL-3'/.test(
+      fo3DefBlock187
+    ),
+    '187.9e: GAME_DEFS.FO3.karmaCompanions carries the good/evil/neutral companion roster as data'
+  );
+
+  // 187.9f  Behavioral (VM sandbox, real DOM stub + real GAME_DEFS data):
+  //         renderKarmaCenter() run at each karma tier, sourcing the REAL
+  //         GAME_DEFS.FO3.karmaCompanions data (loaded from the real
+  //         state.js, not a hand-written stub), produces the correct
+  //         companion text — proves the data plumbing end-to-end, not just
+  //         that the literals are absent from the render body.
+  {
+    const vm = require('vm');
+    let tiersOk187 = false;
+    let errMsg187f = '';
+    try {
+      const stateSandbox187 = { window: {} };
+      vm.createContext(stateSandbox187);
+      vm.runInContext(stateSource, stateSandbox187);
+      const realKarmaCompanions187 = vm.runInContext(
+        'GAME_DEFS.FO3.karmaCompanions',
+        stateSandbox187
+      );
+
+      function makeKarmaDom187f() {
+        const registry = new Map();
+        ['karmaCenterBlock', 'karmaNeedleReadout', 'karmaCenterDisplay'].forEach(id =>
+          registry.set(id, { style: {}, innerHTML: '' })
+        );
+        return { getElementById: id => registry.get(id) || null, _registry: registry };
+      }
+      // Local copy — 187.9c's declareFn187 is scoped to its own block.
+      function declareFn187f(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const parenIdx = src.indexOf('(', nameIdx);
+        const braceIdx = src.indexOf('{', parenIdx);
+        const params = src.slice(parenIdx, braceIdx);
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const runAt = karmaVal => {
+        const dom = makeKarmaDom187f();
+        const sandbox = {
+          document: dom,
+          state: { karma: karmaVal },
+          _activeDef: () => ({ usesKarmaCenter: true, karmaCompanions: realKarmaCompanions187 }),
+          console,
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(declareFn187f(render187, 'renderKarmaCenter'), sandbox);
+        vm.runInContext('renderKarmaCenter()', sandbox);
+        return dom._registry.get('karmaCenterDisplay').innerHTML;
+      };
+      const goodHtml = runAt(500);
+      const evilHtml = runAt(-500);
+      const neutralHtml = runAt(0);
+      tiersOk187 =
+        goodHtml.includes(realKarmaCompanions187.good) &&
+        evilHtml.includes(realKarmaCompanions187.evil) &&
+        neutralHtml.includes(realKarmaCompanions187.neutral);
+    } catch (e) {
+      errMsg187f = e && e.message;
+    }
+    assert(
+      tiersOk187,
+      '187.9f: [behavioral] renderKarmaCenter() sources the REAL GAME_DEFS.FO3.karmaCompanions data end-to-end — good/evil/neutral tiers render the correct roster' +
+        (errMsg187f ? ' — error: ' + errMsg187f : '')
     );
   }
 
@@ -40286,6 +40416,270 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       );
     }
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)
+// ══════════════════════════════════════════════════════════════
+//  WHY: state.equipped stores an item NAME per slot, not a reference. Every
+//  path that can remove an inventory item (delItem, adjItemQty draining to
+//  0, _craftConsume — shared by CRAFT ingredient consumption and SCRAP,
+//  doSell, and autoImportState's wholesale AI inventory replace) used to
+//  leave a stale state.equipped entry pointing at gear the Courier no
+//  longer carries — reproduced live (browser) before this fix landed.
+//  reconcileEquipped() in state.js is the ONE shared fix (Protocol 22); this
+//  suite locks that every removal path actually calls it, and behaviorally
+//  proves the real functions (not stubs) clear the stale reference.
+//  11 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)');
+
+  const delItemBody221 = extractFunctionBody(uiSource, 'delItem');
+  const adjQtyBody221 = extractFunctionBody(uiSource, 'adjItemQty');
+  const craftConsumeBody221 = extractFunctionBody(uiSource, '_craftConsume');
+  const doSellBody221 = extractFunctionBody(uiSource, 'doSell');
+  const autoImportBody221 = extractFunctionBody(apiSource, 'autoImportState');
+
+  // 221.1  delItem() calls reconcileEquipped(state) right after splicing the
+  //        item out, and only re-renders the equipped display when it
+  //        actually changed something (no unconditional re-render).
+  assert(
+    /state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);/.test(
+      delItemBody221
+    ),
+    '221.1: delItem() calls reconcileEquipped(state) after splicing, and calls renderEquipped() only when it changed something'
+  );
+
+  // 221.2  adjItemQty() calls reconcileEquipped(state) INSIDE the next===0
+  //        branch (the row-removed case) — not unconditionally, and not in
+  //        the qty-decrement branch where the item survives.
+  {
+    const zeroBranch221 = (adjQtyBody221.match(/if \(next === 0\) \{([\s\S]*?)\} else \{/) ||
+      [])[1];
+    assert(
+      !!zeroBranch221 &&
+        /state\.inventory\.splice\(idx, 1\);/.test(zeroBranch221) &&
+        /reconcileEquipped\(state\)/.test(zeroBranch221),
+      '221.2: adjItemQty() calls reconcileEquipped(state) inside the next===0 (row-removed) branch, alongside the splice'
+    );
+  }
+
+  // 221.3  _craftConsume() — shared by CRAFT ingredient consumption AND
+  //        SCRAP (doScrap → _scrapApply → _craftConsume, Protocol 22) —
+  //        calls reconcileEquipped(state) when an item is fully depleted.
+  assert(
+    /if \(state\.inventory\[idx\]\.qty === 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)/.test(
+      craftConsumeBody221
+    ),
+    '221.3: _craftConsume() (shared by CRAFT and SCRAP) calls reconcileEquipped(state) when an item is fully depleted'
+  );
+
+  // 221.4  doSell() calls reconcileEquipped(state) when the sold item's qty
+  //        drops to zero and is spliced out of inventory.
+  assert(
+    /if \(it\.qty <= 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)/.test(
+      doSellBody221
+    ),
+    '221.4: doSell() calls reconcileEquipped(state) when the sold item is fully depleted and removed from inventory'
+  );
+
+  // 221.5  autoImportState() calls reconcileEquipped(state) after applying
+  //        the AI's equipped block — validates the AI's equipped slots
+  //        against whatever inventory it just (possibly) replaced wholesale,
+  //        even if the AI omitted 'equipped' this turn (Protocol 24 — AI
+  //        output is never trusted without validation).
+  assert(
+    /if \('headgear' in e\) state\.equipped\.headgear = e\.headgear \|\| null;\s*\n\s*\}\s*\n[\s\S]{0,600}reconcileEquipped\(state\)/.test(
+      autoImportBody221
+    ),
+    "221.5: autoImportState() calls reconcileEquipped(state) after applying the AI's equipped block"
+  );
+
+  // 221.6  Behavioral (VM sandbox, REAL source): equip an item, delete it via
+  //        the real delItem(), and confirm state.equipped is actually
+  //        cleared and renderEquipped() was actually invoked — not just that
+  //        the call is present in the source text.
+  {
+    const vm = require('vm');
+    let renderEquippedCalls221 = 0;
+    let after221 = null;
+    let errMsg221 = '';
+    try {
+      const sandbox = {
+        window: {},
+        document: { getElementById: () => null },
+        renderInventory: () => {},
+        renderEquipped: () => {
+          renderEquippedCalls221++;
+        },
+        updateMath: () => {},
+        saveState: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function delItem(idx)' + delItemBody221, sandbox);
+      vm.runInContext(
+        "state.inventory = [{name:'Ghost Rifle',qty:1,wgt:1,val:1,type:'weapon'}];" +
+          "state.equipped = {weapon:'Ghost Rifle',armor:null,headgear:null};" +
+          'delItem(0);',
+        sandbox
+      );
+      after221 = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221 = e && e.message;
+    }
+    assert(
+      after221 && after221.weapon === null && renderEquippedCalls221 === 1,
+      '221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted' +
+        (errMsg221 ? ' — error: ' + errMsg221 : '')
+    );
+  }
+
+  // 221.7  Behavioral (VM sandbox, REAL source): adjItemQty() draining an
+  //        equipped item's qty to 0 clears state.equipped; draining a
+  //        multi-qty stack down to a SURVIVING row (qty 2 -> 1) must NOT
+  //        touch state.equipped (no false-positive reconciliation).
+  {
+    const vm = require('vm');
+    let drainedTo0_221 = null;
+    let survives221 = null;
+    let errMsg221b = '';
+    try {
+      function runAdj(startQty, delta) {
+        const sandbox = {
+          window: {},
+          document: { getElementById: () => null },
+          renderInventory: () => {},
+          renderEquipped: () => {},
+          updateMath: () => {},
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(stateSource, sandbox);
+        // stateSource declares its OWN real saveState()/syncStateFromDom(), which
+        // overwrites this sandbox's initial stub and reads real DOM fields
+        // (document.getElementById(...).value) unconditionally — override it back
+        // to a no-op AFTER loading stateSource, not before.
+        sandbox.saveState = () => {};
+        vm.runInContext('function adjItemQty(idx, delta)' + adjQtyBody221, sandbox);
+        vm.runInContext(
+          `state.inventory = [{name:'Ghost Armor',qty:${startQty},wgt:1,val:1,type:'armor'}];` +
+            "state.equipped = {weapon:null,armor:'Ghost Armor',headgear:null};" +
+            `adjItemQty(0, ${delta});`,
+          sandbox
+        );
+        return vm.runInContext('state.equipped', sandbox);
+      }
+      drainedTo0_221 = runAdj(1, -1); // 1 -> 0, row removed
+      survives221 = runAdj(2, -1); // 2 -> 1, row survives
+    } catch (e) {
+      errMsg221b = e && e.message;
+    }
+    assert(
+      drainedTo0_221 &&
+        drainedTo0_221.armor === null &&
+        survives221 &&
+        survives221.armor === 'Ghost Armor',
+      "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched" +
+        (errMsg221b ? ' — error: ' + errMsg221b : '')
+    );
+  }
+
+  // 221.8  Behavioral (VM sandbox, REAL source): _craftConsume() fully
+  //        depleting an equipped-named item clears state.equipped.
+  {
+    const vm = require('vm');
+    let after221c = null;
+    let errMsg221c = '';
+    try {
+      const sandbox = { window: {}, state: {} };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _craftConsume(itemName, qty)' + craftConsumeBody221, sandbox);
+      vm.runInContext(
+        "state.inventory = [{name:'Scrap Metal',qty:1,wgt:1,val:1,type:'misc'}];" +
+          "state.equipped = {weapon:'Scrap Metal',armor:null,headgear:null};" +
+          "_craftConsume('Scrap Metal', 1);",
+        sandbox
+      );
+      after221c = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221c = e && e.message;
+    }
+    assert(
+      after221c && after221c.weapon === null,
+      '221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item' +
+        (errMsg221c ? ' — error: ' + errMsg221c : '')
+    );
+  }
+
+  // 221.9  Behavioral (VM sandbox, REAL source, Suite 133 harness pattern):
+  //        the AI resends a full inventory array WITHOUT the previously-
+  //        equipped item, and omits 'equipped' entirely this turn — the
+  //        real autoImportState() still clears the now-dangling reference.
+  {
+    const vm = require('vm');
+    let after221d = null;
+    let errMsg221d = '';
+    try {
+      const sandbox = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error: () => {}, log: () => {}, warn: () => {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext(readGroup('reg_nv'), sandbox);
+      vm.runInContext(
+        'function autoImportState(jsonString)' +
+          autoImportBody221 +
+          '\nthis.autoImportState = autoImportState;',
+        sandbox
+      );
+      vm.runInContext(
+        "state.inventory = [{name:'Old Rifle',qty:1,wgt:1,val:1,type:'weapon'}];" +
+          "state.equipped = {weapon:'Old Rifle',armor:null,headgear:null};",
+        sandbox
+      );
+      const aiJson = JSON.stringify({
+        inventory: [{ name: 'Laser Pistol', qty: 1, wgt: 3, val: 50, type: 'weapon' }],
+      });
+      sandbox.autoImportState(aiJson);
+      after221d = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221d = e && e.message;
+    }
+    assert(
+      after221d && after221d.weapon === null,
+      "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely" +
+        (errMsg221d ? ' — error: ' + errMsg221d : '')
+    );
+  }
+
+  // 221.10  Protocol 22 — reconcileEquipped() is defined exactly ONCE (in
+  //         state.js). No caller forks its own local reconcile/cleanup
+  //         helper for this same concern.
+  const reconcileDefCount221 =
+    (stateSource.match(/function reconcileEquipped\(/g) || []).length +
+    (uiSource.match(/function reconcileEquipped\(/g) || []).length +
+    (apiSource.match(/function reconcileEquipped\(/g) || []).length;
+  assert(
+    reconcileDefCount221 === 1 && /function reconcileEquipped\(s\)/.test(stateSource),
+    '221.10: reconcileEquipped() is defined exactly once, in state.js (Protocol 22 — one shared reconciler, not forked per-caller)'
+  );
+
+  // 221.11  migrateState() calls reconcileEquipped() so a save already in
+  //         the stale state (from before this fix) self-heals on load —
+  //         the full behavioral proof lives in Suite 12; this locks the
+  //         call site stays wired.
+  const migrateBody221 = extractFunctionBody(stateSource, 'migrateState');
+  assert(
+    /reconcileEquipped\(s\);/.test(migrateBody221),
+    '221.11: migrateState() calls reconcileEquipped(s) so a pre-existing stale save self-heals on load'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -540,15 +540,19 @@ foreach ($key in $stateKeys) {
 # Suite 12 -- migrateState Runtime Execution Test
 # ===========================================================
 Sep "Suite 12 -- migrateState() Runtime Execution"
-# Mirror of Node Suite "migrateState() Runtime Execution": 6 granular assertions
-# against the same legacy v1 payload (not a single coarse pass/fail).
+# Mirror of Node Suite "migrateState() Runtime Execution": 9 granular assertions
+# (6 against the legacy v1 payload + 3 equipped/inventory reconciliation regression
+# checks) rather than a single coarse pass/fail.
 $migrateLabels = @(
     'Migrated state has structured factions.ncr',
     'Migrated state preserved ncr fame (50)',
     'Migrated state preserved legion fame (-10)',
     'Migrated state added perks array',
     'Migrated state added quests array',
-    'Migrated state added equipped object'
+    'Migrated state added equipped object',
+    'migrateState() self-heals a stale equipped reference -- weapon/armor slots naming an item no longer in inventory are cleared',
+    'migrateState() leaves state.equipped.headgear untouched (no inventory item type backs it -- AI-write-only)',
+    'migrateState() does not clear a VALID equipped reference still present in inventory (no false-positive reconciliation)'
 )
 try {
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
@@ -576,13 +580,30 @@ const r = [
     Array.isArray(m.quests),
     !!(m.equipped && m.equipped.weapon === null)
 ];
+// Regression (equipped/inventory dangling-reference bug): a save already in the
+// stale state self-heals on migration (Protocol 34 "already in the bad state"
+// concern); headgear is untouched (no inventory item type backs it); a VALID
+// reference survives (no false-positive reconciliation).
+const staleEquippedPayload = {
+    inventory: [{ name: 'Real Item', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+    equipped: { weapon: 'Ghost Rifle', armor: 'Ghost Armor', headgear: 'Ghost Hat' }
+};
+const migratedStale = sandbox.migrateState('2.8.0', staleEquippedPayload);
+r.push(migratedStale.equipped.weapon === null && migratedStale.equipped.armor === null);
+r.push(migratedStale.equipped.headgear === 'Ghost Hat');
+const validEquippedPayload = {
+    inventory: [{ name: 'Laser Rifle', qty: 1, wgt: 5, val: 100, type: 'weapon' }],
+    equipped: { weapon: 'Laser Rifle', armor: null, headgear: null }
+};
+const migratedValid = sandbox.migrateState('2.8.0', validEquippedPayload);
+r.push(migratedValid.equipped.weapon === 'Laser Rifle');
 console.log('RESULT:' + r.map(b => b ? '1' : '0').join(''));
 "@
         $out = ($testScript | node 2>&1 | Out-String)
-        $rm = [regex]::Match($out, 'RESULT:([01]{6})')
+        $rm = [regex]::Match($out, 'RESULT:([01]{9})')
         if ($rm.Success) {
             $bits = $rm.Groups[1].Value
-            for ($bi = 0; $bi -lt 6; $bi++) { Check ($bits.Substring($bi, 1) -eq '1') $migrateLabels[$bi] }
+            for ($bi = 0; $bi -lt 9; $bi++) { Check ($bits.Substring($bi, 1) -eq '1') $migrateLabels[$bi] }
         } else {
             $err = if ([string]::IsNullOrWhiteSpace($out)) { "No output from node" } else { $out.Trim() }
             foreach ($lbl in $migrateLabels) { Fail "$lbl  (runtime error: $err)" }
@@ -17264,7 +17285,7 @@ Check (
 # FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma gauge (now a universal
 # board with a nested FO3-only KARMA CENTER appendix). id/handler-preservation
 # + game-agnostic + no-new-campaign-state + centering + reduced-motion
-# guards. Mirrors JS Suite 187. (20 tests)
+# guards. Mirrors JS Suite 187. (23 tests)
 # ===========================================================
 Write-Host "`n-- Suite 187 -- Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin $('-' * 5)"
 $core187 = Read-Group "ui-core"
@@ -17414,6 +17435,104 @@ console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
     }
 } catch {
     Fail "187.9c: [behavioral] renderKarmaCenter() DOM-stub proof  (harness error: $_)"
+}
+
+# 187.9d  Protocol 38 fix: the Karma Center's companion-availability roster is
+#         per-game DATA (GAME_DEFS.FO3.karmaCompanions), never a hardcoded
+#         literal in feature code.
+Check (($karmaCenterBody187 -match '_activeDef\(\)\.karmaCompanions') -and `
+       -not ($karmaCenterBody187 -match 'Dogmeat|Fawkes|Star Paladin Cross|Clover|Jericho|Charon|Sergeant RL-3')) `
+    '187.9d: renderKarmaCenter() reads companion names from _activeDef().karmaCompanions, not a hardcoded FO3 literal (Protocol 38)'
+
+# 187.9e  GAME_DEFS.FO3.karmaCompanions carries the real roster as data
+#         (good/evil/neutral tiers) -- a per-game DEFINITION entry, not a
+#         Protocol 4 `state` field.
+$fo3DefBlockM187 = [regex]::Match($stateSrc, "FO3:\s*\{[\s\S]*?\n {2}FO4:")
+$fo3DefBlock187 = if ($fo3DefBlockM187.Success) { $fo3DefBlockM187.Value } else { '' }
+Check ([bool]([regex]::IsMatch($fo3DefBlock187, "karmaCompanions:\s*\{[\s\S]*?good:\s*'Dogmeat, Fawkes, Star Paladin Cross'[\s\S]*?evil:\s*'Clover, Jericho'[\s\S]*?neutral:\s*'Charon, Sergeant RL-3'"))) `
+    '187.9e: GAME_DEFS.FO3.karmaCompanions carries the good/evil/neutral companion roster as data'
+
+# 187.9f  Behavioral (shelled to node, real DOM stub + real GAME_DEFS data):
+#         renderKarmaCenter() run at each karma tier, sourcing the REAL
+#         GAME_DEFS.FO3.karmaCompanions data (loaded from the real state.js),
+#         produces the correct companion text.
+try {
+    $nodeCheck187f = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck187f) {
+        $repoRootNode187f = $Root.Replace('\', '/')
+        $testScript187f = @"
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+const uiDir187f = path.join('$repoRootNode187f', 'js', 'ui');
+const renderFiles187f = fs.readdirSync(uiDir187f).filter(function(f){ return f === 'ui-render.js' || (f.indexOf('ui-render-') === 0 && f.slice(-3) === '.js'); }).sort();
+const renderSource187f = renderFiles187f.map(function(f){ return fs.readFileSync(path.join(uiDir187f, f), 'utf8'); }).join('\n');
+const stateDir187f = path.join('$repoRootNode187f', 'js', 'core');
+const stateFiles187f = fs.readdirSync(stateDir187f).filter(function(f){ return f === 'state.js' || (f.indexOf('state-') === 0 && f.slice(-3) === '.js'); }).sort();
+const stateSource187f = stateFiles187f.map(function(f){ return fs.readFileSync(path.join(stateDir187f, f), 'utf8'); }).join('\n');
+function extractFunctionBody(source, fnName) {
+  let idx = source.indexOf('function ' + fnName);
+  if (idx === -1) throw new Error('Cannot find function "' + fnName + '"');
+  let i = source.indexOf('{', idx);
+  let depth = 0;
+  const start = i;
+  while (i < source.length) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    i++;
+  }
+  throw new Error('Unclosed brace for function "' + fnName + '"');
+}
+function declareFn(src, name) {
+  const nameIdx = src.indexOf('function ' + name);
+  const parenIdx = src.indexOf('(', nameIdx);
+  const braceIdx = src.indexOf('{', parenIdx);
+  const params = src.slice(parenIdx, braceIdx);
+  return 'function ' + name + params + extractFunctionBody(src, name);
+}
+const stateSandbox187f = { window: {} };
+vm.createContext(stateSandbox187f);
+vm.runInContext(stateSource187f, stateSandbox187f);
+const realKarmaCompanions187f = vm.runInContext('GAME_DEFS.FO3.karmaCompanions', stateSandbox187f);
+function makeKarmaDom() {
+  const registry = new Map();
+  ['karmaCenterBlock', 'karmaNeedleReadout', 'karmaCenterDisplay'].forEach(id => registry.set(id, { style: {}, innerHTML: '' }));
+  return { getElementById: id => registry.get(id) || null, _registry: registry };
+}
+function runAt(karmaVal) {
+  const dom = makeKarmaDom();
+  const sandbox = { document: dom, state: { karma: karmaVal }, _activeDef: () => ({ usesKarmaCenter: true, karmaCompanions: realKarmaCompanions187f }), console };
+  vm.createContext(sandbox);
+  vm.runInContext(declareFn(renderSource187f, 'renderKarmaCenter'), sandbox);
+  vm.runInContext('renderKarmaCenter()', sandbox);
+  return dom._registry.get('karmaCenterDisplay').innerHTML;
+}
+const goodHtml = runAt(500);
+const evilHtml = runAt(-500);
+const neutralHtml = runAt(0);
+const ok = goodHtml.indexOf(realKarmaCompanions187f.good) >= 0 && evilHtml.indexOf(realKarmaCompanions187f.evil) >= 0 && neutralHtml.indexOf(realKarmaCompanions187f.neutral) >= 0;
+console.log('RESULT:' + (ok ? '1' : '0'));
+"@
+        $tmpScript187f = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript187f, $testScript187f, [System.Text.Encoding]::UTF8)
+        try {
+            $out187f = (node $tmpScript187f 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript187f -Force -ErrorAction SilentlyContinue
+        }
+        $rm187f = [regex]::Match($out187f, 'RESULT:([01])')
+        if ($rm187f.Success) {
+            Check ($rm187f.Groups[1].Value -eq '1') `
+                '187.9f: [behavioral] renderKarmaCenter() sources the REAL GAME_DEFS.FO3.karmaCompanions data end-to-end -- good/evil/neutral tiers render the correct roster'
+        } else {
+            $err187f = if ([string]::IsNullOrWhiteSpace($out187f)) { "No output from node" } else { $out187f.Trim() }
+            Fail "187.9f: [behavioral] renderKarmaCenter() companion-data proof  (runtime error: $err187f)"
+        }
+    } else {
+        Fail "187.9f: [behavioral] renderKarmaCenter() companion-data proof  (node not found)"
+    }
+} catch {
+    Fail "187.9f: [behavioral] renderKarmaCenter() companion-data proof  (harness error: $_)"
 }
 
 # 187.10  #stat_karma/#karma_label are kept as the one real karma control, wired to updateKarmaUI()
@@ -26833,6 +26952,203 @@ if ($nonManifestFiles220.Count -gt 0) {
 } else {
     Check ($true) "220.8 (local-only): skipped -- no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
 }
+
+# ===========================================================
+# Suite 221 -- Equipped/Inventory Reconciliation (Protocol 13 regression)
+# ===========================================================
+# WHY: state.equipped stores an item NAME per slot, not a reference. Every
+# path that can remove an inventory item (delItem, adjItemQty draining to 0,
+# _craftConsume -- shared by CRAFT ingredient consumption and SCRAP, doSell,
+# and autoImportState's wholesale AI inventory replace) used to leave a stale
+# state.equipped entry pointing at gear the Courier no longer carries --
+# reproduced live (browser) before this fix landed. reconcileEquipped() in
+# state.js is the ONE shared fix (Protocol 22); this suite locks that every
+# removal path actually calls it, and behaviorally proves the real functions
+# (not stubs) clear the stale reference. Mirrors JS Suite 221. 11 tests.
+# ===========================================================
+Sep "Suite 221 -- Equipped/Inventory Reconciliation (Protocol 13 regression)"
+
+$delItemBody221 = Get-FunctionBody $uiSrc 'delItem'
+$adjQtyBody221 = Get-FunctionBody $uiSrc 'adjItemQty'
+$craftConsumeBody221 = Get-FunctionBody $uiSrc '_craftConsume'
+$doSellBody221 = Get-FunctionBody $uiSrc 'doSell'
+$autoImportBody221 = Get-FunctionBody $apiSrc 'autoImportState'
+
+# 221.1  delItem() calls reconcileEquipped(state) right after splicing the item
+#        out, and only re-renders the equipped display when it actually changed.
+Check ([bool]([regex]::IsMatch($delItemBody221, "state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);"))) `
+    '221.1: delItem() calls reconcileEquipped(state) after splicing, and calls renderEquipped() only when it changed something'
+
+# 221.2  adjItemQty() calls reconcileEquipped(state) INSIDE the next===0 branch
+#        (row-removed case) -- not unconditionally, and not in the surviving branch.
+$zeroBranch221 = [regex]::Match($adjQtyBody221, "if \(next === 0\) \{([\s\S]*?)\} else \{")
+$zeroBranchText221 = if ($zeroBranch221.Success) { $zeroBranch221.Groups[1].Value } else { '' }
+Check ($zeroBranch221.Success -and ($zeroBranchText221 -match 'state\.inventory\.splice\(idx, 1\);') -and ($zeroBranchText221 -match 'reconcileEquipped\(state\)')) `
+    '221.2: adjItemQty() calls reconcileEquipped(state) inside the next===0 (row-removed) branch, alongside the splice'
+
+# 221.3  _craftConsume() -- shared by CRAFT ingredient consumption AND SCRAP
+#        (doScrap -> _scrapApply -> _craftConsume, Protocol 22) -- calls
+#        reconcileEquipped(state) when an item is fully depleted.
+Check ([bool]([regex]::IsMatch($craftConsumeBody221, "if \(state\.inventory\[idx\]\.qty === 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)"))) `
+    '221.3: _craftConsume() (shared by CRAFT and SCRAP) calls reconcileEquipped(state) when an item is fully depleted'
+
+# 221.4  doSell() calls reconcileEquipped(state) when the sold item's qty drops
+#        to zero and is spliced out of inventory.
+Check ([bool]([regex]::IsMatch($doSellBody221, "if \(it\.qty <= 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)"))) `
+    '221.4: doSell() calls reconcileEquipped(state) when the sold item is fully depleted and removed from inventory'
+
+# 221.5  autoImportState() calls reconcileEquipped(state) after applying the
+#        AI's equipped block -- validates the AI's equipped slots against
+#        whatever inventory it just (possibly) replaced wholesale, even if the
+#        AI omitted 'equipped' this turn (Protocol 24).
+Check ([bool]([regex]::IsMatch($autoImportBody221, "if \('headgear' in e\) state\.equipped\.headgear = e\.headgear \|\| null;\s*\n\s*\}\s*\n[\s\S]{0,600}reconcileEquipped\(state\)"))) `
+    "221.5: autoImportState() calls reconcileEquipped(state) after applying the AI's equipped block"
+
+# 221.6-221.9  Behavioral (shelled to node, REAL source -- mirrors the
+#              Suite 12/187.9c pattern): equip/deplete/AI-replace against the
+#              ACTUAL delItem/adjItemQty/_craftConsume/autoImportState bodies,
+#              not stubs -- confirms the reconciliation genuinely works, not
+#              just that the call is present in the source text.
+try {
+    $nodeCheck221 = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCheck221) {
+        $repoRootNode221 = $Root.Replace('\', '/')
+        $testScript221 = @"
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+function readGroupNode(dir, stem) {
+  const files = fs.readdirSync(dir).filter(function(f){ return f === stem + '.js' || (f.indexOf(stem + '-') === 0 && f.slice(-3) === '.js'); }).sort();
+  return files.map(function(f){ return fs.readFileSync(path.join(dir, f), 'utf8'); }).join('\n');
+}
+const uiDir221 = path.join('$repoRootNode221', 'js', 'ui');
+const uiSource221 = readGroupNode(uiDir221, 'ui-render');
+const stateDir221 = path.join('$repoRootNode221', 'js', 'core');
+const stateSource221 = readGroupNode(stateDir221, 'state');
+const apiDir221 = path.join('$repoRootNode221', 'js', 'services');
+const apiSource221 = readGroupNode(apiDir221, 'api');
+const regDir221 = path.join('$repoRootNode221', 'js', 'data');
+const regNvSource221 = readGroupNode(regDir221, 'reg_nv');
+function extractFunctionBody(source, fnName) {
+  let idx = source.indexOf('function ' + fnName);
+  if (idx === -1) throw new Error('Cannot find function "' + fnName + '"');
+  let i = source.indexOf('{', idx);
+  let depth = 0;
+  const start = i;
+  while (i < source.length) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    i++;
+  }
+  throw new Error('Unclosed brace for function "' + fnName + '"');
+}
+const results = [];
+// 221.6 delItem
+try {
+  const sandbox = { window: {}, document: { getElementById: () => null }, renderInventory: () => {}, renderEquipped: () => { sandbox.__calls = (sandbox.__calls||0)+1; }, updateMath: () => {} };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  vm.runInContext('function delItem(idx)' + extractFunctionBody(uiSource221, 'delItem'), sandbox);
+  vm.runInContext("state.inventory = [{name:'Ghost Rifle',qty:1,wgt:1,val:1,type:'weapon'}]; state.equipped = {weapon:'Ghost Rifle',armor:null,headgear:null}; delItem(0);", sandbox);
+  const after = vm.runInContext('state.equipped', sandbox);
+  results.push(after.weapon === null && sandbox.__calls === 1);
+} catch (e) { results.push(false); }
+// 221.7 adjItemQty (drain to 0 clears; surviving row untouched)
+try {
+  function runAdj(startQty, delta) {
+    const sandbox = { window: {}, document: { getElementById: () => null }, renderInventory: () => {}, renderEquipped: () => {}, updateMath: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(stateSource221, sandbox);
+    sandbox.saveState = () => {}; // override the REAL saveState() stateSource221 just declared (it reads real DOM fields)
+    vm.runInContext('function adjItemQty(idx, delta)' + extractFunctionBody(uiSource221, 'adjItemQty'), sandbox);
+    vm.runInContext("state.inventory = [{name:'Ghost Armor',qty:" + startQty + ",wgt:1,val:1,type:'armor'}]; state.equipped = {weapon:null,armor:'Ghost Armor',headgear:null}; adjItemQty(0, " + delta + ");", sandbox);
+    return vm.runInContext('state.equipped', sandbox);
+  }
+  const drained = runAdj(1, -1);
+  const survives = runAdj(2, -1);
+  results.push(drained.armor === null && survives.armor === 'Ghost Armor');
+} catch (e) { results.push(false); }
+// 221.8 _craftConsume
+try {
+  const sandbox = { window: {}, state: {} };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  vm.runInContext('function _craftConsume(itemName, qty)' + extractFunctionBody(uiSource221, '_craftConsume'), sandbox);
+  vm.runInContext("state.inventory = [{name:'Scrap Metal',qty:1,wgt:1,val:1,type:'misc'}]; state.equipped = {weapon:'Scrap Metal',armor:null,headgear:null}; _craftConsume('Scrap Metal', 1);", sandbox);
+  const after = vm.runInContext('state.equipped', sandbox);
+  results.push(after.weapon === null);
+} catch (e) { results.push(false); }
+// 221.9 autoImportState (AI resends inventory without the equipped item, omits 'equipped')
+try {
+  const sandbox = { window: {}, document: { getElementById: () => null }, console: { error: () => {}, log: () => {}, warn: () => {} }, loadUI: () => {}, appendToChat: () => {}, expandPanelForCategory: () => {} };
+  vm.createContext(sandbox);
+  vm.runInContext(stateSource221, sandbox);
+  vm.runInContext(regNvSource221, sandbox);
+  vm.runInContext('function autoImportState(jsonString)' + extractFunctionBody(apiSource221, 'autoImportState') + '\nthis.autoImportState = autoImportState;', sandbox);
+  vm.runInContext("state.inventory = [{name:'Old Rifle',qty:1,wgt:1,val:1,type:'weapon'}]; state.equipped = {weapon:'Old Rifle',armor:null,headgear:null};", sandbox);
+  const aiJson = JSON.stringify({ inventory: [{ name: 'Laser Pistol', qty: 1, wgt: 3, val: 50, type: 'weapon' }] });
+  sandbox.autoImportState(aiJson);
+  const after = vm.runInContext('state.equipped', sandbox);
+  results.push(after.weapon === null);
+} catch (e) { results.push(false); }
+console.log('RESULT:' + results.map(r => r ? '1' : '0').join(''));
+"@
+        $tmpScript221 = [System.IO.Path]::GetTempFileName() + '.js'
+        [System.IO.File]::WriteAllText($tmpScript221, $testScript221, [System.Text.Encoding]::UTF8)
+        try {
+            $out221 = (node $tmpScript221 2>&1 | Out-String)
+        } finally {
+            Remove-Item -Path $tmpScript221 -Force -ErrorAction SilentlyContinue
+        }
+        $rm221 = [regex]::Match($out221, 'RESULT:([01]{4})')
+        $behavioralLabels221 = @(
+            "221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted",
+            "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched",
+            "221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item",
+            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely"
+        )
+        if ($rm221.Success) {
+            $bits221 = $rm221.Groups[1].Value
+            for ($bi221 = 0; $bi221 -lt 4; $bi221++) { Check ($bits221.Substring($bi221, 1) -eq '1') $behavioralLabels221[$bi221] }
+        } else {
+            $err221 = if ([string]::IsNullOrWhiteSpace($out221)) { "No output from node" } else { $out221.Trim() }
+            foreach ($lbl in $behavioralLabels221) { Fail "$lbl  (runtime error: $err221)" }
+        }
+    } else {
+        $behavioralLabels221 = @(
+            "221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted",
+            "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched",
+            "221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item",
+            "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely"
+        )
+        foreach ($lbl in $behavioralLabels221) { Fail "$lbl  (node not found)" }
+    }
+} catch {
+    $behavioralLabels221 = @(
+        "221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted",
+        "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched",
+        "221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item",
+        "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely"
+    )
+    foreach ($lbl in $behavioralLabels221) { Fail "$lbl  (harness error: $_)" }
+}
+
+# 221.10  Protocol 22 -- reconcileEquipped() is defined exactly once, in
+#         state.js. No caller forks its own local reconcile/cleanup helper.
+$reconcileDefCount221 = (
+    ([regex]::Matches($stateSrc, "function reconcileEquipped\(")).Count +
+    ([regex]::Matches($uiSrc, "function reconcileEquipped\(")).Count +
+    ([regex]::Matches($apiSrc, "function reconcileEquipped\(")).Count
+)
+Check (($reconcileDefCount221 -eq 1) -and ([bool]($stateSrc -match "function reconcileEquipped\(s\)"))) `
+    '221.10: reconcileEquipped() is defined exactly once, in state.js (Protocol 22 -- one shared reconciler, not forked per-caller)'
+
+# 221.11  migrateState() calls reconcileEquipped() so a save already in the
+#         stale state (from before this fix) self-heals on load -- the full
+#         behavioral proof lives in Suite 12; this locks the call site stays wired.
+$migrateBody221 = Get-FunctionBody $stateSrc 'migrateState'
+Check ([bool]($migrateBody221 -match "reconcileEquipped\(s\);")) `
+    '221.11: migrateState() calls reconcileEquipped(s) so a pre-existing stale save self-heals on load'
 
 # ===========================================================
 # Results

@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Tests: 2980/2980 | Cache: robco-terminal-v2.8.0-r10 -->
+## [Unreleased]<!-- Tests: 2997/2997 | Cache: robco-terminal-v2.8.0-r11 -->
+
+### Fixed
+
+- Deleting, selling, scrapping, using up, or having the Director replace an equipped weapon or piece of armor no longer leaves your bio-metrics readout showing gear you don't actually have anymore — it now correctly clears to "Nothing equipped" (or shows whatever you still have on) the moment the item is gone. A save from before this fix self-heals the first time it's loaded.
 
 ### Under the Hood
 
@@ -11,6 +15,7 @@
 - Split the file handling the AI conversation into four smaller files by responsibility (the network connection itself, the AI's instructions, applying the AI's replies to your campaign, and the offline typed-command shortcuts), instead of one large catch-all file. Also widened the internal file-corruption safety check so it automatically covers every code file going forward instead of a fixed hand-picked list. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - Split the last of the big catch-all front-end files into nine smaller ones organized by what each actually does (your cargo and ammo, your character and squad status, your personal record and collectibles, your field notes and event log, the cartography table, faction standing, crafting and trade, item pickups, and the native databank lookups), instead of one very large file covering every on-screen panel. Also fixed a couple of internal test checks that were quietly scanning the wrong slice of code after the split. Purely an internal reorganization for readability and maintainability — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - Added plain-English "what this file is and how it fits together" notes and internal signposting throughout the code and stylesheets, and corrected a few stale internal cross-references left over from the recent reorganization. Purely a readability pass for future development — every screen, button, and behavior works exactly as before. Nothing you can see changed.
+- The Fallout 3 Karma Center's companion-availability list now reads from the game's own data definitions instead of being hardcoded into the display code, matching how every other per-game detail already works. Nothing you can see changed.
 
 ---
 

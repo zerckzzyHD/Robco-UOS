@@ -38,7 +38,10 @@ function _craftConsume(itemName, qty) {
   const idx = (state.inventory || []).findIndex(i => i.name.toLowerCase() === lower);
   if (idx === -1) return;
   state.inventory[idx].qty = Math.max(0, (state.inventory[idx].qty || 0) - qty);
-  if (state.inventory[idx].qty === 0) state.inventory.splice(idx, 1);
+  if (state.inventory[idx].qty === 0) {
+    state.inventory.splice(idx, 1);
+    if (reconcileEquipped(state) && typeof renderEquipped === 'function') renderEquipped();
+  }
 }
 
 function craftSetMax(recipeIdx, maxVal) {
@@ -603,7 +606,10 @@ async function doSell(name) {
   const _capsSellEl = document.getElementById('c_caps');
   if (_capsSellEl) _capsSellEl.value = state.caps;
   it.qty = (it.qty || 1) - 1;
-  if (it.qty <= 0) state.inventory.splice(idx, 1);
+  if (it.qty <= 0) {
+    state.inventory.splice(idx, 1);
+    if (reconcileEquipped(state) && typeof renderEquipped === 'function') renderEquipped();
+  }
   if (typeof renderInventory === 'function') renderInventory();
   if (typeof updateMath === 'function') updateMath();
   renderTrade();

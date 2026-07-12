@@ -59,6 +59,7 @@ function addItem() {
 }
 function delItem(idx) {
   state.inventory.splice(idx, 1);
+  if (reconcileEquipped(state)) renderEquipped();
   renderInventory();
   updateMath();
 }
@@ -74,6 +75,7 @@ function adjItemQty(idx, delta) {
   const next = Math.max(0, (parseInt(it.qty) || 0) + delta);
   if (next === 0) {
     state.inventory.splice(idx, 1);
+    if (reconcileEquipped(state)) renderEquipped();
   } else {
     it.qty = next;
   }

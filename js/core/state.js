@@ -1235,6 +1235,18 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       'unarmed',
     ],
     usesKarmaCenter: true,
+    // Karma Center companion-availability notes (Protocol 38 — per-game gameplay
+    // data, not a feature-code literal). Tiered on the SAME karma thresholds the
+    // Karma Center display already uses (>=250 good / <=-250 evil / else neutral)
+    // — those thresholds are a universal karma-scale convention, not FO3-specific,
+    // so only the roster names live here. Read via _activeDef().karmaCompanions
+    // in js/ui/ui-render-factions.js, gated behind usesKarmaCenter so it is only
+    // ever reached for FO3 today.
+    karmaCompanions: {
+      good: 'Dogmeat, Fawkes, Star Paladin Cross',
+      evil: 'Clover, Jericho',
+      neutral: 'Charon, Sergeant RL-3',
+    },
     collectibleLabel: 'BOBBLEHEADS',
     collectibleCategory: 'bobblehead',
     tracksLincoln: true,
@@ -1940,6 +1952,33 @@ async function applyBundleData(parsed) {
 }
 window.applyBundleData = applyBundleData;
 
+// ── EQUIPPED/INVENTORY RECONCILIATION ──────────────────────────────
+// state.equipped stores an item NAME per slot, not a reference — if the
+// named item leaves state.inventory (deleted, sold, scrapped/consumed as a
+// craft ingredient, or replaced wholesale by an AI/cloud import) the slot
+// goes stale and keeps showing gear the Courier no longer carries. Every
+// inventory-removal path calls this after mutating inventory (Protocol 22 —
+// one shared reconciler, not a guard duplicated per-caller); migrateState()
+// below also calls it on every load so a save already in the stale state
+// from before this fix self-heals. 'headgear' is excluded on purpose — it
+// has no inventory item type backing it (AI-write-only, see the toggleEquipItem
+// comment in ui-render-inventory.js), so there is nothing to reconcile it
+// against. Returns true if a slot was cleared, so callers know whether to
+// re-render the equipped-gear readout.
+function reconcileEquipped(s) {
+  if (!s || !s.equipped) return false;
+  const inv = Array.isArray(s.inventory) ? s.inventory : [];
+  let changed = false;
+  ['weapon', 'armor'].forEach(slot => {
+    const name = s.equipped[slot];
+    if (name && !inv.some(it => it && it.name === name)) {
+      s.equipped[slot] = null;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 // ── SAVE VERSION MIGRATION (#16) ─────────────────────────────────
 // Chain of migrations applied whenever a save from an older version is loaded.
 // Add a new entry for each version that changes state structure.
@@ -2037,6 +2076,11 @@ function migrateState(version, s) {
     });
     s.padBindings = pb;
   }
+
+  // A save from before the equipped/inventory reconciliation fix (or a hand-
+  // edited import) may already reference an item that isn't in state.inventory
+  // — self-heal it on every load, same as any other migration.
+  reconcileEquipped(s);
 
   return s;
 }

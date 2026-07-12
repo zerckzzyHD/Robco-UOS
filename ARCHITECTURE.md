@@ -105,8 +105,8 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2980-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2980-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.ps1   28KB    2997-test pre-commit audit
+│   ├── robco-diagnostics.js    36KB    2997-test Node runner (parity with .ps1)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── run-tests.bat           (Batch launcher)
@@ -1721,6 +1721,27 @@ audit gap — `state.equipped.weapon`/`.armor` one-per-slot-family, toggle-off o
 not a fork). `_updateContextPanels()`'s FO3 no-mods fallback now resets to `'weapon'` instead of the
 retired `'all'`.
 
+**Equipped/inventory reconciliation (bug fix):** `state.equipped` stores an item **name** per slot, not a
+reference, so any path that removes an inventory item left a stale `state.equipped` entry pointing at
+gear the Courier no longer carried (confirmed live before the fix — the equipped-gear readout kept
+showing a deleted item). `reconcileEquipped(s)` (`js/core/state.js`) is the one shared reconciler
+(Protocol 22): it clears a `weapon`/`armor` slot whose named item is no longer in `s.inventory`, leaving
+`headgear` untouched (it has no inventory item type backing it — AI-write-only). Every removal path calls
+it — `delItem()`/`adjItemQty()` (`js/ui/ui-render-inventory.js`), `_craftConsume()` (shared by CRAFT
+ingredient consumption and SCRAP) and `doSell()` (`js/ui/ui-render-economy.js`), and `autoImportState()`
+(`js/services/api-import.js`, validating the AI's equipped slots against whatever inventory it just
+replaced wholesale, even when the AI omits `equipped` that turn) — and `migrateState()` also calls it on
+every load, so a save already in the stale state from before this fix self-heals. Protocol 13-regression-
+tested (Suite 221 + Suite 12 additions).
+
+**Karma Center companion roster (Protocol 38 fix):** `renderKarmaCenter()`'s (`js/ui/ui-render-factions.js`)
+companion-availability text used to hardcode the FO3 companion names per karma tier directly in feature
+code — a Protocol 38 violation, mirroring the earlier BUS-14 SQUAD ROSTER fix above. The roster now lives
+as data on `GAME_DEFS.FO3.karmaCompanions` (`good`/`evil`/`neutral` string fields — a per-game
+**definition** entry, not a `state` field, so Protocol 4 doesn't apply); the render function reads
+`_activeDef().karmaCompanions`. No visible behavior change — the panel is already gated behind
+`usesKarmaCenter` (FO3 only today).
+
 **BUS-12 FIELD FABRICATION** (ex-CRAFTING) — `renderCraftCard()` gains a HAVE/NEED **meter-fill bar**
 per ingredient (`.ing`/`.hn-meter`, short = red `.ing.short`) alongside the existing have/need
 numbers, via a plain `animation: opsMeterFill` (reduced-motion-safe). `doCraft`/`doScrap` and their
@@ -3136,7 +3157,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2980-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2997-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

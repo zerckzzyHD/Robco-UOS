@@ -242,16 +242,20 @@ function renderKarmaCenter() {
     html += `<div style="font-size:10px;letter-spacing:1px;opacity:0.8;border:1px dashed rgba(255,80,80,0.6);padding:4px 6px;margin-bottom:6px;">[!] ENCLAVE HIT SQUAD RISK</div>`;
   }
 
-  // Companion availability notes based on karma
-  html += `<div style="font-size:10px;opacity:0.55;margin-top:4px;">`;
-  if (karma >= 250) {
-    html += `COMPANIONS: Dogmeat, Fawkes, Star Paladin Cross available`;
-  } else if (karma <= -250) {
-    html += `COMPANIONS: Clover, Jericho available`;
-  } else {
-    html += `COMPANIONS: Charon, Sergeant RL-3 available`;
+  // Companion availability notes based on karma — roster is per-game DATA
+  // (Protocol 38), never a hardcoded literal here; see GAME_DEFS.FO3.karmaCompanions.
+  const companions = _activeDef().karmaCompanions;
+  if (companions) {
+    html += `<div style="font-size:10px;opacity:0.55;margin-top:4px;">`;
+    if (karma >= 250) {
+      html += `COMPANIONS: ${companions.good} available`;
+    } else if (karma <= -250) {
+      html += `COMPANIONS: ${companions.evil} available`;
+    } else {
+      html += `COMPANIONS: ${companions.neutral} available`;
+    }
+    html += `</div>`;
   }
-  html += `</div>`;
 
   display.innerHTML = html;
 }
