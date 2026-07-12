@@ -24,7 +24,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Two-store boundary** — campaign state (`state` / `robco_v8`) vs. device prefs (`MetaStore` / `META_MANIFEST`) | `library/CODE_MAP.md` § Two-Store Boundary; the rule itself is Protocol 23 below |
 | **Render pipeline** — `loadUI()`, every `render*()` function and its panel, the CRUD helpers | `library/CODE_MAP.md` § Render Pipeline (`js/ui/ui-render.js`) |
 | **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/dev/test-console.js`) |
-| **Test system** — how the gate runs, both runners, suite numbering, parity | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
+| **Test system** — how the gate runs, the single Node runner, suite numbering | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
 | **Full per-suite test catalog** — every suite's coverage, every work-unit's build narration (large; read only when suite-level detail is actually needed) | `library/TEST_CATALOG.md` (gitignored, local-only — see the 3-class model below) |
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
 | **Plain-English release history** | `CHANGELOG.md` |
@@ -107,14 +107,13 @@ Whenever tests are **added or removed**, update the hardcoded count in **every**
 | `README.md`                   | Technology stack table · File structure comment · Commit workflow block · Current State bullet                                                                         |
 | `ARCHITECTURE.md`             | Pre-commit checklist (`all N+ tests`)                                                                                                                                  |
 | `CHANGELOG.md`                | **Current Unreleased section header only** (`## [v2.5.0] — Unreleased<!-- Tests: N/N \| Cache: ... -->`). Released version entries (e.g. `v2.0.1`) are frozen at their release-day values — never update them retroactively. |
-| `tests/robco-diagnostics.js`  | Per-suite `// N tests` comments at the top of each suite block                                                                                                         |
-| `tests/robco-diagnostics.ps1` | Per-suite `# N tests` comments at the top of each suite block                                                                                                          |
+| `tests/robco-diagnostics.js`  | Per-suite `// N tests` comments at the top of each suite block (the single canonical runner)                                                                            |
 | `tests/test.html`             | `Suites: N` header-comment marker (Protocol 40) — must equal the actual `section('…')` count; update when a runtime suite is added/removed                              |
 
 **How to find all stale counts before committing:**
 
 ```powershell
-Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGELOG.md","tests/robco-diagnostics.js","tests/robco-diagnostics.ps1","tests/test.html" -Pattern "\d+[- ]tests?|Suites:\s*\d+" | Select-Object Filename,LineNumber,Line
+Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGELOG.md","tests/robco-diagnostics.js","tests/test.html" -Pattern "\d+[- ]tests?|Suites:\s*\d+" | Select-Object Filename,LineNumber,Line
 ```
 
 Run this after every test addition or removal. Every hit must show the new count **except** the frozen released-version entry in `CHANGELOG.md` (e.g. `v2.0.1` shows its release-day count of 258 — that is intentional and correct). This command deliberately omits `library/TEST_CATALOG.md` — it is gitignored and may not exist on every machine; sync it by hand when it is present, same as `library/BRAIN_DUMP.md`.
@@ -248,7 +247,7 @@ Never run two sessions that commit/push this repo at the same time — sequence 
 
 ## Protocol 13 — Regression Test Required
 
-When a bug is fixed, add a regression test in the **same commit** that would have caught it, and re-sync the count per Protocol 2a in both runners. **No bug fix ships without a guarding test — this is mandatory.** The only permitted exemption is when the bug genuinely cannot be reproduced in the test sandbox (e.g. requires a live network, real browser API, or hardware-specific behavior); in that case the commit message must explicitly state the reason.
+When a bug is fixed, add a regression test in the **same commit** that would have caught it, and re-sync the count per Protocol 2a. **No bug fix ships without a guarding test — this is mandatory.** The only permitted exemption is when the bug genuinely cannot be reproduced in the test sandbox (e.g. requires a live network, real browser API, or hardware-specific behavior); in that case the commit message must explicitly state the reason.
 
 ---
 
@@ -258,9 +257,9 @@ When changing `getSystemDirective()`'s schema or the Tri-Node JSON response shap
 
 ---
 
-## Protocol 15 — Test-Runner Parity
+## Protocol 15 — Test-Runner Parity — RETIRED (2.8.5 U-B3, 2026-07-12)
 
-`tests/robco-diagnostics.js` (Node) and `tests/robco-diagnostics.ps1` (PowerShell) must stay at identical coverage and count. Change one → update the other in the **same commit**, and verify both report the same count and pass. (This is what drifted into the 173-vs-209 gap.)
+**RETIRED.** This protocol policed the two-runner duplication (Node + PowerShell). The PowerShell mirror (`tests/robco-diagnostics.ps1`) was **deleted** in 2.8.5 U-B3 after an evidence-backed review found it caught **nothing** the Node runner cannot: its "behavioral" tests shelled out to `node` (reconstructing the same `vm`-sandbox harness in a string), and its static tests were byte-identical UTF-8 file greps — at ~13× the runtime cost (≈22 s vs ≈2 s) and double the authoring cost of every test. With one runner there is no parity to enforce. This is the project's first deliberate protocol **retirement**; the number is not reused. The former parity checks are inverted into deletion-regression guards (Suites 28, 31.2, 50.6, 128.5) so the mirror cannot silently return.
 
 ---
 
@@ -446,7 +445,7 @@ When a post-deploy regression in a networked/IO feature is detected, the dev pro
 
 ## Protocol 36 — Gate Parity & Escape-Ratchet
 
-**(a) GATE PARITY:** The local gate is split at the commit/push boundary. The pre-commit hook runs the FAST subset (`npm run gate:fast`: lint, format, both test runners + parity check) to keep commits quick (~10–15 s). The pre-push hook runs the FULL gate (`npm run gate`, adds Playwright boot-smoke + render-check) before anything reaches origin. CI also runs `npm run gate` — parity holds at the push boundary, which is the only boundary CI observes. The local gate can never be a weaker promise than CI at that boundary.
+**(a) GATE PARITY:** The local gate is split at the commit/push boundary. The pre-commit hook runs the FAST subset (`npm run gate:fast`: lint, format, the Node test runner) to keep commits quick (~5–8 s). The pre-push hook runs the FULL gate (`npm run gate`, adds Playwright boot-smoke + render-check) before anything reaches origin. CI also runs `npm run gate` — parity holds at the push boundary, which is the only boundary CI observes. The local gate can never be a weaker promise than CI at that boundary.
 
 **(b) ESCAPE-RATCHET:** Any failure that escapes a layer gets a check added AT that layer in the SAME fix — a production bug becomes a regression test; anything that passed the local gate but failed CI gets that check pulled into `npm run gate` / the hook so the whole class is caught locally next time. Every escape permanently tightens the gate.
 
@@ -541,7 +540,7 @@ At the end of **every** task, sweep the project directory for leftover/junk file
 
 **Report:** state what was removed (or "nothing to remove") at the end of the task.
 
-**Enforcement (self-improving — Protocol 36b):** **Suite 98** (both runners) scans the project root and **fails the gate** if a known junk pattern reappears (junk-extension files at root, or a stray `.yoke/`-style empty tool dir). The gate only **flags** — it never auto-deletes; removal is always a deliberate step per this protocol.
+**Enforcement (self-improving — Protocol 36b):** **Suite 98** (Node runner) scans the project root and **fails the gate** if a known junk pattern reappears (junk-extension files at root, or a stray `.yoke/`-style empty tool dir). The gate only **flags** — it never auto-deletes; removal is always a deliberate step per this protocol.
 
 ---
 
@@ -555,7 +554,7 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 - **Investigate before classifying.** Determine whether the issue is a real shipped-code path or only a harness artifact. State the verdict explicitly (in the commit/report).
 - **Real shipped path affected → FIX** the code and add a test proving the fixed behavior.
 - **Harness-only (no shipped path affected) → still add a test** that documents and locks the invariant, so the latent footgun cannot silently become a live bug later. Say "harness-only" explicitly; do not pretend it was a product bug, and do not skip the test.
-- The added test goes in **both runners at parity** (Protocol 15) and the counts sync per Protocol 2a.
+- The added test goes in the Node runner (`tests/robco-diagnostics.js`) and the counts sync per Protocol 2a.
 
 **Why:** The test suite is only as honest as its response to its own findings. Silently routing around a flaw the tests exposed defeats the gate. Every flaw the process surfaces must ratchet the net finer — the same escape-ratchet principle as Protocol 36b, extended from "escaped to production / CI" to "surfaced during development."
 
@@ -569,11 +568,11 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 **Same bar on both branches — there is no "looser" branch.** Every existing rule and protocol applies **identically on `dev`** as on `main`. `dev` is held to the same standard as `main` in every respect. In particular, on **every** `dev` commit and push:
 
-- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, **both** test runners (`tests/robco-diagnostics.js` + `tests/robco-diagnostics.ps1`) green and **at parity** (identical suites, per-suite counts, and 2005 total), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
+- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, the canonical Node test runner (`tests/robco-diagnostics.js`) green (222 suites, 3002 tests), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
 - **Protocol 1** (bump `CACHE_NAME` when a served/precached file changes) applies.
 - **Protocol 2 / 2a** (docs updated + test-count and suite-count synced across every location) applies.
 - **Protocol 38** (game-agnostic feature code), **39** (UTF-8 source integrity), **41** (end-of-task cleanup sweep), **42** (fix flaws found during testing/verification in the same commit), and the **Protocol 36b** escape-ratchet all apply.
-- Every other protocol (13 regression test, 14 AI-contract safety, 15 runner parity, 19 batch-before-push, 20 static source-invariant guards, etc.) applies unchanged.
+- Every other protocol (13 regression test, 14 AI-contract safety, 19 batch-before-push, 20 static source-invariant guards, etc.) applies unchanged. (Protocol 15 — runner parity — is retired; see its section above.)
 
 **Changelog discipline on `dev`.** The `CHANGELOG.md` **chronological ordering convention is explicitly followed on `dev`**: within each category heading (Added / Fixed / Changed / Improved / Under the Hood), entries are ordered **earliest-first** — the oldest change sits at the top of its category and the newest is appended at the bottom. The **`[Unreleased]`** block is maintained on `dev` in this earliest-first order throughout development. At the `dev → main` version release, the accumulated `[Unreleased]` block **consolidates into the dated release version block** (entries preserving their earliest-first order within each category), and a fresh empty `[Unreleased]` block opens for the next cycle.
 
@@ -595,7 +594,7 @@ Any new **ambient, conditional, time-gated, view-once, or otherwise hard-to-repr
 
 ## Protocol 45 — Documentation Reference Integrity (the enforcement arm of Protocol 2/2a)
 
-Protocol 2/2a already require the docs to stay current — but they are **honor-system** rules, and the docs drifted anyway (the cloud push/pull globals `pushToCloud` / `pullFromCloud` were documented for months but never existed under those names; the script load-order list silently omitted `idb.js` / `ocr.js` / `runtime.js` / `test-console.js`). Per the escape-ratchet (Protocol 36b), a class of defect that escapes every layer gets a **gate guard** at the layer it escaped from. Doc drift escaped every layer, so it gets one. **Suite 220** (both runners, at parity) **fails the build** when a load-bearing doc names code that does not exist.
+Protocol 2/2a already require the docs to stay current — but they are **honor-system** rules, and the docs drifted anyway (the cloud push/pull globals `pushToCloud` / `pullFromCloud` were documented for months but never existed under those names; the script load-order list silently omitted `idb.js` / `ocr.js` / `runtime.js` / `test-console.js`). Per the escape-ratchet (Protocol 36b), a class of defect that escapes every layer gets a **gate guard** at the layer it escaped from. Doc drift escaped every layer, so it gets one. **Suite 220** (Node runner) **fails the build** when a load-bearing doc names code that does not exist.
 
 **What it checks (deliberately NARROW — precision over recall):**
 
@@ -618,7 +617,7 @@ The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if t
 
 **The gitignored-library problem, and how it's solved:** `library/` is gitignored (local-only Claude reference docs — see the 3-class model above), so on a clean CI checkout `library/CODE_MAP.md` and `library/BRAIN_DUMP.md` simply don't exist. A guard that does `fs.existsSync('library/CODE_MAP.md')` would either fail every CI run forever (if it requires existence) or never run at all (if skipped whenever the directory is absent) — the latter is a guard that can never fail, which is worse than no guard because it creates false confidence.
 
-The fix is `library/MANIFEST.txt` — a small, filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 checks two things (tests 220.7/220.8, both runners at parity):
+The fix is `library/MANIFEST.txt` — a small, filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 checks two things (tests 220.7/220.8):
 
 - **220.7 (real everywhere, including CI):** every `library/<file>` pointer path named in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` must appear in `library/MANIFEST.txt`. This catches a pointer added for a file that was never added to the manifest — a typo, or a doc edit that outran the manifest update. It runs identically on CI and locally because the manifest is committed.
 - **220.8 (real only locally — honestly weaker, stated plainly):** when at least one *non-manifest* file exists under `library/` (the owner's machine — `library/MANIFEST.txt` alone is always present, even on CI, since it's committed and git checks out its parent directory; the real "am I on the owner's machine" signal is a second file next to it), the manifest's file list must exactly match `library/`'s real contents. This is the only check that can catch the manifest itself drifting from reality (a file quietly deleted from `library/`, or added without updating the manifest) — it is a no-op on a clean CI checkout, because that drift is invisible there by construction. (This distinction was not obvious at first — a naive "does `library/` exist" check looked CI-safe but actually fails the build on a clean checkout, since `MANIFEST.txt` alone makes the directory exist; caught by directly simulating a clean checkout, not assumed.) **What Suite 220 cannot catch on CI:** whether `library/CODE_MAP.md` (or `BRAIN_DUMP.md`) has gone stale in its own *content* — only that the *filename* a pointer names is a real, manifested one. Content staleness is caught by 220.8 locally, or not at all until the owner's next local gate run.
@@ -774,4 +773,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 3002 tests across 222 suites, mirrored in `tests/robco-diagnostics.ps1` (PowerShell, run by the pre-commit hook) and `tests/robco-diagnostics.js` (Node) — both runners are kept at exact parity (same suites, same per-suite counts, same 3002 total). Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 3002 tests across 222 suites in the single canonical Node runner `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.) Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).

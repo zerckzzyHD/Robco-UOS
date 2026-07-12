@@ -2,8 +2,8 @@
 <!--
     RobCo Persistence Audit — tests/test.html
     ==========================================
-    BROWSER-SIDE RUNTIME MIRROR of the canonical static runners
-    (tests/robco-diagnostics.js + tests/robco-diagnostics.ps1).
+    BROWSER-SIDE RUNTIME MIRROR of the canonical static runner
+    (tests/robco-diagnostics.js).
 
     Where the canonical runners statically analyse the source, this page
     actually EXECUTES the live import contract in a real browser: it loads the
@@ -190,8 +190,7 @@
     <div id="summary"></div>
 
     <div class="note">
-      For static analysis (no browser needed): run tests/robco-diagnostics.js or
-      tests/robco-diagnostics.ps1.<br />
+      For static analysis (no browser needed): run tests/robco-diagnostics.js.<br />
       This page is run headless in the gate by tests/test-html-check.mjs.
     </div>
 
@@ -732,7 +731,7 @@
       (async function () {
         // ── Suite 10 — P1 IndexedDB durability shadow (REAL IndexedDB) ────────
         // This is the behavioral half of canonical Suite 138: Chromium has a
-        // native IndexedDB (Node/PowerShell do not), so this proves the real
+        // native IndexedDB (the Node runner does not), so this proves the real
         // round-trip, the no-read-flip invariant, the two-store boundary, and
         // fail-safe resolve-soft behavior — not just the source shape.
         try {
@@ -1184,7 +1183,7 @@
         }
 
         // ── Suite 14 — P5 save version history (REAL IndexedDB) ───────────────
-        // Node/PowerShell have no IndexedDB, so the real per-slot revision-ring
+        // The Node runner has no IndexedDB, so the real per-slot revision-ring
         // behavior is proven HERE against the browser's native IndexedDB and the
         // real state.js accessors (readSlotVersions / pushSlotVersion): a push→read
         // round-trip, newest-first ordering, the SLOT_VERSION_CAP bound, the

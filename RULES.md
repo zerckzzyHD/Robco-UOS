@@ -15,7 +15,8 @@ there.
 
 Quick facts (see `CLAUDE.md` for the authoritative detail):
 
-- The gate requires **3002 tests** to pass, mirrored at parity across the Node
-  and PowerShell runners in `tests/`.
+- The gate requires **3002 tests** to pass in the single canonical Node runner
+  `tests/robco-diagnostics.js`. (The PowerShell mirror was deleted and Protocol 15
+  retired in 2.8.5 U-B3.)
 - State persists to the `localStorage` key `robco_v8`.
 - Bump `CACHE_NAME` in `sw.js` on any served-file change (Protocol 1).

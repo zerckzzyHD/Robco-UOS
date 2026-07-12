@@ -7,23 +7,28 @@
  *   npm run gate       — full gate (lint + format + tests + browser checks)
  *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
  *   npm run gate:iter  — OPT-IN iteration pre-check ONLY (lint changed files +
- *                        format + Node runner). Skips the PowerShell mirror,
- *                        parity, and every browser check for fast inner-loop
- *                        feedback. NOT a substitute for the commit gate
- *                        (gate:fast) or the push gate (gate): it is never run by
- *                        a git hook or CI, so it cannot satisfy either boundary.
+ *                        format + Node runner). Skips every browser check for
+ *                        fast inner-loop feedback. NOT a substitute for the
+ *                        commit gate (gate:fast) or the push gate (gate): it is
+ *                        never run by a git hook or CI, so it cannot satisfy
+ *                        either boundary.
  *
- * Steps (full; --fast skips steps 6-10; --iter takes the separate fast path):
+ * 2.8.5 U-B3: the second (mirror) test runner and its per-suite parity check
+ * were REMOVED — the mirror caught nothing the Node runner cannot, at ~13× the
+ * cost. Protocol 15 (runner parity) is retired. The gate now runs the single
+ * canonical Node runner. (This file intentionally carries no reference to the
+ * deleted mirror — Suite 50.6 / 128.5 guard that it stays single-runner.)
+ *
+ * Steps (full; --fast skips steps 5-9; --iter takes the separate fast path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Boot-chain preflight (index.html/sw.js/disk/docs/test.html consistency)
  *   4. Persistence audit — Node runner
- *   5. Persistence audit — PowerShell runner (+ parity check)
- *   6. Playwright Chromium availability check     ← skipped by --fast
- *   7. Boot smoke test (HTTP)                     ← skipped by --fast
- *   8. Render check (360px & 412px)               ← skipped by --fast
- *   9. A11y check (axe serious/critical baseline) ← skipped by --fast
- *   10. Runtime audit — test.html headless        ← skipped by --fast
+ *   5. Playwright Chromium availability check     ← skipped by --fast
+ *   6. Boot smoke test (HTTP)                     ← skipped by --fast
+ *   7. Render check (360px & 412px)               ← skipped by --fast
+ *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
+ *   9. Runtime audit — test.html headless         ← skipped by --fast
  */
 'use strict';
 
@@ -33,7 +38,6 @@ const fs = require('fs');
 const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
-const isCI = !!process.env.CI;
 const fast = process.argv.includes('--fast');
 // Opt-in iteration pre-check (audit #3). NOT a commit/push gate — see the --iter
 // block below. Never wired into a git hook or CI; it cannot satisfy either gate.
@@ -121,138 +125,6 @@ function run(label, cmd) {
   }
 }
 
-// Per-suite parity (U3/S2-F5, Step 2 Phase 0 Unit 4). The total-only check
-// below this can't catch drift WITHIN a suite (e.g. one runner gains a test
-// and another loses one elsewhere, totals still match by coincidence — the
-// 173-vs-209 gap Protocol 15 exists to prevent). Walks each runner's own
-// captured output (generic header prefix: Node "── Title ─"; PowerShell
-// "-- Title --") into an ordered list of { title, count } sections, where
-// count is the number of PASS/FAIL result lines before the next header.
-//
-// Every suite header in the PowerShell runner is written "Suite N -- Title"
-// (Sep() always numbers). The Node runner only started literally embedding
-// "Suite N" in its header() text from Suite 49 onward — pre-existing suites
-// 1-48 use bare descriptive titles by long-standing historical convention
-// (predates this check; rewriting ~48 legacy header strings across both
-// 14k-line runners is out of scope here and not what drifted). So parity is
-// enforced at TWO tiers:
-//   1. STRICT, per-suite: every suite where Node's header explicitly states
-//      "Suite N" (currently 49+, which covers all Step 2 / Phase 0 work and
-//      everything added from here forward) must have an identical title
-//      (dash/arrow-style normalized — Node uses "—"/"→"/"±", PowerShell
-//      substitutes "--"/"->"/"+-" for the same glyphs by established
-//      convention) and an identical test count in both runners.
-//   2. AGGREGATE, for the legacy zone: suites 1-48 (unnumbered in Node) are
-//      summed on each side and compared as one total — coarser, but still
-//      catches gross drift in the legacy zone without demanding a historical
-//      rewrite unrelated to the current task.
-const ANSI_ESCAPE_RE = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g');
-const HEADER_RE = /^(?:──|--)\s+(.*)$/;
-const NUMBERED_RE = /^Suite\s+(\d+)\s*(?:—|--)\s*(.*)$/;
-
-function normalizeSuiteTitle(title) {
-  return title
-    .replace(/[─-]+\s*$/, '') // trailing decorative dash run
-    .replace(/→/g, '->')
-    .replace(/±/g, '+-')
-    .replace(/—/g, '--')
-    .trim();
-}
-
-// Returns { numbered: Map<num, {title, count}>, legacyTotal: number }
-function parseSections(output, resultLineRe) {
-  const clean = output.replace(ANSI_ESCAPE_RE, '');
-  const numbered = new Map();
-  let legacyTotal = 0;
-  let current = null; // { num: string|null, count: number }
-  const flush = () => {
-    if (!current) return;
-    if (current.num !== null) {
-      if (!numbered.has(current.num)) numbered.set(current.num, { title: current.title, count: 0 });
-      numbered.get(current.num).count += current.count;
-    } else {
-      legacyTotal += current.count;
-    }
-  };
-  for (const raw of clean.split(/\r?\n/)) {
-    const line = raw.trimEnd();
-    const hm = line.match(HEADER_RE);
-    if (hm) {
-      flush();
-      const rawTitle = hm[1].replace(/[─-]+\s*$/, '').trim();
-      const nm = rawTitle.match(NUMBERED_RE);
-      current = nm
-        ? { num: nm[1], title: normalizeSuiteTitle(nm[2]), count: 0 }
-        : { num: null, title: rawTitle, count: 0 };
-      continue;
-    }
-    if (current && resultLineRe.test(line)) current.count++;
-  }
-  flush();
-  return { numbered, legacyTotal };
-}
-
-function checkSuiteParity(nodeOut, psOut) {
-  const node = parseSections(nodeOut, /^\s*[✓✗]/);
-  const ps = parseSections(psOut, /^\s*\[(PASS|FAIL)\]/);
-  const problems = [];
-
-  // Tier 1 — strict, per-suite (every suite Node explicitly numbers).
-  const allNums = new Set([...node.numbered.keys(), ...ps.numbered.keys()]);
-  for (const num of [...allNums].sort((a, b) => Number(a) - Number(b))) {
-    const n = node.numbered.get(num);
-    const p = ps.numbered.get(num);
-    if (!n && p) continue; // PS numbers sections Node doesn't (legacy zone) — folded into aggregate below
-    if (n && !p) {
-      problems.push(
-        `Suite ${num}: present in Node runner ("${n.title}") but missing from PowerShell runner`
-      );
-    } else if (n && p && n.title !== p.title) {
-      problems.push(`Suite ${num}: title mismatch — Node "${n.title}" vs PowerShell "${p.title}"`);
-    } else if (n && p && n.count !== p.count) {
-      problems.push(
-        `Suite ${num} "${n.title}": count mismatch — Node ${n.count} vs PowerShell ${p.count}`
-      );
-    }
-  }
-
-  // Tier 2 — aggregate for the legacy (pre-49) unnumbered-in-Node zone. PS
-  // numbers everything, so its "legacy" total is every numbered suite Node
-  // has no entry for, plus its own unnumbered bucket (should be empty).
-  const psLegacyTotal =
-    ps.legacyTotal +
-    [...ps.numbered.entries()]
-      .filter(([num]) => !node.numbered.has(num))
-      .reduce((sum, [, v]) => sum + v.count, 0);
-  if (node.legacyTotal !== psLegacyTotal) {
-    problems.push(
-      `Legacy (pre-Suite-49, unnumbered-in-Node) zone aggregate mismatch: Node ${node.legacyTotal} vs PowerShell ${psLegacyTotal}`
-    );
-  }
-
-  return {
-    ok: problems.length === 0,
-    problems,
-    suiteCount: allNums.size,
-  };
-}
-
-// Like run(), but captures stdout/stderr (while still echoing them) and returns
-// the combined text. Used for the two persistence runners so the parity check
-// can read their "ALL N TESTS" totals from THIS run's output instead of
-// re-executing both runners a second time (audit #4 — kills the double-run).
-function runCapture(label, cmd) {
-  console.log(`\n[gate] ${label}`);
-  const result = spawnSync(cmd, { cwd: ROOT, shell: true, encoding: 'utf8' });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  if (result.status !== 0) {
-    console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
-    process.exit(result.status || 1);
-  }
-  return (result.stdout || '') + (result.stderr || '');
-}
-
 // Changed .js/.mjs files vs HEAD (staged, unstaged, and untracked) — used only
 // by the --iter pre-check to lint what changed. Returns [] on any failure, which
 // makes the caller fall back to a full lint.
@@ -322,64 +194,12 @@ run('Prettier (format check)', 'npx prettier --check .');
 run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
 
 // ── 4. Node persistence audit ─────────────────────────────────────────────────
-const nodeAuditOut = runCapture('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
-
-// ── 5. PowerShell persistence audit + parity ─────────────────────────────────
-// Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
-// Only warn-skip when neither is found (e.g. bare Linux dev box without pwsh installed).
-const pwshProbe = spawnSync('pwsh --version', { shell: true, stdio: 'pipe' });
-const psProbe =
-  pwshProbe.status === 0
-    ? null
-    : spawnSync('powershell -Command "exit 0"', { shell: true, stdio: 'pipe' });
-const psBin =
-  pwshProbe.status === 0 ? 'pwsh' : psProbe && psProbe.status === 0 ? 'powershell' : null;
-
-if (psBin) {
-  const psFileCmd =
-    psBin === 'pwsh'
-      ? 'pwsh -File tests/robco-diagnostics.ps1'
-      : 'powershell -ExecutionPolicy Bypass -File tests/robco-diagnostics.ps1';
-
-  const psAuditOut = runCapture('Persistence audit (PowerShell)', psFileCmd);
-
-  console.log('\n[gate] Runner parity check');
-  // Read the totals from the runs we ALREADY did in steps 3 & 4 — no second
-  // execution of either runner (audit #4). ANSI codes wrap lines, not words,
-  // so /ALL N TESTS/ matches even in colored output.
-  const nodeTotal = nodeAuditOut.match(/ALL (\d+) TESTS/)?.[1];
-  const psTotal = psAuditOut.match(/ALL (\d+) TESTS/)?.[1];
-  if (!nodeTotal || !psTotal || nodeTotal !== psTotal) {
-    console.error(
-      `[GATE FAIL] Runner parity broken: Node=${nodeTotal} PS=${psTotal} (Protocol 15)`
-    );
-    process.exit(1);
-  }
-  console.log(`  Both runners agree: ${nodeTotal} tests`);
-
-  // Per-suite parity (U4/S2-F5) — the total above can hide drift within a
-  // suite (a test lost here, a test gained there, coincidentally matching
-  // totals). Compares suite-by-suite composition, not just the grand total.
-  const suiteParity = checkSuiteParity(nodeAuditOut, psAuditOut);
-  if (!suiteParity.ok) {
-    console.error(`\n[GATE FAIL] Per-suite runner parity broken (Protocol 15 / U4):`);
-    for (const p of suiteParity.problems) console.error(`  - ${p}`);
-    process.exit(1);
-  }
-  console.log(`  Per-suite parity holds: ${suiteParity.suiteCount} suites, identical composition`);
-} else if (isCI) {
-  console.error('\n[GATE FAIL] pwsh not available in CI — required for parity check (Protocol 15)');
-  process.exit(1);
-} else {
-  console.warn(
-    '\n[GATE WARN] Neither pwsh nor powershell found — PowerShell & parity checks skipped.'
-  );
-  console.warn('  Install PowerShell Core: https://aka.ms/pscore6');
-  console.warn('  CI will enforce parity; this step is required for a passing push.\n');
-}
+// The single canonical runner. (2.8.5 U-B3: the second mirror runner + parity
+// check were removed — Protocol 15 retired. See the header comment for why.)
+run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
 if (!fast) {
-  // ── 6. Playwright Chromium check ──────────────────────────────────────────────
+  // ── 5. Playwright Chromium check ──────────────────────────────────────────────
   console.log('\n[gate] Playwright Chromium availability');
   const chromiumScript =
     "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
@@ -408,16 +228,16 @@ if (!fast) {
       : '\n[gate] Shared Chromium unavailable — each browser check launches its own (fallback).'
   );
 
-  // ── 7. Boot smoke ─────────────────────────────────────────────────────────────
+  // ── 6. Boot smoke ─────────────────────────────────────────────────────────────
   run('Boot smoke (HTTP)', 'node tests/boot-smoke.mjs');
 
-  // ── 8. Render check ───────────────────────────────────────────────────────────
+  // ── 7. Render check ───────────────────────────────────────────────────────────
   run('Render check (360px & 412px)', 'node tests/render-check.mjs');
 
-  // ── 9. A11y check ─────────────────────────────────────────────────────────────
+  // ── 8. A11y check ─────────────────────────────────────────────────────────────
   run('A11y (axe serious/critical)', 'node tests/a11y-check.mjs');
 
-  // ── 10. Browser-side persistence audit (test.html) ─────────────────────────────
+  // ── 9. Browser-side persistence audit (test.html) ─────────────────────────────
   // Executes tests/test.html headless and asserts every suite passes + the
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');

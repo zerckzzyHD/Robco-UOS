@@ -6,7 +6,7 @@
     "removeComments": false,
     "topFilesLength": 20,
     "compress": false,
-    "headerText": "RobCo U.O.S. — full-repo AI context pack. Private agent files (RULES.md, CLAUDE.md, .claude/) are excluded. The PowerShell test runner (tests/robco-diagnostics.ps1) is excluded as a byte-for-byte-coverage mirror of the canonical Node runner (tests/robco-diagnostics.js), which is kept — this halves the test-runner share of the pack with zero coverage-context loss. Run: npx repomix"
+    "headerText": "RobCo U.O.S. — full-repo AI context pack. Private agent files (RULES.md, CLAUDE.md, .claude/) are excluded. Tests are audited by the single canonical Node runner (tests/robco-diagnostics.js); the former PowerShell mirror was deleted in 2.8.5 U-B3. Run: npx repomix"
   },
   "include": [
     "js/**",
@@ -36,7 +36,6 @@
       "RULES.md",
       "CLAUDE.md",
       ".claude/**",
-      "tests/robco-diagnostics.ps1",
       "js/vendor/**",
       "assets/ocr/**"
     ]

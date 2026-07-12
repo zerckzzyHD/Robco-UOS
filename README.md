@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 3002-test gate at parity + boot-smoke / render / a11y checks                |
+| **Testing**     | Node + Playwright                                | 3002-test Node gate + boot-smoke / render / a11y checks                     |
 
 ### Per-game data system
 
@@ -219,11 +219,10 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (3002 tests, 222 suites)
-│   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (3002 tests, 222 suites — the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
-├── scripts/gate.js         The full local gate (lint, format, both runners, browser checks)
+├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
 └── assets/                 PWA icon + app-shortcut icons, ocr/ (vendored OCR language data)
@@ -317,14 +316,14 @@ This is a **static site** — no build step to run it.
 npm run lint        # ESLint (zero warnings)
 npm run format      # Prettier
 npm run dev         # Vite dev server
-npm run gate        # FULL gate: lint + format + both runners + boot-smoke + render + a11y + test.html
+npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
 npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
 ```
 
 ### Quality Gate
 
-Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, **both** test runners at parity); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
+Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
 
 ### Commit Workflow (dev-branch model)
 
@@ -333,7 +332,7 @@ All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit k
 ```
 npm run lint && npm run format
 git add -A
-git commit          # pre-commit: cache-bump guard, then fast gate (both runners)
+git commit          # pre-commit: cache-bump guard, then fast gate (Node runner)
 git push origin dev # pre-push: full gate (+ Playwright + a11y + test.html)
 ```
 
@@ -392,7 +391,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **3002 tests across 222 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **3002 tests across 222 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

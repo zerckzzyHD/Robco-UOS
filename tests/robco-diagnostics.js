@@ -1902,23 +1902,29 @@ header('Assets Completeness');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-40)
+//  SUITE 28 — Meta / Single-Runner Guard (Group 7)
+//  Verifies that the Node runner contains all gate-guard suites (22-40)
 //  and that the canonical test count matches README.md, ARCHITECTURE.md,
 //  and (conditionally, if present) RULES.md and CLAUDE.md.
 //
-//  NOTE: source-level assert() / Check() counts cannot reliably track
-//  runtime test counts because loops multiply results at runtime. Parity
-//  is enforced structurally — both runners must contain every named suite.
+//  2.8.5 U-B3: the PowerShell mirror (tests/robco-diagnostics.ps1) was
+//  DELETED — it caught nothing the Node runner cannot (its "behavioral"
+//  tests shelled out to node/vm; its static tests were the same UTF-8 file
+//  greps) at ~13× the cost. Protocol 15 (runner parity) is RETIRED. The old
+//  "PS runner contains all suites" assertion below is now inverted into a
+//  regression guard that the mirror stays gone (Protocol 36b escape-ratchet).
+//
+//  NOTE: source-level assert() counts cannot reliably track runtime test
+//  counts because loops multiply results at runtime. The single Node runner
+//  is the canonical source; it must contain every named suite.
 //  7 tests
 // ══════════════════════════════════════════════════════════════
-header('Meta / Runner Parity');
+header('Meta / Single-Runner Guard');
 {
   const jsRunner = readFile('tests/robco-diagnostics.js');
-  const psRunner = readFile('tests/robco-diagnostics.ps1');
 
-  // Structural parity: both runners must contain every gate-guard suite marker (22-40).
-  // A missing marker means a suite was added to one runner but not ported to the other.
+  // Structural: the Node runner must contain every gate-guard suite marker (22-40).
+  // A missing marker means a suite was dropped from the canonical runner.
   const GATE_SUITES = [
     'Suite 22',
     'Suite 23',
@@ -2005,16 +2011,16 @@ header('Meta / Runner Parity');
     'Suite 111',
   ];
   const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
-  const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
   assert(
     jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-100)' +
+    'Node runner contains all gate-guard suites (22-41, 49-100)' +
       (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
   );
+  // Regression guard (2.8.5 U-B3, Protocol 36b): the PowerShell mirror was
+  // deleted and Protocol 15 retired — assert it does not silently creep back.
   assert(
-    psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-100)' +
-      (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
+    !fs.existsSync(path.join(ROOT, 'tests/robco-diagnostics.ps1')),
+    'PowerShell test-runner mirror (tests/robco-diagnostics.ps1) stays deleted (Protocol 15 retired — single Node runner)'
   );
 
   // Canonical count in CHANGELOG.md matches README.md and ARCHITECTURE.md (Protocol 2a).
@@ -2180,13 +2186,18 @@ header('CI/CD Automation Guards');
   );
 }
 
-// 31.2 gate.js runs PowerShell persistence runner + ci.yml calls npm run gate
+// 31.2 gate.js runs the single Node runner (no PowerShell mirror) + ci.yml calls npm run gate
+// 2.8.5 U-B3: inverted from the old "gate runs the PS runner" parity check —
+// the PowerShell mirror was deleted and Protocol 15 retired. gate.js must run
+// the Node runner and must NOT reference the deleted .ps1 (Protocol 36b guard).
 {
   const gateSrc = readFile('scripts/gate.js');
   const ciSource = readFile('.github/workflows/ci.yml');
   assert(
-    /robco-diagnostics\.ps1/.test(gateSrc) && /npm run gate/.test(ciSource),
-    'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
+    /node tests\/robco-diagnostics\.js/.test(gateSrc) &&
+      !/robco-diagnostics\.ps1/.test(gateSrc) &&
+      /npm run gate/.test(ciSource),
+    'gate.js runs the Node runner only (no .ps1 mirror) and ci.yml calls npm run gate (single-runner gate)'
   );
 }
 
@@ -4537,10 +4548,15 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     'scripts/gate.js has --fast flag that skips browser steps (Protocol 36 — fast commit / full push split)'
   );
 
-  // 50.6  gate.js falls back to powershell when pwsh absent
+  // 50.6  gate.js invokes no PowerShell (single Node runner — Protocol 15 retired)
+  // 2.8.5 U-B3: inverted from the old "gate.js falls back to powershell" check.
+  // The PowerShell mirror was deleted; the gate must contain no pwsh/powershell
+  // invocation and no .ps1 reference (Protocol 36b regression guard).
   assert(
-    gateSrc50.includes('pwsh') && gateSrc50.includes('powershell'),
-    'scripts/gate.js falls back to powershell when pwsh absent (Protocol 36 — Windows PS 5.1 support)'
+    !/\bpwsh\b/.test(gateSrc50) &&
+      !/\bpowershell\b/i.test(gateSrc50) &&
+      !/robco-diagnostics\.ps1/.test(gateSrc50),
+    'scripts/gate.js invokes no PowerShell and references no .ps1 mirror (single Node runner — Protocol 15 retired)'
   );
 
   // 50.7  scripts/pre-push exists and invokes full npm run gate
@@ -14782,10 +14798,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 128 — WU-REN test-runner rename escape-ratchet (Protocol 36b)
-//  The runners were renamed to tests/robco-diagnostics.{js,ps1}. This guard fails the
+//  The runner was renamed to tests/robco-diagnostics.js. This guard fails the
 //  gate if ANY stale reference to the legacy runner name reappears anywhere — code,
 //  scripts, hooks, CI, or docs — so the rename can never silently regress.
 //  (The forbidden literal is assembled at runtime so this guard file never self-matches.)
+//  2.8.5 U-B3: the PowerShell mirror (.ps1) was deleted; these guards now cover
+//  the single Node runner only, and 128.5 asserts the gate is single-runner.
 //  5 tests
 // ══════════════════════════════════════════════════════════════
 {
@@ -14806,10 +14824,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     }
   };
 
-  // 128.1  the renamed runners exist under the RobCo-themed names
+  // 128.1  the renamed Node runner exists under the RobCo-themed name
   assert(
-    _exists('tests/robco-diagnostics.js') && _exists('tests/robco-diagnostics.ps1'),
-    '128.1: tests/robco-diagnostics.js + tests/robco-diagnostics.ps1 both exist (runners renamed)'
+    _exists('tests/robco-diagnostics.js'),
+    '128.1: tests/robco-diagnostics.js exists (canonical Node runner, RobCo-themed name)'
   );
 
   // 128.2  the legacy-named runner files are gone (git mv, not copy)
@@ -14826,9 +14844,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'scripts/pre-push',
     'scripts/install-hooks.js',
     'tests/test.html',
-    'tests/run-tests.bat',
     'tests/robco-diagnostics.js',
-    'tests/robco-diagnostics.ps1',
     '.github/workflows/nightly-tests.yml',
     '.github/workflows/ci.yml',
     'README.md',
@@ -14844,22 +14860,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       (offenders.length ? ' — OFFENDERS: ' + offenders.join(', ') : '')
   );
 
-  // 128.4  the runtime invocations were actually repointed to the new names
+  // 128.4  the runtime invocations were actually repointed to the new name
   const gate128 = _readIf('scripts/gate.js');
   const pkg128 = _readIf('package.json');
   const nightly128 = _readIf('.github/workflows/nightly-tests.yml');
   assert(
     /node tests\/robco-diagnostics\.js/.test(gate128) &&
-      /robco-diagnostics\.ps1/.test(gate128) &&
       /tests\/robco-diagnostics\.js/.test(pkg128) &&
-      /tests\/robco-diagnostics\.(js|ps1)/.test(nightly128),
-    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed runners'
+      /tests\/robco-diagnostics\.js/.test(nightly128),
+    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed Node runner'
   );
 
-  // 128.5  gate.js still pairs BOTH runners (parity invocation intact under the new names)
+  // 128.5  the gate is single-runner: gate.js runs the Node runner and does NOT
+  //        reference the deleted PowerShell mirror (2.8.5 U-B3, Protocol 15 retired)
   assert(
-    /robco-diagnostics\.js/.test(gate128) && /robco-diagnostics\.ps1/.test(gate128),
-    '128.5: scripts/gate.js references both robco-diagnostics.js and robco-diagnostics.ps1 (dual-runner gate intact)'
+    /robco-diagnostics\.js/.test(gate128) && !/robco-diagnostics\.ps1/.test(gate128),
+    '128.5: scripts/gate.js references the Node runner only, not the deleted .ps1 mirror (single-runner gate)'
   );
 }
 
@@ -17378,7 +17394,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  _applySlotEnvelope core loadFromSlot uses (Protocol 22). Fail-safe: no IDB →
 //  no version history offered, save/load byte-identical to pre-P5. Structural
 //  guards here; the real-IndexedDB behavioral proof lives in tests/test.html
-//  (Suite 14 — Node/PowerShell have no IndexedDB). 12 tests
+//  (Suite 14 — the Node runner has no IndexedDB). 12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 142 — P5 save version history (per-slot revision ring)');
@@ -31213,11 +31229,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       }
       // Re-emit the Suite 196 header immediately before this deferred proof's
       // own assert() (the Suite 137/137.6 precedent): _pendingAsync now holds
-      // proofs from TWO suites, and gate.js's per-suite parity parser
-      // attributes each console line to whichever header printed LAST — the
-      // generic re-emit right before Promise.all() below only covers
-      // whichever suite is named there, so each deferred proof must announce
-      // its own suite immediately before its own result line prints.
+      // proofs from TWO suites, and the per-suite output grouping attributes
+      // each console line to whichever header printed LAST — the generic
+      // re-emit right before Promise.all() below only covers whichever suite is
+      // named there, so each deferred proof must announce its own suite
+      // immediately before its own result line prints. (This kept the now-removed
+      // gate.js parity parser honest too; retained for correct output grouping.)
       header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
       assert(
         !threw &&
@@ -40151,7 +40168,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //        count (this one) legitimately diverges the two, and the old
   //        first-match read picked the stale, frozen number. REAL shipped-code
   //        defect (the gate runs on every commit) — fixed in the SAME commit
-  //        (both runners) to take the MAXIMUM across every header, and locked
+  //        to take the MAXIMUM across every header, and locked
   //        here with a behavioral proof against a synthetic frozen-Unreleased /
   //        hotfixed-released pair.
   {
@@ -40265,6 +40282,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // MUST-NOT-EXIST: retired in the ui-* split, guarded by Suite 56; the docs
     // name it precisely to warn it off, which is correct, not drift.
     'js/ui.js',
+    // MUST-NOT-EXIST: the PowerShell test-runner mirror, deleted in 2.8.5 U-B3
+    // when Protocol 15 (runner parity) was retired. The docs name it precisely
+    // to record the retirement (CLAUDE.md Protocol 15, the file trees), which is
+    // correct, not drift. Its absence is guarded by Suites 28/50.6/128.5.
+    'tests/robco-diagnostics.ps1',
   ]);
   {
     const pathRe =
@@ -40888,12 +40910,13 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // before printing totals — the runner body above is otherwise synchronous.
 // Re-emit the Suite 137 header first (Protocol 42, harness-only): the deferred
 // proof prints its single result line HERE, at the end of output — which, once
-// Suite 138 became the last synchronous suite, fell under Suite 138's header and
-// made the per-suite parity parser (scripts/gate.js) miscount it (Node 138 = 13
-// vs PowerShell 12; Node 137 = 13 vs 14). The parser sums counts across repeated
-// headers for the same suite number and keeps the first-seen title, so re-emitting
-// Suite 137's exact header re-attributes the deferred line to Suite 137 and
-// restores parity. Any future suite added after 137 would have hit the same trap.
+// Suite 138 became the last synchronous suite, would otherwise fall under Suite
+// 138's header and misattribute the line in the per-suite output grouping.
+// Re-emitting Suite 137's exact header re-attributes the deferred line to Suite
+// 137, keeping the printed output correctly grouped. (Historically this also fed
+// the per-suite parity parser in scripts/gate.js; that parser and the PowerShell
+// mirror were removed in 2.8.5 U-B3 when Protocol 15 was retired, but the
+// re-emit stays for honest output grouping.)
 header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
 Promise.all(_pendingAsync)
   .catch(e => {

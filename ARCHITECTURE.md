@@ -105,11 +105,9 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    3002-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    3002-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.js    36KB    3002-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
-│   ├── render-check.mjs        Mobile overflow check at 360px and 412px
-│   └── run-tests.bat           (Batch launcher)
+│   └── render-check.mjs        Mobile overflow check at 360px and 412px
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
@@ -455,14 +453,14 @@ its exports to `window.*` for the other scripts to call.
 
 **A1 was purely additive; A2 migrates the timers/standby on (one behavior per commit).** A1 tracked state **in parallel** with the existing standby/timers (only the inert `runtime-selftest` observer). A2 folds them onto the runtime as observers:
 
-- **A2.1 — standby machine.** The tab-standby dim + audio ducking is now a single **STANDBY coordinator observer** (`id:'standby'`, `states:['STANDBY']`, `tier:'minimal'` — essential feedback, never dial-quieted). `_wireStandby()` registers it; the runtime's own blur/focus/visibility listeners (A1) drive `ACTIVE↔STANDBY`, and the coordinator's `onEnter`/`onExit` run the unchanged `enterStandby`/`exitStandby` (which keep their `_standbyActive` idempotency guard). The former direct blur/focus/visibilitychange listeners are retired — the runtime is the single lifecycle driver (no double-wiring). Guarded by Suite 147 (both runners); behavior identical at every tier.
+- **A2.1 — standby machine.** The tab-standby dim + audio ducking is now a single **STANDBY coordinator observer** (`id:'standby'`, `states:['STANDBY']`, `tier:'minimal'` — essential feedback, never dial-quieted). `_wireStandby()` registers it; the runtime's own blur/focus/visibility listeners (A1) drive `ACTIVE↔STANDBY`, and the coordinator's `onEnter`/`onExit` run the unchanged `enterStandby`/`exitStandby` (which keep their `_standbyActive` idempotency guard). The former direct blur/focus/visibilitychange listeners are retired — the runtime is the single lifecycle driver (no double-wiring). Guarded by Suite 147 (Node runner); behavior identical at every tier.
 
 - **A2.2 — fixed-cadence timers.** The three fixed-cadence loops become `onTick` observers registered in `_startAmbientTimers()` / `initOverseerLog()`, retiring their `setInterval`s (ui-core.js now calls `setInterval` **zero** times — the runtime heartbeat is the one scheduler):
   - **uptime-clock** — `states:['ACTIVE','IDLE']`, `tier:'minimal'`, `cadenceMs:1000`. Baseline telemetry; pauses on STANDBY (state-gated), never dial-quieted.
   - **mem-cycle** — `states:['ACTIVE','IDLE']`, `tier:'balanced'`, `cadenceMs:900000`. Ambient flourish; the runtime's tier check is now the single dial gate (fires at Full/Balanced, silent at Minimal — its former `immersionAllows('balanced')` behavior exactly).
   - **overseer-flush** — `states:['READY','ACTIVE','IDLE','STANDBY']`, `tier:'minimal'`, `cadenceMs:30000`. Runs in **all** live states incl. STANDBY, so power-on accounting keeps ticking while blurred (matching the old never-cleared `setInterval`).
 
-  Two runtime refinements make this byte-identical: `register()` seeds `_lastTick` to `now()` (a `cadenceMs>0` observer first fires one full cadence later, like `setInterval`), and `transition()` restarts an observer's cadence clock when it **re-enters** its state set (so a paused-then-resumed observer behaves exactly like a `setInterval` cleared on standby and freshly restarted on wake). Guarded by Suite 148 (both runners) + the `tests/test.html` parity assertion.
+  Two runtime refinements make this byte-identical: `register()` seeds `_lastTick` to `now()` (a `cadenceMs>0` observer first fires one full cadence later, like `setInterval`), and `transition()` restarts an observer's cadence clock when it **re-enters** its state set (so a paused-then-resumed observer behaves exactly like a `setInterval` cleared on standby and freshly restarted on wake). Guarded by Suite 148 (Node runner) + the `tests/test.html` parity assertion.
 
 Behavior is identical at every immersion tier. If the runtime fails to start, the app is byte-identical to today. Still self-scheduling and NOT yet runtime observers: geiger (Poisson, rads-driven), radio + tinnitus (randomized, game-state/user driven), and the audio heartbeat (HP-driven) — these keep their own scheduling; the standby coordinator pauses/resumes the ones that were standby-coupled.
 
@@ -474,7 +472,7 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
 
   A companion fix (found while verifying this unit, then hardened further after review, Protocol 42): the standby "wake" sequence — the tone, the audio ramp, and the `"COURIER RETURNED. SYNCHRONIZING TELEMETRY..."` chat line — is a return-to-active-use behavior and must fire **only** on a genuine wake, never on a power-down. A shutdown can land two different ways relative to that sequence: as a **direct** `STANDBY→SHUTDOWN` edge (reachable via the Test Console today), or **mid-window** — after a normal wake has already started, but before its 650ms delayed half runs. A single check made once, up front, only catches the first case. Instead, the shared `_isShuttingDown()` helper (`AmbientRuntime.getState() === 'SHUTDOWN' || 'OFF'`) is re-checked at **each half's own fire time**: synchronously, right before `playWakeTone()` (that half's fire time is now — since `transition()` flips `_state` before dispatching observer callbacks, this reflects the state the exit is actually happening in), and again as the **first statement inside** the 650ms `setTimeout`, before the class removal / audio ramp / chat line / `updateMath()` (that half's fire time is later — closing the mid-window race a single up-front check would miss). Either half no-oping independently is sufficient; the `shutdown-crt` observer's own `onEnter` already force-clears the `standby` class regardless, so nothing is ever left stuck. A Node `vm`-sandbox behavioral proof (Suite 150.10) executes the real `enterStandby`/`exitStandby`/`_isShuttingDown` bodies against a synthetic DOM with a synchronous-mock `setTimeout`, proving all three scenarios: direct shutdown (no tone, no chat), a normal wake (tone + chat + `updateMath`, byte-identical to before this fix), and the mid-window race (tone already fired, chat/`updateMath` suppressed).
 
-  Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (both runners).
+  Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (Node runner).
 
   **Power-on affordance (Protocol 42 fix, Suite 152).** Owner bug: forcing SHUTDOWN/OFF left a
   fully black screen with no visible way back on — the `.rt-shutdown(-plain)::after` cover has
@@ -499,7 +497,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 **Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
 
-**Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (both runners); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
+**Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (Node runner); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
 
 **Read-only observer introspection.** `AmbientRuntime.listObservers()` returns a plain-data snapshot of every registered observer (`{id, states, tier, cadenceMs}` only — never the `onTick`/`onEnter`/`onExit` closures), for tooling that needs to inspect what's wired without touching the registry. Consumed by the Test Console below.
 
@@ -535,7 +533,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **`_openShell()`/`_closeShell()`/`_shellKeydown()`/`_shellFocusables()`** implement a self-contained Tab focus-trap + Escape-close, mirroring the shape of the existing `#sysModal` trap in `_wireKeyboardShortcuts()` (`ui-core.js`) without forking it — the Diagnostic Shell is its own dialog surface, not a `#sysModal` caller (Protocol 23). Opening sets `aria-expanded="true"` on the FAB and focuses the close button; closing restores focus to whatever triggered the open and resets `aria-expanded="false"`. The slide-in (`@keyframes dsh-slide-in`) is a plain `animation:` declaration (Protocol UI-9) — the existing global `prefers-reduced-motion` block neutralizes it to an instant open automatically.
 - **Icons everywhere.** `_renderShell()` now prepends a per-category glyph (`CATEGORY_META[cat].icon`) to every section `<h3>` and a per-tool glyph (the registry `icon` field) into every migrated control's `.optics-label`, via two new CSS classes (`.dsh-section-icon`/`.dsh-tool-icon`). A single `DEV_MARKER` constant (`⚙`) is the shared glyph — used as the icon fallback and set onto the FAB by `_wireShellToggle()` — reserved for the inline dev-reset buttons a future unit (U4) will add.
 
-Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (both runners: U1 registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action`) + Suite 211 (both runners: the U2 mobile-overlay markup/CSS shape, the float-over-content `position:fixed` invariant, the `#testConsoleMount` zero-height placement, the `_mountConsole()` append ordering extended to the FAB/scrim, the DIAGNOSTIC SHELL identity rebrand, a Node `vm`-sandbox synthetic-DOM behavioral proof that the FAB/scrim/close-button/Escape wiring actually opens and closes the drawer, the reduced-motion-safe slide, the atmosphere/save boundary extended to the new U2 functions, the Protocol 17 mobile tap-target floor, and a regression guard that the U1 document-flow shape can never silently come back) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
+Guarded by Suite 149 (Node runner: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (Node runner: U1 registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action`) + Suite 211 (Node runner: the U2 mobile-overlay markup/CSS shape, the float-over-content `position:fixed` invariant, the `#testConsoleMount` zero-height placement, the `_mountConsole()` append ordering extended to the FAB/scrim, the DIAGNOSTIC SHELL identity rebrand, a Node `vm`-sandbox synthetic-DOM behavioral proof that the FAB/scrim/close-button/Escape wiring actually opens and closes the drawer, the reduced-motion-safe slide, the atmosphere/save boundary extended to the new U2 functions, the Protocol 17 mobile tap-target floor, and a regression guard that the U1 document-flow shape can never silently come back) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
 
 **Mobile chrome fixes (owner report, on top of U2, MOBILE ONLY except FIX 4).** Five presentation fixes, all gated behind the exact inverse of the `(min-width:1000px)...` Suite 129 desktop signal (`(max-width:999.98px)` in CSS, a new `_dshIsMobile()` matchMedia helper in JS) — desktop's drawer/FAB stay byte-identical to what U2 shipped.
 
@@ -545,13 +543,13 @@ Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durabl
 - **FIX 4 — glyph centering (all breakpoints).** `.dsh-fab span` gets its own `line-height: 1` plus a small `translateY` nudge, correcting a font-metrics offset present at every screen size — the only one of the five fixes not mobile-gated.
 - **FIX 5 — constant-size bezel dock (CSS only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
 
-Guarded by Suite 213 (both runners, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
+Guarded by Suite 213 (Node runner, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
 
 **Diagnostic Shell U4a (`planning/DIAGNOSTIC_SHELL_PLAN.md` §3.1/§11 U4, Protocol 8) — collapsible groups + INSPECT build-out.** With the U3 TRIGGERS catalog landed, a 45-tool category made the shell one giant always-expanded scroll: every registry `group` (not just the top-level CATEGORY) is now its own nested collapsible `details.sub-panel`, built by `_buildGroupDetails(cat, headingText, headingIcon)` and wired through the SAME `_wireDynamicSubPanel()` persistence helper the category itself uses (Protocol 22/UI-1/UI-2 — not a second mechanism). `_dshGroupDefaultOpen(headingText)` defaults every group OPEN except any heading starting with `FIRE ANIMATION` (the ~28 buttons across its 3 tier-split groups), which defaults COLLAPSED so the shell opens compact. `_renderShell()`'s per-tool loop now resolves a `groupKey` (`tool.group || tool.label`) per category, builds the wrapper on first encounter, and reuses it for every later tool of that group — whether the tool is anchor-based (an existing `.input-group` moved in) or synthesized (a `.dsh-tool-btn` in a `.dsh-tool-grid`). The retired flat `.dsh-tool-subhead` label div (a non-collapsible group heading) is gone.
 
 **INSPECT rebuild.** `CATEGORY_ORDER` moves `'inspect'` to the LAST slot, so the readout renders at the bottom of the shell. INSPECT is a read-only "system diagnostics" readout — **never a raw JSON blob**, in staging or production — grouped into **VITALS & CAMPAIGN SUMMARY** (`_inspectVitalsHtml()`: game/level/XP/HP/location/caps/karma/active-directive-count, reading `state`/`GAME_DEFS[getGameContext()].label`), **DEVICE / SYSTEM** (the migrated `RUNTIME STATE`/`REGISTERED OBSERVERS` anchors plus new `DEVICE DETAIL` — app version + active Cache Storage revision via the existing `_readActiveCacheName()`, ui-core.js — and a staging-only `SERVICE WORKER INTERNALS` board), **CONNECTION** (`_inspectConnectionHtml()`: carrier/AI chat/network, reusing `_isUplinkConnected()`), and **FLAGS** (`_inspectFlagsHtml()`: a readable ENABLED/DISABLED line per known flag, plus a staging-only `FEATURE FLAGS — RAW CACHE` presence/count readout). Every field is built from `_chassisIdRow()`/`_chassisBreaker()` — the CHASSIS SYSTEM STATUS board's own labeled-row helpers (Protocol 22, reused verbatim, never a parallel raw-dump renderer). The readable summary (7 of the 9 `inspect-*` tools) is `tier:'prod'` — safe on a minigame-unlocked production build, the same class of telemetry a network tab already reveals; the 2 genuinely dev-only internals stay `tier:'staging'`, still rendered as labeled text, never `JSON.stringify`. A `COPY DIAGNOSTICS` button (`_copyDiagnostics()`) copies the rendered section's own `textContent` — the already-readable DOM — via `navigator.clipboard.writeText`, never a fresh state dump. INSPECT is fully read-only: none of its functions ever call `saveState()`/`MetaStore.set()`/assign `state.*`.
 
-Guarded by Suite 214 (both runners, 16 tests): the group-collapse default-open/collapsed rule (static + a Node `vm`-sandbox behavioral proof against both a synthetic and the real registry), `_buildGroupDetails()`'s shape and its `_wireDynamicSubPanel()` reuse, that every migrated U1 tool now carries an explicit `group`, `CATEGORY_ORDER`'s `'inspect'`-last placement, the 7 new INSPECT tool ids/categories/anchors, the prod/staging tier + all-read-only (`destructive:false`) split across the 9 `inspect-*` tools, a static "never `JSON.stringify`" guard across every INSPECT builder function, a static read-only guard (no `saveState`/`MetaStore.set`/`robco_v8`/state-write), Node `vm`-sandbox behavioral proofs of `_inspectVitalsHtml()`/`_inspectConnectionHtml()`/`_inspectFlagsHtml()` against synthetic globals, and the atmosphere/save boundary + game-agnosticism extended to every new U4a function by name.
+Guarded by Suite 214 (Node runner, 16 tests): the group-collapse default-open/collapsed rule (static + a Node `vm`-sandbox behavioral proof against both a synthetic and the real registry), `_buildGroupDetails()`'s shape and its `_wireDynamicSubPanel()` reuse, that every migrated U1 tool now carries an explicit `group`, `CATEGORY_ORDER`'s `'inspect'`-last placement, the 7 new INSPECT tool ids/categories/anchors, the prod/staging tier + all-read-only (`destructive:false`) split across the 9 `inspect-*` tools, a static "never `JSON.stringify`" guard across every INSPECT builder function, a static read-only guard (no `saveState`/`MetaStore.set`/`robco_v8`/state-write), Node `vm`-sandbox behavioral proofs of `_inspectVitalsHtml()`/`_inspectConnectionHtml()`/`_inspectFlagsHtml()` against synthetic globals, and the atmosphere/save boundary + game-agnosticism extended to every new U4a function by name.
 
 **Diagnostic Shell U4b (`planning/DIAGNOSTIC_SHELL_PLAN.md` §4/§11 U4, Protocol 8) — STATE SETUP + RESETS + FIXTURES + inline dev-resets.** 80 new `tier:'staging'` + `destructive:true` registry entries — the first tools this panel ships that mutate the LIVE campaign, a deliberate, documented exception to the U1 Hard Atmosphere/Save Boundary (Suite 149.9 rescoped to the pre-U4b portion of the file; Suite 215 independently proves the U4b block's own correctness). 63 STATE SETUP cheats (VITALS/PROGRESSION/SPECIAL/SKILLS/KARMA/ECONOMY/INVENTORY/FACTIONS/COLLECTIBLES/PERKS-TRAITS-BOOKS/QUESTS/MAP/CONDITIONS/COMPANIONS/TIME/MEGA-PRESETS groups) and 13 RESETS each route through an EXISTING native setter/mutator (`_nativeSetHp`/`_nativeSetRads`/`_nativeSetSpecial`/`_nativeSetSkill`/`_nativeSetLevel`/`_nativeSetXp`/`_nativeSetKarma`/`_nativeSetCaps`/`toggleLimb`/`adjustAffinity`/`adjustFaction`/`recordLocationVisit`/`onLocationChange` — Protocol 22/24), never a parallel unclamped write path. `_renderShell()` gained a parameterized-tool synthesis path — `control:'input'|'select'|'select-input'` renders a select and/or input plus a GO button instead of a plain button — and `_invoke(tool, arg)` gained an optional `arg` passthrough forwarded unchanged into `tool.action(arg)`. 1 FIXTURE (`fixture-nv-test-campaign`, `_dshLoadNvTestCampaign()`) populates a fully-stocked New Vegas practice campaign, guarded on the active game genuinely being FNV BEFORE its first `state.*` write (`FALLOUT_REGISTRY` is whichever per-game file the boot manifest loaded, not swappable at runtime — populating it during an FO3 session would silently corrupt state under a mislabeled context). 3 `category:'inline'` dev-reset buttons (`_mountInlineResets()`, staging-tier-rechecked by construction) mount tiny DEV-MARKER-glyph buttons directly on the WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels' own static header line, sharing the exact same registry/gate/confirm path as every other tool (Protocol 22 — never a parallel button/confirm mechanism).
 
@@ -564,7 +562,7 @@ Guarded by Suite 214 (both runners, 16 tests): the group-collapse default-open/c
 - **The MINIGAME-UNLOCK SEAM itself.** `_devConsoleUnlocked()` now ALSO returns `true` on a production build when the persisted `robco_dsh_minigame_unlocked` flag (new `META_MANIFEST` key, owner `test-console.js`) reads `'true'` — set only by a future in-game hacking minigame once built, or by two new staging-only `env`-category test triggers (`minigame-unlock-test`/`minigame-lock-test`) that flip the exact same flag purely to rehearse the flow. **Critically, `_shellTier()` is completely untouched by this seam** — it stays staging-signal-only, referencing neither `MetaStore` nor the unlock flag — so a minigame-unlocked production build shows the shell but renders ONLY `tier:'prod'` tools. `_fireUnlockCeremony()` is the short in-fiction "RESTRICTED ACCESS GRANTED" flourish: opens the drawer, flashes the env banner via `.dsh-unlock-ceremony`/`@keyframes dshUnlockGlow` (a plain `animation:`, Protocol UI-9, auto-neutralized by the existing global reduced-motion block), then settles back through the existing `_paintEnvBanner()` — writing nothing durable anywhere in its own body. A third, `tier:'prod'` `unlock-ceremony-replay` tool fires it standalone with no flag mutation, mirroring the M1-M5 ceremony-replay convention (planning §4: never clears the real persisted flag).
 - **The FINAL LEAK-PROOF AUDIT.** A from-scratch behavioral re-proof of the Suite 210.6/212.5 invariant against the COMPLETE, final 159-tool registry (not a sampled subset): every `tier:'staging'` tool is invisible under a stubbed `'prod'` tier and visible under `'staging'`; every `tier:'prod'` tool is visible under both. A newly-enforced plan guard (§8.6, previously unimplemented) statically confirms every `tier:'prod'` tool's own inline `action()` source text contains no direct campaign-state write pattern (`saveState(`/`state.<field>`/`robco_v8`/`pushToCloud`) — every prod tool only ever delegates to a named helper.
 
-Guarded by Suite 215 (both runners, 16 tests: the U4b registry/synthesis-path/native-setter/fixture-guard/inline-reset proofs) and Suite 216 (both runners, 22 tests: every new U5 tool id/tier/destructive flag, the `control:'toggle'` synthesis behavioral proof, the minigame-unlock-seam behavioral matrix (staging/non-staging × flag set/unset/throwing), the `_shellTier()`-independence proof, the two-part FINAL LEAK-PROOF AUDIT over the full 159-tool registry, the `_setFeatureFlagOverride`/`isFeatureEnabled` override behavioral proofs, the cache/SW/update-prompt seam proofs, and the Protocol 44 trigger-coverage guard re-derived against the complete registry).
+Guarded by Suite 215 (Node runner, 16 tests: the U4b registry/synthesis-path/native-setter/fixture-guard/inline-reset proofs) and Suite 216 (Node runner, 22 tests: every new U5 tool id/tier/destructive flag, the `control:'toggle'` synthesis behavioral proof, the minigame-unlock-seam behavioral matrix (staging/non-staging × flag set/unset/throwing), the `_shellTier()`-independence proof, the two-part FINAL LEAK-PROOF AUDIT over the full 159-tool registry, the `_setFeatureFlagOverride`/`isFeatureEnabled` override behavioral proofs, the cache/SW/update-prompt seam proofs, and the Protocol 44 trigger-coverage guard re-derived against the complete registry).
 
 ---
 
@@ -793,7 +791,7 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
 write exists anywhere in the identity block itself. DO-K itself landed under `[Unreleased]` as a
 cache-rev-only change; `APP_VERSION` bumped to 2.8.0 at the v2.8.0 release cut. Guarded end-to-end by
-Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
+Suite 157 (Node runner) — a Node `vm`-sandbox behavioral test that loads the real
 `js/core/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
 write sites.
@@ -898,7 +896,7 @@ neutralizes it automatically with no bespoke carve-out.
 `_bezelTelemetryText`, `_bezelSweep`, `openBezelDirectory`, `initBezelSubsystem`,
 `_initBezelChrome`, `_updateFaultLamp`) reads `state`/MetaStore but never writes `saveState()` /
 `robco_v8` / `state.<field> =` anywhere — view choice and device telemetry only. Guarded by
-Suite 158 (both runners at parity, 18 tests).
+Suite 158 (Node runner, 18 tests).
 
 **Mobile bottom-dock follow-up (owner audit, Suite 160):** DO-N originally shipped the desktop
 casing-top/glass-frame/bezel `order:1/2/3` flip (Desk-terminal shell, above) but had no mobile
@@ -922,7 +920,7 @@ it), and (b) fixed the amber connector/vent-pin strips (`details.bay-board::afte
 `.chip-card::after`) from a `repeating-linear-gradient` — whose fixed cycle length rarely divides
 the strip's actual responsive width evenly, leaving a stray thin partial pin at the end — to
 `background-repeat: round`, which rescales the tile so a whole number of pins always fits. Guarded
-by Suite 160 (both runners at parity, 6 tests).
+by Suite 160 (Node runner, 6 tests).
 
 **Bezel fidelity pass (Protocol 8 Sonnet-stage implementation of `planning/BEZEL_FIDELITY_PLAN.md`):**
 closes the gap between the shipped chrome and the approved `nv-machine-mockup.html`/
@@ -946,7 +944,7 @@ already owns `::after` — delivering the mockup's glass depth with zero DOM res
 `.glass-frame > .glass` wrapper), plus a desktop-only radius/padding bump. A low-opacity
 `.bezel::before` hazard strip is desktop-only. Mobile (360/412px) keeps the disciplined edge exactly
 as before: dial/serial/field-kit/hazard-strip/`.nk-sub` all hidden, zero new horizontal overflow.
-Guarded by Suite 158.21–158.27 (both runners at parity, +7 tests, 2686 total). Cache r118.
+Guarded by Suite 158.21–158.27 (Node runner, +7 tests, 2686 total). Cache r118.
 
 **Mobile immersion pass (owner follow-up — the mobile complement to the bezel fidelity pass
 above):** mobile was intentionally left as a disciplined flat edge by the desktop-only pass;
@@ -965,7 +963,7 @@ An optional compact serial/flavor micro-line was evaluated and deliberately skip
 `nv-machine-412.png` mobile reference shows zero decorative text on mobile, so omitting it keeps
 the disciplined mobile edge faithful to the golden reference rather than forcing a fit. Verified
 live at 360/412/desktop with zero horizontal overflow and the desktop gate completely untouched.
-Guarded by Suite 158.28–158.30 (both runners at parity, +3 tests, 2689 total); this unit also
+Guarded by Suite 158.28–158.30 (Node runner, +3 tests, 2689 total); this unit also
 caught and fixed a stale Suite 158 header-comment test count that had drifted since the bezel
 fidelity pass (Protocol 42 — harness/doc-only, no functional impact). Cache r119.
 
@@ -1104,7 +1102,7 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 31 tests, including a Node
+from persistence. Guarded by Suite 162 (Node runner, 31 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 **DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
@@ -1307,7 +1305,7 @@ entries, one per behaviour) into the shared `#sysModal` via `openModal()`.
 device telemetry; no function in the CHASSIS CORE block ever touches `state.*`, `saveState()`, or
 `robco_v8` (Suite 192.15, a static grep across the whole block).
 
-Guarded by Suite 192 (both runners at parity, 26 tests): the three-board split, the button/mirror
+Guarded by Suite 192 (Node runner, 26 tests): the three-board split, the button/mirror
 contract, the casing-top screen's placement/sizing (192.23), the `.chassis-core-shape` self-clip
 regression guard (192.24 — Protocol 42, see below), the `#chassisScreenMini` aria-prohibited-attr
 regression guard (192.25 — Protocol 42, see below), the compound-selector specificity regression
@@ -1524,7 +1522,7 @@ by `PANEL_NAV_ALIASES` in `js/services/api.js` — e.g. typing "stats" or "bio s
 stopped finding these panels. Fixed alongside the rename, with the pre-existing regression tests
 covering it (123.7, 168.7) updated to the new strings rather than left stale.
 
-Guarded by Suite 181 (both runners, 20 tests): id/handler preservation, the `stat_rads`
+Guarded by Suite 181 (Node runner, 20 tests): id/handler preservation, the `stat_rads`
 single-instance invariant, `>` glyph presence on all nine board headings, `_syncOperatorTelemetry()`
 status-row wiring, the `_bumpSpecialStat`/zone-click/`level.up`-subscriber wiring, the Protocol 38
 part-number fix, and the `expandPanelForCategory()` string-literal fix.
@@ -1571,7 +1569,7 @@ interactive, not display-only readouts beside an editable number field:
   real `elementFromPoint` hit-test followed by dispatched `mousedown`/`mousemove`/`mouseup` (never a
   direct-to-element dispatch, which would bypass the hit-test the fix depends on).
 
-Guarded by Suite 182 (both runners, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
+Guarded by Suite 182 (Node runner, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
 the REAL function bodies against a synthetic DOM, mirroring the Suite 137.6/177.4 technique) that
 dragging the HP/XP bars and the SPECIAL faders actually drives `stat_hp_cur`/`stat_xp`/`commitStat`,
 that a zone click/Enter/Space calls `toggleLimb()` (and an unrelated key does not), and that
@@ -1650,7 +1648,7 @@ work, one gate run):
   already shipped for the mode pill), since an ungated `:hover` fill can stick visibly after a tap on
   a touch device.
 
-Guarded by Suite 183 (both runners, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
+Guarded by Suite 183 (Node runner, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
 away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, a regression
 guard that the reverted `.zc-name`/`.rad-row` content changes stay gone, the `#c_caps` spinner
 suppression, the `.rb-tile input` `max-width: 100%` override (the actual BOTTLE CAPS fix), the
@@ -1832,7 +1830,7 @@ flow OPERATOR already uses (not a `.bay-grid` two-column grid — that pattern i
 Module Bay's SLOT sub-panels, per existing precedent). Zero new campaign-state field: the drawer
 choice is a MetaStore device pref (`robco_cargo_drawer`), not `state.*`.
 
-Guarded by Suite 185 (both runners, 24 tests): the id/handler-preservation contract, the caps/weight
+Guarded by Suite 185 (Node runner, 24 tests): the id/handler-preservation contract, the caps/weight
 relocation (exactly one `#c_caps`/`#display_weight`, both inside `#opsBridgePanel`), the beam
 transition + SEIZED shudder (plain animation/transition, reduced-motion-safe), the 6-drawer-no-"All"
 contract, the bounded in-panel scroll (no render cap), the `robco_cargo_drawer` MetaStore round-trip,
@@ -1908,7 +1906,7 @@ choice persisted via a new registered `robco_databank_qdrawer` MetaStore device 
 Protocol UI-6). An in-tray search field (`#questSearch`) narrows the list client-side. The owner-locked
 **⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui/ui-render.js`) is the ONE new native write path this unit
 adds: advances a directive's status ACTIVE→COMPLETE→FAILED→ACTIVE with no AI involved, proven by a
-real Node `vm`-sandbox behavioral test (both runners) that actually executes the function body across
+real Node `vm`-sandbox behavioral test (Node runner) that actually executes the function body across
 three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/services/api.js`)
 is completely untouched — this is a second, additive entry point onto the same `state.quests[i].status`
 field (Protocol 14/24), exactly like the existing native affinity/mark-visited setters. `addQuest`/
@@ -1953,7 +1951,7 @@ only (BUS-16/17); BUS-18–21 default collapsed — the same `<details open>` HT
 `_wirePanelPersistence()` already reads. Zero new campaign-state field: the quest-drawer choice is a
 MetaStore device pref (`robco_databank_qdrawer`), not `state.*`.
 
-Guarded by Suite 189 (both runners, 20 tests): the deleted `_mapAbbrev` table, the SVG node-map's
+Guarded by Suite 189 (Node runner, 20 tests): the deleted `_mapAbbrev` table, the SVG node-map's
 gridRow/gridCol positioning, the fog-of-war label-suppression + CSS styling, the typed signal-glyph
 data-driven logic, the known-route trail, the `_mapNodeKeyNav` keyboard contract, the sector-sheet
 handler preservation, `cycleQuestStatus()`'s real behavioral ACTIVE→COMPLETE→FAILED→ACTIVE proof, the
@@ -2018,7 +2016,7 @@ var or a registered MetaStore device pref.
   `[data-game='FO3']` keyframe override reading `identity.motionTexture.seat` — never a JS branch
   (Protocol 38).
 
-Guarded by Suite 208 (both runners at parity, 30 tests): each moment's trigger, the zero-write
+Guarded by Suite 208 (Node runner, 30 tests): each moment's trigger, the zero-write
 invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavor
 `_bootLinesFor()` call all preserved), and the game-agnostic guard.
 
@@ -2059,7 +2057,7 @@ footgun caught before shipping. Living at the end of the cascade guarantees the 
 `≤480px` cascade regardless of where a future edit
 adds a same-selector rule earlier in the file.
 
-Guarded by Suite 209 (both runners at parity, 10 tests): the token scale (base + mobile-tuned
+Guarded by Suite 209 (Node runner, 10 tests): the token scale (base + mobile-tuned
 values), each F1-F8 selector's mobile values, the never-`display:none` subtitle guardrail, the
 untouched floor-bearing children (`.pk-x`, `.vu-track`, `.composer-input`), the block's cascade-order
 placement after every base rule, and the no-desktop-gate-leak guard.
@@ -2120,8 +2118,8 @@ persistence audit will block the commit if any step is missed:
 3. **api.js** — Add import handling in `autoImportState()` so AI responses update the field
 4. _(If applicable)_ **ui-render.js** — Add rendering in the appropriate `render*()` function
 
-The pre-commit hook (`tests/robco-diagnostics.ps1`) auto-discovers all keys in `state.js`
-and verifies that every key appears in `autoImportState()`.
+The pre-commit gate (`tests/robco-diagnostics.js`, the Node runner) auto-discovers all keys
+in `state.js` and verifies that every key appears in `autoImportState()`.
 
 ---
 
@@ -2250,7 +2248,7 @@ shared state (`_standbyActive`/`_uptimeInterval`/`_memCycleInterval`/
 `enterStandby`/`exitStandby`) moved to true module scope so `_wireStandby()`
 (listener wiring) and the later `_startAmbientTimers()` (boot-time timer
 kickoff) share one set of double-start guards, matching the original
-DUP-3/DUP-4 invariant. A static structural suite (Suite 132, both runners)
+DUP-3/DUP-4 invariant. A static structural suite (Suite 132, Node runner)
 guards the function list, the call order, the module-scope promotion, and
 that `window.onload` stays a slim composition; the decomposition was also
 verified live via the full Playwright gate (boot-smoke + 360/412 render-check)
@@ -2386,7 +2384,7 @@ inline `ctx === 'FO3'/'FNV' ?` ternary — it is data-driven via
 `GAME_DEFS[ctx].ai.trackerDirectives` (`state.js`), read by `_directiveTrackers()`.
 A future game with no trackers supplies `trackerDirectives: ''` (or omits the
 field) — zero code changes to the builders. A Protocol 14 golden-master test
-(Suite 131, both runners) evaluates the real builders + real `GAME_DEFS` across
+(Suite 131, Node runner) evaluates the real builders + real `GAME_DEFS` across
 an 11-point state matrix (both games × every playstyle/playthroughType/
 campaignMode branch) and asserts SHA-256 equality against the pre-refactor
 output, proving the decomposition is byte-identical.
@@ -2980,7 +2978,7 @@ graph TD
 
     J[sw.js] -->|cache-first| A
 
-    K[tests/robco-diagnostics.ps1] -.-|validates| B
+    K[tests/robco-diagnostics.js] -.-|validates| B
     K -.-|validates| C
     K -.-|validates| D
     K -.-|validates| H
