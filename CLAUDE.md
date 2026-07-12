@@ -201,7 +201,7 @@ Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a *
 
 1. **Opus — Diagnose & Plan.** Opus investigates the actual code and git history, identifies the root cause, and writes a concrete plan: exact files, selectors, and line numbers; the change and its rationale; desktop/regression safety; and explicit verification steps. No edits in this stage.
 
-2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 1130-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
+2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 3002-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
 
 3. **Opus — Audit before done.** Opus independently reviews the actual committed diff and the verification evidence against the original root cause: is the issue fully resolved, nothing regressed, and is the change actually live on the deployed branch (origin/main) and site — not just a local/worktree commit? If anything falls short, loop back to stage 2. The task is "done" only after this audit passes.
 
@@ -229,7 +229,7 @@ Dispatch reports must be formatted for mobile reading: lead with a one-line summ
 
 Any change touching `index.html`, `css/`, or render JS (`ui-render.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
-The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 1106-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
+The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 3002-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
 ---
 
@@ -496,7 +496,7 @@ All source files are UTF-8. The app is intentionally full of non-ASCII character
 
 ## Protocol 40 — Keep `tests/test.html` In Sync
 
-`tests/test.html` is the **browser-side runtime mirror** of the canonical static runners (`tests/robco-diagnostics.js` / `.ps1`). Where the canonical runners statically analyse the source, `test.html` actually **executes** the live import contract in a real browser (`autoImportState` / `sanitizeImportedContainer`, the v8 container + boot-merge, registry validation, SPECIAL/skill clamping, status tick-down) and asserts the result. It must never be allowed to fall out of date.
+`tests/test.html` is the **browser-side runtime mirror** of the canonical static runner (`tests/robco-diagnostics.js`). Where the canonical runner statically analyses the source, `test.html` actually **executes** the live import contract in a real browser (`autoImportState` / `sanitizeImportedContainer`, the v8 container + boot-merge, registry validation, SPECIAL/skill clamping, status tick-down) and asserts the result. It must never be allowed to fall out of date.
 
 **When you must update `test.html` (same commit):**
 
@@ -515,7 +515,7 @@ All source files are UTF-8. The app is intentionally full of non-ASCII character
 **Enforcement (self-improving — Protocol 36b):**
 
 - `tests/test-html-check.mjs` runs `test.html` **headless in the full gate** and fails if any suite fails, if the audit throws, or if the declared `Suites: N` marker ≠ the suites actually executed.
-- **Suite 96** (both canonical runners) statically guards that `test.html` loads the current boot chain, exercises the current entry points, stays game-agnostic, carries no dead stubs, keeps its suite-count marker honest, and that the gate still invokes the headless runner.
+- **Suite 96** (Node runner) statically guards that `test.html` loads the current boot chain, exercises the current entry points, stays game-agnostic, carries no dead stubs, keeps its suite-count marker honest, and that the gate still invokes the headless runner.
 
 This is folded into Protocol 2a: `tests/test.html` is in the test-count/suite-sync table below, and the `Select-String` drift scan includes it.
 

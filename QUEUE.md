@@ -13,7 +13,8 @@ _Last rewritten in full: 2026-07-11._
 
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas overhaul, the offline native calculators, the Diagnostic Shell, the ambient runtime, the living core — all live.
 - **The brain dump is done** (the deep Claude-facing reconstruction of the project) and this roadmap file is its phone-readable companion.
-- **Next up is 2.8.5** — a code-and-test health phase to clean the foundation, then the Fallout 3 device skin.
+- **2.8.5's spine — the code + test health restructure — is SHIPPED** (2026-07-12). The heavier test-health/perf/a11y/bundle-size work under that same version number is deliberately deferred to a later pass (your call: stop at the spine, ship Fallout 3 next).
+- **Next up is the Fallout 3 device skin** (2.8.5 item 4), then the legacy/schematic per-game layout (item 5).
 - **After that is 2.9.0** — the big one: gameplay systems, ambient life, and the "it's a real operating system" round.
 - **Then 3.0** is Fallout 4 as a real playable third game.
 - **A "for fun" recreation prompt sits dead last**, by your own placement.
@@ -54,44 +55,58 @@ Everything below expands each of those.
 
 This whole version is about making the foundation solid **before** stacking more on top. The items run **in this order on purpose.**
 
-## 1. The code + test health phase — the spine
+## 1. ✅ The code + test health phase — the spine (SHIPPED, 2026-07-12)
 
-**What it is.** A deep cleanup and restructuring of both the codebase and the test suite, run as one coordinated phase (not scattered passes) so the pieces don't fight each other. Several strands:
+**What it is.** A deep cleanup and restructuring of both the codebase and the test suite, run as one coordinated phase (not scattered passes) so the pieces don't fight each other. Several strands.
 
-**a) Readability / code-organization refactor.**
-The app grew organically into a few enormous single files. This strand splits them sensibly, gives each file a header explaining what it is and what it exposes, cleans up naming into predictable conventions, sweeps out dead code, and adds the newcomer materials: a guided "start here" onboarding narrative with a recommended reading order, a code map ("where does X live"), a glossary of the project's internal vocabulary, documented data shapes (the exact form of the character state, the AI schema, a game definition, the save file), and documented naming conventions. The north star, in your words: someone who has never seen the code should be able to open it and understand it cleanly. Magic numbers become named constants with a reason attached. Long functions get broken into small named helpers so the top level reads like prose. The linter is tightened (function length, nesting depth, complexity, naming) so the tidiness can't rot. A decision already made: the diegetic/in-fiction code renaming idea is scrapped — readability beats flavor in the source.
+**What becomes easier because this exists:** every later 2.8.5+ unit (Fallout 3, the schematic layout, the whole 2.9.0 round) now lands on a codebase that's organized by purpose instead of a few enormous files — new work goes into a clearly-labeled home instead of one more thing bolted onto an already-overloaded file. The pointer-index + code-map pattern means a session no longer has to load the whole rules doc to get oriented.
 
-**✅ Progress so far:** the largest single UI file has been split into six responsibility-scoped pieces, and the entire `js/` folder has been reorganized out of one flat pile into labeled subfolders by purpose (game content, core engine, on-screen interface, outside-world services, developer-only tools). The giant stylesheet question folded in below is also answered now — it's been split into twelve section-scoped files, cut in the exact order they always loaded in so nothing about how the terminal looks changed. Both reorganizations are pure filing exercises — every screen, button, and behavior works exactly as before.
+**a) ✅ Readability / code-organization refactor — shipped.**
+The app grew organically into a few enormous single files. This strand splits them sensibly, gives each file a header explaining what it is and what it exposes, cleans up naming into predictable conventions, and sweeps out dead code. The north star, in your words: someone who has never seen the code should be able to open it and understand it cleanly. A decision already made: the diegetic/in-fiction code renaming idea is scrapped — readability beats flavor in the source.
 
-**b) Library / token split.**
-The rules doc currently carries a giant suite-by-suite test history that is loaded into every single work session — it burns tokens on every session whether it's needed or not, and it has drifted out of sync with reality. This strand moves that catalog out into a local reference library and wires an automatic pointer index so a session is auto-directed to the right reference instead of loading everything blindly. The library gets a deliberate three-class maintenance model so it doesn't become a second codebase that rots: **live** docs that describe the code (kept current and gate-guarded, because a stale one makes the next session confidently wrong); **generated** docs that are produced from the source itself (the test catalog should be generated from the test runners, not hand-maintained — that's the real fix for the drift); and **archive** docs (every audit, plan, and mockup, frozen and stamped "snapshot as of X," never updated). A fourth thing, the portable brief for handing the project to another AI, is generated fresh on demand and never stored.
+**Shipped:** the largest UI file split into six responsibility-scoped pieces, then the API/services hub split into three (directive builder, AI-import path, native command router) and the render pipeline split into nine per-panel files; the entire `js/` folder reorganized out of one flat pile into labeled subfolders by purpose (game content, core engine, on-screen interface, outside-world services, developer-only tools); the giant stylesheet split into twelve order-scoped files, cut in the exact cascade order they always loaded in; a readability pass adding per-file headers, section banners, and WHY/GOTCHA comments across the restructured files; and two real bugs the restructure surfaced and fixed along the way (equipped-item reconciliation across every removal and load path; the Karma Center companion list moved out of a hardcoded literal into `GAME_DEFS`). Every reorganization was a pure filing exercise plus the two named bug fixes — no other behavior changed.
 
-**c) Test-health pass.**
-The suite grew to thousands of tests organically. This audits their real strength, consolidates exact-duplicate and superseded tests without losing any coverage (coverage-preserving only — never cut the number for its own sake), strengthens weak or tautological assertions that would pass even if the feature broke, rebalances brittle "the source contains this string" checks toward tests that actually run the code, prepares the suite to survive the refactor above (this is coupled to the refactor — done with it, not after), hardens the known flaky tests, profiles and speeds up the gate, and reconciles the test catalog with what actually runs.
+**Newcomer materials — NOT done, deferred:** the guided "start here" onboarding narrative, the internal-vocabulary glossary, and documented data shapes (character state / AI schema / game definition / save file) did not ship in this pass. They fold into a later doc pass, not blocking Fallout 3.
 
-**Folded in here** (these were separate parked audits — they belong in this phase, run together and coordinated): the expanded token-usage audit, the performance audit, the accessibility audit, the code-quality audit (including the specific question of whether the giant stylesheet should be split into multiple files), the test-strength audit, and the leftover half of the offline audit — a final sweep confirming nothing in the app still quietly reaches the network when it shouldn't. Genuinely-new additions for this phase: an asset/bundle-size and caching audit (the app grew a lot — the on-device OCR data alone is several megabytes), a dependency/security hygiene pass, and a protocol-consolidation pass (the rules have sprawled — dedupe, clarify, retire superseded ones).
+**b) ✅ Library / token split — shipped.**
+The rules doc used to carry a giant suite-by-suite test history loaded into every single work session, burning tokens whether it was needed or not, and it had drifted out of sync with reality.
 
-**Why it sits first.** This is the spine. Everything after it — Fallout 3, the schematic layout, and the entire 2.9.0 round — would otherwise be built on a codebase that's about to be torn apart and reassembled. Building Fallout 3 first would mean building it twice.
+**Shipped:** the rules doc cut from roughly 80k to roughly 23k tokens by moving the per-suite catalog out into a local reference library (`library/TEST_CATALOG.md`); a Reference Pointer Index plus `library/CODE_MAP.md` so a session is auto-directed to the right reference instead of loading everything blindly; the three-class library maintenance model (**live** docs kept current and gate-guarded, **generated** docs meant to be produced from source rather than hand-written, **archive** docs frozen and stamped "snapshot as of X"); and a new doc-reference integrity gate check that fails the build if a doc names a global, file path, or load-order that doesn't actually exist in the code, plus a boot-chain preflight keeping the app shell, service worker, docs, and test harness in agreement. The portable-brief-for-another-AI idea is generated fresh on demand, never stored, per the original design.
 
-**★ Hard exit condition.** This phase changes the whole file layout, which invalidates large parts of the brain dump's architecture sections. **This phase is not "done" until the brain dump has been re-baselined against the restructured code.** (The same condition is written into the brain dump itself, so it can't be forgotten from either side.)
+**Still generated-in-name-only:** the test catalog is hand-synced today, not actually auto-generated from the test runner — that generator is explicitly a separate, later unit, same as originally scoped.
 
-**Done means:** files are navigable and headed, dead code is gone, the newcomer docs exist, the rules doc is lean with the catalog moved out, the test suite has equal-or-stronger coverage with a faster gate and no flakes, and the brain dump is re-baselined.
+**c) ⬜ Test-health pass — NOT done, deferred to a later pass.**
+This strand (real assertion-strength audit, coverage-preserving dedup, rebalancing brittle string-match tests toward behavioral ones, flaky-test hardening, gate profiling) did **not** run in this unit, beyond one concrete, related win: **the redundant PowerShell test-runner mirror was deleted** (it caught nothing the Node runner couldn't — its "behavioral" tests just shelled out to Node with a reconstructed sandbox — while costing ~13× the runtime and double the authoring cost of every test), which cut the fast gate from roughly 35s to roughly 12.7s and retired Protocol 15 (the project's first deliberate protocol retirement).
 
-## 2. Performance / accessibility / asset-and-bundle-size work
+**Folded audits — also NOT done, deferred with strand (c):** the expanded token-usage audit, the performance audit, the accessibility audit, the code-quality audit, the test-strength audit, the leftover offline-network sweep, the asset/bundle-size and caching audit, the dependency/security hygiene pass, and the protocol-consolidation pass. None of these ran in this unit.
+
+**Why it sat first.** This was the spine. Everything after it — Fallout 3, the schematic layout, and the entire 2.9.0 round — would otherwise have been built on a codebase that was about to be torn apart and reassembled. Building Fallout 3 first would have meant building it twice.
+
+**★ Hard exit condition — MET.** This phase changed the whole file layout, which invalidated large parts of the brain dump's architecture sections. The brain dump has been re-baselined against the restructured code, closing the condition written into both this file and the brain dump itself.
+
+**Owner's exit line, followed exactly:** _if the phase grows past the spine, stop and ship Fallout 3._ The spine (strands a + b, plus the one concrete test-health win of deleting the redundant runner) is done. Strand (c) in full and its folded audits are real, high-value work — just not spine — and defer to a later pass rather than blocking Fallout 3.
+
+**Done means (as actually delivered):** files are navigable and headed, dead code is gone, the rules doc is lean with the catalog moved out, a doc-reference integrity gate now catches drift automatically, the redundant test runner is gone with zero coverage loss, and the brain dump is re-baselined. The newcomer docs and the full test-health pass are explicitly not part of "done" here — they're queued, not forgotten.
+
+## 2. ⬜ Performance / accessibility / asset-and-bundle-size work (deferred past the spine — see item 1c)
 
 **What it is.** With the codebase clean, measure and actually improve real load performance, accessibility beyond the current baseline, and the size of what ships to the device.
 
 **Why it exists.** Mobile-primary means load time and payload size matter on a phone. Safer and easier to do once the code is restructured.
 
+**Status.** Not started. This is the deferred half of item 1's strand (c) — high-value, not spine — and now sits behind Fallout 3 rather than in front of it, per the owner's exit line.
+
 **Done means:** measured, real improvements — not guesses.
 
-## 3. Brain-dump update — re-baselined on the clean codebase
+## 3. ✅ Brain-dump update — re-baselined on the clean codebase (SHIPPED, 2026-07-12)
 
 **What it is.** The explicit re-baseline that closes the hard exit condition above: re-verify the brain dump against the restructured code and rewrite the parts that moved. The vision sections stay stable; only the structural sections refresh.
 
 **Why it exists.** A stale reconstruction doc is worse than none — it makes sessions confidently wrong.
 
-## 4. Fallout 3 device skin — the virtual Pip-Boy
+**Status.** Done, as part of item 1's spine — see the hard exit condition note there.
+
+## 4. ⏭️ Fallout 3 device skin — the virtual Pip-Boy (NEXT UP)
 
 **What it is.** Fallout 3 stops wearing New Vegas's face and gets its own device identity. The panels themselves stay one shared, dynamic set (they already adapt per game — Fallout 3 shows bobbleheads instead of snow globes, the Capital Wasteland map, its own factions, its Karma Center, no magazines). What changes is the **device chrome around them.** New Vegas is a salvaged desk terminal; Fallout 3 becomes the Pip-Boy 3000 itself.
 
