@@ -508,6 +508,7 @@ function renderPerks() {
   const perks = state.perks || [];
   if (perks.length === 0) {
     perksDiv.innerHTML = emptyState('NO PERKS ON FILE');
+    _renderFo3PerkDetail();
     return;
   }
   const searchEl = document.getElementById('perkSearch');
@@ -518,6 +519,7 @@ function renderPerks() {
 
   if (displayPerks.length === 0) {
     perksDiv.innerHTML = emptyState('NO PERK MATCHES');
+    _renderFo3PerkDetail();
     return;
   }
   // FEEDBACK ANIMATION WAVE 3 (#13 CARD SEAT) — consume the pending marker
@@ -532,13 +534,19 @@ function renderPerks() {
         ? `<span class="s-meta">REQ LVL ${parseInt(p.level_taken)}</span>`
         : '';
       const isSeated = seatName && p.name.toLowerCase() === seatName;
+      // FO3 Shape A (Batch 1): a click-to-select affordance for the detail
+      // pane, additive to (never replacing) the row's own real ✕ delete
+      // button below — zero tap regression. Keyboard reachable via
+      // tabindex + Enter/Space (the row has no other natural focus stop).
       return (
-        `<div class="slot-row${isSeated ? ' slot-row--seated' : ''}">` +
+        `<div class="slot-row${isSeated ? ' slot-row--seated' : ''}" data-idx="${p._origIdx}" tabindex="0" ` +
+        `onclick="_selectFo3PerkRow(${p._origIdx})" ` +
+        `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_selectFo3PerkRow(${p._origIdx})}">` +
         `<span class="s-idx">SLOT ${String(p._origIdx + 1).padStart(2, '0')}</span>` +
         `<span class="s-name">${escapeHtml(p.name)}</span>` +
         `<span class="s-rank" title="Rank ${rank}">${pips}</span>` +
         levelTag +
-        `<button class="delete-btn pk-x" onclick="removePerk(${p._origIdx})" aria-label="Remove ${escapeHtml(p.name)}">✕</button>` +
+        `<button class="delete-btn pk-x" onclick="event.stopPropagation();removePerk(${p._origIdx})" aria-label="Remove ${escapeHtml(p.name)}">✕</button>` +
         `</div>`
       );
     })
@@ -563,6 +571,49 @@ function renderPerks() {
         .forEach(el => el.classList.remove('slot-row--seated'));
     }, 700);
   }
+  if (typeof getIdentity === 'function' && getIdentity().rails) {
+    perksDiv
+      .querySelectorAll('.slot-row[data-idx]')
+      .forEach(el => el.classList.toggle('fo3-sel', +el.dataset.idx === _fo3PerkSel));
+    _renderFo3PerkDetail();
+  }
+}
+
+// ── FO3 PERK DETAIL (Shape A list+detail, Batch 1) ──────────────────────
+// Transient in-memory selection (never state.*/MetaStore). The list row's
+// own ✕ delete button is untouched (zero tap regression); the detail pane
+// mirrors rank/level + a second REMOVE action, both calling removePerk().
+let _fo3PerkSel = null;
+
+function _selectFo3PerkRow(idx) {
+  _fo3PerkSel = idx;
+  const perksDiv = document.getElementById('perksList');
+  if (perksDiv) {
+    perksDiv
+      .querySelectorAll('.slot-row[data-idx]')
+      .forEach(el => el.classList.toggle('fo3-sel', +el.dataset.idx === idx));
+  }
+  _renderFo3PerkDetail();
+}
+
+function _renderFo3PerkDetail() {
+  const detail = document.getElementById('fo3PerkDetail');
+  if (!detail) return;
+  if (typeof getIdentity !== 'function' || !getIdentity().rails) return;
+  const perks = state.perks || [];
+  if (!perks.length) {
+    detail.innerHTML = '<div class="fo3-empty">NO PERKS ON FILE</div>';
+    return;
+  }
+  if (_fo3PerkSel == null || !perks[_fo3PerkSel]) _fo3PerkSel = 0;
+  const idx = _fo3PerkSel;
+  const p = perks[idx];
+  const rank = Math.max(1, parseInt(p.rank) || 1);
+  const levelLine = p.level_taken ? `<b>REQ LVL</b>${parseInt(p.level_taken)}` : '';
+  detail.innerHTML =
+    `<div class="fo3-dt-title">${escapeHtml(p.name)}</div>` +
+    `<div class="fo3-dt-stats"><b>RANK</b>${rank} ${levelLine}</div>` +
+    `<div class="fo3-dt-actions"><button class="fo3-act" onclick="removePerk(${idx})">REMOVE <i>&#9633;</i></button></div>`;
 }
 
 function removePerk(idx) {

@@ -10072,7 +10072,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
   assert(
     !/skillBooksPanel/.test(skillMatrixBlock85) &&
-      /<details class="panel bay-board" data-tab="stat" id="skillBooksPanel">/.test(htmlSource),
+      /<details class="panel bay-board fo3-flat" data-tab="stat" id="skillBooksPanel">/.test(
+        htmlSource
+      ),
     '85.23: #skillBooksPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
   );
 
@@ -10384,7 +10386,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
   assert(
     !/magazinesPanel/.test(skillMatrixBlock87) &&
-      /<details class="panel bay-board" data-tab="stat" id="magazinesPanel">/.test(idxSrc87),
+      /<details class="panel bay-board fo3-flat" data-tab="stat" id="magazinesPanel">/.test(
+        idxSrc87
+      ),
     '87.26: index.html #magazinesPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
   );
 
@@ -26082,9 +26086,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // \s+ between words instead of a literal space (Protocol 42 — caught live
   // by npm run format inserting exactly this wrap on the 4 hero boards).
   const flexTitle181 = t => t.replace(/[.]/g, '\\.').replace(/ /g, '\\s+');
+  // class="panel bay-board" is a PREFIX match (no closing quote) — the FO3
+  // Batch 1 panel relayout added an additive `fo3-flat` marker class to
+  // most of these boards' class attributes (class="panel bay-board
+  // fo3-flat"); the assertion's intent (every OPERATOR board reuses the
+  // shared .bay-board class family, never a parallel one) still holds
+  // regardless of what else rides along in the attribute.
   assert(
     boardTitles181.every(t =>
-      new RegExp('class="panel bay-board"[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
+      new RegExp('class="panel bay-board[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
     ) && busTags181.every(b => new RegExp('class="bay-slot-tag">' + b + '<').test(html181)),
     '181.4: all 11 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
   );
@@ -42129,6 +42139,214 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   assert(
     !/function\s+renderStatusFO3|function\s+renderVaultBoy/.test(navSrc225),
     '225.13: no second STATUS render path was introduced — the Vault Boy view is a CSS re-layout of the existing render pipeline (Protocol 22)'
+  );
+}
+
+{
+  header(
+    'Suite 226 — FO3 PIP-BOY BUILD Batch 1 (STATUS/SPECIAL/SKILLS/PERKS/GENERAL/MANIFEST re-layout, Protocol 8 stage 2)'
+  );
+
+  const fo3CssPath226 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css226 = fs.existsSync(fo3CssPath226) ? fs.readFileSync(fo3CssPath226, 'utf8') : '';
+  const uiCoreSrc226 = readGroup('ui-core');
+  const invSrc226 = readGroup('ui-render-inventory');
+  const charSrc226 = readGroup('ui-render-character');
+  const cmdSrc226 = readGroup('ui-core-cmd');
+
+  // 226.1 — every board this batch re-laid out carries the .fo3-flat marker
+  //         (the shared "drop the per-board title bar, force always-open"
+  //         convention — Section H), and the CSS actually hides the summary
+  //         + the Section-A stepper/kit rules are present.
+  const flatBoardIds226 = [
+    'opVitalPanel',
+    'opHarnessPanel',
+    'statusEffectsPanel',
+    'opSpecialPanel',
+    'skillMatrixPanel',
+    'skillBooksPanel',
+    'magazinesPanel',
+    'perkLoadoutPanel',
+    'positionClockPanel',
+    'factionPanel',
+    'karmaPanel',
+    'opsManifestPanel',
+  ];
+  assert(
+    flatBoardIds226.every(id =>
+      new RegExp('class="panel bay-board[^"]*fo3-flat[^"]*"[^>]*id="' + id + '"').test(htmlSource)
+    ),
+    '226.1: all 12 Batch 1 boards carry the .fo3-flat marker class on their <details> tag'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-flat\s*>\s*summary\s*\{\s*display:\s*none;\s*\}/.test(fo3Css226),
+    "226.2: [data-game='FO3'] .fo3-flat > summary is display:none — the Pip-Boy screen has no per-board title bar"
+  );
+
+  // 226.3 — Protocol 42 regression: _wirePanelPersistence() must force a
+  //         .fo3-flat board open (gated on identity.rails, never a hardcoded
+  //         game literal — Protocol 38), defensively guarding classList in
+  //         case a caller ever runs this against a minimal mock element
+  //         (the exact crash a live behavioral test — 172.2 — surfaced when
+  //         this guard was first added without the `d.classList &&` check).
+  assert(
+    /d\.classList\s*&&\s*\n?\s*d\.classList\.contains\('fo3-flat'\)/.test(uiCoreSrc226) &&
+      /getIdentity\(\)\.rails/.test(uiCoreSrc226),
+    '226.3: _wirePanelPersistence() forces open any .fo3-flat board only when the active identity carries `rails` data, and defensively checks classList exists first (Protocol 42 — a minimal test mock without classList must not throw)'
+  );
+
+  // 226.4 — STATUS full-bleed merge: #fo3BoardScroll is a single-column grid
+  //         by default (identical stacking to every other sub-tab/rail —
+  //         GENERAL's 3 boards, SKILLS' 3 boards, etc. all still just
+  //         stack), and :has() switches it to 2 columns ONLY while the
+  //         STATUS group's own harness board is active, with the 3 STATUS
+  //         boards explicitly placed into that grid.
+  assert(
+    /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{\s*display:\s*grid;/.test(fo3Css226) &&
+      /#fo3BoardScroll:has\(#opHarnessPanel\.subtab-active\)/.test(fo3Css226),
+    '226.4a: #fo3BoardScroll is a single-column grid by default, switching to a 2-column template only via :has(#opHarnessPanel.subtab-active) — every other rail (single-board or multi-board-but-stacked) keeps the same visual stacking it had before this batch'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1\s*\/\s*span 2;\s*\}/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opVitalPanel\s*\{\s*grid-column:\s*2;\s*grid-row:\s*1;\s*\}/.test(
+        fo3Css226
+      ) &&
+      /\[data-game='FO3'\]\s*#statusEffectsPanel\s*\{\s*grid-column:\s*2;\s*grid-row:\s*2;\s*\}/.test(
+        fo3Css226
+      ),
+    '226.4b: the Skeletal Harness board spans both grid rows on the left; Vital Telemetry and Status Effects stack on the right — the three previously-separate stacked boards now read as one merged screen'
+  );
+
+  // 226.5 — Protocol 42 regression: the vitals column is only ~190px wide
+  //         (the STATUS merge above) — narrow enough that the shipped HP/RAD
+  //         stepper group silently overflowed #fo3BoardScroll's own
+  //         overflow-x:clip and lost its second (▼) button. `.t-read` is
+  //         constrained to its own trace's width so flex-wrap can actually
+  //         engage (a content-sized `flex:0 0 auto` item ignores flex-wrap
+  //         entirely without a width constraint — the root cause).
+  assert(
+    /\[data-game='FO3'\]\s*#opVitalPanel\s*\.t-read\s*\{[^}]*flex:\s*1 1 100%;[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/.test(
+      fo3Css226
+    ),
+    '226.5: [live-browser regression, Protocol 42] #opVitalPanel .t-read is width-constrained (flex:1 1 100%; max-width:100%) so flex-wrap actually engages — without the width constraint the HP/RAD stepper group silently lost its ▼ button off the edge of the narrow STATUS vitals column'
+  );
+
+  // 226.6 — SPECIAL Shape B: the segment-ladder graphic is hidden, the row
+  //         is horizontal, and the real attribute name (previously only a
+  //         `title` tooltip) is shown as visible text via the same
+  //         `hidden`-attribute-then-CSS-reveal idiom already proven by
+  //         .fo3-stepper-btn-group.
+  const specialNames226 = [
+    'Strength',
+    'Perception',
+    'Endurance',
+    'Charisma',
+    'Intelligence',
+    'Agility',
+    'Luck',
+  ];
+  assert(
+    specialNames226.every(n =>
+      new RegExp('<span class="fd-name" hidden>' + n + '</span>').test(htmlSource)
+    ),
+    '226.6a: all seven SPECIAL stats carry a hidden .fd-name span with the real attribute name, revealed only under FO3'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-ladder\s*\{\s*display:\s*none;\s*\}/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fader\s*\{[^}]*flex-direction:\s*row;/.test(
+        fo3Css226
+      ),
+    '226.6b: the segment-ladder graphic is hidden and each SPECIAL row is a horizontal flat row (Shape B), not the NV vertical fader'
+  );
+  // 226.7 — Protocol 42 regression: the base NV .fd-steps rule stacks the
+  //         +/- buttons in a COLUMN (its own vertical-fader idiom) and never
+  //         sets a button color — both silently carried over into FO3
+  //         unless explicitly overridden, producing near-invisible
+  //         dark-on-dark stacked squares instead of a legible horizontal
+  //         stepper.
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-steps\s*\{[^}]*flex-direction:\s*row;/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-steps button\s*\{[^}]*color:\s*var\(\s*--robco-green\s*\);/.test(
+        fo3Css226
+      ),
+    '226.7: [live-browser regression, Protocol 42] #opSpecialPanel .fd-steps is explicitly flex-direction:row with an explicit button color — the base NV rule stacks them in a column with no color set, which silently produced invisible dark-on-dark stacked squares under FO3'
+  );
+
+  // 226.8 — SKILLS/PERKS/MANIFEST Shape A: each board's detail pane exists,
+  //         ships `hidden` by default (NV/portrait never reveal it — no
+  //         FNV-exclusion CSS needed), and the shared .fo3-split/.fo3-list-col
+  //         control-kit wraps the existing list markup rather than forking
+  //         a second list renderer.
+  ['fo3SkillDetail', 'fo3PerkDetail', 'fo3ManifestDetail'].forEach(id => {
+    assert(
+      new RegExp('id="' + id + '" class="fo3-detail" hidden').test(htmlSource),
+      '226.8: #' + id + ' exists and ships the `hidden` boolean attribute by default'
+    );
+  });
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-detail\s*\{\s*display:\s*block;/.test(fo3Css226),
+    '226.9: .fo3-detail overrides its own `hidden` attribute with display:block, scoped to FO3 landscape only'
+  );
+
+  // 226.10 — tap-parity guard: PERKS keeps its real inline ✕ delete button
+  //          in the list row (only MANIFEST's actions move to detail-only,
+  //          per the design's own accepted tradeoff) — a static guard that
+  //          the delete-btn markup was never removed from renderPerks().
+  assert(
+    /class="delete-btn pk-x"/.test(charSrc226) && /removePerk\(/.test(charSrc226),
+    '226.10: renderPerks() still emits the real inline ✕ delete button on every row — PERKS keeps zero-tap-regression delete, unlike the flagged MANIFEST case'
+  );
+
+  // 226.11 — MANIFEST's detail-only actions call the exact same mutators
+  //          the inline row always called — no forked state path.
+  assert(
+    /toggleEquipItem\(/.test(invSrc226) &&
+      /nativeUseItem\(/.test(invSrc226) &&
+      /adjItemQty\(/.test(invSrc226) &&
+      /delItem\(/.test(invSrc226) &&
+      !/function\s+_fo3ManifestEquip|function\s+_fo3ManifestUse|function\s+_fo3ManifestDrop/.test(
+        invSrc226
+      ),
+    '226.11: _renderFo3ManifestDetail() calls the existing toggleEquipItem/nativeUseItem/adjItemQty/delItem handlers — no parallel action-handler family was invented for the detail pane (Protocol 22)'
+  );
+
+  // 226.12 — Protocol 42 regression: LOAD-CELL WEIGH BRIDGE (#opsBridgePanel)
+  //          carries no data-subtab (by design — its one live figure already
+  //          rides #fo3TopStrip's Wg segment), which also meant the
+  //          Section-C hide rule could never match it: it rendered
+  //          permanently ABOVE whichever OPERATIONS board was actually
+  //          selected, fully consuming the 360px-tall content region and
+  //          burying the real MANIFEST/CRAFT/BARTER/SQUAD/CURIO board out of
+  //          view without a scroll. Found live while verifying the MANIFEST
+  //          flagship.
+  assert(
+    /\[data-game='FO3'\]\s*#opsBridgePanel\s*\{\s*display:\s*none;\s*\}/.test(fo3Css226),
+    "226.12: [live-browser regression, Protocol 42] [data-game='FO3'] #opsBridgePanel is display:none — un-hidden, it rendered above every OPERATIONS board (no data-subtab to gate it) and fully buried the MANIFEST/CRAFT/BARTER/SQUAD/CURIO rail content on a 360px-tall screen"
+  );
+
+  // 226.13 — SKILLS list value stays legible: the compact read-only input in
+  //          the list row is wide enough to show 2-digit values without
+  //          clipping (Protocol 42 regression — 34px silently clipped "15"
+  //          down to "1").
+  assert(
+    /\[data-game='FO3'\]\s*#skillMatrixPanel\s*\.vu-input\s*\{[^}]*width:\s*44px;/.test(fo3Css226),
+    '226.13: [live-browser regression, Protocol 42] #skillMatrixPanel .vu-input is 44px wide — 34px silently clipped a 2-digit value ("15" rendered as "1")'
+  );
+
+  // 226.14 — no second render path anywhere in this batch: every detail/
+  //          selection helper is additive, the shared render*() functions
+  //          are unchanged in name and still own their list's markup.
+  assert(
+    /function\s+renderSkills\s*\(/.test(cmdSrc226) &&
+      /function\s+renderPerks\s*\(/.test(charSrc226) &&
+      /function\s+renderInventory\s*\(/.test(invSrc226),
+    '226.14: renderSkills()/renderPerks()/renderInventory() all still own their list markup under their original names — the FO3 detail panes are additive helpers, never a parallel renderer'
   );
 }
 

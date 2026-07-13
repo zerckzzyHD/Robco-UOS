@@ -674,6 +674,26 @@ function _wirePanelPersistence() {
     if (!id) return;
     d.dataset.panelId = id;
     d.dataset.panelIdx = idx; // numeric index for keyboard shortcuts
+    // .fo3-flat boards have their <summary> hidden under the active game's
+    // landscape skin when that game's identity carries a `rails` map (FO3
+    // today — Protocol 38: gated on the DATA, never a hardcoded game name,
+    // so a game with no rails/fo3-flat convention, e.g. NV, is completely
+    // unaffected) — the Pip-Boy screen has no collapsible board chrome, so
+    // there is no way for a user to ever re-open one; it must always render
+    // open regardless of a stale persisted "closed" choice from a prior
+    // session (Protocol 42 — found while verifying the Batch 1 panel
+    // relayout: most of these boards default closed on touch viewports, per
+    // the no-open-attribute + non-desktop branch below, which would
+    // otherwise hide their content entirely once the summary is hidden).
+    if (
+      d.classList &&
+      d.classList.contains('fo3-flat') &&
+      typeof getIdentity === 'function' &&
+      getIdentity().rails
+    ) {
+      d.setAttribute('open', '');
+      return;
+    }
     if (savedPanelState && savedPanelState[id] !== undefined) {
       if (savedPanelState[id]) d.setAttribute('open', '');
       else d.removeAttribute('open');

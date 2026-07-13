@@ -190,8 +190,78 @@ function setInvFilter(cat) {
   _invFilter = cat;
   _syncDrawerButtons(cat);
   MetaStore.set('robco_cargo_drawer', cat); // UI-6 — remember the last-open drawer
+  _fo3ManifestSel = null; // a drawer switch invalidates the old selection (FO3 detail pane)
   renderInventory();
   renderAmmo();
+}
+
+// ── FO3 MANIFEST DETAIL (Shape A list+detail, Batch 1) ──────────────────
+// A transient (never state.*, never MetaStore) in-memory selection — which
+// row the detail pane is showing. Game-agnostic: _renderFo3ManifestDetail()
+// is a no-op without identity.rails (Protocol 38), so this never executes
+// anything visible for NV; the pane itself is CSS-hidden there regardless.
+let _fo3ManifestSel = null;
+
+function _selectFo3ManifestRow(idx) {
+  _fo3ManifestSel = idx;
+  const lst = document.getElementById('invList');
+  if (lst) {
+    lst
+      .querySelectorAll('.mrow')
+      .forEach(el => el.classList.toggle('fo3-sel', +el.dataset.rowidx === idx));
+  }
+  _renderFo3ManifestDetail();
+}
+
+// The detail pane's actions call the exact same mutators the inline row
+// always called (toggleEquipItem/nativeUseItem/adjItemQty/delItem) — this
+// is a CSS re-layout of the existing action set, never a parallel state
+// path (Protocol 22).
+function _renderFo3ManifestDetail() {
+  const detail = document.getElementById('fo3ManifestDetail');
+  if (!detail) return;
+  if (typeof getIdentity !== 'function' || !getIdentity().rails) return;
+  const cat = _invFilter;
+  const rows = state.inventory
+    .map((it, i) => ({ it, idx: i }))
+    .filter(r => (r.it.type || 'misc') === cat);
+  if (!rows.length) {
+    detail.innerHTML = '<div class="fo3-empty">NO ITEM SELECTED</div>';
+    return;
+  }
+  if (_fo3ManifestSel == null || !rows.some(r => r.idx === _fo3ManifestSel)) {
+    _fo3ManifestSel = rows[0].idx;
+  }
+  const idx = _fo3ManifestSel;
+  const it = state.inventory[idx];
+  if (!it) {
+    detail.innerHTML = '<div class="fo3-empty">NO ITEM SELECTED</div>';
+    return;
+  }
+  const catL = (it.type || 'misc').toLowerCase();
+  const slot = catL === 'weapon' ? 'weapon' : catL === 'armor' ? 'armor' : null;
+  const eq = state.equipped || {};
+  const isEq = !!(slot && eq[slot] === it.name);
+  let actions = '';
+  if (slot) {
+    actions +=
+      `<button class="fo3-act${isEq ? ' fo3-warm' : ''}" onclick="toggleEquipItem(${idx})">` +
+      `${isEq ? 'UNEQUIP' : 'EQUIP'} <i>&#10005;</i></button>`;
+  }
+  if (catL === 'aid') {
+    actions += `<button class="fo3-act" onclick="nativeUseItem(${idx})">USE <i>&#9675;</i></button>`;
+  }
+  actions +=
+    '<span class="fo3-stepper-btn-group" style="display:inline-flex">' +
+    `<button type="button" class="fo3-stepper-btn" onclick="adjItemQty(${idx},-1)" aria-label="Decrease quantity">&#9660;</button>` +
+    `<span class="fo3-dt-qty">${parseInt(it.qty) || 0}</span>` +
+    `<button type="button" class="fo3-stepper-btn" onclick="adjItemQty(${idx},1)" aria-label="Increase quantity">&#9650;</button>` +
+    '</span>';
+  actions += `<button class="fo3-act" onclick="delItem(${idx})">DROP <i>&#9633;</i></button>`;
+  detail.innerHTML =
+    `<div class="fo3-dt-title">${escapeHtml(it.name)}</div>` +
+    `<div class="fo3-dt-stats"><b>TYPE</b>${catL.toUpperCase()} &nbsp; <b>WG</b>${parseFloat(it.wgt) || 0} &nbsp; <b>VAL</b>${parseInt(it.val) || 0}${isEq ? ' &nbsp; <b>STATE</b>EQUIPPED' : ''}</div>` +
+    `<div class="fo3-dt-actions">${actions}</div>`;
 }
 
 // ── NATIVE USE (deterministic item consumption, no AI) ──────────────────────
@@ -471,6 +541,7 @@ function renderInventory() {
     const label = _DRAWER_LABELS[_invFilter] || String(_invFilter).toUpperCase();
     lst.innerHTML = emptyState('NO ' + label + (q ? ' MATCHES' : ' ITEMS'));
     lst.onclick = null;
+    if (typeof getIdentity === 'function' && getIdentity().rails) _renderFo3ManifestDetail();
     return;
   }
   const eq = state.equipped || {};
@@ -484,7 +555,7 @@ function renderInventory() {
         ? `<button class="equip-btn${isEq ? ' equip-btn--on' : ''}" data-equip="${it._origIdx}" aria-label="${isEq ? 'Unequip' : 'Equip'} ${escapeHtml(it.name)}">${isEq ? '● EQUIPPED' : 'EQUIP'}</button>`
         : '';
       return (
-        `<li class="mrow${isEq ? ' iseq' : ''}">` +
+        `<li class="mrow${isEq ? ' iseq' : ''}" data-rowidx="${it._origIdx}">` +
         `<span class="hole" aria-hidden="true"></span>` +
         // Native USE (Part A): gated to consumables — weapons/armor already have
         // EQUIP, ammo/mod/misc have no consume semantics. Removes the confusing
@@ -521,7 +592,19 @@ function renderInventory() {
       adjItemQty(+qtyBtn.dataset.qtyidx, +qtyBtn.dataset.qtydelta);
       return;
     }
+    // FO3 Shape A — the row's own inline controls above are CSS-hidden
+    // (60-fo3-pipboy.css), so any other click on the row selects it for
+    // the detail pane. Inert for NV: none of the closest() checks above
+    // ever fail to match there since the controls stay visible/hittable.
+    const row = e.target.closest('[data-rowidx]');
+    if (row) _selectFo3ManifestRow(+row.dataset.rowidx);
   };
+  if (typeof getIdentity === 'function' && getIdentity().rails) {
+    lst
+      .querySelectorAll('.mrow')
+      .forEach(el => el.classList.toggle('fo3-sel', +el.dataset.rowidx === _fo3ManifestSel));
+    _renderFo3ManifestDetail();
+  }
 }
 
 // ── AMMO RESERVES (folded into the CARGO MANIFEST's AMMO drawer) ───────

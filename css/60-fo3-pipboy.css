@@ -775,4 +775,436 @@
     border-radius: 2px;
     background: rgba(var(--robco-green-rgb), 0.05);
   }
+
+  /* ══ H. THE FLAT BOARD CONVENTION + THE SHARED LIST/DETAIL CONTROL KIT
+     (FO3 Pip-Boy build, Protocol 8 stage 2 — "re-layout, not re-skin" pass).
+     Batch 1 re-lays out the six boards the owner actually uses: STATUS,
+     SPECIAL, SKILLS, PERKS, GENERAL, MANIFEST. Every board keeps its real
+     render*() function and its real state-mutating handlers (Protocol
+     22/23) — this section only adds CSS re-layout plus small additive
+     selection/detail helpers that call those SAME handlers.
+
+     .fo3-flat boards drop their own per-board title bar entirely — a
+     Pip-Boy screen has no stack of titled instrument bays, and a rail's
+     boards are already reached via the top strip + sub-tab rail, so a
+     second per-board heading is pure NV-instrument residue. Forced open
+     regardless of persisted closed-state in _wirePanelPersistence()
+     (js/ui/ui-core.js, Protocol 42 — most of these boards default CLOSED on
+     a touch viewport when nothing is persisted, which would otherwise hide
+     all their content once the summary affordance is gone). ══ */
+  [data-game='FO3'] .fo3-flat > summary {
+    display: none;
+  }
+
+  /* the shared list+detail control kit (design doc §4) — every Shape A
+     board below (SKILLS/PERKS/GENERAL-faction/MANIFEST) reuses these same
+     classes rather than bespoke per-board split markup. */
+  [data-game='FO3'] .fo3-split {
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    gap: 4px;
+  }
+  [data-game='FO3'] .fo3-list-col {
+    flex: 0 1 42%;
+    min-width: 0;
+    overflow-y: auto;
+    border-right: 1px solid rgba(var(--robco-green-rgb), 0.25);
+    padding-right: 4px;
+  }
+  [data-game='FO3'] .fo3-detail {
+    display: block; /* overrides the `hidden` attribute this element carries by default (NV/portrait never reveal it) */
+    flex: 1 1 58%;
+    min-width: 0;
+    overflow-y: auto;
+    padding-left: 6px;
+  }
+  [data-game='FO3'] .fo3-dt-title {
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin: 2px 0 6px;
+    text-shadow: var(--robco-glow);
+  }
+  [data-game='FO3'] .fo3-dt-stats {
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+    line-height: 1.9;
+    opacity: 0.9;
+    margin-bottom: 8px;
+  }
+  [data-game='FO3'] .fo3-dt-stats b {
+    font-weight: normal;
+    opacity: 0.6;
+    margin-right: 4px;
+  }
+  [data-game='FO3'] .fo3-dt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  [data-game='FO3'] .fo3-dt-qty {
+    min-width: 24px;
+    text-align: center;
+    display: inline-block;
+  }
+  [data-game='FO3'] .fo3-act {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 28px;
+    padding: 3px 9px;
+    font-size: 9.5px;
+    letter-spacing: 0.8px;
+    color: var(--robco-green);
+    border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+    border-radius: 2px;
+    background: rgba(var(--robco-green-rgb), 0.05);
+  }
+  [data-game='FO3'] .fo3-act.fo3-warm {
+    color: var(--bezel-wire);
+    border-color: rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  [data-game='FO3'] .fo3-empty {
+    opacity: 0.5;
+    font-size: 9.5px;
+    padding: 6px 2px;
+  }
+
+  /* ══ I. STATUS — the true merge (design doc §3: "the single most Pip-Boy
+     thing in the project"). #fo3BoardScroll becomes a single-column CSS
+     grid — identical stacking behavior to the previous flex-column for
+     EVERY other sub-tab (a 1-column grid auto-places each visible board
+     into its own row, exactly like flex-direction:column did) — and
+     :has() switches it to a 2-column template ONLY while the STATUS
+     group's boards are the ones on screen, so Vital Telemetry + Status
+     Effects can sit BESIDE the Skeletal Harness figure instead of stacking
+     under it. Every other rail (GENERAL's 3 boards included) still just
+     stacks — nothing here changes that. ══ */
+  [data-game='FO3'] #fo3BoardScroll {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    gap: 4px;
+  }
+  [data-game='FO3'] #fo3BoardScroll:has(#opHarnessPanel.subtab-active) {
+    grid-template-columns: 1fr 190px;
+    grid-template-rows: auto auto;
+  }
+  [data-game='FO3'] #opHarnessPanel {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  [data-game='FO3'] #opVitalPanel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  [data-game='FO3'] #statusEffectsPanel {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  /* HP/RAD (+ LVL/XP/readback/equipped, kept — Protocol 26: editing survives,
+     nothing is deleted just because the mockup's placeholder didn't name
+     it) as boxed meters rather than CRT beam traces. */
+  [data-game='FO3'] #opVitalPanel .trace {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+    border-radius: 2px;
+    padding: 3px 6px;
+    margin-bottom: 4px;
+  }
+  /* found while verifying STATUS (Protocol 42): the vitals column is only
+     ~190px wide (the STATUS grid merge, Section I) — too narrow to fit
+     both HP number fields AND the ▲▼ stepper group on one line without the
+     stepper overflowing #fo3BoardScroll's own overflow-x:clip (Section A),
+     silently clipping the ▼ button. The base rule (35-operator-boards.css)
+     sizes `.t-read` to `flex: 0 0 auto` (content width, ignoring its own
+     parent) — flex-wrap alone does nothing on a content-sized item, since
+     there is no width constraint forcing anything to move to a second
+     line. Constraining it to the trace's own width is what actually makes
+     the wrap trigger — adaptive to any column width, rather than guessing
+     a wider fixed size. */
+  [data-game='FO3'] #opVitalPanel .t-read {
+    flex: 1 1 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  /* effect chips + the + ADD form, compact */
+  [data-game='FO3'] #statusEffectsPanel .stlamp-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  [data-game='FO3'] #statusEffectsPanel .stlamp-tile {
+    flex: 1 1 auto;
+    min-width: 100px;
+    border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+    border-radius: 2px;
+    padding: 3px 6px;
+  }
+  [data-game='FO3'] #statusEffectsPanel .panel-form {
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  /* ══ J. SPECIAL — Shape B, seven flat rows (design doc §4: "the seven-
+     fader mixing board is a New Vegas instrument"). The segment-ladder
+     graphic is hidden; the SAME numeric input + +/- buttons that already
+     write to commitStat()/_bumpSpecialStat() stay, just reflowed
+     horizontally with the real attribute name (already present, just
+     invisible, as the `title` tooltip) now shown as visible text. ══ */
+  [data-game='FO3'] #opSpecialPanel .fader-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    justify-content: center;
+    height: 100%;
+  }
+  [data-game='FO3'] #opSpecialPanel .fader {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-ladder {
+    display: none;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-letter {
+    width: 16px;
+    flex-shrink: 0;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: var(--robco-glow);
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-name {
+    display: inline-block;
+    flex: 1 1 auto;
+    min-width: 0;
+    opacity: 0.8;
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  [data-game='FO3'] #opSpecialPanel .fader-input {
+    width: 40px;
+    flex: 0 0 40px;
+    text-align: center;
+    border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+    border-radius: 2px;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-steps {
+    display: flex;
+    flex-direction: row; /* overrides the base NV vertical-fader stack (35-operator-boards.css) */
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-steps button {
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    min-width: 28px;
+    padding: 0;
+    /* the base NV rule leaves color unset, inheriting a near-invisible dark shade against FO3's dark boxed background */
+    color: var(--robco-green);
+    border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+    border-radius: 2px;
+    background: rgba(var(--robco-green-rgb), 0.05);
+  }
+  [data-game='FO3'] #opSpecialPanel .fader-note {
+    display: none;
+  }
+
+  /* ══ K. SKILLS — Shape A. The 13-row list keeps every row's real value
+     visible and directly editable (the shipped numeric input — no tap
+     lost); only the drag-to-set VU track is dropped from the compact row
+     (a mouse-drag gesture, not a tap). The detail pane adds boxed
+     steppers as a second, faster way to nudge the SELECTED skill —
+     _skillVuSet() is the exact same committed setter the drag/typed paths
+     already call (js/ui/ui-core-cmd.js), never a forked state write. ══ */
+  [data-game='FO3'] #skillMatrixPanel .fo3-list-col {
+    display: flex;
+    flex-direction: column;
+  }
+  [data-game='FO3'] #skillMatrixPanel .vu-track {
+    display: none;
+  }
+  [data-game='FO3'] #skillMatrixPanel .vu-legend {
+    display: none;
+  }
+  [data-game='FO3'] #skillMatrixPanel .skill-row {
+    min-height: 28px;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    align-items: center;
+  }
+  [data-game='FO3'] #skillMatrixPanel .skill-row.fo3-sel {
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+  [data-game='FO3'] #skillMatrixPanel .vu-input {
+    width: 44px;
+    flex: 0 0 44px;
+    text-align: right;
+    padding-right: 2px;
+    border: none;
+    background: none;
+    opacity: 0.85;
+  }
+
+  /* ══ L. PERKS — Shape A. The socketed-slot list keeps its real inline
+     REMOVE (✕) button — zero tap regression — and gains a click-to-select
+     affordance so the detail pane can show the selected perk's rank/level
+     (+ a mirrored remove action) without forcing a select-then-act step
+     for the common single action. ══ */
+  [data-game='FO3'] #perkLoadoutPanel .slot-row:not(.vacant) {
+    cursor: pointer;
+  }
+  [data-game='FO3'] #perkLoadoutPanel .slot-row.fo3-sel {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+    border-radius: 2px;
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+
+  /* ══ M. GENERAL — Shape B/A hybrid: clock+position as flat label/value
+     rows (the framed instrument-bay cards are the thing being killed
+     here; the boxed MM/DD/YYYY "flip" fields are ALREADY the control-kit
+     boxed-field primitive, so they stay exactly as they are); faction
+     standing as a list (the channel selector, already the real 1-tap
+     picker — setFactionChannel()) + detail (the meter/keys, already the
+     real editor — adjustFaction()), zero new code, pure CSS re-layout;
+     karma as a flat boxed readout around the existing renderKarmaCenter()
+     output. ══ */
+  [data-game='FO3'] #positionClockPanel .chrono-wrap {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  [data-game='FO3'] #positionClockPanel .chrono-unit,
+  [data-game='FO3'] #positionClockPanel .chrono-unit--pos {
+    max-width: none;
+    flex-basis: auto;
+    border: none;
+    background: none;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+  }
+  [data-game='FO3'] #positionClockPanel .cu-cap {
+    flex: 0 0 96px;
+    margin: 0;
+    text-align: left;
+  }
+  [data-game='FO3'] #positionClockPanel .flip-row {
+    justify-content: flex-start;
+  }
+  [data-game='FO3'] #positionClockPanel .chrono-readout {
+    margin-left: 4px;
+    opacity: 0.7;
+  }
+  [data-game='FO3'] #positionClockPanel .pos-plate {
+    flex: 1 1 auto;
+  }
+
+  [data-game='FO3'] #factionContainer {
+    display: flex;
+    gap: 4px;
+    height: 100%;
+    min-height: 0;
+  }
+  [data-game='FO3'] #factionContainer .facon-groups {
+    flex: 0 1 42%;
+    min-width: 0;
+    overflow-y: auto;
+    border-right: 1px solid rgba(var(--robco-green-rgb), 0.25);
+    padding-right: 4px;
+  }
+  [data-game='FO3'] #factionContainer .facon-chan {
+    display: flex;
+    width: 100%;
+    min-height: 28px;
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    padding: 3px 6px;
+    font-size: 9.5px;
+  }
+  [data-game='FO3'] #factionContainer .facon-chan.cur {
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+  [data-game='FO3'] #factionContainer .facon-meter-wrap {
+    flex: 1 1 58%;
+    min-width: 0;
+    overflow-y: auto;
+    padding-left: 4px;
+  }
+  /* the mini all-faction strip duplicates what the channel selector list
+     already shows — redundant on the compact FO3 screen (design's own
+     "small consistent control kit, not a hundred bespoke reskins"). */
+  [data-game='FO3'] #factionContainer .facon-strip {
+    display: none;
+  }
+
+  [data-game='FO3'] #karmaCenterDisplay {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+    border-radius: 2px;
+    padding: 6px 8px;
+  }
+  [data-game='FO3'] #karmaPanel .k-slider {
+    margin-top: 6px;
+  }
+
+  /* ══ N. MANIFEST — the flagship, Shape A. This is the one board where
+     the per-row action set (equip/use/qty/drop) genuinely does not fit a
+     compact list row at readable size, so — matching the design doc's own
+     accepted tradeoff (§6) — actions move to the detail pane only. This
+     is the one FLAGGED tap regression in this batch: +1 tap on the FIRST
+     action per item (select the row, then act); equal from the second
+     action on, and every action still calls the exact same handler
+     (toggleEquipItem/nativeUseItem/adjItemQty/delItem) the inline row
+     always called. ══ */
+  [data-game='FO3'] #opsManifestPanel .mrow {
+    cursor: pointer;
+  }
+  [data-game='FO3'] #opsManifestPanel .mrow.fo3-sel {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+    border-radius: 2px;
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+  [data-game='FO3'] #opsManifestPanel .mrow .use-btn,
+  [data-game='FO3'] #opsManifestPanel .mrow .equip-btn,
+  [data-game='FO3'] #opsManifestPanel .mrow .qtybox,
+  [data-game='FO3'] #opsManifestPanel .mrow .delete-btn {
+    display: none;
+  }
+  [data-game='FO3'] #opsManifestPanel .tray-scrollwrap {
+    height: 100%;
+  }
+
+  /* Found while verifying MANIFEST (Protocol 42): LOAD-CELL WEIGH BRIDGE
+     (`#opsBridgePanel`) carries no `data-subtab` — it was deliberately left
+     off every rail because its one live figure (carry weight) already
+     rides `#fo3TopStrip`'s `Wg` segment (design doc §3/build plan §2's
+     "no-rail allowlist"). But lacking `data-subtab` also means the
+     Section-C hide rule can never match it, so it rendered permanently
+     ABOVE whichever OPERATIONS board was actually selected — on a 360px-
+     tall screen that fully consumed the content region, burying the real
+     MANIFEST/CRAFT/BARTER/SQUAD/CURIO board out of view without a scroll
+     first. A real, pre-existing gap surfaced by this batch's own
+     verification (Suite regression below), fixed here: the board is
+     redundant with the top strip under FO3 landscape, so it is hidden
+     outright, exactly like `.casing-top`/`.ovs-head`/`#carrierStrip`
+     above (Section A) — its data is not lost, only its duplicate board. */
+  [data-game='FO3'] #opsBridgePanel {
+    display: none;
+  }
 }

@@ -835,7 +835,7 @@
                  ══════════════════════════════════════════════════════════════ -->
 
               <!-- BUS-01 · VITAL TELEMETRY — CRT multi-trace patient monitor -->
-              <details class="panel bay-board" data-tab="stat" id="opVitalPanel" open>
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="opVitalPanel" open>
                 <summary>
                   <h2>
                     &gt; <span class="board-led" id="opVitalLed" aria-hidden="true"></span> VITAL
@@ -1039,7 +1039,7 @@
               </details>
 
               <!-- BUS-02 · S.P.E.C.I.A.L. TUNING — seven-fader equalizer bank -->
-              <details class="panel bay-board" data-tab="stat" id="opSpecialPanel" open>
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="opSpecialPanel" open>
                 <summary>
                   <h2>
                     &gt; <span class="board-led" aria-hidden="true"></span> S.P.E.C.I.A.L. TUNING
@@ -1057,6 +1057,7 @@
                 <div class="fader-row">
                   <div class="fader">
                     <span class="fd-letter" title="Strength">S</span>
+                    <span class="fd-name" hidden>Strength</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="s">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1095,6 +1096,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Perception">P</span>
+                    <span class="fd-name" hidden>Perception</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="p">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1133,6 +1135,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Endurance">E</span>
+                    <span class="fd-name" hidden>Endurance</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="e">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1171,6 +1174,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Charisma">C</span>
+                    <span class="fd-name" hidden>Charisma</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="c">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1209,6 +1213,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Intelligence">I</span>
+                    <span class="fd-name" hidden>Intelligence</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="i">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1247,6 +1252,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Agility">A</span>
+                    <span class="fd-name" hidden>Agility</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="a">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1285,6 +1291,7 @@
                   </div>
                   <div class="fader">
                     <span class="fd-letter" title="Luck">L</span>
+                    <span class="fd-name" hidden>Luck</span>
                     <div class="fd-ladder" aria-hidden="true" data-fd-ladder="l">
                       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
                       <span class="fd-cap"></span>
@@ -1332,7 +1339,7 @@
                  ground-up reskin: flip-card date tiles + an LCD 24h mission
                  clock + a position-fix plate around the location field. EVERY
                  field stays editable — same ids/handlers, Protocol 22.) -->
-              <details class="panel bay-board" data-tab="stat" id="positionClockPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="positionClockPanel">
                 <summary>
                   <h2>
                     &gt; <span class="board-led" aria-hidden="true"></span> POSITION &amp; MISSION
@@ -1463,7 +1470,7 @@
                  mirrors that SAME value read-only (#opHarnessRadMirror,
                  refreshed alongside stat_rads by updateMath()) rather than a
                  second editable input with a duplicate id. -->
-              <details class="panel bay-board" data-tab="stat" id="opHarnessPanel" open>
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="opHarnessPanel" open>
                 <summary>
                   <h2>
                     &gt;
@@ -1730,7 +1737,12 @@
               </details>
 
               <!-- BUS-11 · CARGO MANIFEST — six pull-drawers, bounded in-panel scroll -->
-              <details class="panel bay-board span2" data-tab="inv" id="opsManifestPanel" open>
+              <details
+                class="panel bay-board span2 fo3-flat"
+                data-tab="inv"
+                id="opsManifestPanel"
+                open
+              >
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> CARGO MANIFEST</h2>
                   <span class="panel-substatus" id="opsManifestStatus"
@@ -1808,13 +1820,24 @@
                     oninput="renderInventory()"
                   />
                 </div>
-                <div class="tray-scrollwrap" id="invListWrap">
-                  <ul
-                    class="inventory-list tray-list"
-                    id="invList"
-                    role="list"
-                    aria-label="Cargo manifest — open drawer contents"
-                  ></ul>
+                <div class="fo3-split">
+                  <div class="fo3-list-col">
+                    <div class="tray-scrollwrap" id="invListWrap">
+                      <ul
+                        class="inventory-list tray-list"
+                        id="invList"
+                        role="list"
+                        aria-label="Cargo manifest — open drawer contents"
+                      ></ul>
+                    </div>
+                  </div>
+                  <!-- FO3 landscape ONLY (hidden attribute — Suite-guarded no-image-
+                     assets pattern): the selected item's detail — name/type/weight/
+                     value/qty + EQUIP/USE/qty ±/DROP, all calling the exact same
+                     toggleEquipItem/nativeUseItem/adjItemQty/delItem handlers the
+                     inline row always called (Protocol 22). Populated by
+                     _renderFo3ManifestDetail() (js/ui/ui-render-inventory.js). -->
+                  <div id="fo3ManifestDetail" class="fo3-detail" hidden></div>
                 </div>
 
                 <!-- AMMO drawer folds AMMO RESERVES in place of the item list above (ids kept) -->
@@ -2074,14 +2097,25 @@
                  reskin: renderSkills() now builds a 13-channel VU meter row
                  per skill, drag/keyboard-settable, still emitting sk_<key>
                  inputs through the same clamp+save path) -->
-              <details class="panel bay-board" data-tab="stat" id="skillMatrixPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="skillMatrixPanel">
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> SKILL MATRIX</h2>
                   <span class="panel-substatus" id="opSkillsStatus">&mdash;</span>
                 </summary>
                 <span class="bay-slot-tag">BUS-05</span>
                 <span class="bay-part-no">PN RBC-SKL-09 &middot; SKILL VU ARRAY</span>
-                <div class="skills-grid" id="skillsGrid"></div>
+                <div class="fo3-split">
+                  <div class="fo3-list-col">
+                    <div class="skills-grid" id="skillsGrid"></div>
+                  </div>
+                  <!-- FO3 landscape ONLY (hidden — see the MANIFEST detail comment
+                     above for the pattern): the selected skill's value + boxed
+                     steppers, calling the exact same committed setter
+                     (_skillVuSet, js/ui/ui-core-cmd.js) the row's own input
+                     already calls — no forked state. Populated by
+                     _renderFo3SkillDetail(). -->
+                  <div id="fo3SkillDetail" class="fo3-detail" hidden></div>
+                </div>
               </details>
 
               <!-- BUS-05a · SKILL BOOKS — reference shelf (Phase 3 OPERATOR
@@ -2089,7 +2123,7 @@
                  sub-panel to its own board: one vertical spine per volume,
                  read = upright/lit/ribbon, unread = leaning/dashed/dim.
                  renderSkillBooks() toggles kept; ids unchanged, Protocol 22.) -->
-              <details class="panel bay-board" data-tab="stat" id="skillBooksPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="skillBooksPanel">
                 <summary>
                   <h2>
                     &gt; <span class="board-led" aria-hidden="true"></span> SKILL BOOKS — REFERENCE
@@ -2112,7 +2146,7 @@
 
               <!-- BUS-05b · SKILL MAGAZINES — periodical rack (FNV only —
                  hidden on FO3 by renderMagazines() per hasMagazines) -->
-              <details class="panel bay-board" data-tab="stat" id="magazinesPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="magazinesPanel">
                 <summary>
                   <h2>
                     &gt; <span class="board-led" aria-hidden="true"></span> SKILL MAGAZINES —
@@ -2243,7 +2277,7 @@
                  traits as amber "FACTORY-BURNED" chips. Every id/handler kept:
                  perksList + newPerkName/newPerkRank/newPerkLevel → addPerk;
                  traitsSection/traitFilter/traitsDisplay + renderTraits.) -->
-              <details class="panel bay-board" data-tab="stat" id="perkLoadoutPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="perkLoadoutPanel">
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> PERK LOADOUT</h2>
                   <span class="panel-substatus" id="opPerksStatus">&mdash;</span>
@@ -2268,10 +2302,21 @@
                     oninput="renderPerks()"
                   />
                 </div>
-                <div class="tray-scrollwrap">
-                  <div class="tray-list slot-list" id="perksList">
-                    <span class="empty-state">NO PERKS ON FILE</span>
+                <div class="fo3-split">
+                  <div class="fo3-list-col">
+                    <div class="tray-scrollwrap">
+                      <div class="tray-list slot-list" id="perksList">
+                        <span class="empty-state">NO PERKS ON FILE</span>
+                      </div>
+                    </div>
                   </div>
+                  <!-- FO3 landscape ONLY (hidden — see the MANIFEST detail comment):
+                     the selected perk's rank/level + a mirrored REMOVE action,
+                     calling the exact same removePerk() the row's own ✕ button
+                     already calls — the row's inline ✕ stays too (zero tap
+                     regression), this is a bonus detail view, not a
+                     replacement. Populated by _renderFo3PerkDetail(). -->
+                  <div id="fo3PerkDetail" class="fo3-detail" hidden></div>
                 </div>
 
                 <div class="perk-form">
@@ -2333,7 +2378,7 @@
               <!-- BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2 — ground-up
                  reskin: renderStatus() now builds lit/dark compound lamp
                  tiles; the add-effect form ids/addStatusEffect() unchanged) -->
-              <details class="panel bay-board" data-tab="stat" id="statusEffectsPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="statusEffectsPanel">
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> STATUS EFFECTS</h2>
                   <span class="panel-substatus" id="opStatusStatus">&mdash;</span>
@@ -2411,7 +2456,7 @@
                  reskin: renderFactionRep() now builds a shared INFAMY<>FAME
                  console — channel selector + wide meter + all-faction mini
                  pin strip — the ±5 adjustFaction() keys unchanged) -->
-              <details class="panel bay-board" data-tab="stat" id="factionPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="factionPanel">
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> FACTION STANDING</h2>
                   <span class="panel-substatus" id="opFactionStatus">&mdash;</span>
@@ -2427,7 +2472,7 @@
                  (Protocol 22, the #c_caps/BUS-10 precedent) — now a UNIVERSAL
                  board (every game tracks karma); only the nested FO3 KARMA
                  CENTER appendix is conditional per usesKarmaCenter. -->
-              <details class="panel bay-board" data-tab="stat" id="karmaPanel">
+              <details class="panel bay-board fo3-flat" data-tab="stat" id="karmaPanel">
                 <summary>
                   <h2>&gt; <span class="board-led" aria-hidden="true"></span> KARMA ALIGNMENT</h2>
                   <span class="panel-substatus" id="opKarmaStatus">&mdash;</span>

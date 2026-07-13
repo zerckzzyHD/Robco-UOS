@@ -1019,7 +1019,7 @@ function renderSkills() {
       const val = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
       const label = SKILL_LABELS[sk] || sk;
       const labelSafe = escapeHtml(label);
-      return `<div class="skill-row vu-row" data-skill="${sk}">
+      return `<div class="skill-row vu-row" data-skill="${sk}" onclick="_selectFo3SkillRow('${sk}')">
         <label for="sk_${sk}" class="vu-label" title="${labelSafe}">${labelSafe}</label>
         <span class="vu-track" data-vu-track="${sk}" role="slider" tabindex="0"
               aria-label="${labelSafe} signal level, drag or use arrow keys to set"
@@ -1027,7 +1027,8 @@ function renderSkills() {
           <span class="vu-fill" data-vu-fill="${sk}" style="width:${val}%"></span>
         </span>
         <input type="number" id="sk_${sk}" class="vu-input" value="${val}" min="0" max="100"
-               inputmode="numeric" oninput="_onSkillVuInput('${sk}')" aria-label="${labelSafe} value, 0 to 100" />
+               inputmode="numeric" oninput="_onSkillVuInput('${sk}')"
+               onfocus="_selectFo3SkillRow('${sk}')" aria-label="${labelSafe} value, 0 to 100" />
       </div>`;
     })
     .join('');
@@ -1035,6 +1036,55 @@ function renderSkills() {
     `<div class="vu-rows">${rows}</div>` +
     '<div class="vu-legend"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
   _wireSkillVuDrag(grid);
+  if (typeof getIdentity === 'function' && getIdentity().rails) {
+    const sel =
+      _fo3SkillSel && getSkillKeys().includes(_fo3SkillSel) ? _fo3SkillSel : getSkillKeys()[0];
+    grid
+      .querySelectorAll('.skill-row')
+      .forEach(el => el.classList.toggle('fo3-sel', el.dataset.skill === sel));
+    _renderFo3SkillDetail();
+  }
+}
+
+// ── FO3 SKILL DETAIL (Shape A list+detail, Batch 1) ─────────────────────
+// Transient in-memory selection (never state.*/MetaStore) — the list row's
+// own numeric input stays directly editable (zero tap lost); the detail
+// pane adds boxed steppers as a second, faster way to nudge the SELECTED
+// skill, both calling the exact same committed setter (_skillVuSet below).
+let _fo3SkillSel = null;
+
+function _selectFo3SkillRow(sk) {
+  _fo3SkillSel = sk;
+  const grid = document.getElementById('skillsGrid');
+  if (grid) {
+    grid
+      .querySelectorAll('.skill-row')
+      .forEach(el => el.classList.toggle('fo3-sel', el.dataset.skill === sk));
+  }
+  _renderFo3SkillDetail();
+}
+
+function _renderFo3SkillDetail() {
+  const detail = document.getElementById('fo3SkillDetail');
+  if (!detail) return;
+  if (typeof getIdentity !== 'function' || !getIdentity().rails) return;
+  const keys = getSkillKeys();
+  if (!keys.length) {
+    detail.innerHTML = '<div class="fo3-empty">NO SKILLS TRACKED</div>';
+    return;
+  }
+  if (!_fo3SkillSel || !keys.includes(_fo3SkillSel)) _fo3SkillSel = keys[0];
+  const sk = _fo3SkillSel;
+  const label = SKILL_LABELS[sk] || sk;
+  const val = state.skills && state.skills[sk] !== undefined ? state.skills[sk] : 15;
+  detail.innerHTML =
+    `<div class="fo3-dt-title">${escapeHtml(label)}</div>` +
+    `<div class="fo3-dt-stats"><b>VALUE</b>${val} / 100</div>` +
+    '<div class="fo3-dt-actions">' +
+    '<span class="fo3-stepper-btn-group" style="display:inline-flex">' +
+    `<button type="button" class="fo3-stepper-btn" onclick="_skillVuSet('${sk}', ${val - 1}); renderSkills();" aria-label="Decrease ${escapeHtml(label)}">&#9660;</button>` +
+    `<button type="button" class="fo3-stepper-btn" onclick="_skillVuSet('${sk}', ${val + 1}); renderSkills();" aria-label="Increase ${escapeHtml(label)}">&#9650;</button>` +
+    '</span></div>';
 }
 
 // Shared clamp/paint helper for both the drag surface and the arrow-key path —

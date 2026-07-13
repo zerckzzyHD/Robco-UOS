@@ -1,9 +1,10 @@
-## [Unreleased]<!-- Tests: 3138/3138 | Cache: robco-terminal-v2.8.0-r18 -->
+## [Unreleased]<!-- Tests: 3156/3156 | Cache: robco-terminal-v2.8.0-r19 -->
 
 ### Added
 
 - Continued building the true-to-the-game Fallout 3 Pip-Boy screen for landscape (rotate your phone sideways while playing a Fallout 3 campaign): the three main screens now show up as glowing lamps on the device casing, alongside a radio knob, a status gauge, and a toggle switch standing in for the AI channel, system status, and settings. Each screen's sub-sections (like STATUS, SPECIAL, and SKILLS under the character screen) get their own row of tabs on the glass, remembering which one you last had open. Portrait mode is untouched — it keeps showing today's layout — and Fallout: New Vegas isn't affected at all. This is still a functional pass; a fully dressed casing (indicator sway, working knob detent, etc.) comes later.
 - Added a Vault Boy figure to the Fallout 3 Pip-Boy's landscape character screen — your five body-part health toggles now flank an original stylized figure instead of a plain top-down diagram, matching the in-game STATUS display. Tapping a body part still works exactly as before; a new pair of small up/down buttons next to your health and radiation readouts lets you adjust them without opening the number field.
+- Reworked six of the Fallout 3 Pip-Boy landscape screen's boards to actually look and behave like the real device instead of a re-colored New Vegas layout. Your health, radiation, and status effects now share one merged screen around the Vault Boy figure instead of three separate stacked boxes. S.P.E.C.I.A.L. is now seven plain rows with an up/down stepper instead of a mixing-board of faders. Your skills, perks, and cargo manifest now show as a scrolling list on the left with the selected item's full details and actions on the right, just like flipping through pages on a real Pip-Boy — cargo actions (equip, use, adjust quantity, drop) now live in that details pane, which costs one extra tap the first time you act on a newly-selected item and is exactly as fast from then on; your perk list keeps its one-tap delete either way. Your mission clock, position, faction standing, and karma are now plain boxed readouts instead of framed instrument panels.
 
 ### Fixed
 
@@ -21,6 +22,10 @@
 - Fixed the Fallout 3 Pip-Boy landscape screen's bottom sub-section tabs visually sliding over the bottom of a long screen's content instead of sitting below it — for example, part of the body-part health toggles could end up hidden under the tab row while scrolling. The screen area between the top readout strip and the bottom tab row is now its own properly bounded, scrolling section, so the tab row can never sit on top of content again.
 - Trimmed the Fallout 3 Pip-Boy landscape screen's bottom control bar (the lamps, radio knob, status gauge, and settings switch) to a noticeably shorter height, freeing up more room for the screen above it.
 - Fixed a leftover internal label ("FO3 — karmaCenterDisplay") showing literally on screen next to the Karma Center heading — it now reads as plain text like every other label on the page.
+- Fixed the Fallout 3 Pip-Boy's cargo manifest screen showing only the load-bearing weight readout and nothing else — that board doesn't have its own tab, so it was rendering permanently on top of whichever cargo screen you actually opened, hiding your weapons, apparel, aid, misc, and ammo lists entirely unless you scrolled past it.
+- Fixed the Fallout 3 Pip-Boy's health/radiation up-down buttons losing their bottom arrow once the character screen was reworked into a narrower column — both arrows now always fit.
+- Fixed the Fallout 3 Pip-Boy's S.P.E.C.I.A.L. up/down buttons rendering as blank, barely-visible squares stacked on top of each other instead of a legible side-by-side pair.
+- Fixed a two-digit skill value getting cut down to one digit in the Fallout 3 Pip-Boy's skills list (showing "1" instead of "15") because its display box was too narrow.
 
 ### Under the Hood
 
