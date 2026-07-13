@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════
    60-fo3-pipboy.css — cascade slot 60: the FO3 PIP-BOY 3000 landscape skin
-   (FO3 PIP-BOY BUILD U2 — Protocol 8 stage 2, "the spine").
+   (FO3 PIP-BOY BUILD U2 — Protocol 8 stage 2, "the spine", + the owner's
+   real-device landscape feedback pass that follows it).
 
    WHY HERE: after every shared board/chrome file (05-55) so its
    [data-game='FO3'] rules win by source order over the shared defaults
@@ -8,26 +9,41 @@
    own header). A third game ADDS a file here; it never edits 05-55
    (Protocol UI-7 / Protocol 22).
 
-   SCOPE — every rule below is gated [data-game='FO3'], and the casing/
-   austere-glass/rails-reveal rules are ADDITIONALLY gated
+   SCOPE — every rule below is gated [data-game='FO3'], and every rule
+   except the root --bezel-wire token override is ADDITIONALLY gated
    @media(orientation:landscape). NV carries no [data-game='FO3'] match,
    ever — nothing here can touch it. FO3 PORTRAIT gets none of these rules
    either (no @media(orientation:portrait) block exists in this file) —
    it keeps rendering the shared flat/plain layout exactly as it does
    today ("portrait = the legacy view").
 
-   SPINE SCOPE NOTE (honest, not silent): this ships the rails-reveal
-   mechanism's skin, a functional lamp/knob/gauge/toggle re-skin of the
-   EXISTING bezel keycaps (Protocol UI-7 — no new interactive markup), the
-   in-glass top strip + sub-tab rail, and an austere board re-skin — all
-   CSS-only, zero new render paths. It deliberately does NOT attempt the
-   mockup's fully-dressed multi-column casing (free-floating left-rail/
-   right-col flanking the glass, gauge sway, knob detent, screws, fins,
-   fixed-viewport internal scrolling) — that is real casing-dressing
-   POLISH (plan §11 cut-order item 3) layered on top later, not the spine.
-   The page keeps its normal scrollable flow; only real-device testing (an
-   explicit owner-only gate per the build plan) can settle whether a
-   fixed-viewport treatment is actually needed. ══════════════════════════════════════════════════════════════════════ */
+   OWNER FEEDBACK PASS (real phone, landscape, both browser tab and
+   installed PWA) — closes the gap the U2 audit flagged as "honest
+   skeleton, not yet the finished machine":
+     1. the 3 lamps re-label STATS/ITEMS/DATA (identity.navLamps,
+        js/core/state.js + _applyFo3NavLabels(), ui-core-nav.js) with the
+        real subsystem name riding along as a small sub-label — CSS here
+        only reveals that sub-label in landscape.
+     2. the glass is now a BOUNDED, internally-scrolling region (the
+        existing uplink-only "fixed viewport + flex column" pattern from
+        css/15-overseer.css, extended here to every FO3-landscape
+        subsystem) — the casing bar can no longer obscure content.
+     3. the casing (hood + bezel) gets the dark weathered cast-metal
+        material throughout, not just the bezel row.
+     4/5/6. the CHASSIS gauge/UPLINK knob/SETTINGS toggle get real
+        pseudo-element dressing (needle, pointer, lever) instead of reading
+        as flat abstract shapes; SETTINGS widens so its label never
+        truncates.
+     7. the shell is 100dvw/100dvh + safe-area insets, position:fixed to
+        the viewport (not a padded block in normal flow) — closes the
+        dead-space-on-both-sides gap.
+     8. the glass interior sheds the NV "machine-language" instrument
+        dressing (BUS-nn tags, part-number subtitles, pulsing LEDs, the
+        CRT beam-trace look, amber fader/readback highlights) in favor of
+        the flat austere phosphor-text look the design doc's thesis calls
+        for — a small set of generic, board-agnostic rules, not bespoke
+        per-board reskins.
+   ══════════════════════════════════════════════════════════════════════ */
 
 /* ── FO3's amber accent — "the wire," spent ONLY on the active lamp, the
    tuned knob, and the toggle's active lever (design doc §8). Lives here,
@@ -41,31 +57,199 @@
 }
 
 @media (orientation: landscape) {
-  /* ── THE SECOND NAV AXIS REVEAL (U1 built the mechanism; this is its
-     skin). NV boards never carry data-subtab (U0/U1), so this selector
-     can never match an NV element — U1's own invariant, restated here as
-     the reason this rule is safe to scope only to FO3, not to orientation
-     AND game together being redundant. Landscape-only: FO3 portrait keeps
-     today's accordion (data-subtab stays stamped year-round once U1's
-     boot-time stamper runs, but this hide rule only fires here). */
+  /* ══ A. THE FULL-VIEWPORT FIXED SHELL — closes the dead-space-on-both-
+     sides gap (owner item 7) and gives the glass a BOUNDED region so the
+     casing bar can never obscure content again (owner item 2). This
+     extends the SAME fixed-viewport + flex-column pattern the app already
+     trusts for the mobile UPLINK self-contained view
+     (body[data-subsystem='uplink'] .container.machine, css/15-overseer.css)
+     to every FO3-landscape subsystem — not a new mechanism, the existing
+     one applied more broadly and upgraded to 100dvw/100dvh + safe-area
+     insets per the explicit real-device requirement (mobile browser chrome
+     eats plain vh/vw at the deciding 360px-tall viewport). Uses
+     position:fixed (not just height:100dvh) so it also bypasses body's own
+     10px padding + .container's own 12px padding without needing to touch
+     either of those shared, NV-visible rules. ══ */
+  [data-game='FO3'] body {
+    padding: 0;
+  }
+  [data-game='FO3'] #uosMachine.container.machine {
+    position: fixed;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    max-width: none;
+    margin: 0;
+    padding: env(safe-area-inset-top, 0) max(env(safe-area-inset-right, 0), 3px)
+      env(safe-area-inset-bottom, 0) max(env(safe-area-inset-left, 0), 3px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 2;
+  }
+  [data-game='FO3'] .casing-top {
+    flex: 0 0 auto;
+    order: 0;
+  }
+  /* the real DOM order is casing-top -> .bezel -> .glass-frame (the bezel
+     nav sits BETWEEN the header and the screen in the shared desktop/NV
+     layout — it only becomes a bottom dock via position:fixed on mobile).
+     The Pip-Boy body puts the lamp bar BELOW the glass (design doc §3/§4,
+     mockup .lampbar). order (flex, no DOM change — Protocol UI-7) reflows
+     the visual stack to hood -> glass -> bezel without touching the DOM or
+     tab order's underlying source (the pre-existing NV mobile fixed-dock
+     already has this same visual-order-vs-DOM-order relationship, so this
+     introduces no new class of a11y tradeoff). */
+  [data-game='FO3'] .glass-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    order: 1;
+  }
+  [data-game='FO3'] .main-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* #uiPanel (.col-left) becomes the ONE bounded, internally-scrolling
+     region — the boards scroll inside it; the top strip/sub-tab rail
+     (section D below) stick to its top/bottom edge instead of scrolling
+     away with them. UPLINK's own existing rule already hides .col-left
+     and scrolls .panel.chat-panel instead (css/15-overseer.css) — that
+     rule is untouched and still wins for the `display` property (this
+     block never declares display:none, so there's no conflict); these
+     flex/overflow properties simply go inert on a hidden element. */
+  [data-game='FO3'] .col-left {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: clip;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+  }
+  /* the sub-tab rail (section D) is DOM-first (right after the top strip,
+     before every board) but visually belongs at the BOTTOM of the glass
+     (design doc §4, mockup .subrail) — order:1 moves it after the boards
+     (which stay at the default order:0) inside the new flex column,
+     without touching the DOM. */
+  [data-game='FO3'] #fo3SubtabRail {
+    order: 1;
+  }
+
+  /* ══ B. THE HOOD — a compact Pip-Boy brand strip, not the RobCo desk-
+     terminal header (owner item 8's "top half of the screen is still the
+     generic RobCo terminal"). Every hidden element here is decorative
+     (Protocol UI-5 — no control is ever among them); PWR/UPLINK/FAULT stay
+     real, tappable, aria-labelled buttons, just visually shrunk to dots
+     (font-size:0 collapses the raw text node while the icon glyph, sized
+     in px not em, stays visible — the same "redundant visible text,
+     meaning carried by aria-label" pattern already used for #bezelTelemetry
+     below and .nk-num elsewhere in this file). ══ */
+  [data-game='FO3'] .casing-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    margin-bottom: 0;
+    flex-wrap: nowrap;
+    border-bottom: 2px solid #0e1108;
+    border-radius: 0 0 8px 8px;
+    background:
+      radial-gradient(ellipse 46px 26px at 80% 8%, rgba(96, 74, 36, 0.2), transparent 70%),
+      linear-gradient(
+        105deg,
+        transparent 47.6%,
+        rgba(214, 222, 182, 0.08) 47.9%,
+        transparent 48.2%
+      ),
+      linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
+    box-shadow:
+      0 6px 10px rgba(0, 0, 0, 0.7),
+      inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+      inset -1px -2px 4px rgba(0, 0, 0, 0.55);
+  }
+  [data-game='FO3'] .brand-plate {
+    font-size: 7px;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    color: rgba(226, 232, 198, 0.62);
+    text-shadow: none;
+  }
+  [data-game='FO3'] .brand-plate .uos,
+  [data-game='FO3'] .status-annunciator,
+  [data-game='FO3'] .chassis-screen-mini,
+  [data-game='FO3'] .uptime-line,
+  [data-game='FO3'] .vents,
+  [data-game='FO3'] .serial {
+    display: none;
+  }
+  [data-game='FO3'] .lamp-row {
+    margin-left: auto;
+    font-size: 0;
+    gap: 6px;
+  }
+  [data-game='FO3'] .lamp i {
+    width: 5px;
+    height: 5px;
+  }
+
+  /* ══ C. THE SECOND NAV AXIS REVEAL — U1 built the mechanism; this is its
+     skin (unchanged from the U2 spine). NV boards never carry data-subtab
+     (U0/U1), so this selector can never match an NV element. ══ */
   [data-game='FO3'] .panel[data-tab].tab-visible[data-subtab]:not(.subtab-active) {
     display: none;
   }
 
-  /* ── the sub-tab rail (U1's #fo3SubtabRail, shipped `hidden`) — an
-     author-origin rule always wins over the UA [hidden] default
-     regardless of specificity (origin trumps specificity in the cascade),
-     so no HTML/JS change was needed to reveal it here. */
+  /* ══ D. THE STICKY TOP STRIP + SUB-TAB RAIL — pinned to the top/bottom of
+     the now-scrollable #uiPanel (section A) via position:sticky, so they
+     never scroll away with the boards even though they share the same DOM
+     parent as the boards (Protocol UI-7 — no new markup, CSS-only). ══ */
+  [data-game='FO3'] #fo3TopStrip {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    color: var(--robco-green);
+    background: rgba(3, 7, 10, 0.92);
+    border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  }
+  [data-game='FO3'] .fo3-strip-seg {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+    border-radius: 2px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    background: rgba(var(--robco-green-rgb), 0.05);
+    text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
+  }
+  [data-game='FO3'] .fo3-strip-seg b {
+    font-weight: normal;
+    opacity: 0.65;
+    margin-right: 3px;
+  }
   [data-game='FO3'] #fo3SubtabRail {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
     gap: 2px;
     padding: 4px 6px;
-    margin: 6px 0 2px;
+    margin: 0;
+    background: rgba(3, 7, 10, 0.92);
     border-top: 1px solid rgba(var(--robco-green-rgb), 0.25);
-    border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
   }
   [data-game='FO3'] .fo3-subtab-btn {
     width: auto; /* overrides the global button{width:100%} base rule (Protocol UI-5) — these sit inline in a row, not stacked full-width */
@@ -88,52 +272,44 @@
     background: rgba(var(--robco-green-rgb), 0.08);
   }
 
-  /* ── the in-glass top strip (identity.statusStrip, LVL/HP/Wg/RAD/Caps —
-     _renderFo3TopStrip(), js/ui/ui-core-nav.js). Austere: flat phosphor
-     text in boxed segments, the FO3 control language's one shared
-     vocabulary piece that appears everywhere on the screen. */
-  [data-game='FO3'] #fo3TopStrip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 4px 8px;
-    font-size: 9px;
-    letter-spacing: 0.5px;
-    color: var(--robco-green);
-  }
-  [data-game='FO3'] .fo3-strip-seg {
-    border: 1px solid rgba(var(--robco-green-rgb), 0.45);
-    border-radius: 2px;
-    padding: 2px 6px;
-    white-space: nowrap;
-    background: rgba(var(--robco-green-rgb), 0.05);
-    text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
-  }
-  [data-game='FO3'] .fo3-strip-seg b {
-    font-weight: normal;
-    opacity: 0.65;
-    margin-right: 3px;
-  }
-
-  /* ── THE CASING FASCIA — a functional re-skin of the EXISTING bezel
+  /* ══ E. THE CASING FASCIA — a functional re-skin of the EXISTING bezel
      keycaps into lamp/knob/gauge/toggle form (Protocol UI-7: chrome
      layered around the working shell, never a new shell — every button
      below keeps its real id, onclick, role=tab, aria-selected; only its
-     skin changes). DIR has no casing control on FO3 (a Pip-Boy has none —
-     design doc §3); hotkey [0] still opens it (the JS handler fires
-     regardless of the button's visibility). The GOVERNOR dial / field-kit
-     flavor are NV-bezel decoration, not part of the Pip-Boy body — hidden
-     here, not deleted (they still render for every other game/breakpoint). */
+     skin changes). The bezel is no longer position:fixed (it is now a
+     normal-flow flex child of the section-A shell, so it can never overlay
+     content again) and carries the same dark weathered cast-metal material
+     as the hood (owner item 3). ══ */
   [data-game='FO3'] .bezel {
+    position: relative;
+    inset: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    z-index: auto;
+    flex: 0 0 auto;
+    order: 2; /* visually last — see the .glass-frame order comment above */
+    margin-top: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 10px;
     padding: 8px 10px 6px;
-    border-radius: 8px;
-    background: linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
+    border-radius: 0 0 10px 10px; /* rounds the corners now touching the true bottom edge, matching the hood's own top rounding */
+    border-top: 2px solid #0e1108;
+    background:
+      radial-gradient(ellipse 60px 30px at 20% 92%, rgba(96, 74, 36, 0.18), transparent 70%),
+      linear-gradient(
+        105deg,
+        transparent 47.6%,
+        rgba(214, 222, 182, 0.06) 47.9%,
+        transparent 48.2%
+      ),
+      linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
     box-shadow:
+      0 -3px 10px rgba(0, 0, 0, 0.7),
       inset 1px 1px 0 rgba(255, 255, 255, 0.1),
       inset -1px -2px 4px rgba(0, 0, 0, 0.55);
   }
@@ -154,14 +330,17 @@
     white-space: nowrap;
   }
 
-  /* the 3 subsystem keys → domed lamps. Real names stay stamped via the
-     existing .nk-label span (design doc §3: "clarity outranks flavor"). */
+  /* the 3 subsystem keys → domed lamps. STATS/ITEMS/DATA is stamped by
+     _applyFo3NavLabels() from identity.navLamps (js/ui/ui-core-nav.js,
+     js/core/state.js) — real names ride along as a small sub-label
+     beneath (design doc §3: "clarity outranks flavor" + the owner's
+     CLARITY VETO going the OTHER way, obscure→plain). */
   [data-game='FO3'] #navkey-operator,
   [data-game='FO3'] #navkey-operations,
   [data-game='FO3'] #navkey-databank {
-    width: 60px;
-    height: 60px;
-    flex: 0 0 60px;
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
     border-radius: 50%;
     background: radial-gradient(circle at 38% 30%, #6e463c, #3c2620 78%);
     border: 2px solid #141006;
@@ -194,12 +373,30 @@
   [data-game='FO3'] #navkey-databank .nk-led {
     display: none; /* the whole dome IS the lamp — a separate LED dot would be redundant */
   }
+  [data-game='FO3'] #navkey-operator .nk-label,
+  [data-game='FO3'] #navkey-operations .nk-label,
+  [data-game='FO3'] #navkey-databank .nk-label {
+    font-size: 8px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  [data-game='FO3'] #navkey-operator .nk-sub,
+  [data-game='FO3'] #navkey-operations .nk-sub,
+  [data-game='FO3'] #navkey-databank .nk-sub {
+    display: block;
+    font-size: 5px;
+    letter-spacing: 0.3px;
+    opacity: 0.7;
+  }
 
-  /* UPLINK → the radio knob (dark ribbed ring) */
+  /* UPLINK → the radio knob (dark ribbed ring). A ::after pointer
+     disambiguates it as a tuning dial rather than an abstract radial fan
+     pattern (owner item 6) and swings to its detent on selection, exactly
+     like the reference mockup's .kp. */
   [data-game='FO3'] #navkey-uplink {
-    width: 56px;
-    height: 56px;
-    flex: 0 0 56px;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
     border-radius: 50%;
     background:
       repeating-conic-gradient(rgba(0, 0, 0, 0.55) 0 7deg, transparent 7deg 15deg),
@@ -209,6 +406,27 @@
       0 3px 6px rgba(0, 0, 0, 0.8),
       inset 0 2px 2px rgba(255, 255, 255, 0.1);
   }
+  [data-game='FO3'] #navkey-uplink::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 3px;
+    height: 15px;
+    margin-top: -15px;
+    translate: -50% 0;
+    transform-origin: bottom center;
+    transform: rotate(-64deg);
+    background: rgba(240, 244, 220, 0.95);
+    border-radius: 2px;
+    box-shadow: 0 0 5px rgba(226, 232, 198, 0.6);
+    transition:
+      transform 0.34s cubic-bezier(0.3, 1.6, 0.4, 1),
+      background 0.2s,
+      box-shadow 0.2s;
+    pointer-events: none;
+  }
   [data-game='FO3'] #navkey-uplink.active {
     transform: none;
     box-shadow:
@@ -216,52 +434,148 @@
       0 0 0 2px rgba(var(--bezel-wire-rgb), 0.55),
       0 0 16px rgba(var(--bezel-wire-rgb), 0.45);
   }
+  [data-game='FO3'] #navkey-uplink.active::after {
+    transform: rotate(58deg);
+    background: var(--bezel-wire);
+    box-shadow: 0 0 8px rgba(var(--bezel-wire-rgb), 0.9);
+  }
   [data-game='FO3'] #navkey-uplink .nk-led {
     display: none;
   }
 
-  /* CHASSIS → the white-face gauge */
+  /* CHASSIS → the white-face gauge: red needle + chrome ring (owner item
+     4). The needle/hub are ::before/::after — decorative, pointer-events
+     disabled, never intercepts the tap target; the button itself stays the
+     one real, full-circle hit area. */
   [data-game='FO3'] #navkey-chassis {
-    width: 52px;
-    height: 52px;
-    flex: 0 0 52px;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
     border-radius: 50%;
     background: radial-gradient(circle at 42% 34%, #efe9d2, #c9c2a8 75%, #9a937c 96%);
-    border: 3px solid #7e8278;
+    border: 3px solid #b9bdb0;
     box-shadow:
       0 2px 3px rgba(0, 0, 0, 0.75),
-      inset 0 1px 2px rgba(255, 255, 255, 0.7);
+      0 0 0 1px #4a4a42,
+      0 0 0 3px #7e8278,
+      inset 0 1px 2px rgba(255, 255, 255, 0.75);
     color: #22270f; /* dark labels — this dome is a light face, unlike the others */
+  }
+  [data-game='FO3'] #navkey-chassis::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    margin-top: -12px;
+    translate: -50% 0;
+    transform-origin: bottom center;
+    transform: rotate(-40deg);
+    background: #c22e1e;
+    border-radius: 1px;
+    box-shadow: 0 0 2px rgba(194, 46, 30, 0.8);
+    pointer-events: none;
+  }
+  [data-game='FO3'] #navkey-chassis::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin: -2.5px 0 0 -2.5px;
+    border-radius: 50%;
+    background: #3a382c;
+    border: 1px solid rgba(0, 0, 0, 0.7);
+    pointer-events: none;
   }
   [data-game='FO3'] #navkey-chassis.active {
     transform: none;
     box-shadow:
       0 2px 3px rgba(0, 0, 0, 0.75),
-      0 0 0 2px rgba(var(--robco-green-rgb), 0.7),
+      0 0 0 1px #4a4a42,
+      0 0 0 3px rgba(var(--robco-green-rgb), 0.7),
       0 0 12px rgba(var(--robco-green-rgb), 0.5);
   }
   [data-game='FO3'] #navkey-chassis .nk-led {
     display: none;
   }
 
-  /* SETTINGS → the flick toggle (rectangular slot, not a dome) */
+  /* SETTINGS → the flick toggle (rectangular slot + a real sliding lever,
+     owner item 5). Widened from the previous 34px so "SETTINGS" never
+     truncates (owner item 5) — 158.31's base .nk-label nowrap/ellipsis
+     stays the safety net; this override just gives it room to never need
+     it, plus a dedicated smaller size since the label now shares the slot
+     with a lever graphic instead of sitting alone in the button. */
   [data-game='FO3'] #navkey-settings {
-    width: 34px;
+    width: 42px;
     height: 60px;
-    flex: 0 0 34px;
-    border-radius: 6px;
-    background: linear-gradient(180deg, #0a0c05, #171a0e);
+    flex: 0 0 42px;
+    border-radius: 8px;
+    padding-top: 4px;
+    justify-content: flex-end;
+    background: linear-gradient(180deg, #4a5132, #333921 34%, #22270f 88%);
     border: 1px solid rgba(0, 0, 0, 0.8);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.6),
+      inset 1px 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  [data-game='FO3'] #navkey-settings::before {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 6px;
+    width: 14px;
+    height: 30px;
+    translate: -50% 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #0a0c05, #171a0e);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+  }
+  [data-game='FO3'] #navkey-settings::after {
+    content: '';
+    display: block;
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    width: 10px;
+    height: 14px;
+    translate: -50% 0;
+    border-radius: 5px;
+    background: radial-gradient(circle at 35% 25%, #6a7048, #23261a 70%);
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.8),
+      inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    transition:
+      top 0.18s ease-out,
+      background 0.18s,
+      box-shadow 0.18s;
+    pointer-events: none;
   }
   [data-game='FO3'] #navkey-settings.active {
     transform: none;
     box-shadow:
-      inset 0 2px 4px rgba(0, 0, 0, 0.9),
+      inset 0 2px 4px rgba(0, 0, 0, 0.6),
       0 0 8px rgba(var(--bezel-wire-rgb), 0.6);
   }
-  [data-game='FO3'] #navkey-settings::after {
-    display: none; /* the shared amber service-stripe reads wrong on a toggle body */
+  [data-game='FO3'] #navkey-settings.active::after {
+    top: 26px;
+    background: radial-gradient(circle at 35% 25%, var(--bezel-wire), #7a4c10 75%);
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.8),
+      0 0 8px rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  [data-game='FO3'] #navkey-settings .nk-label {
+    position: relative;
+    z-index: 1;
+    font-size: 5.5px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
   }
   [data-game='FO3'] #navkey-settings .nk-led {
     display: none;
@@ -284,10 +598,14 @@
     display: none; /* the design's hotkey glyphs are aria-only on FO3 (design doc §7 item 13) — the number still reaches AT via the button's aria-label */
   }
 
-  /* ── AUSTERE BOARD RE-SKIN — flat phosphor text, boxed outlines, in
-     place of NV's faders/dials. Pure CSS re-treatment of the EXISTING
-     board markup and controls (Protocol 22 — no render-function fork);
-     every board keeps its real inline controls at the same tap count. */
+  /* ══ F. THE AUSTERE GLASS — strip the NV "machine-language" instrument
+     dressing (owner item 8): the BUS-nn slot tags, the long part-number
+     subtitles, the pulsing LEDs, the CRT scanline/beam-trace look, and any
+     amber highlight living INSIDE a board (FO3's amber is spent ONLY on
+     the lamp/knob/toggle — design doc §8). A small, board-agnostic set of
+     rules (Protocol 22/25 — no render-function fork, every board keeps its
+     real inline controls at the same tap count); every hidden/flattened
+     element here is decorative, never a control. ══ */
   [data-game='FO3'] .col-left .panel.bay-board {
     border-radius: 2px;
     background: rgba(var(--robco-green-rgb), 0.03);
@@ -298,16 +616,43 @@
   [data-game='FO3'] .col-left .panel.bay-board input[type='text'] {
     border-radius: 2px;
   }
-
-  /* ── viewport sizing — 100dvh (not 100vh: browser chrome eats real
-     landscape height that vh doesn't account for) + safe-area insets, on
-     the shared casing wrapper (Protocol UI-7 — chrome layered around the
-     unchanged working shell, never a new one). Real-device confirmation
-     (browser tab AND installed PWA standalone) is an explicit owner-only
-     gate the build plan calls out — this value is the best static choice
-     available without that hardware, not a substitute for it. */
-  [data-game='FO3'] #uosMachine {
-    padding-left: max(env(safe-area-inset-left), 4px);
-    padding-right: max(env(safe-area-inset-right), 4px);
+  [data-game='FO3'] .col-left .bay-slot-tag,
+  [data-game='FO3'] .col-left .bay-part-no,
+  [data-game='FO3'] .col-left .board-led {
+    display: none;
+  }
+  [data-game='FO3'] .col-left .crt-mon {
+    background: rgba(0, 0, 0, 0.35);
+    box-shadow: none;
+    outline-color: rgba(var(--robco-green-rgb), 0.4);
+  }
+  [data-game='FO3'] .col-left .crt-mon .t-line,
+  [data-game='FO3'] .col-left #opRadLineWrap {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  [data-game='FO3'] .col-left .crt-mon .hp-bar-fill,
+  [data-game='FO3'] .col-left .crt-mon .hp-bar-fill::after {
+    box-shadow: none;
+  }
+  [data-game='FO3'] .col-left #opRadLineWrap i {
+    background: var(--robco-green);
+    box-shadow: none;
+  }
+  [data-game='FO3'] .col-left #opRadLineWrap i::after {
+    box-shadow: none;
+  }
+  [data-game='FO3'] .col-left .fd-ladder i.lit.top {
+    background: var(--robco-green);
+    box-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.7);
+  }
+  [data-game='FO3'] .col-left .rb-tile.amber {
+    outline-color: rgba(var(--robco-green-rgb), 0.5);
+    border-color: rgba(var(--robco-green-rgb), 0.3);
+  }
+  [data-game='FO3'] .col-left .rb-tile.amber .rb-val,
+  [data-game='FO3'] .col-left .rb-tile.amber input,
+  [data-game='FO3'] .col-left .rb-tile.amber .rb-cap {
+    color: var(--robco-green);
+    text-shadow: var(--robco-glow);
   }
 }

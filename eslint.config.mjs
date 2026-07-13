@@ -93,6 +93,8 @@ export default [
         _applyRailGrouping: 'readonly',
         _applyRails: 'readonly',
         selectSubtab: 'readonly',
+        // FO3 PIP-BOY BUILD U2 owner-feedback pass — lamp re-labeling (js/ui/ui-core-nav.js -> js/ui/ui-core.js)
+        _applyFo3NavLabels: 'readonly',
         appendToChat: 'readonly',
         loadUI: 'readonly',
         saveState: 'readonly',

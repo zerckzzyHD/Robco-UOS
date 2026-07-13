@@ -197,6 +197,28 @@ function _applyRailGrouping() {
   });
 }
 
+// _applyFo3NavLabels() — owner real-device feedback pass (FO3 PIP-BOY BUILD
+// U2 follow-up): re-labels the 3 lamp keycaps from identity.navLamps (pure
+// data, Protocol 38 — its presence is the switch, never a game-name branch).
+// A complete no-op for any identity without a `navLamps` key (NV/FO4 today)
+// — nk-label/nk-sub keep their shipped index.html text (OPERATOR/STAT etc.)
+// untouched. Runs once from window.onload, same boot phase as
+// _applyRailGrouping() (board elements are static markup already present in
+// the DOM at that point). Only textContent is touched — aria-label stays the
+// literal real subsystem name (index.html), never overwritten.
+function _applyFo3NavLabels() {
+  const lamps = getIdentity().navLamps;
+  if (!lamps) return;
+  Object.keys(lamps).forEach(key => {
+    const btn = document.getElementById('navkey-' + key);
+    if (!btn) return;
+    const labelEl = btn.querySelector('.nk-label');
+    const subEl = btn.querySelector('.nk-sub');
+    if (labelEl) labelEl.textContent = lamps[key].label;
+    if (subEl) subEl.textContent = lamps[key].sub;
+  });
+}
+
 // _renderFo3SubtabRail(subsystem, activeName) — (re)builds #fo3SubtabRail's
 // button list for `subsystem`'s rail, marking `activeName` current. The
 // container itself stays `hidden` in this unit (see header note above); this
@@ -319,7 +341,19 @@ function _scrollElFor(subsystem) {
   const isDesktop =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(min-width: 1000px) and (hover: hover) and (pointer: fine)').matches;
-  return isDesktop ? document.getElementById('uiPanel') : null;
+  if (isDesktop) return document.getElementById('uiPanel');
+  // FO3 PIP-BOY BUILD U2 owner-feedback pass: the FO3 landscape shell
+  // (css/60-fo3-pipboy.css) makes #uiPanel its own bounded, internally-
+  // scrolling region instead of the page itself scrolling — same reasoning
+  // as the desktop branch above, just gated on identity.orientation (data,
+  // Protocol 38 — the sanctioned flag U0 added for exactly this) instead of
+  // desktop pointer capability, so it stays a no-op for every game without
+  // that flag (NV/FO4 today).
+  const usesLandscapeShell =
+    getIdentity().orientation === 'landscape-primary' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(orientation: landscape)').matches;
+  return usesLandscapeShell ? document.getElementById('uiPanel') : null;
 }
 
 // Saves the CURRENT scroll offset under `subsystem`'s key. null el = the page

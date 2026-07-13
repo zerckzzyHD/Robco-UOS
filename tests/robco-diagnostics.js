@@ -15350,10 +15350,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // own stated intent (headroom for natural named-call growth, not a monolith guard).
     // CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) —
     // bumped again for the same reason. FO3 PIP-BOY BUILD U1 added one more
-    // (_applyRailGrouping()) — bumped again, same reason.
+    // (_applyRailGrouping()) — bumped again, same reason. FO3 PIP-BOY BUILD U2
+    // owner-feedback pass added one more (_applyFo3NavLabels()) — bumped again, same reason.
     assert(
-      onloadLineCount < 56,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 56)`
+      onloadLineCount < 57,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 57)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -23051,7 +23052,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 166 — Casing/layout polish batch (owner-reported): the big purple
 //  frame outline removed, per-subsystem scroll-position memory added, and
 //  the Module Bay's BACKPLANE BUS header centered.
-//  17 tests
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 166 — Casing/layout polish batch (outline, scroll memory, header centering)');
@@ -23229,11 +23230,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '\n' +
       declareFn166(uiSource, '_saveOutgoingScroll');
 
-    function makeSandbox166(desktop) {
+    function makeSandbox166(desktop, identity, landscape) {
       const store = {};
       const uiPanelEl = { scrollTop: 0 };
       const chatPanelEl = { scrollTop: 0 };
-      const st = { desktop: desktop !== false, scrollY: 0 };
+      const st = { desktop: desktop !== false, landscape: landscape === true, scrollY: 0 };
       const sb = {
         MetaStore: {
           get(k) {
@@ -23252,8 +23253,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           },
         },
         window: {
-          matchMedia() {
-            return { matches: st.desktop };
+          // FO3 PIP-BOY BUILD U2 owner-feedback pass: _scrollElFor() now
+          // probes TWO distinct media queries (the pre-existing desktop
+          // pointer/hover query and the new orientation:landscape query) —
+          // the stub must tell them apart instead of collapsing both onto
+          // one `desktop` flag, or the new FO3-landscape branch could never
+          // be exercised independently of the desktop branch.
+          matchMedia(q) {
+            return { matches: /orientation/.test(q) ? st.landscape : st.desktop };
           },
           get scrollY() {
             return st.scrollY;
@@ -23261,6 +23268,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           scrollTo(x, y) {
             st.scrollY = y;
           },
+        },
+        // getIdentity() default (NV-shaped, no orientation key) so every
+        // pre-existing 166.x expectation is unaffected unless a test
+        // explicitly passes an FO3-shaped identity.
+        getIdentity() {
+          return identity || {};
         },
         _lastScrollSubsystem: null,
       };
@@ -23347,6 +23360,40 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           uiPanelEl.scrollTop === 42 &&
           !Object.prototype.hasOwnProperty.call(store, 'robco_scroll_positions');
       }
+
+      // 166.18 FO3 PIP-BOY BUILD U2 owner-feedback pass: on a mobile-width
+      //        breakpoint (not desktop pointer capability) with
+      //        identity.orientation === 'landscape-primary' AND the
+      //        orientation:landscape media query matching, #uiPanel is the
+      //        scroll target (the FO3 landscape shell's own bounded,
+      //        internally-scrolling region — css/60-fo3-pipboy.css section
+      //        A) — the same #uiPanel round-trip as the desktop branch, but
+      //        reached via identity data instead of a hover/pointer probe.
+      //        A plain NV-shaped identity (no orientation key) still falls
+      //        back to window.scrollY (166.15) even at the same mobile
+      //        width — proving this is data-gated, not orientation-gated
+      //        alone.
+      {
+        const { sb, uiPanelEl } = makeSandbox166(false, { orientation: 'landscape-primary' }, true);
+        uiPanelEl.scrollTop = 77;
+        sb._saveScrollFor('operator');
+        uiPanelEl.scrollTop = 0;
+        const restored = sb._restoreScrollFor('operator', true);
+        r166.fo3LandscapeShellUsesUiPanel = restored === true && uiPanelEl.scrollTop === 77;
+      }
+
+      // 166.19 the SAME mobile width + landscape orientation, but WITHOUT
+      //        identity.orientation (a plain NV-shaped identity) falls back
+      //        to window.scrollY — proving 166.18 is gated on the identity
+      //        DATA, not on the orientation media query alone (Protocol 38).
+      {
+        const { sb, st } = makeSandbox166(false, {}, true);
+        st.scrollY = 88;
+        sb._saveScrollFor('operator');
+        st.scrollY = 0;
+        const restored = sb._restoreScrollFor('operator', true);
+        r166.landscapeAloneIsNotEnough = restored === true && st.scrollY === 88;
+      }
     } catch (e) {
       err166 = e;
     }
@@ -23379,6 +23426,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       err166 === null && r166 && r166.invalidSubsystemGuard === true,
       '166.17: [behavioral] an unrecognized subsystem name is ignored by both _saveScrollFor() and _restoreScrollFor() (NAV_KEYS guard)'
+    );
+    assert(
+      err166 === null && r166 && r166.fo3LandscapeShellUsesUiPanel === true,
+      "166.18: [behavioral, FO3 PIP-BOY BUILD U2 owner-feedback pass] at a mobile width with identity.orientation === 'landscape-primary' AND orientation:landscape matching, #uiPanel (not window.scrollY) is the scroll target — the FO3 landscape shell's own bounded, internally-scrolling region"
+    );
+    assert(
+      err166 === null && r166 && r166.landscapeAloneIsNotEnough === true,
+      '166.19: [behavioral] the SAME mobile-width landscape orientation with a plain NV-shaped identity (no orientation key) still falls back to window.scrollY — 166.18 is gated on identity data, never orientation alone (Protocol 38)'
     );
   }
 }
@@ -41510,8 +41565,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  view" — stays untouched too), zero image assets, no board control is
 //  functionally disabled by the re-skin, and the new
 //  _renderFo3TopStrip()/_fo3StripFieldValue() functions are no-ops
-//  without identity.statusStrip.
-//  25 tests.
+//  without identity.statusStrip. 224.11 (owner-feedback pass) additionally
+//  locks the casing-top/glass-frame/bezel flex `order` values that keep the
+//  visual stack (hood -> glass -> casing bar) correct despite the bezel's
+//  real DOM position sitting BEFORE the glass.
+//  26 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 224 — FO3 PIP-BOY BUILD U2 (landscape casing shell, the spine)');
@@ -41584,6 +41642,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         deliberately unscoped, because it only checked the total count
   //         outside the media block, never that every rule INSIDE it is
   //         individually scoped).
+  // Hoisted so 224.6 (below) can reuse the same brace-depth-parsed rule list
+  // (selector + declaration body) instead of re-parsing or falling back to a
+  // fragile comment-boundary regex.
+  let rules224 = [];
   if (fo3Css224) {
     const fo3CssNoComments224 = fo3Css224.replace(/\/\*[\s\S]*?\*\//g, '');
     const mediaOpenMarker224 = '@media (orientation: landscape) {';
@@ -41629,18 +41691,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
       // Split the media block's own inner content into top-level
       // "selector { declarations }" rules (depth-1 relative to mediaInner224).
-      const rules224 = [];
+      // Also captures each rule's declaration body (declBody) so 224.6 below
+      // can check per-rule properties instead of scanning a comment-bounded
+      // text slice.
       let ruleDepth224 = 0;
       let selStart224 = 0;
+      let declStart224 = -1;
       for (let j = 0; j < mediaInner224.length; j++) {
         const c = mediaInner224[j];
         if (c === '{') {
-          if (ruleDepth224 === 0)
+          if (ruleDepth224 === 0) {
             rules224.push({ selectorText: mediaInner224.slice(selStart224, j) });
+            declStart224 = j + 1;
+          }
           ruleDepth224++;
         } else if (c === '}') {
           ruleDepth224--;
-          if (ruleDepth224 === 0) selStart224 = j + 1;
+          if (ruleDepth224 === 0) {
+            rules224[rules224.length - 1].declBody = mediaInner224.slice(declStart224, j);
+            selStart224 = j + 1;
+          }
         }
       }
 
@@ -41698,22 +41768,39 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '224.5b: the U1/U2 sub-tab-rail + top-strip markup region carries no <img> tags'
   );
 
-  // 224.6 — the board re-skin never functionally disables a control — only
-  //         cosmetic properties (border/background/border-radius) touch
-  //         .bay-board/button/input selectors, never display:none,
-  //         visibility:hidden, or pointer-events:none (editing-survives —
-  //         no tab ever goes read-only, build plan invariant 2).
+  // 224.6 — the board re-skin never functionally disables a CONTROL — no
+  //         rule whose selector names button/input (any comma-separated
+  //         part) may set display:none, visibility:hidden, or
+  //         pointer-events:none (editing-survives — no tab ever goes
+  //         read-only, build plan invariant 2). This is a per-RULE check
+  //         over the real brace-parsed rule list (rules224, hoisted from
+  //         224.3d above), not a comment-boundary text-slice heuristic — the
+  //         owner-feedback pass's austere-glass rules legitimately hide
+  //         DECORATIVE elements (.bay-slot-tag/.bay-part-no/.board-led,
+  //         none of which are buttons or inputs), and a naive substring scan
+  //         over that whole region would false-positive on them.
   {
-    const boardReskinMatch224 = fo3Css224.match(
-      /\[data-game='FO3'\] \.col-left \.panel\.bay-board[\s\S]*?(?=\n\n|\/\* ── viewport)/
-    );
-    const boardReskinBlock224 = boardReskinMatch224 ? boardReskinMatch224[0] : '';
+    const controlSelectorRe224 = /(^|[\s,>+~.[])(button|input)\b/i;
+    const offenders224 = [];
+    rules224.forEach(r => {
+      const isControlRule = r.selectorText
+        .split(',')
+        .map(s => s.trim())
+        .some(sel => controlSelectorRe224.test(sel));
+      if (!isControlRule) return;
+      const body = r.declBody || '';
+      if (
+        /display:\s*none/.test(body) ||
+        /visibility:\s*hidden/.test(body) ||
+        /pointer-events:\s*none/.test(body)
+      ) {
+        offenders224.push(r.selectorText.trim());
+      }
+    });
     assert(
-      boardReskinBlock224 !== '' &&
-        !/display:\s*none/.test(boardReskinBlock224) &&
-        !/visibility:\s*hidden/.test(boardReskinBlock224) &&
-        !/pointer-events:\s*none/.test(boardReskinBlock224),
-      '224.6: the austere board re-skin block never sets display:none/visibility:hidden/pointer-events:none on a board control — every inline control stays exactly as tappable as it is today'
+      rules224.length > 0 && offenders224.length === 0,
+      '224.6: no rule whose selector names button/input ever sets display:none/visibility:hidden/pointer-events:none — every inline control stays exactly as tappable as it is today' +
+        (offenders224.length ? ' — OFFENDERS: ' + offenders224.join(' | ') : '')
     );
   }
 
@@ -41801,6 +41888,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   assert(
     /\[data-game='FO3'\]\s*\.fo3-subtab-btn\s*\{[^}]*width:\s*auto/.test(fo3Css224),
     '224.10: [live-browser regression, Protocol 42] .fo3-subtab-btn sets width:auto, overriding the global button{width:100%} base rule — without it every sub-tab button renders full-width, stacking the rail into 5 rows instead of one'
+  );
+
+  // 224.11 — Protocol 13/42 regression test (owner-feedback pass): a live-
+  //          browser geometry check (getBoundingClientRect, not a static
+  //          text scan) found the casing bar rendering BETWEEN the hood and
+  //          the glass instead of BELOW the glass. Root cause: the real DOM
+  //          order is casing-top -> .bezel -> .glass-frame (the bezel sits
+  //          between the header and the screen in the shared desktop/NV
+  //          layout; it only becomes a bottom dock via position:fixed on
+  //          mobile) — flipping .bezel off position:fixed without also
+  //          reordering it left it in its natural (visually wrong) DOM
+  //          position. Fixed with flex `order` (no DOM change, Protocol
+  //          UI-7): casing-top order:0, .glass-frame order:1, .bezel
+  //          order:2. Locked here so a future edit can't silently drop the
+  //          reorder and reintroduce the "casing sits above the glass" bug.
+  assert(
+    /\[data-game='FO3'\]\s*\.casing-top\s*\{[^}]*order:\s*0/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*order:\s*1/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.bezel\s*\{[^}]*order:\s*2/.test(fo3Css224),
+    '224.11: [live-browser regression, Protocol 42] .casing-top/.glass-frame/.bezel carry order:0/1/2 respectively — without this the casing bar renders ABOVE the glass (DOM order) instead of below it (visual order, matching the Pip-Boy reference)'
   );
 }
 

@@ -1,13 +1,19 @@
-## [Unreleased]<!-- Tests: 3107/3107 | Cache: robco-terminal-v2.8.0-r16 -->
+## [Unreleased]<!-- Tests: 3110/3110 | Cache: robco-terminal-v2.8.0-r17 -->
 
 ### Added
 
-- Started building a true-to-the-game Fallout 3 Pip-Boy screen for landscape (rotate your phone sideways while playing a Fallout 3 campaign): the three main screens now show up as glowing lamps on the device casing, alongside a radio knob, a status gauge, and a toggle switch standing in for the AI channel, system status, and settings. Each screen's sub-sections (like STATUS, SPECIAL, and SKILLS under the character screen) get their own row of tabs on the glass, remembering which one you last had open. Portrait mode is untouched — it keeps showing today's layout — and Fallout: New Vegas isn't affected at all. This is an early, functional pass; a fully dressed casing (indicator sway, working knob detent, etc.) comes later.
+- Continued building the true-to-the-game Fallout 3 Pip-Boy screen for landscape (rotate your phone sideways while playing a Fallout 3 campaign): the three main screens now show up as glowing lamps on the device casing, alongside a radio knob, a status gauge, and a toggle switch standing in for the AI channel, system status, and settings. Each screen's sub-sections (like STATUS, SPECIAL, and SKILLS under the character screen) get their own row of tabs on the glass, remembering which one you last had open. Portrait mode is untouched — it keeps showing today's layout — and Fallout: New Vegas isn't affected at all. This is still a functional pass; a fully dressed casing (indicator sway, working knob detent, etc.) comes later.
 
 ### Fixed
 
 - Deleting, selling, scrapping, using up, or having the Director replace an equipped weapon or piece of armor no longer leaves your bio-metrics readout showing gear you don't actually have anymore — it now correctly clears to "Nothing equipped" (or shows whatever you still have on) the moment the item is gone. A save from before this fix self-heals the first time it's loaded.
 - Fixed the new Fallout 3 Pip-Boy screen being unreachable once the app was installed to a home screen — the installed app was locked to portrait mode at the phone level, so rotating sideways could never reveal it. Rotation is now unlocked in both orientations. If you already installed the app, remove it from your home screen, reload the site once in your browser, then add it to your home screen again to pick up the fix.
+- Fixed the Fallout 3 Pip-Boy landscape screen's three main lamps reading OPERATOR, OPERATIONS, and DATABANK — the terminal jargon left over from the desk-terminal screen it replaced. They now read the plainer STATS, ITEMS, and DATA, with the original names riding along underneath in smaller text.
+- Fixed the Fallout 3 Pip-Boy landscape screen's bottom control bar sliding on top of the last few lines of a long screen and hiding them — the screen now scrolls entirely inside its own bounded display, so the control bar can never cover anything again.
+- Fixed the Fallout 3 Pip-Boy landscape screen leaving dead black space down both sides instead of filling your phone's screen.
+- Fixed the Fallout 3 Pip-Boy landscape screen's casing reading as a flat, pale placeholder color — it's now a dark, weathered metal, matching the rest of the device.
+- Fixed the Fallout 3 Pip-Boy landscape screen's system-status gauge, AI-channel knob, and settings switch looking like flat abstract shapes — the gauge now has a proper needle and a metal ring, the knob has a pointer that swings when you tune in, and the settings switch is a real toggle with a lever, and its label no longer gets cut off.
+- Fixed the Fallout 3 Pip-Boy landscape screen still showing the same instrument dressing (part-number tags, blinking status lights, and amber highlights) as the New Vegas desk terminal — it's now a flatter, plainer green readout to match the rest of the Pip-Boy's look.
 
 ### Under the Hood
 

@@ -1088,6 +1088,7 @@ window.onload = async function () {
     _restoreApiKeyAndChatHistory();
     loadUI();
     _applyRailGrouping(); // FO3 PIP-BOY BUILD U1: stamp data-subtab (no-op without identity.rails) — must run before initTabs()/switchTab() so the boot-time sub-tab restore has real data-subtab attributes to work with
+    _applyFo3NavLabels(); // FO3 PIP-BOY BUILD U2 owner-feedback pass: re-label the 3 lamp keycaps from identity.navLamps (no-op without it) — board elements are static markup already present, same boot phase as _applyRailGrouping()
     initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
     _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();

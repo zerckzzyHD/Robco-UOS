@@ -1242,6 +1242,21 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       // allowlist — see FO3_RAILS_NO_RAIL_ALLOWLIST in the same test.
       orientation: 'landscape-primary',
       statusStrip: ['LVL', 'HP', 'Wg', 'RAD', 'Caps'],
+      // ── FO3 PIP-BOY BUILD U2 owner-feedback pass: the 3 lamp keycaps read
+      // STATS/ITEMS/DATA (obscure→plain, the owner's CLARITY VETO going the
+      // OTHER way — plainer than OPERATOR/OPERATIONS/DATABANK, not more
+      // diegetic), with the real subsystem name riding along as a small
+      // sub-label beneath (the Module Bay real-control-labels-ride-along
+      // pattern, Protocol 25). Pure data (Protocol 38) — _applyFo3NavLabels()
+      // (ui-core-nav.js) is a complete no-op for any identity without this
+      // key, so NV/FO4 keep OPERATOR/OPERATIONS/DATABANK untouched.
+      // aria-labels are NOT touched by this — they stay the literal real
+      // subsystem name at every game (index.html), never diegetic.
+      navLamps: {
+        operator: { label: 'STATS', sub: 'OPERATOR' },
+        operations: { label: 'ITEMS', sub: 'OPERATIONS' },
+        databank: { label: 'DATA', sub: 'DATABANK' },
+      },
       rails: {
         operator: {
           STATUS: ['opVitalPanel', 'opHarnessPanel', 'statusEffectsPanel'],
