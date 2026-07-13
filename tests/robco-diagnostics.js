@@ -15313,10 +15313,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // DO-N added one legitimate named call (_initBezelChrome()) — bumped per this test's
     // own stated intent (headroom for natural named-call growth, not a monolith guard).
     // CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) —
-    // bumped again for the same reason.
+    // bumped again for the same reason. FO3 PIP-BOY BUILD U1 added one more
+    // (_applyRailGrouping()) — bumped again, same reason.
     assert(
-      onloadLineCount < 55,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 55)`
+      onloadLineCount < 56,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 56)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -41095,6 +41096,330 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     JSON.stringify(unrailedRealIds222) === JSON.stringify(NO_RAIL_ALLOWLIST_222),
     '222.7: every data-tab board id in index.html is EITHER in a rail OR in the exhaustive no-rail allowlist (weigh bridge / 3 CHASSIS / 4 SETTINGS) — derived: ' +
       JSON.stringify(unrailedRealIds222)
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 223 — FO3 PIP-BOY BUILD U1: second nav axis, inert (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: U1 ships the MECHANISM for the second nav axis
+//  (_applyRailGrouping/selectSubtab/_applyRails, js/ui/ui-core-nav.js) with
+//  no FO3 skin yet — #fo3SubtabRail stays `hidden` until a later unit's CSS
+//  reveals it. This suite behaviorally proves the REAL extracted function
+//  bodies (not a reimplementation of their logic) against a minimal fake
+//  DOM/MetaStore harness: the axis is a complete no-op the instant
+//  identity.rails is absent (the NV/FO4-today case), rails-bearing boards
+//  get grouped/toggled correctly, the choice persists per-subsystem and
+//  restores on a fresh "reload" (a fresh _applyRails() call with no live
+//  in-memory state), and switchTab() calls _applyRails() from the ONE choke
+//  point every entry path (including boot) funnels through.
+//  21 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 223 — FO3 PIP-BOY BUILD U1 (second nav axis, inert)');
+
+  const navSrc223 = readGroup('ui-core-nav');
+
+  // 223.1 — the three new functions are all defined, extractably, in ui-core-nav.js
+  let bodies223 = null;
+  let extractErr223 = null;
+  try {
+    bodies223 = {
+      grouping: extractFunctionBody(navSrc223, '_applyRailGrouping'),
+      selectSubtab: extractFunctionBody(navSrc223, 'selectSubtab'),
+      applyRails: extractFunctionBody(navSrc223, '_applyRails'),
+    };
+  } catch (e) {
+    extractErr223 = e;
+  }
+  assert(
+    bodies223 && bodies223.grouping && bodies223.selectSubtab && bodies223.applyRails,
+    '223.1: _applyRailGrouping()/selectSubtab()/_applyRails() are all defined in js/ui/ui-core-nav.js' +
+      (extractErr223 ? ' — ' + extractErr223.message : '')
+  );
+
+  // 223.1b — Protocol 38: none of the three carry a hardcoded game-name branch;
+  //          the axis is switched entirely by whether identity.rails exists.
+  if (bodies223) {
+    const allBodies223 = bodies223.grouping + bodies223.selectSubtab + bodies223.applyRails;
+    assert(
+      !/['"]FO3['"]|['"]FNV['"]|['"]FO4['"]/.test(allBodies223),
+      '223.1b: no game-name literal (FO3/FNV/FO4) appears anywhere in the three new functions — the axis switches on identity.rails alone (Protocol 38)'
+    );
+  } else {
+    assert(false, '223.1b: skipped — extraction failed');
+  }
+
+  // ── minimal fake DOM + MetaStore harness the REAL extracted bodies run
+  //    against — not a reimplementation of their logic. _renderFo3SubtabRail
+  //    (a pure rendering side-effect) is the one stubbed dependency.
+  function makeSandbox223(rails) {
+    const elements = new Map();
+    function elFor(id) {
+      if (!elements.has(id)) {
+        const classes = new Set();
+        elements.set(id, {
+          dataset: {},
+          innerHTML: '',
+          classList: {
+            toggle(cls, force) {
+              const has = classes.has(cls);
+              const want = force === undefined ? !has : !!force;
+              if (want) classes.add(cls);
+              else classes.delete(cls);
+              return want;
+            },
+            contains: cls => classes.has(cls),
+          },
+        });
+      }
+      return elements.get(id);
+    }
+    const metaStore = {};
+    const renderCalls = [];
+    const bodyEl = { dataset: {} };
+    const sandbox = {
+      document: {
+        getElementById: id => elFor(id),
+        querySelectorAll: sel => {
+          if (sel !== '[data-subtab]') return [];
+          return Array.from(elements.values()).filter(el => el.dataset.subtab !== undefined);
+        },
+        body: bodyEl,
+      },
+      getIdentity: () => ({ rails }),
+      MetaStore: {
+        get: k => (Object.prototype.hasOwnProperty.call(metaStore, k) ? metaStore[k] : null),
+        set: (k, v) => {
+          metaStore[k] = v;
+        },
+      },
+      _renderFo3SubtabRail: (subsystem, name) => renderCalls.push([subsystem, name]),
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const vm223 = require('vm');
+    vm223.createContext(sandbox);
+    vm223.runInContext(
+      'function _applyRailGrouping()' +
+        bodies223.grouping +
+        '\nfunction selectSubtab(name)' +
+        bodies223.selectSubtab +
+        '\nfunction _applyRails(subsystem)' +
+        bodies223.applyRails,
+      sandbox
+    );
+    return { sandbox, elFor, metaStore, renderCalls, bodyEl };
+  }
+
+  const TEST_RAILS_223 = {
+    operator: { STATUS: ['boardA', 'boardB'], SPECIAL: ['boardC'] },
+    operations: { MANIFEST: ['boardD'] },
+  };
+
+  if (bodies223) {
+    // 223.2 — _applyRailGrouping() stamps data-subtab on every rail'd id
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      assert(
+        h.elFor('boardA').dataset.subtab === 'STATUS' &&
+          h.elFor('boardB').dataset.subtab === 'STATUS' &&
+          h.elFor('boardC').dataset.subtab === 'SPECIAL' &&
+          h.elFor('boardD').dataset.subtab === 'MANIFEST',
+        '223.2: _applyRailGrouping() stamps data-subtab="<SUBTAB>" on every board id named in identity.rails'
+      );
+    }
+
+    // 223.3 — axis-inert-for-NV: _applyRailGrouping() is a COMPLETE no-op
+    //         when identity.rails is undefined (the NV/FO4 case today)
+    {
+      const h = makeSandbox223(undefined);
+      let threw223 = false;
+      try {
+        h.sandbox._applyRailGrouping();
+      } catch (_) {
+        threw223 = true;
+      }
+      assert(
+        !threw223 && h.sandbox.document.querySelectorAll('[data-subtab]').length === 0,
+        '223.3: axis-inert-for-NV — _applyRailGrouping() throws nothing and stamps zero data-subtab attributes when identity.rails is absent'
+      );
+    }
+
+    // 223.4 — selectSubtab(name) toggles .subtab-active onto exactly the
+    //         boards carrying that data-subtab, persists a per-subsystem
+    //         MetaStore pref, and renders the rail's active state
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox.selectSubtab('STATUS');
+      assert(
+        h.elFor('boardA').classList.contains('subtab-active') &&
+          h.elFor('boardB').classList.contains('subtab-active') &&
+          !h.elFor('boardC').classList.contains('subtab-active') &&
+          !h.elFor('boardD').classList.contains('subtab-active'),
+        '223.4a: selectSubtab("STATUS") activates exactly boardA/boardB (data-subtab=STATUS) and leaves boardC/boardD inactive'
+      );
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        '223.4b: selectSubtab() persists the choice to MetaStore as robco_fo3_subtab_<subsystem>'
+      );
+      assert(
+        h.renderCalls.some(c => c[0] === 'operator' && c[1] === 'STATUS'),
+        '223.4c: selectSubtab() re-renders the rail via _renderFo3SubtabRail(subsystem, name)'
+      );
+    }
+
+    // 223.5 — selectSubtab() no-ops (no throw, no MetaStore write, no class
+    //         change) when: rails absent, current subsystem has no rails
+    //         entry, or the name isn't a real sub-tab of that subsystem
+    {
+      const h1 = makeSandbox223(undefined);
+      h1.bodyEl.dataset.subsystem = 'operator';
+      h1.sandbox.selectSubtab('STATUS');
+      const h2 = makeSandbox223(TEST_RAILS_223);
+      h2.sandbox._applyRailGrouping();
+      h2.bodyEl.dataset.subsystem = 'chassis'; // no rails.chassis entry
+      h2.sandbox.selectSubtab('STATUS');
+      const h3 = makeSandbox223(TEST_RAILS_223);
+      h3.sandbox._applyRailGrouping();
+      h3.bodyEl.dataset.subsystem = 'operator';
+      h3.sandbox.selectSubtab('NOT_A_REAL_SUBTAB');
+      assert(
+        Object.keys(h1.metaStore).length === 0 &&
+          Object.keys(h2.metaStore).length === 0 &&
+          Object.keys(h3.metaStore).length === 0 &&
+          !h3.elFor('boardA').classList.contains('subtab-active'),
+        '223.5: selectSubtab() no-ops with no MetaStore write and no class change for (a) no rails, (b) a subsystem with no rails entry, (c) an unreal sub-tab name'
+      );
+    }
+
+    // 223.6 — subtab-persists (Protocol UI-6): _applyRails(subsystem) resolves
+    //         to the FIRST sub-tab on a genuine first visit, and to whatever
+    //         was persisted on every subsequent call ("reload restores the
+    //         last sub-tab") — including falling back to the first sub-tab
+    //         when the persisted value no longer names a real one.
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        "223.6a: _applyRails() defaults a genuine first visit to the rail's FIRST declared sub-tab (STATUS)"
+      );
+      h.metaStore['robco_fo3_subtab_operator'] = 'SPECIAL';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.elFor('boardC').classList.contains('subtab-active') &&
+          !h.elFor('boardA').classList.contains('subtab-active'),
+        '223.6b: [reload simulation] _applyRails() restores the PERSISTED sub-tab (SPECIAL) instead of defaulting back to the first one'
+      );
+      h.metaStore['robco_fo3_subtab_operator'] = 'DELETED_SUBTAB';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        "223.6c: a stale/unreal persisted sub-tab name falls back to the rail's first sub-tab rather than erroring"
+      );
+    }
+
+    // 223.7 — _applyRails() no-ops (and clears any stale rail content) for a
+    //         subsystem with no rails entry — CHASSIS/SETTINGS/UPLINK keep
+    //         their current stacked behavior under FO3 (U0's no-rail allowlist)
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.elFor('fo3SubtabRail').innerHTML = 'STALE CONTENT';
+      h.bodyEl.dataset.subsystem = 'chassis';
+      h.sandbox._applyRails('chassis');
+      assert(
+        Object.keys(h.metaStore).length === 0 && h.elFor('fo3SubtabRail').innerHTML === '',
+        '223.7: _applyRails() for a rails-less subsystem (e.g. CHASSIS) writes nothing to MetaStore and clears any stale #fo3SubtabRail content'
+      );
+    }
+
+    // 223.8 — axis-inert-for-NV, full sequence: with no identity.rails at
+    //         all, the complete boot-equivalent call sequence
+    //         (_applyRailGrouping then _applyRails) never touches the DOM,
+    //         MetaStore, or the render stub — selectSubsystem/switchTab's
+    //         routing is therefore untouched for NV (nothing new executes).
+    {
+      const h = makeSandbox223(undefined);
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox._applyRailGrouping();
+      h.sandbox._applyRails('operator');
+      assert(
+        h.sandbox.document.querySelectorAll('[data-subtab]').length === 0 &&
+          Object.keys(h.metaStore).length === 0 &&
+          h.renderCalls.length === 0,
+        '223.8: axis-inert-for-NV — the full _applyRailGrouping()+_applyRails() boot sequence stamps nothing, writes nothing, and renders nothing when identity.rails is absent'
+      );
+    }
+  } else {
+    assert(false, '223.2-223.8: skipped — function extraction failed');
+  }
+
+  // 223.9 — switchTab() calls _applyRails(subsystem) AFTER _syncBezelNav(subsystem)
+  //         — the ONE choke point every entry path (hotkey, #go=, bezel click,
+  //         AND the boot-time initTabs() restore) funnels through, so "reload
+  //         restores the last sub-tab" actually holds on a fresh page load.
+  const switchTabBody223 = extractFunctionBody(navSrc223, 'switchTab');
+  const syncIdx223 = switchTabBody223.indexOf('_syncBezelNav(subsystem)');
+  const applyRailsIdx223 = switchTabBody223.indexOf('_applyRails(subsystem)');
+  assert(
+    syncIdx223 !== -1 && applyRailsIdx223 !== -1 && applyRailsIdx223 > syncIdx223,
+    '223.9: switchTab() calls _applyRails(subsystem) after _syncBezelNav(subsystem) — covers every entry path including the boot-time restore (initTabs() calls switchTab() directly, bypassing selectSubsystem())'
+  );
+
+  // 223.10 — window.onload calls _applyRailGrouping() before initTabs(), so
+  //          the boot-time sub-tab restore has real data-subtab attributes
+  //          to work with (the stamper must run before the first switchTab()).
+  const onloadSrc223 = readGroup('ui-core');
+  const groupingCallIdx223 = onloadSrc223.indexOf('_applyRailGrouping();');
+  const initTabsCallIdx223 = onloadSrc223.indexOf('initTabs();');
+  assert(
+    groupingCallIdx223 !== -1 &&
+      initTabsCallIdx223 !== -1 &&
+      groupingCallIdx223 < initTabsCallIdx223,
+    '223.10: window.onload calls _applyRailGrouping() before initTabs() — the stamper must run before the first switchTab()'
+  );
+
+  // 223.11 — #fo3SubtabRail exists exactly once in index.html, ships `hidden`
+  //          (a plain HTML boolean attribute — U1 adds no new CSS file), and
+  //          is a labelled role=tablist (a later unit's a11y requirement,
+  //          already satisfied by construction).
+  const fo3RailMatches223 = (htmlSource.match(/id="fo3SubtabRail"/g) || []).length;
+  assert(fo3RailMatches223 === 1, '223.11a: index.html has exactly one #fo3SubtabRail element');
+  assert(
+    /<div\s+id="fo3SubtabRail"[^>]*\bhidden\b[^>]*>/.test(htmlSource) ||
+      /<div\s+id="fo3SubtabRail"[\s\S]{0,120}?\bhidden\b[\s\S]{0,120}?>/.test(htmlSource),
+    '223.11b: #fo3SubtabRail ships the `hidden` boolean attribute (U1 has no FO3 skin yet — no new CSS file exists to govern its visibility)'
+  );
+  assert(
+    /<div\s+id="fo3SubtabRail"[\s\S]{0,200}?role="tablist"[\s\S]{0,200}?aria-label="[^"]+"/.test(
+      htmlSource
+    ),
+    '223.11c: #fo3SubtabRail carries role="tablist" and a real aria-label (a11y groundwork)'
+  );
+
+  // 223.12 — U1 adds NO new CSS file (that's a later unit's job) — the split
+  //          order derived from index.html's own <link> tags is unchanged.
+  assert(
+    CSS_SPLIT_FILES.length === 12 && !CSS_SPLIT_FILES.some(f => /fo3/i.test(f)),
+    '223.12: U1 ships no new CSS file — css/ split order is still the 12 pre-U1 files, none FO3-named'
+  );
+
+  // 223.13 — robco_fo3_subtab_ is registered in META_MANIFEST as a device
+  //          pref (Protocol 23 — never campaign state), not a `state` field.
+  assert(
+    /robco_fo3_subtab_:\s*\{[\s\S]{0,200}?family:\s*true/.test(stateSource),
+    '223.13a: robco_fo3_subtab_ is registered in META_MANIFEST as a per-subsystem device-pref family key'
+  );
+  const stateKeys223 = extractStateKeys(readGroup('state'));
+  assert(
+    !stateKeys223.some(k => /fo3.?subtab/i.test(k)),
+    '223.13b: no `state` field was added for the sub-tab preference — it lives only in META_MANIFEST (device pref), never campaign state'
   );
 }
 

@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3063/3063 | Cache: robco-terminal-v2.8.0-r13 -->
+## [Unreleased]<!-- Tests: 3084/3084 | Cache: robco-terminal-v2.8.0-r14 -->
 
 ### Fixed
 
@@ -7,6 +7,7 @@
 ### Under the Hood
 
 - Laid invisible groundwork for an upcoming true-to-the-game Fallout 3 Pip-Boy screen layout: gave a handful of existing panels stable internal names and added a new per-game data table describing how they'll eventually group together on that screen. Nothing you can see changed yet — Fallout: New Vegas is completely unaffected.
+- Wired up the (still invisible) mechanism that will let that upcoming Fallout 3 screen switch between its own sub-views. Nothing renders or behaves differently yet — this groundwork only takes effect once its screen actually ships — and Fallout: New Vegas is completely unaffected either way.
 - Reorganized the internal developer documentation so a working session no longer has to load a large chunk of historical build notes it usually doesn't need — those notes now live in a separate reference file, read only when actually wanted. Nothing you can see changed.
 - Added a "where does this feature live in the code" navigation guide and expanded the developer documentation's quick-reference index so a working session can find any subsystem without guessing. Added an automated check that fails the build if that guide's file references ever go stale. Nothing you can see changed.
 - Clarified the internal naming-convention guidance: in-world flavor names for features only ship when they're immediately understandable at a glance — clarity always wins over theme. Nothing you can see changed.

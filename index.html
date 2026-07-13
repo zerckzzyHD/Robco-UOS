@@ -791,6 +791,19 @@
         </button>
         <div class="main-grid">
           <div class="col-left" id="uiPanel">
+            <!-- FO3 PIP-BOY BUILD U1: the second nav axis's sub-tab rail —
+                 stays `hidden` (a plain HTML boolean attribute, not a CSS
+                 rule) until the FO3 casing CSS (a later unit) reveals it.
+                 Populated by _renderFo3SubtabRail() (js/ui/ui-core-nav.js);
+                 a complete no-op for any game with no identity.rails (NV/FO4
+                 today) — stays empty and hidden for them. -->
+            <div
+              id="fo3SubtabRail"
+              class="fo3-subtab-rail"
+              role="tablist"
+              aria-label="Sub-tabs"
+              hidden
+            ></div>
             <!-- 1. VITAL TELEMETRY / S.P.E.C.I.A.L. TUNING / CHRONO-POSITION (STAT tab) -->
             <!-- ══════════════════════════════════════════════════════════════
                  PHASE 3 · OPERATOR hero-three (Protocol 22/25 reskin — wraps the

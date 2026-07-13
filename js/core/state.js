@@ -108,6 +108,19 @@ const META_MANIFEST = {
   // so an unlocked production build shows the shell but only ever renders
   // tier:'prod' tools — leak-proof by construction.
   robco_dsh_minigame_unlocked: { type: 'bool', default: false, owner: 'test-console.js' },
+  // FO3 PIP-BOY BUILD U1 — the second nav axis's per-subsystem sub-tab memory
+  // (Protocol UI-6, "everything remembers on reload"): which rail sub-tab
+  // (STATUS/SPECIAL/…) was last selected under EACH rails-bearing subsystem —
+  // robco_fo3_subtab_operator / _operations / _databank. A device pref, never
+  // campaign state (Protocol 23); a complete no-op for any game whose active
+  // identity carries no `rails` (NV/FO4 today — the key is simply never
+  // written or read for them).
+  robco_fo3_subtab_: {
+    type: 'string',
+    default: '',
+    owner: 'ui-core-nav.js',
+    family: true, // dynamic per-subsystem key: robco_fo3_subtab_<subsystem>
+  },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore

@@ -89,6 +89,10 @@ export default [
         _migrateEventLog: 'readonly', // P4 [T#]→eventLog migration helper (js/core/state.js)
         switchTab: 'readonly',
         initTabs: 'readonly',
+        // FO3 PIP-BOY BUILD U1 — the second nav axis (js/ui/ui-core-nav.js -> js/ui/ui-core.js)
+        _applyRailGrouping: 'readonly',
+        _applyRails: 'readonly',
+        selectSubtab: 'readonly',
         appendToChat: 'readonly',
         loadUI: 'readonly',
         saveState: 'readonly',

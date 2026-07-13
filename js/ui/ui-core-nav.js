@@ -138,6 +138,17 @@ function switchTab(tab) {
   // stays visually consistent through this one call.
   const subsystem = TAB_TO_SUBSYSTEM[tab] || 'operator';
   _syncBezelNav(subsystem);
+  // FO3 PIP-BOY BUILD U1: apply this subsystem's rail (game-agnostic no-op
+  // when the active identity carries no `rails` data — NV/FO4 today). Placed
+  // here, not in selectSubsystem() as the build plan's literal wording
+  // suggested, because switchTab() — not selectSubsystem() — is the ONE
+  // choke point every entry path funnels through, including the boot-time
+  // restore (initTabs() calls switchTab() directly, bypassing
+  // selectSubsystem() entirely) — exactly the same reasoning that already
+  // placed _syncBezelNav() here instead of only in selectSubsystem(). Without
+  // this correction, "reload restores the last sub-tab" (U1's own
+  // acceptance criterion) would silently fail on every fresh page load.
+  _applyRails(subsystem);
   // FIX 2: restore this subsystem's remembered scroll offset (or the top of
   // the column if it's never been visited) — covers the boot-time initial
   // tab too, since initTabs() calls switchTab() directly.
@@ -151,6 +162,107 @@ function initTabs() {
   const saved = MetaStore.get('robco_active_tab');
   if (saved && TAB_NAMES.includes(saved)) tab = saved;
   switchTab(tab);
+}
+
+// ── FO3 PIP-BOY BUILD U1: THE SECOND NAV AXIS (mechanism only, no skin yet) ──
+// Today one axis (subsystem→tab) reveals a GROUP of stacked boards. FO3 needs
+// a second axis (subsystem→sub-tab) that reveals ONE sub-tab's boards at a
+// time, driven entirely by GAME_DEFS.<ctx>.identity.rails (Protocol 38 — the
+// DATA's presence is the switch, never a game-name branch; see U0). Every
+// function below is a complete no-op the instant `rails` is absent from the
+// active identity — which is true for NV/FO4 today — so this whole axis
+// stays fully dormant for them: no data-subtab attribute is ever stamped, no
+// .subtab-active class is ever toggled, nothing new renders or executes.
+// This unit ships the MECHANISM only — #fo3SubtabRail stays `hidden` (a
+// plain HTML boolean attribute, not a CSS rule) until the FO3 casing CSS
+// (a later unit) explicitly reveals it; no new stylesheet is added here.
+
+// _applyRailGrouping() — stamps data-subtab="<SUBTAB>" onto every board id
+// identity.rails names, so the FO3-scoped CSS hide rule (added when the
+// casing CSS ships) can target them. Runs exactly once, from window.onload,
+// before initTabs()/switchTab() ever run — board elements are static markup
+// already present in the DOM at that point. A context switch always does a
+// full window.location.reload() (onGameContextChange(), ui-core-modulebay.js),
+// so there is no live cross-context stamp to clean up between games.
+function _applyRailGrouping() {
+  const rails = getIdentity().rails;
+  if (!rails) return;
+  Object.keys(rails).forEach(subsystem => {
+    Object.keys(rails[subsystem]).forEach(subtab => {
+      rails[subsystem][subtab].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.dataset.subtab = subtab;
+      });
+    });
+  });
+}
+
+// _renderFo3SubtabRail(subsystem, activeName) — (re)builds #fo3SubtabRail's
+// button list for `subsystem`'s rail, marking `activeName` current. The
+// container itself stays `hidden` in this unit (see header note above); this
+// only keeps its CONTENT correct so a later unit only has to reveal it, not
+// also build it. Every subtab name is identity DATA (never user input), so
+// no escaping is required for the literal uppercase labels.
+function _renderFo3SubtabRail(subsystem, activeName) {
+  const rail = document.getElementById('fo3SubtabRail');
+  if (!rail) return;
+  const rails = getIdentity().rails;
+  const subtabNames = rails && rails[subsystem] ? Object.keys(rails[subsystem]) : [];
+  rail.innerHTML = subtabNames
+    .map(
+      name =>
+        '<button type="button" class="fo3-subtab-btn" role="tab" aria-selected="' +
+        (name === activeName) +
+        '" onclick="selectSubtab(\'' +
+        name +
+        '\')">' +
+        name +
+        '</button>'
+    )
+    .join('');
+}
+
+// selectSubtab(name) — the second-axis selector. Reads the CURRENT subsystem
+// off document.body.dataset.subsystem (the same choke point _syncBezelNav()
+// already maintains — Protocol 22, one truth), toggles .subtab-active onto
+// every board carrying data-subtab===name (and off every other railed
+// board — subtab names are unique across all three rails, so no subsystem
+// scoping is needed for the toggle itself), persists the choice as a
+// per-subsystem MetaStore device pref (Protocol UI-6 — "everything
+// remembers on reload"), and re-renders the rail's active state. A complete
+// no-op if the active identity has no rails, or no rails for the current
+// subsystem, or `name` isn't one of that subsystem's real sub-tabs.
+function selectSubtab(name) {
+  const subsystem = document.body.dataset.subsystem;
+  const rails = getIdentity().rails;
+  if (!rails || !subsystem || !rails[subsystem] || !rails[subsystem][name]) return;
+  document.querySelectorAll('[data-subtab]').forEach(el => {
+    el.classList.toggle('subtab-active', el.dataset.subtab === name);
+  });
+  MetaStore.set('robco_fo3_subtab_' + subsystem, name);
+  _renderFo3SubtabRail(subsystem, name);
+}
+
+// _applyRails(subsystem) — called from switchTab() for every subsystem
+// switch (bezel click, hotkey, #go= deep-link, AND the boot-time restore —
+// see the call site in switchTab() above for why). No-op (and clears any
+// stale rail content) when `subsystem` has no rails entry — CHASSIS/SETTINGS
+// keep their current stacked behavior under FO3 exactly as today, per the
+// build plan's explicit no-rail allowlist (U0). Otherwise resolves the
+// target sub-tab — the last one persisted for THIS subsystem
+// (robco_fo3_subtab_<subsystem>), falling back to the rail's first sub-tab
+// on a genuine first visit — and applies it via selectSubtab().
+function _applyRails(subsystem) {
+  const rails = getIdentity().rails;
+  const rail = document.getElementById('fo3SubtabRail');
+  if (!rails || !rails[subsystem]) {
+    if (rail) rail.innerHTML = '';
+    return;
+  }
+  const subtabNames = Object.keys(rails[subsystem]);
+  const saved = MetaStore.get('robco_fo3_subtab_' + subsystem);
+  const target = saved && subtabNames.includes(saved) ? saved : subtabNames[0];
+  selectSubtab(target);
 }
 
 // ── DO-N: BEZEL SUBSYSTEM NAV ─────────────────────────────────────────

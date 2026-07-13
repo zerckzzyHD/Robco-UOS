@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + Playwright                                | 3063-test Node gate + boot-smoke / render / a11y checks                     |
+| **Testing**     | Node + Playwright                                | 3084-test Node gate + boot-smoke / render / a11y checks                     |
 
 ### Per-game data system
 
@@ -219,7 +219,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (3063 tests, 223 suites — the single canonical runner)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (3084 tests, 224 suites — the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
 ├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
@@ -327,7 +327,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3063-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3084-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -391,7 +391,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **3063 tests across 223 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **3084 tests across 224 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

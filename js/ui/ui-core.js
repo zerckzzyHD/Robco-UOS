@@ -1087,6 +1087,7 @@ window.onload = async function () {
     if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
     _restoreApiKeyAndChatHistory();
     loadUI();
+    _applyRailGrouping(); // FO3 PIP-BOY BUILD U1: stamp data-subtab (no-op without identity.rails) — must run before initTabs()/switchTab() so the boot-time sub-tab restore has real data-subtab attributes to work with
     initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
     _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
     setupHpBarInteraction();
