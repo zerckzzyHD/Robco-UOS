@@ -1219,6 +1219,39 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
         mapCaptionSub: 'SURVEY GRID',
         recordsLabel: "WANDERER'S RECORDS BAY",
       },
+      // ── FO3 PIP-BOY BUILD U0: the second nav axis is pure DATA (Protocol 38)
+      // — its presence is the switch. NV/FO4 identity has no `rails` key, so
+      // the stamper/selector this data drives (U1) is a complete no-op for
+      // them. Every board id below must resolve to exactly one real
+      // `.panel[data-tab]` id in index.html (guarded by Suite 222). Boards
+      // intentionally absent from every rail (the weigh bridge → top-strip,
+      // the 3 CHASSIS boards, the 4 SETTINGS boards) are the no-rail
+      // allowlist — see FO3_RAILS_NO_RAIL_ALLOWLIST in the same test.
+      orientation: 'landscape-primary',
+      statusStrip: ['LVL', 'HP', 'Wg', 'RAD', 'Caps'],
+      rails: {
+        operator: {
+          STATUS: ['opVitalPanel', 'opHarnessPanel', 'statusEffectsPanel'],
+          SPECIAL: ['opSpecialPanel'],
+          SKILLS: ['skillMatrixPanel', 'skillBooksPanel', 'magazinesPanel'],
+          PERKS: ['perkLoadoutPanel'],
+          GENERAL: ['positionClockPanel', 'factionPanel', 'karmaPanel'],
+        },
+        operations: {
+          MANIFEST: ['opsManifestPanel'],
+          CRAFT: ['craftPanel'],
+          BARTER: ['tradePanel'],
+          SQUAD: ['squadPanel'],
+          CURIO: ['curioPanel'],
+        },
+        databank: {
+          MAP: ['worldMapPanel'],
+          QUESTS: ['questLogPanel'],
+          NOTES: ['campaignNotesPanel'],
+          LOG: ['campaignLogPanel', 'campgPanel'],
+          QUERY: ['databankPanel'],
+        },
+      },
     },
     factions: FACTION_REGISTRY_FO3,
     skillKeys: SKILL_KEYS_FO3,

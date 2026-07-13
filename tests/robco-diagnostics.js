@@ -26157,11 +26157,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 181.20  no campaign-state field was added or removed by this reskin —
   //         the plan's "no state field touched" constraint, checked against
-  //         the state.js default-state declaration.
+  //         the DECLARED `let state = {...}` field keys, not the whole
+  //         state.js file. [Protocol 42, harness-only, found during the FO3
+  //         Pip-Boy build's U0]: this guard originally string-matched the
+  //         whole file, which false-positived the instant GAME_DEFS.FO3
+  //         .identity.rails legitimately started referencing board ids like
+  //         'opVitalPanel'/'opSpecialPanel'/'opHarnessPanel' as DATA (U0's
+  //         rails map) — no `state` field was ever added, so the original
+  //         assertion's INTENT was never actually violated; only its
+  //         over-broad implementation was. Narrowed to extractStateKeys() so
+  //         it locks the real invariant (no new campaign-state field) without
+  //         colliding with unrelated GAME_DEFS identity data.
   const stateSrc181 = readGroup('state');
+  const stateKeys181 = extractStateKeys(stateSrc181);
   assert(
-    !/opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(stateSrc181),
-    '181.20: js/state.js declares no new state field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data'
+    !stateKeys181.some(k => /opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(k)),
+    '181.20: js/state.js declares no new `state` field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data (checked against the declared state field keys — GAME_DEFS.identity.rails may legitimately reference board ids as data)'
   );
 }
 
@@ -40901,6 +40912,190 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         (errMsg221g ? ' — error: ' + errMsg221g : '')
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 222 — FO3 PIP-BOY BUILD U0: board ids + rails data (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: the FO3 landscape Pip-Boy's second nav axis (a sub-tab rail inside
+//  each of the three lamps) is pure DATA (Protocol 38) — GAME_DEFS.FO3
+//  .identity.rails groups shared board ids into named sub-tabs; NV/FO4 carry
+//  no `rails` key at all, so the U1 stamper/selector this data drives is a
+//  complete no-op for them (the data's ABSENCE is what keeps the axis
+//  dormant, not a game-name branch anywhere in feature code). This suite
+//  locks: (a) the rails object shape is exactly what the build plan
+//  specifies, (b) NV and FO4 carry no rails key, (c) every id named in rails
+//  resolves to exactly one real `<details data-tab>` board in index.html on
+//  the correct tab, and (d) the no-rail allowlist (weigh bridge · the 3
+//  CHASSIS boards · the 4 SETTINGS boards) is EXHAUSTIVE — derived directly
+//  from index.html, not hand-copied, so a future un-allowlisted board can't
+//  silently fall through the cracks of both lists.
+//  61 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 222 — FO3 PIP-BOY BUILD U0 (board ids + rails data)');
+
+  const vm222 = require('vm');
+  let h222 = null;
+  let err222 = null;
+  try {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    vm222.createContext(sandbox);
+    vm222.runInContext(stateSource, sandbox);
+    h222 = { GAME_DEFS: sandbox.window.GAME_DEFS };
+  } catch (e) {
+    err222 = e;
+  }
+  assert(
+    h222 && !err222,
+    '222.1: js/core/state.js loads cleanly in a fresh VM sandbox' +
+      (err222 ? ' — ' + String(err222.message || err222) : '')
+  );
+
+  const EXPECTED_RAILS_222 = {
+    operator: {
+      STATUS: ['opVitalPanel', 'opHarnessPanel', 'statusEffectsPanel'],
+      SPECIAL: ['opSpecialPanel'],
+      SKILLS: ['skillMatrixPanel', 'skillBooksPanel', 'magazinesPanel'],
+      PERKS: ['perkLoadoutPanel'],
+      GENERAL: ['positionClockPanel', 'factionPanel', 'karmaPanel'],
+    },
+    operations: {
+      MANIFEST: ['opsManifestPanel'],
+      CRAFT: ['craftPanel'],
+      BARTER: ['tradePanel'],
+      SQUAD: ['squadPanel'],
+      CURIO: ['curioPanel'],
+    },
+    databank: {
+      MAP: ['worldMapPanel'],
+      QUESTS: ['questLogPanel'],
+      NOTES: ['campaignNotesPanel'],
+      LOG: ['campaignLogPanel', 'campgPanel'],
+      QUERY: ['databankPanel'],
+    },
+  };
+  // The tab each rail-group's boards must actually carry (databank splits
+  // across the two merged tabs — every id except campgPanel lives on 'data').
+  const RAIL_SUBSYSTEM_TAB_222 = { operator: 'stat', operations: 'inv', databank: 'data' };
+
+  // 222.2 — GAME_DEFS.FO3.identity.rails is EXACTLY the build-plan shape (§2)
+  if (h222) {
+    const fo3rails222 = h222.GAME_DEFS.FO3 && h222.GAME_DEFS.FO3.identity.rails;
+    assert(
+      JSON.stringify(fo3rails222) === JSON.stringify(EXPECTED_RAILS_222),
+      '222.2: GAME_DEFS.FO3.identity.rails matches the build-plan §2 board→sub-tab map exactly'
+    );
+  } else {
+    assert(false, '222.2: skipped — sandbox failed to load');
+  }
+
+  // 222.3 — NV and FO4 identity carry NO `rails` key at all (Protocol 38: the
+  //         axis is inert for them because the DATA is simply absent — this
+  //         is what U1's stamper/selector no-op on, not a game-name check).
+  if (h222) {
+    ['FNV', 'FO4'].forEach(ctx => {
+      const id222 = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      assert(
+        id222 && id222.rails === undefined,
+        `222.3.${ctx}: GAME_DEFS.${ctx}.identity has no "rails" key (the second nav axis stays fully dormant)`
+      );
+    });
+  } else {
+    assert(false, '222.3: skipped — sandbox failed to load');
+  }
+
+  // 222.4 — orientation + statusStrip identity fields are present on FO3 only
+  if (h222) {
+    const fo3id222 = h222.GAME_DEFS.FO3 && h222.GAME_DEFS.FO3.identity;
+    assert(
+      fo3id222 && fo3id222.orientation === 'landscape-primary',
+      '222.4: GAME_DEFS.FO3.identity.orientation === "landscape-primary"'
+    );
+    assert(
+      Array.isArray(fo3id222 && fo3id222.statusStrip) && fo3id222.statusStrip.length > 0,
+      '222.4b: GAME_DEFS.FO3.identity.statusStrip is a non-empty field list (data, not a hardcoded strip)'
+    );
+    ['FNV', 'FO4'].forEach(ctx => {
+      const id222b = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      assert(
+        id222b && id222b.orientation === undefined && id222b.statusStrip === undefined,
+        `222.4c.${ctx}: GAME_DEFS.${ctx}.identity carries no orientation/statusStrip (FO3-only facets)`
+      );
+    });
+  } else {
+    assert(false, '222.4: skipped — sandbox failed to load');
+  }
+
+  // ── Derive the REAL id→tab map straight from index.html (house rule: if a
+  //    list can be derived, derive it — never hand-maintain what the file
+  //    already knows) — every <details> that carries BOTH a data-tab and an
+  //    id attribute, regardless of attribute order or single-/multi-line tags.
+  const DETAILS_TAG_RE_222 = /<details\b[^>]*>/gs;
+  const derivedIdToTab222 = {};
+  let dm222;
+  while ((dm222 = DETAILS_TAG_RE_222.exec(htmlSource))) {
+    const tag = dm222[0];
+    const tabMatch = tag.match(/data-tab="([a-z]+)"/);
+    const idMatch = tag.match(/\bid="([a-zA-Z0-9_]+)"/);
+    if (tabMatch && idMatch) {
+      assert(
+        derivedIdToTab222[idMatch[1]] === undefined,
+        `222.5: index.html has no duplicate data-tab board id "${idMatch[1]}"`
+      );
+      derivedIdToTab222[idMatch[1]] = tabMatch[1];
+    }
+  }
+
+  // 222.6 — every id named in every rail resolves to exactly one real board
+  //         in index.html, carrying the tab that rail's subsystem requires.
+  Object.keys(EXPECTED_RAILS_222).forEach(subsystem => {
+    const expectedTab = RAIL_SUBSYSTEM_TAB_222[subsystem];
+    Object.keys(EXPECTED_RAILS_222[subsystem]).forEach(subtab => {
+      EXPECTED_RAILS_222[subsystem][subtab].forEach(id => {
+        const realTab = derivedIdToTab222[id];
+        // LOG absorbs both merged DATABANK tabs (data + campg) — campgPanel
+        // is the one rail id that legitimately carries 'campg', not 'data'.
+        const okTab = id === 'campgPanel' ? realTab === 'campg' : realTab === expectedTab;
+        assert(
+          okTab,
+          `222.6: rails.${subsystem}.${subtab} id "${id}" resolves to a real index.html board on the expected tab (found: ${realTab || 'MISSING'})`
+        );
+      });
+    });
+  });
+
+  // 222.7 — the no-rail allowlist is EXHAUSTIVE: every data-tab board id in
+  //         index.html that is NOT named in any rail is exactly this set
+  //         (weigh bridge · 3 CHASSIS boards · 4 SETTINGS boards) — derived
+  //         so a future un-ided/un-allowlisted board can't silently fall
+  //         through the cracks of both the rails map and this allowlist.
+  const railedIds222 = new Set();
+  Object.values(EXPECTED_RAILS_222).forEach(subtabs =>
+    Object.values(subtabs).forEach(ids => ids.forEach(id => railedIds222.add(id)))
+  );
+  const NO_RAIL_ALLOWLIST_222 = [
+    'opsBridgePanel', // LOAD-CELL WEIGH BRIDGE → folds into the top-strip Wg segment, no rail
+    'unitPowerPlantPanel',
+    'systemStatusPanel',
+    'serviceFaultConsolePanel', // CHASSIS — stays stacked under FO3, no rail
+    'accountPanel',
+    'securityConfigPanel',
+    'savesPanel',
+    'campaignConfigPanel', // SETTINGS — stays stacked under FO3, no rail
+  ].sort();
+  const unrailedRealIds222 = Object.keys(derivedIdToTab222)
+    .filter(id => !railedIds222.has(id))
+    .sort();
+  assert(
+    JSON.stringify(unrailedRealIds222) === JSON.stringify(NO_RAIL_ALLOWLIST_222),
+    '222.7: every data-tab board id in index.html is EITHER in a rail OR in the exhaustive no-rail allowlist (weigh bridge / 3 CHASSIS / 4 SETTINGS) — derived: ' +
+      JSON.stringify(unrailedRealIds222)
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -803,7 +803,7 @@
                  ══════════════════════════════════════════════════════════════ -->
 
             <!-- BUS-01 · VITAL TELEMETRY — CRT multi-trace patient monitor -->
-            <details class="panel bay-board" data-tab="stat" open>
+            <details class="panel bay-board" data-tab="stat" id="opVitalPanel" open>
               <summary>
                 <h2>
                   &gt; <span class="board-led" id="opVitalLed" aria-hidden="true"></span> VITAL
@@ -964,7 +964,7 @@
             </details>
 
             <!-- BUS-02 · S.P.E.C.I.A.L. TUNING — seven-fader equalizer bank -->
-            <details class="panel bay-board" data-tab="stat" open>
+            <details class="panel bay-board" data-tab="stat" id="opSpecialPanel" open>
               <summary>
                 <h2>
                   &gt; <span class="board-led" aria-hidden="true"></span> S.P.E.C.I.A.L. TUNING
@@ -1257,7 +1257,7 @@
                  ground-up reskin: flip-card date tiles + an LCD 24h mission
                  clock + a position-fix plate around the location field. EVERY
                  field stays editable — same ids/handlers, Protocol 22.) -->
-            <details class="panel bay-board" data-tab="stat">
+            <details class="panel bay-board" data-tab="stat" id="positionClockPanel">
               <summary>
                 <h2>
                   &gt; <span class="board-led" aria-hidden="true"></span> POSITION &amp; MISSION
@@ -1388,7 +1388,7 @@
                  mirrors that SAME value read-only (#opHarnessRadMirror,
                  refreshed alongside stat_rads by updateMath()) rather than a
                  second editable input with a duplicate id. -->
-            <details class="panel bay-board" data-tab="stat" open>
+            <details class="panel bay-board" data-tab="stat" id="opHarnessPanel" open>
               <summary>
                 <h2>
                   &gt; <span class="board-led" id="opHarnessLed" aria-hidden="true"></span> SKELETAL
@@ -1953,7 +1953,7 @@
                  reskin: renderSkills() now builds a 13-channel VU meter row
                  per skill, drag/keyboard-settable, still emitting sk_<key>
                  inputs through the same clamp+save path) -->
-            <details class="panel bay-board" data-tab="stat">
+            <details class="panel bay-board" data-tab="stat" id="skillMatrixPanel">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> SKILL MATRIX</h2>
                 <span class="panel-substatus" id="opSkillsStatus">&mdash;</span>
@@ -2118,7 +2118,7 @@
                  traits as amber "FACTORY-BURNED" chips. Every id/handler kept:
                  perksList + newPerkName/newPerkRank/newPerkLevel → addPerk;
                  traitsSection/traitFilter/traitsDisplay + renderTraits.) -->
-            <details class="panel bay-board" data-tab="stat">
+            <details class="panel bay-board" data-tab="stat" id="perkLoadoutPanel">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> PERK LOADOUT</h2>
                 <span class="panel-substatus" id="opPerksStatus">&mdash;</span>
@@ -2208,7 +2208,7 @@
             <!-- BUS-07 · COMPOUND LAMPS (Phase 3 OPERATOR batch 2 — ground-up
                  reskin: renderStatus() now builds lit/dark compound lamp
                  tiles; the add-effect form ids/addStatusEffect() unchanged) -->
-            <details class="panel bay-board" data-tab="stat">
+            <details class="panel bay-board" data-tab="stat" id="statusEffectsPanel">
               <summary>
                 <h2>&gt; <span class="board-led" aria-hidden="true"></span> STATUS EFFECTS</h2>
                 <span class="panel-substatus" id="opStatusStatus">&mdash;</span>
