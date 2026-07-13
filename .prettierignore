@@ -6,6 +6,10 @@ package-lock.json
 scripts/rollback.sh
 scripts/pre-commit
 
+# Single-source Node version pin (read by local dev + every CI OS via
+# node-version-file). A bare version string — Prettier has no parser for it.
+.nvmrc
+
 # Vendored third-party dependency (Visual Upload OCR, Unit 1) — pinned, minified/generated
 # files committed byte-for-byte as downloaded. Never reformatted (Prettier reflowing the
 # emscripten-generated wasm glue bloats it and risks corrupting the pinned build).

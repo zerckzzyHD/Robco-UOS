@@ -33,7 +33,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          # Single source of truth for the Node version (see .nvmrc / ci.yml).
+          node-version-file: .nvmrc
 
       - name: Build staging bundle (served files + [DEV] manifest + _redirects)
         # cf-staging-build.mjs uses only Node built-ins - no npm install needed.

@@ -276,7 +276,7 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18+ (dev tooling only — not required to run the app)
+- [Node.js](https://nodejs.org/) — the version pinned in `.nvmrc` (currently Node 24, the active LTS line). Dev tooling only; not required to run the app. Both the local gate and CI (Linux + Windows) read this same file so every environment runs one Node version.
 - A [Google Gemini API key](https://aistudio.google.com/apikey) — **optional**; the native tools and the whole terminal work without one
 
 ### Installation
