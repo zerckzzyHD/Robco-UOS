@@ -11452,13 +11452,22 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 100 — Staging build output guards (Cloudflare Pages) (4 tests)
+//  Suite 100 — Staging build output guards (Cloudflare Pages) (6 tests)
 //  The staging PWA registers a service worker at root scope. A service-worker
 //  script fetch that returns a 3xx redirect cannot be registered/updated —
 //  browsers reject it ("The script resource is behind a redirect, which is
 //  disallowed"). cf-staging-build.mjs emits a _redirects file pinning sw.js +
 //  manifest.json to a direct 200 serve so Cloudflare's path canonicalization can
 //  never redirect them. These guards lock that emission + sw.js-at-root.
+//
+//  100.5/100.6 (2026-07-13 staging-freeze fix): the SW *install* precache is
+//  also redirect-fragile. cache.addAll() is all-or-nothing and the Cache API
+//  REJECTS a redirected response, so a single precached entry that Cloudflare
+//  308-canonicalizes fails the entire install → the new SW never activates →
+//  the staging PWA freezes on the old build and "REBOOT TERMINAL" is a no-op.
+//  './index.html' is exactly such an entry (Cloudflare 308s '/index.html' → '/'),
+//  so the staging build DROPS it from the staged sw.js precache (the './' entry
+//  already caches the identical shell) AND pins '/index.html' to a 200 serve.
 // ══════════════════════════════════════════════════════════════
 header('Suite 100 — Staging build output guards (Cloudflare Pages)');
 {
@@ -11487,6 +11496,23 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
     [
       /FILES\s*=\s*\[[^\]]*'sw\.js'/,
       '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)',
+    ],
+
+    // 100.5 _redirects pins /index.html to a direct 200 so a direct hit is not
+    //       308-canonicalized to / (defense-in-depth for the deployed artifact).
+    [
+      /\/index\.html\s+\/index\.html\s+200/,
+      '100.5: staging _redirects pins /index.html to a direct 200 serve (Cloudflare never 308-canonicalizes it)',
+    ],
+
+    // 100.6 the STAGED sw.js drops './index.html' from its precache — Cloudflare
+    //       308s '/index.html' → '/', and a redirected asset fails cache.addAll()
+    //       (all-or-nothing), which would freeze the staging PWA on the old build.
+    //       This regex matches the strip's replace target ('\.\/index\.html' in
+    //       the build's regex literal), so it fails if the strip is ever removed.
+    [
+      /'\\\.\\\/index\\\.html'/,
+      "100.6: cf-staging-build.mjs strips './index.html' from the staged sw.js precache (redirected asset would fail SW install)",
     ],
   ]);
 }

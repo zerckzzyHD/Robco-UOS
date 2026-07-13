@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3103/3103 | Cache: robco-terminal-v2.8.0-r15 -->
+## [Unreleased]<!-- Tests: 3105/3105 | Cache: robco-terminal-v2.8.0-r15 -->
 
 ### Added
 
@@ -23,6 +23,7 @@
 - Added plain-English "what this file is and how it fits together" notes and internal signposting throughout the code and stylesheets, and corrected a few stale internal cross-references left over from the recent reorganization. Purely a readability pass for future development — every screen, button, and behavior works exactly as before. Nothing you can see changed.
 - The Fallout 3 Karma Center's companion-availability list now reads from the game's own data definitions instead of being hardcoded into the display code, matching how every other per-game detail already works. Nothing you can see changed.
 - Removed a second, redundant copy of the test suite that ran the exact same checks a second way. It caught nothing the main test suite didn't and ran about thirteen times slower, so every test had to be written twice for no added safety. Deleting it makes the pre-commit check noticeably faster and halves the future cost of writing tests, with zero loss of coverage — all 3002 tests still run and pass. Nothing you can see changed.
+- Fixed the private staging test site silently freezing on an old build so new work (like the in-progress Fallout 3 screen) never appeared and the "Reboot Terminal" prompt did nothing. The site's offline-caching step was trying to store the home page under a web address that the staging host automatically forwards to a shorter one; browsers refuse to cache a forwarded page, and because that caching step is all-or-nothing, the single bad entry aborted the entire update — so the freshly-published build could never take over. The staging build now caches the home page the correct way (and serves that address directly as a backstop), and a new automated pre-flight check fails the build if this class of mistake is ever reintroduced. This only ever affected the private staging site — the live production site was never impacted, because its host serves that page directly. Nothing you can see changed on the live site.
 
 ---
 

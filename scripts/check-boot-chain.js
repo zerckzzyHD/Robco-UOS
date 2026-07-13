@@ -333,6 +333,62 @@ const CANONICAL_CSS_ORDER = [
   );
 }
 
+// ── CHECK L: every non-directory asset in sw.js ASSETS exists on disk ──────
+// Owner-requested defense-in-depth: a precached path that doesn't exist on disk
+// 404s at serve time, and cache.addAll() is all-or-nothing → the SW install
+// rejects → the new worker never activates. CHECK B/C/K already cover js/ and
+// css/; this closes the top-level gap (index.html, manifest.json, assets/*.png).
+// NOTE: this would NOT have caught the 2026-07-13 staging freeze — that file
+// existed on disk; Cloudflare *redirected* it at serve time (see CHECK M).
+{
+  const allAssetPaths = assetsBlock
+    ? [...assetsBlock[1].matchAll(/'\.\/([^']+)'/g)].map(m => m[1])
+    : [];
+  const missingAssets = allAssetPaths.filter(p => {
+    if (p === '' || p.endsWith('/')) return false; // './' (root dir) is not a file
+    return !fs.existsSync(path.join(ROOT, p));
+  });
+  ok(
+    missingAssets.length === 0,
+    'every non-directory path in sw.js ASSETS exists on disk (no precached 404 → no install failure)',
+    missingAssets.length ? `precached but missing on disk: ${missingAssets.join(', ')}` : undefined
+  );
+}
+
+// ── CHECK M: the staging build neutralizes every redirect-prone precache entry ─
+// Cloudflare Pages 308-canonicalizes '/index.html' → '/' (and '/x/index.html' →
+// '/x/'). The Cache API REJECTS a redirected response inside cache.addAll(), and
+// that precache is all-or-nothing, so ONE such entry fails the whole SW install
+// → the new worker never activates → the staging PWA freezes on the old build
+// and "REBOOT TERMINAL" does nothing. (Exact root cause of the r15-dev staging
+// freeze.) For every '*index.html' entry in sw.js ASSETS, the staging build
+// (cf-staging-build.mjs) MUST neutralize it: either STRIP it from the staged
+// sw.js precache, or PIN it to a direct 200 serve in the staged _redirects.
+{
+  const assetPathsM = assetsBlock
+    ? [...assetsBlock[1].matchAll(/'\.\/([^']+)'/g)].map(m => m[1])
+    : [];
+  // ASSETS matches capture WITHOUT the leading './', e.g. 'index.html'.
+  const redirectProne = assetPathsM.filter(p => /(^|\/)index\.html$/.test(p));
+  const cfBuild = read('scripts/cf-staging-build.mjs');
+  const unhandled = redirectProne.filter(p => {
+    // (a) STRIPPED: the build's strip regex literal `'\.\/<path-with-escaped-dots>'`
+    //     appears in cf-staging-build.mjs (dots escaped to match the regex literal).
+    const stripLiteral = `'\\.\\/${p.replace(/\./g, '\\.')}'`;
+    const stripped = cfBuild.includes(stripLiteral);
+    // (b) PINNED: `_redirects` pins `/<path> <target> 200` in the build source.
+    const pinned = new RegExp(`/${p.replace(/\./g, '\\.')}\\s+\\S+\\s+200`).test(cfBuild);
+    return !(stripped || pinned);
+  });
+  ok(
+    unhandled.length === 0,
+    'every Cloudflare-canonicalized precache entry (*/index.html) is stripped or 200-pinned by the staging build',
+    unhandled.length
+      ? `redirect-prone precache entry not neutralized in cf-staging-build.mjs: ${unhandled.join(', ')}`
+      : undefined
+  );
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────
 console.log('');
 if (failCount > 0) {
