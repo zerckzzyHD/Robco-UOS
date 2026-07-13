@@ -5269,7 +5269,7 @@ header('Suite 51 — Save Integrity + Rolling Backups');
 //  Suite 52 — Repo / Site Enrichment Guards (Protocol 37)
 //  Verifies static site files, repomix config tuning, manifest
 //  enrichment, and README CI badge are present and correct.
-//  13 tests
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 {
@@ -5346,6 +5346,16 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
   assert(
     readmeSrc52.includes('ci.yml') && readmeSrc52.includes('badge'),
     'README.md contains GitHub Actions CI badge referencing ci.yml'
+  );
+
+  // 52.14  manifest.json start_url/scope stay the GitHub Pages subdirectory
+  //        root (Protocol 36b-adjacent: the r15 portrait-lock incident showed
+  //        nothing in the gate reconciled manifest.json against the app's
+  //        real deployment shape at all — start_url/scope drifting off './'
+  //        would break install/launch exactly as silently as that lock did)
+  assert(
+    manifest52.start_url === './' && manifest52.scope === './',
+    "manifest.json start_url and scope stay './' (the GitHub Pages subdirectory deploy root)"
   );
 }
 
@@ -40957,7 +40967,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  CHASSIS boards · the 4 SETTINGS boards) is EXHAUSTIVE — derived directly
 //  from index.html, not hand-copied, so a future un-allowlisted board can't
 //  silently fall through the cracks of both lists.
-//  61 tests.
+//  62 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 222 — FO3 PIP-BOY BUILD U0 (board ids + rails data)');
@@ -41054,6 +41064,29 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         `222.4c.${ctx}: GAME_DEFS.${ctx}.identity carries no orientation/statusStrip (FO3-only facets)`
       );
     });
+
+    // 222.4d — Protocol 36b escape-ratchet: manifest.json's orientation lock
+    //          must never contradict a game whose identity requires landscape.
+    //          The r15 incident: manifest.json shipped "orientation": "portrait"
+    //          while GAME_DEFS.FO3.identity.orientation was "landscape-primary" —
+    //          the @media(orientation:landscape) CSS this whole build depends on
+    //          (css/60-fo3-pipboy.css) can never match on an INSTALLED PWA, because
+    //          the OS honours the manifest lock and refuses to rotate the app past
+    //          it, regardless of what CSS asks for. This escaped design, plan,
+    //          build, AND audit because every one of them verified in a browser
+    //          TAB, where the manifest orientation lock does not apply — only an
+    //          installed, standalone PWA enforces it. This assertion is the guard.
+    const manifest222d = JSON.parse(readFile('manifest.json'));
+    const landscapeGames222d = Object.keys(h222.GAME_DEFS).filter(ctx => {
+      const id = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      return id && id.orientation === 'landscape-primary';
+    });
+    assert(
+      landscapeGames222d.length === 0 || !/^portrait/.test(manifest222d.orientation || ''),
+      `222.4d: manifest.json orientation ("${manifest222d.orientation}") must not lock to ` +
+        `portrait while ${landscapeGames222d.join(', ')} identity.orientation is ` +
+        `landscape-primary — an installed PWA cannot rotate past a manifest portrait lock`
+    );
   } else {
     assert(false, '222.4: skipped — sandbox failed to load');
   }
