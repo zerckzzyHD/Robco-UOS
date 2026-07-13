@@ -150,7 +150,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + Playwright                                | 3156-test Node gate + boot-smoke / render / a11y checks                     |
+| **Testing**     | Node + Playwright                                | 3185-test Node gate + boot-smoke / render / a11y checks                     |
 
 ### Per-game data system
 
@@ -220,7 +220,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (3156 tests, 226 suites — the single canonical runner)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (3185 tests, 227 suites — the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
 ├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
@@ -328,7 +328,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3156-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3185-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -375,7 +375,7 @@ A **production-quality, two-game browser application** with:
 - **Eight device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics)
 - **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
 - **Device bezel chrome** — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS/SETTINGS + a flat DIRECTORY fallback) that routes through the same underlying tab router; CHASSIS hosts device telemetry + firmware/carrier/feature-flag status, and SETTINGS is the one home for Account, the Module Bay, Save Archive, and Campaign Configs
-- **Fallout 3 landscape Pip-Boy** _(in progress)_ — rotate a Fallout 3 campaign sideways and the same three subsystem keys, the UPLINK/CHASSIS/SETTINGS controls, and a flat directory recast as a real Pip-Boy 3000 casing: three domed lamps reading STATS/ITEMS/DATA (with their real names riding along underneath), a radio knob with a swinging tuner pointer, a status gauge with a needle and chrome ring, and a toggle switch with a real lever, all set in a dark, weathered metal casing that fills the whole screen. Each screen's sub-sections get their own row of tabs on the glass, scroll inside a bounded display that the casing can never cover, and remember which one you last had open. Portrait keeps today's layout untouched, and New Vegas is unaffected either way; a fully dressed casing (indicator sway, working knob detent) and the Vault Boy status view are still to come
+- **Fallout 3 landscape Pip-Boy** _(in progress)_ — rotate a Fallout 3 campaign sideways and the same three subsystem keys, the UPLINK/CHASSIS/SETTINGS controls, and a flat directory recast as a real Pip-Boy 3000 casing: three domed lamps reading STATS/ITEMS/DATA (with their real names riding along underneath), a radio knob with a swinging tuner pointer, a status gauge with a needle and chrome ring, and a toggle switch with a real lever, all set in a dark, weathered metal casing that now wraps the glass on both sides with a system-status gauge, an embossed nameplate, and a brand plate above the screen, matching the real device's housing. Each of the six main screens is noticeably denser and closer to the game — S.P.E.C.I.A.L. shows a fill bar per attribute, body-part health boxes are labeled, and your Vault Boy figure now shows a dashed outline and the word CRIPPLED on a damaged limb, exactly like the real damage screen. Each screen's sub-sections get their own dash-separated row of tabs on the glass, scroll inside a bounded display that the casing can never cover, and remember which one you last had open. Portrait keeps today's layout untouched, and New Vegas is unaffected either way; indicator sway, a working knob detent, and Fable's fully-drawn Vault Boy figure are still to come
 - **Director Uplink — the living Overseer** — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
 - **Tool Deck + Quick-Draw Holster** — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
 - **OPERATIONS — the quartermaster's freight console** — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
@@ -393,7 +393,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **3156 tests across 226 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **3185 tests across 227 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

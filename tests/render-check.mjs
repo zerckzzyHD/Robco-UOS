@@ -15,6 +15,7 @@
  */
 
 import { acquireBrowser } from './browser-shared.mjs';
+import { runRenderIntegrity } from './render-integrity.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -724,6 +725,18 @@ for (const vp of VIEWPORTS) {
     }
   }
   await ctx.close();
+}
+
+// U6 Strand 4 — render-integrity (Protocol 36b escape-ratchet for the class
+// of defect U5 shipped with a fully-green gate: MANIFEST rendering
+// completely invisible). Runs on the SAME shared Chromium (zero extra
+// launches) — see tests/render-integrity.mjs for the five assertions and
+// the demonstrate-red-then-green evidence in its own header.
+{
+  const { failed: integrityFailed, log } = await runRenderIntegrity(browser);
+  console.log('\n  -- render-integrity (FO3 landscape) --');
+  console.log(log.join('\n'));
+  failed += integrityFailed;
 }
 
 await browser.close();

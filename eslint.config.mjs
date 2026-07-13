@@ -538,12 +538,14 @@ export default [
       '*.min.js',
       'eslint.config.mjs',
       'tests/render-check.mjs',
+      'tests/render-integrity.mjs',
       'tests/boot-smoke.mjs',
       'tests/a11y-check.mjs',
       'tests/test-html-check.mjs',
       'tests/browser-server.mjs',
       'tests/browser-shared.mjs',
       'tests/_diag*.mjs',
+      'planning/', // gitignored scratch/planning scripts — never shipped, not lint-covered
       'scripts/cf-staging-build.mjs',
       'js/vendor/', // vendored third-party dependency (Visual Upload OCR, Unit 1) — not our code
     ],

@@ -541,6 +541,34 @@
     </div>
 
     <div class="container machine" id="uosMachine">
+      <!-- U6 Strand 3 — the FO3 Pip-Boy casing left/right rails + hood +
+           lamp-bar backing. Purely decorative (hidden + aria-hidden by
+           default — a game-agnostic default so NV/FO4/FO3-portrait never
+           render them); [data-game='FO3'] landscape CSS un-hides them with
+           an author `display` that beats the UA `[hidden]{display:none}`
+           sheet (the same precedent .fo3-detail already relies on). They
+           contain NO controls — only material/etching; the real controls
+           (#navkey-chassis/#navkey-uplink/#navkey-settings below) are
+           positioned onto these rails via CSS, never moved in the DOM
+           (Protocol UI-7). -->
+      <div class="casing-rail-left" id="casingRailLeft" hidden aria-hidden="true">
+        <!-- no decorative gauge plate here — the REAL #navkey-chassis gauge
+             (Section E) is positioned into this same top slot; a second
+             decorative circle would just duplicate it (Protocol 22). -->
+        <div class="crl-spacer" aria-hidden="true"></div>
+        <div class="crl-script" aria-hidden="true">Pip-Boy</div>
+        <div class="crl-ribstack" aria-hidden="true"></div>
+        <div class="crl-slider" aria-hidden="true"></div>
+        <div class="crl-model" aria-hidden="true">MODEL 3000</div>
+      </div>
+      <div class="casing-hood" id="casingHood" hidden aria-hidden="true">
+        <span class="ch-brand">ROBCO IND. &middot; PIP-BOY 3000</span>
+        <span class="ch-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="casing-rail-right" id="casingRailRight" hidden aria-hidden="true">
+        <div class="crr-vent" aria-hidden="true"></div>
+      </div>
+      <div class="casing-lampbar" id="casingLampBar" hidden aria-hidden="true"></div>
       <!-- ════════════════════════════════════════════════════════════════
            DEVICE CHRome (DO-N, Protocol UI-7): the app becomes a physical
            RobCo terminal. Casing-top = brand plate + status lamps + uptime.
@@ -1566,23 +1594,58 @@
                       stroke-linecap="round"
                       stroke-linejoin="round"
                     >
-                      <circle cx="76" cy="30" r="21" />
-                      <path d="M58 22 Q66 8 84 12 Q94 14 95 24" stroke-width="2.5" />
-                      <circle cx="69" cy="27" r="1.6" fill="currentColor" />
-                      <circle cx="84" cy="27" r="1.6" fill="currentColor" />
-                      <path d="M67 37 Q76 45 86 37" stroke-width="2.5" />
+                      <!-- U6 Strand 6: each limb wrapped in a <g data-limb="hd|la|ra|ll|rl"
+                         class="limbline"> so one shared apply loop (loadUI(),
+                         js/ui/ui-core.js — the SAME loop that already sets the
+                         btn_l_* readout buttons' class/text) can toggle .crippled
+                         here too: one state, one code path (Protocol 22/24), never
+                         a second source of truth. Matches the data-limb naming
+                         Fable's future figure (planning/mockups/fo3/fo3-status-
+                         figure.html) documents as its own contract, so that later
+                         swap is a drop-in. The torso has no tracked condition in
+                         state, so its two paths stay outside the mechanism. -->
+                      <g class="limbline" data-limb="hd">
+                        <circle cx="76" cy="30" r="21" />
+                        <path d="M58 22 Q66 8 84 12 Q94 14 95 24" stroke-width="2.5" />
+                        <circle cx="69" cy="27" r="1.6" fill="currentColor" />
+                        <circle cx="84" cy="27" r="1.6" fill="currentColor" />
+                        <path d="M67 37 Q76 45 86 37" stroke-width="2.5" />
+                        <text class="crip-label" x="108" y="16" font-size="7" text-anchor="middle">
+                          CRIPPLED
+                        </text>
+                      </g>
                       <path d="M76 51 L76 58" />
                       <path d="M56 60 L96 60 L91 122 L61 122 Z" />
                       <path d="M60 112 L92 112" stroke-width="2" />
-                      <path d="M56 64 L38 96 L34 116" />
-                      <circle cx="33" cy="122" r="5" />
-                      <path d="M96 64 L114 82 L118 66" />
-                      <circle cx="119" cy="58" r="7" />
-                      <path d="M117 50 L117 42" stroke-width="4" />
-                      <path d="M65 122 L58 170 L56 200" />
-                      <path d="M87 122 L94 170 L96 200" />
-                      <path d="M56 200 L44 202" stroke-width="4" />
-                      <path d="M96 200 L108 202" stroke-width="4" />
+                      <g class="limbline" data-limb="la">
+                        <path d="M56 64 L38 96 L34 116" />
+                        <circle cx="33" cy="122" r="5" />
+                        <text class="crip-label" x="14" y="108" font-size="7" text-anchor="middle">
+                          CRIPPLED
+                        </text>
+                      </g>
+                      <g class="limbline" data-limb="ra">
+                        <path d="M96 64 L114 82 L118 66" />
+                        <circle cx="119" cy="58" r="7" />
+                        <path d="M117 50 L117 42" stroke-width="4" />
+                        <text class="crip-label" x="128" y="68" font-size="7" text-anchor="middle">
+                          CRIPPLED
+                        </text>
+                      </g>
+                      <g class="limbline" data-limb="ll">
+                        <path d="M65 122 L58 170 L56 200" />
+                        <path d="M56 200 L44 202" stroke-width="4" />
+                        <text class="crip-label" x="26" y="165" font-size="7" text-anchor="middle">
+                          CRIPPLED
+                        </text>
+                      </g>
+                      <g class="limbline" data-limb="rl">
+                        <path d="M87 122 L94 170 L96 200" />
+                        <path d="M96 200 L108 202" stroke-width="4" />
+                        <text class="crip-label" x="122" y="165" font-size="7" text-anchor="middle">
+                          CRIPPLED
+                        </text>
+                      </g>
                     </svg>
                   </div>
                   <div class="zone-readout">
@@ -1632,6 +1695,16 @@
                       >
                         [████] OK
                       </button>
+                    </div>
+                    <!-- U6 Strand 2 (G-3): the mockup's 6th limb-column box —
+                         a read-only readout, not a control (no live
+                         rad-resistance stat exists anywhere in state/
+                         GAME_DEFS to back it; flagged, not invented — see
+                         css/60-fo3-pipboy.css Section G). Hidden by default,
+                         same idiom as .fd-name/.fo3-stepper-btn-group. -->
+                    <div class="zone-radres" hidden aria-hidden="true">
+                      <span class="zone-name">RAD RES</span>
+                      <span class="zone-status">&mdash;</span>
                     </div>
                     <div class="rad-row">
                       <div class="rr-meter">

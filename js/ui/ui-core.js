@@ -685,11 +685,26 @@ function _wirePanelPersistence() {
     // relayout: most of these boards default closed on touch viewports, per
     // the no-open-attribute + non-desktop branch below, which would
     // otherwise hide their content entirely once the summary is hidden).
+    //
+    // U6 Strand 1 (Protocol 42 — found while tracing the owner's CURIO
+    // scroll report): the SAME "no way to ever re-open it" problem also
+    // applies to every OTHER rail-grouped board that ISN'T `.fo3-flat` yet
+    // (CURIO/CRAFT/BARTER/SQUAD — the operations sub-tabs Batch 1 never
+    // touched). Landing on a sub-tab that's a collapsed native <details>
+    // shows only its summary line, not the board — the second nav axis
+    // (sub-tab selection, css/60-fo3-pipboy.css Section C) is already the
+    // ONE gate deciding what's visible; the accordion collapse under it is
+    // pure redundant chrome with no way to escape once the summary's own
+    // toggle click is competing with the tap-to-select-subtab flow. `
+    // d.dataset.subtab` is stamped by _applyRailGrouping() (runs earlier in
+    // window.onload, before this function) for every board named in
+    // identity.rails, fo3-flat or not — so this is the SAME data-driven
+    // condition, just no longer scoped to the Batch 1 class list.
     if (
       d.classList &&
-      d.classList.contains('fo3-flat') &&
       typeof getIdentity === 'function' &&
-      getIdentity().rails
+      getIdentity().rails &&
+      (d.classList.contains('fo3-flat') || d.dataset.subtab)
     ) {
       d.setAttribute('open', '');
       return;
@@ -1850,19 +1865,36 @@ function loadUI() {
   });
   // All limbs including head
   var _limbNames = { la: 'Left Arm', ra: 'Right Arm', ll: 'Left Leg', rl: 'Right Leg', hd: 'Head' };
+  // U6 Strand 2 (G-1): the FO3 Pip-Boy mockup labels each limb box (HEAD,
+  // L.ARM, L.LEG / R.ARM, R.LEG) — today the name only reaches AT via
+  // aria-label above, with nothing visible on screen. A short abbreviation
+  // map, separate from the full-word aria map, matches the mockup's boxed-
+  // field width. `hidden` by default (the same idiom .fd-name already
+  // uses) — NV never reveals it, no FNV-exclusion CSS needed, no game
+  // literal here (Protocol 38).
+  var _limbShortNames = { la: 'L.ARM', ra: 'R.ARM', ll: 'L.LEG', rl: 'R.LEG', hd: 'HEAD' };
   ['la', 'ra', 'll', 'rl', 'hd'].forEach(k => {
     let btn = document.getElementById('btn_l_' + k);
     if (!btn) return;
     const isCrippled = state[k] !== 'OK';
+    const nameSpan = '<span class="zone-name" hidden>' + _limbShortNames[k] + '</span>';
     if (!isCrippled) {
       btn.className = 'limb-ok';
-      btn.innerText = '[██████] OK';
+      btn.innerHTML = nameSpan + '<span class="zone-status">[██████] OK</span>';
     } else {
       btn.className = 'limb-crip limb-glitch';
-      btn.innerText = '[░░░░░░] CRIP';
+      btn.innerHTML = nameSpan + '<span class="zone-status">[░░░░░░] CRIP</span>';
     }
     btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
     btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));
+    // U6 Strand 6: the Vault Boy figure is a projection of this SAME
+    // isCrippled value — one state, one code path (Protocol 22/24), never
+    // a second source of truth. Scoped to .vaultboy-fig so this never
+    // touches the (hidden-under-FO3) legacy .zone-body plate, which has
+    // its own [data-limb] elements and its own sync function
+    // (_syncBioHarnessZones(), called below).
+    const figLimb = document.querySelector('.vaultboy-fig [data-limb="' + k + '"]');
+    if (figLimb) figLimb.classList.toggle('crippled', isCrippled);
   });
   // PHASE 3 · OPERATOR BUS-03: sync the SVG zone plate — the "second
   // projection" of the exact same state.la/ra/ll/rl/hd this loop already

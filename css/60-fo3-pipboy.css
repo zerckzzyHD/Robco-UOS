@@ -235,6 +235,13 @@
     opacity: 0.65;
     margin-right: 3px;
   }
+  /* U6 (§2.7): the active-subsystem chip leads the strip — bolder,
+     brighter border, matching the mockup's .sseg.sname. */
+  [data-game='FO3'] .fo3-strip-seg.fo3-strip-name {
+    font-weight: bold;
+    letter-spacing: 1px;
+    border-color: rgba(var(--robco-green-rgb), 0.7);
+  }
   [data-game='FO3'] #fo3SubtabRail {
     flex-shrink: 0;
     display: flex;
@@ -267,6 +274,14 @@
     border-color: rgba(var(--robco-green-rgb), 0.55);
     background: rgba(var(--robco-green-rgb), 0.08);
   }
+  /* U6 (§2.8): the dash connector between sub-tab names — pure decoration
+     (aria-hidden, the buttons' own role=tab/aria-selected carry the real
+     structure), matching the mockup's .dash. */
+  [data-game='FO3'] .fo3-rail-dash {
+    opacity: 0.3;
+    font-size: 8px;
+    align-self: center;
+  }
 
   /* ══ E. THE CASING FASCIA — a functional re-skin of the EXISTING bezel
      keycaps into lamp/knob/gauge/toggle form (Protocol UI-7: chrome
@@ -276,42 +291,18 @@
      normal-flow flex child of the section-A shell, so it can never overlay
      content again) and carries the same dark weathered cast-metal material
      as the hood (owner item 3). ══ */
-  [data-game='FO3'] .bezel {
-    position: relative;
-    inset: auto;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    top: auto;
-    z-index: auto;
-    flex: 0 0 auto;
-    order: 2; /* visually last — see the .glass-frame order comment above */
-    margin-top: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    /* owner round-2 report: "the control bar is too tall — trim it to what
-       the mockup uses." Tighter padding + smaller keycaps below bring the
-       bar from ~81px down to ~62px while every control stays >=28px
-       (Protocol 17). */
-    padding: 5px 8px 4px;
-    border-radius: 0 0 10px 10px; /* rounds the corners now touching the true bottom edge, matching the hood's own top rounding */
-    border-top: 2px solid #0e1108;
-    background:
-      radial-gradient(ellipse 60px 30px at 20% 92%, rgba(96, 74, 36, 0.18), transparent 70%),
-      linear-gradient(
-        105deg,
-        transparent 47.6%,
-        rgba(214, 222, 182, 0.06) 47.9%,
-        transparent 48.2%
-      ),
-      linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
-    box-shadow:
-      0 -3px 10px rgba(0, 0, 0, 0.7),
-      inset 1px 1px 0 rgba(255, 255, 255, 0.1),
-      inset -1px -2px 4px rgba(0, 0, 0, 0.55);
+  /* U6 Strand 3: the casing left column. `.bezel`/`.nav-row` are flattening
+     wrappers (display:contents — the same technique Section G already
+     relies on for the STATUS zone plate) so `.nav-cluster` becomes a real
+     grid item, landing in the lamp-bar cell (Section P, below). ⚠ This
+     DESTROYS `.bezel`'s own box — its cast-metal material/border/shadow
+     moves onto #casingLampBar (Section P) so the bottom bar doesn't render
+     as bare page background. All the id/onclick/role=tab/aria-selected
+     contract on the six keycaps is completely untouched — only their
+     container's box model changes. */
+  [data-game='FO3'] .bezel,
+  [data-game='FO3'] .nav-row {
+    display: contents;
   }
   [data-game='FO3'] #navkey-directory,
   [data-game='FO3'] .bezel-side {
@@ -621,6 +612,18 @@
   [data-game='FO3'] .col-left .board-led {
     display: none;
   }
+  /* U6 Strand 2 (M-1, Protocol 42): the true source of the "amber leak" the
+     owner's screenshot showed under GENERAL — details.bay-board::after
+     (30-modulebay.css) is a hardcoded #d9a24a amber "connector pin" strip
+     along the BOTTOM of every single board, game-agnostic and un-scoped.
+     It isn't GENERAL-specific: it is every board's own decorative edge, so
+     the fix belongs here at the class level (Protocol 36b), not as a
+     one-off on #positionClockPanel. FO3's amber is spent ONLY on the lamp/
+     knob/toggle (this section's own header, above) — this strip has no
+     home under that rule. */
+  [data-game='FO3'] .col-left .panel.bay-board::after {
+    display: none;
+  }
   [data-game='FO3'] .col-left .crt-mon {
     background: rgba(0, 0, 0, 0.35);
     box-shadow: none;
@@ -698,13 +701,43 @@
     width: auto;
     height: 100%;
     max-height: 165px;
+    overflow: visible; /* U6 Strand 6: the per-limb CRIPPLED labels sit just outside the 0-150 viewBox on the outer limbs; SVG roots clip to their viewBox by default (UA overflow:hidden) */
     filter: drop-shadow(0 0 6px rgba(var(--robco-green-rgb), 0.45));
   }
+  /* U6 Strand 6 — the figure reflects limb damage, driven by the same
+     .crippled toggle loadUI() (js/ui/ui-core.js) already applies to the
+     btn_l_* readout buttons (one state, one code path). Owner correction
+     (real FO3 reference screenshots, 2026-07-13): the game's own crippled
+     treatment is a DASHED outline plus visible CRIPPLED text — NO colour
+     change anywhere, the whole screen stays one green. This is thin
+     plumbing only (Protocol 22/24) — a later unit swaps this whole figure
+     for Fable's planning/mockups/fo3/fo3-status-figure.html drawing; keep
+     this simple, don't gold-plate it. */
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .crip-label {
+    opacity: 0;
+    fill: currentColor;
+    stroke: none;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig g.limbline[data-limb].crippled {
+    stroke-dasharray: 5 4;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig [data-limb].crippled .crip-label {
+    opacity: 1;
+    animation: fo3CripLabelBlink 1.6s steps(2) infinite;
+  }
+  /* U6 Strand 2 (G-2): two FIXED columns flanking the figure, not a wrap —
+     the shipped flex-wrap dropped the bottom row below the fold at 780x360
+     (5 buttons wrapped 3+2). A 3-column grid places each limb explicitly
+     (left column top-to-bottom: HEAD/L.ARM/L.LEG; right column: R.ARM/
+     R.LEG/RAD RES), so nothing can ever wrap out of view regardless of
+     content width. display:contents on .zone-readout/.zone-chips still
+     flattens those wrapper divs — the same flattening mechanism works for
+     grid placement exactly as it did for flex order (Protocol UI-7). */
   [data-game='FO3'] #opHarnessPanel .zone-flex {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 106px minmax(90px, 1fr) 106px;
+    grid-template-rows: repeat(3, auto);
     align-items: center;
-    justify-content: center;
     gap: 4px 8px;
   }
   [data-game='FO3'] #opHarnessPanel .zone-readout,
@@ -712,23 +745,82 @@
     display: contents;
   }
   [data-game='FO3'] #opHarnessPanel #btn_l_hd {
-    order: 1;
+    grid-column: 1;
+    grid-row: 1;
   }
   [data-game='FO3'] #opHarnessPanel #btn_l_la {
-    order: 2;
+    grid-column: 1;
+    grid-row: 2;
   }
   [data-game='FO3'] #opHarnessPanel #btn_l_ll {
-    order: 3;
+    grid-column: 1;
+    grid-row: 3;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig {
+    grid-column: 2;
+    grid-row: 1 / span 3;
   }
   [data-game='FO3'] #opHarnessPanel #btn_l_ra {
-    order: 5;
+    grid-column: 3;
+    grid-row: 1;
   }
   [data-game='FO3'] #opHarnessPanel #btn_l_rl {
-    order: 6;
+    grid-column: 3;
+    grid-row: 2;
+  }
+  /* G-3: the 6th box — RAD RES. A read-only readout (never a control, so
+     no toggleLimb()-style handler), styled at reduced opacity to read as
+     data rather than an interactive limb. No live rad-resistance stat
+     exists anywhere in state/GAME_DEFS today (checked: only registry ITEM
+     flavor text like "+25 Rad Resist" on armor pieces, never a tracked
+     player stat) — Protocol 4 makes adding a whole state field for one
+     cosmetic readout the wrong trade, so this ships the placeholder the
+     plan itself sanctioned for exactly this case, flagged rather than
+     invented. */
+  [data-game='FO3'] #opHarnessPanel .zone-radres {
+    grid-column: 3;
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    opacity: 0.55;
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+    padding: 4px 7px;
+  }
+  /* G-4: dash leader lines from each limb box toward the figure — pure
+     decoration (pointer-events:none, the same rule the gauge needle/knob
+     pointer already follow at Section E). */
+  [data-game='FO3'] #opHarnessPanel #btn_l_hd::after,
+  [data-game='FO3'] #opHarnessPanel #btn_l_la::after,
+  [data-game='FO3'] #opHarnessPanel #btn_l_ll::after {
+    content: '';
+    position: absolute;
+    right: -9px;
+    top: 50%;
+    width: 8px;
+    height: 1px;
+    background: rgba(var(--robco-green-rgb), 0.4);
+    pointer-events: none;
+  }
+  [data-game='FO3'] #opHarnessPanel #btn_l_ra::after,
+  [data-game='FO3'] #opHarnessPanel #btn_l_rl::after {
+    content: '';
+    position: absolute;
+    left: -9px;
+    top: 50%;
+    width: 8px;
+    height: 1px;
+    background: rgba(var(--robco-green-rgb), 0.4);
+    pointer-events: none;
   }
   [data-game='FO3'] #opHarnessPanel .zone-chips button {
+    position: relative;
     width: auto;
-    flex: 0 0 108px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
     min-height: 30px;
     font-size: 9.5px;
     letter-spacing: 0.5px;
@@ -736,14 +828,40 @@
     text-align: left;
     border-radius: 2px;
   }
+  /* U6 Strand 6 (G-1): the limb name label — hidden by default (NV never
+     reveals it, the same idiom .fd-name already uses), shown only under
+     FO3 landscape. Written by updateMath() (js/ui/ui-core.js), the SAME
+     choke point that already sets the OK/CRIP status text — one source,
+     never a second render path. */
+  [data-game='FO3'] #opHarnessPanel .zone-chips button .zone-name {
+    display: block;
+    font-size: 7.5px;
+    opacity: 0.7;
+    letter-spacing: 0.6px;
+  }
+  /* G-5 (owner correction, 2026-07-13 — real FO3 reference screenshots
+     supersede the plan's original red treatment, which was a designer
+     guess, not the game's real convention): the game's own crippled
+     treatment is a DASHED outline with the CRIPPLED text already shown —
+     NO colour change anywhere; the whole screen stays one green. Hooks off
+     the button's own existing aria-pressed toggle (set by the same
+     updateMath() loop) — no new JS, no new colour. The shared (NV-facing)
+     button.limb-crip rule (css/05-base.css) sets color/border-color to
+     --robco-danger red and 35-operator-boards.css tints its text-shadow
+     red too — both are explicitly reset back to green here, scoped to
+     FO3 only, so NV's existing red crippled look is untouched. */
+  [data-game='FO3'] #opHarnessPanel .zone-chips button[aria-pressed='true'] {
+    color: var(--robco-green);
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+    border-style: dashed;
+    text-shadow: var(--robco-glow);
+  }
   [data-game='FO3'] #opHarnessPanel .rad-row {
-    order: 7;
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     justify-content: center;
   }
   [data-game='FO3'] #opHarnessPanel .bio-actions {
-    order: 8;
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     display: flex;
     justify-content: center;
   }
@@ -913,6 +1031,18 @@
     padding: 3px 6px;
     margin-bottom: 4px;
   }
+  /* U6 (Protocol 42 regression, found by tests/render-integrity.mjs's
+     assertion 4): #stat_rads (.num-sm, 46px, shared with NV) keeps a real
+     native spinner — unlike stat_hp_cur/hp_max/lvl/xp/c_caps, 25-toolbar.css
+     never strips it — so a 3-digit RAD value ("780"+) silently clips at
+     46px. Widened here, scoped to FO3 only: NV's own layout has more
+     horizontal room per field and was not shown clipping in the
+     u5-fnv-regression baselines, so this is left as a targeted fix rather
+     than a shared-file width change (Protocol 22 — smallest correct scope,
+     not a rewrite of a field 2 other games also use). */
+  [data-game='FO3'] #opVitalPanel #stat_rads {
+    width: 58px;
+  }
   /* found while verifying STATUS (Protocol 42): the vitals column is only
      ~190px wide (the STATUS grid merge, Section I) — too narrow to fit
      both HP number fields AND the ▲▼ stepper group on one line without the
@@ -954,23 +1084,66 @@
      write to commitStat()/_bumpSpecialStat() stay, just reflowed
      horizontally with the real attribute name (already present, just
      invisible, as the `title` tooltip) now shown as visible text. ══ */
+  /* U6 Strand 2 (density pass, mockup fidelity): the mockup's SPECIAL row
+     is 29px tall — U5 shipped 40px (1.38x fatter), which is the whole
+     reason SPECIAL only showed 5 of 7 rows. J-3: tighten the row pitch to
+     28px so all 7 attributes fit inside the ~211px board region (7*28=196,
+     15px of headroom). */
   [data-game='FO3'] #opSpecialPanel .fader-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     justify-content: center;
     height: 100%;
   }
+  /* the base NV rule sets `.fader{flex:0 0 38px}` to size a NARROW COLUMN
+     in NV's horizontal fader-row (flex-direction:row there) — under FO3's
+     flex-direction:column that same flex-basis silently became a fixed
+     38px ROW HEIGHT (flex-basis dominates the used size when grow/shrink
+     are both 0, min-height notwithstanding), which is exactly the 1.38x
+     density bug this pass exists to fix. Override the whole shorthand, not
+     just min-height. */
   [data-game='FO3'] #opSpecialPanel .fader {
     display: flex;
+    flex: 0 0 auto;
     flex-direction: row;
     align-items: center;
     gap: 8px;
     width: 100%;
     min-height: 28px;
+    max-height: 28px;
   }
+  /* J-1: the fill bar reuses the SAME ten <i> segments the ladder drag
+     surface already lights via updateMath() (idx < v -> .lit) — Protocol
+     22, zero new JS, one source of truth for the value. Reflowed from the
+     NV vertical drag-column into a horizontal read-only bar and explicitly
+     pointer-events:none so _wireFaderDrag()'s mousedown/touchstart drag
+     handlers — which the shipped `display:none` already made unreachable
+     under FO3 — stay exactly as unreachable as they already were (adds no
+     control, removes none: the drag gesture was never available on FO3 in
+     any shipped build). */
   [data-game='FO3'] #opSpecialPanel .fd-ladder {
-    display: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1px;
+    flex: 1 1 auto;
+    min-width: 40px;
+    height: 10px;
+    pointer-events: none;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-ladder i {
+    flex: 1 1 0;
+    height: 100%;
+    background: rgba(var(--robco-green-rgb), 0.12);
+    border-radius: 1px;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-ladder i.lit {
+    background: var(--robco-green);
+    box-shadow: 0 0 4px rgba(var(--robco-green-rgb), 0.6);
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-ladder .fd-cap {
+    display: none; /* the amber top-marker is vertical-ladder-only chrome; the row of lit segments already reads the value */
   }
   [data-game='FO3'] #opSpecialPanel .fd-letter {
     width: 16px;
@@ -979,10 +1152,14 @@
     font-weight: bold;
     text-shadow: var(--robco-glow);
   }
+  /* J-2: left-align the name instead of centring it in the flexible slot
+     (the base rule's `flex:1 1 auto` with no text-align centred it by
+     default alignment). */
   [data-game='FO3'] #opSpecialPanel .fd-name {
     display: inline-block;
-    flex: 1 1 auto;
+    flex: 0 0 78px;
     min-width: 0;
+    text-align: left;
     opacity: 0.8;
     font-size: 9.5px;
     letter-spacing: 0.5px;
@@ -1013,6 +1190,14 @@
     border: 1px solid rgba(var(--robco-green-rgb), 0.35);
     border-radius: 2px;
     background: rgba(var(--robco-green-rgb), 0.05);
+    font-size: 0; /* J-4: swap the +/- text glyph for a ▲/▼ pseudo-element glyph without forking renderSpecial()/_bumpSpecialStat() */
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-steps button::before {
+    content: '▲';
+    font-size: 8px;
+  }
+  [data-game='FO3'] #opSpecialPanel .fd-steps button:last-child::before {
+    content: '▼';
   }
   [data-game='FO3'] #opSpecialPanel .fader-note {
     display: none;
@@ -1047,11 +1232,15 @@
     border-color: rgba(var(--robco-green-rgb), 0.55);
     background: rgba(var(--robco-green-rgb), 0.08);
   }
+  /* U6 Strand 2 (K-1, Protocol 42 regression): 44px still clipped a
+     2-digit value ("15" rendered as "1") — the base rule's font-size:16px
+     (Protocol 17 iOS-zoom guard) plus the native number-input spinner
+     reserve leaves too little room at 44px. Widened to 52px. */
   [data-game='FO3'] #skillMatrixPanel .vu-input {
-    width: 44px;
-    flex: 0 0 44px;
+    width: 52px;
+    flex: 0 0 52px;
     text-align: right;
-    padding-right: 2px;
+    padding-right: 4px;
     border: none;
     background: none;
     opacity: 0.85;
@@ -1069,6 +1258,23 @@
     border: 1px solid rgba(var(--robco-green-rgb), 0.55);
     border-radius: 2px;
     background: rgba(var(--robco-green-rgb), 0.08);
+  }
+  /* L-2: the framed socketed-slot card -> a flat one-line row (min-height
+     28px, matching the shared control-kit pitch). The real inline ✕
+     REMOVE button (removePerk()) stays untouched — zero tap regression. */
+  [data-game='FO3'] #perkLoadoutPanel .slot-row {
+    border: none;
+    border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.2);
+    border-radius: 0;
+    background: none;
+    padding: 4px 6px;
+    margin-bottom: 0;
+    min-height: 28px;
+    flex-wrap: nowrap;
+  }
+  [data-game='FO3'] #perkLoadoutPanel .slot-row.vacant {
+    min-height: 28px;
+    border-bottom-style: dashed;
   }
 
   /* ══ M. GENERAL — Shape B/A hybrid: clock+position as flat label/value
@@ -1190,6 +1396,81 @@
     height: 100%;
   }
 
+  /* U6 Strand 2 — N-1: thin drawer pills. The count badge is redundant
+     chrome at this density (the list itself is one tap away); hidden, not
+     removed as a control — the button/onclick/data-filter stays exactly
+     what setInvFilter() always called (Protocol 22). */
+  [data-game='FO3'] #invFilterBar.drawer-bank,
+  [data-game='FO3'] #opsManifestPanel .drawer-bank {
+    display: flex;
+    gap: 2px;
+  }
+  [data-game='FO3'] #invFilterBar .drawer,
+  [data-game='FO3'] #opsManifestPanel .drawer {
+    width: auto;
+    flex: 1 1 0;
+    min-height: 28px;
+    padding: 2px;
+    font-size: 8px;
+    border-radius: 2px;
+  }
+  [data-game='FO3'] #invFilterBar .drawer .d-count,
+  [data-game='FO3'] #opsManifestPanel .drawer .d-count {
+    display: none;
+  }
+
+  /* N-2 (Protocol 42 regression): the native <input type="search"> drawer
+     filter bar has no dark styling anywhere in the shared CSS — it renders
+     as a plain white UA search box, the single worst visual break in the
+     shipped screenshots. Restyled into the boxed-field primitive under
+     FO3 landscape; the filter CAPABILITY is untouched (same input, same
+     oninput handler) — only its paint. font-size:16px keeps Protocol 17's
+     iOS-zoom guard. Same fix applies to PERKS' identical bar (Section L). */
+  [data-game='FO3'] .col-left .tray-head input[type='search'] {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+    color: var(--robco-green);
+    border-radius: 2px;
+    font-size: 16px;
+    padding: 2px 6px;
+  }
+  [data-game='FO3'] .col-left .tray-head input[type='search']::placeholder {
+    color: rgba(var(--robco-green-rgb), 0.5);
+  }
+
+  /* N-3: one-line list rows — the [WEAPON] tag chip and the second meta
+     line (qty/weight/value) are hidden; the row reads `<name> <qty>` at
+     28px. The equipped state keeps a real, disclosed text marker (never
+     colour alone, Protocol 17) rather than losing its signal along with
+     the tag chip. */
+  [data-game='FO3'] #opsManifestPanel .mrow {
+    min-height: 28px;
+    padding: 4px 8px 4px 22px;
+    align-items: center;
+  }
+  [data-game='FO3'] #opsManifestPanel .mrow .tag,
+  [data-game='FO3'] #opsManifestPanel .mrow .m-meta,
+  [data-game='FO3'] #opsManifestPanel .mrow.iseq::after {
+    display: none;
+  }
+  [data-game='FO3'] #opsManifestPanel .mrow .m-name {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  [data-game='FO3'] #opsManifestPanel .mrow.iseq .m-name::before {
+    content: '◈ '; /* the equipped marker — disclosed text, not colour alone (Protocol 17) */
+  }
+
+  /* N-4: the detail pane's meta line stays on one row — an explicit
+     ellipsis is a declared author intent (render-integrity's truncation
+     assertion treats a DECLARED ellipsis as compliant, never a silent
+     clip). */
+  [data-game='FO3'] #opsManifestPanel .fo3-dt-stats {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* Found while verifying MANIFEST (Protocol 42): LOAD-CELL WEIGH BRIDGE
      (`#opsBridgePanel`) carries no `data-subtab` — it was deliberately left
      off every rail because its one live figure (carry weight) already
@@ -1206,5 +1487,236 @@
      above (Section A) — its data is not lost, only its duplicate board. */
   [data-game='FO3'] #opsBridgePanel {
     display: none;
+  }
+
+  /* ══ O. THE SCROLL TRAP FIX (U6 Strand 1) — owner report: "on the
+     collectable tab, touching the display glass, I can't scroll anymore."
+     Root cause, traced and confirmed via planning/_probe_scroll.mjs:
+     .curio-caselist (css/40-curio-operations.css:135) and .tray-list
+     (same file :1122) are BOTH `max-height:342-430px; overflow-y:auto;
+     overscroll-behavior:contain` — fixed pixel heights authored for NV's
+     tall portrait layout, dropped inside FO3-landscape's ~211-224px
+     #fo3BoardScroll glass. A finger landing on either becomes trapped: the
+     inner container is nearest, and `overscroll-behavior:contain`
+     EXPLICITLY refuses to hand an exhausted/zero-range gesture up to
+     #fo3BoardScroll (the ONE scroller this whole design is built around,
+     Section A). Neutralised here rather than at the source file because
+     the fixed heights are still correct for NV's portrait card layout
+     (Protocol 22 — this is a re-skin, not a shared-file rewrite). */
+  [data-game='FO3'] .curio-caselist,
+  [data-game='FO3'] .tray-list {
+    max-height: none;
+    overscroll-behavior: auto;
+  }
+  [data-game='FO3'] #opsManifestPanel .tray-scrollwrap,
+  [data-game='FO3'] #opsManifestPanel .tray-list {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  /* ══ P. THE CASING LEFT/RIGHT COLUMNS (U6 Strand 3, owner: "it is a real
+     gap that I want fixed"). CSS-only chrome layered around the working
+     shell (Protocol UI-7) — no control moves in the DOM, no JS game
+     branch. #uosMachine becomes a 3-col x 3-row grid; the four decorative
+     casing divs (index.html, `hidden` by default) are un-hidden into their
+     cells; `.glass-frame` (Section A) is pinned into the centre cell. Costs
+     124px of width and 13px of glass height — verified against every
+     board's minimum content width/height before this shipped (plan §4.2). */
+  /* matches Section A's `#uosMachine.container.machine` selector
+     specificity exactly (ID + 2 classes) — a plain `#uosMachine` here would
+     lose the `display` property to Section A's `display:flex` despite
+     appearing later in the file, since specificity is compared before
+     source order (Protocol 42 regression: caught via screenshot — the
+     grid silently never applied and every casing element rendered as a
+     giant stacked flex item). */
+  [data-game='FO3'] #uosMachine.container.machine {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr) 44px;
+    grid-template-rows: 22px minmax(0, 1fr) 52px;
+  }
+  [data-game='FO3'] .casing-top {
+    display: none; /* Section A already hides this; keep the grid item count honest if it's ever un-hidden upstream */
+  }
+  [data-game='FO3'] .glass-frame {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  [data-game='FO3'] #casingRailLeft {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 4px;
+    background: linear-gradient(180deg, #4a5132, #333921 34%, #22270f 88%);
+    border-right: 2px solid #0e1108;
+    box-shadow: inset -3px 0 6px rgba(0, 0, 0, 0.5);
+  }
+  [data-game='FO3'] .crl-spacer {
+    height: 40px; /* clears the real #navkey-chassis gauge, absolutely positioned into this same top slot below */
+  }
+  [data-game='FO3'] .crl-script {
+    font-family: cursive, serif;
+    font-style: italic;
+    font-size: 11px;
+    color: rgba(214, 222, 182, 0.7);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+  [data-game='FO3'] .crl-ribstack {
+    flex: 1 1 auto;
+    width: 18px;
+    min-height: 20px;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.35) 0 3px,
+      rgba(214, 222, 182, 0.08) 3px 6px
+    );
+    border-radius: 2px;
+  }
+  [data-game='FO3'] .crl-slider {
+    width: 10px;
+    height: 46px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #0a0c05, #171a0e);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+  }
+  [data-game='FO3'] .crl-model {
+    font-size: 6px;
+    letter-spacing: 0.5px;
+    opacity: 0.55;
+    writing-mode: vertical-rl;
+  }
+  [data-game='FO3'] .casing-hood {
+    display: flex;
+    grid-column: 2;
+    grid-row: 1;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 8px;
+    background: linear-gradient(180deg, #4a5132, #333921 34%, #22270f 88%);
+    border-bottom: 1px solid #0e1108;
+  }
+  [data-game='FO3'] .ch-brand {
+    font-size: 7.5px;
+    letter-spacing: 1px;
+    color: rgba(214, 222, 182, 0.75);
+  }
+  [data-game='FO3'] .ch-dots {
+    display: inline-flex;
+    gap: 3px;
+  }
+  [data-game='FO3'] .ch-dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(var(--robco-green-rgb), 0.6);
+  }
+  [data-game='FO3'] .casing-rail-right {
+    display: flex;
+    grid-column: 3;
+    grid-row: 1 / -1;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #4a5132, #333921 34%, #22270f 88%);
+    border-left: 2px solid #0e1108;
+    box-shadow: inset 3px 0 6px rgba(0, 0, 0, 0.5);
+  }
+  [data-game='FO3'] .crr-vent {
+    width: 18px;
+    height: 70%;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.35) 0 3px,
+      rgba(214, 222, 182, 0.08) 3px 6px
+    );
+    border-radius: 2px;
+  }
+  /* the bottom bar's cast-metal material — moved here from the old `.bezel`
+     rule (now display:contents, Section E) so the bar doesn't render as
+     bare page background once `.bezel`'s own box disappears. */
+  [data-game='FO3'] .casing-lampbar {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    z-index: 0;
+    border-radius: 0 0 10px 10px;
+    border-top: 2px solid #0e1108;
+    background:
+      radial-gradient(ellipse 60px 30px at 20% 92%, rgba(96, 74, 36, 0.18), transparent 70%),
+      linear-gradient(
+        105deg,
+        transparent 47.6%,
+        rgba(214, 222, 182, 0.06) 47.9%,
+        transparent 48.2%
+      ),
+      linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
+    box-shadow:
+      0 -3px 10px rgba(0, 0, 0, 0.7),
+      inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+      inset -1px -2px 4px rgba(0, 0, 0, 0.55);
+  }
+  /* `.nav-cluster` is now a real grid item (its `.bezel`/`.nav-row`
+     wrappers are display:contents, Section E) — placed into the SAME
+     lamp-bar cell, on top of the material above (z-index:1), holding the
+     three lamps that remain in flow (operator/operations/databank). The
+     other three keycaps are lifted out via position:absolute below. */
+  [data-game='FO3'] .nav-cluster {
+    grid-column: 2;
+    grid-row: 3;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 5px 8px 4px;
+  }
+  /* the three side controls are POSITIONED, not moved — #uosMachine is
+     already position:fixed (Section A), so it is the containing block.
+     They never leave the DOM: tab order, role=tab, aria-selected, onclick,
+     hotkeys, #go= deep-links all stay exactly what they were. */
+  [data-game='FO3'] #navkey-chassis {
+    position: absolute;
+    left: 19px;
+    top: 30px;
+  }
+  [data-game='FO3'] #navkey-uplink {
+    position: absolute;
+    left: 7px;
+    bottom: 12px;
+  }
+  [data-game='FO3'] #navkey-settings {
+    position: absolute;
+    right: 1px;
+    top: 50%;
+    translate: 0 -50%;
+  }
+  /* decorative-only, never intercepts a keycap tap (the same rule Section E
+     already holds for the gauge needle/knob pointer). */
+  [data-game='FO3'] .casing-rail-left,
+  [data-game='FO3'] .casing-rail-left *,
+  [data-game='FO3'] .casing-hood,
+  [data-game='FO3'] .casing-hood *,
+  [data-game='FO3'] .casing-rail-right,
+  [data-game='FO3'] .casing-rail-right *,
+  [data-game='FO3'] .casing-lampbar {
+    pointer-events: none;
+  }
+}
+
+/* U6 Strand 6 — @keyframes can't carry a [data-game='FO3'] selector prefix
+   (they're an at-rule, not a style rule), so this lives at file scope,
+   outside the @media(orientation:landscape) block above — it stays
+   completely inert everywhere until something references it by name, and
+   the one thing that does (.vaultboy-fig [data-limb].crippled .crip-label,
+   Section G above) is itself FO3-scoped. */
+@keyframes fo3CripLabelBlink {
+  50% {
+    opacity: 0.35;
   }
 }

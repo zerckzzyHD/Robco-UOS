@@ -230,6 +230,11 @@ function _renderFo3SubtabRail(subsystem, activeName) {
   if (!rail) return;
   const rails = getIdentity().rails;
   const subtabNames = rails && rails[subsystem] ? Object.keys(rails[subsystem]) : [];
+  // U6 (§2.8): the mockup separates sub-tabs with a dash connector
+  // (STATUS — SPECIAL — SKILLS …). aria-hidden so it never reaches AT —
+  // the buttons' own role=tab/aria-selected already carry the real
+  // structure (Protocol 39: em-dash is non-ASCII, written via the Edit
+  // tool, never PowerShell).
   rail.innerHTML = subtabNames
     .map(
       name =>
@@ -241,7 +246,7 @@ function _renderFo3SubtabRail(subsystem, activeName) {
         name +
         '</button>'
     )
-    .join('');
+    .join('<span class="fo3-rail-dash" aria-hidden="true">—</span>');
 }
 
 // selectSubtab(name) — the second-axis selector. Reads the CURRENT subsystem
@@ -552,16 +557,29 @@ function _renderFo3TopStrip() {
     strip.innerHTML = '';
     return;
   }
-  strip.innerHTML = fields
-    .map(
-      key =>
-        '<span class="fo3-strip-seg"><b>' +
-        escapeHtml(key) +
-        '</b>' +
-        escapeHtml(String(_fo3StripFieldValue(key))) +
-        '</span>'
-    )
-    .join('');
+  // U6 (§2.7): the mockup leads the strip with the active subsystem's own
+  // name as a bold "current channel" chip. Read straight off the real
+  // keycap's existing .nk-label text — zero new state, zero game literal
+  // (Protocol 38). Resolves to an empty string (no chip) when the keycap
+  // can't be found, e.g. a unit test calling this against a minimal DOM.
+  const subsystem = document.body.dataset.subsystem;
+  const keycap = subsystem && document.getElementById('navkey-' + subsystem);
+  const nameLabel = keycap && keycap.querySelector('.nk-label');
+  const nameSeg = nameLabel
+    ? '<span class="fo3-strip-seg fo3-strip-name">' + escapeHtml(nameLabel.textContent) + '</span>'
+    : '';
+  strip.innerHTML =
+    nameSeg +
+    fields
+      .map(
+        key =>
+          '<span class="fo3-strip-seg"><b>' +
+          escapeHtml(key) +
+          '</b>' +
+          escapeHtml(String(_fo3StripFieldValue(key))) +
+          '</span>'
+      )
+      .join('');
 }
 
 // _fo3BumpNumberInput(id, delta) — the Vault Boy screen's HP/RAD steppers

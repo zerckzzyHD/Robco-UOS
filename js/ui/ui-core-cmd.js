@@ -58,6 +58,15 @@ function setupHpBarInteraction() {
   document.addEventListener('touchend', () => {
     dragging = false;
   });
+  // U6 Strand 1 (Protocol 42 — found while tracing the scroll bug): a
+  // cancelled gesture (an incoming call, an app switch, the browser
+  // reinterpreting the touch as a page scroll) fires touchcancel, NOT
+  // touchend. Without this listener `dragging` stayed true forever, so
+  // every LATER touchmove anywhere on the document silently rewrote HP
+  // from whatever X coordinate the finger happened to be at.
+  document.addEventListener('touchcancel', () => {
+    dragging = false;
+  });
 }
 
 // C11: XP bar click-drag — mirrors HP bar but sets XP within [xpCur, xpNext-1] range.
@@ -106,6 +115,11 @@ function setupXpBarInteraction() {
     { passive: false }
   );
   document.addEventListener('touchend', () => {
+    dragging = false;
+  });
+  // U6 Strand 1 (Protocol 42) — see setupHpBarInteraction()'s touchcancel
+  // comment above: the same unguarded-cancel state-corruption bug, on XP.
+  document.addEventListener('touchcancel', () => {
     dragging = false;
   });
 }
@@ -185,6 +199,13 @@ function _wireRadDragSurface(containerId) {
     { passive: false }
   );
   document.addEventListener('touchend', () => {
+    dragging = false;
+    container.classList.remove('dragging');
+  });
+  // U6 Strand 1 (Protocol 42) — see setupHpBarInteraction()'s touchcancel
+  // comment above: the same unguarded-cancel state-corruption bug, on RAD
+  // (both drag surfaces share this one wiring function).
+  document.addEventListener('touchcancel', () => {
     dragging = false;
     container.classList.remove('dragging');
   });

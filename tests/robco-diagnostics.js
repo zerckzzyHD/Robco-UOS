@@ -28982,8 +28982,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /container\.classList\.add\('dragging'\)/.test(wireBody190b) &&
         /container\.classList\.remove\('dragging'\)/.test(wireBody190b) &&
         (wireBody190b.match(/container\.classList\.add\('dragging'\)/g) || []).length === 2 &&
-        (wireBody190b.match(/container\.classList\.remove\('dragging'\)/g) || []).length === 2,
-      "190.12: _wireRadDragSurface() adds the 'dragging' class on both mousedown AND touchstart, and removes it on both mouseup AND touchend — the RAD drag surface is marked dragging for the full duration of either input method"
+        // U6 Strand 1 (Protocol 42): a third removal site was added for
+        // 'touchcancel' — a cancelled gesture (call, app switch) previously
+        // left both `dragging` (the JS flag) and this CSS class stuck true
+        // forever. 3, not 2, is now correct.
+        (wireBody190b.match(/container\.classList\.remove\('dragging'\)/g) || []).length === 3,
+      "190.12: _wireRadDragSurface() adds the 'dragging' class on mousedown AND touchstart, and removes it on mouseup, touchend, AND touchcancel (U6) — the RAD drag surface is marked dragging for the full duration of any input method, including a cancelled one"
     );
   }
 
@@ -41916,17 +41920,28 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //          layout; it only becomes a bottom dock via position:fixed on
   //          mobile) — flipping .bezel off position:fixed without also
   //          reordering it left it in its natural (visually wrong) DOM
-  //          position. Fixed with flex `order` (no DOM change, Protocol
-  //          UI-7): .glass-frame order:1, .bezel order:2. Locked here so a
-  //          future edit can't silently drop the reorder and reintroduce the
-  //          "casing sits above the glass" bug. Superseded in part by Suite
-  //          225 (owner round-2 pass): .casing-top itself no longer needs an
-  //          `order` — it is fully display:none (Suite 225.1), so it no
-  //          longer participates in the flex layout at all.
+  //          position. Originally fixed with flex `order`: .glass-frame
+  //          order:1, .bezel order:2. Superseded in part by Suite 225
+  //          (owner round-2 pass): .casing-top itself no longer needs an
+  //          `order` — it is fully display:none (Suite 225.1).
+  //
+  //          U6 Strand 3 superseded the mechanism again: #uosMachine became
+  //          a CSS Grid (the casing left/right rails + hood), .bezel/
+  //          .nav-row flattened to display:contents (so `order` no longer
+  //          applies to them at all — a flattened element isn't a flex/grid
+  //          item itself), and the glass-vs-lamp-bar ordering is now
+  //          guaranteed by explicit GRID ROW placement instead:
+  //          .glass-frame sits in grid-row:2, the lamp-bar material
+  //          (.casing-lampbar) and the flattened .nav-cluster it now hosts
+  //          both sit in grid-row:3 — a later row, so the glass always
+  //          paints above the casing bar. Locked here so a future edit
+  //          can't silently drop this and reintroduce the "casing sits
+  //          above the glass" bug.
   assert(
-    /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*order:\s*1/.test(fo3Css224) &&
-      /\[data-game='FO3'\]\s*\.bezel\s*\{[^}]*order:\s*2/.test(fo3Css224),
-    '224.11: [live-browser regression, Protocol 42] .glass-frame/.bezel carry order:1/2 respectively — without this the casing bar renders ABOVE the glass (DOM order) instead of below it (visual order, matching the Pip-Boy reference)'
+    /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*grid-row:\s*2/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.casing-lampbar\s*\{[^}]*grid-row:\s*3/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.nav-cluster\s*\{[^}]*grid-row:\s*3/.test(fo3Css224),
+    '224.11: [U6 Strand 3 update, Protocol 42] .glass-frame is grid-row:2 while .casing-lampbar/.nav-cluster are grid-row:3 — without this the casing bar could render ABOVE or overlapping the glass instead of below it (visual order, matching the Pip-Boy reference); supersedes the pre-U6 flex-order mechanism, which no longer applies now that .bezel/.nav-row are display:contents'
   );
 }
 
@@ -42189,10 +42204,22 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         case a caller ever runs this against a minimal mock element
   //         (the exact crash a live behavioral test — 172.2 — surfaced when
   //         this guard was first added without the `d.classList &&` check).
+  //         U6 Strand 1 (Protocol 42) widened the condition so the SAME
+  //         "force open" rule also covers every OTHER rail-grouped board
+  //         (CURIO/CRAFT/BARTER/SQUAD — not just the Batch 1 .fo3-flat
+  //         class list): any board carrying `d.dataset.subtab` (stamped by
+  //         _applyRailGrouping() for every board named in identity.rails)
+  //         is forced open too, since the sub-tab selector is already the
+  //         one gate deciding visibility and a collapsed <details> under it
+  //         is pure dead-end chrome. The `d.classList &&` guard and the
+  //         `.fo3-flat` check both still exist — no longer immediately
+  //         adjacent, since the widened OR-condition sits between them.
   assert(
-    /d\.classList\s*&&\s*\n?\s*d\.classList\.contains\('fo3-flat'\)/.test(uiCoreSrc226) &&
-      /getIdentity\(\)\.rails/.test(uiCoreSrc226),
-    '226.3: _wirePanelPersistence() forces open any .fo3-flat board only when the active identity carries `rails` data, and defensively checks classList exists first (Protocol 42 — a minimal test mock without classList must not throw)'
+    /d\.classList\s*&&/.test(uiCoreSrc226) &&
+      /getIdentity\(\)\.rails/.test(uiCoreSrc226) &&
+      /d\.classList\.contains\('fo3-flat'\)/.test(uiCoreSrc226) &&
+      /d\.dataset\.subtab/.test(uiCoreSrc226),
+    '226.3: [U6 update] _wirePanelPersistence() forces open any .fo3-flat board OR any board carrying d.dataset.subtab, only when the active identity carries `rails` data, and defensively checks classList exists first (Protocol 42 — a minimal test mock without classList must not throw)'
   );
 
   // 226.4 — STATUS full-bleed merge: #fo3BoardScroll is a single-column grid
@@ -42253,14 +42280,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     ),
     '226.6a: all seven SPECIAL stats carry a hidden .fd-name span with the real attribute name, revealed only under FO3'
   );
+  // U6 Strand 2 (J-1) re-purposed the segment ladder from hidden dead
+  // weight into the mockup's horizontal fill bar (Protocol 22 — reuses the
+  // SAME ten <i> segments updateMath() already lights, never a second value
+  // source) — display:none is no longer correct; it must now be a visible,
+  // non-interactive (pointer-events:none) horizontal bar.
   assert(
-    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-ladder\s*\{\s*display:\s*none;\s*\}/.test(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-ladder\s*\{\s*display:\s*flex;[^}]*pointer-events:\s*none;\s*\}/.test(
       fo3Css226
     ) &&
       /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fader\s*\{[^}]*flex-direction:\s*row;/.test(
         fo3Css226
       ),
-    '226.6b: the segment-ladder graphic is hidden and each SPECIAL row is a horizontal flat row (Shape B), not the NV vertical fader'
+    '226.6b: [U6 update] the segment-ladder graphic is repurposed into a visible, non-interactive (pointer-events:none) horizontal fill bar (Shape B) — no longer hidden — and each SPECIAL row is a horizontal flat row, not the NV vertical fader'
   );
   // 226.7 — Protocol 42 regression: the base NV .fd-steps rule stacks the
   //         +/- buttons in a COLUMN (its own vertical-fader idiom) and never
@@ -42333,10 +42365,14 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // 226.13 — SKILLS list value stays legible: the compact read-only input in
   //          the list row is wide enough to show 2-digit values without
   //          clipping (Protocol 42 regression — 34px silently clipped "15"
-  //          down to "1").
+  //          down to "1"). U6 re-measured against the approved mockup's
+  //          real rendered pixels and found 44px STILL clipped a 2-digit
+  //          value (the font-size:16px iOS-zoom guard plus the native
+  //          number-input spinner reserve leaves too little room) — widened
+  //          to 52px; see Suite 227.
   assert(
-    /\[data-game='FO3'\]\s*#skillMatrixPanel\s*\.vu-input\s*\{[^}]*width:\s*44px;/.test(fo3Css226),
-    '226.13: [live-browser regression, Protocol 42] #skillMatrixPanel .vu-input is 44px wide — 34px silently clipped a 2-digit value ("15" rendered as "1")'
+    /\[data-game='FO3'\]\s*#skillMatrixPanel\s*\.vu-input\s*\{[^}]*width:\s*52px;/.test(fo3Css226),
+    '226.13: [live-browser regression, Protocol 42] #skillMatrixPanel .vu-input is 52px wide — 44px (this suite\'s own earlier fix) still clipped a 2-digit value ("15" rendered as "1"), re-measured and widened in U6'
   );
 
   // 226.14 — no second render path anywhere in this batch: every detail/
@@ -42348,6 +42384,244 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       /function\s+renderInventory\s*\(/.test(invSrc226),
     '226.14: renderSkills()/renderPerks()/renderInventory() all still own their list markup under their original names — the FO3 detail panes are additive helpers, never a parallel renderer'
   );
+}
+
+{
+  header(
+    'Suite 227 — FO3 PIP-BOY UNIT U6 (scroll trap, render-integrity, mockup density pass, casing, STATUS figure wiring)'
+  );
+
+  const fo3CssPath227 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css227 = fs.existsSync(fo3CssPath227) ? fs.readFileSync(fo3CssPath227, 'utf8') : '';
+  const cmdSrc227 = readGroup('ui-core-cmd');
+  const navSrc227 = readGroup('ui-core-nav');
+  const uiCoreSrc227 = readGroup('ui-core');
+
+  // 227.1 — Protocol 42: the owner's touchcancel state-corruption bug, found
+  //         while tracing the scroll trap. Without a touchcancel listener a
+  //         cancelled gesture (incoming call, app switch) left `dragging`
+  //         true forever, so every LATER touchmove anywhere on the document
+  //         silently rewrote HP/XP/RAD from whatever X the finger was at.
+  //         All three drag surfaces (HP, XP, and the shared RAD wiring
+  //         function covering both radDragTrack and opRadLineWrap) must
+  //         register touchcancel alongside touchend.
+  const touchcancelCount = (cmdSrc227.match(/addEventListener\('touchcancel'/g) || []).length;
+  assert(
+    touchcancelCount === 3,
+    "227.1: [Protocol 42 regression] all three drag-surface wiring functions (setupHpBarInteraction, setupXpBarInteraction, _wireRadDragSurface) register a 'touchcancel' listener alongside their 'touchend' listener — found " +
+      touchcancelCount +
+      ' — without it a cancelled gesture left `dragging` stuck true, and every later touchmove anywhere on the page silently rewrote HP/XP/RAD'
+  );
+
+  // 227.2 — the scroll trap fix (Strand 1): .curio-caselist and .tray-list
+  //         are fixed-px inner scroll containers authored for NV's tall
+  //         portrait layout (css/40-curio-operations.css) — dropped inside
+  //         FO3-landscape's ~211-224px glass they were nearly twice as tall
+  //         as their region and `overscroll-behavior:contain` explicitly
+  //         refused to hand an exhausted gesture up to #fo3BoardScroll, the
+  //         one scroller the whole design is built around. Confirmed via
+  //         planning/_probe_scroll.mjs (a real CDP touch-drag moved
+  //         #fo3BoardScroll.scrollTop on every board tested).
+  assert(
+    /\[data-game='FO3'\]\s*\.curio-caselist,\s*\n\s*\[data-game='FO3'\]\s*\.tray-list\s*\{\s*max-height:\s*none;\s*overscroll-behavior:\s*auto;/.test(
+      fo3Css227
+    ),
+    "227.2: [live-browser regression, Protocol 27/42] .curio-caselist and .tray-list are neutralised to max-height:none + overscroll-behavior:auto under [data-game='FO3'] — the NV-authored fixed-px scroll trap that swallowed the owner's CURIO/MANIFEST touch-drag"
+  );
+
+  // 227.3 — Protocol 42 regression: the native <input type="search"> drawer
+  //         filter bar (MANIFEST, PERKS, CURIO — every board sharing
+  //         .tray-head) had no dark styling anywhere in the shared CSS, so
+  //         it rendered as a plain white UA search box — the single worst
+  //         visual break in the U5 screenshots. Fixed at the class level
+  //         (Protocol 36b), not per-board.
+  assert(
+    /\[data-game='FO3'\]\s*\.col-left\s*\.tray-head\s*input\[type='search'\]\s*\{[^}]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.35\);[^}]*color:\s*var\(\s*--robco-green\s*\);/.test(
+      fo3Css227
+    ),
+    "227.3: [live-browser regression, Protocol 42] .col-left .tray-head input[type='search'] is restyled dark/green under FO3 — the shared class-level fix for MANIFEST/PERKS/CURIO's identical white search-bar break"
+  );
+
+  // 227.4 — Protocol 42 regression (M-1, the "amber leak"): the owner's
+  //         GENERAL screenshot showed an amber dashed divider and an
+  //         amber-bordered input. Traced to details.bay-board::after
+  //         (css/30-modulebay.css) — a hardcoded #d9a24a "connector pin"
+  //         strip on the bottom edge of EVERY board, game-agnostic and
+  //         un-scoped. FO3's amber is spent only on the lamp/knob/toggle —
+  //         fixed at the class level so no future board can leak it back in.
+  assert(
+    /\[data-game='FO3'\]\s*\.col-left\s*\.panel\.bay-board::after\s*\{\s*display:\s*none;\s*\}/.test(
+      fo3Css227
+    ),
+    "227.4: [live-browser regression, Protocol 42] [data-game='FO3'] .col-left .panel.bay-board::after is display:none — neutralises the game-agnostic amber connector-pin strip (css/30-modulebay.css) every board otherwise inherits, which the owner's GENERAL screenshot caught bleeding through as NV-style chrome"
+  );
+
+  // 227.5 — G-5 (owner correction, 2026-07-13): real FO3 reference
+  //         screenshots supersede the plan's original "crippled limb reads
+  //         red" treatment, which was a designer guess, not the game's real
+  //         convention. The game's own treatment is a DASHED outline with
+  //         the CRIPPLED text already shown — NO colour change anywhere.
+  //         The shared (NV-facing) button.limb-crip rule (css/05-base.css)
+  //         sets color/border-color to --robco-danger red; FO3 explicitly
+  //         resets both back to green. A static guard also locks out any
+  //         reintroduction of the red hex/rgba this unit shipped and then
+  //         corrected, so the mistake can't quietly come back.
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.zone-chips button\[aria-pressed='true'\]\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);\s*border-style:\s*dashed;/.test(
+      fo3Css227
+    ),
+    "227.5a: [owner correction, Protocol 42] #opHarnessPanel .zone-chips button[aria-pressed='true'] is dashed + explicitly reset to green (color and border-color) under FO3 — never red"
+  );
+  assert(
+    !/#ff6a50/i.test(fo3Css227) && !/rgba\(\s*255,\s*106,\s*80/i.test(fo3Css227),
+    '227.5b: [owner correction — regression guard] the red crippled-limb hex/rgba this unit shipped and then corrected per real reference screenshots does not reappear anywhere in css/60-fo3-pipboy.css'
+  );
+
+  // 227.6 — Strand 6: the STATUS Vault Boy figure is wired to reflect limb
+  //         damage from the SAME state the readout buttons already use (one
+  //         code path, Protocol 22/24) — dashed outline + a CRIPPLED text
+  //         label, never a colour change (the same owner correction as
+  //         G-5). Thin plumbing only: a later unit swaps this figure and
+  //         its data-limb wiring for Fable's planning/mockups/fo3/fo3-
+  //         status-figure.html drawing without touching the apply logic.
+  assert(
+    (htmlSource.match(/<g class="limbline" data-limb="(hd|la|ra|ll|rl)">/g) || []).length === 5,
+    '227.6a: the Vault Boy figure (.vaultboy-fig svg) wraps all five tracked limbs in their own <g class="limbline" data-limb="..."> group, matching Fable\'s future figure contract (fo3-status-figure.html) so that swap is a drop-in'
+  );
+  assert(
+    /class="crip-label"/.test(htmlSource),
+    '227.6b: each limb group carries a hidden-by-default CRIPPLED text label (.crip-label), shown only while that limb is crippled'
+  );
+  assert(
+    /const\s+figLimb\s*=\s*document\.querySelector\(\s*'\.vaultboy-fig \[data-limb="'\s*\+\s*k\s*\+\s*'"\]'\s*\)/.test(
+      uiCoreSrc227
+    ) && /figLimb\.classList\.toggle\('crippled',\s*isCrippled\)/.test(uiCoreSrc227),
+    "227.6c: loadUI() toggles .crippled on the Vault Boy figure's matching [data-limb] group from the SAME isCrippled value the btn_l_* readout buttons already use — never a second state read"
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*g\.limbline\[data-limb\]\.crippled\s*\{\s*stroke-dasharray:/.test(
+      fo3Css227
+    ) && !/\.vaultboy-fig[^}]*\.crippled[^}]*color:\s*#/i.test(fo3Css227),
+    '227.6d: the crippled figure treatment is a dashed stroke — no colour override anywhere on the .vaultboy-fig crippled state'
+  );
+
+  // 227.7 — §2.7: the mockup leads the top strip with the active
+  //         subsystem's own name as a bold "current channel" chip, read
+  //         straight off the real keycap's existing .nk-label text (zero
+  //         new state, zero game literal — Protocol 38).
+  assert(
+    /const\s+nameLabel\s*=\s*keycap\s*&&\s*keycap\.querySelector\('\.nk-label'\)/.test(navSrc227) &&
+      /fo3-strip-seg fo3-strip-name/.test(navSrc227),
+    "227.7: _renderFo3TopStrip() prepends a .fo3-strip-name chip read from the active keycap's own .nk-label text — no hardcoded game literal, no new state"
+  );
+
+  // 227.8 — §2.8: the mockup separates sub-tab names with a dash connector
+  //         (STATUS — SPECIAL — SKILLS …), aria-hidden so it never reaches
+  //         AT (the buttons' own role=tab/aria-selected already carry the
+  //         real structure).
+  assert(
+    /\.join\('<span class="fo3-rail-dash" aria-hidden="true">—<\/span>'\)/.test(navSrc227),
+    '227.8: _renderFo3SubtabRail() joins its buttons with an aria-hidden dash connector span, matching the mockup'
+  );
+
+  // 227.9 — Strand 3: the casing left/right rails + hood + lamp-bar. CSS-only
+  //         chrome layered around the working shell (Protocol UI-7) — no
+  //         control moves in the DOM. #uosMachine becomes a 3x3 grid; the
+  //         four decorative casing divs (index.html, hidden by default) are
+  //         un-hidden into their cells; .bezel/.nav-row flatten via
+  //         display:contents so the three side controls (chassis/uplink/
+  //         settings) can be positioned onto the rails without leaving the
+  //         DOM — tab order, role=tab, aria-selected, onclick, hotkeys,
+  //         #go= deep-links all stay untouched.
+  assert(
+    /\[data-game='FO3'\]\s*#uosMachine\.container\.machine\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*86px minmax\(0,\s*1fr\)\s*44px;/.test(
+      fo3Css227
+    ),
+    "227.9a: [data-game='FO3'] #uosMachine.container.machine is a 3-column grid (86px | 1fr | 44px) — the ID+class specificity matches Section A's own #uosMachine.container.machine selector exactly, a Protocol 42 regression the implementer caught by screenshot (a plain #uosMachine selector here would lose to Section A's display:flex despite later source order)"
+  );
+  assert(
+    /\[data-game='FO3'\]\s*\.bezel,\s*\n\s*\[data-game='FO3'\]\s*\.nav-row\s*\{\s*display:\s*contents;\s*\}/.test(
+      fo3Css227
+    ),
+    '227.9b: .bezel/.nav-row flatten via display:contents so .nav-cluster becomes a real grid item in the lamp-bar cell — the three side controls (chassis/uplink/settings) are then positioned via CSS only, never moved in the DOM'
+  );
+  ['navkey-chassis', 'navkey-uplink', 'navkey-settings'].forEach(id => {
+    assert(
+      new RegExp("\\[data-game='FO3'\\]\\s*#" + id + '\\s*\\{\\s*position:\\s*absolute;').test(
+        fo3Css227
+      ),
+      '227.9c: #' + id + ' is positioned (not moved) onto its casing rail via CSS only'
+    );
+  });
+  ['casingRailLeft', 'casingHood', 'casingRailRight', 'casingLampBar'].forEach(id => {
+    assert(
+      new RegExp(
+        '<div class="casing-[a-z-]+"\\s+id="' + id + '"\\s+hidden aria-hidden="true">'
+      ).test(htmlSource),
+      '227.9d: #' +
+        id +
+        ' ships the `hidden` boolean attribute by default (game-agnostic default — NV/FO4/FO3-portrait never render it)'
+    );
+  });
+
+  // 227.10 — Protocol 42 regression (found verifying the density pass by
+  //          screenshot): the base NV .fader rule sets flex:0 0 38px to
+  //          size a column in NV's horizontal fader-row; under FO3's
+  //          flex-direction:column that silently became a fixed 38px ROW
+  //          HEIGHT. The FO3 override's own min-height:28px alone still
+  //          measured 31px in the live browser (an inherited line-height
+  //          contribution on the flex container, not any single child) —
+  //          an explicit max-height:28px was needed to actually hit the
+  //          mockup's row pitch and fit all 7 SPECIAL rows in the ~211px
+  //          budget.
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fader\s*\{[^}]*min-height:\s*28px;\s*max-height:\s*28px;/.test(
+      fo3Css227
+    ),
+    "227.10: [live-browser regression, Protocol 42] #opSpecialPanel .fader has both min-height AND max-height at 28px — min-height alone still measured 31px live, one row-height short of the mockup's 28px pitch needed for all 7 SPECIAL rows to fit"
+  );
+
+  // 227.11 — NV-untouched proof: every new selector this unit introduces
+  //          lives ONLY inside the [data-game='FO3'] selector list. Plain
+  //          standalone selectors are checked generically; .fo3-strip-name
+  //          and .crip-label are always COMPOUND (attached directly to
+  //          .fo3-strip-seg / used only as a descendant inside .vaultboy-fig
+  //          rules) so the generic "prefix immediately precedes the
+  //          selector" lookbehind can't see past the attached/intervening
+  //          class — checked with their own full compound-selector regex
+  //          instead (227.11b).
+  [
+    '#casingRailLeft',
+    '#casingHood',
+    '#casingRailRight',
+    '#casingLampBar',
+    '.fo3-rail-dash',
+  ].forEach(sel => {
+    const escaped = sel.replace(/[.#]/g, '\\$&');
+    const bare = new RegExp("(?<!\\[data-game='FO3'\\]\\s{0,3})" + escaped + '\\s*[,{]', 'g');
+    assert(
+      !bare.test(fo3Css227),
+      '227.11a: every ' +
+        sel +
+        " rule in css/60-fo3-pipboy.css carries the [data-game='FO3'] prefix"
+    );
+  });
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-strip-seg\.fo3-strip-name\s*\{/.test(fo3Css227) &&
+      (fo3Css227.match(/\.fo3-strip-name/g) || []).length === 1,
+    "227.11b: .fo3-strip-name is declared exactly once, as a compound class on .fo3-strip-seg inside the [data-game='FO3'] scope"
+  );
+  {
+    // Every rule ending in `.crip-label {` (there are two: the base
+    // opacity:0 rule and the .crippled-state reveal rule) must itself begin
+    // with the [data-game='FO3'] prefix earlier on the same line/selector.
+    const crippedLabelRules227 = fo3Css227.match(/^.*\.crip-label\s*\{/gm) || [];
+    assert(
+      crippedLabelRules227.length === 2 &&
+        crippedLabelRules227.every(line => line.includes("[data-game='FO3']")),
+      "227.11c: both rules ending in .crip-label { (the base opacity:0 rule and the .crippled-state reveal rule) carry the [data-game='FO3'] prefix"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
