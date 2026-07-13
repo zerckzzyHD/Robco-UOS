@@ -564,6 +564,26 @@ function _renderFo3TopStrip() {
     .join('');
 }
 
+// _fo3BumpNumberInput(id, delta) — the Vault Boy screen's HP/RAD steppers
+// (design doc §4's "the stepper" primitive). Game-agnostic and reusable for
+// ANY number input (Protocol 38 — the game-specific part is only which CSS
+// reveals the button, never this function); it never owns state directly —
+// it bumps the EXISTING input's value and re-dispatches its own 'input'
+// event, so the input's own oninput handler (updateMath()/capRadsMax(), the
+// same path the number field itself already used) is the single source of
+// truth (Protocol 22 — no forked state).
+function _fo3BumpNumberInput(id, delta) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const min = el.min !== '' ? parseFloat(el.min) : -Infinity;
+  const max = el.max !== '' ? parseFloat(el.max) : Infinity;
+  let v = (parseFloat(el.value) || 0) + delta;
+  v = Math.max(min, Math.min(max, v));
+  el.value = v;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+window._fo3BumpNumberInput = _fo3BumpNumberInput;
+
 // ── MOTION VERBS (Protocol UI-9) ─────────────────────────────────────
 // SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.
 // Reduced-motion is handled by the existing global prefers-reduced-motion

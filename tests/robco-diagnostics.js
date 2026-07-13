@@ -12632,7 +12632,7 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   assert(
     /<details class="panel[^"]*"[^>]*id="databankPanel"/.test(html108) &&
       /data-tab="data"/.test(databankPanel108) &&
-      /<h2>[\s\S]*?CATALOG QUERY<\/h2>/.test(databankPanel108) &&
+      /<h2>[\s\S]*?CATALOG QUERY\s*<\/h2>/.test(databankPanel108) &&
       /id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"/.test(databankPanel108) &&
       /aria-label="[^"]+"/.test(databankPanel108) &&
       /id="databankResults"/.test(databankPanel108) &&
@@ -14358,7 +14358,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"/.test(
         html123
       ) &&
-      /CATALOG QUERY<\/h2>/.test(html123),
+      /CATALOG QUERY\s*<\/h2>/.test(html123),
     '123.10: #databankPanel (CATALOG QUERY h2, data-tab="data") exists as the consult/databank/lookup target'
   );
 }
@@ -24769,7 +24769,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       html176.indexOf('<div class="col-right">')
     );
     assert(
-      /<h2>&gt;[\s\S]*?CAMPAIGN CHRONICLE<\/h2>/.test(campgBlock176) &&
+      /<h2>\s*&gt;[\s\S]*?CAMPAIGN CHRONICLE\s*<\/h2>/.test(campgBlock176) &&
         campgBlock176.includes('data-sub-id="campaign_status"') &&
         campgBlock176.includes('data-sub-id="crossroads_record"') &&
         campgBlock176.includes('data-sub-id="incident_log"') &&
@@ -26722,12 +26722,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 183.4  the reverted content-scope changes (per-limb labels, RAD-row
   //        centering) stay gone — a regression guard that a future commit
   //        doesn't silently re-add the over-scoped content changes the
-  //        owner explicitly asked to drop.
+  //        owner explicitly asked to drop. Tightened (FO3 Pip-Boy landscape
+  //        pass): the guard is specifically against an UNSCOPED/bare
+  //        `.rad-row { justify-content: center }` rule (the original
+  //        over-scoped mistake, affecting every game) — it must not false-
+  //        positive on a narrowly [data-game='FO3']-scoped, per-board
+  //        exception (css/60-fo3-pipboy.css's #opHarnessPanel .rad-row,
+  //        which legitimately centers the RAD row under the Vault Boy
+  //        figure and is a different, intentional rule).
   assert(
     !/\.zc-name\s*\{/.test(css183) &&
       !/class="zc-name"/.test(html183) &&
-      !/\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183),
-    '183.4: the reverted over-scoped content changes (.zc-name limb labels, .rad-row centering) stay reverted — this push is frame/layout only, per the owner scope correction'
+      !/(^|\n)\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183),
+    "183.4: the reverted over-scoped content changes (.zc-name limb labels, a BARE unscoped .rad-row centering rule) stay reverted — this push is frame/layout only, per the owner scope correction; a [data-game='FO3']-scoped .rad-row exception is a different, intentional rule and is exempt"
   );
 
   // 183.5  #c_caps (the readback-strip BOTTLE CAPS tile) joins the existing
@@ -26998,7 +27005,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       /75 \* \(\(lvl \+ 1\) \* \(lvl \+ 1\)\) - 25 \* \(lvl \+ 1\) - 50/.test(xpBody184) &&
         /Math\.max\(0, Math\.min\(raw, xpNext - 1\)\)/.test(xpBody184) &&
-        /id="stat_xp"[\s\S]{0,120}oninput="onXpInputChanged\(\)"/.test(html184),
+        /id="stat_xp"[\s\S]{0,200}oninput="onXpInputChanged\(\)"/.test(html184),
       '184.8: onXpInputChanged() caps the typed/stepped XP value at xpNext(lvl)-1 using the exact same per-level curve as the XP bar drag handler, and #stat_xp is wired to call it'
     );
   }
@@ -28249,7 +28256,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         'PERK LOADOUT',
         'KARMA ALIGNMENT',
       ].every(t =>
-        new RegExp('<h2>[\\s\\S]{0,20}?&gt;[\\s\\S]{0,80}?' + flexTitle187(t)).test(html187)
+        new RegExp('<h2>[\\s\\S]{0,40}?&gt;[\\s\\S]{0,80}?' + flexTitle187(t)).test(html187)
       ),
       '187.20: SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT headings all start with the mandatory "> " glyph'
     );
@@ -41900,14 +41907,228 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //          mobile) — flipping .bezel off position:fixed without also
   //          reordering it left it in its natural (visually wrong) DOM
   //          position. Fixed with flex `order` (no DOM change, Protocol
-  //          UI-7): casing-top order:0, .glass-frame order:1, .bezel
-  //          order:2. Locked here so a future edit can't silently drop the
-  //          reorder and reintroduce the "casing sits above the glass" bug.
+  //          UI-7): .glass-frame order:1, .bezel order:2. Locked here so a
+  //          future edit can't silently drop the reorder and reintroduce the
+  //          "casing sits above the glass" bug. Superseded in part by Suite
+  //          225 (owner round-2 pass): .casing-top itself no longer needs an
+  //          `order` — it is fully display:none (Suite 225.1), so it no
+  //          longer participates in the flex layout at all.
   assert(
-    /\[data-game='FO3'\]\s*\.casing-top\s*\{[^}]*order:\s*0/.test(fo3Css224) &&
-      /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*order:\s*1/.test(fo3Css224) &&
+    /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*order:\s*1/.test(fo3Css224) &&
       /\[data-game='FO3'\]\s*\.bezel\s*\{[^}]*order:\s*2/.test(fo3Css224),
-    '224.11: [live-browser regression, Protocol 42] .casing-top/.glass-frame/.bezel carry order:0/1/2 respectively — without this the casing bar renders ABOVE the glass (DOM order) instead of below it (visual order, matching the Pip-Boy reference)'
+    '224.11: [live-browser regression, Protocol 42] .glass-frame/.bezel carry order:1/2 respectively — without this the casing bar renders ABOVE the glass (DOM order) instead of below it (visual order, matching the Pip-Boy reference)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 225 — FO3 PIP-BOY landscape feedback pass round 2 (Protocol 8
+//  stage 2): reclaim the room (casing-top removed entirely, the mobile
+//  carrier strip and the Director Uplink header hidden on the glass),
+//  fix the sub-tab-rail-overlays-content bug (live-browser
+//  getBoundingClientRect regression, Protocol 42 — position:sticky inside
+//  a scrolling container that also held the (much taller) board content
+//  let the rail's pinned screen position and a board's normal-flow content
+//  share the same pixels while scrolling), the Vault Boy STATUS figure
+//  (design doc §5), and the karmaCenterDisplay literal-id leak (Protocol
+//  38/41). Every assertion is static-analysis-only, matching Suite 223/224's
+//  house style; NV-untouched is proven by requiring every new/changed
+//  selector to carry the [data-game='FO3'] prefix.
+//  13 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 225 — FO3 PIP-BOY landscape feedback pass round 2 (room reclaim + Vault Boy)');
+
+  const fo3CssPath225 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css225 = fs.existsSync(fo3CssPath225) ? fs.readFileSync(fo3CssPath225, 'utf8') : '';
+  const navSrc225 = readGroup('ui-core-nav');
+
+  // 225.1 — the ROBCO INDUSTRIES header band is fully removed from FO3
+  //         landscape layout (not merely shrunk, as the prior pass left it —
+  //         the owner's explicit "a real Pip-Boy has no such thing").
+  assert(
+    /\[data-game='FO3'\]\s*\.casing-top\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.1: [data-game='FO3'] .casing-top is display:none outright under FO3 landscape (fully removed, not shrunk)"
+  );
+
+  // 225.2 — the mobile "Overseer never fully leaves the screen" carrier
+  //         strip (css/15-overseer.css, amber-colored via --bezel-wire) is
+  //         hidden under FO3 landscape — this was the owner's "floating
+  //         orange button" report, confirmed by live DOM geometry
+  //         (getBoundingClientRect showed it at the very top of the glass
+  //         content region) before this fix.
+  assert(
+    /\[data-game='FO3'\]\s*#carrierStrip\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.2: [live-browser regression, Protocol 42] [data-game='FO3'] #carrierStrip is display:none — without this the amber mobile carrier strip renders inside the glass on every non-uplink subsystem"
+  );
+
+  // 225.3 — the Director Uplink header bar (DIRECTOR UPLINK / CARRIER LINK
+  //         / PURGE) is hidden under FO3 landscape ("the AI-chat header has
+  //         no business on a Pip-Boy screen" — the AI stays reachable via
+  //         the unchanged UPLINK knob/transcript/composer).
+  assert(
+    /\[data-game='FO3'\]\s*\.ovs-head\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.3: [data-game='FO3'] .ovs-head is display:none — the Director Uplink header no longer renders on the FO3 glass"
+  );
+
+  // 225.4 — #fo3BoardScroll: a plain, non-decorative layout wrapper (no aria
+  //         role — grouping only) around every existing board panel, added
+  //         once in index.html between #fo3SubtabRail and the boards.
+  assert(
+    (htmlSource.match(/id="fo3BoardScroll"/g) || []).length === 1,
+    '225.4a: index.html has exactly one #fo3BoardScroll element'
+  );
+  {
+    const wrapStart = htmlSource.indexOf('id="fo3BoardScroll"');
+    const firstBoard = htmlSource.indexOf('id="opVitalPanel"');
+    const wrapEnd = htmlSource.indexOf('<!-- /#fo3BoardScroll -->');
+    assert(
+      wrapStart !== -1 && firstBoard !== -1 && wrapEnd !== -1 && wrapStart < firstBoard,
+      '225.4b: #fo3BoardScroll opens before the first board panel'
+    );
+    assert(
+      firstBoard < wrapEnd,
+      '225.4c: #fo3BoardScroll closes after the board panels — every board sits inside the wrapper'
+    );
+  }
+
+  // 225.5 — Protocol 13/42 regression test for the "sub-tab rail overlays
+  //         content" bug: a live-browser geometry check (scrolling
+  //         #fo3BoardScroll to its end and testing every visible board's
+  //         rect against the rail's rect) found board content rendering
+  //         under the sticky rail. Root cause: position:sticky computed its
+  //         stuck offset against a scroll container (#uiPanel) that ALSO
+  //         held the (much taller than the viewport) board content in the
+  //         same flow, so the rail's pinned screen position and a board's
+  //         normal-flow content could occupy the same pixels while
+  //         scrolling. Fixed structurally: #fo3BoardScroll is now the ONE
+  //         scrolling region, sitting in normal flow (flex order 0/1/2)
+  //         between the non-scrolling top strip and rail — no
+  //         position:sticky is used anywhere in this file anymore.
+  const fo3Css225NoComments = fo3Css225.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert(
+    !/position:\s*sticky/.test(fo3Css225NoComments),
+    '225.5a: [live-browser regression, Protocol 42] css/60-fo3-pipboy.css no longer uses position:sticky in any actual rule (comments discussing the old bug are exempt) — the rail-overlays-content bug was caused by sticky positioning inside a scroll container that also held taller board content'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3TopStrip\s*\{\s*order:\s*0;\s*\}/.test(fo3Css225) &&
+      /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{[^}]*order:\s*1/.test(fo3Css225) &&
+      /\[data-game='FO3'\]\s*#fo3SubtabRail\s*\{\s*order:\s*2;\s*\}/.test(fo3Css225),
+    '225.5b: #fo3TopStrip/#fo3BoardScroll/#fo3SubtabRail carry flex order 0/1/2 — the rail is a true sibling AFTER the scrollable board region, never an overlay on top of it'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{[^}]*overflow-y:\s*auto/.test(fo3Css225),
+    '225.5c: #fo3BoardScroll (not #uiPanel) is the internally-scrolling region'
+  );
+
+  // 225.6 — Protocol 38/41 regression: the KARMA CENTER real-label used to
+  //         show the literal internal element id ("FO3 — karmaCenterDisplay")
+  //         directly on screen — a hardcoded game literal AND a leaked
+  //         implementation identifier, unlike every other .real-label on the
+  //         page (which name a plain real-world term, e.g. "(HP)", never a
+  //         DOM id). Locked so it cannot silently regress.
+  assert(
+    !/real-label">\(FO3\s*—\s*karmaCenterDisplay\)/.test(htmlSource),
+    '225.6a: [Protocol 38/41 regression] the karmaCenterDisplay real-label no longer contains the literal game name + raw element id'
+  );
+  assert(
+    /KARMA CENTER — VAULT LEGEND INDEX[\s\S]{0,40}real-label">\(KARMA LEGEND/.test(htmlSource),
+    '225.6b: the KARMA CENTER real-label now names a plain real-world term, matching every other real-label on the page'
+  );
+
+  // 225.7 — the Vault Boy figure (design doc §5 — "the single most Pip-Boy
+  //         thing in the project"): original inline SVG, zero image assets,
+  //         decorative (aria-hidden), ships `hidden` by default so NV
+  //         (which shares this exact markup — Protocol 22, no new render
+  //         path) never shows it without needing any [data-game='FNV']
+  //         exclusion rule.
+  assert(
+    (htmlSource.match(/class="vaultboy-fig"/g) || []).length === 1,
+    '225.7a: index.html has exactly one .vaultboy-fig element'
+  );
+  assert(
+    /<div class="vaultboy-fig" aria-hidden="true" hidden>/.test(htmlSource),
+    '225.7b: .vaultboy-fig is aria-hidden and ships the `hidden` boolean attribute by default (NV-inert without any FNV-exclusion CSS)'
+  );
+  assert(
+    !/<img[^>]*vaultboy/i.test(htmlSource) &&
+      /<div class="vaultboy-fig"[^>]*>\s*<svg/.test(htmlSource),
+    '225.7c: the Vault Boy figure is inline SVG markup — zero image assets'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.zone-body\s*\{\s*display:\s*none;\s*\}/.test(
+      fo3Css225
+    ) &&
+      /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\{[^}]*display:\s*flex/.test(
+        fo3Css225
+      ),
+    "225.7d: under [data-game='FO3'] landscape the old top-down zone plate is hidden and the Vault Boy figure is revealed — NV keeps the zone plate (no rule outside the [data-game='FO3'] scope touches it)"
+  );
+
+  // 225.8 — the five existing toggleLimb() buttons are the ONLY limb toggle
+  //         control — the Vault Boy view re-flows them via CSS `order`, it
+  //         does not duplicate them (Protocol 22 — one id, one control).
+  ['btn_l_hd', 'btn_l_la', 'btn_l_ra', 'btn_l_ll', 'btn_l_rl'].forEach(id => {
+    assert(
+      (htmlSource.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1,
+      '225.8: #' +
+        id +
+        ' still appears exactly once — the Vault Boy re-layout did not duplicate any limb button'
+    );
+  });
+
+  // 225.9 — _fo3BumpNumberInput() (the HP/RAD stepper helper) is
+  //         game-agnostic (Protocol 38): it re-dispatches the target
+  //         input's own native 'input' event rather than calling any
+  //         game-specific setter directly, so the input's EXISTING oninput
+  //         handler (updateMath()/capRadsMax()) stays the single source of
+  //         truth (Protocol 22 — no forked state path).
+  const bumpBody225 = extractFunctionBody(navSrc225, '_fo3BumpNumberInput');
+  assert(
+    typeof bumpBody225 === 'string' && /dispatchEvent\(new Event\('input'/.test(bumpBody225),
+    "225.9: _fo3BumpNumberInput() re-dispatches the target input's native 'input' event rather than duplicating updateMath()/capRadsMax() logic"
+  );
+
+  // 225.10 — the HP/RAD stepper button groups ship `hidden` by default in
+  //          the markup (the same game-agnostic-default pattern as
+  //          #fo3TopStrip/#fo3SubtabRail/.vaultboy-fig above) — NV, which
+  //          shares this exact markup, never sees them.
+  assert(
+    (htmlSource.match(/class="fo3-stepper-btn-group" hidden/g) || []).length === 2,
+    '225.10: both HP and RAD stepper button groups ship the `hidden` boolean attribute by default'
+  );
+
+  // 225.11 — NV-untouched proof: every FO3-scoped rule this suite locks
+  //          above lives ONLY inside the [data-game='FO3'] selector list —
+  //          spot-check that none of the new selectors this pass introduced
+  //          (#carrierStrip, .ovs-head, #opHarnessPanel, #fo3BoardScroll)
+  //          appear anywhere in this file WITHOUT that prefix.
+  ['#carrierStrip', '.ovs-head', '#opHarnessPanel', '#fo3BoardScroll'].forEach(sel => {
+    const escaped = sel.replace(/[.#]/g, '\\$&');
+    const bare = new RegExp("(?<!\\[data-game='FO3'\\]\\s{0,3})" + escaped + '\\s*\\{', 'g');
+    assert(
+      !bare.test(fo3Css225),
+      '225.11: every ' + sel + " rule in css/60-fo3-pipboy.css carries the [data-game='FO3'] prefix"
+    );
+  });
+
+  // 225.12 — Protocol 17 mobile baseline: every new interactive control this
+  //          pass adds (the HP/RAD stepper buttons) meets the >=28px tap
+  //          target minimum.
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-stepper-btn\s*\{[^}]*width:\s*28px[^}]*height:\s*28px/.test(
+      fo3Css225
+    ),
+    '225.12: .fo3-stepper-btn is 28x28px — meets the Protocol 17 minimum tap target'
+  );
+
+  // 225.13 — Protocol 22/23 architectural boundary: the Vault Boy re-layout
+  //          and the board-scroll fix are pure CSS (`order`/`display`) plus
+  //          one layout-only markup wrapper — no second render function was
+  //          added for STATUS (grep guard: no renderStatusFO3-style function
+  //          exists anywhere in the codebase).
+  assert(
+    !/function\s+renderStatusFO3|function\s+renderVaultBoy/.test(navSrc225),
+    '225.13: no second STATUS render path was introduced — the Vault Boy view is a CSS re-layout of the existing render pipeline (Protocol 22)'
   );
 }
 

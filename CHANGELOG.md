@@ -1,8 +1,9 @@
-## [Unreleased]<!-- Tests: 3110/3110 | Cache: robco-terminal-v2.8.0-r17 -->
+## [Unreleased]<!-- Tests: 3138/3138 | Cache: robco-terminal-v2.8.0-r18 -->
 
 ### Added
 
 - Continued building the true-to-the-game Fallout 3 Pip-Boy screen for landscape (rotate your phone sideways while playing a Fallout 3 campaign): the three main screens now show up as glowing lamps on the device casing, alongside a radio knob, a status gauge, and a toggle switch standing in for the AI channel, system status, and settings. Each screen's sub-sections (like STATUS, SPECIAL, and SKILLS under the character screen) get their own row of tabs on the glass, remembering which one you last had open. Portrait mode is untouched — it keeps showing today's layout — and Fallout: New Vegas isn't affected at all. This is still a functional pass; a fully dressed casing (indicator sway, working knob detent, etc.) comes later.
+- Added a Vault Boy figure to the Fallout 3 Pip-Boy's landscape character screen — your five body-part health toggles now flank an original stylized figure instead of a plain top-down diagram, matching the in-game STATUS display. Tapping a body part still works exactly as before; a new pair of small up/down buttons next to your health and radiation readouts lets you adjust them without opening the number field.
 
 ### Fixed
 
@@ -14,6 +15,12 @@
 - Fixed the Fallout 3 Pip-Boy landscape screen's casing reading as a flat, pale placeholder color — it's now a dark, weathered metal, matching the rest of the device.
 - Fixed the Fallout 3 Pip-Boy landscape screen's system-status gauge, AI-channel knob, and settings switch looking like flat abstract shapes — the gauge now has a proper needle and a metal ring, the knob has a pointer that swings when you tune in, and the settings switch is a real toggle with a lever, and its label no longer gets cut off.
 - Fixed the Fallout 3 Pip-Boy landscape screen still showing the same instrument dressing (part-number tags, blinking status lights, and amber highlights) as the New Vegas desk terminal — it's now a flatter, plainer green readout to match the rest of the Pip-Boy's look.
+- Removed the "ROBCO INDUSTRIES" desk-terminal header bar from the top of the Fallout 3 Pip-Boy landscape screen entirely, instead of just shrinking it — a real Pip-Boy has no such header, and removing it frees up meaningfully more room for the actual screen content.
+- Fixed an unlabeled amber strip floating over the top of the Fallout 3 Pip-Boy landscape screen on every view except the radio channel — it was the "AI is one tap away" banner meant only for phones, left showing even though the AI's radio knob already provides that same one-tap access on this screen. It's now hidden on the Pip-Boy screen.
+- Fixed the AI radio channel's header bar (with its title and history-clear button) still showing on top of the Fallout 3 Pip-Boy's landscape screen — a real Pip-Boy has no such header. The channel itself, and clearing its history, are unaffected; only the redundant header is gone.
+- Fixed the Fallout 3 Pip-Boy landscape screen's bottom sub-section tabs visually sliding over the bottom of a long screen's content instead of sitting below it — for example, part of the body-part health toggles could end up hidden under the tab row while scrolling. The screen area between the top readout strip and the bottom tab row is now its own properly bounded, scrolling section, so the tab row can never sit on top of content again.
+- Trimmed the Fallout 3 Pip-Boy landscape screen's bottom control bar (the lamps, radio knob, status gauge, and settings switch) to a noticeably shorter height, freeing up more room for the screen above it.
+- Fixed a leftover internal label ("FO3 — karmaCenterDisplay") showing literally on screen next to the Karma Center heading — it now reads as plain text like every other label on the page.
 
 ### Under the Hood
 
