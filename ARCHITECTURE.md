@@ -51,7 +51,7 @@
 
 ```
 ├── index.html          ~55KB  DOM structure + all inline event handlers
-├── css/                       12 order-prefixed files (2.8.5 U-A2 split), source order = cascade order
+├── css/                       13 order-prefixed files (2.8.5 U-A2 split + the FO3 Pip-Boy build), source order = cascade order
 │   ├── 05-base.css              Tokens, reset, layout, app-shell
 │   ├── 10-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
 │   ├── 15-overseer.css          Director Uplink / Overseer presence
@@ -63,6 +63,7 @@
 │   ├── 45-databank.css          Databank / Records Bay
 │   ├── 50-chassis.css           Chassis diagnostic bay + Living Core
 │   ├── 55-feedback-animations.css Feedback Animation Waves 1-3
+│   ├── 60-fo3-pipboy.css        FO3 landscape Pip-Boy casing/glass skin — [data-game='FO3'] only, NV untouched
 │   └── 99-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
 ├── js/                        Reorganized into subfolders by responsibility (2.8.5 U-A2)
 │   ├── data/                  Fallout game content: item DBs + registries
@@ -105,7 +106,7 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    36KB    3084-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    36KB    3103-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   └── render-check.mjs        Mobile overflow check at 360px and 412px
 ├── scripts/
@@ -3165,7 +3166,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3084-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3103-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

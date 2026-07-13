@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Tests: 3084/3084 | Cache: robco-terminal-v2.8.0-r14 -->
+## [Unreleased]<!-- Tests: 3103/3103 | Cache: robco-terminal-v2.8.0-r15 -->
+
+### Added
+
+- Started building a true-to-the-game Fallout 3 Pip-Boy screen for landscape (rotate your phone sideways while playing a Fallout 3 campaign): the three main screens now show up as glowing lamps on the device casing, alongside a radio knob, a status gauge, and a toggle switch standing in for the AI channel, system status, and settings. Each screen's sub-sections (like STATUS, SPECIAL, and SKILLS under the character screen) get their own row of tabs on the glass, remembering which one you last had open. Portrait mode is untouched — it keeps showing today's layout — and Fallout: New Vegas isn't affected at all. This is an early, functional pass; a fully dressed casing (indicator sway, working knob detent, etc.) comes later.
 
 ### Fixed
 

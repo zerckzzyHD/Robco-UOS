@@ -285,6 +285,7 @@ const CANONICAL_CSS_ORDER = [
   '45-databank.css',
   '50-chassis.css',
   '55-feedback-animations.css',
+  '60-fo3-pipboy.css',
   '99-mobile.css',
 ];
 {
@@ -297,7 +298,7 @@ const CANONICAL_CSS_ORDER = [
   // (not just a permutation — order is the entire point of this guard).
   ok(
     JSON.stringify(cssLinkOrder) === JSON.stringify(CANONICAL_CSS_ORDER),
-    'index.html <link> tags list the 12 split CSS files in the exact canonical cascade order',
+    'index.html <link> tags list the 13 split CSS files in the exact canonical cascade order',
     `index.html order: ${JSON.stringify(cssLinkOrder)}\n         canonical order: ${JSON.stringify(CANONICAL_CSS_ORDER)}`
   );
 
@@ -311,13 +312,13 @@ const CANONICAL_CSS_ORDER = [
   const missingCss = CANONICAL_CSS_ORDER.filter(f => !onDiskCss.includes(f));
   ok(
     orphanCss.length === 0 && missingCss.length === 0,
-    'css/ on disk contains exactly the 12 canonical split files (no orphans, none missing)',
+    'css/ on disk contains exactly the 13 canonical split files (no orphans, none missing)',
     orphanCss.length || missingCss.length
       ? `orphaned: ${orphanCss.join(', ') || 'none'}; missing: ${missingCss.join(', ') || 'none'}`
       : undefined
   );
 
-  // CHECK K: sw.js ASSETS precaches every one of the 12 split CSS files
+  // CHECK K: sw.js ASSETS precaches every one of the 13 split CSS files
   // (precache order doesn't affect the cascade — only existence matters here).
   const assetCssPaths = assetsBlock
     ? [...assetsBlock[1].matchAll(/'\.\/(css\/[^']+)'/g)].map(mm => mm[1].replace(/^css\//, ''))

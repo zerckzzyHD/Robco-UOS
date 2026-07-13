@@ -462,8 +462,73 @@ function _bezelTelemetryText(subsystem) {
 function _refreshBezelTelemetry() {
   const lcd = document.getElementById('bezelTelemetry');
   if (lcd) lcd.textContent = _bezelTelemetryText(document.body.dataset.subsystem || 'operator');
+  // FO3 PIP-BOY BUILD U2 (temptation item 2 — "ONE writer, two projection
+  // targets"): the exact same choke point that keeps the NV bezel LCD live
+  // also keeps the FO3 in-glass top strip live, with zero new call-site
+  // wiring. A no-op for any game with no identity.statusStrip (NV/FO4 today).
+  _renderFo3TopStrip();
 }
 window._refreshBezelTelemetry = _refreshBezelTelemetry;
+
+// ── FO3 PIP-BOY BUILD U2: THE IN-GLASS TOP STRIP ─────────────────────
+// _fo3StripFieldValue(key) — reads the ONE existing live DOM/state source
+// each identity.statusStrip field name already has (never a second,
+// parallel computation — Protocol 22): LVL/#stat_lvl, HP/#stat_hp_cur+max,
+// Wg/#display_weight (already formatted "cur / max" by updateMath()),
+// RAD/#stat_rads, Caps/#c_caps (falling back to state.caps before the DOM
+// is first painted).
+function _fo3StripFieldValue(key) {
+  switch (key) {
+    case 'LVL': {
+      const el = document.getElementById('stat_lvl');
+      return el ? el.value : '';
+    }
+    case 'HP': {
+      const cur = document.getElementById('stat_hp_cur');
+      const max = document.getElementById('stat_hp_max');
+      return cur && max ? cur.value + '/' + max.value : '';
+    }
+    case 'Wg': {
+      const el = document.getElementById('display_weight');
+      return el ? el.innerText : '';
+    }
+    case 'RAD': {
+      const el = document.getElementById('stat_rads');
+      return el ? el.value : '';
+    }
+    case 'Caps': {
+      const el = document.getElementById('c_caps');
+      return el ? el.value : state.caps != null ? state.caps : '';
+    }
+    default:
+      return '';
+  }
+}
+
+// _renderFo3TopStrip() — (re)builds #fo3TopStrip's boxed segments from
+// identity.statusStrip (pure data, Protocol 38 — never a hardcoded field
+// list). A complete no-op when the active identity carries no
+// statusStrip (NV/FO4 today): the strip stays empty and `hidden`-governed
+// exactly as U1 shipped it.
+function _renderFo3TopStrip() {
+  const strip = document.getElementById('fo3TopStrip');
+  if (!strip) return;
+  const fields = getIdentity().statusStrip;
+  if (!fields) {
+    strip.innerHTML = '';
+    return;
+  }
+  strip.innerHTML = fields
+    .map(
+      key =>
+        '<span class="fo3-strip-seg"><b>' +
+        escapeHtml(key) +
+        '</b>' +
+        escapeHtml(String(_fo3StripFieldValue(key))) +
+        '</span>'
+    )
+    .join('');
+}
 
 // ── MOTION VERBS (Protocol UI-9) ─────────────────────────────────────
 // SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change.

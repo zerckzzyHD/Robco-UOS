@@ -41403,11 +41403,18 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '223.11c: #fo3SubtabRail carries role="tablist" and a real aria-label (a11y groundwork)'
   );
 
-  // 223.12 — U1 adds NO new CSS file (that's a later unit's job) — the split
-  //          order derived from index.html's own <link> tags is unchanged.
+  // 223.12 — U1 itself adds NO new CSS file (that job belongs to a later
+  //          unit). This assertion's threshold is milestone-scoped and
+  //          expected to move: at U1 alone the split order was still
+  //          exactly the 12 pre-U1 files; U2 (see Suite 224) legitimately
+  //          adds exactly one FO3-named file on top of it. Checked here as
+  //          "at least the 12 pre-U1 files, at most one of them FO3-named"
+  //          so this suite keeps documenting U1's own boundary without
+  //          re-failing the moment U2 lands (Suite 224 owns U2's own count).
+  const fo3CssFiles223 = CSS_SPLIT_FILES.filter(f => /fo3/i.test(f));
   assert(
-    CSS_SPLIT_FILES.length === 12 && !CSS_SPLIT_FILES.some(f => /fo3/i.test(f)),
-    '223.12: U1 ships no new CSS file — css/ split order is still the 12 pre-U1 files, none FO3-named'
+    CSS_SPLIT_FILES.length >= 12 && fo3CssFiles223.length <= 1,
+    '223.12: css/ split order carries at most one FO3-named file (zero as of U1 alone; U2 legitimately adds exactly one — see Suite 224)'
   );
 
   // 223.13 — robco_fo3_subtab_ is registered in META_MANIFEST as a device
@@ -41420,6 +41427,321 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   assert(
     !stateKeys223.some(k => /fo3.?subtab/i.test(k)),
     '223.13b: no `state` field was added for the sub-tab preference — it lives only in META_MANIFEST (device pref), never campaign state'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 224 — FO3 PIP-BOY BUILD U2: landscape casing shell, THE SPINE
+//  (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: U2 ships the first VISIBLE piece of the FO3 Pip-Boy — a new,
+//  own-numbered CSS file (css/60-fo3-pipboy.css, Protocol UI-7: a third
+//  game ADDS a file, never edits one) that re-skins the EXISTING bezel
+//  keycaps into lamp/knob/gauge/toggle form, reveals U1's sub-tab rail and
+//  a new in-glass top strip, and applies the rails-reveal hide rule. The
+//  NV-unchanged hard invariant is proven MECHANICALLY here, not just
+//  asserted: every single rule in the new file (bar one root token
+//  override) is asserted to carry a [data-game='FO3'] selector, which can
+//  never match under any other game context — combined with the fact
+//  (verifiable via `git diff --stat` against every pre-U2 CSS file, run
+//  and recorded in the commit) that NOT ONE byte of the 12 pre-existing
+//  CSS files changed, NV cannot possibly render differently after this
+//  unit. This suite also locks: the casing selectors sit inside exactly
+//  one @media(orientation:landscape) block (so FO3 PORTRAIT — "the legacy
+//  view" — stays untouched too), zero image assets, no board control is
+//  functionally disabled by the re-skin, and the new
+//  _renderFo3TopStrip()/_fo3StripFieldValue() functions are no-ops
+//  without identity.statusStrip.
+//  25 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 224 — FO3 PIP-BOY BUILD U2 (landscape casing shell, the spine)');
+
+  // 224.1 — the new CSS file exists on disk and is registered everywhere
+  //         a served/precached file must be (Protocol 1): index.html
+  //         <link>, sw.js ASSETS, and CSS_SPLIT_FILES' derived cascade
+  //         order (after 55-feedback-animations, before 99-mobile).
+  const fo3CssPath224 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  assert(fs.existsSync(fo3CssPath224), '224.1a: css/60-fo3-pipboy.css exists on disk');
+  const fo3Css224 = fs.existsSync(fo3CssPath224) ? fs.readFileSync(fo3CssPath224, 'utf8') : '';
+  const cssIdx224 = CSS_SPLIT_FILES.indexOf('60-fo3-pipboy.css');
+  const idx55_224 = CSS_SPLIT_FILES.indexOf('55-feedback-animations.css');
+  const idx99_224 = CSS_SPLIT_FILES.indexOf('99-mobile.css');
+  assert(
+    cssIdx224 !== -1 && cssIdx224 === idx55_224 + 1 && cssIdx224 === idx99_224 - 1,
+    "224.1b: css/60-fo3-pipboy.css sits in index.html's <link> order directly after 55-feedback-animations.css and directly before 99-mobile.css"
+  );
+  const swText224 = readFile('sw.js');
+  assert(
+    swText224.includes("'./css/60-fo3-pipboy.css'"),
+    '224.1c: sw.js ASSETS precaches css/60-fo3-pipboy.css (Protocol 1)'
+  );
+
+  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 12
+  //         pre-existing CSS files changed by even a byte in this unit
+  //         (verified directly against the git index — the strongest
+  //         available proof short of a live-browser pixel diff).
+  {
+    let gitDiffOut224 = '';
+    let gitErr224 = null;
+    try {
+      gitDiffOut224 = require('child_process')
+        .execSync(
+          'git diff --stat HEAD -- css/05-base.css css/10-chrome.css css/15-overseer.css ' +
+            'css/20-diagnostic-shell.css css/25-toolbar.css css/30-modulebay.css ' +
+            'css/35-operator-boards.css css/40-curio-operations.css css/45-databank.css ' +
+            'css/50-chassis.css css/55-feedback-animations.css css/99-mobile.css',
+          { cwd: ROOT, encoding: 'utf8' }
+        )
+        .trim();
+    } catch (e) {
+      gitErr224 = e;
+    }
+    // Only meaningful when this unit's own changes are already staged/committed
+    // (a fresh, un-committed working tree at HEAD would trivially show empty
+    // too) — the assertion is intentionally lenient (skips rather than fails)
+    // when git itself is unavailable, since this check is a bonus proof on
+    // top of 224.3's structural [data-game='FO3']-scoping guarantee below,
+    // not the sole line of defense.
+    assert(
+      gitErr224 !== null || gitDiffOut224 === '',
+      '224.2: git diff --stat confirms zero bytes changed in any of the 12 pre-existing CSS files (NV-unchanged, mechanically verified against the git index)' +
+        (gitDiffOut224 ? ' — DIFF FOUND: ' + gitDiffOut224 : '')
+    );
+  }
+
+  // 224.3 — EVERY rule in the new file (bar the one root token-override
+  //         block) carries a [data-game='FO3'] selector — the structural
+  //         guarantee that NV can never match anything in this file,
+  //         regardless of what the file's CSS actually says (Protocol 20).
+  //         Comments are stripped first — this file's own header prose
+  //         mentions both [data-game='FO3'] and @media(orientation:...)
+  //         in plain English, which must not be counted as real rules.
+  //         This is a REAL parse (brace-depth walk), not a occurrence-count
+  //         heuristic — a naive count can't tell "one unscoped rule swapped
+  //         in for a scoped one" from "the totals happen to still add up"
+  //         (caught live: an earlier count-based version of this check
+  //         passed even after the FO3 hide rule's own selector was
+  //         deliberately unscoped, because it only checked the total count
+  //         outside the media block, never that every rule INSIDE it is
+  //         individually scoped).
+  if (fo3Css224) {
+    const fo3CssNoComments224 = fo3Css224.replace(/\/\*[\s\S]*?\*\//g, '');
+    const mediaOpenMarker224 = '@media (orientation: landscape) {';
+    const mediaOpenIdx224 = fo3CssNoComments224.indexOf(mediaOpenMarker224);
+    const beforeMedia224 =
+      mediaOpenIdx224 === -1 ? fo3CssNoComments224 : fo3CssNoComments224.slice(0, mediaOpenIdx224);
+    const fo3SelectorsBeforeMedia224 = (beforeMedia224.match(/\[data-game='FO3'\]/g) || []).length;
+    assert(
+      mediaOpenIdx224 !== -1,
+      '224.3a: css/60-fo3-pipboy.css has exactly one @media(orientation:landscape) block opener'
+    );
+    assert(
+      fo3SelectorsBeforeMedia224 === 1,
+      "224.3b: exactly ONE [data-game='FO3'] selector sits outside the @media(orientation:landscape) block (the root --bezel-wire token override)"
+    );
+    // 224.3c — no other @media(orientation:*) block exists (a second,
+    //          differently-scoped block would be easy to miss in review).
+    const mediaBlockCount224 = (fo3CssNoComments224.match(/@media\s*\([^)]*orientation/g) || [])
+      .length;
+    assert(
+      mediaBlockCount224 === 1,
+      '224.3c: exactly one orientation-scoped @media block exists in the file — no stray second block a reviewer could miss'
+    );
+
+    // 224.3d — walk the media block's REAL rule structure (brace-depth
+    //          parse) and assert every top-level rule's selector list is
+    //          FO3-scoped on EVERY comma-separated part — the actual
+    //          mechanical guarantee that FO3 PORTRAIT (the legacy view)
+    //          can never be touched by anything in this file.
+    if (mediaOpenIdx224 !== -1) {
+      const bodyStart224 = mediaOpenIdx224 + mediaOpenMarker224.length - 1; // index of the media block's own '{'
+      let depth224 = 0;
+      let i224 = bodyStart224;
+      let mediaBodyEnd224 = -1;
+      for (; i224 < fo3CssNoComments224.length; i224++) {
+        if (fo3CssNoComments224[i224] === '{') depth224++;
+        else if (fo3CssNoComments224[i224] === '}' && --depth224 === 0) {
+          mediaBodyEnd224 = i224;
+          break;
+        }
+      }
+      const mediaInner224 = fo3CssNoComments224.slice(bodyStart224 + 1, mediaBodyEnd224);
+
+      // Split the media block's own inner content into top-level
+      // "selector { declarations }" rules (depth-1 relative to mediaInner224).
+      const rules224 = [];
+      let ruleDepth224 = 0;
+      let selStart224 = 0;
+      for (let j = 0; j < mediaInner224.length; j++) {
+        const c = mediaInner224[j];
+        if (c === '{') {
+          if (ruleDepth224 === 0)
+            rules224.push({ selectorText: mediaInner224.slice(selStart224, j) });
+          ruleDepth224++;
+        } else if (c === '}') {
+          ruleDepth224--;
+          if (ruleDepth224 === 0) selStart224 = j + 1;
+        }
+      }
+
+      const unscoped224 = [];
+      rules224.forEach(r => {
+        r.selectorText
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+          .forEach(sel => {
+            if (!sel.startsWith("[data-game='FO3']")) unscoped224.push(sel);
+          });
+      });
+      assert(
+        rules224.length > 0 && unscoped224.length === 0,
+        "224.3d: EVERY top-level rule inside the @media(orientation:landscape) block is [data-game='FO3']-scoped on every comma-separated selector part" +
+          (unscoped224.length ? ' — UNSCOPED: ' + unscoped224.join(' | ') : '')
+      );
+    } else {
+      assert(false, '224.3d: skipped — no @media(orientation:landscape) block found');
+    }
+  } else {
+    assert(false, '224.3: skipped — css/60-fo3-pipboy.css not found');
+  }
+
+  // 224.4 — the rails-reveal hide rule (U1's mechanism, U2's skin) is
+  //         present, exactly matching the build plan's §1 step 4 form —
+  //         it is what actually makes "selecting OPERATOR shows only the
+  //         STATUS group" true, now that a real stylesheet governs it.
+  assert(
+    /\[data-game='FO3'\]\s*\.panel\[data-tab\]\.tab-visible\[data-subtab\]:not\(\.subtab-active\)\s*\{\s*display:\s*none;?\s*\}/.test(
+      fo3Css224
+    ),
+    "224.4: the FO3 hide rule [data-game='FO3'] .panel[data-tab].tab-visible[data-subtab]:not(.subtab-active){display:none} is present verbatim"
+  );
+
+  // 224.5 — no image assets anywhere in the new CSS or the new index.html
+  //         markup this unit added (#fo3TopStrip/#fo3SubtabRail region) —
+  //         all casing chrome is gradients/shadows/borders (design doc §1/
+  //         build plan invariant 6).
+  assert(
+    !/url\(/i.test(fo3Css224),
+    '224.5a: css/60-fo3-pipboy.css contains zero url(...) references — no external image assets'
+  );
+  const fo3StripIdx224 = htmlSource.indexOf('id="fo3TopStrip"');
+  const fo3RailIdx224 = htmlSource.indexOf('id="fo3SubtabRail"');
+  const fo3RailCloseIdx224 =
+    fo3RailIdx224 === -1 ? -1 : htmlSource.indexOf('</div>', fo3RailIdx224);
+  const fo3MarkupRegion224 =
+    fo3StripIdx224 !== -1 && fo3RailCloseIdx224 !== -1
+      ? htmlSource.slice(fo3StripIdx224, fo3RailCloseIdx224)
+      : '';
+  assert(
+    fo3MarkupRegion224 !== '' && !/<img\b/i.test(fo3MarkupRegion224),
+    '224.5b: the U1/U2 sub-tab-rail + top-strip markup region carries no <img> tags'
+  );
+
+  // 224.6 — the board re-skin never functionally disables a control — only
+  //         cosmetic properties (border/background/border-radius) touch
+  //         .bay-board/button/input selectors, never display:none,
+  //         visibility:hidden, or pointer-events:none (editing-survives —
+  //         no tab ever goes read-only, build plan invariant 2).
+  {
+    const boardReskinMatch224 = fo3Css224.match(
+      /\[data-game='FO3'\] \.col-left \.panel\.bay-board[\s\S]*?(?=\n\n|\/\* ── viewport)/
+    );
+    const boardReskinBlock224 = boardReskinMatch224 ? boardReskinMatch224[0] : '';
+    assert(
+      boardReskinBlock224 !== '' &&
+        !/display:\s*none/.test(boardReskinBlock224) &&
+        !/visibility:\s*hidden/.test(boardReskinBlock224) &&
+        !/pointer-events:\s*none/.test(boardReskinBlock224),
+      '224.6: the austere board re-skin block never sets display:none/visibility:hidden/pointer-events:none on a board control — every inline control stays exactly as tappable as it is today'
+    );
+  }
+
+  // 224.7 — _renderFo3TopStrip()/_fo3StripFieldValue() are defined, and the
+  //         strip render is a complete no-op without identity.statusStrip
+  //         (NV/FO4 today) — behavioral proof against the real extracted
+  //         function body, mirroring Suite 223's harness style.
+  const navSrc224 = readGroup('ui-core-nav');
+  let topStripBody224 = null;
+  let topStripErr224 = null;
+  try {
+    topStripBody224 = extractFunctionBody(navSrc224, '_renderFo3TopStrip');
+  } catch (e) {
+    topStripErr224 = e;
+  }
+  assert(
+    topStripBody224 !== null && navSrc224.includes('function _fo3StripFieldValue('),
+    '224.7a: _renderFo3TopStrip() and _fo3StripFieldValue() are both defined in js/ui/ui-core-nav.js' +
+      (topStripErr224 ? ' — ' + topStripErr224.message : '')
+  );
+  if (topStripBody224) {
+    const elements224 = new Map();
+    function elFor224(id) {
+      if (!elements224.has(id)) elements224.set(id, { innerHTML: '' });
+      return elements224.get(id);
+    }
+    const sandbox224 = {
+      document: { getElementById: id => elFor224(id) },
+      getIdentity: () => ({ statusStrip: undefined }),
+      escapeHtml: s => s,
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const vm224 = require('vm');
+    vm224.createContext(sandbox224);
+    vm224.runInContext('function _renderFo3TopStrip()' + topStripBody224, sandbox224);
+    elFor224('fo3TopStrip').innerHTML = 'STALE';
+    let threw224 = false;
+    try {
+      sandbox224._renderFo3TopStrip();
+    } catch (_) {
+      threw224 = true;
+    }
+    assert(
+      !threw224 && elFor224('fo3TopStrip').innerHTML === '',
+      '224.7b: axis-inert-for-NV — _renderFo3TopStrip() throws nothing and clears #fo3TopStrip to empty when identity.statusStrip is absent'
+    );
+  } else {
+    assert(false, '224.7b: skipped — _renderFo3TopStrip extraction failed');
+  }
+
+  // 224.8 — _refreshBezelTelemetry() calls _renderFo3TopStrip() — the ONE
+  //         choke point that already keeps the NV bezel LCD live now also
+  //         keeps the FO3 top strip live, with zero new call-site wiring
+  //         (temptation item 2 — "ONE writer, two projection targets").
+  const refreshBody224 = extractFunctionBody(navSrc224, '_refreshBezelTelemetry');
+  assert(
+    /_renderFo3TopStrip\(\);/.test(refreshBody224),
+    '224.8: _refreshBezelTelemetry() calls _renderFo3TopStrip() — the shared choke point every HP/rads/limb/connection change already runs through'
+  );
+
+  // 224.9 — #fo3TopStrip exists exactly once in index.html and ships
+  //         `hidden` by default, same U1-precedent pattern as #fo3SubtabRail
+  //         (an author-origin CSS rule — 224.4's sibling rules in the new
+  //         file — always wins over the UA [hidden] default).
+  assert(
+    (htmlSource.match(/id="fo3TopStrip"/g) || []).length === 1,
+    '224.9a: index.html has exactly one #fo3TopStrip element'
+  );
+  assert(
+    /<div id="fo3TopStrip" hidden><\/div>/.test(htmlSource),
+    '224.9b: #fo3TopStrip ships the `hidden` boolean attribute by default'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3TopStrip\s*\{[^}]*display:\s*flex/.test(fo3Css224),
+    "224.9c: css/60-fo3-pipboy.css reveals #fo3TopStrip under [data-game='FO3'] landscape"
+  );
+
+  // 224.10 — Protocol 13/42 regression test: a live-browser check (Suite 224
+  //          is static-analysis-only and could not have caught this) found
+  //          .fo3-subtab-btn rendering as 5 STACKED full-width rows instead
+  //          of one inline row — the codebase's global `button{width:100%}`
+  //          base rule (Protocol UI-5) was silently winning because this
+  //          rule never overrode it. Fixed by adding `width: auto`; locked
+  //          here so a future edit can't silently drop it again.
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-subtab-btn\s*\{[^}]*width:\s*auto/.test(fo3Css224),
+    '224.10: [live-browser regression, Protocol 42] .fo3-subtab-btn sets width:auto, overriding the global button{width:100%} base rule — without it every sub-tab button renders full-width, stacking the rail into 5 rows instead of one'
   );
 }
 

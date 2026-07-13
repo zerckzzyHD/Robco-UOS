@@ -41,6 +41,7 @@
     <link rel="stylesheet" href="css/45-databank.css" />
     <link rel="stylesheet" href="css/50-chassis.css" />
     <link rel="stylesheet" href="css/55-feedback-animations.css" />
+    <link rel="stylesheet" href="css/60-fo3-pipboy.css" />
     <link rel="stylesheet" href="css/99-mobile.css" />
     <script>
       // Pre-paint optic apply (flash-free) — read THIS game's per-game pick (robco_optic_<ctx>,
@@ -791,6 +792,12 @@
         </button>
         <div class="main-grid">
           <div class="col-left" id="uiPanel">
+            <!-- FO3 PIP-BOY BUILD U2: the in-glass top strip (LVL/HP/Wg/RAD/
+                 Caps, from identity.statusStrip) — hidden by default (no CSS
+                 targets it outside [data-game='FO3'] landscape); populated by
+                 _renderFo3TopStrip() (js/ui/ui-core-nav.js), a no-op for any
+                 game with no identity.statusStrip (NV/FO4 today). -->
+            <div id="fo3TopStrip" hidden></div>
             <!-- FO3 PIP-BOY BUILD U1: the second nav axis's sub-tab rail —
                  stays `hidden` (a plain HTML boolean attribute, not a CSS
                  rule) until the FO3 casing CSS (a later unit) reveals it.

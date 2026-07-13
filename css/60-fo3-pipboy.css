@@ -1,0 +1,313 @@
+/* ══════════════════════════════════════════════════════════════════════
+   60-fo3-pipboy.css — cascade slot 60: the FO3 PIP-BOY 3000 landscape skin
+   (FO3 PIP-BOY BUILD U2 — Protocol 8 stage 2, "the spine").
+
+   WHY HERE: after every shared board/chrome file (05-55) so its
+   [data-game='FO3'] rules win by source order over the shared defaults
+   they re-skin, and before 99-mobile.css (which must stay last — see its
+   own header). A third game ADDS a file here; it never edits 05-55
+   (Protocol UI-7 / Protocol 22).
+
+   SCOPE — every rule below is gated [data-game='FO3'], and the casing/
+   austere-glass/rails-reveal rules are ADDITIONALLY gated
+   @media(orientation:landscape). NV carries no [data-game='FO3'] match,
+   ever — nothing here can touch it. FO3 PORTRAIT gets none of these rules
+   either (no @media(orientation:portrait) block exists in this file) —
+   it keeps rendering the shared flat/plain layout exactly as it does
+   today ("portrait = the legacy view").
+
+   SPINE SCOPE NOTE (honest, not silent): this ships the rails-reveal
+   mechanism's skin, a functional lamp/knob/gauge/toggle re-skin of the
+   EXISTING bezel keycaps (Protocol UI-7 — no new interactive markup), the
+   in-glass top strip + sub-tab rail, and an austere board re-skin — all
+   CSS-only, zero new render paths. It deliberately does NOT attempt the
+   mockup's fully-dressed multi-column casing (free-floating left-rail/
+   right-col flanking the glass, gauge sway, knob detent, screws, fins,
+   fixed-viewport internal scrolling) — that is real casing-dressing
+   POLISH (plan §11 cut-order item 3) layered on top later, not the spine.
+   The page keeps its normal scrollable flow; only real-device testing (an
+   explicit owner-only gate per the build plan) can settle whether a
+   fixed-viewport treatment is actually needed. ══════════════════════════════════════════════════════════════════════ */
+
+/* ── FO3's amber accent — "the wire," spent ONLY on the active lamp, the
+   tuned knob, and the toggle's active lever (design doc §8). Lives here,
+   not in 10-chrome.css, because a third game's per-game token override
+   belongs in the third game's own file — [data-game='FO3'] never matches
+   simultaneously with [data-game='FNV'], so there is no cascade conflict
+   regardless of file load order (Protocol UI-7). */
+[data-game='FO3'] {
+  --bezel-wire: #ffa030;
+  --bezel-wire-rgb: 255, 160, 48;
+}
+
+@media (orientation: landscape) {
+  /* ── THE SECOND NAV AXIS REVEAL (U1 built the mechanism; this is its
+     skin). NV boards never carry data-subtab (U0/U1), so this selector
+     can never match an NV element — U1's own invariant, restated here as
+     the reason this rule is safe to scope only to FO3, not to orientation
+     AND game together being redundant. Landscape-only: FO3 portrait keeps
+     today's accordion (data-subtab stays stamped year-round once U1's
+     boot-time stamper runs, but this hide rule only fires here). */
+  [data-game='FO3'] .panel[data-tab].tab-visible[data-subtab]:not(.subtab-active) {
+    display: none;
+  }
+
+  /* ── the sub-tab rail (U1's #fo3SubtabRail, shipped `hidden`) — an
+     author-origin rule always wins over the UA [hidden] default
+     regardless of specificity (origin trumps specificity in the cascade),
+     so no HTML/JS change was needed to reveal it here. */
+  [data-game='FO3'] #fo3SubtabRail {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    margin: 6px 0 2px;
+    border-top: 1px solid rgba(var(--robco-green-rgb), 0.25);
+    border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.25);
+  }
+  [data-game='FO3'] .fo3-subtab-btn {
+    width: auto; /* overrides the global button{width:100%} base rule (Protocol UI-5) — these sit inline in a row, not stacked full-width */
+    min-height: 28px;
+    min-width: 28px;
+    padding: 4px 8px;
+    font-size: 9.5px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--robco-green);
+    opacity: 0.55;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: none;
+    text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
+  }
+  [data-game='FO3'] .fo3-subtab-btn[aria-selected='true'] {
+    opacity: 1;
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+
+  /* ── the in-glass top strip (identity.statusStrip, LVL/HP/Wg/RAD/Caps —
+     _renderFo3TopStrip(), js/ui/ui-core-nav.js). Austere: flat phosphor
+     text in boxed segments, the FO3 control language's one shared
+     vocabulary piece that appears everywhere on the screen. */
+  [data-game='FO3'] #fo3TopStrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    color: var(--robco-green);
+  }
+  [data-game='FO3'] .fo3-strip-seg {
+    border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+    border-radius: 2px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    background: rgba(var(--robco-green-rgb), 0.05);
+    text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.5);
+  }
+  [data-game='FO3'] .fo3-strip-seg b {
+    font-weight: normal;
+    opacity: 0.65;
+    margin-right: 3px;
+  }
+
+  /* ── THE CASING FASCIA — a functional re-skin of the EXISTING bezel
+     keycaps into lamp/knob/gauge/toggle form (Protocol UI-7: chrome
+     layered around the working shell, never a new shell — every button
+     below keeps its real id, onclick, role=tab, aria-selected; only its
+     skin changes). DIR has no casing control on FO3 (a Pip-Boy has none —
+     design doc §3); hotkey [0] still opens it (the JS handler fires
+     regardless of the button's visibility). The GOVERNOR dial / field-kit
+     flavor are NV-bezel decoration, not part of the Pip-Boy body — hidden
+     here, not deleted (they still render for every other game/breakpoint). */
+  [data-game='FO3'] .bezel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 10px 6px;
+    border-radius: 8px;
+    background: linear-gradient(168deg, #4a5132, #333921 34%, #22270f 88%);
+    box-shadow:
+      inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+      inset -1px -2px 4px rgba(0, 0, 0, 0.55);
+  }
+  [data-game='FO3'] #navkey-directory,
+  [data-game='FO3'] .bezel-side {
+    display: none;
+  }
+  /* the LCD telemetry line is superseded visually by #fo3TopStrip, but
+     stays in the accessibility tree (aria-live="polite") rather than
+     being removed from it — a screen-reader user still hears every
+     update; only the redundant on-screen text is suppressed. */
+  [data-game='FO3'] #bezelTelemetry {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  /* the 3 subsystem keys → domed lamps. Real names stay stamped via the
+     existing .nk-label span (design doc §3: "clarity outranks flavor"). */
+  [data-game='FO3'] #navkey-operator,
+  [data-game='FO3'] #navkey-operations,
+  [data-game='FO3'] #navkey-databank {
+    width: 60px;
+    height: 60px;
+    flex: 0 0 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #6e463c, #3c2620 78%);
+    border: 2px solid #141006;
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.7),
+      inset 0 -3px 5px rgba(0, 0, 0, 0.5),
+      inset 0 1px 2px rgba(255, 255, 255, 0.15);
+  }
+  [data-game='FO3'] #navkey-operator.active,
+  [data-game='FO3'] #navkey-operations.active,
+  [data-game='FO3'] #navkey-databank.active {
+    transform: none; /* the shared .navkey.active "pressed in" effect reads wrong on a lamp — it should GLOW, not depress */
+    background: radial-gradient(
+      circle at 42% 36%,
+      #fffdf4,
+      #ffedb6 24%,
+      #ffbe55 54%,
+      #f07f12 82%,
+      #b25708 98%
+    );
+    border-color: #2a1604;
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.7),
+      inset 0 -2px 4px rgba(150, 70, 0, 0.5),
+      0 0 14px rgba(var(--bezel-wire-rgb), 0.95),
+      0 0 30px rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  [data-game='FO3'] #navkey-operator .nk-led,
+  [data-game='FO3'] #navkey-operations .nk-led,
+  [data-game='FO3'] #navkey-databank .nk-led {
+    display: none; /* the whole dome IS the lamp — a separate LED dot would be redundant */
+  }
+
+  /* UPLINK → the radio knob (dark ribbed ring) */
+  [data-game='FO3'] #navkey-uplink {
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    border-radius: 50%;
+    background:
+      repeating-conic-gradient(rgba(0, 0, 0, 0.55) 0 7deg, transparent 7deg 15deg),
+      radial-gradient(circle at 35% 28%, #34362b, #0b0c07 78%);
+    border: 2px solid #000;
+    box-shadow:
+      0 3px 6px rgba(0, 0, 0, 0.8),
+      inset 0 2px 2px rgba(255, 255, 255, 0.1);
+  }
+  [data-game='FO3'] #navkey-uplink.active {
+    transform: none;
+    box-shadow:
+      0 3px 6px rgba(0, 0, 0, 0.8),
+      0 0 0 2px rgba(var(--bezel-wire-rgb), 0.55),
+      0 0 16px rgba(var(--bezel-wire-rgb), 0.45);
+  }
+  [data-game='FO3'] #navkey-uplink .nk-led {
+    display: none;
+  }
+
+  /* CHASSIS → the white-face gauge */
+  [data-game='FO3'] #navkey-chassis {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 42% 34%, #efe9d2, #c9c2a8 75%, #9a937c 96%);
+    border: 3px solid #7e8278;
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.75),
+      inset 0 1px 2px rgba(255, 255, 255, 0.7);
+    color: #22270f; /* dark labels — this dome is a light face, unlike the others */
+  }
+  [data-game='FO3'] #navkey-chassis.active {
+    transform: none;
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.75),
+      0 0 0 2px rgba(var(--robco-green-rgb), 0.7),
+      0 0 12px rgba(var(--robco-green-rgb), 0.5);
+  }
+  [data-game='FO3'] #navkey-chassis .nk-led {
+    display: none;
+  }
+
+  /* SETTINGS → the flick toggle (rectangular slot, not a dome) */
+  [data-game='FO3'] #navkey-settings {
+    width: 34px;
+    height: 60px;
+    flex: 0 0 34px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #0a0c05, #171a0e);
+    border: 1px solid rgba(0, 0, 0, 0.8);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+  }
+  [data-game='FO3'] #navkey-settings.active {
+    transform: none;
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.9),
+      0 0 8px rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  [data-game='FO3'] #navkey-settings::after {
+    display: none; /* the shared amber service-stripe reads wrong on a toggle body */
+  }
+  [data-game='FO3'] #navkey-settings .nk-led {
+    display: none;
+  }
+
+  /* every re-skinned keycap keeps its real name stamped, small and legible
+     (design doc §3: "clarity outranks flavor") — just recolored to sit on
+     the new dark dome/knob/gauge/toggle backgrounds. */
+  [data-game='FO3'] .nk-label {
+    font-size: 6.5px;
+    letter-spacing: 0.6px;
+  }
+  [data-game='FO3'] #navkey-chassis .nk-label,
+  [data-game='FO3'] #navkey-chassis .nk-sub,
+  [data-game='FO3'] #navkey-chassis .nk-num {
+    color: #22270f;
+    opacity: 0.75;
+  }
+  [data-game='FO3'] .nk-num {
+    display: none; /* the design's hotkey glyphs are aria-only on FO3 (design doc §7 item 13) — the number still reaches AT via the button's aria-label */
+  }
+
+  /* ── AUSTERE BOARD RE-SKIN — flat phosphor text, boxed outlines, in
+     place of NV's faders/dials. Pure CSS re-treatment of the EXISTING
+     board markup and controls (Protocol 22 — no render-function fork);
+     every board keeps its real inline controls at the same tap count. */
+  [data-game='FO3'] .col-left .panel.bay-board {
+    border-radius: 2px;
+    background: rgba(var(--robco-green-rgb), 0.03);
+    border-color: rgba(var(--robco-green-rgb), 0.35);
+  }
+  [data-game='FO3'] .col-left .panel.bay-board button,
+  [data-game='FO3'] .col-left .panel.bay-board input[type='number'],
+  [data-game='FO3'] .col-left .panel.bay-board input[type='text'] {
+    border-radius: 2px;
+  }
+
+  /* ── viewport sizing — 100dvh (not 100vh: browser chrome eats real
+     landscape height that vh doesn't account for) + safe-area insets, on
+     the shared casing wrapper (Protocol UI-7 — chrome layered around the
+     unchanged working shell, never a new one). Real-device confirmation
+     (browser tab AND installed PWA standalone) is an explicit owner-only
+     gate the build plan calls out — this value is the best static choice
+     available without that hardware, not a substitute for it. */
+  [data-game='FO3'] #uosMachine {
+    padding-left: max(env(safe-area-inset-left), 4px);
+    padding-right: max(env(safe-area-inset-right), 4px);
+  }
+}
