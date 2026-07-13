@@ -26,6 +26,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/dev/test-console.js`) |
 | **Test system** — how the gate runs, the single Node runner, suite numbering | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
 | **Full per-suite test catalog** — every suite's coverage, every work-unit's build narration (large; read only when suite-level detail is actually needed) | `library/TEST_CATALOG.md` (gitignored, local-only — see the 3-class model below) |
+| **Re-making an existing feature with all six models** (Claude×3 + Gemini + ChatGPT) — the reusable collaborative-remake prompt, with ready-to-paste blocks | `library/PROMPT_MULTI_AI_REMAKE.md` (gitignored, local-only, standing tool — re-aim per feature) |
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
 | **Plain-English release history** | `CHANGELOG.md` |
 

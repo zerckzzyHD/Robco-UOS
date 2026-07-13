@@ -7,4 +7,5 @@
 # same commit a file is added to or removed from library/ (Protocol 46).
 BRAIN_DUMP.md
 CODE_MAP.md
+PROMPT_MULTI_AI_REMAKE.md
 TEST_CATALOG.md
