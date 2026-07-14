@@ -14,7 +14,7 @@ _Last rewritten in full: 2026-07-11._
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas overhaul, the offline native calculators, the Diagnostic Shell, the ambient runtime, the living core — all live.
 - **The brain dump is done** (the deep Claude-facing reconstruction of the project) and this roadmap file is its phone-readable companion.
 - **2.8.5's spine — the code + test health restructure — is SHIPPED** (2026-07-12). The heavier test-health/perf/a11y/bundle-size work under that same version number is deliberately deferred to a later pass (your call: stop at the spine, ship Fallout 3 next).
-- **Next up is the Fallout 3 device skin** (2.8.5 item 4), then the legacy/schematic per-game layout (item 5).
+- **The Fallout 3 device skin is IN PROGRESS** (2.8.5 item 4) — units U0-U7 have shipped on `dev` (the Pip-Boy spine, the weathered device casing, the six re-laid-out landscape boards, the scroll-trap fix, and a real render-integrity guard that now checks 12 configs across both games). What's left is a short non-blocking punch-list and a couple of deferred polish items — see item 4 below. Then the legacy/schematic per-game layout (item 5).
 - **After that is 2.9.0** — the big one: gameplay systems, ambient life, and the "it's a real operating system" round.
 - **Then 3.0** is Fallout 4 as a real playable third game.
 - **A "for fun" recreation prompt sits dead last**, by your own placement.
@@ -80,6 +80,8 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **Folded audits — also NOT done, deferred with strand (c):** the expanded token-usage audit, the performance audit, the accessibility audit, the code-quality audit, the test-strength audit, the leftover offline-network sweep, the asset/bundle-size and caching audit, the dependency/security hygiene pass, and the protocol-consolidation pass. None of these ran in this unit.
 
+**Two test-health items now have a named home here (2026-07-13):** a **real offline-first behavioural test** (does the app actually boot and stay usable offline — not just "the source looks right") and **CI failure-evidence packaging** (when CI goes red, capture the screenshots/logs/artifacts so the failure is diagnosable without a re-run) both belong to this deferred test-health pass — neither is a new unit. The gate review (2026-07-13) put it bluntly: the test count measures how _greppable_ the source is, not that the app _works_ — roughly 65-75% of the suite is static source-text analysis and nothing opens a browser at commit time, which is exactly how an entire panel once rendered invisible under a green gate. The `render-integrity.mjs` guard — "make green mean the user can see it" — is the #1 leverage point and the pattern the rest of this pass should follow. (Consequence worth stating plainly so it isn't treated as a headline metric: the raw test count is not a measure of correctness.)
+
 **Why it sat first.** This was the spine. Everything after it — Fallout 3, the schematic layout, and the entire 2.9.0 round — would otherwise have been built on a codebase that was about to be torn apart and reassembled. Building Fallout 3 first would have meant building it twice.
 
 **★ Hard exit condition — MET.** This phase changed the whole file layout, which invalidated large parts of the brain dump's architecture sections. The brain dump has been re-baselined against the restructured code, closing the condition written into both this file and the brain dump itself.
@@ -106,7 +108,7 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **Status.** Done, as part of item 1's spine — see the hard exit condition note there.
 
-## 4. ⏭️ Fallout 3 device skin — the virtual Pip-Boy (NEXT UP)
+## 4. 🔄 Fallout 3 device skin — the virtual Pip-Boy (IN PROGRESS — U0-U7 shipped)
 
 **What it is.** Fallout 3 stops wearing New Vegas's face and gets its own device identity. The panels themselves stay one shared, dynamic set (they already adapt per game — Fallout 3 shows bobbleheads instead of snow globes, the Capital Wasteland map, its own factions, its Karma Center, no magazines). What changes is the **device chrome around them.** New Vegas is a salvaged desk terminal; Fallout 3 becomes the Pip-Boy 3000 itself.
 
@@ -117,6 +119,15 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 **Done means:** switching to Fallout 3 gives you a visibly different, Fallout 3-native device.
 
 **Found and flagged, not yet fixed (2026-07-13, Protocol 8 U7):** broadening the automated screen-check to actually cover New Vegas on mobile (it previously only ever checked Fallout 3) found that New Vegas's fixed bottom bezel dock — `position:fixed` on every screen under 1000px, by design — can visually cover whatever content happens to render in its own footprint at the current scroll position. Confirmed live on the S.P.E.C.I.A.L. board and a couple of others at 360-412px. Several smaller versions of this same class of bug (a bottom-of-page reserve that was a few px short, a couple of narrow fields clipping their own value) were fixed directly in that same unit — this one wasn't, because fixing it for real means changing how the dock relates to scrollable content, which is a bigger, riskier change than a CSS nudge and deserves its own small unit rather than a rushed patch. Not urgent — nothing is unreachable, it's a landing-scroll cosmetic overlap — but real and worth a deliberate pass.
+
+**Where FO3 actually stands (2026-07-13).** The "done means" above was written before FO3 started; it has since shipped **units U0-U7** on `dev`: the Pip-Boy spine and sub-view switching, the weathered device casing (nameplate, radio knob, status gauge, settings toggle), the six re-laid-out landscape boards (merged STATUS around the Vault Boy figure, seven-row S.P.E.C.I.A.L., list-plus-detail SKILLS/PERKS/MANIFEST, plain boxed mission/faction/karma readouts), the scroll-trap and bounded-glass fixes, the all-green-glass discipline, and — the biggest structural win — a real **render-integrity guard** (`tests/render-integrity.mjs`) that now asserts across **12 configs** (both games × phone/desktop × populated/empty) and has already caught and fixed real defects in BOTH games. The full independent audit is `planning/AUDIT_FO3_U7.md`.
+
+**Still owed on FO3, before it counts as "done":**
+
+- **The U7 audit punch-list** (all non-blocking — full text in `planning/AUDIT_FO3_U7.md`): tighten the render-integrity allowlist so it matches the bezel dock by `hit.closest('.bezel')` instead of by bare `DIV`/`SPAN`/`NAV` tag name (highest value — closes a latent false-confidence gap where a future non-dock occlusion could slip through); raise MANIFEST density from the current ~4-5 visible rows to the mockup's ~6 (drop or inline the optional filter-drawer row); unify "CRIP" vs "CRIPPLED" wording if wanted (currently a deliberate, disclosed shared-code abbreviation); and clear the residual red-bordered "✕" on the FO3 landscape perk-delete buttons if the "single green screen" rule is meant to be absolute.
+- **The fixed bottom-dock occlusion** (flagged just above) — its own small unit, because the real fix changes how the dock relates to scrollable content rather than nudging a CSS value.
+- **Fable's chosen STATUS figure (variant A)** — approved, pending drop-in.
+- **The owed post-FO3 skin-architecture extraction pass** — once FO3's skin is finished, measure how much of it was genuinely per-game vs. shared chrome, so the FO4 question — "is FO4 a clean file-drop or a real refactor?" — is answered with evidence rather than a guess. This is the concrete input to the 3.0 new-game-readiness work, and it is best run while the FO3 skin is fresh.
 
 ## 5. Legacy / schematic per-game layout
 
@@ -141,6 +152,21 @@ This is deliberate planning, not busywork — the round touches gameplay and the
 3. Then ideation: **a capability ideation pass** (original RobCo-native ideas derived from real device/browser capabilities) and **an AI-feature evaluation pass** (which AI features can be made native to the terminal, each scored on offline behavior, grounding, cost, injection-resistance, and fit).
 4. Then **synthesis** — reconcile all of the above into one integrated, dependency-ordered build backlog.
 5. Then **parallelization** — split that backlog into independent workstreams.
+
+## Then, before any new OS service: the hardening gate
+
+**This is not a second roadmap — it is the same 2.9.0 round seen from the engineering side.** The architecture review and the gate review (both 2026-07-13) found that every headline OS feature in this round — the CLI, the DIR filesystem, the Peripheral Bus, the Distribution Network — is a **new SERVICE that renders**, and the boundary those services would plug into already carries real, measured debt. Build the services first and you don't carry the debt forward — **you multiply it.** So a short hardening gate runs before any of them lands. The work is subtractive; it adds almost no net new feature.
+
+**What the hardening gate must close (from the architecture review):**
+
+- **The UI↔services dependency cycles.** The render layer has quietly become a _second state manager_: render files call `saveState()` directly (~22 calls across 8 files) and there are ~31 service→view (`render*()` / `loadUI()`) call sites across 5 service files, producing real bidirectional cycles. ⚠ **This means CLAUDE.md Protocol 23 — "rendering only renders; state.js owns state; services don't own the view" — is RIGHT as intent but currently UNENFORCED: the code violates it.** The fix is **enforcement, not softening the rule** — invert the edges so services emit and the UI subscribes, then add a gate guard that fails when a render file writes a save or a service calls a render function. This is the single highest-damage governance-debt item in the project today (a stray `saveState()` on a render path is a data-loss / trust risk, not just an afternoon).
+- **Bootstrap isolation.** ~45 boot-phase calls sit under ONE outer try/catch with zero per-phase isolation — a mid-boot throw can leave the app half-initialized. Add per-phase guards so one failing phase degrades gracefully instead of taking the rest of boot down with it.
+- **Event-bus hardening.** `RobcoEvents` has no `off` / `once` / dedup and swallows listener errors silently — fine at today's scale, a latent bug factory once dozens of OS subscribers pile on. Harden it before the OS round widens it.
+- **The one escaped interval.** The AmbientRuntime heartbeat is already the single scheduler (one 250ms interval driving ~13 observers); exactly ONE stray `setInterval` escaped it. Fold it in so the "one heartbeat" invariant is actually true.
+
+**Post-deploy TRUTH — the release-integrity gap this round also closes.** Everything the project verifies today answers _"is the repository correct?"_ — offline boot, persisted state, render integrity, the Linux/Windows gate (**pre-deploy confidence**). **Not one check answers _"did the user receive it?"_** — the expected version is live, the service worker actually installs, assets cache without a redirect failure, one critical workflow renders on the DEPLOYED site (**post-deploy truth**). The two can disagree while everything stays green — and they already have: a staging service worker silently failed to install because `sw.js` precached an `index.html` that redirects (browsers refuse to cache a redirect), so "REBOOT TERMINAL" did nothing and users sat on stale code **under a green gate.** Protocol 11 already requires deploy verification, but it is honor-system, so it drifts. The hardening gate turns that one already-proven failure mode into an automated post-deploy check. **This is the home for the "post-deploy verification" idea — release/deployment integrity, not a new initiative or protocol.**
+
+**Why the order is load-bearing:** invert the cycles and harden the boundary FIRST, then the CLI / filesystem / peripheral bus / distribution network each plug into a clean seam instead of deepening three existing cycles.
 
 ## Then the build
 
@@ -199,7 +225,7 @@ This is a curated, combined list of gameplay and immersion features, all built o
 
 **One combined ENCOUNTER flow.** V.A.T.S., threat assessment, the combat log, and looting are treated as one guided combat loop reachable from a single ENCOUNTER entry point — assess the enemy, its stats pre-fill V.A.T.S., the fight auto-logs, defeat rolls into loot. The individual pieces stay independently reachable for edge cases (loot a container with no fight, assess without engaging, log a narrative kill by hand).
 
-**One map, not three.** The map was designed three separate ways over time. The decision: build the geographic per-game map (item 9) as the single target, using the simpler coordinate-node-plus-radar-sweep approach as its low-risk first iteration and evolving toward true geography. The abstract button-grid version is dropped.
+**One map, not three — and it starts from COORDINATES, not a node graph.** The map was designed three separate ways over time. The decision: build the geographic per-game map (item 9) as the single target. ⚠ **AMENDED 2026-07-13** (the 6-AI map remake — full reasoning in `planning/MAP_REMAKE_REPLIES.md`): the earlier "start with a coordinate-node-plus-radar-sweep first iteration and evolve toward true geography" plan is **wrong and dropped.** A node graph is not a stepping stone to a map — it is the wrong ROOT; everything bolted onto it becomes a special case glued to a picture, and you cannot iterate a graph into a surface. **Start from the coordinate space instead:** every settlement, pin, route, and the player position answers exactly one question — "where is this in Mojave space?" The coordinate system is the product; the artwork is one visualization of it. The first iteration may render crudely (few labels, coarse terrain), but it must render FROM real coordinates, not from a node graph. Simplify the VIEW, never the MODEL. Geometry is still authored from `fallout.wiki` (Protocol 3) — an original drawing, never a trace. The abstract button-grid version is dropped.
 
 **Two big immersion additions folded in here** (beyond simple gameplay): an **emergent CRT "condition"** (the screen can develop character/wear — must be toggleable off, and the dev build must be able to test it) and the **hacking minigame** — the iconic RobCo word-guess hack (seeded puzzle, likeness scoring, attempts and lockout, fully offline). The payoff of a successful hack is that it **unlocks the Diagnostic Shell** — which is already built and shipped; the minigame is the diegetic gate in front of it, and that gate is the one piece not yet built.
 
