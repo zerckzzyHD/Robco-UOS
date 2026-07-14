@@ -116,6 +116,8 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **Done means:** switching to Fallout 3 gives you a visibly different, Fallout 3-native device.
 
+**Found and flagged, not yet fixed (2026-07-13, Protocol 8 U7):** broadening the automated screen-check to actually cover New Vegas on mobile (it previously only ever checked Fallout 3) found that New Vegas's fixed bottom bezel dock — `position:fixed` on every screen under 1000px, by design — can visually cover whatever content happens to render in its own footprint at the current scroll position. Confirmed live on the S.P.E.C.I.A.L. board and a couple of others at 360-412px. Several smaller versions of this same class of bug (a bottom-of-page reserve that was a few px short, a couple of narrow fields clipping their own value) were fixed directly in that same unit — this one wasn't, because fixing it for real means changing how the dock relates to scrollable content, which is a bigger, riskier change than a CSS nudge and deserves its own small unit rather than a rushed patch. Not urgent — nothing is unreachable, it's a landing-scroll cosmetic overlap — but real and worth a deliberate pass.
+
 ## 5. Legacy / schematic per-game layout
 
 **What it is.** The plain, flat, chrome-less "schematic" fallback layout — the dense engineering-diagram view — brought current and made correct and dynamic for every game. As the fancy hardware boards were built, this fallback layout drifted; this fixes it so it reflects the current feature set and adapts per game like the immersive panels do.

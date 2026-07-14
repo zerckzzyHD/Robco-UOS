@@ -109,7 +109,15 @@ function renderCraftCard() {
     `<span style="flex:1;">${escapeHtml(recipe.name.toUpperCase())}</span>` +
     `${skillHtml}` +
     `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
-    `<input type="number" id="craftQty_${ri}" value="1" min="1" max="${Math.max(1, maxBatch)}" style="width:38px;font-size:11px;">` +
+    // U7 (Protocol 42 — found by render-integrity.mjs's New Vegas coverage,
+    // a real pre-existing defect): the inline font-size:11px this input was
+    // authored with never actually applies on a touch viewport — Protocol
+    // 17's AUTO-ZOOM GUARD (25-toolbar.css) forces every number input to
+    // 16px !important to stop iOS auto-zoom, and 38px was sized for 11px
+    // text, not 16px + the native spinner reserve. Widened to 52px, the
+    // same width the FO3 SKILLS "15 renders as 1" fix (K-1) already
+    // established for exactly this collision.
+    `<input type="number" id="craftQty_${ri}" value="1" min="1" max="${Math.max(1, maxBatch)}" style="width:52px;font-size:11px;">` +
     `<button class="btn-sm action-btn" onclick="craftSetMax(${ri},${maxBatch})" style="padding:0 5px;font-size:10px;">MAX</button>` +
     `<button class="btn-sm action-btn" data-ridx="${ri}" onclick="doCraft(parseInt(this.dataset.ridx))" style="${allMet ? '' : 'opacity:0.45;'}padding:0 7px;font-size:10px;">CRAFT</button>` +
     `</span></div>` +
@@ -142,7 +150,8 @@ function renderScrapCard() {
     `<span style="font-size:10px;opacity:0.6;">→ ${yieldPreview}</span>` +
     `<span style="display:flex;gap:3px;align-items:center;flex-shrink:0;">` +
     `<span style="font-size:10px;opacity:0.6;margin-right:2px;">have: ${have}</span>` +
-    `<input type="number" id="scrapQty_${bi}" value="1" min="1" max="${Math.max(1, have)}" style="width:38px;font-size:11px;">` +
+    // U7 (Protocol 42) — same fix, same reason, as craftQty above.
+    `<input type="number" id="scrapQty_${bi}" value="1" min="1" max="${Math.max(1, have)}" style="width:52px;font-size:11px;">` +
     `<button class="btn-sm action-btn" data-bidx="${bi}" onclick="doScrap(parseInt(this.dataset.bidx))" style="padding:0 7px;font-size:10px;">SCRAP</button>` +
     `</span></div>`;
 }

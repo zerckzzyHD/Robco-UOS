@@ -767,7 +767,20 @@ button.lamp {
      than the base .machine rule it otherwise inherits from, exactly like
      the desktop gated override above. */
   .container.machine {
-    padding-bottom: 100px;
+    /* U7 (Protocol 42 — found while verifying the render-integrity matrix's
+       new New Vegas coverage, not something this unit's own work touched):
+       100px under-reserved the fixed bezel dock's REAL rendered height —
+       measured live at 412x915 with a populated save, .bezel is 112px tall,
+       not <=100px, so the last ~12px of whatever panel sits at the bottom
+       of the page (confirmed on S.P.E.C.I.A.L.'s fader inputs) rendered
+       partially UNDER the dock. The comment above (.telemetry's 2-line
+       clamp) only deterministically bounds the LCD ticker strip's own
+       height, not the keycap row + borders + shadow above it, which this
+       measurement includes. 140px gives real margin above the observed
+       110-112px range instead of matching it exactly. render-integrity.mjs
+       (tests/), now covering New Vegas at every mobile size, is what keeps
+       this regression-guarded going forward — no separate test needed. */
+    padding-bottom: 140px;
     border-radius: 10px 10px 0 0;
     box-shadow:
       0 0 16px rgba(0, 0, 0, 0.6),

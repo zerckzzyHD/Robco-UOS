@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3187/3187 | Cache: robco-terminal-v2.8.0-r21 -->
+## [Unreleased]<!-- Tests: 3187/3187 | Cache: robco-terminal-v2.8.0-r22 -->
 
 ### Added
 
@@ -33,13 +33,16 @@
 - Fixed the Fallout 3 Pip-Boy's collectibles and cargo screens sometimes refusing to scroll entirely when touched — a leftover scrolling rule sized for a much taller phone screen was trapping the touch gesture instead of handing it up to the screen's own scrollbar.
 - Fixed a rare case where interrupting a health, experience, or radiation drag gesture (an incoming call, switching apps mid-drag) could leave the drag stuck active, silently changing that value on your very next unrelated tap anywhere on the page.
 - Fixed a mismatched amber highlight bleeding into the Fallout 3 Pip-Boy's mission/faction screen from a decorative strip shared by every screen — it's now the same green as the rest of the Pip-Boy.
+- Fixed a handful of narrow number fields — the calendar year, radiation exposure, and the crafting/scrapping quantity boxes — silently clipping their own value by a couple of digits on phones (a 4-digit year could show cut off). Affects both games.
+- Fixed the bottom control dock on phones reserving a fixed amount of space below the last screen, which was a few pixels short of the dock's actual size — the very end of a long screen could render partly behind it. Affects both games.
+- Fixed the quest log's cycle-status and remove buttons being nearly unreadable against their own background color. Affects both games.
 
 ### Under the Hood
 
 - Laid invisible groundwork for an upcoming true-to-the-game Fallout 3 Pip-Boy screen layout: gave a handful of existing panels stable internal names and added a new per-game data table describing how they'll eventually group together on that screen. Nothing you can see changed yet — Fallout: New Vegas is completely unaffected.
 - Wired up the (still invisible) mechanism that will let that upcoming Fallout 3 screen switch between its own sub-views. Nothing renders or behaves differently yet — this groundwork only takes effect once its screen actually ships — and Fallout: New Vegas is completely unaffected either way.
 - Reorganized the internal developer documentation so a working session no longer has to load a large chunk of historical build notes it usually doesn't need — those notes now live in a separate reference file, read only when actually wanted. Nothing you can see changed.
-- Broadened the automated screen-check that catches invisible, unreachable, or clipped controls before they ship — it now actually checks every screen size and both games (it previously only checked one Fallout 3 phone size). Along the way it caught a status-effect remove button that was nearly invisible against its own background on both games; that's fixed too.
+- Broadened the automated screen-check that catches invisible, unreachable, or clipped controls before they ship — it now actually checks every screen size and both games (it previously only checked one Fallout 3 phone size). It immediately found and helped fix several real, long-standing rough edges shared by both games (see the Fixed section above); one it found — the fixed bottom control dock on phones can still slightly cover the tail end of a couple of screens at certain heights — needs a bigger navigation change and is tracked as its own follow-up rather than patched here.
 - Added a permanent safeguard that stops the app's install settings from ever locking out a screen that needs the phone rotated sideways to see, so the portrait-lock mistake above can't quietly ship again unnoticed.
 - Added a "where does this feature live in the code" navigation guide and expanded the developer documentation's quick-reference index so a working session can find any subsystem without guessing. Added an automated check that fails the build if that guide's file references ever go stale. Nothing you can see changed.
 - Clarified the internal naming-convention guidance: in-world flavor names for features only ship when they're immediately understandable at a glance — clarity always wins over theme. Nothing you can see changed.

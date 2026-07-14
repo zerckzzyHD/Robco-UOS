@@ -772,7 +772,29 @@
 #stat_xp::-webkit-outer-spin-button,
 #stat_xp::-webkit-inner-spin-button,
 #c_caps::-webkit-outer-spin-button,
-#c_caps::-webkit-inner-spin-button {
+#c_caps::-webkit-inner-spin-button,
+#stat_rads::-webkit-outer-spin-button,
+#stat_rads::-webkit-inner-spin-button,
+/* U7 (Protocol 42, same fix/reason as #cal_year below): #stat_rads is a
+   3-4 digit value (radiation exposure) inside the same 56px mobile
+   max-width cap, and the unstripped spinner reserve left too little room
+   for a 3-digit reading, clipping it by a few px on narrower phones. */
+/* U7 (Protocol 42 — found by render-integrity.mjs's new New Vegas coverage,
+   a real pre-existing defect, not FO3-related): #cal_year sits inside the
+   global mobile max-width cap on every number input (56px, set further
+   below in this file) with its native spin button still reserving ~20px
+   inside that box — a 4-digit year ("2281") needs ~38px of text width but
+   only had ~36px of content box left, clipping by a couple of px.
+   Stripping the spin button (nobody drags a year field's arrows) reclaims
+   exactly that reserve, the same fix already applied to the other compact
+   fields in this list. CAUTION for future edits: this selector list is
+   parsed by tests/render-integrity.mjs's findSpinnerStrippedIds() using a
+   regex that treats an open or close curly brace as the boundary of the
+   rule — do not write a literal curly-brace pair anywhere in comments
+   inside this rule, even quoted; it silently truncates that parse (found
+   live during U7 — see the U7 report for the full story). */
+#cal_year::-webkit-outer-spin-button,
+#cal_year::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
@@ -780,7 +802,9 @@
 #stat_hp_max,
 #stat_lvl,
 #stat_xp,
-#c_caps {
+#c_caps,
+#stat_rads,
+#cal_year {
   -moz-appearance: textfield;
 }
 /* Themed Scrollbar */

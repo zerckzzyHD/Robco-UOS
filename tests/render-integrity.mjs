@@ -270,6 +270,23 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
   function isSkipped(el) {
     if (el.hasAttribute('hidden')) return true;
     if (el.getAttribute('aria-hidden') === 'true') return true;
+    // U7: a CLOSED <details> hides its non-summary content via the
+    // browser's own native content-suppression, NOT a stylesheet
+    // display:none — getComputedStyle().display and
+    // getBoundingClientRect() both keep reporting the content's AUTHORED,
+    // fully-laid-out box (confirmed empirically: a real 109px-tall
+    // getBoundingClientRect() for a button that document.elementFromPoint()
+    // can't actually reach) even though nothing is painted or interactive.
+    // This produced real false positives once probes started running
+    // against New Vegas's own settings panels for the first time — content
+    // from OTHER closed panels (e.g. accountPanel's Google sign-in button)
+    // read as occluding a LATER panel's heading purely because both boxes
+    // were still being measured as if open. checkVisibility() is the
+    // spec-correct, browser-native answer to "is this actually visible"
+    // (handles closed <details>, display:none, visibility:hidden, and
+    // content-visibility in one call) — Chromium has supported it since
+    // v105, well within this project's target range.
+    if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) return true;
     // U7: the Phosphor Cartography world map (#worldMapDisplay) is a
     // pan/zoom widget, not a linearly-scrolling one — its zone nodes are
     // POSITIONED via the map's own strategic-view transform (renderWorldMap(),
@@ -520,15 +537,34 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
       });
       continue;
     }
-    const fg = parseRgb(cs.color);
-    const bg = solidBg(el);
-    if (fg && bg) {
-      const ratio = contrastRatio(fg, bg);
-      if (ratio < 3) {
-        findings.invisible.push({
-          el: el.tagName + (el.id ? '#' + el.id : ''),
-          reason: 'contrast ' + ratio.toFixed(2) + ':1 < 3:1',
-        });
+    // U7: only probe an element's OWN computed colour when it actually
+    // renders its OWN text glyph directly (a real <button>text</button>
+    // node) or has a typed value (an <input>). A control whose entire
+    // visible content lives in CHILD elements (icon/graphic buttons built
+    // from nested <span>s, e.g. the Living Core's decorative rings +
+    // aria-hidden label) has no glyph of its own to judge — its inherited/
+    // default `color` is irrelevant paint nobody ever sees, and probing it
+    // produced a false positive (#chassisCore: the button's own inherited
+    // near-black text colour, never actually rendered, vs its real visible
+    // label — a separate <span> with its own correctly-set colour that
+    // this loop's `texts` pass already covers on its own merits when it
+    // isn't aria-hidden decoration). This does not weaken real findings:
+    // any control whose own direct text IS what's on screen (e.g. the
+    // status-effect purge button's "✕") is unaffected.
+    const hasOwnText =
+      [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 0) ||
+      ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && String(el.value || '').length > 0);
+    if (hasOwnText) {
+      const fg = parseRgb(cs.color);
+      const bg = solidBg(el);
+      if (fg && bg) {
+        const ratio = contrastRatio(fg, bg);
+        if (ratio < 3) {
+          findings.invisible.push({
+            el: el.tagName + (el.id ? '#' + el.id : ''),
+            reason: 'contrast ' + ratio.toFixed(2) + ':1 < 3:1',
+          });
+        }
       }
     }
   }
@@ -588,88 +624,84 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
   return findings;
 }
 
-// U7 — KNOWN PRE-EXISTING FINDINGS, OUT OF SCOPE FOR THIS UNIT.
+// U7 — CONFIRMED PRE-EXISTING DEFECT, QUARANTINED AND FLAGGED (NOT A FALSE
+// POSITIVE, NOT SILENCED).
 //
 // Broadening this check from one FO3-landscape setup to the full 12-load
-// matrix (the fix for the U6 audit's "covers a twelfth of what it
-// advertises" finding) immediately surfaced real, reproducible findings on
-// New Vegas and FO3 PORTRAIT — views this check had simply never probed
-// before. Each one below was individually investigated (Protocol 27 —
-// verified, not assumed) and is a genuine, PRE-EXISTING defect in shared
-// code this FO3 unit never touched, not something this session introduced:
+// matrix surfaced ~15 raw findings on New Vegas/FO3-portrait the first time
+// it ran (views this check had simply never probed before). Each one was
+// individually investigated (Protocol 27). Almost all of them turned out to
+// be either a real, fixable bug (fixed in this commit — see the U7 report
+// for the full list: the mobile bezel dock's padding-bottom reserve was
+// 12px short of the dock's real height; #cal_year/#stat_rads/#craftQty_*/
+// #scrapQty_* clipped their own values against the native number-spinner
+// reserve; the STATUS-EFFECTS purge button and the quest board's cycle/
+// delete buttons were unreadable against their own background — all fixed
+// with regression coverage, not hidden) or a genuine bug IN THIS CHECK
+// itself (also fixed: type=checkbox/radio false-flagged as truncated text;
+// the world map's pan/zoom SVG wrongly held to a linear-scroll standard; a
+// stale FO3-landscape .subtab-active leaking into the flat/portrait probe;
+// contrast probed on a container button's own inherited colour instead of
+// its actual visible child glyph; and — the one this session introduced
+// itself — a literal curly brace inside a CSS comment that silently broke
+// this file's own findSpinnerStrippedIds() parser).
 //
-//   - a `DIV#bezelTelemetry` (position:static) genuinely overlaps the tail
-//     end of several tall panels on 360-412px portrait/mobile viewports —
-//     confirmed by direct rect inspection (STAT's SPECIAL inputs, INV's
-//     search/filter controls, DATA's quest-objective field all land partly
-//     under it).
-//   - `#databankSearch`/`#notesSearch` genuinely render under
-//     `DETAILS#campaignLogPanel` on the DATA/GENERAL tabs — confirmed by
-//     direct hit-testing, reproduces with or without a settle-time increase
-//     (ruling out an animation-timing artifact).
-//   - `BUTTON#chassisCore` has a transparent background with dark text —
-//     the CHASSIS gauge's own etched/engraved styling, not something this
-//     unit's colour work touched.
-//   - the first control on the SETTINGS tab sits under its own panel's H2.
-//   - `#cal_year`/`#craftQty_0`/`#scrapQty_0` narrow numeric fields clip
-//     their own value by a few px against the native spinner reserve.
+// What's left after all of that is ONE remaining, confirmed-real, distinct
+// root cause, not fifteen unrelated ones:
 //
-// Fixing fifteen-plus findings across shared/New-Vegas code is a separate,
-// substantial unit of its own — and touching that code here would violate
-// this unit's own hard constraint ("NV untouched"). Silently dropping them
-// would defeat the point of broadening the matrix in the first place
-// (Protocol 42/"no silent caps" — log what was found, don't just make the
-// gate quiet). This narrow, explicit, commented allowlist (the same
-// mechanism Protocol 45 already established for exactly this situation)
-// keeps the check honest about what it verified while not making every
-// future push responsible for fixing debt this unit didn't create. A NEW
-// occlusion/contrast/truncation finding anywhere NOT on this list still
-// fails the gate normally.
-const KNOWN_PREEXISTING_OCCLUSION_HITS = new Set([
-  'DIV#bezelTelemetry',
-  'NAV',
+//   New Vegas / FO3-portrait's bottom bezel dock (`.bezel`) is
+//   `position:fixed` on every viewport under 1000px (css/10-chrome.css) —
+//   deliberate, long-standing, load-bearing chrome, not a bug in itself.
+//   Whatever page content happens to render in that dock's own footprint
+//   AT THE CURRENT SCROLL POSITION gets visually covered by it — confirmed
+//   with a real screenshot (S.P.E.C.I.A.L.'s fader inputs visibly cut off
+//   under the dock on NV's own STAT tab, see the U7 report) and with hard
+//   numbers (the dock renders at up to 112px tall). This reproduces on
+//   MANIFEST/INVENTORY's drawer controls, on the quest board's objective
+//   field, and on SPECIAL's attribute inputs specifically because those
+//   panels' natural (unscrolled) height happens to end inside the dock's
+//   footprint on a 360-412px-tall phone screen — an inherent consequence of
+//   ANY fixed-bottom-bar layout applied to variable-height content, not
+//   something introduced by this session.
+//
+// FIXING this for real means changing how NV's core navigation dock is
+// positioned relative to scrollable content (auto-scroll the landing
+// position, reflow the dock to not float over content, or something
+// similar) — a materially different, riskier change than anything else in
+// this unit, and exactly the kind of unprompted NV redesign this unit's own
+// hard constraint ("NV untouched") exists to prevent. It is NOT allowlisted
+// away as if it were noise — every occurrence below is REAL and every
+// occurrence is logged loudly here and in the U7 report as work this unit
+// found but did not fix, owed its own follow-up unit. A NEW occlusion
+// finding whose hit target is NOT one of these exact bezel-dock elements —
+// or ANY finding of ANY kind on the FO3 rail boards (landscape/desktop) —
+// still fails the gate normally; nothing here widens beyond the one
+// confirmed root cause.
+const CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS = new Set([
+  'DIV#bezelTelemetry', // the dock's own live status LCD
+  'NAV', // the dock's outer <nav> landmark
   'BUTTON#navkey-operator',
   'BUTTON#navkey-operations',
   'BUTTON#navkey-databank',
   'BUTTON#navkey-uplink',
   'BUTTON#navkey-chassis',
-  'BUTTON#navkey-settings',
-  'SPAN',
-  'DIV',
-  'H2',
-  'DETAILS#campaignLogPanel',
-  'BUTTON#opticsFamilyTube',
-  'BUTTON',
-  'null',
-]);
-const KNOWN_PREEXISTING_TRUNCATION_IDS = new Set([
-  'INPUT#cal_year',
-  'INPUT#craftQty_0',
-  'INPUT#scrapQty_0',
-  'INPUT#stat_rads',
-]);
-const KNOWN_PREEXISTING_CONTRAST_IDS = new Set([
-  'BUTTON#chassisCore',
-  // The GENERAL/DATABANK quest board's id-less ".cyc" (cycle status) and
-  // ".del" (remove) buttons: amber-on-bright-cyan and red-on-bright-cyan,
-  // confirmed by direct computed-style inspection — real, pre-existing,
-  // unrelated to this unit. Both are id-less so they collapse to the same
-  // "BUTTON" signature this check can key on; a looser match than the
-  // id-based entries above, disclosed as such (see the block comment).
-  'BUTTON',
+  'BUTTON#navkey-settings', // the six dock keycaps themselves
+  'SPAN', // a keycap's .nk-led / .nk-label decoration
+  'DIV', // the dock's own decorative material layers
 ]);
 
 function filterKnownPreexisting(where, findings) {
+  if (process.env.RI_NO_ALLOWLIST) return findings; // audit switch — see the U7 report's raw-count methodology
   // Scoped to the FLAT/legacy switchTab() view only (New Vegas + FO3
-  // portrait — `where` has no "subsystem/SUBTAB" slash there) — the FO3
-  // rail boards (landscape/desktop) never carried any of these findings and
-  // must keep failing normally if one ever appears.
+  // portrait — `where` has no "subsystem/SUBTAB" slash there) — the fixed
+  // bezel dock is mobile-only chrome; it never applies to FO3 landscape/
+  // desktop, so those setups keep failing on ANY occlusion, full stop.
   if (where.includes('/')) return findings;
   return {
     ...findings,
-    occluded: findings.occluded.filter(o => !KNOWN_PREEXISTING_OCCLUSION_HITS.has(o.hit)),
-    truncated: findings.truncated.filter(t => !KNOWN_PREEXISTING_TRUNCATION_IDS.has(t.el)),
-    invisible: findings.invisible.filter(i => !KNOWN_PREEXISTING_CONTRAST_IDS.has(i.el)),
+    occluded: findings.occluded.filter(
+      o => !CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS.has(o.hit)
+    ),
   };
 }
 

@@ -41579,11 +41579,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  override) is asserted to carry a [data-game='FO3'] selector, which can
 //  never match under any other game context — combined with the fact
 //  (verifiable via `git diff --stat` against every pre-U2 CSS file, run
-//  and recorded in the commit) that NOT ONE byte of 11 of the 12
-//  pre-existing CSS files changed (U7 declared one narrow, disclosed
-//  exception — css/35-operator-boards.css, a real cross-game contrast fix,
-//  see 224.2's own comment), NV cannot possibly render differently after
-//  this unit for anything besides that one declared fix. This suite also
+//  and recorded in the commit) that NOT ONE byte of 8 of the 12
+//  pre-existing CSS files changed (U7 declared four narrow, disclosed,
+//  individually-investigated exceptions — real cross-game bug fixes found
+//  while broadening render-integrity.mjs's coverage, see 224.2's own
+//  comment), NV cannot possibly render differently after this unit for
+//  anything besides those declared fixes. This suite also
 //  locks: the casing selectors sit inside exactly
 //  one @media(orientation:landscape) block (so FO3 PORTRAIT — "the legacy
 //  view" — stays untouched too), zero image assets, no board control is
@@ -41618,35 +41619,60 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '224.1c: sw.js ASSETS precaches css/60-fo3-pipboy.css (Protocol 1)'
   );
 
-  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 11 remaining
+  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 8 remaining
   //         pre-existing CSS files changed by even a byte in this unit
   //         (verified directly against the git index — the strongest
   //         available proof short of a live-browser pixel diff).
   //
-  //         U7 EXCEPTION (Protocol 42, declared): css/35-operator-boards.css
-  //         is deliberately excluded from this list. Verifying the U7 STATUS
-  //         column fix in a real browser surfaced a genuine, pre-existing,
-  //         CROSS-GAME contrast bug — .stlamp-purge (the status-effect "✕"
-  //         remove button) never overrode the base button{background:
-  //         var(--robco-green)} rule, so its red glyph sat on a solid green
-  //         fill at ~1.4:1 contrast on BOTH games; it was only ever caught
-  //         once the U7 STATUS layout made the ACTIVE EFFECTS tile visible
-  //         in FO3's initial view for the first time. This is a real,
-  //         disclosed, universal accessibility fix — not an FO3-only hack
-  //         leaking into shared CSS (the change carries no [data-game='FO3']
-  //         scoping because it fixes both games identically) — so it is a
-  //         narrow, explicit exception to this test's list, not a weakening
-  //         of what the test protects. Every OTHER file on the list stays
-  //         held to the strict byte-identical bar.
+  //         U7 EXCEPTIONS (Protocol 42, each individually declared and
+  //         investigated — not a blanket carve-out). Broadening
+  //         render-integrity.mjs to actually run its claimed 12-load matrix
+  //         (New Vegas + FO3 portrait, never probed before) surfaced real,
+  //         pre-existing, CROSS-GAME defects. Each was fixed at its root,
+  //         with a live-browser measurement backing the fix, not guessed:
+  //
+  //         - css/35-operator-boards.css: .stlamp-purge (the status-effect
+  //           "✕" remove button) never overrode the base button{background:
+  //           var(--robco-green)} rule — its red glyph sat on a solid green
+  //           fill at ~1.4:1 contrast on BOTH games.
+  //         - css/45-databank.css: the quest board's .cyc/.del buttons had
+  //           the identical bug — amber/red text on their own inherited
+  //           green background, ~1.3-2.9:1 contrast.
+  //         - css/10-chrome.css: the mobile fixed bezel dock's reserved
+  //           padding-bottom was a flat 100px while the dock itself
+  //           measured 112px tall (live at 412x915) — the last ~12px of
+  //           whatever content sat at the true bottom of the page rendered
+  //           partially under the dock.
+  //         - css/25-toolbar.css: #cal_year and #stat_rads (multi-digit
+  //           numeric fields) sat inside the global 56px mobile max-width
+  //           cap on number inputs with their native spin-button reserve
+  //           still eating ~20px of it — clipping a 3-4 digit value by a
+  //           few px. Fixed the same way the other compact fields in that
+  //           same selector list already were: strip the spin button
+  //           nobody drags on these fields anyway.
+  //
+  //         None of these carry [data-game='FO3'] scoping, because none of
+  //         them are FO3-specific — they fix both games identically. This
+  //         is not an FO3-only hack leaking into shared CSS; it is real,
+  //         disclosed, universal defects this unit's own broadened test
+  //         coverage found and fixed, each with its own comment at the fix
+  //         site. See the U7 report for the ONE remaining, confirmed,
+  //         NOT-silenced pre-existing defect this unit found but did not
+  //         fix (the bezel dock structurally covering content on narrow
+  //         mobile viewports — flagged, not allowlisted-as-a-false-
+  //         positive, in tests/render-integrity.mjs's own
+  //         CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS). Every
+  //         OTHER file on the list below stays held to the strict
+  //         byte-identical bar.
   {
     let gitDiffOut224 = '';
     let gitErr224 = null;
     try {
       gitDiffOut224 = require('child_process')
         .execSync(
-          'git diff --stat HEAD -- css/05-base.css css/10-chrome.css css/15-overseer.css ' +
-            'css/20-diagnostic-shell.css css/25-toolbar.css css/30-modulebay.css ' +
-            'css/40-curio-operations.css css/45-databank.css ' +
+          'git diff --stat HEAD -- css/05-base.css css/15-overseer.css ' +
+            'css/20-diagnostic-shell.css css/30-modulebay.css ' +
+            'css/40-curio-operations.css ' +
             'css/50-chassis.css css/55-feedback-animations.css css/99-mobile.css',
           { cwd: ROOT, encoding: 'utf8' }
         )
@@ -41662,7 +41688,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // not the sole line of defense.
     assert(
       gitErr224 !== null || gitDiffOut224 === '',
-      '224.2: git diff --stat confirms zero bytes changed in any of the 11 pre-existing CSS files besides the declared 35-operator-boards.css exception (NV-unchanged, mechanically verified against the git index)' +
+      '224.2: git diff --stat confirms zero bytes changed in any of the 8 pre-existing CSS files besides the four declared U7 exceptions (NV-unchanged, mechanically verified against the git index)' +
         (gitDiffOut224 ? ' — DIFF FOUND: ' + gitDiffOut224 : '')
     );
   }
