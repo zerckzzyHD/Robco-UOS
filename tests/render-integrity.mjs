@@ -763,6 +763,112 @@ function recordFindings(results, where, rawFindings) {
   }
 }
 
+// U10 (Protocol 8 stage 2, audit round 4 — "one green, not just no red"):
+// the U9 audit confirmed the FO3 glass red-free but NOT yet green-only —
+// several pre-existing amber (--bezel-wire) readouts still lived on it (the
+// RAD EXPOSURE label, the RAD trace caption, the harness rad mirror, the
+// KARMA CENTER heading) — plus two this sweep's own FIRST, unfiltered run
+// surfaced that nobody had flagged before (Protocol 42: investigated, both
+// real, both fixed in this same commit, not silenced): the PERKS board's
+// rank-pip dot (.slot-row .s-rank) and the MANIFEST/quest drawer buttons'
+// resting-state label (button.drawer). THE INVARIANT: nothing that renders
+// its OWN text inside the FO3 GLASS (.col-left — the phosphor screen
+// content) may compute to any hue but the live --robco-green phosphor
+// colour. "The glass" is deliberately scoped to .col-left, NOT the whole
+// app: the physical CASING around it (the CHASSIS gauge, UPLINK knob,
+// SETTINGS toggle, the bezel's own amber "wire" accent) and the Director
+// Uplink column (.col-right — Protocol UI-10's deliberate "remote AI
+// presence rides --bezel-wire" identity, amber by design on every game, not
+// a leftover) are both real, working amber and are correctly out of scope —
+// this checks the readout glass only, exactly where the U9 audit looked.
+// Scoped to FO3-rail setups (landscape/desktop) only, same as assertion 6
+// above — FO3 PORTRAIT deliberately still renders the shared flat/legacy
+// view (this file's own header — no landscape-only rule ever reaches it),
+// the same disclosed boundary NV has; the flat-tab probe proves both are
+// UNCHANGED, neither is required to turn green.
+async function checkGlassMonochromeGreen(page, results, where) {
+  const findings = await page.evaluate(() => {
+    function parseRgb(str) {
+      const m = str && str.match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const p = m[1].split(',').map(s => parseFloat(s));
+      return { r: p[0], g: p[1], b: p[2] };
+    }
+    const scope = document.querySelector('.col-left');
+    if (!scope) return [];
+    // read the LIVE phosphor colour (the user's chosen optics tint,
+    // js/ui/ui-audio.js changeOpticsColor(), overrides the --robco-green
+    // default via an inline :root style) rather than assuming a literal hex.
+    const probe = document.createElement('span');
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue(
+      '--robco-green'
+    );
+    document.body.appendChild(probe);
+    const ref = parseRgb(getComputedStyle(probe).color);
+    probe.remove();
+    if (!ref) return [];
+    // same NON_TEXT_INPUT_TYPES idiom as pageProbe() above (U7) — a native
+    // range/checkbox/etc. input's `.value` is never a rendered glyph, so
+    // probing its `color` is a guaranteed false positive (confirmed live:
+    // #stat_karma, a type=range slider, false-flagged until this exclusion
+    // was added — harness-only, no shipped defect, Protocol 42).
+    const NON_TEXT_INPUT_TYPES = new Set([
+      'checkbox',
+      'radio',
+      'range',
+      'color',
+      'file',
+      'button',
+      'submit',
+      'reset',
+      'image',
+    ]);
+    const out = [];
+    for (const el of scope.querySelectorAll('*')) {
+      if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') continue;
+      if (typeof el.checkVisibility === 'function' && !el.checkVisibility()) continue;
+      const hasOwnText =
+        [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 0) ||
+        ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') &&
+          !(el.tagName === 'INPUT' && NON_TEXT_INPUT_TYPES.has(el.type)) &&
+          String(el.value || '').length > 0);
+      if (!hasOwnText) continue;
+      const cs = getComputedStyle(el);
+      const c = parseRgb(cs.color);
+      if (!c) continue;
+      const isGreen =
+        Math.abs(c.r - ref.r) < 2 && Math.abs(c.g - ref.g) < 2 && Math.abs(c.b - ref.b) < 2;
+      if (!isGreen) {
+        out.push({
+          el:
+            el.tagName +
+            (el.id ? '#' + el.id : '') +
+            (typeof el.className === 'string' && el.className
+              ? '.' + el.className.slice(0, 40)
+              : ''),
+          text: el.textContent.trim().slice(0, 30),
+          color: cs.color,
+        });
+      }
+    }
+    return out;
+  });
+  if (findings.length) {
+    results.fail(
+      '7. GLASS MONOCHROME GREEN — ' +
+        where +
+        ': ' +
+        findings.map(f => f.el + ' "' + f.text + '" (' + f.color + ')').join(', ')
+    );
+  } else {
+    results.pass(
+      '7. GLASS MONOCHROME GREEN — ' +
+        where +
+        ': every own-text element on the glass renders the phosphor green'
+    );
+  }
+}
+
 // FO3 landscape/desktop: walk the six rail boards via the sub-tab rail
 // (the CSS grid + subtab-active system, @media(orientation:landscape) only).
 async function probeFo3RailBoards(page, results, setupLabel, spinnerStrippedIds) {
@@ -781,6 +887,7 @@ async function probeFo3RailBoards(page, results, setupLabel, spinnerStrippedIds)
       spinnerStrippedIds,
     });
     recordFindings(results, setupLabel + ' ' + subsystem + '/' + subtab, findings);
+    await checkGlassMonochromeGreen(page, results, setupLabel + ' ' + subsystem + '/' + subtab);
   }
 }
 

@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3207/3207 | Cache: robco-terminal-v2.8.0-r25 -->
+## [Unreleased]<!-- Tests: 3207/3207 | Cache: robco-terminal-v2.8.0-r26 -->
 
 ### Added
 
@@ -41,8 +41,9 @@
 - Fixed the Fallout 3 Pip-Boy's crippled-limb readout showing the shortened "CRIP" instead of spelling out "CRIPPLED" in full, matching the figure right next to it.
 - Fixed the perk list's remove button on the Fallout 3 Pip-Boy's landscape screen being the odd one out in red — it's now green like the rest of the screen. It's still clearly a delete button either way, since its "✕" mark never depended on the color.
 - Fixed the Fallout 3 Pip-Boy's body-part health toggles being mirrored — tapping your left arm or leg lit up the figure's right side, and vice versa. Every toggle now sits directly next to the exact body part it controls.
-- Fixed the rest of the red on the Fallout 3 Pip-Boy's landscape screen — the radiation readout, the RadAway treatment warning, the active-effects remove button, and the screen's low-health glow are all green now, matching the rest of the device. Nothing they warn you about lost its meaning: the numbers, the wording, and the icons are all exactly the same.
+- Fixed the rest of the red on the Fallout 3 Pip-Boy's landscape screen — the radiation readout, the RadAway treatment warning, the active-effects remove button, and the screen's low-health glow are all green now instead of red. Nothing they warn you about lost its meaning: the numbers, the wording, and the icons are all exactly the same.
 - Your radiation level is now visible on the Fallout 3 Pip-Boy's character screen without scrolling, right alongside your health.
+- Fixed the last of the leftover orange on the Fallout 3 Pip-Boy's landscape and desktop screens — the "RAD EXPOSURE" label, the radiation caption next to your health readout, the radiation number shown beside the Vault Boy figure, the Karma Center heading, each perk's rank dots, and the cargo/quest filter buttons all show up in the same green as everything else now, instead of the leftover orange accent color. Nothing about what any of them tell you changed — only the color.
 
 ### Under the Hood
 
@@ -67,6 +68,7 @@
 - Fixed the private staging test site silently freezing on an old build so new work (like the in-progress Fallout 3 screen) never appeared and the "Reboot Terminal" prompt did nothing. The site's offline-caching step was trying to store the home page under a web address that the staging host automatically forwards to a shorter one; browsers refuse to cache a forwarded page, and because that caching step is all-or-nothing, the single bad entry aborted the entire update — so the freshly-published build could never take over. The staging build now caches the home page the correct way (and serves that address directly as a backstop), and a new automated pre-flight check fails the build if this class of mistake is ever reintroduced. This only ever affected the private staging site — the live production site was never impacted, because its host serves that page directly. Nothing you can see changed on the live site.
 - Added an automated check that loads every Fallout 3 landscape screen and confirms nothing on it is hidden behind something else, cut off at the edge of the display, too faint to read, or unreachable by touch — the same class of problem a manual look could miss but a previous pass shipped anyway. Proven against five real examples of each of those problems before being trusted. Nothing you can see changed.
 - Tightened that same automated screen-check's one exception (for the phone navigation dock covering whatever happens to sit under it) so it only excuses that exact dock, not anything of the same broad element type sitting anywhere else on screen — the looser version could have let a real, unrelated overlap slip through unnoticed on a future change. Proven with a live example that the check now catches what it would have missed before. Nothing you can see changed.
+- Added an automated check that fails the build if anything on the Fallout 3 Pip-Boy's landscape or desktop screen ever renders in any color but its own green again — it caught two real leftover orange spots nobody had noticed yet (a perk's rank dots and the cargo/quest filter buttons) the first time it ran, both fixed above. Proven against a real example before being trusted. The AI channel column keeps its own orange by design and is correctly left alone. Nothing you can see changed beyond the two spots called out above.
 
 ---
 

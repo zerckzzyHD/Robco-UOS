@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.8.0
-> **Last Updated:** 2026-07-13
+> **Last Updated:** 2026-07-14
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -109,7 +109,7 @@
 │   ├── robco-diagnostics.js    36KB    3207-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
-│   └── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability) — called from render-check.mjs as one more section, push-gate only (U6)
+│   └── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install

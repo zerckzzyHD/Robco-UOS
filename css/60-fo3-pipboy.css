@@ -658,11 +658,76 @@
     color: var(--robco-green);
     text-shadow: var(--robco-glow);
   }
+  /* U10's own render-integrity sweep (assertion 7, tests/render-integrity.mjs)
+     surfaced this one itself — the PERKS board's rank-pip dot
+     (.slot-row .s-rank, css/35-operator-boards.css) rides the same
+     game-agnostic --bezel-wire the RAD row/harness mirror did, and nobody
+     had recoloured it yet. The pip COUNT (not colour) carries the rank —
+     "Rank N" is also in the title tooltip — so recolouring loses nothing
+     (Protocol 17). */
+  [data-game='FO3'] .col-left .slot-row .s-rank {
+    color: var(--robco-green);
+    text-shadow: var(--robco-glow);
+  }
+  /* Same sweep, second self-found hit: the CARGO MANIFEST/quest drawer
+     pills' resting-state label rides --bezel-etch (css/10-chrome.css), a
+     stamped-metal placard tone, not a phosphor readout colour — but
+     Section F's own thesis is that FO3's glass drops ALL of NV's
+     machine-language material dressing in favour of flat green text, and
+     this button's ALREADY-shipped .active/.pulled state
+     (css/40-curio-operations.css) is var(--robco-green) — proof the
+     active/inactive distinction is carried by opacity + glow + border, not
+     by this resting hue, so recolouring it loses no signal either. */
+  [data-game='FO3'] .col-left button.drawer {
+    color: var(--robco-green);
+  }
   /* the KARMA CENTER's dev caption ("THE SHIPPED stat_karma SLIDER — STILL
      THE CONTROL") is internal build commentary, not Pip-Boy screen text —
      same class of leak as the bay-slot-tag/bay-part-no hides above. */
   [data-game='FO3'] .col-left .ks-cap {
     display: none;
+  }
+  /* U10 (Protocol 8 stage 2, audit round 4 — "one green, not just no red"):
+     the U9 audit found the glass red-free but not yet green-only — these
+     three are genuinely leftover AMBER READOUTS on the glass, not the
+     lamp/knob/toggle accent this file's intro comment reserves --bezel-wire
+     for (that accent lives on the CASING — the CHASSIS gauge/UPLINK knob/
+     SETTINGS toggle — never inside .glass-frame's .col-left). Protocol 17:
+     none of these carry meaning through colour alone. The RAD EXPOSURE bar
+     fill/track and the numeric "850" readouts both already carry the
+     rad-exposure signal without colour (same as the RadAway alert text and
+     the purge ✕ glyph the U9 audit already confirmed) — these are just
+     their static caption/label text and a read-only value mirror, so
+     recolouring them loses no information. The (RADS) sub-label nested in
+     each caption inherits this colour (it sets none of its own — see
+     .real-label, css/35-operator-boards.css), so no separate rule is
+     needed for it. */
+  [data-game='FO3'] .col-left .rad-row .rr-label {
+    color: var(--robco-green);
+  }
+  [data-game='FO3'] .col-left #opTraceRad .t-cap {
+    /* beats the shared style="color:var(--bezel-wire)" inline attribute
+       (index.html) — inline styles win over any selector specificity short
+       of !important. The inline attribute itself is untouched (Protocol
+       39/22 — it's what lets this SAME markup read amber under NV, where
+       --bezel-wire is the correct game-agnostic accent); only FO3 overrides it. */
+    color: var(--robco-green) !important;
+  }
+  /* beats its own inline style="color:var(--bezel-wire)" (index.html),
+     same reasoning as #opTraceRad .t-cap above. */
+  [data-game='FO3'] .col-left #opHarnessRadMirror {
+    color: var(--robco-green) !important;
+  }
+  /* the KARMA CENTER heading only — U10's punch-list is explicit that the
+     karma TIER colours themselves (.k-standing.neut / .tier-lamps
+     .t-neut.cur, css/40-curio-operations.css) are OUT OF SCOPE and stay
+     untouched: those carry real semantic meaning (good/neutral/evil karma
+     standing) that a blanket green-everything pass would destroy by making
+     "neutral" indistinguishable from "good." Only the decorative section
+     heading text is recoloured. */
+  [data-game='FO3'] .col-left .kc-title {
+    color: var(--robco-green);
+    text-shadow: var(--robco-glow);
   }
 
   /* ══ G. STATUS — the Vault Boy figure, full-bleed (design doc §5/§3 —
