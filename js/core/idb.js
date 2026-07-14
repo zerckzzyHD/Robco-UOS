@@ -1,19 +1,27 @@
-// ── IDBSTORE — async IndexedDB key/value engine (Step 2 · Phase 1 · P1) ──────
-// A minimal, Promise-returning key/value store over IndexedDB that provides a
-// DURABLE SHADOW of the device-preference store. In P1 it is written through the
-// single MetaStore choke point (js/state.js) as a fire-and-forget mirror: every
-// device-pref write ALSO lands here. localStorage stays the sole READ source and
-// the sole authority — NOTHING reads IdbStore in P1, so if IndexedDB is absent,
-// blocked, quota-full, slow to open, or corrupt, every op no-ops / resolves-soft
-// and the app is byte-identical to a build without this file (the migration-
-// safety guarantee). Later units (P2 boot-hydration read path, P3 cold-store)
-// build the reconciliation and ceiling-relief on top of this engine.
+// ── IDBSTORE — async IndexedDB key/value engine (Step 2 · Phases 1-3) ─────────
+// A minimal, Promise-returning key/value store over IndexedDB. It is FAIL-SAFE by
+// construction: if IndexedDB is absent, blocked, quota-full, slow to open, or
+// corrupt, every op no-ops / resolves-soft and NEVER throws, so the app degrades
+// cleanly to a pure-localStorage build (the migration-safety guarantee). That one
+// guarantee is unchanged across every phase below.
 //
-// TWO OBJECT STORES — 'meta' (device prefs) and 'campaign' (the campaign
-// container / save slots / rolling backups) — so the two-store boundary
-// (Protocol 23) is STRUCTURAL
-// in IndexedDB, not just in localStorage. P1 writes ONLY 'meta'; 'campaign' is
-// created now so P2 needs no version bump.
+// TWO OBJECT STORES, TWO DIFFERENT ROLES — the two-store boundary (Protocol 23)
+// is STRUCTURAL in IndexedDB, not just in localStorage:
+//   'meta' (device prefs) — a WRITE-THROUGH SHADOW MIRROR. MetaStore's single
+//     choke point (js/core/state.js, _idbShadow) mirrors every device-pref
+//     set/remove here fire-and-forget. localStorage stays the authority for prefs;
+//     the ONLY read of 'meta' is the P2 boot reconciliation (_reconcileMetaFromIdb
+//     in ui-core.js), which recovers/backfills under a strict "localStorage wins"
+//     rule — never a live pref read.
+//   'campaign' (save slots / rolling backups / slot-version history / cloud queue)
+//     — a LIVE READ+WRITE COLD STORE. P3 shipped: _coldReadObj / _coldWriteObj /
+//     _migrateColdStoreToIdb (state.js) treat IDB 'campaign' as the PRIMARY store
+//     (localStorage is the fallback mirror; newer-by-stamp wins), and the account
+//     save-picker (ui-account.js) reads it to surface oversized saves localStorage
+//     could never hold — the storage-ceiling relief.
+//
+// So the old "P1: NOTHING reads IdbStore" state is HISTORY: as of P2/P3 the store
+// IS read, on the boot-reconciliation and cold-store paths named above.
 //
 // Game-agnostic (Protocol 38): a pure key/value engine — no game data, no game
 // literals. Record checksums REUSE window.computeSaveChecksum() from state.js

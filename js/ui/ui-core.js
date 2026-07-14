@@ -1146,7 +1146,7 @@ window.onload = async function () {
     _wireStandby();
     _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
     initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
-    initAmbientRuntime(); // A1: Ambient Runtime — additive state machine + observer scheduler (parallel to standby; owns no timers yet)
+    initAmbientRuntime(); // Ambient Runtime — the single-heartbeat scheduler; owns the app's one setInterval and drives every ambient observer
     initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
     initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
     _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)

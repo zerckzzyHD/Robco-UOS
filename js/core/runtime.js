@@ -10,13 +10,18 @@
 //   One heartbeat:    a single setInterval; each beat runs every eligible observer.
 //   Central dial:     the runtime is the ONE place immersionAllows(tier) is checked.
 //
-// ── A1 IS PURELY ADDITIVE ─────────────────────────────────────────────────────
-// A1 tracks the terminal state IN PARALLEL with the existing standby/timers in
-// ui-core.js / ui-audio.js, which are left completely untouched. It migrates no
-// timer and moves no standby action (that is A2, one-per-commit, later). Nothing
-// observable changes in this unit: the ONLY registered observer is an inert
-// self-test that bumps an in-memory counter. If the runtime fails to start, the
-// app is byte-identical to today.
+// ── THE ONE SCHEDULER (A1 shipped additively; A2+ migrated the timers in) ─────
+// A1 landed additively — running IN PARALLEL with the old ui-core.js/ui-audio.js
+// timers, with a single inert self-test observer. That is HISTORY. A2+ then
+// migrated the fixed-cadence loops onto this heartbeat: the runtime now OWNS the
+// app's one setInterval (GRANULARITY_MS below) and drives every registered
+// observer from it — idle detection, boot-complete, the uptime clock, mem-cycle,
+// overseer-flush, and the dial-gated ambient experiences. ui-core.js now calls
+// setInterval zero times; this heartbeat is the single scheduler. A few
+// self-scheduling audio loops (geiger, radio/tinnitus, the HP-driven audio
+// heartbeat) intentionally keep their own cadence and are NOT runtime observers.
+// If the runtime fails to start, its try/catch keeps boot alive and standby
+// simply never deepens.
 //
 // ── HARD ATMOSPHERE / SAVE BOUNDARY (Phase-2 prime invariant #1) ──────────────
 // The ambient layer writes NOTHING durable to the campaign: it never persists the

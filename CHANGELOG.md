@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3187/3187 | Cache: robco-terminal-v2.8.0-r22 -->
+## [Unreleased]<!-- Tests: 3187/3187 | Cache: robco-terminal-v2.8.0-r23 -->
 
 ### Added
 
@@ -43,6 +43,7 @@
 - Wired up the (still invisible) mechanism that will let that upcoming Fallout 3 screen switch between its own sub-views. Nothing renders or behaves differently yet — this groundwork only takes effect once its screen actually ships — and Fallout: New Vegas is completely unaffected either way.
 - Reorganized the internal developer documentation so a working session no longer has to load a large chunk of historical build notes it usually doesn't need — those notes now live in a separate reference file, read only when actually wanted. Nothing you can see changed.
 - Broadened the automated screen-check that catches invisible, unreachable, or clipped controls before they ship — it now actually checks every screen size and both games (it previously only checked one Fallout 3 phone size). It immediately found and helped fix several real, long-standing rough edges shared by both games (see the Fixed section above); one it found — the fixed bottom control dock on phones can still slightly cover the tail end of a couple of screens at certain heights — needs a bigger navigation change and is tracked as its own follow-up rather than patched here.
+- Corrected three out-of-date internal code comments that no longer described what the code actually does (they claimed the durable-storage engine was never read from and that the background timing loop owned no timers — both untrue since those systems were finished). Comments only; nothing you can see or interact with changed.
 - Added a permanent safeguard that stops the app's install settings from ever locking out a screen that needs the phone rotated sideways to see, so the portrait-lock mistake above can't quietly ship again unnoticed.
 - Added a "where does this feature live in the code" navigation guide and expanded the developer documentation's quick-reference index so a working session can find any subsystem without guessing. Added an automated check that fails the build if that guide's file references ever go stale. Nothing you can see changed.
 - Clarified the internal naming-convention guidance: in-world flavor names for features only ship when they're immediately understandable at a glance — clarity always wins over theme. Nothing you can see changed.
