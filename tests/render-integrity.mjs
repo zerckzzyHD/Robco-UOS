@@ -886,6 +886,70 @@ async function assertReachable(page, results, setupLabel) {
   }
 }
 
+// U9 (Protocol 8 stage 2, round 3, Protocol 13): the owner-reported
+// mirrored-limb-controls bug (planning/AUDIT_FO3_U8.md) — tapping L.ARM lit
+// the figure's RIGHT side and vice versa. Root cause was a layout mismatch:
+// the box grid columns sat on the opposite side from the anatomically-drawn
+// (front-facing) figure limb they toggle. The U8 audit explicitly called out
+// that NOTHING in the 3199-test static suite checks that a control sits next
+// to the thing it controls — a render-integrity-class check (real computed
+// geometry, not source text), which belongs here, not in the static Node
+// runner. For each lateral limb (head has no laterality, excluded), compares
+// the on-screen horizontal side (relative to the figure's own centre-x) of
+// the [data-limb] SVG group against the on-screen side of the button that
+// toggles it — they must match.
+const LATERAL_LIMB_IDS = ['la', 'ra', 'll', 'rl'];
+async function checkLimbBoxAlignment(page, results, setupLabel) {
+  await page.evaluate(() => window.selectSubsystem && window.selectSubsystem('operator'));
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#fo3SubtabRail button')].find(
+      x => x.textContent.trim() === 'STATUS'
+    );
+    if (b) b.click();
+  });
+  await page.waitForTimeout(200);
+  const geo = await page.evaluate(ids => {
+    const fig = document.querySelector('.vaultboy-fig');
+    if (!fig || typeof fig.checkVisibility !== 'function' || !fig.checkVisibility()) return null;
+    const figRect = fig.getBoundingClientRect();
+    const figCx = figRect.left + figRect.width / 2;
+    const out = [];
+    for (const id of ids) {
+      const btn = document.getElementById('btn_l_' + id);
+      const limbGroup = document.querySelector('.vaultboy-fig [data-limb="' + id + '"]');
+      if (!btn || !limbGroup) continue;
+      const br = btn.getBoundingClientRect();
+      const lr = limbGroup.getBoundingClientRect();
+      out.push({
+        id,
+        btnSide: br.left + br.width / 2 < figCx ? 'left' : 'right',
+        limbSide: lr.left + lr.width / 2 < figCx ? 'left' : 'right',
+      });
+    }
+    return out;
+  }, LATERAL_LIMB_IDS);
+  if (!geo) {
+    results.pass('6. LIMB BOX ALIGNMENT — ' + setupLabel + ': figure not visible here, skipped');
+    return;
+  }
+  const mismatched = geo.filter(g => g.btnSide !== g.limbSide);
+  if (mismatched.length) {
+    results.fail(
+      '6. LIMB BOX ALIGNMENT — ' +
+        setupLabel +
+        ': box sits on the opposite side from the figure limb it controls — ' +
+        mismatched.map(m => m.id + ' (box=' + m.btnSide + ', limb=' + m.limbSide + ')').join(', ')
+    );
+  } else {
+    results.pass(
+      '6. LIMB BOX ALIGNMENT — ' +
+        setupLabel +
+        ': every arm/leg box sits on the same side as the figure limb it controls'
+    );
+  }
+}
+
 // Opens CURIO and its collectibles sub-panel — the board the owner actually
 // reported the scroll trap on — mirroring the manual-tap path a real
 // session would already have persisted open, before the reachability check
@@ -1044,6 +1108,7 @@ async function runOneSetup(browser, setup, spinnerStrippedIds, results) {
 
   if (setup.mode === 'fo3-rail') {
     await probeFo3RailBoards(page, results, setup.label, spinnerStrippedIds);
+    await checkLimbBoxAlignment(page, results, setup.label);
     if (setup.checkReachable) {
       await openCurioForReachability(page);
       await assertReachable(page, results, setup.label);

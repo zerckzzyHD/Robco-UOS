@@ -762,12 +762,25 @@
   }
   /* U6 Strand 2 (G-2): two FIXED columns flanking the figure, not a wrap —
      the shipped flex-wrap dropped the bottom row below the fold at 780x360
-     (5 buttons wrapped 3+2). A 3-column grid places each limb explicitly
-     (left column top-to-bottom: HEAD/L.ARM/L.LEG; right column: R.ARM/
-     R.LEG/RAD RES), so nothing can ever wrap out of view regardless of
-     content width. display:contents on .zone-readout/.zone-chips still
-     flattens those wrapper divs — the same flattening mechanism works for
-     grid placement exactly as it did for flex order (Protocol UI-7). */
+     (5 buttons wrapped 3+2). A 3-column grid places each limb explicitly,
+     so nothing can ever wrap out of view regardless of content width.
+     display:contents on .zone-readout/.zone-chips still flattens those
+     wrapper divs — the same flattening mechanism works for grid placement
+     exactly as it did for flex order (Protocol UI-7).
+     U9 (Protocol 8 stage 2, round 3): the figure at Section D/H is drawn
+     front-facing (anatomically correct — a person facing the viewer has
+     their LEFT arm on the VIEWER'S right, `[data-limb='la']` sits at
+     viewBox x~194-296). U6/U7/U8 placed the L.ARM/L.LEG *boxes* by naive
+     screen-side instead (left column = "L"), so every arm/leg box sat on
+     the opposite side of the figure from the limb it actually toggles —
+     tapping L.ARM lit up the figure's right side and vice versa (the
+     owner-reported mirror bug, root-caused in planning/AUDIT_FO3_U8.md).
+     The figure and the toggleLimb() wiring were both already correct;
+     only the column ASSIGNMENT was swapped. Fix: the left column (beside
+     figure's `ra`/`rl`, which are drawn on the viewer's left) now holds
+     R.ARM/R.LEG; the right column (beside `la`/`ll`) now holds L.ARM/
+     L.LEG. HEAD (no laterality) and the RAD RES placeholder keep their
+     original slots — only the arm/leg box↔column pairing changed. */
   [data-game='FO3'] #opHarnessPanel .zone-flex {
     display: grid;
     grid-template-columns: 106px minmax(90px, 1fr) 106px;
@@ -783,11 +796,11 @@
     grid-column: 1;
     grid-row: 1;
   }
-  [data-game='FO3'] #opHarnessPanel #btn_l_la {
+  [data-game='FO3'] #opHarnessPanel #btn_l_ra {
     grid-column: 1;
     grid-row: 2;
   }
-  [data-game='FO3'] #opHarnessPanel #btn_l_ll {
+  [data-game='FO3'] #opHarnessPanel #btn_l_rl {
     grid-column: 1;
     grid-row: 3;
   }
@@ -795,11 +808,11 @@
     grid-column: 2;
     grid-row: 1 / span 3;
   }
-  [data-game='FO3'] #opHarnessPanel #btn_l_ra {
+  [data-game='FO3'] #opHarnessPanel #btn_l_la {
     grid-column: 3;
     grid-row: 1;
   }
-  [data-game='FO3'] #opHarnessPanel #btn_l_rl {
+  [data-game='FO3'] #opHarnessPanel #btn_l_ll {
     grid-column: 3;
     grid-row: 2;
   }
@@ -825,10 +838,13 @@
   }
   /* G-4: dash leader lines from each limb box toward the figure — pure
      decoration (pointer-events:none, the same rule the gauge needle/knob
-     pointer already follow at Section E). */
+     pointer already follow at Section E). Column-position-based (which
+     side of the BOX the connector sits on to point at the center figure),
+     so the U9 column swap above just needed the box IDs listed here
+     updated to match their new column membership. */
   [data-game='FO3'] #opHarnessPanel #btn_l_hd::after,
-  [data-game='FO3'] #opHarnessPanel #btn_l_la::after,
-  [data-game='FO3'] #opHarnessPanel #btn_l_ll::after {
+  [data-game='FO3'] #opHarnessPanel #btn_l_ra::after,
+  [data-game='FO3'] #opHarnessPanel #btn_l_rl::after {
     content: '';
     position: absolute;
     right: -9px;
@@ -838,8 +854,8 @@
     background: rgba(var(--robco-green-rgb), 0.4);
     pointer-events: none;
   }
-  [data-game='FO3'] #opHarnessPanel #btn_l_ra::after,
-  [data-game='FO3'] #opHarnessPanel #btn_l_rl::after {
+  [data-game='FO3'] #opHarnessPanel #btn_l_la::after,
+  [data-game='FO3'] #opHarnessPanel #btn_l_ll::after {
     content: '';
     position: absolute;
     left: -9px;
@@ -1063,7 +1079,7 @@
   }
   [data-game='FO3'] #fo3BoardScroll:has(#opHarnessPanel.subtab-active) {
     grid-template-columns: 1fr 190px;
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(186px, auto) auto;
   }
   [data-game='FO3'] #opHarnessPanel {
     grid-column: 1;
@@ -1181,6 +1197,39 @@
   [data-game='FO3'] #opSpecialPanel .fader-input.rad-debuffed {
     border-style: dashed;
     border-color: rgba(var(--robco-green-rgb), 0.9);
+  }
+  /* U9 (Protocol 8 stage 2 round 3, audit planning/AUDIT_FO3_U8.md finding A):
+     the U8 CHANGELOG claimed the perk-delete ✕ was "the last remaining red
+     element" — false. Three more red states remained, all driven by inline
+     styles from the SAME shared (game-agnostic) updateMath() this file
+     already overrides above for HP/rad-debuff — the identical !important
+     pattern applies here for the same reason (an inline style always wins
+     over a class-based rule). Every case already carries its meaning
+     WITHOUT colour (Protocol 17): the RAD number's own escalating VALUE,
+     the RadAway alert's own "NONE IN PACK" text, and the status-effect
+     chip's own ✕ glyph + aria-label — so resetting each to green loses no
+     information, only the colour signal. */
+  [data-game='FO3'] #opVitalPanel #stat_rads {
+    color: var(--robco-green) !important;
+  }
+  [data-game='FO3'] #opVitalPanel #radAwayAlert {
+    color: var(--robco-green) !important;
+  }
+  [data-game='FO3'] #statusEffectsPanel .stlamp-purge {
+    color: var(--robco-green);
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+  }
+  /* the critical-HP edge glow (body.hp-critical-vignette .glass-frame,
+     css/55-feedback-animations.css) is a shared, UNSCOPED global rule —
+     itself a Protocol 38 smell (no [data-game] gate at all) — so it reddens
+     every FO3 board whenever HP < 25%, same box-shadow rgba(231,76,60,...)
+     both games share. Rather than silently killing the alarm (Protocol 26 —
+     the plan calls for expressing it, not deleting it), FO3 gets its own
+     keyframe that keeps the exact same spread/timing and swaps only the
+     colour to green, and this override wins by source order (60-fo3-pipboy
+     .css loads after 55-feedback-animations.css) without needing !important. */
+  [data-game='FO3'] body.hp-critical-vignette .glass-frame {
+    animation-name: fo3HpVignetteBreathe;
   }
   /* U6 (Protocol 42 regression, found by tests/render-integrity.mjs's
      assertion 4): #stat_rads (.num-sm, 46px, shared with NV) keeps a real
@@ -1578,10 +1627,10 @@
     display: none;
   }
   [data-game='FO3'] #opsManifestPanel .tray-head {
-    margin: 2px 0;
+    margin: 1px 0;
   }
   [data-game='FO3'] #opsManifestPanel .mrow {
-    margin: 0 0 2px;
+    margin: 0 0 1px;
   }
 
   /* U6 Strand 2 — N-1: thin drawer pills. The count badge is redundant
@@ -1945,5 +1994,20 @@
 @keyframes fo3CripLabelBlink {
   50% {
     opacity: 0.35;
+  }
+}
+
+/* U9: same reason as fo3CripLabelBlink above — @keyframes can't carry a
+   [data-game='FO3'] prefix, so this lives at file scope too. The one thing
+   that references it by name (body.hp-critical-vignette .glass-frame's
+   animation-name override, Section [data-game='FO3'] STATUS above) is
+   itself FO3-scoped, so this stays inert everywhere else. */
+@keyframes fo3HpVignetteBreathe {
+  0%,
+  100% {
+    box-shadow: inset 0 0 40px 6px rgba(var(--robco-green-rgb), 0.15);
+  }
+  50% {
+    box-shadow: inset 0 0 70px 14px rgba(var(--robco-green-rgb), 0.4);
   }
 }

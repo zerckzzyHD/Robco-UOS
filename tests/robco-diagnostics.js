@@ -42877,6 +42877,99 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       "227.14b: no rule scoped to the FO3 perk delete button reintroduces --robco-danger or its hex — the mistake corrected at G-5 (227.5b) can't quietly come back here either"
     );
   }
+
+  // 227.15 — U9 (Protocol 8 stage 2 round 3, Protocol 13 regression for the
+  //          owner-reported mirrored-limb-controls bug, root-caused in
+  //          planning/AUDIT_FO3_U8.md): the box grid columns were on the
+  //          OPPOSITE side from the anatomically-drawn (front-facing) figure
+  //          limb they toggle — L.ARM/L.LEG sat in the left column beside
+  //          the figure's RIGHT-side `la`/`ll` groups, and vice versa. Fixed
+  //          by swapping which box occupies each column: R.ARM/R.LEG now sit
+  //          in the left column (beside `ra`/`rl`, drawn on the viewer's
+  //          left) and L.ARM/L.LEG in the right column (beside `la`/`ll`,
+  //          drawn on the viewer's right). This static check locks the
+  //          SOURCE assignment; the live computed-geometry check (comparing
+  //          each box's on-screen side against its figure limb's own
+  //          on-screen side — the render-integrity-class check the audit
+  //          asked for, since source text alone can't observe a live mirror)
+  //          lives in tests/render-integrity.mjs assertion 6, run at push-gate.
+  assert(
+    /#btn_l_ra\s*\{\s*grid-column:\s*1;/.test(fo3Css227) &&
+      /#btn_l_rl\s*\{\s*grid-column:\s*1;/.test(fo3Css227) &&
+      /#btn_l_la\s*\{\s*grid-column:\s*3;/.test(fo3Css227) &&
+      /#btn_l_ll\s*\{\s*grid-column:\s*3;/.test(fo3Css227),
+    "227.15a: [Protocol 13, owner-reported mirror bug] R.ARM/R.LEG boxes sit in grid-column 1 (beside the figure's left-side ra/rl groups) and L.ARM/L.LEG sit in grid-column 3 (beside the figure's right-side la/ll groups) — not the naive screen-side placement that caused the mirror"
+  );
+  assert(
+    /#btn_l_hd::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_ra::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_rl::after\s*\{/.test(
+      fo3Css227
+    ) &&
+      /#btn_l_la::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_ll::after\s*\{/.test(
+        fo3Css227
+      ),
+    '227.15b: the dash leader-line ::after rules follow the same column swap as 227.15a (HEAD/R.ARM/R.LEG point right toward the figure, L.ARM/L.LEG point left) — the connector never points at the wrong limb'
+  );
+
+  // 227.16 — U9 (Protocol 8 stage 2 round 3, Protocol 13 regression for the
+  //          audit's finding A: the U8 CHANGELOG falsely claimed the perk-
+  //          delete ✕ was "the last remaining red element" on the FO3
+  //          landscape glass. Three more red states remained, all driven by
+  //          the SAME shared (game-agnostic) updateMath() inline styles this
+  //          file already overrides above for HP/rad-debuff — reset to green
+  //          here with the identical !important pattern, plus the unscoped
+  //          global critical-HP vignette gets its own green keyframe.
+  {
+    const fo3Css227_16 = fo3Css227;
+    assert(
+      /#opVitalPanel\s*#stat_rads\s*\{\s*color:\s*var\(\s*--robco-green\s*\)\s*!important;/.test(
+        fo3Css227_16
+      ),
+      "227.16a: [Protocol 13, audit finding A] [data-game='FO3'] #opVitalPanel #stat_rads is reset to green !important, overriding updateMath()'s inline red/orange rad-escalation colour"
+    );
+    assert(
+      /#opVitalPanel\s*#radAwayAlert\s*\{\s*color:\s*var\(\s*--robco-green\s*\)\s*!important;/.test(
+        fo3Css227_16
+      ),
+      "227.16b: [Protocol 13, audit finding A] [data-game='FO3'] #opVitalPanel #radAwayAlert is reset to green !important, overriding updateMath()'s inline red \"NONE IN PACK\" colour — the alert's own text still carries the meaning"
+    );
+    assert(
+      /#statusEffectsPanel\s*\.stlamp-purge\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);/.test(
+        fo3Css227_16
+      ),
+      "227.16c: [Protocol 13, audit finding A] [data-game='FO3'] #statusEffectsPanel .stlamp-purge (the ACTIVE EFFECTS purge ✕) is reset to green — the ✕ glyph and its aria-label still carry the meaning"
+    );
+    assert(
+      /body\.hp-critical-vignette\s*\.glass-frame\s*\{\s*animation-name:\s*fo3HpVignetteBreathe;/.test(
+        fo3Css227_16
+      ) &&
+        /@keyframes\s+fo3HpVignetteBreathe\s*\{[^}]*rgba\(var\(--robco-green-rgb\),/.test(
+          fo3Css227_16
+        ),
+      '227.16d: [Protocol 13, audit finding A] the FO3 critical-HP edge vignette rides its own fo3HpVignetteBreathe keyframe (green rgba) instead of the shared red one, same spread/timing, still visibly alarming at HP < 25%'
+    );
+    assert(
+      !/#stat_rads[^}]*--robco-danger/.test(fo3Css227_16) &&
+        !/#radAwayAlert[^}]*--robco-danger/.test(fo3Css227_16) &&
+        !/\.stlamp-purge[^}]*--robco-danger/.test(fo3Css227_16),
+      "227.16e: no FO3-scoped override of #stat_rads/#radAwayAlert/.stlamp-purge reintroduces --robco-danger — the false-CHANGELOG mistake (audit finding A) can't quietly come back"
+    );
+  }
+
+  // 227.17 — U9 (carry-forward, audit finding B): the STATUS vitals column
+  //          (#opVitalPanel, row 1 of the 2-row STATUS grid merge) was
+  //          measured at only ~141px visible against ~495px of content,
+  //          clipping the RAD value below the fold — the U7 "CONDITION and
+  //          RAD visible without scrolling" claim was optimistic. Giving
+  //          row 1 an explicit floor (186px, verified against a real
+  //          Playwright measurement at 780x360: RAD's own bottom edge needs
+  //          179px) reclaims just enough space for RAD to clear the fold,
+  //          without shrinking #statusEffectsPanel (row 2) below its own
+  //          natural content height — verified empirically that row 2 keeps
+  //          scrollHeight === clientHeight (no new clipping introduced).
+  assert(
+    /grid-template-rows:\s*minmax\(186px,\s*auto\)\s*auto;/.test(fo3Css227),
+    "227.17: [Protocol 13, audit finding B] #fo3BoardScroll:has(#opHarnessPanel.subtab-active) gives the vitals row (row 1) an explicit 186px floor — enough for the RAD value to clear the fold without scrolling, verified against a live measurement, and without starving #statusEffectsPanel's own natural content height"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -730,8 +730,9 @@ for (const vp of VIEWPORTS) {
 // U6 Strand 4 — render-integrity (Protocol 36b escape-ratchet for the class
 // of defect U5 shipped with a fully-green gate: MANIFEST rendering
 // completely invisible). Runs on the SAME shared Chromium (zero extra
-// launches) — see tests/render-integrity.mjs for the five assertions and
-// the demonstrate-red-then-green evidence in its own header.
+// launches) — see tests/render-integrity.mjs for the six assertions (U9
+// added #6, box-vs-figure limb alignment) and the demonstrate-red-then-green
+// evidence in its own header.
 {
   const { failed: integrityFailed, log } = await runRenderIntegrity(browser);
   console.log(
