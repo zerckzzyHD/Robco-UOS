@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3207/3207 | Cache: robco-terminal-v2.8.0-r26 -->
+## [Unreleased]<!-- Tests: 3213/3213 | Cache: robco-terminal-v2.8.0-r27 -->
 
 ### Added
 
@@ -44,6 +44,7 @@
 - Fixed the rest of the red on the Fallout 3 Pip-Boy's landscape screen — the radiation readout, the RadAway treatment warning, the active-effects remove button, and the screen's low-health glow are all green now instead of red. Nothing they warn you about lost its meaning: the numbers, the wording, and the icons are all exactly the same.
 - Your radiation level is now visible on the Fallout 3 Pip-Boy's character screen without scrolling, right alongside your health.
 - Fixed the last of the leftover orange on the Fallout 3 Pip-Boy's landscape and desktop screens — the "RAD EXPOSURE" label, the radiation caption next to your health readout, the radiation number shown beside the Vault Boy figure, the Karma Center heading, each perk's rank dots, and the cargo/quest filter buttons all show up in the same green as everything else now, instead of the leftover orange accent color. Nothing about what any of them tell you changed — only the color.
+- Fixed the location, item, quest, and perk suggestion boxes — and everything else that looks things up for you, including what the AI itself sees — sometimes showing the OTHER game's content, like a Fallout 3 campaign suggesting New Vegas locations. This only happened right after loading a save slot that held a campaign for a different game than the one you were currently playing; loading now properly restarts the terminal into that game, so every suggestion and lookup matches the game you're actually in. Affects both games, in either direction.
 
 ### Under the Hood
 

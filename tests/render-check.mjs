@@ -727,6 +727,313 @@ for (const vp of VIEWPORTS) {
   await ctx.close();
 }
 
+// ── CROSS-GAME LOCAL-SLOT SWITCH — stale-registry regression (Protocol 13,
+// owner report: "FO3 suggests NV locations"). Root cause: _applySlotEnvelope()
+// (js/ui/ui-saves.js — the shared core behind LOAD SLOT and VERSION RESTORE)
+// applied a cross-game slot IN PLACE (loadUI() only, no reload) even though it
+// already detects and confirms the context mismatch. FALLOUT_REGISTRY and
+// databaseCSVs are boot-time-only globals (index.html's GAME_FILES manifest
+// loads exactly ONE of reg_nv.js/reg_fo3.js + db_nv.js/db_fo3.js) — an
+// in-place apply left them stuck on the OLD game's data while state.gameContext
+// silently flipped to the new game. Every registry-backed surface (location/
+// item/quest/perk autocomplete, native LOOT/THREAT/CONSULT lookups, and the
+// AI's own databaseCSVs system context) was affected, not just the location
+// box the owner happened to notice. Fixed: the cross-game branch now persists
+// robco_v8 and reloads, exactly like every other cross-game apply path
+// (onGameContextChange, loadCloudSave, restoreCloudSaveVersion) already did.
+// These are REAL end-to-end proofs (real reload, real reg_nv.js/reg_fo3.js) —
+// a source-text grep cannot see a stale object surviving in memory, which is
+// exactly how this bug shipped past all 3207 prior tests.
+{
+  const NV_ONLY_LOCATION = 'Novac';
+  const FO3_ONLY_LOCATION = 'Megaton';
+
+  async function waitBooted(page) {
+    await page
+      .waitForFunction(
+        () => {
+          const bs = document.getElementById('bootScreen');
+          return !bs || bs.style.display === 'none' || getComputedStyle(bs).display === 'none';
+        },
+        { timeout: 8000 }
+      )
+      .catch(() => {});
+    await page.waitForTimeout(500);
+  }
+
+  // Boots once (fresh/default), then — if seedFn is given — writes localStorage
+  // in-page and does ONE controlled page.reload() so the boot loader picks up
+  // the seed. This is deliberately NOT addInitScript: addInitScript re-runs on
+  // every navigation in this context, which would silently re-clobber the
+  // localStorage state the APP itself writes just before ITS OWN reload later
+  // (the exact mechanism under test) and defeat the whole proof.
+  async function seedAndBoot(browser, seedFn) {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+    const page = await ctx.newPage();
+    await page.goto(`file://${INDEX.replace(/\\/g, '/')}`);
+    await waitBooted(page);
+    if (seedFn) {
+      await page.evaluate(seedFn);
+      // The app's own beforeunload flush (js/ui/ui-core.js) re-derives
+      // robco_v8.activeContext from the CURRENTLY RUNNING page's state.gameContext
+      // (still whatever the first default boot loaded) and writes it back over
+      // whatever we just seeded — unless window._loadingSave/_contextSwitching is
+      // set first, exactly the guard every real reload path in the app sets before
+      // its own reload (Suite 95.8/95.9 precedent). This is OUR harness triggering
+      // a raw page.reload(), not the app's own guarded reload, so we must set the
+      // same guard ourselves or the flush silently clobbers the seed we just wrote.
+      await page.evaluate(() => {
+        window._loadingSave = true;
+      });
+      await page.reload({ waitUntil: 'load' });
+      await waitBooted(page);
+    }
+    return { ctx, page };
+  }
+
+  async function locationDatalistNames(page) {
+    return page.evaluate(() =>
+      Array.from(document.querySelectorAll('#locationOptions option')).map(o => o.value)
+    );
+  }
+
+  async function registryVersion(page) {
+    return page.evaluate(() =>
+      typeof FALLOUT_REGISTRY !== 'undefined' ? FALLOUT_REGISTRY.version : null
+    );
+  }
+
+  // 1. Fresh-boot baseline — NV (default, no seed). Proves the normal
+  //    no-switch path is unaffected by this fix.
+  {
+    const { ctx, page } = await seedAndBoot(browser, null);
+    const names = await locationDatalistNames(page);
+    const version = await registryVersion(page);
+    if (
+      names.includes(NV_ONLY_LOCATION) &&
+      !names.includes(FO3_ONLY_LOCATION) &&
+      version === '2.0.0'
+    ) {
+      pass(
+        'fresh-boot NV — #locationOptions/FALLOUT_REGISTRY carry NV data only (Novac present, Megaton absent, version 2.0.0)'
+      );
+    } else {
+      fail(
+        `fresh-boot NV — registry wrong: version=${version}, locations=${JSON.stringify(names)}`
+      );
+    }
+    await ctx.close();
+  }
+
+  // 2. Fresh-boot baseline — FO3 (seeded activeContext, no slot switch
+  //    involved). Proves a plain FO3 boot is unaffected by this fix.
+  {
+    const { ctx, page } = await seedAndBoot(browser, () => {
+      localStorage.setItem(
+        'robco_v8',
+        JSON.stringify({ activeContext: 'FO3', campaigns: { FO3: { gameContext: 'FO3' } } })
+      );
+    });
+    const names = await locationDatalistNames(page);
+    const version = await registryVersion(page);
+    if (
+      names.includes(FO3_ONLY_LOCATION) &&
+      !names.includes(NV_ONLY_LOCATION) &&
+      version === '2.0.0-fo3'
+    ) {
+      pass(
+        'fresh-boot FO3 — #locationOptions/FALLOUT_REGISTRY carry FO3 data only (Megaton present, Novac absent, version 2.0.0-fo3)'
+      );
+    } else {
+      fail(
+        `fresh-boot FO3 — registry wrong: version=${version}, locations=${JSON.stringify(names)}`
+      );
+    }
+    await ctx.close();
+  }
+
+  // 3. THE BUG: boot NV, LOAD a FO3 slot — must reload and end up on FO3 data
+  //    only (this is the exact owner-reported scenario).
+  {
+    const { ctx, page } = await seedAndBoot(browser, () => {
+      localStorage.setItem(
+        'robco_v8',
+        JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { gameContext: 'FNV' } } })
+      );
+      localStorage.setItem(
+        'robco_slot_1',
+        JSON.stringify({
+          version: '1.0.0',
+          state: { gameContext: 'FO3' },
+          chat: [],
+          playstyle: 'any',
+          savedAt: Date.now(),
+          slotName: 'SLOT A',
+          gameContext: 'FO3',
+        })
+      );
+    });
+
+    const beforeNames = await locationDatalistNames(page);
+    const beforeOk =
+      beforeNames.includes(NV_ONLY_LOCATION) && !beforeNames.includes(FO3_ONLY_LOCATION);
+    if (beforeOk) {
+      pass(
+        'cross-game slot load (NV→FO3) — pre-load sanity: still showing NV-only locations before LOAD'
+      );
+    } else {
+      fail(
+        `cross-game slot load (NV→FO3) — pre-load sanity failed: ${JSON.stringify(beforeNames)}`
+      );
+    }
+
+    await page.evaluate(() => {
+      window.confirmAction = () => Promise.resolve(true); // auto-approve CONTEXT MISMATCH
+    });
+    const navPromise = page.waitForNavigation({ timeout: 10000 }).catch(() => null);
+    await page.evaluate(() => {
+      loadFromSlot(1);
+    });
+    await navPromise;
+    await waitBooted(page);
+
+    const afterCtx = await page.evaluate(() =>
+      typeof state !== 'undefined' ? state.gameContext : null
+    );
+    const afterNames = await locationDatalistNames(page);
+    const afterVersion = await registryVersion(page);
+    const afterOk =
+      afterNames.includes(FO3_ONLY_LOCATION) &&
+      !afterNames.includes(NV_ONLY_LOCATION) &&
+      afterVersion === '2.0.0-fo3';
+
+    if (afterCtx === 'FO3') {
+      pass('cross-game slot load (NV→FO3) — state.gameContext is FO3 after the reload');
+    } else {
+      fail(`cross-game slot load (NV→FO3) — state.gameContext is "${afterCtx}", expected "FO3"`);
+    }
+    if (afterOk) {
+      pass(
+        'cross-game slot load (NV→FO3) — FALLOUT_REGISTRY/#locationOptions now carry FO3-only data (Megaton present, Novac ABSENT) — the reported bug is fixed'
+      );
+    } else {
+      fail(
+        `cross-game slot load (NV→FO3) — [REGRESSION] registry still stale after the switch: version=${afterVersion}, locations=${JSON.stringify(afterNames)}`
+      );
+    }
+    await ctx.close();
+  }
+
+  // 4. Reverse direction: boot FO3, LOAD an NV slot.
+  {
+    const { ctx, page } = await seedAndBoot(browser, () => {
+      localStorage.setItem(
+        'robco_v8',
+        JSON.stringify({ activeContext: 'FO3', campaigns: { FO3: { gameContext: 'FO3' } } })
+      );
+      localStorage.setItem(
+        'robco_slot_1',
+        JSON.stringify({
+          version: '1.0.0',
+          state: { gameContext: 'FNV' },
+          chat: [],
+          playstyle: 'any',
+          savedAt: Date.now(),
+          slotName: 'SLOT A',
+          gameContext: 'FNV',
+        })
+      );
+    });
+
+    await page.evaluate(() => {
+      window.confirmAction = () => Promise.resolve(true);
+    });
+    const navPromise = page.waitForNavigation({ timeout: 10000 }).catch(() => null);
+    await page.evaluate(() => {
+      loadFromSlot(1);
+    });
+    await navPromise;
+    await waitBooted(page);
+
+    const afterCtx = await page.evaluate(() =>
+      typeof state !== 'undefined' ? state.gameContext : null
+    );
+    const afterNames = await locationDatalistNames(page);
+    const afterVersion = await registryVersion(page);
+    const afterOk =
+      afterNames.includes(NV_ONLY_LOCATION) &&
+      !afterNames.includes(FO3_ONLY_LOCATION) &&
+      afterVersion === '2.0.0';
+
+    if (afterCtx === 'FNV') {
+      pass('cross-game slot load (FO3→NV) — state.gameContext is FNV after the reload');
+    } else {
+      fail(`cross-game slot load (FO3→NV) — state.gameContext is "${afterCtx}", expected "FNV"`);
+    }
+    if (afterOk) {
+      pass(
+        'cross-game slot load (FO3→NV) — FALLOUT_REGISTRY/#locationOptions now carry NV-only data (Novac present, Megaton ABSENT)'
+      );
+    } else {
+      fail(
+        `cross-game slot load (FO3→NV) — [REGRESSION] registry still stale after the switch: version=${afterVersion}, locations=${JSON.stringify(afterNames)}`
+      );
+    }
+    await ctx.close();
+  }
+
+  // 5. Same-game slot load must NOT reload (unchanged fast in-place path) —
+  //    proves this fix didn't turn every LOAD into an unnecessary full reboot.
+  {
+    const { ctx, page } = await seedAndBoot(browser, () => {
+      localStorage.setItem(
+        'robco_v8',
+        JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: { gameContext: 'FNV' } } })
+      );
+      localStorage.setItem(
+        'robco_slot_1',
+        JSON.stringify({
+          version: '1.0.0',
+          state: { gameContext: 'FNV', lvl: 7 },
+          chat: [],
+          playstyle: 'any',
+          savedAt: Date.now(),
+          slotName: 'SLOT A',
+          gameContext: 'FNV',
+        })
+      );
+    });
+    await page.evaluate(() => {
+      window.confirmAction = () => Promise.resolve(true);
+    });
+    const result = await page.evaluate(async () => {
+      window.__preLoadMarker = 'still-here';
+      await window.loadFromSlot(1);
+      return { lvl: state.lvl, markerRightAfter: window.__preLoadMarker };
+    });
+    // Give a would-be reload (the cross-game path's 2s setTimeout) time to fire
+    // if this regressed — a real navigation would wipe window.__preLoadMarker.
+    await page.waitForTimeout(2500);
+    const markerAfterWait = await page
+      .evaluate(() => window.__preLoadMarker)
+      .catch(() => undefined);
+
+    if (result.lvl === 7 && result.markerRightAfter === 'still-here') {
+      pass(
+        'same-game slot load — applies state in-place synchronously (lvl 7 from the slot, no reload yet)'
+      );
+    } else {
+      fail(`same-game slot load — in-place apply failed: ${JSON.stringify(result)}`);
+    }
+    if (markerAfterWait === 'still-here') {
+      pass('same-game slot load — does NOT reload the page (unchanged fast in-place path)');
+    } else {
+      fail('same-game slot load — [REGRESSION] the page reloaded even for a same-game slot');
+    }
+    await ctx.close();
+  }
+}
+
 // U6 Strand 4 — render-integrity (Protocol 36b escape-ratchet for the class
 // of defect U5 shipped with a fully-green gate: MANIFEST rendering
 // completely invisible). Runs on the SAME shared Chromium (zero extra

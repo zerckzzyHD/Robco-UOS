@@ -42973,6 +42973,197 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 228 — cross-game local-slot switch: stale-registry regression
+//  (Protocol 13, owner report: "FO3 suggests NV locations"). Root cause:
+//  _applySlotEnvelope() (js/ui/ui-saves.js — the shared core behind LOAD SLOT
+//  and VERSION RESTORE) applied a cross-game slot IN PLACE (loadUI() only, no
+//  reload) even though it already detects and confirms the context mismatch.
+//  FALLOUT_REGISTRY/databaseCSVs are boot-time-only globals (index.html's
+//  GAME_FILES manifest loads exactly ONE of reg_nv.js/reg_fo3.js +
+//  db_nv.js/db_fo3.js) — an in-place apply left them stuck on the OLD game's
+//  data while state.gameContext silently flipped to the new game. Fixed: the
+//  cross-game branch now persists robco_v8 and reloads, exactly like every
+//  other cross-game apply path (onGameContextChange, loadCloudSave,
+//  restoreCloudSaveVersion) already did. 228.1-228.4 are static regression
+//  guards on the fixed shape; 228.5/228.6 (deferred, async) are BEHAVIORAL —
+//  they execute the REAL extracted _applySlotEnvelope() against a mocked
+//  boot environment, because a source-text grep cannot see a stale global
+//  object surviving in memory, which is exactly how this bug shipped past
+//  every prior test in this file. The full real-browser, real-registry proof (actual
+//  reg_nv.js/reg_fo3.js, actual reload) lives in tests/render-check.mjs.
+//  6 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 228 — cross-game local-slot switch stale-registry regression');
+
+  const uiSaves228 = readGroup('ui-saves');
+  let applyBody228;
+  try {
+    applyBody228 = extractFunctionBody(uiSaves228, '_applySlotEnvelope');
+  } catch (e) {
+    fail('Cannot extract _applySlotEnvelope: ' + e.message);
+  }
+
+  // 228.1 — the crossGame branch calls window.location.reload().
+  assert(
+    typeof applyBody228 === 'string' && /window\.location\.reload\(\)/.test(applyBody228),
+    '228.1: _applySlotEnvelope() calls window.location.reload() — a cross-game slot load must reboot, not apply in place'
+  );
+
+  // 228.2 — the crossGame branch sets window._loadingSave = true before the
+  //         reload (Suite 95.8/95.9 precedent: guards the beforeunload flush
+  //         from clobbering the just-written robco_v8 before boot re-reads it).
+  assert(
+    typeof applyBody228 === 'string' && /window\._loadingSave\s*=\s*true/.test(applyBody228),
+    '228.2: _applySlotEnvelope() sets window._loadingSave = true before reload (beforeunload-flush clobber guard, Suite 95.8/95.9 precedent)'
+  );
+
+  // 228.3 — the crossGame branch persists activeContext as slotCtx (the NEW
+  //         game), not curCtx — the exact inversion that would silently
+  //         reboot back into the wrong game.
+  assert(
+    typeof applyBody228 === 'string' &&
+      /window\.robco_v8\.activeContext\s*=\s*slotCtx/.test(applyBody228),
+    "228.3: _applySlotEnvelope() persists robco_v8.activeContext = slotCtx (the slot's game) before reload"
+  );
+
+  // 228.4 — the common (same-game) path is unchanged: still calls loadUI()
+  //         in place, with no reload for that case (regression guard so this
+  //         fix doesn't turn every LOAD into a full reboot).
+  assert(
+    typeof applyBody228 === 'string' && /loadUI\(\)/.test(applyBody228),
+    '228.4: _applySlotEnvelope() still calls loadUI() for the same-game path (in-place apply, unregressed)'
+  );
+
+  // 228.5/228.6 — BEHAVIORAL (deferred, per the Suite 137.6/207.16 precedent):
+  // execute the REAL extracted _applySlotEnvelope() in a vm sandbox that
+  // mocks a booted-NV environment, once loading a FO3 slot (crossGame) and
+  // once loading an FNV slot (same-game), and assert the actual runtime
+  // effects — not just source shape.
+  _pendingAsync.push(
+    (async () => {
+      const vm228 = require('vm');
+      let ok228a = false; // crossGame behavioral
+      let ok228b = false; // same-game behavioral
+      let err228 = null;
+      try {
+        const nameIdx = uiSaves228.indexOf('function _applySlotEnvelope');
+        const asyncPrefix =
+          uiSaves228.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ' ? 'async ' : '';
+        const params = uiSaves228.slice(
+          uiSaves228.indexOf('(', nameIdx),
+          uiSaves228.indexOf('{', uiSaves228.indexOf('(', nameIdx))
+        );
+        const fnSrc228 = asyncPrefix + 'function _applySlotEnvelope' + params + applyBody228;
+
+        function makeSandbox228() {
+          const calls = { reload: 0, loadUI: 0, snapRollingBackup: 0, openModal: [] };
+          const ls = {};
+          const sb = {
+            state: { gameContext: 'FNV', lvl: 5 },
+            APP_VERSION: '2.9.0',
+            confirmAction: () => Promise.resolve(true),
+            migrateState: (v, s) => s,
+            restoreChatHistory: () => {},
+            appendToChat: () => {},
+            openModal: opts => calls.openModal.push(opts),
+            loadUI: () => {
+              calls.loadUI++;
+            },
+            document: { getElementById: () => null },
+            _slotLabel: n => 'SLOT ' + n,
+            setTimeout: fn => {
+              fn(); // invoke the reload timer synchronously — no real wait needed
+              return 0;
+            },
+            location: {
+              reload: () => {
+                calls.reload++;
+              },
+            },
+            localStorage: {
+              getItem: k => (Object.prototype.hasOwnProperty.call(ls, k) ? ls[k] : null),
+              setItem: (k, v) => {
+                ls[k] = String(v);
+              },
+            },
+            console,
+          };
+          sb.window = sb;
+          sb.window.robco_v8 = {
+            activeContext: 'FNV',
+            campaigns: { FNV: { gameContext: 'FNV', lvl: 5 } },
+          };
+          sb.window.snapRollingBackup = () => {
+            calls.snapRollingBackup++;
+          };
+          vm228.createContext(sb);
+          vm228.runInContext(fnSrc228, sb);
+          return { sb, calls, ls };
+        }
+
+        // Case A — CROSS-GAME: booted FNV, load a FO3 slot.
+        const A228 = makeSandbox228();
+        const envA228 = {
+          gameContext: 'FO3',
+          version: '1.0.0',
+          state: { gameContext: 'FO3', lvl: 1 },
+          chat: [{ sender: 'sys', text: 'hi' }],
+          playstyle: 'melee',
+          savedAt: 123,
+        };
+        const retA228 = await A228.sb._applySlotEnvelope(envA228, 1, {});
+        const v8A228 = JSON.parse(A228.ls.robco_v8 || '{}');
+        ok228a =
+          retA228 === true &&
+          A228.calls.reload === 1 &&
+          A228.calls.loadUI === 0 &&
+          A228.calls.snapRollingBackup === 1 &&
+          v8A228.activeContext === 'FO3' &&
+          !!v8A228.campaigns &&
+          v8A228.campaigns.FO3 &&
+          v8A228.campaigns.FO3.gameContext === 'FO3' &&
+          v8A228.campaigns.FNV &&
+          v8A228.campaigns.FNV.gameContext === 'FNV';
+
+        // Case B — SAME-GAME: booted FNV, load an FNV slot (unregressed fast path).
+        const B228 = makeSandbox228();
+        const envB228 = {
+          gameContext: 'FNV',
+          version: '1.0.0',
+          state: { gameContext: 'FNV', lvl: 9 },
+          chat: [],
+          playstyle: 'any',
+          savedAt: 456,
+        };
+        const retB228 = await B228.sb._applySlotEnvelope(envB228, 2, {});
+        ok228b =
+          retB228 === true &&
+          B228.calls.reload === 0 &&
+          B228.calls.loadUI === 1 &&
+          B228.sb.state.lvl === 9 && // applied in place
+          B228.ls.robco_v8 === undefined; // in-place path never touches robco_v8 at all
+      } catch (e) {
+        err228 = e;
+      }
+      // Re-emit this suite's header (Protocol 42, Suite 137.6/207.16
+      // precedent) so the deferred result line prints under the right group.
+      header('Suite 228 — cross-game local-slot switch stale-registry regression');
+      assert(
+        ok228a,
+        '228.5: [behavioral] _applySlotEnvelope() applied to a REAL booted-FNV sandbox loading a FO3 slot: confirms context mismatch, snapshots a rolling backup, persists robco_v8 (activeContext=FO3, both campaigns present), sets no in-place loadUI(), and reloads — this is the exact scenario that used to leave FALLOUT_REGISTRY stuck on FNV data' +
+          (err228 ? ' — ' + err228.message : '')
+      );
+      assert(
+        ok228b,
+        '228.6: [behavioral] _applySlotEnvelope() applied to a REAL booted-FNV sandbox loading an FNV slot: applies state in place (loadUI(), no reload, no robco_v8 write) — the common case is unregressed by this fix' +
+          (err228 ? ' — ' + err228.message : '')
+      );
+    })()
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

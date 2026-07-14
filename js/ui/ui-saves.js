@@ -375,13 +375,17 @@ async function loadFromSlot(slotNum) {
 }
 
 // _applySlotEnvelope(env, slotNum, opts) — the SHARED verify → context-check →
-// snap → migrate → apply → loadUI core for a slot-shaped save envelope. Extracted
+// snap → migrate → apply core for a slot-shaped save envelope. Extracted
 // verbatim from loadFromSlot so that loadFromSlot AND restoreSlotVersion (P5) run
 // the EXACT same state-replacing path (Protocol 22 — one apply implementation, no
 // parallel copy). Returns true when applied, false if the user cancelled at an
 // integrity or context confirm gate (matching loadFromSlot's original early
 // returns — nothing ran after the apply block, so behavior is unchanged). The
 // optional opts.verb customises only the closing status wording.
+// SAME-GAME apply is in-place (loadUI(), no reload). CROSS-GAME apply persists
+// robco_v8 + reloads instead — FALLOUT_REGISTRY/databaseCSVs are boot-time-only
+// per-game globals an in-place loadUI() can never refresh (see the crossGame
+// branch below for the full explanation).
 async function _applySlotEnvelope(env, slotNum, opts) {
   opts = opts || {};
   // Integrity + forward-compat check before applying
@@ -407,7 +411,8 @@ async function _applySlotEnvelope(env, slotNum, opts) {
   // F5: Warn on gameContext mismatch between slot and current session
   const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
   const curCtx = state.gameContext || 'FNV';
-  if (slotCtx !== curCtx) {
+  const crossGame = slotCtx !== curCtx;
+  if (crossGame) {
     const ok = await confirmAction({
       title: '> CONTEXT MISMATCH',
       warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
@@ -418,6 +423,39 @@ async function _applySlotEnvelope(env, slotNum, opts) {
   // Snapshot current state as rolling backup before replacing
   if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
   if (typeof migrateState === 'function') env.state = migrateState(env.version || '1.0', env.state);
+
+  if (crossGame) {
+    // Cross-game restore: FALLOUT_REGISTRY / databaseCSVs are boot-time-only
+    // per-game globals (index.html's GAME_FILES manifest loads exactly ONE of
+    // reg_nv.js/reg_fo3.js + db_nv.js/db_fo3.js). An in-place loadUI() would
+    // leave every registry-backed surface — item/quest/perk/location
+    // autocomplete, the native LOOT/THREAT/CONSULT lookups, and the AI's own
+    // databaseCSVs system context — silently serving the OLD game's data
+    // (the FO3-shows-NV-locations bug). Route through the SAME
+    // persist-then-reload pattern every other cross-game apply path already
+    // uses (onGameContextChange, loadCloudSave, restoreCloudSaveVersion) —
+    // Protocol 22, no parallel apply path.
+    if (!window.robco_v8) window.robco_v8 = { activeContext: curCtx, campaigns: {} };
+    window.robco_v8.campaigns[curCtx] = JSON.parse(JSON.stringify(state));
+    window.robco_v8.campaigns[slotCtx] = env.state;
+    window.robco_v8.activeContext = slotCtx;
+    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+    if (env.chat && Array.isArray(env.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(env.chat));
+    if (env.playstyle) localStorage.setItem('robco_playstyle', env.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression —
+    // the same guard onGameContextChange/loadCloudSave/handleFileUpload use).
+    window._loadingSave = true;
+    const verb = opts.verb || 'restored';
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> LOAD',
+        body: `${_slotLabel(slotNum)} [${slotCtx}] ${verb}. REBOOTING SYSTEM...`,
+      });
+    setTimeout(() => window.location.reload(), 2000);
+    return true;
+  }
+
   state = { ...state, ...env.state };
   if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
   if (env.playstyle) {
