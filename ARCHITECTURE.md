@@ -106,7 +106,7 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    36KB    3213-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    36KB    3221-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   └── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -584,6 +584,10 @@ Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and
 ```js
 const FALLOUT_REGISTRY = {
   version: '2.0.0',
+  game: 'FNV',                                     // 'FNV' | 'FO3' — authoritative per-registry game tag
+                                                     // (added alongside the api-import.js registry-trust guard);
+                                                     // autoImportState() compares this against state.gameContext
+                                                     // before validating any array against the registry.
   quests:     [ { name, type, dlc }, ... ],       // 130 entries. type: main|side|companion|unmarked
   items:      [ { name, type }, ... ],             // ~280 entries. type: weapon|armor|aid|ammo|misc
   perks:      [ { name, type, level }, ... ],      // ~110 entries. type: regular|companion|challenge|special
@@ -2421,6 +2425,19 @@ JSON string → parse
   → Show undo button
 ```
 
+**Registry-trust guard (Protocol 42 defense-in-depth, added alongside the cross-game
+save-load fix — `planning/AUDIT_registry_leak.md`):** before mapping the five
+registry-validated fields (`collectibles`, `lincolnItems`, `traits`, `skillBooks`,
+`magazines`), `autoImportState()` compares the loaded `FALLOUT_REGISTRY.game` tag
+against `state.gameContext`. Every known cross-game load path already reboots before
+this function can run, so the two should never disagree in practice — but if they
+ever did, validating those five arrays against the wrong game's registry would
+recognise none of the campaign's own real names and silently empty them (reproduced
+in the audit). On a detected mismatch, only those five fields are skipped for that
+sync (existing values are left untouched); every other field above still applies
+normally. A mismatch means the registry is untrustworthy, not that the player's data
+is invalid — so this is additive hardening, not a change to normal-path validation.
+
 ### Native-Input-Path Audit (Player Authority — Step 2 Phase 0 U10)
 
 **Principle:** the AI is never the sole source of truth for durable state (Protocol 24). Every
@@ -3167,7 +3184,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3213-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3221-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

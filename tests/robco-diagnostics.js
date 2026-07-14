@@ -43164,6 +43164,185 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 229 — autoImportState() registry/game-context trust guard
+//  (Protocol 42 defense-in-depth — planning/AUDIT_registry_leak.md §2/§4).
+//  FALLOUT_REGISTRY is a boot-time-only global (index.html's GAME_FILES
+//  manifest loads exactly one of reg_nv.js/reg_fo3.js); every known
+//  cross-game load path already reboots before autoImportState() can run
+//  (commit 2210b57), so registryGame and state.gameContext should never
+//  disagree in a real session. But the audit reproduced real durable data
+//  loss in that window: a stale registry recognises none of the current
+//  campaign's own real names, so the AI's next turn (which echoes state
+//  every message) silently wipes collectibles/traits/skillBooks/magazines/
+//  lincolnItems to empty and persists it. 229.1-229.4 are static regression
+//  guards on the fixed shape (an authoritative FALLOUT_REGISTRY.game tag +
+//  the _registryTrusted gate on all five registry-validated fields);
+//  229.5-229.8 are BEHAVIORAL — they execute the REAL extracted
+//  autoImportState() body in a vm sandbox against a REAL reg_nv.js, because
+//  a source-text grep cannot see a stale FALLOUT_REGISTRY global surviving
+//  in memory, which is exactly how the original leak escaped every prior
+//  test in this file (Suite 133 precedent).
+//  8 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 229 — autoImportState() registry/game-context trust guard');
+
+  const regNv229 = readGroup('reg_nv');
+  const regFo3_229 = readGroup('reg_fo3');
+  let apiImportBody229;
+  try {
+    apiImportBody229 = extractFunctionBody(apiSource, 'autoImportState');
+  } catch (e) {
+    fail('Cannot extract autoImportState: ' + e.message);
+  }
+
+  // 229.1 — reg_nv.js declares an authoritative per-registry game tag.
+  assert(
+    /game\s*:\s*['"]FNV['"]/.test(regNv229),
+    "229.1: reg_nv.js declares FALLOUT_REGISTRY.game = 'FNV' (authoritative registry/game-context signal)"
+  );
+
+  // 229.2 — reg_fo3.js declares the FO3 counterpart.
+  assert(
+    /game\s*:\s*['"]FO3['"]/.test(regFo3_229),
+    "229.2: reg_fo3.js declares FALLOUT_REGISTRY.game = 'FO3' (authoritative registry/game-context signal)"
+  );
+
+  // 229.3 — autoImportState() derives a trust flag comparing the loaded
+  //         registry's game tag against state.gameContext BEFORE any
+  //         registry-gated field is validated.
+  assert(
+    typeof apiImportBody229 === 'string' &&
+      /_registryTrusted\s*=\s*!_registryGame\s*\|\|\s*_registryGame\s*===\s*\(state\.gameContext/.test(
+        apiImportBody229
+      ),
+    '229.3: autoImportState() computes _registryTrusted by comparing FALLOUT_REGISTRY.game to state.gameContext before registry validation'
+  );
+
+  // 229.4 — every one of the five registry-validated field blocks
+  //         (collectibles, lincolnItems, traits, skillBooks, magazines) is
+  //         gated on _registryTrusted — not just collectibles. A partial
+  //         gate would leave the other four fields exploitable exactly like
+  //         the original bug.
+  assert(
+    typeof apiImportBody229 === 'string' &&
+      (apiImportBody229.match(/_registryTrusted\s*&&/g) || []).length >= 5,
+    '229.4: all five registry-validated fields (collectibles/lincolnItems/traits/skillBooks/magazines) are gated on _registryTrusted'
+  );
+
+  const vm229 = require('vm');
+
+  function makeSandbox229(regSource) {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+    };
+    vm229.createContext(sandbox);
+    vm229.runInContext(stateSource, sandbox);
+    vm229.runInContext(regSource, sandbox);
+    const fnSrc229 = 'function autoImportState(jsonString)' + apiImportBody229;
+    vm229.runInContext(fnSrc229 + '\nthis.autoImportState = autoImportState;', sandbox);
+    return sandbox;
+  }
+  function setState229(sandbox, overrides) {
+    const base = vm229.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+    const merged = Object.assign({}, base, overrides);
+    vm229.runInContext('state = ' + JSON.stringify(merged) + ';', sandbox);
+  }
+  function getState229(sandbox) {
+    return vm229.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+  }
+
+  // 229.5 — MISMATCH (collectibles, array-of-strings shape): the NV registry
+  //         is loaded (FALLOUT_REGISTRY.game === 'FNV') but state.gameContext
+  //         is 'FO3' — the exact stale-registry window the audit reproduced.
+  //         The AI echoes the campaign's own real FO3 bobbleheads ("Strength",
+  //         "Perception" — real reg_fo3.js collectible names, absent from
+  //         reg_nv.js). Pre-fix, neither name matches the loaded NV registry,
+  //         so the filter empties state.collectibles to [] (empirically
+  //         reproduced in the audit). Post-fix, the mismatch is detected and
+  //         the field is left untouched.
+  try {
+    const sb229a = makeSandbox229(regNv229);
+    setState229(sb229a, { gameContext: 'FO3', collectibles: ['Strength', 'Perception'] });
+    sb229a.autoImportState(JSON.stringify({ collectibles: ['Strength', 'Perception'] }));
+    const after229a = getState229(sb229a);
+    assert(
+      Array.isArray(after229a.collectibles) &&
+        after229a.collectibles.length === 2 &&
+        after229a.collectibles.includes('Strength') &&
+        after229a.collectibles.includes('Perception'),
+      "229.5: [behavioral] registry/gameContext mismatch (NV registry loaded, state.gameContext=FO3) — an AI turn echoing the campaign's own real FO3 collectibles (Strength/Perception) does NOT get wiped to [] (the exact durable-data-loss scenario reproduced in the audit)"
+    );
+  } catch (e) {
+    fail('229.5: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.6 — MISMATCH (lincolnItems, object-map shape): same mismatch, but
+  //         against the differently-shaped lincolnItems field (a map, not an
+  //         array) to prove the guard generalises across both data shapes,
+  //         not just collectibles. "Lincoln's Repeater" is a real
+  //         reg_fo3.js lincolnMemorabilia name, absent from reg_nv.js.
+  try {
+    const sb229b = makeSandbox229(regNv229);
+    setState229(sb229b, {
+      gameContext: 'FO3',
+      lincolnItems: { "Lincoln's Repeater": 'hannibal' },
+    });
+    sb229b.autoImportState(JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'hannibal' } }));
+    const after229b = getState229(sb229b);
+    assert(
+      after229b.lincolnItems && after229b.lincolnItems["Lincoln's Repeater"] === 'hannibal',
+      '229.6: [behavioral] registry/gameContext mismatch also protects lincolnItems (object-map shape) — a real FO3 memorabilia disposition survives instead of being dropped for not matching the NV registry'
+    );
+  } catch (e) {
+    fail('229.6: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.7 — SAME-GAME (trusted): registry and state.gameContext AGREE (both
+  //         FNV). Protocol 24 must still reject a genuinely hallucinated
+  //         name that matches nothing in either game's registry — the guard
+  //         must not have weakened normal validation.
+  try {
+    const sb229c = makeSandbox229(regNv229);
+    setState229(sb229c, { gameContext: 'FNV', collectibles: [] });
+    sb229c.autoImportState(
+      JSON.stringify({ collectibles: ['Goodsprings', 'TOTALLY HALLUCINATED ITEM 229'] })
+    );
+    const after229c = getState229(sb229c);
+    assert(
+      Array.isArray(after229c.collectibles) &&
+        after229c.collectibles.length === 1 &&
+        after229c.collectibles[0] === 'Goodsprings',
+      '229.7: [behavioral] same-game (trusted) import still drops a genuinely hallucinated collectible name not present in the registry (Protocol 24 intact — the guard only protects against a MISMATCHED registry, not against real validation)'
+    );
+  } catch (e) {
+    fail('229.7: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.8 — SAME-GAME (trusted): the normal accept path for a real,
+  //         registry-recognised name is unregressed by this change.
+  try {
+    const sb229d = makeSandbox229(regNv229);
+    setState229(sb229d, { gameContext: 'FNV', collectibles: [] });
+    sb229d.autoImportState(JSON.stringify({ collectibles: ['Goodsprings'] }));
+    const after229d = getState229(sb229d);
+    assert(
+      Array.isArray(after229d.collectibles) &&
+        after229d.collectibles.length === 1 &&
+        after229d.collectibles[0] === 'Goodsprings',
+      '229.8: [behavioral] same-game (trusted) import still accepts and keeps a real registry-recognised collectible name — the normal path is unregressed'
+    );
+  } catch (e) {
+    fail('229.8: [behavioral] threw — ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

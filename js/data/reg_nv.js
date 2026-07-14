@@ -27,6 +27,11 @@
 
 const FALLOUT_REGISTRY = {
   version: '2.0.0',
+  // Authoritative per-registry game tag (added alongside the api-import.js
+  // registry-trust guard, planning/AUDIT_registry_leak.md §2/§4) — the ONE
+  // signal autoImportState() uses to confirm this loaded registry actually
+  // belongs to state.gameContext before validating an array against it.
+  game: 'FNV',
 
   // ── QUESTS ─────────────────────────────────────────────────────────────────
   // type: 'tutorial' | 'main' | 'side' | 'companion' | 'unmarked'

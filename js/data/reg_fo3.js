@@ -19,6 +19,9 @@
 
 const FALLOUT_REGISTRY = {
   version: '2.0.0-fo3',
+  // Authoritative per-registry game tag — see reg_nv.js's sibling field for
+  // the full rationale (api-import.js registry-trust guard).
+  game: 'FO3',
 
   // ── QUESTS ─────────────────────────────────────────────────────────────────
   // Data source: https://fallout.wiki/wiki/Fallout_3_quests

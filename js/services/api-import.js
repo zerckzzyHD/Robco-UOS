@@ -663,10 +663,39 @@ function autoImportState(jsonString) {
     // onGameContextChange(). The AI's gameContext field is intentionally ignored
     // here to avoid cross-campaign corruption; do not wire it into state.
 
+    // ── REGISTRY / GAME-CONTEXT TRUST GUARD (Protocol 42 defense-in-depth —
+    // planning/AUDIT_registry_leak.md §2/§4) ──────────────────────────────
+    // FALLOUT_REGISTRY is a boot-time-only global — index.html's GAME_FILES
+    // manifest loads exactly one of reg_nv.js/reg_fo3.js, and every known
+    // cross-game load path already reboots before this function can run
+    // (commit 2210b57), so registryGame and state.gameContext should never
+    // disagree in practice. But nothing previously ASSERTED that invariant:
+    // if some future path ever left them mismatched, the five registry-
+    // validated fields below would silently empty real player data, because
+    // a stale-game registry recognises none of the current campaign's own
+    // real names (reproduced in the audit — FO3 collectibles wiped to []
+    // against a stale NV registry). A mismatch means the registry is
+    // untrustworthy, not that the player's data is invalid — so when one is
+    // detected, ONLY those five registry-gated fields (collectibles,
+    // lincolnItems, traits, skillBooks, magazines) are skipped this sync,
+    // leaving their existing state values untouched. Every other field in
+    // this function (lvl/xp/hp/quests/inventory/factions/etc.) is unaffected.
+    // `_registryGame` undefined (registry missing its `game` tag, e.g. a
+    // stale cached bundle) fails OPEN to the pre-existing behavior — this is
+    // additive hardening, not stricter validation for the normal path.
+    const _registryGame =
+      typeof FALLOUT_REGISTRY !== 'undefined' ? FALLOUT_REGISTRY.game : undefined;
+    const _registryTrusted = !_registryGame || _registryGame === (state.gameContext || 'FNV');
+    if (!_registryTrusted) {
+      console.error(
+        `autoImportState: FALLOUT_REGISTRY (${_registryGame}) does not match state.gameContext (${state.gameContext}) — skipping registry-validated fields this sync to avoid dropping real campaign data`
+      );
+    }
+
     // ── COLLECTIBLES (v2.0) ──────────────────────────────────
     // Flat array of collected item name strings. Registry defines what names are valid;
     // state only tracks which have been found. DLC collectibles slot in via registry only.
-    if (parsed.collectibles && Array.isArray(parsed.collectibles)) {
+    if (_registryTrusted && parsed.collectibles && Array.isArray(parsed.collectibles)) {
       const _collectNames =
         typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.collectibles)
           ? new Set(FALLOUT_REGISTRY.collectibles.map(c => c.name))
@@ -695,7 +724,7 @@ function autoImportState(jsonString) {
     // Keeps only recognised pairs — rejects arbitrary AI-injected keys (Protocol 24).
     {
       const raw = _g(parsed, 'lincolnItems');
-      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      if (_registryTrusted && raw && typeof raw === 'object' && !Array.isArray(raw)) {
         const LINCOLN_VOCAB = ['found', 'hannibal', 'leroy', 'washington'];
         const registryNames =
           typeof FALLOUT_REGISTRY !== 'undefined' &&
@@ -715,7 +744,7 @@ function autoImportState(jsonString) {
     // Rejects arbitrary AI-injected names (Protocol 24).
     {
       const raw = _g(parsed, 'traits');
-      if (Array.isArray(raw)) {
+      if (_registryTrusted && Array.isArray(raw)) {
         const traitNames =
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.traits)
             ? new Set(FALLOUT_REGISTRY.traits.map(t => t.name))
@@ -732,7 +761,7 @@ function autoImportState(jsonString) {
     // Validated array: accept only entries matching a registry skill-book name (both games); dedup.
     {
       const raw = _g(parsed, 'skillBooks');
-      if (Array.isArray(raw)) {
+      if (_registryTrusted && Array.isArray(raw)) {
         const bookNames =
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
             ? new Set(FALLOUT_REGISTRY.skillBooks.map(b => b.name))
@@ -749,7 +778,7 @@ function autoImportState(jsonString) {
     // Validated array: accept only entries matching a registry magazine name (FNV only); dedup.
     {
       const raw = _g(parsed, 'magazines');
-      if (Array.isArray(raw)) {
+      if (_registryTrusted && Array.isArray(raw)) {
         const magNames =
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
             ? new Set(FALLOUT_REGISTRY.magazines.map(m => m.name))

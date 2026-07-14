@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3213/3213 | Cache: robco-terminal-v2.8.0-r27 -->
+## [Unreleased]<!-- Tests: 3221/3221 | Cache: robco-terminal-v2.8.0-r28 -->
 
 ### Added
 
@@ -70,6 +70,7 @@
 - Added an automated check that loads every Fallout 3 landscape screen and confirms nothing on it is hidden behind something else, cut off at the edge of the display, too faint to read, or unreachable by touch — the same class of problem a manual look could miss but a previous pass shipped anyway. Proven against five real examples of each of those problems before being trusted. Nothing you can see changed.
 - Tightened that same automated screen-check's one exception (for the phone navigation dock covering whatever happens to sit under it) so it only excuses that exact dock, not anything of the same broad element type sitting anywhere else on screen — the looser version could have let a real, unrelated overlap slip through unnoticed on a future change. Proven with a live example that the check now catches what it would have missed before. Nothing you can see changed.
 - Added an automated check that fails the build if anything on the Fallout 3 Pip-Boy's landscape or desktop screen ever renders in any color but its own green again — it caught two real leftover orange spots nobody had noticed yet (a perk's rank dots and the cargo/quest filter buttons) the first time it ran, both fixed above. Proven against a real example before being trusted. The AI channel column keeps its own orange by design and is correctly left alone. Nothing you can see changed beyond the two spots called out above.
+- Closed off a theoretical gap a follow-up review found around the cross-game suggestion-box fix above: if the reference data used to reject made-up collectibles, traits, skill books, magazines, or Lincoln memorabilia ever mismatched the game you were actually playing, it could have silently emptied your own real ones instead of just rejecting nonsense — the same underlying stale-data window as the fix above, closed a second, more permanent way so it stays closed even if some future change reopens the first one. Genuinely made-up items are still rejected exactly as before. Nothing you can see changed.
 
 ---
 
