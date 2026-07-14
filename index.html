@@ -1576,75 +1576,127 @@
                       </g>
                     </svg>
                   </div>
-                  <!-- FO3 PIP-BOY landscape feedback pass, PART 3: the Vault Boy figure
-                     (design doc §5 — "the single most Pip-Boy thing in the project").
-                     Original inline SVG, zero image assets, phosphor-stroke outline;
-                     purely decorative (aria-hidden) — the REAL toggle affordance stays
-                     the five existing btn_l_* buttons below (Protocol 22: no new
-                     render path, no duplicate ids/state). Hidden everywhere except
-                     [data-game='FO3'] landscape (css/60-fo3-pipboy.css), where the
-                     existing .zone-body top-down plate is hidden and the same five
-                     buttons are CSS-flowed to flank this figure instead. -->
+                  <!-- FO3 PIP-BOY landscape feedback pass, U8 drop-in: the Vault Boy
+                     figure is now Fable's approved VARIANT A drawing (design unit,
+                     planning/mockups/fo3/fo3-status-figure.html — "the single most
+                     Pip-Boy thing in the project"). Original inline SVG, zero image
+                     assets, hand-authored from the owner's reference screenshots;
+                     purely decorative (aria-hidden) — the REAL toggle affordance
+                     stays the five existing btn_l_* buttons below (Protocol 22: no
+                     new render path, no duplicate ids/state). Hidden everywhere
+                     except [data-game='FO3'] landscape (css/60-fo3-pipboy.css),
+                     where the existing .zone-body top-down plate is hidden and the
+                     same five buttons are CSS-flowed to flank this figure instead.
+
+                     Each tracked limb is <g data-limb="hd|la|ra|ll|rl"> — state's
+                     own field names (head/left-arm/right-arm/left-leg/right-leg) —
+                     so the SAME shared apply loop that already sets the btn_l_*
+                     readout buttons' class/text (loadUI(), js/ui/ui-core.js) drives
+                     this figure too: one state, one code path (Protocol 22/24),
+                     never a second source of truth. .crippled (toggled by that same
+                     loop) flips the limb's outline to dashed (css var --dash) and
+                     swaps its bracket condition bar for a blinking CRIPPLED label;
+                     the head additionally swaps to Fable's referenced wail face.
+                     ra/la are drawn mirrored (wearer's right arm on the VIEWER's
+                     left) — the anatomically correct front-facing convention Fable's
+                     mockup documents; the prior placeholder had this unmirrored.
+                     The torso has no tracked condition anywhere in state, so — same
+                     call the placeholder it replaces already made — it stays purely
+                     decorative (drawn, no data-limb, no bar): inventing a fake
+                     "torso condition" mechanic with nothing in state to drive it
+                     would be a second source of truth with no data behind it
+                     (Protocol 24). Fable's own name-line text ("Lone Wanderer —
+                     Level 12") is dropped for the same reason — no state field
+                     backs a display name, and level already renders in the FO3 top
+                     strip; baking in fixed flavor text here would go stale against
+                     the real character. -->
                   <div class="vaultboy-fig" aria-hidden="true" hidden>
-                    <svg
-                      viewBox="0 0 150 224"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="3"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <!-- U6 Strand 6: each limb wrapped in a <g data-limb="hd|la|ra|ll|rl"
-                         class="limbline"> so one shared apply loop (loadUI(),
-                         js/ui/ui-core.js — the SAME loop that already sets the
-                         btn_l_* readout buttons' class/text) can toggle .crippled
-                         here too: one state, one code path (Protocol 22/24), never
-                         a second source of truth. Matches the data-limb naming
-                         Fable's future figure (planning/mockups/fo3/fo3-status-
-                         figure.html) documents as its own contract, so that later
-                         swap is a drop-in. The torso has no tracked condition in
-                         state, so its two paths stay outside the mechanism. -->
-                      <g class="limbline" data-limb="hd">
-                        <circle cx="76" cy="30" r="21" />
-                        <path d="M58 22 Q66 8 84 12 Q94 14 95 24" stroke-width="2.5" />
-                        <circle cx="69" cy="27" r="1.6" fill="currentColor" />
-                        <circle cx="84" cy="27" r="1.6" fill="currentColor" />
-                        <path d="M67 37 Q76 45 86 37" stroke-width="2.5" />
-                        <text class="crip-label" x="108" y="16" font-size="7" text-anchor="middle">
-                          CRIPPLED
-                        </text>
+                    <svg class="fig" viewBox="-6 -26 352 288">
+                      <g class="limbline">
+                        <path
+                          d="M164,88 L164,93 C148,95 141,99 140,106 L143,150 Q144,156 151,156 L165,156 Q170,162 175,156 L189,156 Q196,156 197,150 L200,106 C199,99 192,95 176,93 L176,88"
+                        />
                       </g>
-                      <path d="M76 51 L76 58" />
-                      <path d="M56 60 L96 60 L91 122 L61 122 Z" />
-                      <path d="M60 112 L92 112" stroke-width="2" />
-                      <g class="limbline" data-limb="la">
-                        <path d="M56 64 L38 96 L34 116" />
-                        <circle cx="33" cy="122" r="5" />
-                        <text class="crip-label" x="14" y="108" font-size="7" text-anchor="middle">
-                          CRIPPLED
-                        </text>
+                      <g data-limb="hd">
+                        <g class="limbline">
+                          <path d="M142,31 A40,33 0 1 0 198,31" />
+                          <path d="M142,31 C146,12 164,4 178,9 C189,13 197,21 198,31" />
+                          <path
+                            class="fig-detail"
+                            d="M154,16 C162,6 176,6 181,14 C183,18 181,21 178,21"
+                          />
+                        </g>
+                        <g class="face-ok">
+                          <circle class="gfill" cx="156" cy="50" r="2.6" />
+                          <circle class="gfill" cx="184" cy="50" r="2.6" />
+                          <path d="M152,62 Q170,76 188,62" />
+                          <path class="fig-detail" d="M167,54 q3,4 7,2" />
+                        </g>
+                        <g class="face-crpl">
+                          <path d="M148,48 a7,7 0 1 1 7,8 a3.5,3.5 0 1 0 3,-4" />
+                          <path d="M176,48 q6,5 12,1" />
+                          <path d="M144,60 q-5,8 -1,12 q4,3 7,-2 q2,-6 -6,-10" />
+                          <path d="M158,66 Q170,61 184,67 Q186,79 170,81 Q156,78 158,66 Z" />
+                        </g>
+                        <g class="slotbar">
+                          <rect x="126" y="-12" width="30" height="11" />
+                          <rect class="gfill" x="128" y="-10" width="26" height="7" />
+                          <path d="M156,-1 h44 v6" />
+                        </g>
+                        <text class="slottxt" x="170" y="-2" text-anchor="middle">CRIPPLED</text>
                       </g>
-                      <g class="limbline" data-limb="ra">
-                        <path d="M96 64 L114 82 L118 66" />
-                        <circle cx="119" cy="58" r="7" />
-                        <path d="M117 50 L117 42" stroke-width="4" />
-                        <text class="crip-label" x="128" y="68" font-size="7" text-anchor="middle">
-                          CRIPPLED
-                        </text>
+                      <g data-limb="ra">
+                        <g class="limbline">
+                          <path
+                            d="M146,94 C130,90 116,90 104,86 L98,84 L92,62 L86,76 L76,62 L76,78 L64,70 L70,84 L56,82 L66,92 L58,104 L74,104 Q84,106 90,102 L100,98 C112,104 122,107 132,109 C138,110 142,111 146,112"
+                          />
+                        </g>
+                        <g class="slotbar">
+                          <rect x="2" y="40" width="30" height="11" />
+                          <rect class="gfill" x="4" y="42" width="26" height="7" />
+                          <path d="M32,51 h44 v6" />
+                        </g>
+                        <text class="slottxt" x="44" y="50" text-anchor="start">CRIPPLED</text>
                       </g>
-                      <g class="limbline" data-limb="ll">
-                        <path d="M65 122 L58 170 L56 200" />
-                        <path d="M56 200 L44 202" stroke-width="4" />
-                        <text class="crip-label" x="26" y="165" font-size="7" text-anchor="middle">
-                          CRIPPLED
-                        </text>
+                      <g data-limb="la">
+                        <g class="limbline">
+                          <path
+                            d="M194,94 C210,90 224,90 236,86 L242,84 L248,62 L254,76 L264,62 L264,78 L276,70 L270,84 L284,82 L274,92 L282,104 L266,104 Q256,106 250,102 L240,98 C228,104 218,107 208,109 C202,110 198,111 194,112"
+                          />
+                        </g>
+                        <g class="slotbar">
+                          <rect x="252" y="40" width="30" height="11" />
+                          <rect class="gfill" x="254" y="42" width="26" height="7" />
+                          <path d="M282,51 h44 v6" />
+                        </g>
+                        <text class="slottxt" x="296" y="50" text-anchor="start">CRIPPLED</text>
                       </g>
-                      <g class="limbline" data-limb="rl">
-                        <path d="M87 122 L94 170 L96 200" />
-                        <path d="M96 200 L108 202" stroke-width="4" />
-                        <text class="crip-label" x="122" y="165" font-size="7" text-anchor="middle">
-                          CRIPPLED
-                        </text>
+                      <g data-limb="rl">
+                        <g class="limbline">
+                          <path
+                            d="M144,152 C140,166 135,176 128,186 C124,192 122,197 121,202 L119,208 Q118,214 110,215 L94,215 Q89,215 89,210 Q89,206 95,205 L108,202 Q114,199 117,195 C124,188 130,180 134,172 C138,164 142,159 148,156"
+                          />
+                          <path class="fig-detail" d="M108,215 L107,207" />
+                        </g>
+                        <g class="slotbar">
+                          <rect x="2" y="176" width="30" height="11" />
+                          <rect class="gfill" x="4" y="178" width="26" height="7" />
+                          <path d="M32,187 h44 v6" />
+                        </g>
+                        <text class="slottxt" x="44" y="186" text-anchor="start">CRIPPLED</text>
+                      </g>
+                      <g data-limb="ll">
+                        <g class="limbline">
+                          <path
+                            d="M196,152 C200,164 205,174 211,184 C215,190 218,194 221,199 C225,203 228,208 229,212 Q230,217 224,216 Q217,214 213,208 Q211,204 208,200 C203,192 197,183 193,175 C189,167 184,160 178,157"
+                          />
+                        </g>
+                        <g class="slotbar">
+                          <rect x="252" y="180" width="30" height="11" />
+                          <rect class="gfill" x="254" y="182" width="26" height="7" />
+                          <path d="M282,191 h44 v6" />
+                        </g>
+                        <text class="slottxt" x="296" y="190" text-anchor="start">CRIPPLED</text>
                       </g>
                     </svg>
                   </div>
@@ -1880,9 +1932,28 @@
                   >
                     AMMO<span class="d-count" data-dcount="ammo">0</span>
                   </button>
+                  <!-- U8 (MANIFEST density, audit punch-list item 2): FO3 landscape only
+                     — the always-visible search row below ate a whole row's worth of the
+                     ~211px board budget for a rarely-used optional filter. This toggle
+                     reveals/hides that same row instead of a duplicate control (Protocol
+                     22); hidden by default (game-agnostic default — NV/FO4/FO3-portrait
+                     never render it, matching the #casingRailLeft idiom above). The
+                     filtering CAPABILITY is never removed — one extra tap reaches it. -->
+                  <button
+                    id="mfFilterToggle"
+                    class="mf-filter-toggle"
+                    type="button"
+                    onclick="toggleManifestFilterRow()"
+                    aria-expanded="false"
+                    aria-controls="opsManifestFilterRow"
+                    aria-label="Show drawer filter search"
+                    hidden
+                  >
+                    ⌕
+                  </button>
                 </div>
 
-                <div class="tray-head">
+                <div class="tray-head" id="opsManifestFilterRow" hidden>
                   <span class="t-title" id="opsDrawerTitle">WEAPONS DRAWER</span>
                   <input
                     type="search"

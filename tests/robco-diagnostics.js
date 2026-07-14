@@ -41593,8 +41593,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  without identity.statusStrip. 224.11 (owner-feedback pass) additionally
 //  locks the casing-top/glass-frame/bezel flex `order` values that keep the
 //  visual stack (hood -> glass -> casing bar) correct despite the bezel's
-//  real DOM position sitting BEFORE the glass.
-//  26 tests.
+//  real DOM position sitting BEFORE the glass. 224.13 (U8) locks the
+//  render-integrity.mjs allowlist tightening from a bare-tag-name match to
+//  a precise `.closest('.bezel')` dock-membership check.
+//  28 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 224 — FO3 PIP-BOY BUILD U2 (landscape casing shell, the spine)');
@@ -41661,9 +41663,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         fix (the bezel dock structurally covering content on narrow
   //         mobile viewports — flagged, not allowlisted-as-a-false-
   //         positive, in tests/render-integrity.mjs's own
-  //         CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS). Every
-  //         OTHER file on the list below stays held to the strict
-  //         byte-identical bar.
+  //         filterKnownPreexisting(), which U8 tightened from a bare-tag-name
+  //         match to a precise `.closest('.bezel')` dock-membership check —
+  //         see 224.13). Every OTHER file on the list below stays held to
+  //         the strict byte-identical bar.
   {
     let gitDiffOut224 = '';
     let gitErr224 = null;
@@ -42062,6 +42065,30 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   } else {
     assert(false, '224.12b: skipped — _renderFo3TopStrip extraction failed');
   }
+
+  // 224.13 — U8 audit punch-list item 1 (Protocol 42, highest-value item):
+  //          render-integrity.mjs's filterKnownPreexisting() used to
+  //          allowlist the known bezel-dock occlusion exception by BARE TAG
+  //          NAME (a CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS
+  //          Set containing literal 'DIV'/'SPAN'/'NAV') — which silently
+  //          forgave ANY id-less <div>/<span>/<nav> occluder on the flat
+  //          view, not just the dock. True today only because every id-less
+  //          div/span/nav occluder happened to be the dock — a future,
+  //          unrelated occlusion with an id-less hit target would have
+  //          slipped through undetected (the audit's own flagged latent
+  //          false-confidence gap). Locks that the check now scopes by dock
+  //          MEMBERSHIP (`hit.closest('.bezel')`, captured live in the page
+  //          via pageProbe()'s hitInBezelDock field) and that the old
+  //          bare-tag-name Set is gone for good.
+  const riSrc224_13 = readFile('tests/render-integrity.mjs');
+  assert(
+    riSrc224_13.includes(".closest('.bezel')"),
+    "224.13a: render-integrity.mjs filters occlusion findings by hit.closest('.bezel') dock-membership, not by the occluder's bare tag name"
+  );
+  assert(
+    !/CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS/.test(riSrc224_13),
+    '224.13b: the old bare-tag-name allowlist Set (CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS) is gone — a future non-dock occlusion whose hit target is an id-less DIV/SPAN/NAV can no longer be silently forgiven'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -42596,20 +42623,24 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '227.5b: [owner correction — regression guard] the red crippled-limb hex/rgba this unit shipped and then corrected per real reference screenshots does not reappear anywhere in css/60-fo3-pipboy.css'
   );
 
-  // 227.6 — Strand 6: the STATUS Vault Boy figure is wired to reflect limb
-  //         damage from the SAME state the readout buttons already use (one
-  //         code path, Protocol 22/24) — dashed outline + a CRIPPLED text
-  //         label, never a colour change (the same owner correction as
-  //         G-5). Thin plumbing only: a later unit swaps this figure and
-  //         its data-limb wiring for Fable's planning/mockups/fo3/fo3-
-  //         status-figure.html drawing without touching the apply logic.
+  // 227.6 — Strand 6, U8 drop-in: the STATUS Vault Boy figure is wired to
+  //         reflect limb damage from the SAME state the readout buttons
+  //         already use (one code path, Protocol 22/24) — dashed outline +
+  //         a blinking CRIPPLED text label, never a colour change (the same
+  //         owner correction as G-5). U8 replaced the U6 placeholder with
+  //         Fable's approved VARIANT A drawing (planning/mockups/fo3/fo3-
+  //         status-figure.html); the outer <g data-limb="..."> wrapper
+  //         (toggled by loadUI()) now contains a nested <g class="limbline">
+  //         (the drawn outline) rather than carrying both attributes on the
+  //         same element, so the apply logic (227.6c) — the one thing this
+  //         swap was designed not to touch — needed no change at all.
   assert(
-    (htmlSource.match(/<g class="limbline" data-limb="(hd|la|ra|ll|rl)">/g) || []).length === 5,
-    '227.6a: the Vault Boy figure (.vaultboy-fig svg) wraps all five tracked limbs in their own <g class="limbline" data-limb="..."> group, matching Fable\'s future figure contract (fo3-status-figure.html) so that swap is a drop-in'
+    (htmlSource.match(/<g data-limb="(hd|la|ra|ll|rl)">/g) || []).length === 5,
+    '227.6a: the Vault Boy figure (.vaultboy-fig svg) wraps all five tracked limbs in their own <g data-limb="..."> group (Fable\'s VARIANT A drawing), matching the exact contract loadUI() already applies .crippled against'
   );
   assert(
-    /class="crip-label"/.test(htmlSource),
-    '227.6b: each limb group carries a hidden-by-default CRIPPLED text label (.crip-label), shown only while that limb is crippled'
+    (htmlSource.match(/<text class="slottxt"[^>]*>CRIPPLED<\/text>/g) || []).length === 5,
+    '227.6b: each tracked limb group carries its own hidden-by-default, blinking CRIPPLED text label (.slottxt), shown only while that limb is crippled'
   );
   assert(
     /const\s+figLimb\s*=\s*document\.querySelector\(\s*'\.vaultboy-fig \[data-limb="'\s*\+\s*k\s*\+\s*'"\]'\s*\)/.test(
@@ -42618,10 +42649,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     "227.6c: loadUI() toggles .crippled on the Vault Boy figure's matching [data-limb] group from the SAME isCrippled value the btn_l_* readout buttons already use — never a second state read"
   );
   assert(
-    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*g\.limbline\[data-limb\]\.crippled\s*\{\s*stroke-dasharray:/.test(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\.fig\s*\[data-limb\]\.crippled\s*\.limbline\s*\{\s*stroke-dasharray:/.test(
       fo3Css227
     ) && !/\.vaultboy-fig[^}]*\.crippled[^}]*color:\s*#/i.test(fo3Css227),
     '227.6d: the crippled figure treatment is a dashed stroke — no colour override anywhere on the .vaultboy-fig crippled state'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\.fig\s*\[data-limb='hd'\]\.crippled\s*\.face-crpl\s*\{\s*display:\s*initial;/.test(
+      fo3Css227
+    ),
+    "227.6e: [U8] the head additionally swaps to Fable's referenced wail face (.face-crpl) when crippled — the one limb-specific face swap variant A documents"
   );
 
   // 227.7 — §2.7: the mockup leads the top strip with the active
@@ -42703,12 +42740,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // 227.11 — NV-untouched proof: every new selector this unit introduces
   //          lives ONLY inside the [data-game='FO3'] selector list. Plain
   //          standalone selectors are checked generically; .fo3-strip-name
-  //          and .crip-label are always COMPOUND (attached directly to
-  //          .fo3-strip-seg / used only as a descendant inside .vaultboy-fig
-  //          rules) so the generic "prefix immediately precedes the
-  //          selector" lookbehind can't see past the attached/intervening
-  //          class — checked with their own full compound-selector regex
-  //          instead (227.11b).
+  //          and the Vault Boy figure's classes are always COMPOUND
+  //          (attached directly to .fo3-strip-seg / used only as a
+  //          descendant inside .vaultboy-fig rules) so the generic "prefix
+  //          immediately precedes the selector" lookbehind can't see past
+  //          the attached/intervening class — checked with their own full
+  //          compound-selector regex instead (227.11b/c).
   [
     '#casingRailLeft',
     '#casingHood',
@@ -42731,14 +42768,113 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     "227.11b: .fo3-strip-name is declared exactly once, as a compound class on .fo3-strip-seg inside the [data-game='FO3'] scope"
   );
   {
-    // Every rule ending in `.crip-label {` (there are two: the base
-    // opacity:0 rule and the .crippled-state reveal rule) must itself begin
-    // with the [data-game='FO3'] prefix earlier on the same line/selector.
-    const crippedLabelRules227 = fo3Css227.match(/^.*\.crip-label\s*\{/gm) || [];
+    // U8: .crip-label is gone (replaced by the Vault Boy figure's Fable-
+    // drawing classes — .limbline/.fig-detail/.face-ok/.face-crpl/.gfill/
+    // .slottxt/.slotbar, every one a descendant of .vaultboy-fig). Every
+    // physical line touching one of them must itself begin with the
+    // [data-game='FO3'] prefix.
+    const figClasses227c = [
+      '.limbline',
+      '.fig-detail',
+      '.face-ok',
+      '.face-crpl',
+      '.gfill',
+      '.slottxt',
+      '.slotbar',
+    ];
+    const figRuleLines227c = fo3Css227
+      .split('\n')
+      .filter(line => line.includes('.vaultboy-fig') && figClasses227c.some(c => line.includes(c)));
     assert(
-      crippedLabelRules227.length === 2 &&
-        crippedLabelRules227.every(line => line.includes("[data-game='FO3']")),
-      "227.11c: both rules ending in .crip-label { (the base opacity:0 rule and the .crippled-state reveal rule) carry the [data-game='FO3'] prefix"
+      figRuleLines227c.length >= figClasses227c.length &&
+        figRuleLines227c.every(line => line.includes("[data-game='FO3']")),
+      "227.11c: [U8] every Vault Boy figure rule (.limbline/.fig-detail/.face-ok/.face-crpl/.gfill/.slottxt/.slotbar, each a descendant of .vaultboy-fig) carries the [data-game='FO3'] prefix"
+    );
+  }
+
+  // 227.12 — U8 (MANIFEST density, audit punch-list item 2): the always-
+  //          visible drawer filter search row ate a whole row of the FO3
+  //          landscape MANIFEST board's ~211px budget for a rarely-used
+  //          optional filter, leaving only ~4-5 item rows visible against
+  //          the mockup's ~6. Fixed by collapsing that row behind a toggle
+  //          — hidden by default under FO3 landscape only, one tap away —
+  //          rather than deleting the filtering capability (Protocol 26).
+  //          NV's own always-visible search row is untouched (227.12a/b).
+  {
+    const invSrc227 = readGroup('ui-render-inventory');
+    assert(
+      (htmlSource.match(/id="mfFilterToggle"/g) || []).length === 1 &&
+        /id="mfFilterToggle"[^>]*onclick="toggleManifestFilterRow\(\)"[^>]*hidden/.test(htmlSource),
+      '227.12a: exactly one #mfFilterToggle button exists, wired to toggleManifestFilterRow(), and ships `hidden` by default (game-agnostic default, matching the #casingRailLeft idiom)'
+    );
+    assert(
+      /<div class="tray-head" id="opsManifestFilterRow" hidden>/.test(htmlSource),
+      '227.12b: the MANIFEST drawer search row (.tray-head) carries id="opsManifestFilterRow" and ships `hidden` by default — inert for NV (.tray-head\'s own unscoped display:flex rule already defeats [hidden] there, so NV keeps its search row always visible)'
+    );
+    assert(
+      /function toggleManifestFilterRow\(\)\s*\{[\s\S]{0,400}?row\.hidden\s*=\s*!opening[\s\S]{0,200}?aria-expanded[\s\S]{0,150}?focus\(\)/.test(
+        invSrc227
+      ),
+      "227.12c: toggleManifestFilterRow() flips #opsManifestFilterRow.hidden, updates #mfFilterToggle's aria-expanded, and focuses #invDrawerSearch when opening — a real reveal, not a dead stub"
+    );
+    assert(
+      /\[data-game='FO3'\]\s*#opsManifestPanel\s*\.tray-head\[hidden\]\s*\{\s*display:\s*none;/.test(
+        fo3Css227
+      ),
+      "227.12d: [data-game='FO3'] #opsManifestPanel .tray-head[hidden] forces display:none — without this, the row's own base display:flex rule (css/40-curio-operations.css, unscoped) would defeat the shipped `hidden` attribute under FO3 too, same as it correctly does for NV"
+    );
+    assert(
+      !/id="mfFilterToggle"[^>]*class="[^"]*\bdrawer\b/.test(htmlSource) &&
+        /\[data-game='FO3'\]\s*#mfFilterToggle\s*\{[^}]*display:\s*flex;[^}]*width:\s*auto;/.test(
+          fo3Css227
+        ),
+      "227.12e: #mfFilterToggle carries no shared .drawer class (button.drawer's own unscoped display:flex base rule would defeat its `hidden` attribute everywhere, including NV — the same bug class 227.12d guards against on the row) and explicitly overrides width:auto (Protocol 17 — the global button{width:100%} base rule has nothing to do with `hidden` and would otherwise stretch it full-width)"
+    );
+  }
+
+  // 227.13 — U8 (audit punch-list item 3): the limb-status readout chip
+  //          (btn_l_*, js/ui/ui-core.js) showed the abbreviation "CRIP"
+  //          while the Vault Boy figure right next to it (on FO3 landscape)
+  //          spells out "CRIPPLED" in full — a disclosed inconsistency the
+  //          U7 audit flagged as minor but left as-is. Verified it fits:
+  //          live-measured on FO3 landscape (106px grid column) the text
+  //          wraps onto two lines with no clipping/overlap, and on NV
+  //          (content-width chip, no fixed column) scrollWidth===clientWidth
+  //          — zero overflow either game. Shared code (Protocol 22) — one
+  //          render path, both games get the full word together.
+  {
+    const uiCoreSrc227_13 = readGroup('ui-core');
+    assert(
+      /zone-status">\[░░░░░░\] CRIPPLED<\/span>/.test(uiCoreSrc227_13),
+      '227.13a: the crippled-limb chip now renders the full word "CRIPPLED", matching the Vault Boy figure\'s own label instead of the shorthand "CRIP"'
+    );
+    assert(
+      !/zone-status">\[░░░░░░\] CRIP<\/span>/.test(uiCoreSrc227_13),
+      '227.13b: the old "CRIP" shorthand does not reappear in the crippled-limb chip markup'
+    );
+  }
+
+  // 227.14 — U8 (audit punch-list item 5): the real FO3 Pip-Boy screen is
+  //          one green — no red anywhere. The perk-slot delete "✕" button
+  //          (.pk-x, shared .delete-btn base rule in css/05-base.css sets
+  //          --robco-danger red) was the one remaining red element on the
+  //          FO3 landscape glass, outside U7's stated red-removal scope
+  //          (HP/SPECIAL/CRITICAL). Reset to green here, the same pattern
+  //          as the G-5 crippled-limb-chip fix — scoped to .pk-x only, so
+  //          NV's own red delete buttons (squad dismiss, inventory row
+  //          remove, save-slot delete) stay exactly as they are.
+  {
+    const fo3Css227_14 = fo3Css227;
+    assert(
+      /\[data-game='FO3'\]\s*#perkLoadoutPanel\s*\.slot-row\s*\.pk-x\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);/.test(
+        fo3Css227_14
+      ),
+      "227.14a: [data-game='FO3'] #perkLoadoutPanel .slot-row .pk-x is explicitly reset to green (color and border-color) — never red — matching the whole-screen all-green discipline"
+    );
+    assert(
+      !/#perkLoadoutPanel[^}]*\.pk-x[^}]*--robco-danger/.test(fo3Css227_14) &&
+        !/\.pk-x[^}]*#e74c3c/i.test(fo3Css227_14),
+      "227.14b: no rule scoped to the FO3 perk delete button reintroduces --robco-danger or its hex — the mistake corrected at G-5 (227.5b) can't quietly come back here either"
     );
   }
 }

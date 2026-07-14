@@ -1883,7 +1883,7 @@ function loadUI() {
       btn.innerHTML = nameSpan + '<span class="zone-status">[██████] OK</span>';
     } else {
       btn.className = 'limb-crip limb-glitch';
-      btn.innerHTML = nameSpan + '<span class="zone-status">[░░░░░░] CRIP</span>';
+      btn.innerHTML = nameSpan + '<span class="zone-status">[░░░░░░] CRIPPLED</span>';
     }
     btn.setAttribute('aria-pressed', isCrippled ? 'true' : 'false');
     btn.setAttribute('aria-label', (_limbNames[k] || k) + ': ' + (isCrippled ? 'Crippled' : 'OK'));

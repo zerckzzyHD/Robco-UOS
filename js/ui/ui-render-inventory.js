@@ -195,6 +195,23 @@ function setInvFilter(cat) {
   renderAmmo();
 }
 
+// U8 (MANIFEST density, audit punch-list item 2): reveals/hides the
+// #opsManifestFilterRow search row in place. The toggle button that calls
+// this is hidden everywhere except [data-game='FO3'] landscape
+// (css/60-fo3-pipboy.css) — NV's own always-visible search row never gets
+// this control at all — but the function itself is plain DOM toggling with
+// no game literal (Protocol 38). The filtering CAPABILITY is never removed,
+// only its default visibility (Protocol 26 — one extra tap reaches it).
+function toggleManifestFilterRow() {
+  const row = document.getElementById('opsManifestFilterRow');
+  const btn = document.getElementById('mfFilterToggle');
+  if (!row || !btn) return;
+  const opening = row.hidden;
+  row.hidden = !opening;
+  btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  if (opening) document.getElementById('invDrawerSearch')?.focus();
+}
+
 // ── FO3 MANIFEST DETAIL (Shape A list+detail, Batch 1) ──────────────────
 // A transient (never state.*, never MetaStore) in-memory selection — which
 // row the detail pane is showing. Game-agnostic: _renderFo3ManifestDetail()

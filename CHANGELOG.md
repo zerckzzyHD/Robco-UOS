@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3187/3187 | Cache: robco-terminal-v2.8.0-r23 -->
+## [Unreleased]<!-- Tests: 3199/3199 | Cache: robco-terminal-v2.8.0-r24 -->
 
 ### Added
 
@@ -9,6 +9,8 @@
 - The Fallout 3 Pip-Boy's six landscape screens are now noticeably denser and closer to the real device: S.P.E.C.I.A.L. now fits all seven attributes on screen at once instead of five; each body-part health box on the character screen now shows its name; the cargo/perk/collectibles filter search boxes no longer show up as a plain white browser search field; and the top readout strip now leads with the name of whichever screen you're currently on, updating correctly the moment you switch screens.
 - Added a damage indicator to the Fallout 3 Pip-Boy's Vault Boy figure: a crippled body part's outline now turns dashed and shows the word CRIPPLED next to it, matching the real game's own damage screen exactly — no color change, same as the original.
 - Reworked the Fallout 3 Pip-Boy's character screen so your radiation exposure and active status effects are now visible right alongside your health without scrolling — condition and radiation now sit compactly at the top of that column, with everything else (max health, level, experience, the radiation drag control, and the medical advisory button) still there, one scroll away. Your health bar, S.P.E.C.I.A.L. values, and condition readout no longer flash red at low health — they stay the same green as the rest of the screen, matching the real device, with the wording ("CRITICAL", a dashed outline) still telling you exactly what's wrong. The cargo screen dropped its redundant "drawer" label and tightened its spacing to show more items at once without scrolling.
+- Redrew the Fallout 3 Pip-Boy's Vault Boy figure from scratch — a detailed, hand-inked figure (quiff, face, spread fingers) replaces the earlier placeholder outline, much closer to the real game's own screen. A crippled head now also swaps to a distressed face, on top of the dashed outline and blinking CRIPPLED label a crippled limb already showed.
+- The Fallout 3 Pip-Boy's cargo screen now shows another row of items at a glance — its always-visible filter search box tucks behind a small tap-to-reveal search button by default, freeing up the room it used to take up permanently. The filter is still there, one tap away.
 
 ### Fixed
 
@@ -36,6 +38,8 @@
 - Fixed a handful of narrow number fields — the calendar year, radiation exposure, and the crafting/scrapping quantity boxes — silently clipping their own value by a couple of digits on phones (a 4-digit year could show cut off). Affects both games.
 - Fixed the bottom control dock on phones reserving a fixed amount of space below the last screen, which was a few pixels short of the dock's actual size — the very end of a long screen could render partly behind it. Affects both games.
 - Fixed the quest log's cycle-status and remove buttons being nearly unreadable against their own background color. Affects both games.
+- Fixed the Fallout 3 Pip-Boy's crippled-limb readout showing the shortened "CRIP" instead of spelling out "CRIPPLED" in full, matching the figure right next to it.
+- Fixed the last remaining red element on the Fallout 3 Pip-Boy's landscape screen — the perk list's remove button is now green like the rest of the screen. It's still clearly a delete button either way, since its "✕" mark never depended on the color.
 
 ### Under the Hood
 
@@ -58,6 +62,7 @@
 - Removed a second, redundant copy of the test suite that ran the exact same checks a second way. It caught nothing the main test suite didn't and ran about thirteen times slower, so every test had to be written twice for no added safety. Deleting it makes the pre-commit check noticeably faster and halves the future cost of writing tests, with zero loss of coverage — all 3002 tests still run and pass. Nothing you can see changed.
 - Fixed the private staging test site silently freezing on an old build so new work (like the in-progress Fallout 3 screen) never appeared and the "Reboot Terminal" prompt did nothing. The site's offline-caching step was trying to store the home page under a web address that the staging host automatically forwards to a shorter one; browsers refuse to cache a forwarded page, and because that caching step is all-or-nothing, the single bad entry aborted the entire update — so the freshly-published build could never take over. The staging build now caches the home page the correct way (and serves that address directly as a backstop), and a new automated pre-flight check fails the build if this class of mistake is ever reintroduced. This only ever affected the private staging site — the live production site was never impacted, because its host serves that page directly. Nothing you can see changed on the live site.
 - Added an automated check that loads every Fallout 3 landscape screen and confirms nothing on it is hidden behind something else, cut off at the edge of the display, too faint to read, or unreachable by touch — the same class of problem a manual look could miss but a previous pass shipped anyway. Proven against five real examples of each of those problems before being trusted. Nothing you can see changed.
+- Tightened that same automated screen-check's one exception (for the phone navigation dock covering whatever happens to sit under it) so it only excuses that exact dock, not anything of the same broad element type sitting anywhere else on screen — the looser version could have let a real, unrelated overlap slip through unnoticed on a future change. Proven with a live example that the check now catches what it would have missed before. Nothing you can see changed.
 
 ---
 

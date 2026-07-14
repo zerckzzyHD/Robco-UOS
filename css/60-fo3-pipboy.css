@@ -698,31 +698,66 @@
     color: var(--robco-green);
   }
   [data-game='FO3'] #opHarnessPanel .vaultboy-fig svg {
-    width: auto;
-    height: 100%;
+    width: 100%;
+    height: auto;
     max-height: 165px;
-    overflow: visible; /* U6 Strand 6: the per-limb CRIPPLED labels sit just outside the 0-150 viewBox on the outer limbs; SVG roots clip to their viewBox by default (UA overflow:hidden) */
+    overflow: visible; /* the per-limb CRIPPLED labels and condition bars sit outside the drawn silhouette's own bounds; SVG roots clip to their viewBox by default (UA overflow:hidden) */
     filter: drop-shadow(0 0 6px rgba(var(--robco-green-rgb), 0.45));
   }
-  /* U6 Strand 6 — the figure reflects limb damage, driven by the same
-     .crippled toggle loadUI() (js/ui/ui-core.js) already applies to the
-     btn_l_* readout buttons (one state, one code path). Owner correction
-     (real FO3 reference screenshots, 2026-07-13): the game's own crippled
-     treatment is a DASHED outline plus visible CRIPPLED text — NO colour
-     change anywhere, the whole screen stays one green. This is thin
-     plumbing only (Protocol 22/24) — a later unit swaps this whole figure
-     for Fable's planning/mockups/fo3/fo3-status-figure.html drawing; keep
-     this simple, don't gold-plate it. */
-  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .crip-label {
-    opacity: 0;
+  /* U8 drop-in — Fable's approved VARIANT A drawing
+     (planning/mockups/fo3/fo3-status-figure.html), replacing the U6
+     placeholder stick figure. Driven by the SAME .crippled toggle loadUI()
+     (js/ui/ui-core.js) already applies to the btn_l_* readout buttons (one
+     state, one code path, Protocol 22/24). Owner-verified against real FO3
+     reference screenshots: the game's own crippled treatment is a DASHED
+     outline plus a visible CRIPPLED label — NO colour change anywhere, the
+     whole screen stays one green (Protocol 17 — never signal by colour
+     alone). The head additionally swaps to Fable's referenced wail face
+     when crippled. */
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig {
+    stroke: currentColor;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .limbline {
+    stroke-width: 3;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .fig-detail {
+    stroke-width: 2.1;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .face-ok,
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .face-crpl {
+    stroke-width: 2.4;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .gfill {
     fill: currentColor;
     stroke: none;
   }
-  [data-game='FO3'] #opHarnessPanel .vaultboy-fig g.limbline[data-limb].crippled {
-    stroke-dasharray: 5 4;
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .face-crpl {
+    display: none;
   }
-  [data-game='FO3'] #opHarnessPanel .vaultboy-fig [data-limb].crippled .crip-label {
-    opacity: 1;
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig [data-limb='hd'].crippled .face-ok {
+    display: none;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig [data-limb='hd'].crippled .face-crpl {
+    display: initial;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig .slottxt {
+    display: none;
+    fill: currentColor;
+    stroke: none;
+    font-size: 11px;
+    letter-spacing: 2px;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig [data-limb].crippled .limbline {
+    stroke-dasharray: 7 5;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig [data-limb].crippled .slotbar {
+    display: none;
+  }
+  [data-game='FO3'] #opHarnessPanel .vaultboy-fig .fig [data-limb].crippled .slottxt {
+    display: initial;
     animation: fo3CripLabelBlink 1.6s steps(2) infinite;
   }
   /* U6 Strand 2 (G-2): two FIXED columns flanking the figure, not a wrap —
@@ -1392,6 +1427,21 @@
     min-height: 28px;
     border-bottom-style: dashed;
   }
+  /* U8 (audit punch-list item 5): the real FO3 Pip-Boy screen is one green
+     — there is no red anywhere on it. The shared (NV-facing) .delete-btn
+     rule (css/05-base.css) sets color/border-color to --robco-danger red;
+     explicitly reset back to green here, scoped to the perk row's own .pk-x
+     — the exact same pattern as the G-5 crippled-limb-chip and U7 status-
+     effect-purge/quest-cycle-delete fixes. The ✕ glyph itself still carries
+     the delete meaning without colour (Protocol 17 — never by colour
+     alone); nothing about the button's function changes, zero tap
+     regression (Protocol 25). Scoped to .pk-x only — NV's own red delete
+     buttons (squad dismiss, inventory row remove, save-slot delete)
+     are untouched; the audit named the perk-delete button specifically. */
+  [data-game='FO3'] #perkLoadoutPanel .slot-row .pk-x {
+    color: var(--robco-green);
+    border-color: rgba(var(--robco-green-rgb), 0.55);
+  }
 
   /* ══ M. GENERAL — Shape B/A hybrid: clock+position as flat label/value
      rows (the framed instrument-bay cards are the thing being killed
@@ -1555,6 +1605,38 @@
   [data-game='FO3'] #invFilterBar .drawer .d-count,
   [data-game='FO3'] #opsManifestPanel .drawer .d-count {
     display: none;
+  }
+
+  /* U8 (MANIFEST density, audit punch-list item 2): the search row this
+     reveals (#opsManifestFilterRow, toggleManifestFilterRow() in
+     js/ui/ui-render-inventory.js) is HIDDEN by default under FO3 landscape
+     ONLY — .tray-head's own base rule (css/40-curio-operations.css) sets
+     display:flex unscoped, so without this override the [hidden] attribute
+     the row ships with would have no visible effect anywhere, NV included;
+     this id+attribute selector out-specifies that base rule to actually
+     hide it, reclaiming a whole row of the ~211px board budget by default.
+     The toggle button (#mfFilterToggle) intentionally carries NO shared
+     .drawer class — .drawer's own base rule (button.drawer,
+     css/40-curio-operations.css) would have the identical problem, so the
+     toggle instead relies on the plain `hidden` idiom used everywhere else
+     in this file (e.g. #casingRailLeft): no competing base display rule
+     exists for it, so its shipped `hidden` attribute already hides it
+     everywhere except the display:flex this block gives it (Protocol 17's
+     width:auto override is still needed, since the global button{width:
+     100%} rule has nothing to do with `hidden` and applies regardless). */
+  [data-game='FO3'] #opsManifestPanel .tray-head[hidden] {
+    display: none;
+  }
+  [data-game='FO3'] #mfFilterToggle {
+    display: flex;
+    width: auto;
+    flex: 0 0 24px;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    font-size: 12px;
+    border-radius: 2px;
   }
 
   /* N-2 (Protocol 42 regression): the native <input type="search"> drawer
@@ -1858,8 +1940,8 @@
    (they're an at-rule, not a style rule), so this lives at file scope,
    outside the @media(orientation:landscape) block above — it stays
    completely inert everywhere until something references it by name, and
-   the one thing that does (.vaultboy-fig [data-limb].crippled .crip-label,
-   Section G above) is itself FO3-scoped. */
+   the one thing that does (the crippled Vault Boy figure's blinking text
+   label, U8 — Section G above) is itself FO3-scoped. */
 @keyframes fo3CripLabelBlink {
   50% {
     opacity: 0.35;

@@ -502,6 +502,13 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
         findings.occluded.push({
           el: el.tagName + (el.id ? '#' + el.id : ''),
           hit: hit ? hit.tagName + (hit.id ? '#' + hit.id : '') : null,
+          // U8: precise dock-membership check — is the ACTUAL occluding
+          // element (or an ancestor of it) inside the fixed bezel dock
+          // (`.bezel`, index.html)? Captured here (inside the page) because
+          // only the live DOM node, not the tag-name string above, can
+          // answer `.closest('.bezel')` — see filterKnownPreexisting()'s
+          // own header for why this replaced a bare-tag-name allowlist.
+          hitInBezelDock: !!(hit && hit.closest && hit.closest('.bezel')),
         });
       }
     }
@@ -670,26 +677,24 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
 // similar) — a materially different, riskier change than anything else in
 // this unit, and exactly the kind of unprompted NV redesign this unit's own
 // hard constraint ("NV untouched") exists to prevent. It is NOT allowlisted
-// away as if it were noise — every occurrence below is REAL and every
-// occurrence is logged loudly here and in the U7 report as work this unit
-// found but did not fix, owed its own follow-up unit. A NEW occlusion
-// finding whose hit target is NOT one of these exact bezel-dock elements —
-// or ANY finding of ANY kind on the FO3 rail boards (landscape/desktop) —
-// still fails the gate normally; nothing here widens beyond the one
-// confirmed root cause.
-const CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS = new Set([
-  'DIV#bezelTelemetry', // the dock's own live status LCD
-  'NAV', // the dock's outer <nav> landmark
-  'BUTTON#navkey-operator',
-  'BUTTON#navkey-operations',
-  'BUTTON#navkey-databank',
-  'BUTTON#navkey-uplink',
-  'BUTTON#navkey-chassis',
-  'BUTTON#navkey-settings', // the six dock keycaps themselves
-  'SPAN', // a keycap's .nk-led / .nk-label decoration
-  'DIV', // the dock's own decorative material layers
-]);
-
+// away as if it were noise — every occurrence is REAL and is logged loudly
+// here and in the U7 report as work this unit found but did not fix, owed
+// its own follow-up unit. ANY finding of ANY kind on the FO3 rail boards
+// (landscape/desktop) still fails the gate normally; nothing here widens
+// beyond the one confirmed root cause.
+//
+// U8 PRECISION FIX (audit punch-list item 1): U7 shipped this filter
+// matching occluders by BARE TAG NAME — the set contained literal 'DIV',
+// 'SPAN', 'NAV' alongside the specific #bezelTelemetry/#navkey-* ids. That
+// meant ANY id-less <div>/<span>/<nav> occluding ANYTHING on the flat view
+// would have been silently forgiven, not just the dock — true today only
+// because every id-less div/span/nav occluder happened to BE the dock; a
+// future, unrelated occlusion with an id-less hit target would have slipped
+// through undetected. Fixed by testing dock MEMBERSHIP directly
+// (hit.closest('.bezel') — captured inside the page in pageProbe(), see
+// `hitInBezelDock` above) instead of the hit element's bare tag name. This
+// is strictly narrower: it matches exactly the dock subtree, nothing else,
+// regardless of the occluder's tag or id.
 function filterKnownPreexisting(where, findings) {
   if (process.env.RI_NO_ALLOWLIST) return findings; // audit switch — see the U7 report's raw-count methodology
   // Scoped to the FLAT/legacy switchTab() view only (New Vegas + FO3
@@ -699,9 +704,7 @@ function filterKnownPreexisting(where, findings) {
   if (where.includes('/')) return findings;
   return {
     ...findings,
-    occluded: findings.occluded.filter(
-      o => !CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS.has(o.hit)
-    ),
+    occluded: findings.occluded.filter(o => !o.hitInBezelDock),
   };
 }
 
