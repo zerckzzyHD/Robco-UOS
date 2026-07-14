@@ -418,6 +418,15 @@ function _syncBezelNav(subsystem) {
   // DO-O: the single choke point every subsystem change already routes through —
   // drives the mobile UPLINK self-contained-view CSS (body[data-subsystem="uplink"]).
   document.body.dataset.subsystem = subsystem;
+  // U7 fix: _syncBezelNav() — not _refreshBezelTelemetry() — is the ONE choke
+  // point every subsystem-change entry path (switchTab()'s six tabs AND the
+  // standalone 'uplink' path in selectSubsystem()) actually funnels through.
+  // U6 wired the FO3 top-strip's name chip to _refreshBezelTelemetry() only,
+  // which fires on stat changes but never on a subsystem switch — so the chip
+  // stayed stuck on whatever subsystem last edited a stat. Calling it here
+  // keeps it correct on every switch, not just the one it happened to boot on.
+  // A no-op for any game whose identity carries no statusStrip (NV/FO4 today).
+  _renderFo3TopStrip();
 }
 
 function _bezelSubsystemLabel(subsystem) {

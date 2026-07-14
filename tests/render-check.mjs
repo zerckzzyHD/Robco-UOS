@@ -734,7 +734,9 @@ for (const vp of VIEWPORTS) {
 // the demonstrate-red-then-green evidence in its own header.
 {
   const { failed: integrityFailed, log } = await runRenderIntegrity(browser);
-  console.log('\n  -- render-integrity (FO3 landscape) --');
+  console.log(
+    '\n  -- render-integrity (12-load matrix: FO3 landscape/portrait/desktop + NV x3, populated/empty) --'
+  );
   console.log(log.join('\n'));
   failed += integrityFailed;
 }

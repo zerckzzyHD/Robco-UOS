@@ -848,6 +848,15 @@ button.rb-key:disabled {
   width: auto;
   border-color: rgba(231, 76, 60, 0.55);
   color: var(--robco-danger);
+  /* U7 (Protocol 42 — found while verifying FO3's STATUS EFFECTS board is
+     actually reachable without scrolling): this button never overrode the
+     base `button{background:var(--robco-green)}` (05-base.css), so its red
+     ✕ sat on a solid green fill at ~1.4:1 contrast — invisible in practice.
+     Pre-existing on both games (renderStatus() is shared, Protocol 22); it
+     was never caught because the tile it lives in was always scrolled out
+     of every prior FO3 screenshot. Real shipped path, not a harness
+     artifact — fixed here, not just on FO3. */
+  background: rgba(0, 0, 0, 0.4);
 }
 .stlamp-sub {
   display: flex;

@@ -2032,9 +2032,16 @@ function loadUI() {
     if (radDebuffs[k]) {
       el.style.color = 'var(--robco-danger)';
       el.title = 'RAD debuff active';
+      // U7: a second, non-color signal for the same state (Protocol 17 —
+      // never convey meaning by color alone; the FO3 CSS also neutralizes
+      // this inline red to green, per the owner's real-device reference
+      // that the FO3 screen never shows red — this class is what still
+      // reads as "debuffed" once the color is gone).
+      el.classList.add('rad-debuffed');
     } else {
       el.style.color = '';
       el.title = '';
+      el.classList.remove('rad-debuffed');
     }
   });
 }

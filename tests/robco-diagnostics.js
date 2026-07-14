@@ -41579,9 +41579,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  override) is asserted to carry a [data-game='FO3'] selector, which can
 //  never match under any other game context — combined with the fact
 //  (verifiable via `git diff --stat` against every pre-U2 CSS file, run
-//  and recorded in the commit) that NOT ONE byte of the 12 pre-existing
-//  CSS files changed, NV cannot possibly render differently after this
-//  unit. This suite also locks: the casing selectors sit inside exactly
+//  and recorded in the commit) that NOT ONE byte of 11 of the 12
+//  pre-existing CSS files changed (U7 declared one narrow, disclosed
+//  exception — css/35-operator-boards.css, a real cross-game contrast fix,
+//  see 224.2's own comment), NV cannot possibly render differently after
+//  this unit for anything besides that one declared fix. This suite also
+//  locks: the casing selectors sit inside exactly
 //  one @media(orientation:landscape) block (so FO3 PORTRAIT — "the legacy
 //  view" — stays untouched too), zero image assets, no board control is
 //  functionally disabled by the re-skin, and the new
@@ -41615,10 +41618,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '224.1c: sw.js ASSETS precaches css/60-fo3-pipboy.css (Protocol 1)'
   );
 
-  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 12
+  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 11 remaining
   //         pre-existing CSS files changed by even a byte in this unit
   //         (verified directly against the git index — the strongest
   //         available proof short of a live-browser pixel diff).
+  //
+  //         U7 EXCEPTION (Protocol 42, declared): css/35-operator-boards.css
+  //         is deliberately excluded from this list. Verifying the U7 STATUS
+  //         column fix in a real browser surfaced a genuine, pre-existing,
+  //         CROSS-GAME contrast bug — .stlamp-purge (the status-effect "✕"
+  //         remove button) never overrode the base button{background:
+  //         var(--robco-green)} rule, so its red glyph sat on a solid green
+  //         fill at ~1.4:1 contrast on BOTH games; it was only ever caught
+  //         once the U7 STATUS layout made the ACTIVE EFFECTS tile visible
+  //         in FO3's initial view for the first time. This is a real,
+  //         disclosed, universal accessibility fix — not an FO3-only hack
+  //         leaking into shared CSS (the change carries no [data-game='FO3']
+  //         scoping because it fixes both games identically) — so it is a
+  //         narrow, explicit exception to this test's list, not a weakening
+  //         of what the test protects. Every OTHER file on the list stays
+  //         held to the strict byte-identical bar.
   {
     let gitDiffOut224 = '';
     let gitErr224 = null;
@@ -41627,7 +41646,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         .execSync(
           'git diff --stat HEAD -- css/05-base.css css/10-chrome.css css/15-overseer.css ' +
             'css/20-diagnostic-shell.css css/25-toolbar.css css/30-modulebay.css ' +
-            'css/35-operator-boards.css css/40-curio-operations.css css/45-databank.css ' +
+            'css/40-curio-operations.css css/45-databank.css ' +
             'css/50-chassis.css css/55-feedback-animations.css css/99-mobile.css',
           { cwd: ROOT, encoding: 'utf8' }
         )
@@ -41643,7 +41662,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // not the sole line of defense.
     assert(
       gitErr224 !== null || gitDiffOut224 === '',
-      '224.2: git diff --stat confirms zero bytes changed in any of the 12 pre-existing CSS files (NV-unchanged, mechanically verified against the git index)' +
+      '224.2: git diff --stat confirms zero bytes changed in any of the 11 pre-existing CSS files besides the declared 35-operator-boards.css exception (NV-unchanged, mechanically verified against the git index)' +
         (gitDiffOut224 ? ' — DIFF FOUND: ' + gitDiffOut224 : '')
     );
   }
@@ -41943,6 +41962,80 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       /\[data-game='FO3'\]\s*\.nav-cluster\s*\{[^}]*grid-row:\s*3/.test(fo3Css224),
     '224.11: [U6 Strand 3 update, Protocol 42] .glass-frame is grid-row:2 while .casing-lampbar/.nav-cluster are grid-row:3 — without this the casing bar could render ABOVE or overlapping the glass instead of below it (visual order, matching the Pip-Boy reference); supersedes the pre-U6 flex-order mechanism, which no longer applies now that .bezel/.nav-row are display:contents'
   );
+
+  // 224.12 — U7 regression (Protocol 13/42): an independent audit found the
+  //          top-strip's name chip STUCK on whichever subsystem last edited
+  //          a stat (e.g. permanently "STATS" even on the ITEMS/DATA
+  //          screens) — 224.8 only proved _refreshBezelTelemetry() (fired
+  //          by stat edits) calls _renderFo3TopStrip(); nothing proved the
+  //          strip refreshes on a SUBSYSTEM SWITCH, which is the actual
+  //          user action that was broken. Two checks close both halves of
+  //          that gap: (a) static — _syncBezelNav() (the ONE choke point
+  //          every subsystem-change entry path funnels through — switchTab,
+  //          selectSubsystem's 'uplink' branch, hotkeys, #go= deep-links)
+  //          now calls _renderFo3TopStrip() too; (b) behavioral — against
+  //          the REAL extracted _renderFo3TopStrip() function body, proving
+  //          it reads document.body.dataset.subsystem and renders a
+  //          DIFFERENT value per subsystem, not just SOME value once. A
+  //          check that only verified the chip's PRESENCE (as the U6 gate
+  //          did) would have stayed green through this entire bug — this
+  //          asserts the chip's VALUE.
+  const syncBezelNavBody224_12 = extractFunctionBody(navSrc224, '_syncBezelNav');
+  assert(
+    /_renderFo3TopStrip\(\);/.test(syncBezelNavBody224_12),
+    '224.12a: _syncBezelNav() — the one choke point every subsystem-switch entry path (switchTab, the standalone uplink path, hotkeys, deep-links) actually funnels through — calls _renderFo3TopStrip(), not only _refreshBezelTelemetry() (which only fires on stat edits, never on a subsystem switch)'
+  );
+  if (topStripBody224) {
+    const elements224_12 = new Map();
+    function elFor224_12(id) {
+      if (!elements224_12.has(id)) elements224_12.set(id, { innerHTML: '' });
+      return elements224_12.get(id);
+    }
+    function keycapFor224_12(label) {
+      return { querySelector: sel => (sel === '.nk-label' ? { textContent: label } : null) };
+    }
+    const bodyDataset224_12 = {};
+    const sandbox224_12 = {
+      document: {
+        body: { dataset: bodyDataset224_12 },
+        getElementById: id => {
+          if (id === 'navkey-operator') return keycapFor224_12('STATS');
+          if (id === 'navkey-operations') return keycapFor224_12('ITEMS');
+          return elFor224_12(id);
+        },
+      },
+      getIdentity: () => ({ statusStrip: ['LVL'] }),
+      escapeHtml: s => s,
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const fieldValueBody224_12 = extractFunctionBody(navSrc224, '_fo3StripFieldValue');
+    const vm224_12 = require('vm');
+    vm224_12.createContext(sandbox224_12);
+    vm224_12.runInContext(
+      'function _fo3StripFieldValue(key)' + fieldValueBody224_12,
+      sandbox224_12
+    );
+    vm224_12.runInContext('function _renderFo3TopStrip()' + topStripBody224, sandbox224_12);
+    bodyDataset224_12.subsystem = 'operator';
+    sandbox224_12._renderFo3TopStrip();
+    const stripOnOperator224_12 = elFor224_12('fo3TopStrip').innerHTML;
+    bodyDataset224_12.subsystem = 'operations';
+    sandbox224_12._renderFo3TopStrip();
+    const stripOnOperations224_12 = elFor224_12('fo3TopStrip').innerHTML;
+    assert(
+      stripOnOperator224_12.includes('STATS') &&
+        stripOnOperations224_12.includes('ITEMS') &&
+        !stripOnOperations224_12.includes('STATS'),
+      '224.12b: _renderFo3TopStrip() renders the CURRENT document.body.dataset.subsystem\'s own name — "STATS" while dataset.subsystem is operator, "ITEMS" (not still "STATS") once it changes to operations — the exact value-correctness check the U6 gate never ran' +
+        ' — got operator="' +
+        stripOnOperator224_12 +
+        '" operations="' +
+        stripOnOperations224_12 +
+        '"'
+    );
+  } else {
+    assert(false, '224.12b: skipped — _renderFo3TopStrip extraction failed');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
