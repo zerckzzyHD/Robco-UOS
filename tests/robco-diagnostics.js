@@ -44107,6 +44107,417 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 232 — FO3 Weapon Data: Protocol 3 golden-master + plausibility
+//  guard + FIX-WEAPON-DATA regression. Sibling to the Suite 231 perk
+//  citation guard, per the FO3_WEAPON_DATA sweep (2026-07-15): the FO3
+//  WEAPONS.CSV combat + economy fields were model-estimated, not
+//  transcribed, then stamped with a file-header citation they never
+//  earned (Sniper Rifle value 3500 vs wiki 300; 10mm fire-rate 1.7 vs 6).
+//  Data was corrected FIRST against the live fallout.wiki "Fallout 3
+//  Weapons" master table (explosives' blast pulled per-page), THEN cited
+//  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
+//  a citation label proves nothing about a value; the pin does.
+//  10 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 232 — FO3 Weapon Data: Protocol 3 golden-master + plausibility guard');
+
+  // Parse any db_*.js WEAPONS.CSV block into { name: [base,crit,mult,atk,wt,val] }
+  // — the 6 consumed/displayed numeric fields, in code order. Same extraction
+  // idiom as checkWeaponsCsvColumnCount (Suite 20); game-agnostic (Protocol 38):
+  // hand it any game's source, get that game's weapon stats.
+  function parseWeaponStats232(src) {
+    const out = {};
+    const block = src.match(/\[WEAPONS\.CSV\]([\s\S]*?)(?=\[|`;)/);
+    if (!block) return out;
+    const lines = block[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      out[c[0]] = [1, 2, 3, 4, 5, 6].map(j => parseFloat(c[j]));
+    }
+    return out;
+  }
+  const FIELD_NAMES_232 = [
+    'Base_Damage',
+    'Crit_Damage',
+    'Crit_Multiplier',
+    'Attacks_Per_Second',
+    'Weight',
+    'Value',
+  ];
+  const dbFo3Raw232 = readGroup('db_fo3');
+  const fo3Weapons232 = parseWeaponStats232(dbFo3Raw232);
+  const nvWeapons232 = parseWeaponStats232(readGroup('db_nv'));
+
+  // The golden fixture: every FO3 weapon's 6 consumed fields, pinned to the
+  // values re-verified against fallout.wiki on 2026-07-15 (see
+  // planning/FO3_WEAPON_DATA.md). Field order: [Base_Damage, Crit_Damage,
+  // Crit_Multiplier, Attacks_Per_Second, Weight, Value].
+  const FO3_WEAPON_GOLDEN_232 = {
+    '10mm Pistol': [9, 9, 1, 6, 3, 225],
+    '.32 Pistol': [6, 6, 1, 3, 2, 110],
+    'Scoped .44 Magnum': [35, 35, 2, 2.25, 4, 300],
+    '10mm Submachine Gun': [7, 7, 1, 10, 5, 330],
+    'Hunting Rifle': [25, 25, 1, 0.75, 6, 150],
+    'Combat Shotgun': [55, 27, 1, 1.5, 7, 200],
+    'Assault Rifle': [8, 8, 1, 8, 7, 300],
+    'Sniper Rifle': [40, 40, 5, 1.0714, 10, 300],
+    'Chinese Assault Rifle': [11, 10, 1, 8, 7, 500],
+    "Lincoln's Repeater": [50, 50, 2, 0.75, 5, 500],
+    "Sydney's 10mm Ultra SMG": [9, 9, 1, 10, 5, 430],
+    'Xuanlong Assault Rifle': [12, 12, 1, 8, 7, 400],
+    'Victory Rifle': [40, 40, 3, 1.0714, 10, 450],
+    "Colonel Autumn's 10mm Pistol": [13, 13, 1, 6, 3, 325],
+    'The Terrible Shotgun': [80, 40, 1, 1.5, 10, 250],
+    'Laser Pistol': [12, 12, 1.5, 6, 3, 320],
+    'Laser Rifle': [23, 22, 1.5, 2.0455, 8, 1000],
+    'Plasma Pistol': [25, 25, 2, 3, 3, 360],
+    'Plasma Rifle': [45, 44, 2, 2, 8, 1799],
+    'A3-21 Plasma Rifle': [50, 50, 2.5, 2, 8, 2200],
+    'Gatling Laser': [8, 6, 1, 20, 18, 2000],
+    Mesmetron: [1, 0, 1, 1.0345, 2, 500],
+    Minigun: [5, 0, 0, 20, 18, 1000],
+    'Missile Launcher': [150, 0, 0, 0.5, 20, 500],
+    'Fat Man': [1600, 0, 0, 0.4, 30, 1000],
+    'Rock-It Launcher': [50, 25, 1, 1.5, 8, 200],
+    Flamer: [16, 1, 4, 8, 15, 500],
+    'Heavy Incinerator': [35, 5, 4, 4, 15, 500],
+    'Frag Grenade': [100, 0, 0, 1, 0.5, 25],
+    'Plasma Grenade': [150, 0, 0, 1, 0.5, 50],
+    'Pulse Grenade': [10, 0, 0, 1, 0.5, 40],
+    'Bottlecap Mine': [500, 0, 0, 1, 0.5, 75],
+    'Frag Mine': [100, 0, 0, 1, 0.5, 25],
+    'Baseball Bat': [9, 9, 1, 1.4286, 3, 55],
+    Sledgehammer: [20, 10, 1, 1.4286, 12, 130],
+    'Super Sledge': [25, 25, 1, 1.4286, 20, 180],
+    Shishkebab: [35, 24, 2, 2.3077, 3, 200],
+    'Combat Knife': [7, 13, 3, 3, 1, 50],
+    Switchblade: [5, 9, 2, 3, 1, 35],
+    'Power Fist': [20, 20, 1, 1.0909, 6, 100],
+    'Brass Knuckles': [6, 6, 1, 1.5789, 1, 20],
+    'Tire Iron': [6, 6, 1, 2.3077, 3, 40],
+    'Lead Pipe': [9, 18, 1, 2.3077, 3, 75],
+    "Chinese Officer's Sword": [10, 15, 2, 2.3077, 3, 75],
+    Ripper: [30, 0, 0, 1, 6, 100],
+    'Pool Cue': [3, 0, 0, 1.4286, 1, 15],
+    'Rolling Pin': [3, 8, 0, 1.7308, 1, 10],
+    'Nail Board': [8, 0, 0, 1.4286, 4, 30],
+    'Board of Education': [12, 12, 1, 1.4286, 4, 60],
+    Blackhawk: [55, 45, 2, 2.25, 4, 500],
+    'Alien Blaster': [100, 100, 100, 3, 2, 500],
+    Firelance: [80, 80, 100, 3, 2, 750],
+    "Jingwei's Shocksword": [35, 25, 2, 2.3077, 3, 500],
+    'The Mauler': [45, 0, 0, 1, 20, 200],
+    Stabhappy: [10, 15, 4, 3, 1, 65],
+    'Dart Gun': [6, 12, 2.5, 6, 3, 500],
+    'Deathclaw Gauntlet': [20, 30, 5, 1.6304, 10, 150],
+    'Nuka Grenade': [501, 0, 0, 1, 0.5, 50],
+    'Railway Rifle': [30, 30, 3, 2, 9, 200],
+    'Chinese Pistol': [4, 4, 1, 6, 2, 190],
+    'Silenced 10mm Pistol': [8, 5, 2, 6, 3, 250],
+    'BB Gun': [4, 4, 1, 0.75, 2, 36],
+    "Reservist's Rifle": [40, 40, 5, 1.6071, 10, 500],
+    "Ol' Painless": [30, 30, 1, 1.125, 6, 250],
+    'Sawed-Off Shotgun': [50, 0, 0, 2.25, 6, 190],
+    Eugene: [7, 0, 0, 20, 18, 1500],
+    Vengeance: [11, 12, 1, 20, 18, 2400],
+    Burnmaster: [24, 1, 4, 8, 15, 500],
+    'Experimental MIRV': [12800, 0, 0, 1.579, 30, 2498],
+    'Miss Launcher': [200, 0, 0, 1.579, 15, 400],
+    'Wazer Wifle': [29, 28, 1.5, 2.0455, 8, 900],
+    "Smuggler's End": [18, 18, 1.5, 6, 2, 450],
+    'The Break': [6, 6, 1, 1.4286, 1, 50],
+    Jack: [30, 15, 1, 1, 6, 200],
+    "Highwayman's Friend": [10, 10, 1, 2.3077, 5, 75],
+    'Fisto!': [25, 25, 1.5, 1.0909, 6, 100],
+    'The Tenderizer': [30, 15, 1, 1.4286, 12, 230],
+    "Vampire's Edge": [15, 20, 3, 2.3077, 1, 100],
+    "Occam's Razor": [10, 13, 3, 3, 1, 65],
+    "Ant's Sting": [4, 4, 1, 3, 1, 30],
+    "Butch's Toothpick": [10, 13, 2.5, 3, 1, 50],
+    'Gauss Rifle': [100, 50, 5, 1.0714, 12, 500],
+    'Trench Knife': [7, 13, 3, 3, 1, 50],
+    'Auto Axe': [35, 0, 0, 1, 20, 200],
+    'Man Opener': [35, 0, 0, 1, 20, 200],
+    'Steel Saw': [16, 0, 0, 1, 20, 200],
+    Infiltrator: [7, 10, 1, 8, 7, 400],
+    Perforator: [10, 14, 2, 6, 7, 600],
+    "Wild Bill's Sidearm": [10, 15, 1, 3, 2, 250],
+    'Metal Blaster': [55, 27, 1.5, 2.0455, 8, 1000],
+    'Tri-beam Laser Rifle': [75, 15, 1.5, 2.7273, 9, 1000],
+    "Callahan's Magnum": [65, 50, 2, 2.25, 4, 750],
+    'Precision Gatling Laser': [8, 6, 4, 20, 18, 3000],
+    'Lever-Action Rifle': [40, 40, 5, 0.75, 8, 200],
+    'Double-Barrel Shotgun': [85, 30, 1, 2.25, 6, 175],
+    'Backwater Rifle': [45, 45, 5, 0.75, 7, 250],
+    'The Dismemberer': [25, 40, 2, 1.4286, 6, 55],
+    'Microwave Emitter': [60, 100, 2, 1.0345, 8, 500],
+    Axe: [20, 30, 2, 1.4286, 6, 60],
+    'Fertilizer Shovel': [15, 30, 3, 1.4286, 3, 55],
+    'Ritual Knife': [6, 18, 3, 3, 1, 20],
+    'Alien Atomizer': [35, 40, 1, 3, 2, 500],
+    'Alien Disintegrator': [65, 50, 2, 2, 7, 300],
+    'Atomic Pulverizer': [37, 40, 2, 3, 2, 500],
+    "Captain's Sidearm": [35, 40, 1, 3, 2, 500],
+    Destabilizer: [30, 20, 2, 4.5, 7, 1199],
+    'Drone Cannon': [40, 50, 1, 3.3333, 18, 1999],
+    'Drone Cannon Ex-B': [40, 50, 1, 3.3333, 18, 1999],
+    'Electro-Suppressor': [25, 4, 1, 2.3077, 2, 70],
+    'Cryo Grenade': [1, 0, 0, 0.652, 0.5, 50],
+    'Cryo Mine': [1, 0, 0, 0.5, 0.5, 25],
+  };
+
+  // The golden-master validator — the chokepoint. Returns a list of drift
+  // strings (empty = clean). Run against the real shipped data (232.1, green)
+  // and a deliberately re-inflated fixture (232.2, red) to prove it fails
+  // red and passes green — and proves it catches the NUMBER, not a label.
+  function goldenDrift232(weapons) {
+    const drift = [];
+    for (const n of Object.keys(FO3_WEAPON_GOLDEN_232)) {
+      if (!(n in weapons)) {
+        drift.push(`${n}: MISSING from db_fo3.js`);
+        continue;
+      }
+      const exp = FO3_WEAPON_GOLDEN_232[n];
+      const got = weapons[n];
+      for (let f = 0; f < 6; f++) {
+        if (got[f] !== exp[f])
+          drift.push(`${n} ${FIELD_NAMES_232[f]} expected ${exp[f]} got ${got[f]}`);
+      }
+    }
+    for (const n of Object.keys(weapons))
+      if (!(n in FO3_WEAPON_GOLDEN_232)) drift.push(`${n}: UNPINNED extra weapon in db_fo3.js`);
+    return drift;
+  }
+
+  // 232.1 — [GREEN] the real shipped db_fo3.js weapon table matches the pin
+  //         exactly — every one of the 111 weapons' 6 consumed fields.
+  {
+    const drift = goldenDrift232(fo3Weapons232);
+    assert(
+      drift.length === 0,
+      '232.1: [golden-master] every FO3 weapon’s 6 consumed stats match the fallout.wiki-verified pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.2 — [RED] a fixture that re-inflates the Sniper Rifle value back to
+  //         the old 3500 AND silently restores the deleted non-FO3 "Bumper
+  //         Sword" row must fail the pin BY NAME — proving the guard catches
+  //         a wrong number and a resurrected bad row, not just a label.
+  {
+    const broken232 = { ...fo3Weapons232 };
+    broken232['Sniper Rifle'] = [40, 40, 5, 1.0714, 10, 3500];
+    broken232['Bumper Sword'] = [30, 30, 1, 1.5, 6, 1500];
+    const drift = goldenDrift232(broken232);
+    assert(
+      drift.some(d => d.includes('Sniper Rifle') && d.includes('Value') && d.includes('3500')) &&
+        drift.some(d => d.includes('Bumper Sword') && d.includes('UNPINNED')),
+      '232.2: [RED] the golden-master flags a re-inflated Sniper Rifle value (3500) and a resurrected non-FO3 row by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.3 — headline corrections restated independently of the pin above
+  //         (typed from the live fallout.wiki page), spanning every category
+  //         and both error directions (value 3500→300 down; 10mm value
+  //         100→225 up; fire-rate 1.7→6; Alien Blaster crit ×2→×100).
+  {
+    const spot232 = {
+      'Sniper Rifle': [40, 40, 5, 1.0714, 10, 300],
+      '10mm Pistol': [9, 9, 1, 6, 3, 225],
+      'Assault Rifle': [8, 8, 1, 8, 7, 300],
+      'Alien Blaster': [100, 100, 100, 3, 2, 500],
+      'Super Sledge': [25, 25, 1, 1.4286, 20, 180],
+      'Power Fist': [20, 20, 1, 1.0909, 6, 100],
+      'Deathclaw Gauntlet': [20, 30, 5, 1.6304, 10, 150],
+      Minigun: [5, 0, 0, 20, 18, 1000],
+      "Lincoln's Repeater": [50, 50, 2, 0.75, 5, 500],
+      'Combat Shotgun': [55, 27, 1, 1.5, 7, 200],
+    };
+    const wrong = Object.entries(spot232).filter(
+      ([n, exp]) =>
+        !fo3Weapons232[n] || FIELD_NAMES_232.some((_, f) => fo3Weapons232[n][f] !== exp[f])
+    );
+    assert(
+      wrong.length === 0,
+      '232.3: [spot-check] headline FO3 weapon corrections match the live fallout.wiki values — ' +
+        JSON.stringify(wrong.map(w => w[0]))
+    );
+  }
+
+  // 232.4 — explosives special case: each blast value was pulled from that
+  //         weapon’s OWN fallout.wiki page (the master table lists impact=1),
+  //         and every thrown/placed grenade, mine and nuke-launcher carries
+  //         Crit_Multiplier 0 (explosives cannot critically hit).
+  {
+    const blast232 = {
+      'Frag Grenade': 100,
+      'Plasma Grenade': 150,
+      'Pulse Grenade': 10,
+      'Nuka Grenade': 501,
+      'Frag Mine': 100,
+      'Bottlecap Mine': 500,
+      'Fat Man': 1600,
+      'Missile Launcher': 150,
+      'Miss Launcher': 200,
+      'Experimental MIRV': 12800,
+      'Rock-It Launcher': 50,
+    };
+    const cantCrit232 = [
+      'Frag Grenade',
+      'Plasma Grenade',
+      'Pulse Grenade',
+      'Nuka Grenade',
+      'Frag Mine',
+      'Bottlecap Mine',
+      'Cryo Grenade',
+      'Cryo Mine',
+      'Fat Man',
+      'Missile Launcher',
+      'Miss Launcher',
+      'Experimental MIRV',
+    ];
+    const badBlast = Object.entries(blast232).filter(
+      ([n, b]) => !fo3Weapons232[n] || fo3Weapons232[n][0] !== b
+    );
+    const badCrit = cantCrit232.filter(n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 0);
+    assert(
+      badBlast.length === 0 && badCrit.length === 0,
+      '232.4: [explosives] per-page blast values pinned and grenades/mines/launchers carry crit-mult 0 — badBlast ' +
+        JSON.stringify(badBlast.map(b => b[0])) +
+        ' badCrit ' +
+        JSON.stringify(badCrit)
+    );
+  }
+
+  // 232.5 — the 4 non-FO3 rows (cross-game / invented, same class as the
+  //         fabricated perks) are gone from BOTH the WEAPONS.CSV table (now
+  //         exactly 111 weapons) AND the reg_fo3.js autocomplete registry —
+  //         a half-deletion would leave a suggestible weapon with no DB stats.
+  {
+    const deleted232 = ['Bumper Sword', 'Golf Club', 'Plunger', 'Tin Grenade'];
+    const regFo3Raw232 = readGroup('reg_fo3');
+    const stillInReg232 = deleted232.filter(n => regFo3Raw232.includes(`'${n}'`));
+    assert(
+      deleted232.every(n => !(n in fo3Weapons232)) &&
+        Object.keys(fo3Weapons232).length === 111 &&
+        stillInReg232.length === 0,
+      `232.5: [deletions] the 4 non-FO3 rows are removed from db_fo3.js (now 111 weapons) and from the reg_fo3.js registry — got ${Object.keys(fo3Weapons232).length} weapons, still-in-DB ${JSON.stringify(deleted232.filter(n => n in fo3Weapons232))}, still-in-registry ${JSON.stringify(stillInReg232)}`
+    );
+  }
+
+  // 232.6 — [citation] the false blanket "every data row here is sourced from
+  //         fallout.wiki" header claim is GONE from db_fo3.js, replaced with a
+  //         dated, honestly-scoped provenance note. Correct-then-cite: the
+  //         citation rides ON the corrected values, and does NOT vouch for the
+  //         un-re-sourced PARKED columns / other tables.
+  assert(
+    !/every data row here is sourced from fallout\.wiki/.test(dbFo3Raw232) &&
+      /re-verified row-by-row against the fallout\.wiki/.test(dbFo3Raw232) &&
+      dbFo3Raw232.includes('2026-07-15') &&
+      dbFo3Raw232.includes('Bumper Sword, Golf Club, Plunger, Tin Grenade') &&
+      /NOT re-sourced/.test(dbFo3Raw232),
+    '232.6: [citation] db_fo3.js drops the false blanket fallout.wiki claim for a dated, scoped provenance note naming the removed rows and the un-re-sourced columns'
+  );
+
+  // ── Plausibility range guard (per-game bands, Protocol 38) ──────────
+  // FO3 — tight, audited bands: the re-verified table’s real envelope + a
+  // little headroom, chosen so the OLD inflated values trip (old Sniper value
+  // 3500 > 3000; old Fat Man 8500; old Gatling Laser 22500). Base_Damage’s
+  // ceiling is generous only because the Experimental MIRV legitimately deals
+  // 12800 (8 mini-nukes, wiki Dmg/Attack) — the guard’s teeth are on
+  // Value / Crit_Multiplier / fire-rate / Weight.
+  const FO3_BANDS_232 = {
+    Base_Damage: [0, 13000],
+    Crit_Damage: [0, 200],
+    Crit_Multiplier: [0, 100],
+    Attacks_Per_Second: [0, 25],
+    Weight: [0, 35],
+    Value: [0, 3000],
+  };
+  // FNV — grandfathered ceiling. NV weapon data was NOT re-sourced by this unit
+  // and carries its own (separately suspect) inflation — e.g. Bozar value 75000
+  // — so NV bands only catch gross overflow above the current envelope. A future
+  // NV audit should tighten these; flagged, out of scope here. The plan’s
+  // "same band valid for NV" was refuted by NV’s real 5000–75000 values.
+  const NV_BANDS_232 = {
+    Base_Damage: [0, 13000],
+    Crit_Damage: [0, 1000],
+    Crit_Multiplier: [0, 100],
+    Attacks_Per_Second: [0, 25],
+    Weight: [0, 50],
+    Value: [0, 100000],
+  };
+  function rangeViolations232(weapons, bands) {
+    const v = [];
+    for (const [n, s] of Object.entries(weapons)) {
+      FIELD_NAMES_232.forEach((fn, i) => {
+        const [lo, hi] = bands[fn];
+        if (!(s[i] >= lo && s[i] <= hi)) v.push(`${n} ${fn}=${s[i]} outside [${lo},${hi}]`);
+      });
+    }
+    return v;
+  }
+
+  // 232.7 — [RED] the range guard flags a wildly-out-of-band FO3 value — the
+  //         old Sniper Rifle value 3500 (> 3000) and a hypothetical 35000 —
+  //         by weapon and field. This is the "10× inflation" class the guard
+  //         exists to catch even for a future weapon the pin doesn’t cover.
+  {
+    const broken232 = { ...fo3Weapons232 };
+    broken232['Sniper Rifle'] = [40, 40, 5, 1.0714, 10, 3500];
+    broken232['Gatling Laser'] = [8, 6, 1, 20, 18, 35000];
+    const v = rangeViolations232(broken232, FO3_BANDS_232);
+    assert(
+      v.some(x => x.includes('Sniper Rifle') && x.includes('Value=3500')) &&
+        v.some(x => x.includes('Gatling Laser') && x.includes('Value=35000')),
+      '232.7: [RED] the plausibility range guard flags out-of-band FO3 values (Sniper 3500, Gatling 35000) by name — ' +
+        JSON.stringify(v)
+    );
+  }
+
+  // 232.8 — [GREEN] every corrected FO3 weapon stat sits inside the FO3 bands.
+  {
+    const v = rangeViolations232(fo3Weapons232, FO3_BANDS_232);
+    assert(
+      v.length === 0,
+      '232.8: [GREEN] every corrected FO3 weapon stat is within the audited plausibility bands — ' +
+        JSON.stringify(v.slice(0, 10))
+    );
+  }
+
+  // 232.9 — [GREEN + game-agnostic] the range guard also runs over the NV
+  //         table (Protocol 38 §4.4) and every NV weapon passes its
+  //         grandfathered bands — proving the guard covers NV and does not
+  //         break the untouched NV build.
+  {
+    const v = rangeViolations232(nvWeapons232, NV_BANDS_232);
+    assert(
+      v.length === 0,
+      '232.9: [GREEN] every NV weapon stat is within the NV grandfathered bands (guard covers both games) — ' +
+        JSON.stringify(v.slice(0, 10))
+    );
+  }
+
+  // 232.10 — [NV untouched] this unit edited ONLY db_fo3.js. NV still carries
+  //          its own "Bumper Sword"/"Golf Club" (genuine NV weapons — the FO3
+  //          deletion was cross-game-only) and its own un-audited high value
+  //          (Marksman Carbine 5000), and its weapon count is unchanged (192).
+  assert(
+    Object.keys(nvWeapons232).length === 192 &&
+      'Bumper Sword' in nvWeapons232 &&
+      'Golf Club' in nvWeapons232 &&
+      nvWeapons232['Marksman Carbine'] &&
+      nvWeapons232['Marksman Carbine'][5] === 5000,
+    `232.10: [NV untouched] db_nv.js weapon table is unmodified (192 weapons, keeps Bumper Sword/Golf Club and Marksman Carbine value 5000) — got ${Object.keys(nvWeapons232).length}`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

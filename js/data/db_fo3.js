@@ -11,9 +11,16 @@
 // builder), lookupItemInDb(), getQuestItemDetail(), getChemsTable(),
 // lookupWeaponStats(), lookupBestiaryEntry(), getBestiaryNames(),
 // getVendors(), getTradeCatalog(), getAmmoCalibers().
-// PROTOCOL 3: every data row here is sourced from fallout.wiki — this file
-// (and its lookup helpers) is a typist for that data, never an authority
-// that invents or edits Fallout facts.
+// PROTOCOL 3 (WEAPONS.CSV): the combat + economy fields — Base_Damage,
+// Crit_Damage, Crit_Multiplier, Attacks_Per_Second, Weight, Value — were
+// re-verified row-by-row against the fallout.wiki "Fallout 3 Weapons" master
+// table on 2026-07-15 (thrown/placed explosives' blast damage pulled from each
+// weapon's own page; see planning/FO3_WEAPON_DATA.md). Four non-FO3 rows
+// (Bumper Sword, Golf Club, Plunger, Tin Grenade) were removed. The PARKED
+// columns (Req_Unarmed/Req_STR/Reach/Special_Attack_AP) were NOT re-sourced,
+// and the other tables below (ARMOR/AMMO/CHEMS/BESTIARY/RECIPES/…) are NOT yet
+// re-verified — do not read this note as vouching for them. This file is a
+// typist for wiki data, never an authority that invents or edits Fallout facts.
 //
 // ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
 // Columns below are authored (fallout.wiki-sourced) but have no current code
@@ -44,92 +51,88 @@
 const databaseCSVs = `
 [WEAPONS.CSV]
 Weapon_Name,Base_Damage,Crit_Damage,Crit_Multiplier,Attacks_Per_Second,Weight,Value,Req_Unarmed,Req_STR,Reach,Special_Attack_AP,Special_Rules,Ammo_Type
-10mm Pistol,13,13,1.0,1.7,2,100,0,2,0,0,None,10mm
-.32 Pistol,18,18,1.5,1.4,3,150,0,3,0,0,None,.32 Caliber
-Scoped .44 Magnum,50,50,2.0,0.9,4,750,0,4,0,0,None,.44 Magnum
-10mm Submachine Gun,15,15,1.0,4.5,5,250,0,3,0,0,Full Auto,10mm
-Hunting Rifle,40,40,2.0,1.0,7,500,0,5,0,0,None,.32 Caliber
-Combat Shotgun,60,60,1.0,1.0,8,600,0,4,0,0,None,Shotgun Shell
-Assault Rifle,30,30,1.0,2.5,7,400,0,4,0,0,None,5.56mm
-Sniper Rifle,55,55,2.0,0.9,10,3500,0,6,0,0,None,.308 Caliber
-Chinese Assault Rifle,30,30,1.0,2.5,7,450,0,4,0,0,None,5.56mm
-Lincoln's Repeater,50,50,2.0,0.9,4,4000,0,4,0,0,None,.44 Magnum
-Sydney's 10mm Ultra SMG,20,20,1.0,5.0,5,3500,0,3,0,0,Full Auto,10mm
-Xuanlong Assault Rifle,30,30,1.0,3.5,7,5000,0,4,0,0,None,5.56mm
-Victory Rifle,55,55,2.5,0.9,10,5000,0,6,0,0,Silenced,.308 Caliber
-Colonel Autumn's 10mm Pistol,13,13,2.0,1.7,2,1500,0,2,0,0,None,10mm
-The Terrible Shotgun,80,80,1.0,1.0,8,7000,0,5,0,0,None,Shotgun Shell
-Laser Pistol,12,24,2.0,1.5,2,400,0,2,0,0,None,Energy Cell
-Laser Rifle,22,44,2.0,1.5,3,3500,0,2,0,0,None,Energy Cell
-Plasma Pistol,25,50,2.0,1.3,3,1400,0,3,0,0,None,Microfusion Cell
-Plasma Rifle,45,90,2.0,1.5,7,4000,0,5,0,0,None,Microfusion Cell
-A3-21 Plasma Rifle,55,110,2.0,1.5,7,6500,0,5,0,0,None,Microfusion Cell
-Gatling Laser,8,16,1.5,8.0,18,22500,0,6,0,0,Full Auto,Electron Charge Pack
-Mesmetron,0,0,1.0,1.0,2,200,0,2,0,0,Paralyze/Confuse,None
-Minigun,10,10,1.0,8.0,28,22500,0,7,0,0,Full Auto,5mm
-Missile Launcher,100,100,1.0,0.5,15,4500,0,6,0,0,Splash,Missile
-Fat Man,600,600,1.0,0.4,30,8500,0,8,0,0,Splash,Mini Nuke
-Rock-It Launcher,25,25,1.0,1.5,10,250,0,5,0,0,Junk Ammo,Junk
-Flamer,10,10,1.0,4.0,10,1500,0,8,0,0,Fire DoT,Flamer Fuel
-Heavy Incinerator,12,12,1.0,3.5,12,5000,0,8,0,0,Fire DoT,Flamer Fuel
-Frag Grenade,50,50,1.0,1.0,1,100,0,0,0,0,Splash,None
-Plasma Grenade,80,80,1.0,1.0,1,200,0,0,0,0,Splash,None
-Pulse Grenade,60,60,1.0,1.0,1,75,0,0,0,0,EMP/Splash,None
-Bottlecap Mine,200,200,1.0,1.0,0,75,0,0,0,0,Triggered/Splash,None
-Frag Mine,100,100,1.0,1.0,0.5,250,0,0,0,0,Triggered/Splash,None
-Baseball Bat,15,15,1.0,1.8,3,100,0,3,1.0,20,None,None
-Sledgehammer,30,30,1.0,0.9,10,100,0,7,1.2,40,Knockdown,None
-Super Sledge,80,80,1.5,0.9,15,10000,0,8,1.2,55,Knockdown,None
-Shishkebab,50,50,1.5,1.3,4,2000,0,5,0.9,30,Fire DoT,None
-Combat Knife,20,20,2.0,2.5,1,75,0,0,0.6,20,None,None
-Switchblade,9,9,1.5,2.5,0.5,25,0,0,0.5,15,None,None
-Power Fist,60,60,1.0,1.1,5,2500,75,7,0.7,35,None,None
-Brass Knuckles,8,8,1.0,2.7,1,25,25,4,0.5,15,None,None
-Tire Iron,12,12,1.0,1.8,3,15,0,4,1.0,20,None,None
-Lead Pipe,22,22,1.0,1.5,8,50,0,6,1.0,30,None,None
-Chinese Officer's Sword,20,20,2.0,2.0,4,300,0,4,0.9,25,None,None
-Bumper Sword,30,30,1.0,1.5,6,1500,0,6,1.0,30,None,None
-Ripper,20,20,2.0,2.5,3,600,50,4,0.7,25,Chainsaw,None
-Pool Cue,12,12,1.0,2.5,2,15,0,2,1.2,20,None,None
-Rolling Pin,6,6,1.0,2.5,1,15,0,1,0.8,15,None,None
-Golf Club,15,15,1.0,2.0,2,75,0,3,1.1,20,None,None
-Nail Board,20,20,1.0,2.0,5,50,0,5,1.0,25,None,None
-Board of Education,25,25,1.0,1.8,6,1500,0,6,1.0,30,None,None
-Plunger,4,4,1.0,2.5,1,5,0,1,0.8,10,None,None
-Blackhawk,60,60,2.0,0.9,4,8000,0,4,0,0,None,.44 Magnum
-Alien Blaster,100,200,2.0,1.5,0.5,8000,0,0,0,0,None,Alien Power Cell
-Firelance,90,180,2.0,1.5,2,10000,0,0,0,0,None,Alien Power Cell
-Jingwei's Shocksword,20,40,2.0,2.0,4,3000,0,4,0.9,30,EMP,None
-The Mauler,80,80,1.0,1.1,5,4000,75,7,0.7,40,None,None
-Stabhappy,30,30,2.0,2.5,1,3500,0,0,0.6,25,None,None
-Dart Gun,1,1,1.0,1.5,3,250,0,2,0,0,Cripple Legs,Dart
-Deathclaw Gauntlet,60,60,1.0,1.1,1,5000,75,7,0.7,45,None,None
-Nuka Grenade,500,500,1.0,1.0,1,200,0,0,0,0,Splash,None
-Railway Rifle,20,40,2.0,1.5,15,500,0,5,0,0,None,Railway Spike
-Tin Grenade,50,50,1.0,1.0,0.5,15,0,0,0,0,Splash,None
+10mm Pistol,9,9,1.0,6,3,225,0,2,0,0,None,10mm
+.32 Pistol,6,6,1.0,3,2,110,0,3,0,0,None,.32 Caliber
+Scoped .44 Magnum,35,35,2.0,2.25,4,300,0,4,0,0,None,.44 Magnum
+10mm Submachine Gun,7,7,1.0,10,5,330,0,3,0,0,Full Auto,10mm
+Hunting Rifle,25,25,1.0,0.75,6,150,0,5,0,0,None,.32 Caliber
+Combat Shotgun,55,27,1.0,1.5,7,200,0,4,0,0,None,Shotgun Shell
+Assault Rifle,8,8,1.0,8,7,300,0,4,0,0,None,5.56mm
+Sniper Rifle,40,40,5.0,1.0714,10,300,0,6,0,0,None,.308 Caliber
+Chinese Assault Rifle,11,10,1.0,8,7,500,0,4,0,0,None,5.56mm
+Lincoln's Repeater,50,50,2.0,0.75,5,500,0,4,0,0,None,.44 Magnum
+Sydney's 10mm Ultra SMG,9,9,1.0,10,5,430,0,3,0,0,Full Auto,10mm
+Xuanlong Assault Rifle,12,12,1.0,8,7,400,0,4,0,0,None,5.56mm
+Victory Rifle,40,40,3.0,1.0714,10,450,0,6,0,0,Silenced,.308 Caliber
+Colonel Autumn's 10mm Pistol,13,13,1.0,6,3,325,0,2,0,0,None,10mm
+The Terrible Shotgun,80,40,1.0,1.5,10,250,0,5,0,0,None,Shotgun Shell
+Laser Pistol,12,12,1.5,6,3,320,0,2,0,0,None,Energy Cell
+Laser Rifle,23,22,1.5,2.0455,8,1000,0,2,0,0,None,Energy Cell
+Plasma Pistol,25,25,2.0,3,3,360,0,3,0,0,None,Microfusion Cell
+Plasma Rifle,45,44,2.0,2,8,1799,0,5,0,0,None,Microfusion Cell
+A3-21 Plasma Rifle,50,50,2.5,2,8,2200,0,5,0,0,None,Microfusion Cell
+Gatling Laser,8,6,1.0,20,18,2000,0,6,0,0,Full Auto,Electron Charge Pack
+Mesmetron,1,0,1.0,1.0345,2,500,0,2,0,0,Paralyze/Confuse,None
+Minigun,5,0,0.0,20,18,1000,0,7,0,0,Full Auto,5mm
+Missile Launcher,150,0,0.0,0.5,20,500,0,6,0,0,Splash,Missile
+Fat Man,1600,0,0.0,0.4,30,1000,0,8,0,0,Splash,Mini Nuke
+Rock-It Launcher,50,25,1.0,1.5,8,200,0,5,0,0,Junk Ammo,Junk
+Flamer,16,1,4.0,8,15,500,0,8,0,0,Fire DoT,Flamer Fuel
+Heavy Incinerator,35,5,4.0,4,15,500,0,8,0,0,Fire DoT,Flamer Fuel
+Frag Grenade,100,0,0.0,1.0,0.5,25,0,0,0,0,Splash,None
+Plasma Grenade,150,0,0.0,1.0,0.5,50,0,0,0,0,Splash,None
+Pulse Grenade,10,0,0.0,1.0,0.5,40,0,0,0,0,EMP/Splash,None
+Bottlecap Mine,500,0,0.0,1.0,0.5,75,0,0,0,0,Triggered/Splash,None
+Frag Mine,100,0,0.0,1.0,0.5,25,0,0,0,0,Triggered/Splash,None
+Baseball Bat,9,9,1.0,1.4286,3,55,0,3,1.0,20,None,None
+Sledgehammer,20,10,1.0,1.4286,12,130,0,7,1.2,40,Knockdown,None
+Super Sledge,25,25,1.0,1.4286,20,180,0,8,1.2,55,Knockdown,None
+Shishkebab,35,24,2.0,2.3077,3,200,0,5,0.9,30,Fire DoT,None
+Combat Knife,7,13,3.0,3,1,50,0,0,0.6,20,None,None
+Switchblade,5,9,2.0,3,1,35,0,0,0.5,15,None,None
+Power Fist,20,20,1.0,1.0909,6,100,75,7,0.7,35,None,None
+Brass Knuckles,6,6,1.0,1.5789,1,20,25,4,0.5,15,None,None
+Tire Iron,6,6,1.0,2.3077,3,40,0,4,1.0,20,None,None
+Lead Pipe,9,18,1.0,2.3077,3,75,0,6,1.0,30,None,None
+Chinese Officer's Sword,10,15,2.0,2.3077,3,75,0,4,0.9,25,None,None
+Ripper,30,0,0.0,1,6,100,50,4,0.7,25,Chainsaw,None
+Pool Cue,3,0,0.0,1.4286,1,15,0,2,1.2,20,None,None
+Rolling Pin,3,8,0.0,1.7308,1,10,0,1,0.8,15,None,None
+Nail Board,8,0,0.0,1.4286,4,30,0,5,1.0,25,None,None
+Board of Education,12,12,1.0,1.4286,4,60,0,6,1.0,30,None,None
+Blackhawk,55,45,2.0,2.25,4,500,0,4,0,0,None,.44 Magnum
+Alien Blaster,100,100,100.0,3,2,500,0,0,0,0,None,Alien Power Cell
+Firelance,80,80,100.0,3,2,750,0,0,0,0,None,Alien Power Cell
+Jingwei's Shocksword,35,25,2.0,2.3077,3,500,0,4,0.9,30,EMP,None
+The Mauler,45,0,0.0,1,20,200,75,7,0.7,40,None,None
+Stabhappy,10,15,4.0,3,1,65,0,0,0.6,25,None,None
+Dart Gun,6,12,2.5,6,3,500,0,2,0,0,Cripple Legs,Dart
+Deathclaw Gauntlet,20,30,5.0,1.6304,10,150,75,7,0.7,45,None,None
+Nuka Grenade,501,0,0.0,1.0,0.5,50,0,0,0,0,Splash,None
+Railway Rifle,30,30,3.0,2,9,200,0,5,0,0,None,Railway Spike
 Chinese Pistol,4,4,1.0,6.0,2,190,0,0,0,0,None,10mm
 Silenced 10mm Pistol,8,5,2.0,6.0,3,250,0,0,0,0,Suppressed,10mm
 BB Gun,4,4,1.0,0.75,2,36,0,0,0,0,None,BB
-Reservist's Rifle,40,40,5.0,1.607,10,500,0,0,0,0,None,.308 Caliber
+Reservist's Rifle,40,40,5.0,1.6071,10,500,0,0,0,0,None,.308 Caliber
 Ol' Painless,30,30,1.0,1.125,6,250,0,0,0,0,None,.32 Caliber
 Sawed-Off Shotgun,50,0,0.0,2.25,6,190,0,0,0,0,Splash,Shotgun Shell
 Eugene,7,0,0.0,20.0,18,1500,0,0,0,0,Full Auto,5mm
 Vengeance,11,12,1.0,20.0,18,2400,0,0,0,0,None,Electron Charge Pack
 Burnmaster,24,1,4.0,8.0,15,500,0,0,0,0,Fire DoT,Flamer Fuel
-Experimental MIRV,80,0,0.0,1.579,30,2498,0,0,0,0,Splash,Mini Nuke
-Miss Launcher,20,0,0.0,1.579,15,400,0,0,0,0,Splash,Missile
-Wazer Wifle,29,28,1.5,2.046,8,900,0,0,0,0,None,Microfusion Cell
+Experimental MIRV,12800,0,0.0,1.579,30,2498,0,0,0,0,Splash,Mini Nuke
+Miss Launcher,200,0,0.0,1.579,15,400,0,0,0,0,Splash,Missile
+Wazer Wifle,29,28,1.5,2.0455,8,900,0,0,0,0,None,Microfusion Cell
 Smuggler's End,18,18,1.5,6.0,2,450,0,0,0,0,None,Energy Cell
-The Break,6,6,1.0,1.429,1,50,0,2,1.2,20,None,None
+The Break,6,6,1.0,1.4286,1,50,0,2,1.2,20,None,None
 Jack,30,15,1.0,1.0,6,200,0,0,1.0,65,Limb Damage,None
-Highwayman's Friend,10,10,1.0,2.308,5,75,0,0,1.0,27,None,None
-Fisto!,25,25,1.5,1.091,6,100,25,0,0.7,25,None,None
-The Tenderizer,30,15,1.0,1.429,12,230,0,0,1.2,20,None,None
-Vampire's Edge,15,20,3.0,2.308,1,100,0,0,0.9,17,None,None
+Highwayman's Friend,10,10,1.0,2.3077,5,75,0,0,1.0,27,None,None
+Fisto!,25,25,1.5,1.0909,6,100,25,0,0.7,25,None,None
+The Tenderizer,30,15,1.0,1.4286,12,230,0,0,1.2,20,None,None
+Vampire's Edge,15,20,3.0,2.3077,1,100,0,0,0.9,17,None,None
 Occam's Razor,10,13,3.0,3.0,1,65,0,0,0.6,17,None,None
 Ant's Sting,4,4,1.0,3.0,1,30,0,0,0.5,17,Poison DoT,None
 Butch's Toothpick,10,13,2.5,3.0,1,50,0,0,0.5,17,None,None
-Gauss Rifle,100,50,5.0,1.071,12,500,0,0,0,0,Knockdown,Microfusion Cell
+Gauss Rifle,100,50,5.0,1.0714,12,500,0,0,0,0,Knockdown,Microfusion Cell
 Trench Knife,7,13,3.0,3.0,1,50,0,0,0.6,17,None,None
 Auto Axe,35,0,0.0,1.0,20,200,0,0,1.2,65,Full Auto,None
 Man Opener,35,0,0.0,1.0,20,200,0,0,1.2,65,Ignores DR,None
@@ -137,28 +140,28 @@ Steel Saw,16,0,0.0,1.0,20,200,0,0,1.2,65,Full Auto,None
 Infiltrator,7,10,1.0,8.0,7,400,0,0,0,0,Suppressed,5.56mm
 Perforator,10,14,2.0,6.0,7,600,0,0,0,0,Suppressed,5.56mm
 Wild Bill's Sidearm,10,15,1.0,3.0,2,250,0,0,0,0,None,.32 Caliber
-Metal Blaster,55,27,1.5,2.046,8,1000,0,0,0,0,None,Microfusion Cell
-Tri-beam Laser Rifle,75,15,1.5,2.727,9,1000,0,0,0,0,None,Microfusion Cell
+Metal Blaster,55,27,1.5,2.0455,8,1000,0,0,0,0,None,Microfusion Cell
+Tri-beam Laser Rifle,75,15,1.5,2.7273,9,1000,0,0,0,0,None,Microfusion Cell
 Callahan's Magnum,65,50,2.0,2.25,4,750,0,0,0,0,None,.44 Magnum
 Precision Gatling Laser,8,6,4.0,20.0,18,3000,0,0,0,0,Full Auto,Electron Charge Pack
 Lever-Action Rifle,40,40,5.0,0.75,8,200,0,0,0,0,None,10mm
 Double-Barrel Shotgun,85,30,1.0,2.25,6,175,0,0,0,0,Splash,Shotgun Shell
 Backwater Rifle,45,45,5.0,0.75,7,250,0,0,0,0,None,10mm
-The Dismemberer,25,40,2.0,1.429,6,55,0,0,1.2,20,Limb Damage,None
-Microwave Emitter,60,100,2.0,1.035,8,500,0,0,0,0,Ignores DR,Microfusion Cell
-Axe,20,30,2.0,1.429,6,60,0,0,1.2,20,None,None
-Fertilizer Shovel,15,30,3.0,1.429,3,55,0,0,1.2,20,Poison DoT,None
+The Dismemberer,25,40,2.0,1.4286,6,55,0,0,1.2,20,Limb Damage,None
+Microwave Emitter,60,100,2.0,1.0345,8,500,0,0,0,0,Ignores DR,Microfusion Cell
+Axe,20,30,2.0,1.4286,6,60,0,0,1.2,20,None,None
+Fertilizer Shovel,15,30,3.0,1.4286,3,55,0,0,1.2,20,Poison DoT,None
 Ritual Knife,6,18,3.0,3.0,1,20,0,0,0.6,12,None,None
 Alien Atomizer,35,40,1.0,3.0,2,500,0,0,0,0,None,Alien Power Module
 Alien Disintegrator,65,50,2.0,2.0,7,300,0,0,0,0,None,Alien Power Module
 Atomic Pulverizer,37,40,2.0,3.0,2,500,0,0,0,0,None,Alien Power Module
 Captain's Sidearm,35,40,1.0,3.0,2,500,0,0,0,0,None,Alien Power Module
 Destabilizer,30,20,2.0,4.5,7,1199,0,0,0,0,None,Alien Power Module
-Drone Cannon,40,50,1.0,3.333,18,1999,0,0,0,0,Splash,Alien Power Module
-Drone Cannon Ex-B,40,50,1.0,3.333,18,1999,0,0,0,0,Splash,Alien Power Module
-Electro-Suppressor,25,4,1.0,2.308,2,70,0,0,1.0,25,Knockdown,None
-Cryo Grenade,1,0,1.0,0.652,0.5,50,0,0,0,0,Cryo Stun,None
-Cryo Mine,1,0,1.0,0.5,0.5,25,0,0,0,0,Cryo Stun,None
+Drone Cannon,40,50,1.0,3.3333,18,1999,0,0,0,0,Splash,Alien Power Module
+Drone Cannon Ex-B,40,50,1.0,3.3333,18,1999,0,0,0,0,Splash,Alien Power Module
+Electro-Suppressor,25,4,1.0,2.3077,2,70,0,0,1.0,25,Knockdown,None
+Cryo Grenade,1,0,0.0,0.652,0.5,50,0,0,0,0,Cryo Stun,None
+Cryo Mine,1,0,0.0,0.5,0.5,25,0,0,0,0,Cryo Stun,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit

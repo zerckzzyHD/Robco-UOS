@@ -164,7 +164,6 @@ const FALLOUT_REGISTRY = {
     { name: 'Bottlecap Mine', type: 'weapon' },
     { name: 'Frag Mine', type: 'weapon' },
     { name: 'Nuka Grenade', type: 'weapon' },
-    { name: 'Tin Grenade', type: 'weapon' },
     // ── MELEE: Blunt ──────────────────────────────────────────────────
     { name: 'Baseball Bat', type: 'weapon' },
     { name: 'Sledgehammer', type: 'weapon' },
@@ -173,10 +172,8 @@ const FALLOUT_REGISTRY = {
     { name: 'Tire Iron', type: 'weapon' },
     { name: 'Pool Cue', type: 'weapon' },
     { name: 'Rolling Pin', type: 'weapon' },
-    { name: 'Golf Club', type: 'weapon' },
     { name: 'Nail Board', type: 'weapon' },
     { name: 'Board of Education', type: 'weapon' },
-    { name: 'Bumper Sword', type: 'weapon' },
     // ── MELEE: Bladed ─────────────────────────────────────────────────
     { name: 'Combat Knife', type: 'weapon' },
     { name: 'Switchblade', type: 'weapon' },
@@ -192,7 +189,6 @@ const FALLOUT_REGISTRY = {
     { name: 'Deathclaw Gauntlet', type: 'weapon' },
     { name: 'Dart Gun', type: 'weapon' },
     { name: 'Railway Rifle', type: 'weapon' },
-    { name: 'Plunger', type: 'weapon' },
     // ── BASE GAME: Additional ─────────────────────────────────────────────────
     { name: 'Chinese Pistol', type: 'weapon' },
     { name: 'Silenced 10mm Pistol', type: 'weapon' },
