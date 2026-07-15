@@ -328,7 +328,15 @@ function renderKarmaCenter() {
   // index.html).
   const filterEl = document.getElementById('karmaEventFilter');
   const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
-  const shownEvents = events.filter(e => !q || e.label.toLowerCase().includes(q));
+  // Protocol 8 Stage 2 UX polish follow-up (owner report): an UNVERIFIED
+  // event has delta:null (Protocol 3 — no exact wiki figure, never a
+  // guess) so tapping it can never apply anything. It stays in the DATA
+  // record (GAME_DEFS.FO3.karma.events, Suite 230's citation guard still
+  // asserts UNVERIFIED -> delta===null) — only the render picker stops
+  // listing a non-applyable action.
+  const shownEvents = events.filter(
+    e => e.delta != null && (!q || e.label.toLowerCase().includes(q))
+  );
   const eventRowHtml = e => {
     const disabled = e.delta == null;
     const badge = disabled ? 'UNVERIFIED' : (e.delta > 0 ? '+' : '') + e.delta;

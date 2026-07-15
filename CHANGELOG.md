@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3239/3239 | Cache: robco-terminal-v2.8.0-r31 -->
+## [Unreleased]<!-- Tests: 3239/3239 | Cache: robco-terminal-v2.8.0-r32 -->
 
 ### Added
 
@@ -53,6 +53,8 @@
 - Fixed three companions showing the wrong karma requirement on the Fallout 3 Karma Center: Dogmeat and Charon never actually required any particular karma to recruit, and Butch DeLoria (who does require neutral karma) was missing from the list entirely. All eight companions and their real requirements now show correctly.
 - Fixed the Fallout 3 Karma Center printing your karma standing twice on the same screen.
 - Fixed the Fallout 3 Karma Center's action filter box showing distractingly small text in portrait mode — the wider fix that already sized it correctly in landscape was never applied to portrait, where most people actually use it. It now reads at the same comfortable size in every orientation.
+- Fixed the Fallout 3 Karma Center's action list only being a compact, scrollable box in one screen orientation — the other orientation dumped all of its actions inline instead, pushing everything below it off screen. It's now a bounded, internally-scrolling list in both portrait and landscape, and scrolling past its edges still moves the rest of the screen underneath it.
+- Removed the three karma actions the game itself never gives an exact point value for (a general good deed in a quest, a general evil deed in a quest, and activating Project Purity yourself) from the tappable action list, since tapping them could never actually apply anything. They're kept on record as real, unconfirmed entries — only the unusable buttons are gone.
 
 ### Under the Hood
 

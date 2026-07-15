@@ -1861,15 +1861,24 @@
     overflow-y: auto;
   }
   /* .kc-events (Karma Engine action picker, css/40-curio-operations.css) —
-     the exact same scroll-trap class as Strand 1 above (fixed-px max-height
-     + overscroll-behavior:contain), caught by render-integrity.mjs's Suite
-     5 REACHABLE static guard on introduction — the FO3 Karma Center action
-     picker never existed before this unit, so it was never exercised live.
-     A separate rule (not joined into Strand 1's selector list above) so
-     Suite 227.2's exact-text regression guard on that original fix stays
-     untouched. */
+     owner report: bounded+scrolling in one orientation, but in the other
+     all ~20 action rows rendered inline, pushing every board below the
+     Karma Center off-screen. The FIRST fix here went unbounded
+     (max-height:none) to dodge the Strand-1/Section-O scroll trap, which
+     traded the trap for the inline-dump problem. This fix keeps the list
+     bounded+internally-scrolling in landscape too — matching the portrait/
+     base rule above it — using the #opVitalPanel precedent (bounded
+     max-height + overflow-y:auto, overscroll-behavior LEFT at auto): a
+     fixed max-height alone is not the trap, max-height PLUS
+     overscroll-behavior:contain cutting the scroll chain is
+     (render-integrity.mjs Suite 5 REACHABLE only fails on the pair
+     together). A separate rule (not joined into Strand 1's selector list
+     above) so Suite 227.2's exact-text regression guard on that original
+     fix stays untouched. */
   [data-game='FO3'] .kc-events {
-    max-height: none;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: auto;
   }
 

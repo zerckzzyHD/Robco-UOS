@@ -844,11 +844,15 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
 /* Karma Engine action picker + title line (Protocol 8 Stage 2). The event
    rows reuse .tracker-row/.tracker-toggle (Protocol 22 — already ≥28px tap
    target, css/25-toolbar.css); this only bounds the scroll area and styles
-   the level-scaled title readout. */
+   the level-scaled title readout. overscroll-behavior stays at `auto` (never
+   `contain`) — a fixed max-height alone is not the Strand-1/Section-O scroll
+   trap, max-height PLUS a cut scroll chain is (see the #opVitalPanel
+   precedent, css/60-fo3-pipboy.css) — so a drag that exhausts this list's
+   own scroll range still chains up to the page/glass beneath it. */
 .kc-events {
   max-height: 220px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   padding-right: 4px;
   margin-bottom: 8px;
 }
