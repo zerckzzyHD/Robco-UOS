@@ -9078,11 +9078,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)
+//  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)
 //  9 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)');
+  header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)');
   const nvSrc80 = readGroup('db_nv');
   const cStart80 = nvSrc80.indexOf('[CHEMS.CSV]');
   const cEnd80 = nvSrc80.indexOf('\n[', cStart80 + 1);
@@ -9090,8 +9090,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const cLines80 = cBlock80.split('\n').filter(l => l.trim() && !l.startsWith('['));
   const cData80 = cLines80.slice(1); // skip header row
 
-  // 80.a  exactly 76 data rows
-  assert(cData80.length === 76, `[CHEMS.CSV] has exactly 76 data rows (got ${cData80.length})`);
+  // 80.a  exactly 75 data rows (was 76; the fabricated "Whiskey Rose" consumable
+  //       was removed on 2026-07-15 — it is a Cass companion perk, not a chem)
+  assert(cData80.length === 75, `[CHEMS.CSV] has exactly 75 data rows (got ${cData80.length})`);
 
   // 80.b  every row has exactly 8 comma-separated fields (stray-comma guard)
   const badFields80 = cData80.filter(r => r.split(',').length !== 8);
@@ -44122,7 +44123,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Weapons" master table (explosives' blast pulled per-page), THEN cited
 //  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
 //  a citation label proves nothing about a value; the pin does.
-//  15 tests
+//  22 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 232 — FO3 + NV Weapon Data: Protocol 3 golden-master + plausibility guard');
@@ -44882,6 +44883,357 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         /GOODSPRINGS CEMETERY/.test(collBlock232),
       '232.15: [collectibles] Test Site → Lucky 38 Cocktail Lounge; bogus "Lucky 38" globe renamed to "The Strip" (Vault 21); Goodsprings stays Cemetery; all 7 canonical FNV snow-globe names present — got ' +
         JSON.stringify(globeNames232)
+    );
+  }
+
+  // Generic [<SECTION>.CSV] column parser → { name: [parsed cols...] }, any db_*.js.
+  function parseCsvCols232(src, section, colIdx) {
+    const out = {};
+    const m = src.match(new RegExp('\\[' + section + '\\.CSV\\]([\\s\\S]*?)(?=\\n\\[|`;)'));
+    if (!m) return out;
+    const lines = m[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      out[c[0]] = colIdx.map(j => parseFloat(c[j]));
+    }
+    return out;
+  }
+  const nvArmor232 = parseCsvCols232(readGroup('db_nv'), 'ARMOR', [2, 3, 4]); // DT, Weight, Value
+  const nvChems232 = parseCsvCols232(readGroup('db_nv'), 'CHEMS', [6, 7]); // Value, Weight
+  const nvBest232 = parseCsvCols232(readGroup('db_nv'), 'BESTIARY', [1, 2, 3, 4, 5, 6, 10]); // DT,HP,PER,SPD,DMG,RATE,XP
+
+  // Pin validator: only the rows in `pin` are checked (armor/chems pin ONLY the
+  // fallout.wiki-verified rows; UNVERIFIED/unmatched rows are deliberately absent
+  // from the pin, so an "extra" un-pinned row is NOT drift here — unlike weapons).
+  function pinDrift232(pin, data, fieldNames, srcName) {
+    const drift = [];
+    for (const n of Object.keys(pin)) {
+      if (!(n in data)) {
+        drift.push(`${n}: MISSING from ${srcName}`);
+        continue;
+      }
+      pin[n].forEach((exp, f) => {
+        if (data[n][f] !== exp)
+          drift.push(`${n} ${fieldNames[f]} expected ${exp} got ${data[n][f]}`);
+      });
+    }
+    return drift;
+  }
+  // Per-table plausibility bands ([field, lo, hi], one entry per parsed column).
+  const ARMOR_BAND_232 = [
+    ['DT', 0, 40],
+    ['Weight', 0, 50],
+    ['Value', 0, 16000],
+  ];
+  const CHEMS_BAND_232 = [
+    ['Value', 0, 300],
+    ['Weight', 0, 5],
+  ];
+  const BEST_BAND_232 = [
+    ['DT', 0, 30],
+    ['HP', 0, 1000],
+    ['Perception', 0, 15],
+    ['Speed_Factor', 0, 3],
+    ['Base_Damage', 0, 250],
+    ['Attack_Rate', 0, 5],
+    ['XP_Yield', 0, 500],
+  ];
+  function bandViol232b(data, bandArr) {
+    const v = [];
+    for (const [n, s] of Object.entries(data)) {
+      bandArr.forEach(([fn, lo, hi], i) => {
+        if (!(s[i] >= lo && s[i] <= hi)) v.push(`${n} ${fn}=${s[i]} outside [${lo},${hi}]`);
+      });
+    }
+    return v;
+  }
+
+  const NV_ARMOR_GOLDEN_232 = {
+    'Leather Armor': [6, 15, 160],
+    'NCR Trooper Armor': [10, 26, 300],
+    'Gecko-Backed Leather Armor': [10, 15, 500],
+    'NCR Ranger Patrol Armor': [15, 25, 390],
+    'Stealth Suit Mk II': [14, 25, 7500],
+    'Metal Armor': [12, 30, 1100],
+    'Combat Armor': [15, 25, 6500],
+    'Combat Armor Reinforced': [17, 25, 8000],
+    'Legion Centurion Armor': [18, 35, 800],
+    'Desert Ranger Combat Armor': [22, 30, 8000],
+    'Elite Riot Gear': [22, 23, 12500],
+    'NCR Salvaged Power Armor': [20, 40, 3000],
+    'Brotherhood T-45d Power Armor': [22, 45, 4500],
+    'T-51b Power Armor': [25, 40, 5200],
+    'Remnants Power Armor': [28, 45, 6500],
+    'Enclave Power Armor': [32, 45, 780],
+    'Gannon Family Tesla Armor': [26, 35, 8194],
+    'Advanced Radiation Suit': [6, 7, 100],
+    'Armored Vault 13 Jumpsuit': [8, 15, 70],
+    'Armored Vault 21 Jumpsuit': [8, 15, 180],
+    'Assassin Suit': [14, 20, 7500],
+    "Caesar's Armor": [5, 3, 1500],
+    'Chinese Stealth Armor': [12, 20, 500],
+    'Gecko-Backed Leather Armor Reinforced': [15, 18, 2000],
+    'Gladiator Armor': [12, 15, 160],
+    'Great Khan Armored Leather': [8, 7, 100],
+    'Great Khan Simple Armor': [5, 7, 100],
+    "Joshua Graham's Armor": [15, 8, 2000],
+    'Leather Armor Reinforced': [10, 15, 1200],
+    'Lightweight Leather Armor': [8, 10, 160],
+    'NCR Trooper Fatigues': [2, 26, 300],
+    'Radiation Suit': [4, 5, 60],
+    'Raider Badlands Armor': [4, 15, 180],
+    'Raider Blastmaster Armor': [4, 15, 180],
+    'Raider Painspike Armor': [4, 15, 180],
+    'Raider Sadist Armor': [4, 15, 180],
+    'Sierra Madre Armor': [16, 15, 400],
+    'Sierra Madre Armor Reinforced': [18, 17, 1000],
+    'Space Suit': [10, 7, 800],
+    'Tribal Raiding Armor': [4, 15, 180],
+    'Advanced Riot Gear': [21, 25, 8494],
+    'Combat Armor Reinforced Mark 2': [20, 25, 8000],
+    'Lightweight Metal Armor': [12, 20, 460],
+    'NCR Bandoleer Armor': [10, 26, 300],
+    'NCR Ranger Combat Armor': [20, 30, 7500],
+    'Recon Armor': [17, 20, 7200],
+    'Riot Gear': [20, 30, 7994],
+    'Van Graff Combat Armor': [16, 25, 6500],
+    'Brotherhood T-51b Power Armor': [25, 40, 5200],
+    'Gecko-Backed Metal Armor': [17, 33, 2000],
+    "Legate's Armor": [15, 45, 250],
+    'Metal Armor Reinforced': [16, 30, 3500],
+    'Remnants Tesla Armor': [25, 45, 8200],
+    'Scorched Sierra Power Armor': [24, 40, 6500],
+    'T-45d Power Armor': [22, 45, 4500],
+    'Tesla Armor': [20, 45, 6600],
+    "Chalk's Headdress": [1, 3, 150],
+    'Marked Beast Eyes Helmet': [3, 3, 800],
+    'Marked Beast Face Helmet': [3, 3, 800],
+    'Marked Beast Helmet': [3, 3, 800],
+    'Marked Beast Tribal Helmet': [4, 2, 250],
+    "Salt-Upon-Wounds' Helmet": [4, 3, 300],
+    "Ulysses' Mask": [3, 2, 250],
+    "Ambassador Crocker's Suit": [1, 1, 6],
+    "Arcade's Lab Coat": [0, 2, 8],
+    "Benny's Suit": [1, 3, 390],
+    "Brotherhood Elder's Robe": [1, 2, 8],
+    "Daniel's Outfit": [2, 2, 700],
+    "Dean's Tuxedo": [0, 2, 6],
+    "Father Elijah's Robes": [2, 2, 6],
+    'Followers Lab Coat': [0, 2, 16],
+    "President Kimball's Suit": [0, 2, 5],
+    'RobCo Jumpsuit': [0, 1, 6],
+    Trenchcoat: [0, 3, 40],
+    'US Army General Outfit': [1, 1, 1500],
+    'Vault Lab Uniform': [0, 1, 6],
+    "Vera's Outfit": [2, 2, 250],
+    'Viva Las Vegas': [5, 1, 6],
+    "Christine's COS Recon Armor": [19, 20, 9500],
+    'Courier Duster': [13, 3, 1700],
+    "Ulysses' Duster": [13, 3, 1700],
+    'Armor of the 87th Tribe': [22, 35, 6495],
+  };
+  const NV_CHEMS_GOLDEN_232 = {
+    Buffout: [20, 0],
+    'Med-X': [20, 0],
+    Psycho: [20, 0],
+    Stimpak: [75, 0],
+    'Super Stimpak': [150, 0],
+    RadAway: [20, 0],
+    'Rad-X': [20, 0],
+    Antivenom: [25, 0],
+    Hydra: [55, 0],
+    Fixer: [20, 0],
+    "Doctor's Bag": [55, 1],
+    Jet: [20, 0],
+    Ultrajet: [50, 0],
+    Turbo: [20, 0],
+    Mentats: [20, 0],
+    Slasher: [20, 0],
+    'Nuka-Cola': [20, 1],
+    'Nuka-Cola Quartz': [40, 1],
+    'Atomic Cocktail': [25, 1],
+    Steady: [20, 0],
+    Rocket: [20, 0],
+    Cateye: [20, 0],
+    "Dixon's Jet": [5, 0],
+    'Party Time Mentats': [20, 0],
+    'Blood Shield': [50, 0.5],
+    'Rushing Water': [20, 1],
+    'Ant Nectar': [20, 0.25],
+    'Healing Powder': [5, 0.03],
+    'Healing Poultice': [20, 0.03],
+    'Purified Water': [20, 1],
+    'Dirty Water': [10, 1],
+    Beer: [2, 1],
+    Scotch: [10, 1],
+    Vodka: [20, 1],
+    Wine: [10, 1],
+    Absinthe: [20, 1],
+    Moonshine: [20, 1],
+    'Gecko Steak': [5, 1],
+    'Brahmin Steak': [5, 0.8],
+    Cram: [5, 1],
+    InstaMash: [5, 1],
+    'Fancy Lads Snack Cakes': [5, 1],
+    'Dandy Boy Apples': [5, 1],
+    'YumYum Deviled Eggs': [5, 1],
+    'Salisbury Steak': [5, 1],
+    'Pre-War Steak': [5, 1],
+    MRE: [50, 0.2],
+    'Junk Food': [5, 1],
+    'Bighorner Steak': [5, 0.8],
+    'Iguana on a Stick': [5, 1],
+    'Trail Mix': [5, 3],
+    'Mole Rat Wonder Meat': [20, 1],
+    'Wasteland Omelet': [100, 1],
+    "Cook-Cook's Fiend Stew": [25, 1],
+    'Caravan Lunch': [5, 2.5],
+    'Brahmin Wellington': [5, 0.8],
+    'Desert Salad': [5, 0.2],
+    'Grilled Mantis': [8, 1],
+    'Banana Yucca Fruit': [6, 0.5],
+    'Barrel Cactus Fruit': [5, 0.2],
+    'Pinyon Nuts': [5, 0.03],
+    'Broc Flower': [3, 0.01],
+    'Xander Root': [0, 0.02],
+    'Nightstalker Tail': [18, 1],
+    'Sunset Sarsaparilla': [3, 1],
+    'Nuka-Cola Victory': [75, 1],
+    'Nuka-Cola Quantum': [30, 1],
+    Whiskey: [10, 1],
+    'Rum & Nuka': [20, 1],
+    'Wasteland Tequila': [20, 1],
+    'Sierra Madre Martini': [20, 0],
+    'Battle Brew': [150, 1],
+    Rebound: [20, 0],
+    'Sacred Datura Root': [10, 0.02],
+    'Ant Queen Pheromones': [75, 1],
+  };
+
+  // 232.16 — [GREEN] db_nv.js ARMOR.CSV DT/Weight/Value match the fallout.wiki
+  //          "Fallout: New Vegas Apparel" master-table pin for the 82 body-armor/
+  //          clothing rows that were fully verified on 2026-07-15. Headwear (on a
+  //          separate wiki page) + anomalous/unmatched rows are deliberately NOT
+  //          pinned (left at prior values, flagged UNVERIFIED in the file header).
+  {
+    const drift = pinDrift232(
+      NV_ARMOR_GOLDEN_232,
+      nvArmor232,
+      ['DT', 'Weight', 'Value'],
+      'db_nv.js armor'
+    );
+    assert(
+      drift.length === 0,
+      '232.16: [armor golden-master] every verified NV armor row’s DT/Weight/Value matches the fallout.wiki pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.17 — [RED] re-inflating Combat Armor’s value back to the old 3900 must
+  //          fail the armor pin BY NAME — proving the guard catches a wrong armor
+  //          value, not merely that a citation exists.
+  {
+    const broken = { ...nvArmor232 };
+    broken['Combat Armor'] = [15, 25, 3900];
+    const drift = pinDrift232(
+      NV_ARMOR_GOLDEN_232,
+      broken,
+      ['DT', 'Weight', 'Value'],
+      'db_nv.js armor'
+    );
+    assert(
+      drift.some(d => d.includes('Combat Armor') && d.includes('Value') && d.includes('3900')),
+      '232.17: [RED] the armor golden-master flags a re-inflated Combat Armor value (3900) by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.18 — [GREEN] db_nv.js CHEMS.CSV Value/Weight match the fallout.wiki
+  //          "Fallout: New Vegas Consumables" master-table pin for all 75 rows
+  //          (most FNV chems weigh 0, not the old 0.5 placeholder).
+  {
+    const drift = pinDrift232(
+      NV_CHEMS_GOLDEN_232,
+      nvChems232,
+      ['Value', 'Weight'],
+      'db_nv.js chems'
+    );
+    assert(
+      drift.length === 0,
+      '232.18: [chems golden-master] every NV chem’s Value/Weight matches the fallout.wiki pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.19 — [deletion + RED] the fabricated "Whiskey Rose" consumable (it is a
+  //          Cass companion PERK, not a chem) is gone from CHEMS.CSV — now exactly
+  //          75 rows — and re-inflating the Stimpak value back to the old 20 must
+  //          fail the chems pin by name.
+  {
+    const broken = { ...nvChems232 };
+    broken['Stimpak'] = [20, 0];
+    const drift = pinDrift232(NV_CHEMS_GOLDEN_232, broken, ['Value', 'Weight'], 'db_nv.js chems');
+    assert(
+      !('Whiskey Rose' in nvChems232) &&
+        Object.keys(nvChems232).length === 75 &&
+        drift.some(d => d.includes('Stimpak') && d.includes('Value') && d.includes('20')),
+      `232.19: [deletion+RED] fabricated Whiskey Rose consumable removed (75 chems) and the chems pin flags a wrong Stimpak value — count ${Object.keys(nvChems232).length}, whiskey-gone ${!('Whiskey Rose' in nvChems232)}, drift ${JSON.stringify(drift.slice(0, 3))}`
+    );
+  }
+
+  // 232.20 — [GREEN] every NV armor, chem and bestiary row sits inside its
+  //          per-field plausibility band. Bestiary carries a band ONLY (its
+  //          numbers are level-scaled/NPC-variant and were NOT pinned — see the
+  //          db_nv.js header); the band is a sane-bounds guard, not a value pin.
+  {
+    const va = bandViol232b(nvArmor232, ARMOR_BAND_232);
+    const vc = bandViol232b(nvChems232, CHEMS_BAND_232);
+    const vb = bandViol232b(nvBest232, BEST_BAND_232);
+    assert(
+      va.length === 0 && vc.length === 0 && vb.length === 0,
+      '232.20: [GREEN] NV armor/chems/bestiary all within plausibility bands — armor ' +
+        JSON.stringify(va.slice(0, 5)) +
+        ' chems ' +
+        JSON.stringify(vc.slice(0, 5)) +
+        ' bestiary ' +
+        JSON.stringify(vb.slice(0, 5))
+    );
+  }
+
+  // 232.21 — [RED] the plausibility bands flag wildly-out-of-band values in each
+  //          of the three tables (armor value 99999, bestiary HP 99999) by name.
+  {
+    const ba = { ...nvArmor232, 'Combat Armor': [15, 25, 99999] };
+    const bb = { ...nvBest232, Deathclaw: [15, 99999, 8, 1.5, 125, 1.5, 50] };
+    const va = bandViol232b(ba, ARMOR_BAND_232);
+    const vb = bandViol232b(bb, BEST_BAND_232);
+    assert(
+      va.some(x => x.includes('Combat Armor') && x.includes('Value=99999')) &&
+        vb.some(x => x.includes('Deathclaw') && x.includes('HP=99999')),
+      '232.21: [RED] the NV armor/bestiary bands flag out-of-band values (Combat Armor 99999, Deathclaw HP 99999) by name — ' +
+        JSON.stringify(va.concat(vb))
+    );
+  }
+
+  // 232.22 — [citation] the db_nv.js header carries the dated, honestly-scoped
+  //          ARMOR/CHEMS/BESTIARY provenance note (2026-07-15): armor DT/Weight/
+  //          Value + chems Value/Weight re-verified against the named master
+  //          tables, PARKED columns NOT re-sourced, bestiary numbers UNVERIFIED,
+  //          and the removed Whiskey Rose named. Correct-then-cite. Sibling to 232.6/232.14.
+  {
+    const dbNvRaw = readGroup('db_nv');
+    assert(
+      /PROTOCOL 3 \(ARMOR\.CSV \+ CHEMS\.CSV\)/.test(dbNvRaw) &&
+        dbNvRaw.includes('New Vegas Apparel') &&
+        dbNvRaw.includes('New Vegas Consumables') &&
+        /PROTOCOL 3 \(BESTIARY\.CSV\)/.test(dbNvRaw) &&
+        /UNVERIFIED/.test(dbNvRaw) &&
+        dbNvRaw.includes('Whiskey Rose') &&
+        /NOT[\s\S]*re-sourced/.test(dbNvRaw),
+      '232.22: [citation] db_nv.js header carries the dated ARMOR/CHEMS/BESTIARY provenance note (named master tables, UNVERIFIED bestiary, PARKED columns, Whiskey Rose removal)'
     );
   }
 }

@@ -21,10 +21,33 @@
 // (a Fallout 76 weapon), and Vance's Lucky Hat Knife (no such weapon exists) —
 // and "Rocket Launcher" was renamed to its real in-game name, Missile Launcher.
 // The PARKED columns (Req_Unarmed/Req_STR/Reach/Special_Attack_AP) were NOT
-// re-sourced, and the other tables below (ARMOR/AMMO/CHEMS/BESTIARY/RECIPES/…)
-// are NOT yet re-verified — do not read this note as vouching for them. This
-// file is a typist for wiki data, never an authority that invents or edits
-// Fallout facts.
+// re-sourced. This file is a typist for wiki data, never an authority that
+// invents or edits Fallout facts.
+//
+// PROTOCOL 3 (ARMOR.CSV + CHEMS.CSV): a second pass on 2026-07-15 re-verified
+// these two tables against the fallout.wiki "Fallout: New Vegas Apparel" and
+// "Fallout: New Vegas Consumables" master tables. ARMOR DT/Weight/Value were
+// corrected for the body-armor/clothing rows the apparel master table covers
+// (82 of 103 rows fully verified); headwear/hats live on a separate page and a
+// handful of rows carry an anomalous or missing master value — those are LEFT
+// AT THEIR PRIOR VALUES and flagged UNVERIFIED, never guessed. ARMOR Type,
+// Effects and Min_CND_Threshold were NOT re-sourced (PARKED display columns —
+// e.g. Chinese Stealth Armor's Effects still reads the FO3 auto-stealth text;
+// the FNV item actually grants only Sneak +5). CHEMS Value + Weight were
+// corrected against the consumables master (most FNV chems weigh 0, not the old
+// 0.5 placeholder); the fabricated "Whiskey Rose" row was removed (it is a Cass
+// companion PERK, not a consumable). CHEMS Effect/Duration/Addiction columns
+// were NOT re-sourced.
+//
+// PROTOCOL 3 (BESTIARY.CSV): every creature/NPC name was confirmed a real FNV
+// entity (no fakes, no wrong-game leaks), but the NUMERIC stats were NOT
+// re-sourced and remain model-plausible approximations — most entries are
+// level-scaled creatures or human NPCs whose HP/DT/damage vary by level and
+// variant, so no single canonical wiki value exists to pin them to. Treat the
+// bestiary numbers as UNVERIFIED.
+//
+// The remaining tables (AMMO/MISC/RECIPES/QUEST_ITEMS/VENDORS/WEAPON_MODS) are
+// still NOT re-verified — do not read this note as vouching for them.
 //
 // ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
 // Columns below are authored (fallout.wiki-sourced) but have no current code
@@ -307,66 +330,66 @@ Missile,Standard,1.0,0,1.0,3.0
 Name,Type,DT,Weight,Value,Effects,Min_CND_Threshold
 Wasteland Wanderer Outfit,Light,0,2,15,None,50%
 Vault Utility Suit,Light,0,3,50,None,50%
-Leather Armor,Light,6,15,150,None,50%
-NCR Trooper Armor,Light,8,15,400,None,50%
-Gecko-Backed Leather Armor,Light,8,18,300,None,50%
-NCR Ranger Patrol Armor,Light,12,20,1000,None,50%
-Stealth Suit Mk II,Light,16,20,8000,+10 Sneak / Auto-Stealth,50%
-Metal Armor,Medium,12,30,700,None,50%
-Combat Armor,Medium,15,25,3900,None,50%
-Combat Armor Reinforced,Medium,18,28,6000,None,50%
-Legion Centurion Armor,Medium,18,20,3500,None,50%
+Leather Armor,Light,6,15,160,None,50%
+NCR Trooper Armor,Light,10,26,300,None,50%
+Gecko-Backed Leather Armor,Light,10,15,500,None,50%
+NCR Ranger Patrol Armor,Light,15,25,390,None,50%
+Stealth Suit Mk II,Light,14,25,7500,+10 Sneak / Auto-Stealth,50%
+Metal Armor,Medium,12,30,1100,None,50%
+Combat Armor,Medium,15,25,6500,None,50%
+Combat Armor Reinforced,Medium,17,25,8000,None,50%
+Legion Centurion Armor,Medium,18,35,800,None,50%
 Desert Ranger Combat Armor,Medium,22,30,8000,None,50%
 NCR Veteran Ranger Armor,Medium,22,30,9000,None,50%
-Elite Riot Gear,Medium,22,30,9500,+1 PER / +1 CHR,50%
-NCR Salvaged Power Armor,Heavy,20,35,8500,+1 STR,50%
-Brotherhood T-45d Power Armor,Heavy,22,45,6000,+2 STR,50%
+Elite Riot Gear,Medium,22,23,12500,+1 PER / +1 CHR,50%
+NCR Salvaged Power Armor,Heavy,20,40,3000,+1 STR,50%
+Brotherhood T-45d Power Armor,Heavy,22,45,4500,+2 STR,50%
 Ranger Combat Armor,Medium,20,30,7500,None,50%
 T-51b Power Armor,Heavy,25,40,5200,+1 STR / +1 CHA / +25 Rad Resist,50%
-Remnants Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
-Enclave Power Armor,Heavy,28,45,12000,+1 STR / +25 Rad Resist,50%
-Gannon Family Tesla Armor,Heavy,26,40,10000,+10 Energy Resist / +25 Rad Resist,50%
-Advanced Radiation Suit,Light,0,4,350,+60 Rad Resist,50%
-Armored Vault 13 Jumpsuit,Light,10,10,2000,+5 Barter / +5 Repair,50%
-Armored Vault 21 Jumpsuit,Light,10,10,1000,None,50%
-Assassin Suit,Light,14,18,3000,+10 Sneak,50%
-Caesar's Armor,Medium,18,25,4000,+5 Barter / Legion Fame,50%
-Chinese Stealth Armor,Light,16,25,7000,+10 Sneak / Auto-Stealth,50%
-Gecko-Backed Leather Armor Reinforced,Light,10,20,500,None,50%
-Gladiator Armor,Light,12,20,800,None,50%
-Great Khan Armored Leather,Light,8,15,250,None,50%
-Great Khan Simple Armor,Light,4,10,100,None,50%
-Joshua Graham's Armor,Light,18,20,3500,+5 Guns,50%
-Leather Armor Reinforced,Light,8,18,300,None,50%
-Lightweight Leather Armor,Light,6,10,200,None,50%
-NCR Trooper Fatigues,Light,4,5,100,None,50%
-Radiation Suit,Light,0,3,200,+40 Rad Resist,50%
-Raider Badlands Armor,Light,6,14,200,None,50%
-Raider Blastmaster Armor,Light,8,16,250,-1 AGL,50%
-Raider Painspike Armor,Light,8,16,250,+5 Melee,50%
-Raider Sadist Armor,Light,10,18,300,None,50%
-Sierra Madre Armor,Light,10,15,1000,+5 Sneak,50%
-Sierra Madre Armor Reinforced,Light,14,18,2000,+5 Sneak / +5 Energy Weapons,50%
-Space Suit,Light,0,5,500,+60 Rad Resist,50%
-Tribal Raiding Armor,Light,6,12,150,None,50%
-Advanced Riot Gear,Medium,20,28,7500,+1 PER / +1 AGL,50%
-Combat Armor Reinforced Mark 2,Medium,20,30,7000,None,50%
-Lightweight Metal Armor,Medium,10,20,450,None,50%
-NCR Bandoleer Armor,Medium,14,20,500,None,50%
+Remnants Power Armor,Heavy,28,45,6500,+1 STR / +25 Rad Resist,50%
+Enclave Power Armor,Heavy,32,45,780,+1 STR / +25 Rad Resist,50%
+Gannon Family Tesla Armor,Heavy,26,35,8194,+10 Energy Resist / +25 Rad Resist,50%
+Advanced Radiation Suit,Light,6,7,100,+60 Rad Resist,50%
+Armored Vault 13 Jumpsuit,Light,8,15,70,+5 Barter / +5 Repair,50%
+Armored Vault 21 Jumpsuit,Light,8,15,180,None,50%
+Assassin Suit,Light,14,20,7500,+10 Sneak,50%
+Caesar's Armor,Medium,5,3,1500,+5 Barter / Legion Fame,50%
+Chinese Stealth Armor,Light,12,20,500,+10 Sneak / Auto-Stealth,50%
+Gecko-Backed Leather Armor Reinforced,Light,15,18,2000,None,50%
+Gladiator Armor,Light,12,15,160,None,50%
+Great Khan Armored Leather,Light,8,7,100,None,50%
+Great Khan Simple Armor,Light,5,7,100,None,50%
+Joshua Graham's Armor,Light,15,8,2000,+5 Guns,50%
+Leather Armor Reinforced,Light,10,15,1200,None,50%
+Lightweight Leather Armor,Light,8,10,160,None,50%
+NCR Trooper Fatigues,Light,2,26,300,None,50%
+Radiation Suit,Light,4,5,60,+40 Rad Resist,50%
+Raider Badlands Armor,Light,4,15,180,None,50%
+Raider Blastmaster Armor,Light,4,15,180,-1 AGL,50%
+Raider Painspike Armor,Light,4,15,180,+5 Melee,50%
+Raider Sadist Armor,Light,4,15,180,None,50%
+Sierra Madre Armor,Light,16,15,400,+5 Sneak,50%
+Sierra Madre Armor Reinforced,Light,18,17,1000,+5 Sneak / +5 Energy Weapons,50%
+Space Suit,Light,10,7,800,+60 Rad Resist,50%
+Tribal Raiding Armor,Light,4,15,180,None,50%
+Advanced Riot Gear,Medium,21,25,8494,+1 PER / +1 AGL,50%
+Combat Armor Reinforced Mark 2,Medium,20,25,8000,None,50%
+Lightweight Metal Armor,Medium,12,20,460,None,50%
+NCR Bandoleer Armor,Medium,10,26,300,None,50%
 NCR Ranger Combat Armor,Medium,20,30,7500,None,50%
-Recon Armor,Medium,15,20,3500,None,50%
-Riot Gear,Medium,18,26,5000,+1 PER,50%
-Van Graff Combat Armor,Medium,18,25,5000,None,50%
-1st Recon Assault Armor,Heavy,15,30,5000,+5 Guns,50%
-1st Recon Survival Armor,Heavy,15,30,5500,+5 Survival / +5 Medicine,50%
+Recon Armor,Medium,17,20,7200,None,50%
+Riot Gear,Medium,20,30,7994,+1 PER,50%
+Van Graff Combat Armor,Medium,16,25,6500,None,50%
+1st Recon Assault Armor,Heavy,15,30,300,+5 Guns,50%
+1st Recon Survival Armor,Heavy,15,30,300,+5 Survival / +5 Medicine,50%
 Brotherhood T-51b Power Armor,Heavy,25,40,5200,+1 STR / +25 Rad Resist,50%
-Gecko-Backed Metal Armor,Medium,14,32,600,None,50%
-Legate's Armor,Heavy,28,40,15000,+5 Melee / +5 Unarmed,50%
-Metal Armor Reinforced,Medium,14,32,1200,None,50%
-Remnants Tesla Armor,Heavy,24,42,10000,+10 Energy Resist / +25 Rad Resist,50%
-Scorched Sierra Power Armor,Heavy,22,45,7000,+4 STR / Fire DoT Aura,50%
-T-45d Power Armor,Heavy,22,45,5000,+2 STR,50%
-Tesla Armor,Heavy,24,40,8500,+10 Energy Resist / +25 Rad Resist,50%
+Gecko-Backed Metal Armor,Medium,17,33,2000,None,50%
+Legate's Armor,Heavy,15,45,250,+5 Melee / +5 Unarmed,50%
+Metal Armor Reinforced,Medium,16,30,3500,None,50%
+Remnants Tesla Armor,Heavy,25,45,8200,+10 Energy Resist / +25 Rad Resist,50%
+Scorched Sierra Power Armor,Heavy,24,40,6500,+4 STR / Fire DoT Aura,50%
+T-45d Power Armor,Heavy,22,45,4500,+2 STR,50%
+Tesla Armor,Heavy,20,45,6600,+10 Energy Resist / +25 Rad Resist,50%
 Boone's Beret,Headwear,0,0,40,None,—
 Caleb McCaffery's Hat,Headwear,0,0,0,None,—
 Chalk's Headdress,Headwear,1,3,150,Melee Weapons +5,—
@@ -480,46 +503,45 @@ Securitron Mk II,20,300,8,1.0,60,2.0,EMP,Ranged,Energy,100
 
 [CHEMS.CSV]
 Name,Effect,Duration,Addiction_Risk,Addiction_Debuff,Chem_Family,Value,Weight
-Buffout,+2 STR / +2 END / +60 Max HP,4m,25%,-1 STR / -1 END,Buffout,20,0.5
-Med-X,+25 DR,4m,25%,-1 AGI,Med-X,20,0.5
-Psycho,+25% DMG,4m,25%,-1 PER / -1 END,Psycho,20,0.5
-Stimpak,Restore HP,0,0%,None,Medicine,20,0.5
-Super Stimpak,Restore 100 HP,0,0%,None,Medicine,75,0.5
-RadAway,Remove 150 Rads,0,0%,None,Medicine,20,0.5
-Rad-X,+25 Rad Resistance,4m,0%,None,Medicine,20,0.5
-Antivenom,Remove Poison,0,0%,None,Medicine,75,0.5
-Hydra,Restore crippled limb,0,0%,None,Medicine,55,0.5
-Fixer,Remove addiction,0,0%,None,Medicine,35,0.5
-Doctor's Bag,Restore all crippled limbs,0,0%,None,Medicine,250,2.0
-Jet,+20 AP / +1 AGI,1m,25%,-1 PER / -1 END,Jet,20,0.5
-Ultrajet,+30 AP / +1 AGI,2m,30%,-1 AGI / -1 STR,Jet,150,0.5
-Turbo,Slow time / +30% AP,3s,15%,-2 PER,Turbo,65,0.5
-Mentats,+2 INT / +2 PER,1m,10%,-1 INT / -1 PER,Mentats,25,0.5
-Slasher,+3 STR / +3 END / +25% DMG,2m,20%,-1 STR / -1 END,Buffout,75,0.5
-Whiskey Rose,+1 STR / DT vs Energy,1m,10%,-1 CHR,Alcohol,20,0.5
-Nuka-Cola,Restore 20 HP / +5 RAD,0,0%,None,Food,5,0.5
-Nuka-Cola Quartz,Restore 20 HP / Night Vision,5m,0%,None,Food,50,0.5
-Atomic Cocktail,Restore 20 HP / +30 RAD,0,0%,None,Alcohol,20,0.5
-Steady,+2 AGL / No weapon sway,2m,15%,-1 PER,Steady,35,0.5
-Rocket,+25% Melee DMG / +25 AP,1m,20%,-1 AGL,Rocket,35,0.5
-Cateye,Night Vision,2m,0%,None,Cateye,25,0.5
-Dixon's Jet,+15 AP,30s,30%,-1 PER / -1 END,Jet,20,0.5
-Party Time Mentats,+5 CHR / +2 INT,1m,15%,-1 INT / -1 PER,Mentats,50,0.5
-Blood Shield,+50 Poison Resist,2m,0%,None,Medicine,30,0.5
-Rushing Water,+50% Attack Speed,30s,15%,-1 AGL,Rushing Water,50,0.5
-Ant Nectar,+4 STR / -3 INT / Fire Resist,2m,10%,-2 INT,Ant Nectar,30,0.5
-Healing Powder,Restore 15 HP / -2 PER,0,0%,None,Medicine,4,0.5
-Healing Poultice,Restore 20 HP / -2 PER,0,0%,None,Medicine,12,0.5
-Purified Water,Restore 20 HP,0,0%,None,Food,20,0.5
-Dirty Water,Restore 5 HP / +5 RAD,0,0%,None,Food,5,0.5
-Beer,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,5,0.5
-Scotch,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
-Vodka,+1 END / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
-Wine,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,0.5
-Absinthe,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,15,0.5
-Moonshine,+2 STR / -2 INT,4m,10%,-2 CHR,Alcohol,10,0.5
-Gecko Steak,Restore 50 HP,0,0%,None,Food,15,1.0
-Brahmin Steak,Restore 50 HP,0,0%,None,Food,15,1.0
+Buffout,+2 STR / +2 END / +60 Max HP,4m,25%,-1 STR / -1 END,Buffout,20,0
+Med-X,+25 DR,4m,25%,-1 AGI,Med-X,20,0
+Psycho,+25% DMG,4m,25%,-1 PER / -1 END,Psycho,20,0
+Stimpak,Restore HP,0,0%,None,Medicine,75,0
+Super Stimpak,Restore 100 HP,0,0%,None,Medicine,150,0
+RadAway,Remove 150 Rads,0,0%,None,Medicine,20,0
+Rad-X,+25 Rad Resistance,4m,0%,None,Medicine,20,0
+Antivenom,Remove Poison,0,0%,None,Medicine,25,0
+Hydra,Restore crippled limb,0,0%,None,Medicine,55,0
+Fixer,Remove addiction,0,0%,None,Medicine,20,0
+Doctor's Bag,Restore all crippled limbs,0,0%,None,Medicine,55,1
+Jet,+20 AP / +1 AGI,1m,25%,-1 PER / -1 END,Jet,20,0
+Ultrajet,+30 AP / +1 AGI,2m,30%,-1 AGI / -1 STR,Jet,50,0
+Turbo,Slow time / +30% AP,3s,15%,-2 PER,Turbo,20,0
+Mentats,+2 INT / +2 PER,1m,10%,-1 INT / -1 PER,Mentats,20,0
+Slasher,+3 STR / +3 END / +25% DMG,2m,20%,-1 STR / -1 END,Buffout,20,0
+Nuka-Cola,Restore 20 HP / +5 RAD,0,0%,None,Food,20,1
+Nuka-Cola Quartz,Restore 20 HP / Night Vision,5m,0%,None,Food,40,1
+Atomic Cocktail,Restore 20 HP / +30 RAD,0,0%,None,Alcohol,25,1
+Steady,+2 AGL / No weapon sway,2m,15%,-1 PER,Steady,20,0
+Rocket,+25% Melee DMG / +25 AP,1m,20%,-1 AGL,Rocket,20,0
+Cateye,Night Vision,2m,0%,None,Cateye,20,0
+Dixon's Jet,+15 AP,30s,30%,-1 PER / -1 END,Jet,5,0
+Party Time Mentats,+5 CHR / +2 INT,1m,15%,-1 INT / -1 PER,Mentats,20,0
+Blood Shield,+50 Poison Resist,2m,0%,None,Medicine,50,0.5
+Rushing Water,+50% Attack Speed,30s,15%,-1 AGL,Rushing Water,20,1
+Ant Nectar,+4 STR / -3 INT / Fire Resist,2m,10%,-2 INT,Ant Nectar,20,0.25
+Healing Powder,Restore 15 HP / -2 PER,0,0%,None,Medicine,5,0.03
+Healing Poultice,Restore 20 HP / -2 PER,0,0%,None,Medicine,20,0.03
+Purified Water,Restore 20 HP,0,0%,None,Food,20,1
+Dirty Water,Restore 5 HP / +5 RAD,0,0%,None,Food,10,1
+Beer,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,2,1
+Scotch,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,1
+Vodka,+1 END / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,20,1
+Wine,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,10,1
+Absinthe,+1 STR / +1 CHR / -1 INT,4m,10%,-1 CHR,Alcohol,20,1
+Moonshine,+2 STR / -2 INT,4m,10%,-2 CHR,Alcohol,20,1
+Gecko Steak,Restore 50 HP,0,0%,None,Food,5,1
+Brahmin Steak,Restore 50 HP,0,0%,None,Food,5,0.8
 Cram,Restore 15 HP,0,0%,None,Food,5,1
 InstaMash,Restore 15 HP,0,0%,None,Food,5,1
 Fancy Lads Snack Cakes,Restore 15 HP,0,0%,None,Food,5,1
