@@ -29,6 +29,7 @@
  *   7. Render check (360px & 412px)               ← skipped by --fast
  *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
  *   9. Runtime audit — test.html headless         ← skipped by --fast
+ *  10. Save-survival (SAVE_INTEGRITY_PASS)         ← skipped by --fast
  */
 'use strict';
 
@@ -241,6 +242,12 @@ if (!fast) {
   // Executes tests/test.html headless and asserts every suite passes + the
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');
+
+  // ── 10. Save-survival (SAVE_INTEGRITY_PASS) ───────────────────────────────────
+  // Boots real fixtures (current/mature/legacy-v7/malformed) through the REAL
+  // boot + import paths and compares the full durable-field inventory — the
+  // sacred-data guard. Too slow for gate:fast; runs on the push gate + CI.
+  run('Save-survival', 'node tests/save-survival.mjs');
 
   stopSharedBrowser();
 }

@@ -2144,6 +2144,35 @@ button.mode-pill--overseer:hover {
   }
 }
 
+/* SAVE_INTEGRITY_PASS Layer 2 — cloned from #storageWarningBannerTemplate
+   (index.html) ONLY when navigator.storage.persist() resolves denied
+   (js/ui/ui-core.js _requestPersistentStorage). Same fixed-top, tap-target-
+   safe shape as .update-banner above (Protocol 22 reuse) but no pulse
+   animation — this is a standing advisory, not an urgent action prompt. */
+.storage-warning-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: var(--robco-alert);
+  color: #000;
+  padding: 10px 16px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  text-shadow: none;
+}
+
 /* ─── Phase 2b Utility Classes ─────────────────────────────────── */
 
 /* Empty-state message shown when a list has no items */

@@ -106,10 +106,11 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    36KB    3221-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    36KB    3222-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
-│   └── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
+│   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
+│   └── save-survival.mjs       SAVE_INTEGRITY_PASS behavioural gate: boots real fixtures (current/mature-dual-campaign/legacy-v7/malformed) through the REAL boot + import paths and compares the full durable-field inventory (sourced from window._defaultState) — push-gate only
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
@@ -2278,6 +2279,34 @@ FileReader → JSON.parse
   → Restore playstyle
 ```
 
+**v8-container import (current-schema envelopes carrying `.robco_v8`, not the
+legacy `.state` form above)** routes through `_writeImportedContainer()`
+(state.js) — the SAME shared core `applyBundleData()` (full-backup restore)
+reuses (Protocol 22). As of SAVE_INTEGRITY_PASS this now runs the identical
+`sanitizeImportedContainer() → migrateState()` sequence cloud-pull/slot-load/
+backup-restore already ran, per campaign — closing a migrate-parity gap where
+a re-imported old v8 save kept a stale `campaignMode`/`mapView` value and an
+un-archived legacy faction key that every other arrival path already
+normalized (confirmed behaviourally, no field was ever dropped — see
+`tests/save-survival.mjs` PATH2).
+
+### Storage Durability (Layer 2 — SAVE_INTEGRITY_PASS)
+
+The live campaign container (`robco_v8`) is **localStorage-only** — unlike
+cold store (save slots / rolling backups), it has no IndexedDB durability
+shadow, so it is the single most storage-pressure-vulnerable piece of durable
+data in the app (e.g. iOS Safari's low-storage/~2-week-unopened eviction).
+`_requestPersistentStorage()` (ui-core.js) is a fire-and-forget boot phase,
+called from `window.onload` right after `_hydrateStateFromStorage()`, that
+asks the browser to make this origin's storage persistent
+(`navigator.storage.persist()`), feature-detected and fully wrapped so it can
+never throw into or block boot. The `'granted'|'denied'` result is recorded
+to the `robco_storage_persisted` device pref (MetaStore, never campaign
+state — Protocol 23); on `'denied'` a diegetic "MEMORY CORE UNSTABLE" banner
+is cloned from the inert `#storageWarningBannerTemplate` (index.html, the
+same WU-E2 clone-a-`<template>` pattern as the update/FO3 banners) and shown
+until tapped away for that session.
+
 ### Cloud Push (saveCurrentToCloud in cloud.js)
 
 ```
@@ -2899,7 +2928,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 
 ### MetaStore — device preferences (`js/core/state.js`)
 
-`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (41 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui/ui-audio.js` / `js/ui/ui-render.js` / `js/ui/ui-core.js` / `js/services/api.js` / `js/services/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
+`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (50 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui/ui-audio.js` / `js/ui/ui-render.js` / `js/ui/ui-core.js` / `js/services/api.js` / `js/services/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
 | Key                            | Type   | Owner        | Description                                                                                                                                                                                                                                                                            |
 | ------------------------------ | ------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2943,6 +2972,7 @@ Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structu
 | `robco_bay_view`               | string | ui-core.js   | Module Bay Bay-vs-Schematic view choice (`'bay'`/`'schematic'`, B2b) — restored on every reload                                                                                                                                                                                        |
 | `robco_bezel_subsystem`        | string | ui-core.js   | Last-focused bezel subsystem (`'operator'`/`'operations'`/`'databank'`/`'uplink'`/`'chassis'`/`'settings'`, DO-N + Step 2 SETTINGS-tab unit) — `chassis`/`settings` are now real tabs restored by `initTabs()`; only the `uplink` highlight still needs the cosmetic boot-time re-sync |
 | `robco_cargo_drawer`           | string | ui-render.js | Last-open CARGO MANIFEST drawer (`'weapon'`/`'armor'`/`'aid'`/`'mod'`/`'misc'`/`'ammo'`, Phase 3 · Piece 2 OPERATIONS reskin) — restored at boot by `_restoreDevicePrefs()`, written by `setInvFilter()`                                                                               |
+| `robco_storage_persisted`      | string | ui-core.js   | `navigator.storage.persist()` result (`'granted'`/`'denied'`/`''`, SAVE_INTEGRITY_PASS) — set once per boot by `_requestPersistentStorage()`; `'denied'` shows the MEMORY CORE UNSTABLE warning banner                                                                                 |
 
 ### Module Bay (`js/ui/ui-core.js`, B2a/B2b) — settings as installable hardware
 
@@ -3184,7 +3214,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3221-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3222-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

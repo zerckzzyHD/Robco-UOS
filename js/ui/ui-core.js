@@ -434,6 +434,64 @@ function _hydrateStateFromStorage() {
   });
 }
 
+// ── SAVE_INTEGRITY_PASS Layer 2 — STORAGE PERSISTENCE REQUEST (boot phase) ──
+// Clone #storageWarningBannerTemplate (index.html, WU-E2 inert-template
+// pattern) into the DOM — the same clone-a-<template> idiom the Diagnostic
+// Shell panel already uses (js/dev/test-console.js). Shown ONLY on a denied
+// result; never on granted/unknown. Idempotent (a second call while the
+// banner is already up is a no-op) and dismissible for the session (tap to
+// hide) — the MetaStore record is what stops it from re-prompting every boot.
+function _showStorageWarningBanner() {
+  try {
+    if (document.getElementById('storageWarningBanner')) return; // already shown
+    const tpl = document.getElementById('storageWarningBannerTemplate');
+    if (!tpl) return;
+    const frag = tpl.content.cloneNode(true);
+    const banner = frag.querySelector('#storageWarningBanner');
+    if (banner) {
+      banner.style.display = 'flex';
+      banner.addEventListener('click', () => banner.remove());
+    }
+    document.body.prepend(frag);
+  } catch (_) {
+    /* a warning banner must never break boot */
+  }
+}
+
+// Fire-and-forget: ask the browser to make this origin's storage persistent
+// (survive eviction under storage pressure) so the sacred live campaign
+// container — localStorage-only, no IndexedDB durability shadow — is less
+// likely to be silently reclaimed (e.g. iOS Safari's ~2-week/low-storage
+// eviction). Feature-detected and fully wrapped: this must NEVER throw into
+// boot or block it (Protocol 33 fail-safe spirit) — called un-awaited from
+// window.onload, after _hydrateStateFromStorage() so a campaign already
+// exists. Records 'granted'|'denied' to the robco_storage_persisted device
+// pref (Protocol 23 — a browser/device property, never campaign state) and
+// shows the diegetic warning banner only when denied.
+function _requestPersistentStorage() {
+  try {
+    if (!navigator.storage || typeof navigator.storage.persist !== 'function') return;
+    Promise.resolve()
+      .then(async () => {
+        let granted = false;
+        if (typeof navigator.storage.persisted === 'function') {
+          granted = await navigator.storage.persisted();
+        }
+        if (!granted) {
+          granted = await navigator.storage.persist();
+        }
+        const result = granted ? 'granted' : 'denied';
+        MetaStore.set('robco_storage_persisted', result);
+        if (result === 'denied') _showStorageWarningBanner();
+      })
+      .catch(() => {
+        /* a rejected persist()/persisted() call must never surface to boot */
+      });
+  } catch (_) {
+    /* never throw into boot — absent/misbehaving navigator.storage is fine */
+  }
+}
+
 // ── API KEY / CHAT-HISTORY RESTORE + STANDBY WIRING (boot phases) ──
 function _restoreApiKeyAndChatHistory() {
   if (MetaStore.get('robco_gemini_key')) {
@@ -1093,7 +1151,17 @@ function _wireUnloadFlush() {
       window.robco_v8 = { activeContext: state.gameContext || 'FNV', campaigns: {} };
     window.robco_v8.activeContext = state.gameContext || 'FNV';
     window.robco_v8.campaigns[window.robco_v8.activeContext] = JSON.parse(JSON.stringify(state));
-    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+    try {
+      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+    } catch (e) {
+      // SAVE_INTEGRITY_PASS fail-loud audit: setItem is atomic on throw (a
+      // QuotaExceededError never partially writes), so the PRIOR robco_v8
+      // stays intact — this only means the last <500ms of edits since the
+      // last debounced saveState() may not have flushed. No UI is possible
+      // during unload; console.error is the loud, auditable trail (never a
+      // silent swallow, Protocol 42).
+      console.error('[RobCo] beforeunload flush failed (quota?):', e);
+    }
   });
 }
 
@@ -1119,6 +1187,7 @@ window.onload = async function () {
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
     _hydrateStateFromStorage();
+    _requestPersistentStorage(); // SAVE_INTEGRITY_PASS Layer 2: fire-and-forget, never blocks boot
     if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
     _restoreApiKeyAndChatHistory();
     loadUI();

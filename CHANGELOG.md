@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3221/3221 | Cache: robco-terminal-v2.8.0-r28 -->
+## [Unreleased]<!-- Tests: 3222/3222 | Cache: robco-terminal-v2.8.0-r29 -->
 
 ### Added
 
@@ -11,6 +11,7 @@
 - Reworked the Fallout 3 Pip-Boy's character screen so your radiation exposure and active status effects are now visible right alongside your health without scrolling — condition and radiation now sit compactly at the top of that column, with everything else (max health, level, experience, the radiation drag control, and the medical advisory button) still there, one scroll away. Your health bar, S.P.E.C.I.A.L. values, and condition readout no longer flash red at low health — they stay the same green as the rest of the screen, matching the real device, with the wording ("CRITICAL", a dashed outline) still telling you exactly what's wrong. The cargo screen dropped its redundant "drawer" label and tightened its spacing to show more items at once without scrolling.
 - Redrew the Fallout 3 Pip-Boy's Vault Boy figure from scratch — a detailed, hand-inked figure (quiff, face, spread fingers) replaces the earlier placeholder outline, much closer to the real game's own screen. A crippled head now also swaps to a distressed face, on top of the dashed outline and blinking CRIPPLED label a crippled limb already showed.
 - The Fallout 3 Pip-Boy's cargo screen now shows another row of items at a glance — its always-visible filter search box tucks behind a small tap-to-reveal search button by default, freeing up the room it used to take up permanently. The filter is still there, one tap away.
+- Added a safeguard that asks your browser to keep your save data around instead of quietly clearing it under low-storage conditions. If your browser can't guarantee that, a small warning banner now tells you so and reminds you to export a save file as backup — it clears itself once you tap it away.
 
 ### Fixed
 
@@ -45,6 +46,7 @@
 - Your radiation level is now visible on the Fallout 3 Pip-Boy's character screen without scrolling, right alongside your health.
 - Fixed the last of the leftover orange on the Fallout 3 Pip-Boy's landscape and desktop screens — the "RAD EXPOSURE" label, the radiation caption next to your health readout, the radiation number shown beside the Vault Boy figure, the Karma Center heading, each perk's rank dots, and the cargo/quest filter buttons all show up in the same green as everything else now, instead of the leftover orange accent color. Nothing about what any of them tell you changed — only the color.
 - Fixed the location, item, quest, and perk suggestion boxes — and everything else that looks things up for you, including what the AI itself sees — sometimes showing the OTHER game's content, like a Fallout 3 campaign suggesting New Vegas locations. This only happened right after loading a save slot that held a campaign for a different game than the one you were currently playing; loading now properly restarts the terminal into that game, so every suggestion and lookup matches the game you're actually in. Affects both games, in either direction.
+- Fixed re-importing an older save file sometimes leaving a couple of settings (like your map view size, or your standing with a long-retired faction) stuck on their old values instead of being brought up to date, the same way loading a cloud save or a save slot already does. No campaign data was ever lost by this — it only affected a small number of settings staying stale.
 
 ### Under the Hood
 
@@ -71,6 +73,7 @@
 - Tightened that same automated screen-check's one exception (for the phone navigation dock covering whatever happens to sit under it) so it only excuses that exact dock, not anything of the same broad element type sitting anywhere else on screen — the looser version could have let a real, unrelated overlap slip through unnoticed on a future change. Proven with a live example that the check now catches what it would have missed before. Nothing you can see changed.
 - Added an automated check that fails the build if anything on the Fallout 3 Pip-Boy's landscape or desktop screen ever renders in any color but its own green again — it caught two real leftover orange spots nobody had noticed yet (a perk's rank dots and the cargo/quest filter buttons) the first time it ran, both fixed above. Proven against a real example before being trusted. The AI channel column keeps its own orange by design and is correctly left alone. Nothing you can see changed beyond the two spots called out above.
 - Closed off a theoretical gap a follow-up review found around the cross-game suggestion-box fix above: if the reference data used to reject made-up collectibles, traits, skill books, magazines, or Lincoln memorabilia ever mismatched the game you were actually playing, it could have silently emptied your own real ones instead of just rejecting nonsense — the same underlying stale-data window as the fix above, closed a second, more permanent way so it stays closed even if some future change reopens the first one. Genuinely made-up items are still rejected exactly as before. Nothing you can see changed.
+- Added a thorough new automated check that boots real save files — current, densely-packed, very old, and deliberately broken — through the app's actual startup and save-import steps and confirms nothing in your campaign ever quietly disappears, resets, or gets corrupted along the way. It found one real gap (the settings/faction fix described above) and is proven to actually catch a dropped field by deliberately breaking one, watching the check fail with the right name, then undoing the break. Also double-checked that a failed save write always tells you loudly and leaves your prior save untouched, and added one more such check for local save-slot writes specifically. Nothing you can see changed beyond the two items called out above.
 
 ---
 

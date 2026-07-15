@@ -121,6 +121,13 @@ const META_MANIFEST = {
     owner: 'ui-core-nav.js',
     family: true, // dynamic per-subsystem key: robco_fo3_subtab_<subsystem>
   },
+  // SAVE_INTEGRITY_PASS Layer 2: the navigator.storage.persist() result
+  // ('granted'|'denied'), recorded once per boot so the denied-state warning
+  // banner shows once-per-state instead of re-prompting every boot, and so
+  // the result is inspectable. A device pref (Protocol 23) — the live
+  // campaign container's durability is a device/browser property, not
+  // campaign data.
+  robco_storage_persisted: { type: 'string', default: '', owner: 'ui-core.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
@@ -1969,15 +1976,30 @@ function isValidBundleShape(parsed) {
 }
 window.isValidBundleShape = isValidBundleShape;
 
-// Shared container-write core (sanitize → persist robco_v8/chat/playstyle). Boot
-// re-migrates on the following reload, exactly as the single-save import path does.
-// Reused by ui-saves.js handleFileUpload (single-save import) AND applyBundleData
-// (full-backup import) — Protocol 22, ONE container-apply path, no parallel copy.
+// Shared container-write core (sanitize → migrate → persist robco_v8/chat/
+// playstyle). Reused by ui-saves.js handleFileUpload (single-save import) AND
+// applyBundleData (full-backup import) — Protocol 22, ONE container-apply
+// path, no parallel copy.
+// SAVE_INTEGRITY_PASS migrate-parity fix: cloud pull / slot load / backup
+// restore all run migrateState() per campaign after sanitizing (cloud.js
+// loadCloudSave, ui-saves.js loadFromSlot/_restoreBackupApply) — this was the
+// one container-arrival path that sanitized but never migrated, so an old
+// save re-imported here kept stale enum values (campaignMode/mapView) and
+// un-archived legacy faction keys that every other arrival path already
+// normalizes (confirmed behaviourally by tests/save-survival.mjs PATH2 — no
+// field was ever dropped, only left un-normalized). Mirrors cloud.js's
+// migrate step exactly, so every container-arrival path now runs the same
+// sanitize→migrate sequence.
 function _writeImportedContainer(parsed) {
   const _sanitized =
     typeof sanitizeImportedContainer === 'function'
       ? sanitizeImportedContainer(parsed.robco_v8)
       : parsed.robco_v8;
+  if (typeof migrateState === 'function' && _sanitized && _sanitized.campaigns) {
+    Object.keys(_sanitized.campaigns).forEach(ctx => {
+      _sanitized.campaigns[ctx] = migrateState(parsed.version || '1.0', _sanitized.campaigns[ctx]);
+    });
+  }
   localStorage.setItem('robco_v8', JSON.stringify(_sanitized));
   if (parsed.chat && Array.isArray(parsed.chat))
     localStorage.setItem('robco_chat', JSON.stringify(parsed.chat));

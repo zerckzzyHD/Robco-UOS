@@ -15356,9 +15356,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // bumped again for the same reason. FO3 PIP-BOY BUILD U1 added one more
     // (_applyRailGrouping()) — bumped again, same reason. FO3 PIP-BOY BUILD U2
     // owner-feedback pass added one more (_applyFo3NavLabels()) — bumped again, same reason.
+    // SAVE_INTEGRITY_PASS added one more (_requestPersistentStorage()) — bumped again, same reason.
     assert(
-      onloadLineCount < 57,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 57)`
+      onloadLineCount < 58,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 58)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -39896,8 +39897,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Feedback Animation Waves). These tests lock that audit as a regression
 //  guard: CARGO SEIZED and the RNG interlock banners stay state-driven
 //  (never converted to a timed auto-dismiss), and no new full-width banner
-//  class sneaks in outside the known, already-reviewed set.
-//  9 tests
+//  class sneaks in outside the known, already-reviewed set. SAVE_INTEGRITY_PASS
+//  added .storage-warning-banner to that reviewed set (217.7b) alongside its
+//  own inert-template guard, same as .update-banner/.fo3-warning-banner.
+//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 217 — Mobile UX polish: cloud-save prominence + toast audit');
@@ -39961,11 +39964,14 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       '#dshEnvBanner',
       '.update-banner',
       '.rng-banner',
+      // SAVE_INTEGRITY_PASS: same inert-<template> pattern as .update-banner/
+      // .fo3-warning-banner above (WU-E2), reviewed at that same bar — see 217.7b.
+      '.storage-warning-banner',
     ]);
     const unknown217 = [...bannerSelectors217].filter(s => !known217.has(s));
     assert(
       bannerSelectors217.size > 0 && unknown217.length === 0,
-      '217.5: every "*banner*" CSS selector is one of the four known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner) — no new full-width banner-style popup introduced' +
+      '217.5: every "*banner*" CSS selector is one of the five known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner/.storage-warning-banner) — no new full-width banner-style popup introduced' +
         (unknown217.length ? ' — unexpected: ' + unknown217.join(', ') : '')
     );
   }
@@ -39991,6 +39997,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     assert(
       tplIdx217b !== -1 && /fo3-warning-banner|fo3WarningBanner/.test(tplBody217b),
       '217.7: .fo3-warning-banner/#fo3WarningBanner markup lives inside <template id="fo3WarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
+    );
+  }
+
+  // 217.7b  .storage-warning-banner stays inert — same inert-template pattern
+  //         (SAVE_INTEGRITY_PASS). Only _showStorageWarningBanner() (ui-core.js)
+  //         ever clones it into the live DOM, and only on a denied persist() result.
+  {
+    const tplIdx217c = htmlSource217.indexOf('id="storageWarningBannerTemplate"');
+    const tplEnd217c = htmlSource217.indexOf('</template>', tplIdx217c);
+    const tplBody217c = htmlSource217.slice(tplIdx217c, tplEnd217c);
+    assert(
+      tplIdx217c !== -1 && /storage-warning-banner|storageWarningBanner/.test(tplBody217c),
+      '217.7b: .storage-warning-banner/#storageWarningBanner markup lives inside <template id="storageWarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
     );
   }
 

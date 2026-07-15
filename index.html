@@ -159,6 +159,17 @@
         DEFAULT PROFILE UNTIL THE DATA SET IS ENABLED.
       </div>
     </template>
+    <template id="storageWarningBannerTemplate">
+      <!-- SAVE_INTEGRITY_PASS Layer 2: shown ONLY when navigator.storage.persist()
+           resolves denied (_requestPersistentStorage in the ui-core script) — the
+           browser will not guarantee the live campaign survives storage pressure. Tap to
+           dismiss for this session; the underlying MetaStore key keeps it from
+           re-prompting every boot. Game-agnostic copy (Protocol 38). -->
+      <div id="storageWarningBanner" class="storage-warning-banner" role="alert">
+        &gt; MEMORY CORE UNSTABLE &mdash; HOST WILL NOT GUARANTEE PERSISTENCE. EXPORT A SAVE FILE
+        REGULARLY. (TAP TO DISMISS)
+      </div>
+    </template>
 
     <!-- ════════════════════════════════════════════════════════════════════
          DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay
