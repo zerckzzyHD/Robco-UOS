@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
-> **Version:** 2.8.0
-> **Last Updated:** 2026-07-14
+> **Version:** 2.9.0
+> **Last Updated:** 2026-07-15
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -106,7 +106,7 @@
 ├── sw.js               2.0KB  Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    36KB    3222-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    36KB    3236-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -1747,13 +1747,25 @@ calls `reconcileEquipped(state)` directly, right beside the `_migrateEventLog` t
 already runs for the same reason, so the claim is true for every load path, including a plain reload.
 Protocol 13-regression-tested (Suite 221, expanded 11→16 tests to cover both follow-ups; Suite 12).
 
-**Karma Center companion roster (Protocol 38 fix):** `renderKarmaCenter()`'s (`js/ui/ui-render-factions.js`)
-companion-availability text used to hardcode the FO3 companion names per karma tier directly in feature
-code — a Protocol 38 violation, mirroring the earlier BUS-14 SQUAD ROSTER fix above. The roster now lives
-as data on `GAME_DEFS.FO3.karmaCompanions` (`good`/`evil`/`neutral` string fields — a per-game
-**definition** entry, not a `state` field, so Protocol 4 doesn't apply); the render function reads
-`_activeDef().karmaCompanions`. No visible behavior change — the panel is already gated behind
-`usesKarmaCenter` (FO3 only today).
+**FO3 Karma Engine (Protocol 8 Stage 2, v2.9.0 — supersedes an earlier, narrower `karmaCompanions` fix):**
+a deterministic, offline, zero-AI rebuild of `renderKarmaCenter()` (`js/ui/ui-render-factions.js`),
+replacing a shipped Protocol 3 violation (a fabricated "ENCLAVE HIT SQUAD" threat, three wrong companion
+gates, and zero of the game's 90 level-scaled karma titles) with the real, cited FO3 karma system. All
+data lives on `GAME_DEFS.FO3.karma` (`js/core/state.js`, inside `KARMA-DATA-GUARD:BEGIN/END` markers) —
+`hitSquads[]` (Regulators at evil karma / Talon Company at good karma, replacing the invented faction),
+`companions[]` (all 8, with the corrected gate classes), `titles`/`titlesSrc`/`titleMaxLevel` (the 90-cell
+level × alignment title table), and `events[]` (the cited karma-delta action list, `null` for
+UNVERIFIED/CONFLICT values, never a guess) — a per-game **definition** entry, not a `state` field
+(Protocol 4 doesn't apply), transcribed from `planning/KARMA_DATA.md`. Five pure engine functions
+(`getKarmaTier`/`getTitleAlignment`/`getKarmaTitle`/`getKarmaHitSquad`/`getKarmaCompanions`) plus
+`applyKarmaEvent()` (the action-picker apply, clamping `state.karma` to ±1000) read this data via
+`_activeDef().karma`. The rebuilt board is action picker → level-scaled title → tier/number → hit-squad
+
+- companion unlocks; the `#stat_karma` slider remains a working manual override, and the tier word now
+  prints exactly once (F9 fix). A new Node-runner suite (Suite 230) is the Protocol 3 citation guard —
+  every karma constant must carry a `src` field citing fallout.wiki, or the build fails; it also
+  anti-regression-locks that no `enclave` hit-squad faction can reappear. Panel still gated behind
+  `usesKarmaCenter` (FO3 only).
 
 **BUS-12 FIELD FABRICATION** (ex-CRAFTING) — `renderCraftCard()` gains a HAVE/NEED **meter-fill bar**
 per ingredient (`.ing`/`.hn-meter`, short = red `.ing.short`) alongside the existing have/need
@@ -3214,7 +3226,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3222-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3236-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

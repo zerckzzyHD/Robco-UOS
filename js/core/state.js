@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.9.0';
 window.APP_VERSION = APP_VERSION;
 
 // ── METASTORE — device-preference key/value store (Protocol 23 boundary) ────
@@ -1303,18 +1303,459 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       'unarmed',
     ],
     usesKarmaCenter: true,
-    // Karma Center companion-availability notes (Protocol 38 — per-game gameplay
-    // data, not a feature-code literal). Tiered on the SAME karma thresholds the
-    // Karma Center display already uses (>=250 good / <=-250 evil / else neutral)
-    // — those thresholds are a universal karma-scale convention, not FO3-specific,
-    // so only the roster names live here. Read via _activeDef().karmaCompanions
-    // in js/ui/ui-render-factions.js, gated behind usesKarmaCenter so it is only
-    // ever reached for FO3 today.
-    karmaCompanions: {
-      good: 'Dogmeat, Fawkes, Star Paladin Cross',
-      evil: 'Clover, Jericho',
-      neutral: 'Charon, Sergeant RL-3',
+    // ── KARMA-DATA-GUARD:BEGIN — every constant below cites fallout.wiki (Protocol 3, Suite 230) ──
+    // Karma Engine rebuild (Protocol 8 Stage 2, 2026-07-15): replaces the old flat
+    // karmaCompanions bucket + the invented "ENCLAVE HIT SQUAD" with the real,
+    // cited FO3 karma system (hit squads, 8 companions, 90 level-scaled titles,
+    // the karma-event action list). Full source transcription lives in
+    // planning/KARMA_DATA.md (gitignored, local-only) — every entry below is a
+    // verbatim copy from there, never re-derived. Read via _activeDef().karma
+    // in js/ui/ui-render-factions.js, gated behind usesKarmaCenter (FO3 only).
+    karma: {
+      // §a — hunter factions. Replaces the invented ENCLAVE HIT SQUAD (there is
+      // no such faction in FO3; the real hunters are Regulators at evil karma
+      // and Talon Company at good karma — good karma also gets you hunted,
+      // which the old shipped code never modeled at all).
+      hitSquads: [
+        {
+          faction: 'Regulators',
+          alignment: 'evil',
+          threshold: -250,
+          contract: 'Bounty Notice',
+          bounty: 1000,
+          squadSize: 3,
+          spawnFrequency: null,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Fallout 3 Random Encounters" / "Regulator (Fallout 3)" / "Bounty Notice"',
+        },
+        {
+          faction: 'Talon Company',
+          alignment: 'good',
+          threshold: 250,
+          contract: 'Private Contract',
+          bounty: 1000,
+          squadSize: null,
+          spawnFrequency: null,
+          verificationStatus: 'unverified',
+          src: 'fallout.wiki "Fallout 3 Random Encounters" / "Talon Company Merc" / "Private Contract"',
+        },
+      ],
+
+      // §b — 8 companions, 4 gate-classes. karmaReq ∈ none|good|neutral|evil.
+      companions: [
+        {
+          name: 'Dogmeat',
+          karmaReq: 'none',
+          otherGate:
+            'Found at the Scrapyard fighting off Raiders (or occasionally at The Mall); recruitable regardless of Karma.',
+          src: 'fallout.wiki "Dogmeat (Fallout 3)"',
+        },
+        {
+          name: 'Charon',
+          karmaReq: 'none',
+          otherGate:
+            'Obtain his contract from Ahzrukhal at The Ninth Circle: kill Greta, or pay 2,000-5,000 caps, or pay 1,000 caps with Barter 50.',
+          src: 'fallout.wiki "Charon (Fallout 3)"',
+        },
+        {
+          name: 'Fawkes',
+          karmaReq: 'good',
+          otherGate:
+            'Freed from a cell in the Vault 87 Test Labs; joins outside Raven Rock at the final stages of The American Dream.',
+          src: 'fallout.wiki "Fawkes"',
+        },
+        {
+          name: 'Star Paladin Cross',
+          karmaReq: 'good',
+          otherGate: "Found at the Citadel Laboratory, Elder Lyons' seneschal.",
+          src: 'fallout.wiki "Star Paladin Cross"',
+        },
+        {
+          name: 'Butch DeLoria',
+          karmaReq: 'neutral',
+          otherGate:
+            'After completing Trouble on the Homefront, found at the Muddy Rudder in Rivet City. Requires neutral Karma to recruit.',
+          src: 'fallout.wiki "Butch"',
+        },
+        {
+          name: 'Sergeant RL-3',
+          karmaReq: 'neutral',
+          otherGate:
+            'Purchased from Tinker Joe (between the RobCo Facility and Tenpenny Tower) for 1,000 caps, or 500 caps with Barter 70.',
+          src: 'fallout.wiki "Sergeant RL-3"',
+        },
+        {
+          name: 'Clover',
+          karmaReq: 'evil',
+          otherGate:
+            'Purchased from Eulogy Jones at Paradise Falls for 1,000 caps, or 500 caps with Barter 50.',
+          src: 'fallout.wiki "Clover"',
+        },
+        {
+          name: 'Jericho',
+          karmaReq: 'evil',
+          otherGate: 'Found in Megaton; requests 1,000 caps for "supplies" before joining.',
+          src: 'fallout.wiki "Jericho"',
+        },
+      ],
+
+      // §c — 90 titles: level 1..30 x 3 alignment columns. Table-level citation
+      // (one wiki page). titleMaxLevel clamps the app's higher level cap (50).
+      titlesSrc: 'fallout.wiki "Karma (Fallout 3)" (Karma titles table)',
+      titleMaxLevel: 30,
+      titles: {
+        good: [
+          'Vault Guardian',
+          'Vault Martyr',
+          'Sentinel',
+          'Defender',
+          'Dignitary',
+          'Peacekeeper',
+          'Ranger of the Wastes',
+          'Protector',
+          'Urban Avenger',
+          'Exemplar',
+          'Capital Crusader',
+          'Paladin',
+          'Vault Legend',
+          'Ambassador of Peace',
+          'Urban Legend',
+          'Hero of the Wastes',
+          'Paragon',
+          'Wasteland Savior',
+          'Saint',
+          'Last, Best Hope of Humanity',
+          'Restorer of Faith',
+          'Model of Selflessness',
+          'Shepherd',
+          'Friend of the People',
+          'Champion of Justice',
+          'Symbol of Order',
+          'Herald of Tranquility',
+          'Lightbringer',
+          'Earthly Angel',
+          'Messiah',
+        ],
+        neutral: [
+          'Vault Dweller',
+          'Vault Renegade',
+          'Seeker',
+          'Wanderer',
+          'Citizen',
+          'Adventurer',
+          'Vagabond of the Wastes',
+          'Mercenary',
+          'Urban Ranger',
+          'Observer',
+          'Capital Councilor',
+          'Keeper',
+          'Vault Descendant',
+          'Pinnacle of Survival',
+          'Urban Myth',
+          'Strider of the Wastes',
+          'Beholder',
+          'Wasteland Watcher',
+          'Super-Human',
+          'Paradigm of Humanity',
+          'Soldier of Fortune',
+          'Profiteer',
+          'Egocentric',
+          'Loner',
+          'Hero for Hire',
+          'Model of Apathy',
+          'Person of Refinement',
+          'Moneygrubber',
+          'Gray Stranger',
+          'True Mortal',
+        ],
+        bad: [
+          'Vault Delinquent',
+          'Vault Outlaw',
+          'Opportunist',
+          'Plunderer',
+          'Fat Cat',
+          'Marauder',
+          'Pirate of the Wastes',
+          'Reaver',
+          'Urban Invader',
+          "Ne'er-do-well",
+          'Capital Crimelord',
+          'Defiler',
+          'Vault Boogeyman',
+          'Harbinger of War',
+          'Urban Superstition',
+          'Villain of the Wastes',
+          'Fiend',
+          'Wasteland Destroyer',
+          'Evil Incarnate',
+          'Scourge of Humanity',
+          'Architect of Doom',
+          'Bringer of Sorrow',
+          'Deceiver',
+          'Consort of Discord',
+          'Stuff of Nightmares',
+          'Agent of Chaos',
+          'Instrument of Ruin',
+          'Soultaker',
+          "Demon's Spawn",
+          'Devil',
+        ],
+      },
+
+      // §d — event-action table. Player picks one -> applyKarmaEvent(delta).
+      // UNVERIFIED / SOURCE-CONFLICT entries ship delta: null, never a guess.
+      events: [
+        {
+          id: 'donate_church',
+          label: 'Donated caps to a church',
+          delta: 1,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'lawbringer_finger',
+          label: 'Sold a Lawbringer finger to Sonora Cruz',
+          delta: 10,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'scrap_to_walter',
+          label: 'Gave free scrap metal to Walter',
+          delta: 10,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'water_to_beggar',
+          label: 'Gave Purified Water to a beggar',
+          delta: 50,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'save_captive_reward',
+          label: 'Saved a Wasteland Captive (took the reward)',
+          delta: 50,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'save_captive_no_reward',
+          label: 'Saved a Wasteland Captive (refused the reward)',
+          delta: 75,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'kill_very_evil',
+          label: 'Killed a Very Evil character or creature',
+          delta: 100,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'cannibalize',
+          label: 'Devoured a corpse (Cannibal perk)',
+          delta: -1,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'steal_owned_container',
+          label: 'Stole from an owned container',
+          delta: -5,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'hack_owned_terminal',
+          label: 'Hacked/accessed an owned terminal',
+          delta: -5,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'contract_killer_ear',
+          label: 'Sold a Contract Killer ear to Daniel Littlehorn',
+          delta: -10,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'kill_good_creature',
+          label: 'Killed a Good creature',
+          delta: -25,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'fev_water_to_beggar',
+          label: 'Gave FEV-tainted Aqua Pura to a beggar',
+          delta: -50,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'kill_non_evil',
+          label: 'Killed a non-evil character',
+          delta: -100,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'psycho_to_paulie',
+          label: 'Gave Psycho to Paulie Cantelli',
+          delta: -100,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'mesmetron_enslave',
+          label: 'Enslaved a character with the Mesmetron',
+          delta: -100,
+          repeatable: true,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'mei_wong_gun',
+          label: 'Gave Mei Wong 25 caps for a gun',
+          delta: 100,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'disarm_megaton_bomb',
+          label: 'Disarmed the Megaton bomb without payment',
+          delta: 200,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'tranquility_failsafe',
+          label: 'Activated the Tranquility Lane failsafe',
+          delta: 300,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'destroy_enclave_crawler',
+          label: 'Destroyed the Enclave Mobile Command crawler',
+          delta: 500,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'destroy_krivbeknih',
+          label: 'Destroyed the Krivbeknih',
+          delta: 500,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'burn_harold',
+          label: 'Burned Harold (Oasis)',
+          delta: -200,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'bryan_wilks_paradise_falls',
+          label: 'Sold Bryan Wilks to Paradise Falls',
+          delta: -400,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'mister_lopez_suicide',
+          label: 'Caused Mister Lopez to commit suicide',
+          delta: -500,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'ghouls_into_tenpenny',
+          label: 'Let the Feral Ghouls into Tenpenny Tower',
+          delta: -600,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'blow_up_megaton',
+          label: 'Blew up Megaton',
+          delta: -1000,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'infect_purity_fev',
+          label: 'Infected Project Purity with FEV',
+          delta: -1000,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)" / "Take it Back!"',
+        },
+        {
+          id: 'destroy_citadel',
+          label: 'Destroyed the Citadel',
+          delta: -1000,
+          repeatable: false,
+          verificationStatus: 'verified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+        {
+          id: 'good_quest_act',
+          label: 'Performed a good act in a quest (exact value not specified)',
+          delta: null,
+          repeatable: true,
+          verificationStatus: 'unverified',
+          src: 'fallout.wiki "Karma (Fallout 3)" — states "at least +50", no exact figure',
+        },
+        {
+          id: 'evil_quest_act',
+          label: 'Performed an evil act in a quest (exact value not specified)',
+          delta: null,
+          repeatable: true,
+          verificationStatus: 'unverified',
+          src: 'fallout.wiki "Karma (Fallout 3)" — states "at least -50", no exact figure',
+        },
+        {
+          id: 'project_purity_self',
+          label: 'Activated Project Purity yourself',
+          delta: null,
+          repeatable: false,
+          verificationStatus: 'conflict',
+          src: 'fallout.wiki "Karma (Fallout 3)" (+600, no DLC qualifier) vs "Take it Back!" (+1000, Broken Steel-qualified) — SOURCE CONFLICT',
+        },
+      ],
     },
+    // ── KARMA-DATA-GUARD:END ──
     collectibleLabel: 'BOBBLEHEADS',
     collectibleCategory: 'bobblehead',
     tracksLincoln: true,
@@ -1370,8 +1811,8 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       factionSystemText:
         'state.factions tracks reputation with 12 factions as { fame: 0, infamy: 0 } objects.\nMajor keys: enclave, bos, lyons, outcast, supermutants. Minor keys: talon, regulators, slavers, reillys, tunnelsnakes, underworld, rivetcity.\nFame and infamy are INDEPENDENT non-negative integers. Both axes use per-faction thresholds.',
       irreversibleTriggers: `**FO3 Irreversible Triggers** — warn before:
-- Karma dropping below -750 (Enclave hit squads become persistent)
-- Karma rising above +750 (Brotherhood Outcasts become hostile)
+- Karma dropping to Evil or below (-250) — Regulators begin hunting with a Bounty Notice
+- Karma rising to Good or above (+250) — Talon Company begins hunting with a Private Contract
 - Destroying Megaton (permanent loss of town and Moira's full quest line)
 - Turning on the Purifier prematurely (activates endgame sequence)
 - Killing neutral/friendly NPCs with karma impacts above 50`,

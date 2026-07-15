@@ -950,6 +950,18 @@ const _KARMA_TIERS = [
 let _lastKarmaTier = null;
 function updateKarmaUI() {
   const k = parseInt(document.getElementById('stat_karma').value) || 0;
+  // Protocol 42 fix (found verifying the FO3 Karma Engine unit): state.karma
+  // previously only synced from the slider via the debounced syncStateFromDom()
+  // inside saveState() (~500ms later). renderKarmaCenter() reads state.karma
+  // directly, so dragging the slider left its title/tier/hit-squad/companion
+  // readouts stale until the debounce caught up — the Karma Engine plan's own
+  // edge case #9 ("dragging #stat_karma updates state + re-renders the board")
+  // requires this to be immediate. updateKarmaUI() always runs synchronously
+  // on the same 'input' event, right before updateMath()'s karma dirty-check,
+  // so writing state.karma here keeps the slider and the board converged with
+  // no lag — same fix class as _nativeSetKarma() already applies for the
+  // TERMINAL/native path.
+  state.karma = k;
   const tier = _KARMA_TIERS.find(t => t.test(k)) || _KARMA_TIERS[2];
   const label = tier.label;
 

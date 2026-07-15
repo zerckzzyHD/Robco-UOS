@@ -197,6 +197,7 @@ export default [
         // Diagnostic Shell U4b (js/dev/test-console.js) — STATE SETUP cheats read/write these
         // existing native setters/mutators directly (ui-core.js/ui-render.js/ui-saves.js)
         MAX_PLAYER_LEVEL: 'readonly',
+        _KARMA_TIERS: 'readonly', // BUS-09 5-band karma tiers (js/ui/ui-core-cmd.js), reused by the FO3 Karma Engine (js/ui/ui-render-factions.js getKarmaTier — Protocol 22, no new breakpoints)
         _computeEligiblePerks: 'readonly',
         _applyStatusEffect: 'readonly',
         toggleLimb: 'readonly',

@@ -2033,7 +2033,15 @@ function loadUI() {
     )
       renderWorldMap();
   }
-  if (_isDirty('karma', { k: state.karma, ctx: state.gameContext })) renderKarmaCenter(); // G4: FO3 Karma Center
+  // Karma Engine rebuild: the live-drag/level-change dirty-check that
+  // decides WHEN to recompute now lives in updateMath() (see there for why —
+  // neither the slider's oninput nor the level-change handlers call
+  // loadUI()). loadUI() itself is only a full-repaint path (boot, tab
+  // switch, campaign load), so it always calls the renderer unconditionally
+  // here — matching the renderDatabankPanel() precedent just above — which
+  // also keeps this function reachable from loadUI() (Protocol 22/architecture
+  // convention that every render*() is called from loadUI()).
+  if (typeof renderKarmaCenter === 'function') renderKarmaCenter(); // G4: FO3 Karma Center
   if (
     _isDirty('campstatus', {
       q: state.quests,
@@ -2227,6 +2235,20 @@ function updateMath() {
     }
   }
   _lastKarma = curKarma;
+
+  // Karma Engine rebuild (Protocol 8 Stage 2) — the Karma Center's title/
+  // tier/hit-squad/companion readout is level-scaled (getKarmaTitle(karma,
+  // lvl)), so it must recompute live on BOTH a karma change (dragging
+  // #stat_karma) and a level-only change (state.lvl set directly by
+  // onLvlInputChanged()/nativeLevelUp(), neither of which touch state.karma).
+  // updateMath() is the one function every one of those paths already calls,
+  // so it is the single correct hook point (moved here from loadUI(), which
+  // none of those paths call) — Protocol 27: reproduced live via Playwright
+  // before fixing; a slider drag left the board stale until the debounced
+  // save eventually re-synced state.karma, which loadUI() never re-ran to
+  // pick up.
+  if (_isDirty('karma', { k: state.karma, lvl: state.lvl, ctx: state.gameContext }))
+    if (typeof renderKarmaCenter === 'function') renderKarmaCenter(); // G4: FO3 Karma Center
 
   // FEEDBACK ANIMATION WAVE 2 (#17 CAPS ODOMETER SPIN) — caps has no
   // dedicated drag setter like hp/xp/rads, so this reads the one real #c_caps

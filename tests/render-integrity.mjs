@@ -558,9 +558,21 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
     // isn't aria-hidden decoration). This does not weaken real findings:
     // any control whose own direct text IS what's on screen (e.g. the
     // status-effect purge button's "✕") is unaffected.
+    // Protocol 42 fix (found verifying the FO3 Karma Engine unit): the SAME
+    // NON_TEXT_INPUT_TYPES false positive already fixed above for the
+    // truncation `texts` pass (and separately for GLASS MONOCHROME GREEN)
+    // was never applied to THIS check's own independent hasOwnText — a
+    // type=range slider's `.value` (e.g. #stat_karma's "0") is never a
+    // rendered glyph, so its inherited/default `color` was being probed for
+    // contrast against nothing anyone actually sees. #stat_karma newly
+    // failed here once the FO3 Karma Center's action picker made its board
+    // reachable at desktop widths for the first time — harness-only, no
+    // shipped defect (the slider itself is visibly fine; confirmed live).
     const hasOwnText =
       [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().length > 0) ||
-      ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && String(el.value || '').length > 0);
+      ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') &&
+        !(el.tagName === 'INPUT' && NON_TEXT_INPUT_TYPES.has(el.type)) &&
+        String(el.value || '').length > 0);
     if (hasOwnText) {
       const fg = parseRgb(cs.color);
       const bg = solidBg(el);

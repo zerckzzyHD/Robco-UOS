@@ -181,22 +181,119 @@ function renderFactionRep() {
   }
 }
 
-// ── G4: EXPANDED KARMA SYSTEM (FO3) ─────────────────────────────
+// ── G4/KARMA ENGINE: EXPANDED KARMA SYSTEM (FO3) ────────────────────────
 // When gameContext === 'FO3': Karma Center appendix shown inside BUS-09
 // KARMA ALIGNMENT (Phase 3 OPERATOR batch 3 — the board itself is now
 // universal; only this nested block is FO3-only, per usesKarmaCenter).
-// Thresholds: Very Evil (<-750) / Evil (<-250) / Neutral / Good (>250) / Very Good (>750).
-// Differentiated by text labels and brightness — no multi-color.
 //
-// Owner fix (FO3 duplicate-readout report): a game either presents karma via
-// the swing-needle readout (#karmaNeedleReadout — NV, and any future non-
-// KarmaCenter game) OR the Karma Center appendix (usesKarmaCenter — FO3),
-// never both. The stat_karma slider itself is NEVER hidden — it's the one
-// editable control for every game (Protocol 22); only the READOUT half is
-// gated, purely on the existing usesKarmaCenter flag (Protocol 38, no game
-// literal). karma_label/updateKarmaUI keep writing into the needle readout's
-// DOM regardless of its visibility, so the FO3 slider still updates state
-// and the Karma Center title/readout below (both driven off state.karma).
+// Karma Engine rebuild (Protocol 8 Stage 2, 2026-07-15): the deterministic,
+// offline, zero-AI engine below replaces the old hardcoded ENCLAVE HIT SQUAD
+// fabrication + the flat karmaCompanions buckets with the real, cited FO3
+// karma system — hit squads, 8 companions, 90 level-scaled titles, and an
+// action-driven karma-event picker. All data lives in GAME_DEFS.FO3.karma
+// (state.js), transcribed from planning/KARMA_DATA.md (Protocol 3). Every
+// function below is pure over (karma, lvl) + _activeDef().karma —
+// game-agnostic by construction (Protocol 38); NV (usesKarmaCenter: false)
+// never calls any of it.
+//
+// Owner fix (FO3 duplicate-readout report, kept from the prior reskin): a
+// game either presents karma via the swing-needle readout
+// (#karmaNeedleReadout — NV, and any future non-KarmaCenter game) OR the
+// Karma Center appendix (usesKarmaCenter — FO3), never both. The stat_karma
+// slider itself is NEVER hidden — it's the one editable control for every
+// game (Protocol 22) and remains the manual override; only the READOUT half
+// is gated, purely on the existing usesKarmaCenter flag (Protocol 38, no
+// game literal). karma_label/updateKarmaUI keep writing into the needle
+// readout's DOM regardless of its visibility, so the FO3 slider still
+// updates state and the Karma Center below (both driven off state.karma).
+
+// FO3-specific band display labels, index-aligned to the shipped
+// _KARMA_TIERS breakpoints (js/ui/ui-core-cmd.js) — reuses the SAME
+// thresholds (Protocol 22, no new breakpoint definition; a lookup table with
+// no numeric thresholds of its own is not a second breakpoint definition),
+// but corrects the display text for the top band: _KARMA_TIERS[4].label is
+// "Messiah" — an FO3 level-30 karma TITLE, not a band name, and a known,
+// flagged mislabel (planning/KARMA_ENGINE_PLAN.md's "adjacent quirk" note)
+// that today only reaches the NV swing-needle, which FO3 hides. Reusing that
+// label verbatim on this NEW FO3-visible board would both misname the band
+// AND collide with the Title line below (which independently shows
+// "Messiah" as the real level-30 good title) — reintroducing exactly the
+// kind of redundant readout this unit exists to remove (F9). src: fallout.wiki
+// "Karma (Fallout 3)" ("Very Good: +750 to +1000" — the correct band name).
+const _FO3_KARMA_BAND_LABELS = ['Very Evil', 'Evil', 'Neutral', 'Good', 'Very Good'];
+function getKarmaTier(karma) {
+  const idx = _KARMA_TIERS.findIndex(t => t.test(karma));
+  const i = idx === -1 ? 2 : idx;
+  return { label: _FO3_KARMA_BAND_LABELS[i], test: _KARMA_TIERS[i].test };
+}
+
+// 3-way title alignment — distinct from the 5-band tier above (do not
+// conflate). Very Good + Good -> 'good'; Neutral -> 'neutral'; Very Evil +
+// Evil -> 'bad'. Thresholds match the universal karma-scale convention
+// (-250/+250) already used throughout this file.
+function getTitleAlignment(karma) {
+  if (karma >= 250) return 'good';
+  if (karma <= -250) return 'bad';
+  return 'neutral';
+}
+
+// The level-scaled karma title — the single most FO3-specific karma fact,
+// modeled for the first time here. Clamps state.lvl (app cap 50) down to the
+// title table's own cap (30) so levels 31-50 resolve to the level-30 title
+// instead of undefined.
+function getKarmaTitle(karma, lvl) {
+  const karmaDef = _activeDef().karma || {};
+  const titles = karmaDef.titles || {};
+  const align = getTitleAlignment(karma);
+  const maxLevel = karmaDef.titleMaxLevel || 30;
+  const idx = Math.max(1, Math.min(lvl || 1, maxLevel)) - 1;
+  const table = titles[align];
+  const title = Array.isArray(table) ? table[idx] : null;
+  return title || getKarmaTier(karma).label;
+}
+
+// The correct FO3 hunter factions (replaces the invented ENCLAVE HIT SQUAD):
+// Regulators hunt at evil karma, Talon Company hunts at good karma — good
+// karma also gets you hunted, which the old shipped code never modeled.
+// Data-driven from GAME_DEFS.FO3.karma.hitSquads, never a literal faction
+// name here.
+function getKarmaHitSquad(karma) {
+  const hitSquads = (_activeDef().karma || {}).hitSquads || [];
+  if (karma <= -250) return hitSquads.find(h => h.alignment === 'evil') || null;
+  if (karma >= 250) return hitSquads.find(h => h.alignment === 'good') || null;
+  return null;
+}
+
+// Partitions the 8 companions by karma eligibility — 'none' always
+// available; 'good'/'neutral'/'evil' available when karma is in that band.
+function getKarmaCompanions(karma) {
+  const companions = (_activeDef().karma || {}).companions || [];
+  const align = karma >= 250 ? 'good' : karma <= -250 ? 'evil' : 'neutral';
+  return companions.filter(c => c.karmaReq === 'none' || c.karmaReq === align);
+}
+
+// Applies one cited karma-event delta (the action picker's apply button).
+// Guards delta == null — UNVERIFIED events are non-applicable, never a
+// guessed number. Clamps ±1000 and keeps the slider (the manual override)
+// and the board in sync through the same single path (Protocol 22).
+function applyKarmaEvent(eventId) {
+  const karmaDef = _activeDef().karma || {};
+  const events = karmaDef.events || [];
+  const ev = events.find(e => e.id === eventId);
+  if (!ev || ev.delta == null) return;
+  state.karma = Math.max(-1000, Math.min(1000, (state.karma || 0) + ev.delta));
+  const slider = document.getElementById('stat_karma');
+  if (slider) slider.value = state.karma;
+  saveState();
+  if (typeof updateKarmaUI === 'function') updateKarmaUI();
+  renderKarmaCenter();
+}
+
+// The board, rebuilt (Protocol 22 — extends the existing renderKarmaCenter,
+// no parallel renderer): ACTION PICKER -> TITLE -> NUMBER/BAND -> UNLOCKS.
+// The tier word now appears exactly once, on the Number/Band line (F9 fix —
+// the slider-side needle readout stays hidden on FO3 as before and no
+// longer duplicates it here).
 function renderKarmaCenter() {
   const block = document.getElementById('karmaCenterBlock');
   const needleReadout = document.getElementById('karmaNeedleReadout');
@@ -205,56 +302,72 @@ function renderKarmaCenter() {
   const usesKarmaCenter = _activeDef().usesKarmaCenter;
   if (block) block.style.display = usesKarmaCenter ? '' : 'none';
   if (needleReadout) needleReadout.style.display = usesKarmaCenter ? 'none' : '';
+  if (!usesKarmaCenter) return;
 
   const karma = state.karma || 0;
-  let label, opacity, hitSquad;
-  if (karma <= -750) {
-    label = 'VERY EVIL';
-    opacity = 1.0;
-    hitSquad = true;
-  } else if (karma <= -250) {
-    label = 'EVIL';
-    opacity = 0.85;
-    hitSquad = false;
-  } else if (karma < 250) {
-    label = 'NEUTRAL';
-    opacity = 0.65;
-    hitSquad = false;
-  } else if (karma < 750) {
-    label = 'GOOD';
-    opacity = 0.85;
-    hitSquad = false;
-  } else {
-    label = 'VERY GOOD';
-    opacity = 1.0;
-    hitSquad = false;
-  }
-
+  const lvl = state.lvl || 1;
+  const tier = getKarmaTier(karma);
+  const title = getKarmaTitle(karma, lvl);
+  const hitSquad = getKarmaHitSquad(karma);
+  const companions = getKarmaCompanions(karma);
+  const karmaDef = _activeDef().karma || {};
+  const events = Array.isArray(karmaDef.events) ? karmaDef.events : [];
   const barPct = Math.max(0, Math.min(100, ((karma + 1000) / 2000) * 100));
-  let html = `
-    <div style="text-align:center;font-size:18px;letter-spacing:3px;filter:brightness(${opacity + 0.4});padding:6px 0;">${label}</div>
+
+  // ── Action picker — filterable tracker-row list (Protocol UI-3), reusing
+  // the #notesSearch-style filter-input pattern (Protocol 22). The filter
+  // input itself is static markup outside this innerHTML region so it never
+  // loses focus/cursor position on re-render (see #karmaEventFilter in
+  // index.html).
+  const filterEl = document.getElementById('karmaEventFilter');
+  const q = (filterEl ? filterEl.value : '').trim().toLowerCase();
+  const shownEvents = events.filter(e => !q || e.label.toLowerCase().includes(q));
+  const eventRowHtml = e => {
+    const disabled = e.delta == null;
+    const badge = disabled ? 'UNVERIFIED' : (e.delta > 0 ? '+' : '') + e.delta;
+    const cls =
+      'tracker-row tracker-toggle karma-event-row ' +
+      (disabled ? 'tracker-toggle--inactive' : 'tracker-toggle--active');
+    const label = escapeHtml(e.label);
+    const metaText = disabled
+      ? 'value unverified — wiki gives no exact figure'
+      : e.repeatable
+        ? 'repeatable'
+        : 'one-time';
+    return (
+      `<button class="${cls}" ${disabled ? 'disabled' : ''} onclick="applyKarmaEvent('${e.id}')" ` +
+      `aria-label="${label} (${badge})${disabled ? ' — value unverified, cannot apply' : ' — apply'}">` +
+      `${label}<span class="tracker-meta">${escapeHtml(metaText)} &middot; ${badge}</span>` +
+      `</button>`
+    );
+  };
+  let html = `<div class="kc-events">`;
+  html += shownEvents.length
+    ? shownEvents.map(eventRowHtml).join('')
+    : emptyState('NO ACTIONS MATCH THIS FILTER');
+  html += `</div>`;
+
+  // ── Title line — the level-scaled FO3-specific title.
+  html += `<div class="kc-title-line">${escapeHtml(title)}</div>`;
+
+  // ── Number/band — the ONLY place the tier word appears on this board now.
+  html += `
+    <div style="text-align:center;font-size:16px;letter-spacing:3px;padding:4px 0;">${escapeHtml(tier.label.toUpperCase())}</div>
     <div style="font-size:11px;opacity:0.6;text-align:center;margin-bottom:6px;">KARMA: ${karma > 0 ? '+' : ''}${karma}</div>
     <div style="background:rgba(var(--robco-green-rgb),0.1);height:4px;border-radius:2px;margin:0 0 8px;">
       <div style="height:4px;width:${barPct}%;background:var(--robco-green);border-radius:2px;transition:width 0.4s;"></div>
     </div>`;
 
+  // ── Unlocks — hit-squad warning (correct faction + contract, both
+  // directions) and companion availability.
   if (hitSquad) {
-    html += `<div style="font-size:10px;letter-spacing:1px;opacity:0.8;border:1px dashed rgba(255,80,80,0.6);padding:4px 6px;margin-bottom:6px;">[!] ENCLAVE HIT SQUAD RISK</div>`;
+    html += `<div style="font-size:10px;letter-spacing:1px;opacity:0.8;border:1px dashed rgba(255,80,80,0.6);padding:4px 6px;margin-bottom:6px;">[!] ${escapeHtml(hitSquad.faction.toUpperCase())} RISK &mdash; ${escapeHtml(hitSquad.contract.toUpperCase())}</div>`;
+  } else {
+    html += `<div style="font-size:10px;opacity:0.5;margin-bottom:6px;">NO BOUNTY ACTIVE</div>`;
   }
 
-  // Companion availability notes based on karma — roster is per-game DATA
-  // (Protocol 38), never a hardcoded literal here; see GAME_DEFS.FO3.karmaCompanions.
-  const companions = _activeDef().karmaCompanions;
-  if (companions) {
-    html += `<div style="font-size:10px;opacity:0.55;margin-top:4px;">`;
-    if (karma >= 250) {
-      html += `COMPANIONS: ${companions.good} available`;
-    } else if (karma <= -250) {
-      html += `COMPANIONS: ${companions.evil} available`;
-    } else {
-      html += `COMPANIONS: ${companions.neutral} available`;
-    }
-    html += `</div>`;
+  if (companions.length) {
+    html += `<div style="font-size:10px;opacity:0.55;margin-top:4px;">COMPANIONS AVAILABLE: ${escapeHtml(companions.map(c => c.name).join(', '))}</div>`;
   }
 
   display.innerHTML = html;

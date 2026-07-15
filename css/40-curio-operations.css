@@ -841,6 +841,25 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
   color: var(--bezel-wire);
   text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
 }
+/* Karma Engine action picker + title line (Protocol 8 Stage 2). The event
+   rows reuse .tracker-row/.tracker-toggle (Protocol 22 — already ≥28px tap
+   target, css/25-toolbar.css); this only bounds the scroll area and styles
+   the level-scaled title readout. */
+.kc-events {
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  margin-bottom: 8px;
+}
+.kc-title-line {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+  padding: 4px 0 2px;
+}
 
 /* ════════════════════════════════════════════════════════════════════
    PHASE 3 · PIECE 2 — OPERATIONS "quartermaster's freight console"

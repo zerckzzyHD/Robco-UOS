@@ -718,14 +718,19 @@
   [data-game='FO3'] .col-left #opHarnessRadMirror {
     color: var(--robco-green) !important;
   }
-  /* the KARMA CENTER heading only — U10's punch-list is explicit that the
-     karma TIER colours themselves (.k-standing.neut / .tier-lamps
-     .t-neut.cur, css/40-curio-operations.css) are OUT OF SCOPE and stay
-     untouched: those carry real semantic meaning (good/neutral/evil karma
-     standing) that a blanket green-everything pass would destroy by making
-     "neutral" indistinguishable from "good." Only the decorative section
-     heading text is recoloured. */
-  [data-game='FO3'] .col-left .kc-title {
+  /* the KARMA CENTER heading (+ the Karma Engine title-line readout, joined
+     when render-integrity.mjs's GLASS MONOCHROME GREEN check caught it on
+     introduction) — U10's punch-list is explicit that the karma TIER
+     colours themselves (.k-standing.neut / .tier-lamps .t-neut.cur,
+     css/40-curio-operations.css) are OUT OF SCOPE and stay untouched: those
+     carry real semantic meaning (good/neutral/evil karma standing) that a
+     blanket green-everything pass would destroy by making "neutral"
+     indistinguishable from "good." .kc-title-line (the level-scaled karma
+     TITLE, e.g. "Vault Guardian") carries no such semantic color coding —
+     it is decorative heading-style text exactly like .kc-title, so the same
+     recolor applies. */
+  [data-game='FO3'] .col-left .kc-title,
+  [data-game='FO3'] .col-left .kc-title-line {
     color: var(--robco-green);
     text-shadow: var(--robco-glow);
   }
@@ -1854,6 +1859,18 @@
     min-height: 0;
     height: 100%;
     overflow-y: auto;
+  }
+  /* .kc-events (Karma Engine action picker, css/40-curio-operations.css) —
+     the exact same scroll-trap class as Strand 1 above (fixed-px max-height
+     + overscroll-behavior:contain), caught by render-integrity.mjs's Suite
+     5 REACHABLE static guard on introduction — the FO3 Karma Center action
+     picker never existed before this unit, so it was never exercised live.
+     A separate rule (not joined into Strand 1's selector list above) so
+     Suite 227.2's exact-text regression guard on that original fix stays
+     untouched. */
+  [data-game='FO3'] .kc-events {
+    max-height: none;
+    overscroll-behavior: auto;
   }
 
   /* ══ P. THE CASING LEFT/RIGHT COLUMNS (U6 Strand 3, owner: "it is a real

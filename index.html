@@ -2685,6 +2685,21 @@
                     &#9656; KARMA CENTER — VAULT LEGEND INDEX
                     <span class="real-label">(KARMA LEGEND — GAME-SPECIFIC)</span>
                   </div>
+                  <!-- Karma Engine action picker filter (Protocol 8 Stage 2) —
+                     the #notesSearch pattern (Protocol 22): static input OUTSIDE
+                     the innerHTML-replaced #karmaCenterDisplay region so it never
+                     loses focus/cursor while the player types. -->
+                  <div class="tray-head">
+                    <span class="t-title">KARMA ACTIONS</span>
+                    <input
+                      type="search"
+                      id="karmaEventFilter"
+                      placeholder="⌕ FILTER ACTIONS (OPTIONAL)…"
+                      aria-label="Filter karma actions"
+                      maxlength="60"
+                      oninput="renderKarmaCenter()"
+                    />
+                  </div>
                   <div id="karmaCenterDisplay">
                     <span style="opacity: 0.4">[FO3 MODE REQUIRED]</span>
                   </div>

@@ -15139,83 +15139,94 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
+    // All 11 hashes updated together (Karma Engine rebuild, Protocol 8 Stage
+    // 2, v2.9.0): the directive text embeds `${APP_VERSION}` verbatim
+    // (js/services/api-directive.js's persona line), so EVERY row's hash
+    // shifts on any version bump, not just the two FO3 rows whose content
+    // actually changed. The FO3 rows carry an additional, real content
+    // change: ai.irreversibleTriggers was corrected from the fabricated
+    // "Enclave hit squads" / unqualified "Brotherhood Outcasts become
+    // hostile" claims to the real, cited Regulators (-250)/Talon Company
+    // (+250) hunt mechanics — see js/core/state.js and
+    // planning/KARMA_DATA.md. Both are intentional content changes, not
+    // regressions (Protocol 42).
     const GOLDEN_MATRIX = [
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '2fab15de30815451a041e71a48cfb2c5c10830c93302c76f791433fca32b0b13',
+        sha256: '25fd49cfb74b3c7ed84c8fd79cd35254afe3534037989ddfcbcb0a5664872d54',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '4fe38b6130cb6a5aa53b9eaad79d8f0dea044369f5fab4a55ac3f36d275357f3',
+        sha256: '73f6c7455f49e01c48984c4c67b7119b7f0afd9c2eacc4a621ab98a4aacfe861',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: 'c08152e192bc3ca88a8c2cee734c0ffb4e684865e7cc75643012e03820a14a3e',
+        sha256: 'c0fe9352c6fcd759d7d9ac197861e7dc1bbe2797252955fe854184cab307c86f',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'f43a208c6c6e1cdb794d530c5c22353f921176ba22f38ce8025d70bdcc61a498',
+        sha256: 'e787ef849e035d8a6af4f2b6eb441a991451259fb1311c1bb235eb0f702e0bb4',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '5634c2b2c85ad0f848fc269fef7da318f2b9661692d05fb1ea367ae273b5bfe7',
+        sha256: '661fcf57db6ac94f44e19ca7838b0ac47a5b312b4663bc495bee46ea452091fc',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'dda36c2be2bb76069e5e55ca900229a9063b64bc13ba195ec4039250299a9508',
+        sha256: 'a847a204368a3de7e42dfe30302bdc87808591b0e5c146fbbc0d934170446402',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '82ba297d3821af528667f684918a99914311e2ffbac27e2a09a1366250e3a05f',
+        sha256: '7d42137bf48eb50a5f35112ba59400385c2931ceda8012311fdd6555a48ba4ea',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '86e2affd92e0fab06d2b16fbb73a1bee6c770d42903211611dd6cf19e0a83fd1',
+        sha256: '39dc84b3fbe0599aff1a504dc749d90a7226c8ce6e3f4a5b4de3d24163d410cb',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '09a4b018aa2345ee2c22b5f0e7a133b707a6a2b29d270017b51e1d1d9047588f',
+        sha256: 'cd7ad05c353e902c5ed1b520d5978a358777de40773a94094bf9b09fd2d8cdb4',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '670c553882eea505a3e2783a132a3f9afeb87416284db02d48daad3b1b226203',
+        sha256: '69012e8ff8c67c39b4ed0393b7b987ee20e76ba37122b534384043f4ffa1f168',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'dd225f948525b08999b6713a3fb28b76dad344b1007f84aa5d750afbdf93d721',
+        sha256: 'd47b4d9320e6a42f047e67cfee82a3a9e1486e1cda558b883c6e4e011180fb13',
       },
     ];
 
@@ -19156,8 +19167,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         duplicated/hardcoded here too, which would go stale on every
   //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -19606,8 +19617,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        there per the rotation pattern documented at 151.18; kept generic
   //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -20821,10 +20832,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 157.19  APP_VERSION is the released version (bumped at the v2.8.0 dev→release cut; Protocol 2)
+  // 157.19  APP_VERSION reflects the current version (bumped to 2.9.0 for
+  //         the FO3 Karma Engine rebuild — a new user-facing feature, MINOR
+  //         per Protocol 2; not yet released to main).
   assert(
-    /APP_VERSION\s*=\s*'2\.8\.0'/.test(stateSource),
-    '157.19: APP_VERSION is 2.8.0 (released this version)'
+    /APP_VERSION\s*=\s*'2\.9\.0'/.test(stateSource),
+    '157.19: APP_VERSION is 2.9.0 (current dev version)'
   );
 }
 
@@ -21000,8 +21013,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+'/.test(swSource),
-    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
   );
 
   // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
@@ -28016,24 +28029,52 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let fnvOk = false;
     let errMsg187 = '';
     try {
-      const runOnce = usesKarmaCenter => {
+      // Karma Engine rebuild: renderKarmaCenter() now calls the sibling
+      // engine functions (getKarmaTier/getKarmaTitle/getKarmaHitSquad/
+      // getKarmaCompanions) plus escapeHtml/emptyState (ui-core.js) — a
+      // usesKarmaCenter=true run must declare all of them, not just
+      // renderKarmaCenter's own extracted body, or it throws ReferenceError
+      // before ever reaching the display-toggle lines this test proves.
+      const karmaTiersDecl187 = (core187.match(/const _KARMA_TIERS = \[[\s\S]*?\];/) || [''])[0];
+      const bandLabelsDecl187 = (render187.match(
+        /const _FO3_KARMA_BAND_LABELS = \[[\s\S]*?\];/
+      ) || [''])[0];
+      const emptyKarmaData187 = {
+        hitSquads: [],
+        companions: [],
+        titles: { good: [], neutral: [], bad: [] },
+        events: [],
+        titleMaxLevel: 30,
+      };
+      const runOnce = (usesKarmaCenter, karmaData) => {
         const dom = makeKarmaDom187();
         const sandbox = {
           document: dom,
-          state: { karma: 0 },
-          _activeDef: () => ({ usesKarmaCenter }),
+          state: { karma: 0, lvl: 1 },
+          _activeDef: () => ({ usesKarmaCenter, karma: karmaData }),
+          escapeHtml: s => String(s),
+          emptyState: msg => '<span class="empty-state">' + msg + '</span>',
           console,
         };
         vm.createContext(sandbox);
-        vm.runInContext(declareFn187(render187, 'renderKarmaCenter'), sandbox);
+        vm.runInContext(karmaTiersDecl187, sandbox);
+        vm.runInContext(bandLabelsDecl187, sandbox);
+        [
+          'getKarmaTier',
+          'getTitleAlignment',
+          'getKarmaTitle',
+          'getKarmaHitSquad',
+          'getKarmaCompanions',
+          'renderKarmaCenter',
+        ].forEach(fn => vm.runInContext(declareFn187(render187, fn), sandbox));
         vm.runInContext('renderKarmaCenter()', sandbox);
         return dom._registry;
       };
-      const fo3Reg = runOnce(true);
+      const fo3Reg = runOnce(true, emptyKarmaData187);
       fo3Ok =
         fo3Reg.get('karmaCenterBlock').style.display === '' &&
         fo3Reg.get('karmaNeedleReadout').style.display === 'none';
-      const fnvReg = runOnce(false);
+      const fnvReg = runOnce(false, null);
       fnvOk =
         fnvReg.get('karmaCenterBlock').style.display === 'none' &&
         fnvReg.get('karmaNeedleReadout').style.display === '';
@@ -28047,38 +28088,47 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 187.9d  Protocol 38 fix: the Karma Center's companion-availability roster
-  //         is per-game DATA (GAME_DEFS.FO3.karmaCompanions), never a
-  //         hardcoded literal in feature code. renderKarmaCenter()'s body
-  //         must read _activeDef().karmaCompanions and must NOT contain any
-  //         of the FO3 companion names as string literals.
-  assert(
-    /_activeDef\(\)\.karmaCompanions/.test(karmaCenterBody187) &&
-      !/Dogmeat|Fawkes|Star Paladin Cross|Clover|Jericho|Charon|Sergeant RL-3/.test(
-        karmaCenterBody187
-      ),
-    '187.9d: renderKarmaCenter() reads companion names from _activeDef().karmaCompanions, not a hardcoded FO3 literal (Protocol 38)'
-  );
+  // 187.9d  Karma Engine rebuild (Protocol 8 Stage 2): the Karma Center's
+  //         companion-availability roster is per-game DATA
+  //         (GAME_DEFS.FO3.karma.companions), never a hardcoded literal in
+  //         feature code. getKarmaCompanions() must read _activeDef().karma
+  //         and neither it nor renderKarmaCenter() may contain any of the 8
+  //         FO3 companion names as string literals.
+  {
+    const getCompanionsBody187 = extractFunctionBody(render187, 'getKarmaCompanions');
+    assert(
+      /_activeDef\(\)\.karma/.test(getCompanionsBody187) &&
+        !/Dogmeat|Fawkes|Star Paladin Cross|Clover|Jericho|Charon|Sergeant RL-3|Butch DeLoria/.test(
+          getCompanionsBody187 + karmaCenterBody187
+        ),
+      '187.9d: getKarmaCompanions() reads the roster from _activeDef().karma, and neither it nor renderKarmaCenter() hardcodes an FO3 companion name (Protocol 38)'
+    );
+  }
 
-  // 187.9e  GAME_DEFS.FO3.karmaCompanions carries the real roster as data
-  //         (good/evil/neutral tiers), and the field lives on state.js's
-  //         FO3 def specifically — this is a per-game DEFINITION entry
-  //         (GAME_DEFS), not a Protocol 4 `state` field.
+  // 187.9e  GAME_DEFS.FO3.karma.companions carries the real 8-companion
+  //         roster with the corrected gate classes (Dogmeat/Charon: none;
+  //         Fawkes/Star Paladin Cross: good; Butch DeLoria/Sergeant RL-3:
+  //         neutral; Clover/Jericho: evil) — this is a per-game DEFINITION
+  //         entry (GAME_DEFS), not a Protocol 4 `state` field.
   const fo3DefBlockM187 = stateSource.match(/FO3:\s*\{[\s\S]*?\n {2}FO4:/);
   const fo3DefBlock187 = fo3DefBlockM187 ? fo3DefBlockM187[0] : '';
   assert(
-    /karmaCompanions:\s*\{[\s\S]*?good:\s*'Dogmeat, Fawkes, Star Paladin Cross'[\s\S]*?evil:\s*'Clover, Jericho'[\s\S]*?neutral:\s*'Charon, Sergeant RL-3'/.test(
-      fo3DefBlock187
-    ),
-    '187.9e: GAME_DEFS.FO3.karmaCompanions carries the good/evil/neutral companion roster as data'
+    /name:\s*'Dogmeat',\s*\n\s*karmaReq:\s*'none'/.test(fo3DefBlock187) &&
+      /name:\s*'Charon',\s*\n\s*karmaReq:\s*'none'/.test(fo3DefBlock187) &&
+      /name:\s*'Fawkes',\s*\n\s*karmaReq:\s*'good'/.test(fo3DefBlock187) &&
+      /name:\s*'Star Paladin Cross',\s*\n\s*karmaReq:\s*'good'/.test(fo3DefBlock187) &&
+      /name:\s*'Butch DeLoria',\s*\n\s*karmaReq:\s*'neutral'/.test(fo3DefBlock187) &&
+      /name:\s*'Sergeant RL-3',\s*\n\s*karmaReq:\s*'neutral'/.test(fo3DefBlock187) &&
+      /name:\s*'Clover',\s*\n\s*karmaReq:\s*'evil'/.test(fo3DefBlock187) &&
+      /name:\s*'Jericho',\s*\n\s*karmaReq:\s*'evil'/.test(fo3DefBlock187),
+    '187.9e: GAME_DEFS.FO3.karma.companions carries all 8 companions with the corrected gate classes (Dogmeat/Charon=none, Fawkes/Cross=good, Butch/RL-3=neutral, Clover/Jericho=evil)'
   );
 
-  // 187.9f  Behavioral (VM sandbox, real DOM stub + real GAME_DEFS data):
-  //         renderKarmaCenter() run at each karma tier, sourcing the REAL
-  //         GAME_DEFS.FO3.karmaCompanions data (loaded from the real
-  //         state.js, not a hand-written stub), produces the correct
-  //         companion text — proves the data plumbing end-to-end, not just
-  //         that the literals are absent from the render body.
+  // 187.9f  Behavioral (VM sandbox, real GAME_DEFS data): getKarmaCompanions()
+  //         run at each karma tier, sourcing the REAL GAME_DEFS.FO3.karma
+  //         data (loaded from the real state.js, not a hand-written stub),
+  //         partitions the roster correctly — proves the data plumbing
+  //         end-to-end, not just that the literals are absent.
   {
     const vm = require('vm');
     let tiersOk187 = false;
@@ -28087,19 +28137,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       const stateSandbox187 = { window: {} };
       vm.createContext(stateSandbox187);
       vm.runInContext(stateSource, stateSandbox187);
-      const realKarmaCompanions187 = vm.runInContext(
-        'GAME_DEFS.FO3.karmaCompanions',
-        stateSandbox187
-      );
+      const realKarma187 = vm.runInContext('GAME_DEFS.FO3.karma', stateSandbox187);
 
-      function makeKarmaDom187f() {
-        const registry = new Map();
-        ['karmaCenterBlock', 'karmaNeedleReadout', 'karmaCenterDisplay'].forEach(id =>
-          registry.set(id, { style: {}, innerHTML: '' })
-        );
-        return { getElementById: id => registry.get(id) || null, _registry: registry };
-      }
-      // Local copy — 187.9c's declareFn187 is scoped to its own block.
       function declareFn187f(src, name) {
         const nameIdx = src.indexOf('function ' + name);
         const parenIdx = src.indexOf('(', nameIdx);
@@ -28108,31 +28147,35 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         return 'function ' + name + params + extractFunctionBody(src, name);
       }
       const runAt = karmaVal => {
-        const dom = makeKarmaDom187f();
         const sandbox = {
-          document: dom,
-          state: { karma: karmaVal },
-          _activeDef: () => ({ usesKarmaCenter: true, karmaCompanions: realKarmaCompanions187 }),
-          console,
+          _activeDef: () => ({ karma: realKarma187 }),
         };
         vm.createContext(sandbox);
-        vm.runInContext(declareFn187f(render187, 'renderKarmaCenter'), sandbox);
-        vm.runInContext('renderKarmaCenter()', sandbox);
-        return dom._registry.get('karmaCenterDisplay').innerHTML;
+        vm.runInContext(declareFn187f(render187, 'getKarmaCompanions'), sandbox);
+        return vm.runInContext(`getKarmaCompanions(${karmaVal})`, sandbox).map(c => c.name);
       };
-      const goodHtml = runAt(500);
-      const evilHtml = runAt(-500);
-      const neutralHtml = runAt(0);
+      const goodNames = runAt(500);
+      const evilNames = runAt(-500);
+      const neutralNames = runAt(0);
       tiersOk187 =
-        goodHtml.includes(realKarmaCompanions187.good) &&
-        evilHtml.includes(realKarmaCompanions187.evil) &&
-        neutralHtml.includes(realKarmaCompanions187.neutral);
+        goodNames.includes('Dogmeat') &&
+        goodNames.includes('Charon') &&
+        goodNames.includes('Fawkes') &&
+        goodNames.includes('Star Paladin Cross') &&
+        !goodNames.includes('Clover') &&
+        evilNames.includes('Clover') &&
+        evilNames.includes('Jericho') &&
+        !evilNames.includes('Fawkes') &&
+        neutralNames.includes('Butch DeLoria') &&
+        neutralNames.includes('Sergeant RL-3') &&
+        !neutralNames.includes('Clover') &&
+        !neutralNames.includes('Fawkes');
     } catch (e) {
       errMsg187f = e && e.message;
     }
     assert(
       tiersOk187,
-      '187.9f: [behavioral] renderKarmaCenter() sources the REAL GAME_DEFS.FO3.karmaCompanions data end-to-end — good/evil/neutral tiers render the correct roster' +
+      '187.9f: [behavioral] getKarmaCompanions() sources the REAL GAME_DEFS.FO3.karma.companions data end-to-end — good/evil/neutral tiers partition the correct roster, Dogmeat/Charon always included' +
         (errMsg187f ? ' — error: ' + errMsg187f : '')
     );
   }
@@ -41687,12 +41730,27 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         see 224.13). Every OTHER file on the list below stays held to
   //         the strict byte-identical bar.
   {
+    // Protocol 42 fix (discovered while verifying an unrelated later unit,
+    // the FO3 Karma Engine rebuild): this originally diffed against the
+    // literal string 'HEAD', which only proved "U2 touched nothing" for the
+    // ONE commit where U2 itself was being verified pre-commit — once U2
+    // merged, HEAD moved past it, and the check silently became "has
+    // anything changed these files since the most recent commit," a
+    // permanent trap that fails on ANY later, unrelated, legitimate change
+    // to any of the 8 files (exactly what happened here: the Karma Engine
+    // unit added CSS to css/40-curio-operations.css, a fully disclosed,
+    // in-scope change with no relation to U2). Pinning the diff to U2's own
+    // commit (against its parent) makes this a permanent, meaningful,
+    // point-in-time proof — "U2 introduced zero byte changes to these
+    // files" — that stays true forever, instead of a moving goalpost that
+    // blocks all future work on these files.
+    const U2_COMMIT_224 = '95c5b1f';
     let gitDiffOut224 = '';
     let gitErr224 = null;
     try {
       gitDiffOut224 = require('child_process')
         .execSync(
-          'git diff --stat HEAD -- css/05-base.css css/15-overseer.css ' +
+          `git diff --stat ${U2_COMMIT_224}^ ${U2_COMMIT_224} -- css/05-base.css css/15-overseer.css ` +
             'css/20-diagnostic-shell.css css/30-modulebay.css ' +
             'css/40-curio-operations.css ' +
             'css/50-chassis.css css/55-feedback-animations.css css/99-mobile.css',
@@ -41702,12 +41760,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     } catch (e) {
       gitErr224 = e;
     }
-    // Only meaningful when this unit's own changes are already staged/committed
-    // (a fresh, un-committed working tree at HEAD would trivially show empty
-    // too) — the assertion is intentionally lenient (skips rather than fails)
-    // when git itself is unavailable, since this check is a bonus proof on
-    // top of 224.3's structural [data-game='FO3']-scoping guarantee below,
-    // not the sole line of defense.
+    // Skips rather than fails when git/the pinned commit is unavailable
+    // (e.g. a shallow clone) — this check is a bonus proof on top of
+    // 224.3's structural [data-game='FO3']-scoping guarantee below, not the
+    // sole line of defense.
     assert(
       gitErr224 !== null || gitDiffOut224 === '',
       '224.2: git diff --stat confirms zero bytes changed in any of the 8 pre-existing CSS files besides the four declared U7 exceptions (NV-unchanged, mechanically verified against the git index)' +
@@ -43358,6 +43414,386 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   } catch (e) {
     fail('229.8: [behavioral] threw — ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 230 — FO3 Karma Engine: Protocol 3 citation guard + deterministic
+//  engine behavior (Protocol 8 Stage 2 build, 2026-07-15).
+//  The chokepoint that makes the invented "ENCLAVE HIT SQUAD" class of
+//  defect un-recurrable: every karma constant must carry a structured `src`
+//  citing fallout.wiki, UNVERIFIED/CONFLICT entries must ship numeric fields
+//  as null, and the exact invented faction can never come back. Plus
+//  behavioral proof of the five deterministic engine functions
+//  (getKarmaTier/getTitleAlignment/getKarmaTitle/getKarmaHitSquad/
+//  applyKarmaEvent) sourced from the REAL GAME_DEFS.FO3.karma data.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 230 — FO3 Karma Engine: Protocol 3 citation guard + engine behavior');
+
+  const vm230 = require('vm');
+  function loadRealKarma230() {
+    const sandbox = { window: {} };
+    vm230.createContext(sandbox);
+    vm230.runInContext(stateSource, sandbox);
+    return vm230.runInContext('GAME_DEFS.FO3.karma', sandbox);
+  }
+  const realKarma230 = loadRealKarma230();
+
+  // 230.1 — the KARMA-DATA-GUARD:BEGIN/END markers exist in state.js,
+  //         bounding the whole cited dataset for a coarse region grep.
+  assert(
+    /KARMA-DATA-GUARD:BEGIN/.test(stateSource) && /KARMA-DATA-GUARD:END/.test(stateSource),
+    '230.1: state.js carries the KARMA-DATA-GUARD:BEGIN/END markers around the cited karma dataset'
+  );
+
+  // The citation-guard validator — the actual chokepoint logic. Returns a
+  // list of violation strings; empty means the dataset is clean. This same
+  // function is run against the REAL data (230.3) and a deliberately
+  // corrupted fixture (230.2) to prove it fails red and passes green.
+  function _validateKarmaCitations(karma) {
+    const violations = [];
+    const isCited = src => typeof src === 'string' && /fallout\.wiki/.test(src);
+    const UNVERIFIED = new Set(['unverified', 'conflict']);
+
+    (karma.hitSquads || []).forEach((h, i) => {
+      if (!isCited(h.src))
+        violations.push(`hitSquads[${i}] (${h.faction}) missing fallout.wiki src`);
+      if (/enclave/i.test(h.faction || ''))
+        violations.push(`hitSquads[${i}] names an Enclave faction`);
+      if (UNVERIFIED.has(h.verificationStatus)) {
+        if (h.spawnFrequency !== null)
+          violations.push(
+            `hitSquads[${i}] (${h.faction}) is ${h.verificationStatus} but spawnFrequency !== null`
+          );
+        if (h.squadSize !== null && h.verificationStatus !== 'verified')
+          violations.push(
+            `hitSquads[${i}] (${h.faction}) is ${h.verificationStatus} but squadSize !== null`
+          );
+      }
+    });
+
+    (karma.companions || []).forEach((c, i) => {
+      if (!isCited(c.src)) violations.push(`companions[${i}] (${c.name}) missing fallout.wiki src`);
+    });
+
+    if (!isCited(karma.titlesSrc)) violations.push('titlesSrc missing fallout.wiki citation');
+
+    (karma.events || []).forEach((e, i) => {
+      if (!isCited(e.src)) violations.push(`events[${i}] (${e.id}) missing fallout.wiki src`);
+      if (UNVERIFIED.has(e.verificationStatus) && e.delta !== null)
+        violations.push(`events[${i}] (${e.id}) is ${e.verificationStatus} but delta !== null`);
+    });
+
+    const regulators = (karma.hitSquads || []).find(h => h.faction === 'Regulators');
+    const talon = (karma.hitSquads || []).find(h => h.faction === 'Talon Company');
+    if (!regulators || regulators.threshold !== -250)
+      violations.push('Regulators missing or not at threshold -250');
+    if (!talon || talon.threshold !== 250)
+      violations.push('Talon Company missing or not at threshold 250');
+
+    return violations;
+  }
+
+  // 230.2 — RED: a deliberately corrupted fixture (un-cited hit-squad entry,
+  //         a fabricated Enclave faction, and an unverified event shipping a
+  //         non-null delta) must fail every one of the three checks it
+  //         breaks. Proves the guard actually catches the class of defect it
+  //         exists to prevent — not just that it passes on already-clean data.
+  {
+    const brokenKarma230 = {
+      hitSquads: [
+        { faction: 'Enclave', alignment: 'evil', threshold: -750, src: '' },
+        { faction: 'Talon Company', alignment: 'good', threshold: 250, src: 'fallout.wiki "x"' },
+      ],
+      companions: [
+        { name: 'Dogmeat', karmaReq: 'none', src: 'fallout.wiki "Dogmeat (Fallout 3)"' },
+      ],
+      titlesSrc: 'fallout.wiki "Karma (Fallout 3)"',
+      events: [
+        {
+          id: 'fake_event',
+          delta: 999,
+          verificationStatus: 'unverified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+      ],
+    };
+    const violations230 = _validateKarmaCitations(brokenKarma230);
+    assert(
+      violations230.some(v => v.includes('missing fallout.wiki src')) &&
+        violations230.some(v => v.includes('names an Enclave faction')) &&
+        violations230.some(v => v.includes('fake_event') && v.includes('delta !== null')) &&
+        violations230.some(v => v.includes('Regulators missing')),
+      '230.2: [RED] the citation-guard validator flags an un-cited entry, a fabricated Enclave faction, and a non-null delta on an unverified event — ' +
+        JSON.stringify(violations230)
+    );
+  }
+
+  // 230.3 — GREEN: the validator finds ZERO violations against the REAL,
+  //         shipped GAME_DEFS.FO3.karma data — proves the guard passes clean
+  //         data, not just that it can detect broken data.
+  {
+    const violations230b = _validateKarmaCitations(realKarma230);
+    assert(
+      violations230b.length === 0,
+      '230.3: [GREEN] the citation-guard validator finds zero violations in the real GAME_DEFS.FO3.karma data — ' +
+        JSON.stringify(violations230b)
+    );
+  }
+
+  // 230.4 — anti-regression for F1: the invented ENCLAVE HIT SQUAD string
+  //         does not exist ANYWHERE in the shipped karma dataset or the
+  //         render/engine source, and the two real factions sit at the
+  //         correct thresholds.
+  // Local re-read (Suite 187 already defines render187, but suite bodies are
+  // isolated blocks in this runner — re-derive rather than reach across
+  // block scope).
+  const karmaCenterBody230 = extractFunctionBody(readGroup('ui-render'), 'renderKarmaCenter');
+  assert(
+    !/enclave hit squad/i.test(JSON.stringify(realKarma230)) &&
+      !/enclave hit squad/i.test(karmaCenterBody230) &&
+      realKarma230.hitSquads.find(h => h.faction === 'Regulators').threshold === -250 &&
+      realKarma230.hitSquads.find(h => h.faction === 'Talon Company').threshold === 250,
+    '230.4: [anti-regression] no "ENCLAVE HIT SQUAD" string anywhere in the karma data or renderKarmaCenter() — Regulators at -250, Talon Company at +250'
+  );
+
+  // 230.5 — GAME_DEFS.FNV carries no `karma` field at all (Protocol 38 — NV
+  //         never reaches this data; usesKarmaCenter: false gates it out).
+  const fnvDefBlockM230 = stateSource.match(/FNV:\s*\{[\s\S]*?\n {2}FO3:/);
+  const fnvDefBlock230 = fnvDefBlockM230 ? fnvDefBlockM230[0] : '';
+  assert(
+    !/\bkarma:\s*\{/.test(fnvDefBlock230),
+    '230.5: GAME_DEFS.FNV declares no `karma:` data block (Protocol 38 — the FO3 karma dataset never reaches NV)'
+  );
+
+  // 230.6 — the 90-title table is complete: 30 entries per alignment column,
+  //         all three columns present.
+  assert(
+    Array.isArray(realKarma230.titles.good) &&
+      realKarma230.titles.good.length === 30 &&
+      realKarma230.titles.neutral.length === 30 &&
+      realKarma230.titles.bad.length === 30,
+    '230.6: GAME_DEFS.FO3.karma.titles has all 90 entries (30 per Good/Neutral/Bad column)'
+  );
+
+  // 230.7 — the 8 companions carry the corrected gate classes (F5-F8):
+  //         Dogmeat/Charon = none, Fawkes/Star Paladin Cross = good,
+  //         Butch DeLoria/Sergeant RL-3 = neutral, Clover/Jericho = evil.
+  {
+    const byName230 = Object.fromEntries(realKarma230.companions.map(c => [c.name, c.karmaReq]));
+    assert(
+      realKarma230.companions.length === 8 &&
+        byName230['Dogmeat'] === 'none' &&
+        byName230['Charon'] === 'none' &&
+        byName230['Fawkes'] === 'good' &&
+        byName230['Star Paladin Cross'] === 'good' &&
+        byName230['Butch DeLoria'] === 'neutral' &&
+        byName230['Sergeant RL-3'] === 'neutral' &&
+        byName230['Clover'] === 'evil' &&
+        byName230['Jericho'] === 'evil',
+      '230.7: all 8 companions carry the corrected karma gate classes'
+    );
+  }
+
+  // ── Engine function behavior (declared fresh in an isolated sandbox from
+  //    the real source, exercised against the real GAME_DEFS.FO3.karma data
+  //    loaded above) ──
+  function declareFn230(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function makeEngineSandbox230() {
+    const core230 = readGroup('ui-core');
+    const render230 = readGroup('ui-render');
+    const karmaTiersDecl230 = (core230.match(/const _KARMA_TIERS = \[[\s\S]*?\];/) || [''])[0];
+    const bandLabelsDecl230 = (render230.match(/const _FO3_KARMA_BAND_LABELS = \[[\s\S]*?\];/) || [
+      '',
+    ])[0];
+    const sandbox = { _activeDef: () => ({ karma: realKarma230 }) };
+    vm230.createContext(sandbox);
+    vm230.runInContext(karmaTiersDecl230, sandbox);
+    vm230.runInContext(bandLabelsDecl230, sandbox);
+    [
+      'getKarmaTier',
+      'getTitleAlignment',
+      'getKarmaTitle',
+      'getKarmaHitSquad',
+      'getKarmaCompanions',
+    ].forEach(fn => vm230.runInContext(declareFn230(render230, fn), sandbox));
+    return sandbox;
+  }
+
+  // 230.8 — getKarmaTitle(karma, lvl): L1 and L30 across all 3 alignments,
+  //         plus the mandatory L50-clamped-to-30 edge case (app allows level
+  //         50; the title table caps at 30).
+  {
+    const sb230 = makeEngineSandbox230();
+    const title = (karma, lvl) => vm230.runInContext(`getKarmaTitle(${karma}, ${lvl})`, sb230);
+    assert(
+      title(500, 1) === 'Vault Guardian' &&
+        title(0, 1) === 'Vault Dweller' &&
+        title(-500, 1) === 'Vault Delinquent' &&
+        title(500, 30) === 'Messiah' &&
+        title(0, 30) === 'True Mortal' &&
+        title(-500, 30) === 'Devil' &&
+        title(500, 50) === 'Messiah' &&
+        title(500, 31) === 'Messiah',
+      '230.8: [behavioral] getKarmaTitle() returns the correct level-scaled, alignment-scaled title at L1/L30, and clamps L31-50 to the L30 title'
+    );
+  }
+
+  // 230.9 — getKarmaHitSquad(karma): boundary behavior at -250/+250 (Suite
+  //         187.12-style boundary check, extended to the new hit-squad fn).
+  {
+    const sb230b = makeEngineSandbox230();
+    const squad = karma => vm230.runInContext(`getKarmaHitSquad(${karma})`, sb230b);
+    assert(
+      squad(-250).faction === 'Regulators' &&
+        squad(-1000).faction === 'Regulators' &&
+        squad(-249) === null &&
+        squad(250).faction === 'Talon Company' &&
+        squad(1000).faction === 'Talon Company' &&
+        squad(249) === null &&
+        squad(0) === null,
+      '230.9: [behavioral] getKarmaHitSquad() returns Regulators at karma<=-250, Talon Company at karma>=250, null in between — boundary-exact'
+    );
+  }
+
+  // 230.10 — getTitleAlignment(karma): 3-way collapse, distinct from the
+  //          5-band tier (Very Good+Good->good, Neutral->neutral, Very
+  //          Evil+Evil->bad).
+  {
+    const sb230c = makeEngineSandbox230();
+    const align = karma => vm230.runInContext(`getTitleAlignment(${karma})`, sb230c);
+    assert(
+      align(1000) === 'good' &&
+        align(250) === 'good' &&
+        align(249) === 'neutral' &&
+        align(-249) === 'neutral' &&
+        align(-250) === 'bad' &&
+        align(-1000) === 'bad',
+      '230.10: [behavioral] getTitleAlignment() collapses the 5-band scale into good/neutral/bad at the +250/-250 boundaries'
+    );
+  }
+
+  // 230.11 — applyKarmaEvent(): clamps at +/-1000, guards a null-delta
+  //          (UNVERIFIED) event as a no-op, applies a cited delta correctly.
+  {
+    let errMsg230 = '';
+    let ok230 = false;
+    try {
+      const render230b = readGroup('ui-render');
+      const sandbox = {
+        _activeDef: () => ({ karma: realKarma230 }),
+        state: { karma: 990 },
+        document: { getElementById: () => null },
+        saveState: () => {},
+        updateKarmaUI: () => {},
+        renderKarmaCenter: () => {},
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(render230b, 'applyKarmaEvent'), sandbox);
+      // water_to_beggar = +50, cited, verified — 990 + 50 clamps to 1000.
+      vm230.runInContext(`applyKarmaEvent('water_to_beggar')`, sandbox);
+      const afterClamp = vm230.runInContext('state.karma', sandbox);
+      // good_quest_act has delta: null (UNVERIFIED) — must be a no-op.
+      vm230.runInContext(`applyKarmaEvent('good_quest_act')`, sandbox);
+      const afterNoop = vm230.runInContext('state.karma', sandbox);
+      // steal_owned_container = -5, cited, verified.
+      vm230.runInContext('state.karma = -998;', sandbox);
+      vm230.runInContext(`applyKarmaEvent('steal_owned_container')`, sandbox);
+      const afterLowClamp = vm230.runInContext('state.karma', sandbox);
+      ok230 = afterClamp === 1000 && afterNoop === 1000 && afterLowClamp === -1000;
+    } catch (e) {
+      errMsg230 = e && e.message;
+    }
+    assert(
+      ok230,
+      '230.11: [behavioral] applyKarmaEvent() clamps at +/-1000, applies a cited delta correctly, and no-ops on a null-delta UNVERIFIED event' +
+        (errMsg230 ? ' — error: ' + errMsg230 : '')
+    );
+  }
+
+  // 230.12 — Protocol 42 regression (found live via Playwright while
+  //          verifying this unit): updateKarmaUI() now syncs state.karma
+  //          from the slider's own DOM value synchronously. Before this fix,
+  //          state.karma only updated via the DEBOUNCED syncStateFromDom()
+  //          inside saveState() (~500ms later), so renderKarmaCenter()
+  //          (which reads state.karma) rendered stale title/tier/hit-squad/
+  //          companion data for up to half a second after every drag.
+  {
+    const core230b = readGroup('ui-core');
+    const karmaUiBody230 = extractFunctionBody(core230b, 'updateKarmaUI');
+    assert(
+      /state\.karma\s*=\s*k;/.test(karmaUiBody230),
+      '230.12: updateKarmaUI() synchronously writes state.karma from the #stat_karma slider value (no debounce lag before the Karma Center can recompute)'
+    );
+  }
+
+  // 230.13 — Protocol 42 regression: the live-recompute hook lives in
+  //          updateMath() — the ONE function every path that can change
+  //          karma or level actually calls (the slider's oninput chain,
+  //          onLvlInputChanged(), nativeLevelUp()). A prior version of this
+  //          hook lived in loadUI(), which NONE of those paths call, so
+  //          dragging the slider or bumping the level left the Karma
+  //          Center's title/tier/hit-squad/companion readout stale until
+  //          the next full repaint (tab switch, campaign load). loadUI()
+  //          still calls renderKarmaCenter() once too (Suite "P5" — every
+  //          render*() reachable from loadUI(), for the initial paint), but
+  //          the LIVE recompute must be here.
+  {
+    const core230c = readGroup('ui-core');
+    const updateMathBody230 = extractFunctionBody(core230c, 'updateMath');
+    assert(
+      /_isDirty\(\s*'karma'/.test(updateMathBody230) &&
+        /renderKarmaCenter\(\)/.test(updateMathBody230),
+      "230.13: updateMath() — called by the #stat_karma slider's oninput and by both level-change handlers — recomputes the Karma Center via its own karma dirty-check, not just loadUI()"
+    );
+  }
+
+  // 230.14 — [behavioral] end-to-end proof of 230.12+230.13 together: the
+  //          real updateKarmaUI() body, run against a stub DOM whose
+  //          #stat_karma.value differs from state.karma, updates state.karma
+  //          synchronously with no debounce/timer involved.
+  {
+    let errMsg230d = '';
+    let ok230d = false;
+    try {
+      const core230d = readGroup('ui-core-cmd');
+      const sandbox = {
+        state: { karma: -800 },
+        document: {
+          getElementById: id => {
+            if (id === 'stat_karma') return { value: '900' };
+            return null;
+          },
+        },
+        _KARMA_TIERS: [
+          { label: 'Very Evil', test: k => k <= -750 },
+          { label: 'Evil', test: k => k <= -250 },
+          { label: 'Neutral', test: k => k < 250 },
+          { label: 'Good', test: k => k < 750 },
+          { label: 'Messiah', test: () => true },
+        ],
+        _lastKarmaTier: null,
+        RobcoEvents: { emit: () => {} },
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(core230d, 'updateKarmaUI'), sandbox);
+      vm230.runInContext('updateKarmaUI()', sandbox);
+      ok230d = vm230.runInContext('state.karma', sandbox) === 900;
+    } catch (e) {
+      errMsg230d = e && e.message;
+    }
+    assert(
+      ok230d,
+      '230.14: [behavioral] updateKarmaUI() run against a real DOM stub — state.karma synchronously takes on the #stat_karma slider value, no debounce' +
+        (errMsg230d ? ' — error: ' + errMsg230d : '')
+    );
   }
 }
 
