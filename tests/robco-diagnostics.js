@@ -45034,6 +45034,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'Courier Duster': [13, 3, 1700],
     "Ulysses' Duster": [13, 3, 1700],
     'Armor of the 87th Tribe': [22, 35, 6495],
+    "Boone's Beret": [0, 0.1, 40],
+    "Caleb McCaffery's Hat": [0, 0, 0],
+    Fedora: [0, 1, 30],
+    "Jessup's Bandana": [0, 1, 6],
+    'Lucky Shades': [0, 1, 40],
+    "Motor-Runner's Helmet": [2, 0, 8],
+    'Party Hat': [0, 1, 5],
+    'Police Hat': [0, 1, 8],
+    'Suave Gambler Hat': [0, 1, 8],
+    'Tuxedo Hat': [0, 1, 8],
+    "Vance's Lucky Hat": [0, 1, 8],
+    "Vikki's Bonnet": [0, 1, 8],
+    "General Oliver's Uniform": [0, 1, 0],
+    'Naughty Nightwear': [0, 1, 200],
+    'Mysterious Stranger Outfit': [0, 3, 40], // DT held at 0 per WU-D2/Suite 70.15 (the
+    // outfit gives DR 5, not DT; the wiki infobox's DT 55 > power armor is implausible) —
+    // weight/value verified against the FNV page
+
+    '1st Recon Assault Armor': [15, 0, 300],
+    '1st Recon Survival Armor': [15, 0, 300],
   };
   const NV_CHEMS_GOLDEN_232 = {
     Buffout: [20, 0],
@@ -45114,7 +45134,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   };
 
   // 232.16 — [GREEN] db_nv.js ARMOR.CSV DT/Weight/Value match the fallout.wiki
-  //          "Fallout: New Vegas Apparel" master-table pin for the 82 body-armor/
+  //          "Fallout: New Vegas Apparel" master-table pin for the 99 body-armor/
   //          clothing rows that were fully verified on 2026-07-15. Headwear (on a
   //          separate wiki page) + anomalous/unmatched rows are deliberately NOT
   //          pinned (left at prior values, flagged UNVERIFIED in the file header).
@@ -45132,12 +45152,15 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 232.17 — [RED] re-inflating Combat Armor’s value back to the old 3900 must
-  //          fail the armor pin BY NAME — proving the guard catches a wrong armor
-  //          value, not merely that a citation exists.
+  // 232.17 — [RED] re-inflating Combat Armor’s value back to the old 3900 AND
+  //          corrupting a newly-pinned HEADWEAR row (Fedora value) must both fail
+  //          the armor pin BY NAME — proving the guard catches a wrong armor value
+  //          (body armor + the 2026-07-15 headwear additions), not merely that a
+  //          citation exists.
   {
     const broken = { ...nvArmor232 };
     broken['Combat Armor'] = [15, 25, 3900];
+    broken['Fedora'] = [0, 1, 999];
     const drift = pinDrift232(
       NV_ARMOR_GOLDEN_232,
       broken,
@@ -45145,8 +45168,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       'db_nv.js armor'
     );
     assert(
-      drift.some(d => d.includes('Combat Armor') && d.includes('Value') && d.includes('3900')),
-      '232.17: [RED] the armor golden-master flags a re-inflated Combat Armor value (3900) by name — ' +
+      drift.some(d => d.includes('Combat Armor') && d.includes('Value') && d.includes('3900')) &&
+        drift.some(d => d.includes('Fedora') && d.includes('Value') && d.includes('999')),
+      '232.17: [RED] the armor golden-master flags a re-inflated Combat Armor value (3900) and a corrupted headwear (Fedora) value by name — ' +
         JSON.stringify(drift)
     );
   }

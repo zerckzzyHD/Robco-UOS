@@ -24,20 +24,24 @@
 // re-sourced. This file is a typist for wiki data, never an authority that
 // invents or edits Fallout facts.
 //
-// PROTOCOL 3 (ARMOR.CSV + CHEMS.CSV): a second pass on 2026-07-15 re-verified
-// these two tables against the fallout.wiki "Fallout: New Vegas Apparel" and
-// "Fallout: New Vegas Consumables" master tables. ARMOR DT/Weight/Value were
-// corrected for the body-armor/clothing rows the apparel master table covers
-// (82 of 103 rows fully verified); headwear/hats live on a separate page and a
-// handful of rows carry an anomalous or missing master value — those are LEFT
-// AT THEIR PRIOR VALUES and flagged UNVERIFIED, never guessed. ARMOR Type,
-// Effects and Min_CND_Threshold were NOT re-sourced (PARKED display columns —
-// e.g. Chinese Stealth Armor's Effects still reads the FO3 auto-stealth text;
-// the FNV item actually grants only Sneak +5). CHEMS Value + Weight were
-// corrected against the consumables master (most FNV chems weigh 0, not the old
-// 0.5 placeholder); the fabricated "Whiskey Rose" row was removed (it is a Cass
-// companion PERK, not a consumable). CHEMS Effect/Duration/Addiction columns
-// were NOT re-sourced.
+// PROTOCOL 3 (ARMOR.CSV + CHEMS.CSV): re-verified on 2026-07-15 against the
+// fallout.wiki "Fallout: New Vegas Apparel", "Fallout: New Vegas headwear" and
+// "Fallout: New Vegas Consumables" master tables (plus individual item pages for
+// the outliers). ARMOR DT/Weight/Value are verified for 99 of the 103 rows —
+// body armor, clothing AND headwear (the hats live on the separate headwear
+// page; a follow-up pass sourced them). The remaining 4 are LEFT AT THEIR PRIOR
+// VALUES and flagged UNVERIFIED, never guessed: "Wasteland Wanderer Outfit" (a
+// Fallout 3 item, not FNV), "Vault Utility Suit" (no FNV item by that name — the
+// real one is the Vault 3 utility jumpsuit), and "NCR Veteran Ranger Armor" +
+// "Ranger Combat Armor" (duplicate names for the one canonical NCR Ranger combat
+// armor, which is itself already present and verified). ARMOR Type and
+// Min_CND_Threshold were NOT re-sourced (PARKED display columns); the Effects
+// column was left as-authored EXCEPT Chinese Stealth Armor, corrected to the
+// real FNV effect (Sneak +5 — the FNV set has no auto-Stealth-Boy, unlike the
+// FO3 one). CHEMS Value + Weight were corrected against the consumables master
+// (most FNV chems weigh 0, not the old 0.5 placeholder); the fabricated
+// "Whiskey Rose" row was removed (a Cass companion PERK, not a consumable).
+// CHEMS Effect/Duration/Addiction columns were NOT re-sourced.
 //
 // PROTOCOL 3 (BESTIARY.CSV): every creature/NPC name was confirmed a real FNV
 // entity (no fakes, no wrong-game leaks), but the NUMERIC stats were NOT
@@ -354,7 +358,7 @@ Armored Vault 13 Jumpsuit,Light,8,15,70,+5 Barter / +5 Repair,50%
 Armored Vault 21 Jumpsuit,Light,8,15,180,None,50%
 Assassin Suit,Light,14,20,7500,+10 Sneak,50%
 Caesar's Armor,Medium,5,3,1500,+5 Barter / Legion Fame,50%
-Chinese Stealth Armor,Light,12,20,500,+10 Sneak / Auto-Stealth,50%
+Chinese Stealth Armor,Light,12,20,500,+5 Sneak,50%
 Gecko-Backed Leather Armor Reinforced,Light,15,18,2000,None,50%
 Gladiator Armor,Light,12,15,160,None,50%
 Great Khan Armored Leather,Light,8,7,100,None,50%
@@ -380,8 +384,8 @@ NCR Ranger Combat Armor,Medium,20,30,7500,None,50%
 Recon Armor,Medium,17,20,7200,None,50%
 Riot Gear,Medium,20,30,7994,+1 PER,50%
 Van Graff Combat Armor,Medium,16,25,6500,None,50%
-1st Recon Assault Armor,Heavy,15,30,300,+5 Guns,50%
-1st Recon Survival Armor,Heavy,15,30,300,+5 Survival / +5 Medicine,50%
+1st Recon Assault Armor,Heavy,15,0,300,+5 Guns,50%
+1st Recon Survival Armor,Heavy,15,0,300,+5 Survival / +5 Medicine,50%
 Brotherhood T-51b Power Armor,Heavy,25,40,5200,+1 STR / +25 Rad Resist,50%
 Gecko-Backed Metal Armor,Medium,17,33,2000,None,50%
 Legate's Armor,Heavy,15,45,250,+5 Melee / +5 Unarmed,50%
@@ -390,7 +394,7 @@ Remnants Tesla Armor,Heavy,25,45,8200,+10 Energy Resist / +25 Rad Resist,50%
 Scorched Sierra Power Armor,Heavy,24,40,6500,+4 STR / Fire DoT Aura,50%
 T-45d Power Armor,Heavy,22,45,4500,+2 STR,50%
 Tesla Armor,Heavy,20,45,6600,+10 Energy Resist / +25 Rad Resist,50%
-Boone's Beret,Headwear,0,0,40,None,—
+Boone's Beret,Headwear,0,0.1,40,None,—
 Caleb McCaffery's Hat,Headwear,0,0,0,None,—
 Chalk's Headdress,Headwear,1,3,150,Melee Weapons +5,—
 Fedora,Headwear,0,1,30,None,—
