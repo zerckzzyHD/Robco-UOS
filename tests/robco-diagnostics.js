@@ -8762,13 +8762,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 75.3  Regression: {name:'Rebound', type:'weapon'} appears exactly once in reg_nv.js items[]
-  //       (Previously appeared twice due to a copy-paste error — this guards against recurrence)
+  // 75.3  Regression: {name:'Rebound', type:'weapon'} is GONE from reg_nv.js items[].
+  //       Rebound is a Fallout: New Vegas CHEM, never a weapon — the 2026-07-15 NV
+  //       data-provenance correction removed the fabricated weapon entry (and its
+  //       matching db_nv.js WEAPONS.CSV row) while keeping the real Rebound as an
+  //       'aid' entry. (This once guarded a copy-paste duplicate at "exactly once";
+  //       the correct count is now zero — the weapon entry should never exist. The
+  //       real chem's survival is asserted by Suite 232.13.)
   {
     const section = extractItemsSection75(nvSrc75);
     const count = (section.match(/name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'/g) || [])
       .length;
-    assert(count === 1, `reg_nv.js: Rebound weapon entry appears exactly once (found ${count})`);
+    assert(count === 0, `reg_nv.js: fabricated Rebound weapon entry is removed (found ${count})`);
   }
 }
 
@@ -44117,10 +44122,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Weapons" master table (explosives' blast pulled per-page), THEN cited
 //  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
 //  a citation label proves nothing about a value; the pin does.
-//  10 tests
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 232 — FO3 Weapon Data: Protocol 3 golden-master + plausibility guard');
+  header('Suite 232 — FO3 + NV Weapon Data: Protocol 3 golden-master + plausibility guard');
 
   // Parse any db_*.js WEAPONS.CSV block into { name: [base,crit,mult,atk,wt,val] }
   // — the 6 consumed/displayed numeric fields, in code order. Same extraction
@@ -44290,6 +44295,221 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     for (const n of Object.keys(weapons))
       if (!(n in FO3_WEAPON_GOLDEN_232)) drift.push(`${n}: UNPINNED extra weapon in db_fo3.js`);
+    return drift;
+  }
+
+  // The NV golden fixture: every NV weapon's 6 consumed fields, pinned to the
+  // values re-verified against the fallout.wiki "Fallout: New Vegas Weapons"
+  // master table on 2026-07-15 (thrown/placed/launched explosives' blast pulled
+  // from each weapon's own page; see planning/NV_DATA_PROVENANCE.md). Same shape
+  // and field order as the FO3 pin: [Base_Damage, Crit_Damage, Crit_Multiplier,
+  // Attacks_Per_Second, Weight, Value].
+  const NV_WEAPON_GOLDEN_232 = {
+    'Brass Knuckles': [18, 18, 1, 2.0526, 1, 120],
+    'Spiked Knuckles': [25, 25, 1, 2.3684, 1, 500],
+    'Love and Hate': [30, 30, 1, 2.5263, 1, 750],
+    'Power Fist': [40, 40, 1, 1.0909, 6, 800],
+    'Deathclaw Gauntlet': [20, 30, 5, 1.63, 10, 150],
+    'Saturnite Fist Super-Heated': [55, 55, 1, 1.65, 4, 2400],
+    'Ballistic Fist': [80, 80, 1, 1.0909, 6, 7800],
+    'Industrial Hand': [50, 40, 1, 3.2, 10, 2500],
+    'Combat Knife': [15, 15, 2, 3.2308, 1, 500],
+    Machete: [11, 11, 1.5, 3, 2, 50],
+    Ripper: [50, 5, 1, 1, 6, 1200],
+    'Cattle Prod': [5, 5, 2, 2.3077, 3, 450],
+    'Fire Axe': [55, 27, 1, 1.5789, 8, 2500],
+    'Knock Knock': [66, 33, 1, 1.8, 8, 3200],
+    '9mm Pistol': [16, 16, 1, 3.125, 1.5, 100],
+    '10mm Pistol': [22, 22, 1, 2.75, 3, 750],
+    '.357 Magnum Revolver': [26, 26, 1, 1.75, 2, 110],
+    '.44 Magnum Revolver': [36, 36, 1, 1.875, 3.5, 2500],
+    Lucky: [30, 30, 2.5, 2.75, 2.5, 1500],
+    '12.7mm Pistol': [40, 40, 1, 2.75, 3.5, 4000],
+    'Hunting Rifle': [52, 52, 2, 0.947369, 6, 2200],
+    'Cowboy Repeater': [32, 32, 1.25, 1.6923, 5, 800],
+    'Service Rifle': [18, 18, 1, 4.2, 8.5, 540],
+    'Marksman Carbine': [24, 24, 1, 5.7, 6, 5200],
+    'All-American': [26, 26, 1, 6, 6, 5900],
+    'Trail Carbine': [48, 48, 1, 1.5385, 5.5, 3900],
+    'Brush Gun': [75, 75, 1, 1.23, 5, 4900],
+    'Sniper Rifle': [45, 45, 2, 1.9286, 8, 4100],
+    'This Machine': [55, 55, 1, 2.1429, 9.5, 2800],
+    'Gobi Campaign Scout Rifle': [48, 80, 2, 2.1429, 4.5, 6200],
+    'Anti-Materiel Rifle': [110, 110, 1, 0.4478, 20, 5600],
+    'Hunting Shotgun': [70, 10, 1, 1.6667, 7.5, 3800],
+    'Lever-Action Shotgun': [48, 7, 1, 1.7692, 3, 2000],
+    '9mm Submachine Gun': [14, 14, 1, 11, 4, 850],
+    '.45 Auto Submachine Gun': [26, 26, 1, 11, 11, 3750],
+    '12.7mm Submachine Gun': [36, 36, 1, 9, 5, 5100],
+    Minigun: [12, 12, 0.5, 20, 25, 5500],
+    'Grenade Launcher': [100, 0, 1, 0.5556, 12, 4200],
+    'Missile Launcher': [200, 0, 0, 1.5789, 20, 3900],
+    'Fat Man': [600, 0, 0, 1.5789, 30, 6000],
+    Flamer: [16, 1, 4, 8, 15, 2350],
+    'Laser Pistol': [12, 12, 1.5, 3.75, 3, 175],
+    'Plasma Pistol': [33, 33, 1.5, 1.75, 3, 200],
+    'Laser Rifle': [22, 22, 1.5, 3.0818, 8, 800],
+    'Plasma Rifle': [47, 47, 2, 1.4, 8, 1300],
+    'Tri-beam Laser Rifle': [66, 22, 1.5, 2.7273, 9, 4800],
+    'Gauss Rifle': [120, 60, 2, 3, 7, 3000],
+    'Tesla Cannon': [80, 40, 2, 1.342105, 8, 8700],
+    'Frag Grenade': [125, 0, 1, 0.65, 0.5, 150],
+    'Plasma Grenade': [225, 0, 1, 0.6522, 0.5, 300],
+    'Incendiary Grenade': [50, 0, 1, 0.6522, 0.5, 200],
+    'Bottlecap Mine': [200, 0, 1, 0.3261, 0.5, 150],
+    'Bear Trap Fist': [27, 27, 1, 1.0909, 6, 800],
+    'Corrosive Glove': [21, 5, 1, 1.0909, 4, 1500],
+    'Cram Opener': [28, 44, 2, 1.6957, 10, 800],
+    'Displacer Glove': [50, 50, 1, 1.3636, 6, 3500],
+    'Fist of Rawr': [50, 75, 2, 1.9565, 10, 6200],
+    'Mantis Gauntlet': [30, 30, 3, 2.0217, 10, 750],
+    Pushy: [60, 60, 1, 1.4727, 6, 4200],
+    'Saturnite Fist': [35, 35, 1, 1.8, 4, 1600],
+    'Zap Glove': [35, 35, 1, 1.6364, 6, 5200],
+    'Blade of the East': [65, 30, 1, 1.5, 12, 45],
+    'Bowie Knife': [23, 35, 1.5, 3.4615, 1, 1000],
+    'Broad Machete': [15, 15, 2, 3.2308, 1, 75],
+    "Chance's Knife": [22, 22, 2, 4.1538, 1, 900],
+    Figaro: [8, 16, 4, 4.1538, 1, 400],
+    Katana: [22, 22, 2, 3.2308, 3, 2500],
+    'Machete Gladius': [28, 28, 1.5, 3, 2, 1000],
+    Shishkebab: [40, 20, 2, 2.3077, 3, 2500],
+    'Straight Razor': [5, 10, 2, 3.6923, 1, 35],
+    'Throwing Knife': [15, 15, 2, 3.2143, 0.5, 20],
+    'Throwing Knife Spear': [42, 42, 1, 0.48, 0.65, 25],
+    'Baseball Bat': [22, 22, 1, 1.65, 3, 250],
+    'Bumper Sword': [32, 32, 1, 1.4211, 12, 2500],
+    'Oh Baby!': [80, 40, 1, 1.7368, 20, 6200],
+    'Pool Cue': [15, 15, 0, 1.5789, 1, 15],
+    Sledgehammer: [24, 24, 1, 1.8947, 12, 130],
+    'Super Sledge': [70, 35, 1, 1.5789, 20, 5800],
+    'Thermic Lance': [100, 10, 1, 1, 20, 5500],
+    'Tire Iron': [15, 15, 1, 2.3077, 3, 40],
+    'Two-Step Goodbye': [70, 10, 4, 1.0909, 6, 20000],
+    'War Club': [19, 19, 1, 3, 3, 75],
+    'Hunting Revolver': [58, 58, 1, 1.5, 4, 3500],
+    '.45 Auto Pistol': [29, 29, 1, 2.75, 1.5, 1750],
+    '5.56mm Pistol': [28, 28, 2, 2.75, 5, 1200],
+    'A Light Shining in Darkness': [33, 33, 2, 4.375, 1.2, 4500],
+    "Li'l Devil": [45, 45, 2, 3.25, 3.2, 16000],
+    Maria: [20, 20, 2, 3.75, 1.5, 999],
+    'Police Pistol': [30, 45, 1, 2, 3, 1000],
+    'Ranger Sequoia': [62, 62, 1.5, 1.6875, 4, 1200],
+    'Silenced .22 Pistol': [9, 18, 3, 3.5, 3, 80],
+    'That Gun': [30, 30, 2.5, 3, 5, 1750],
+    'Weathered 10mm Pistol': [24, 24, 1, 2.75, 3, 1200],
+    'Abilene Kid LE BB Gun': [4, 70, 1.5, 1.5385, 2, 500],
+    'Assault Carbine': [13, 13, 1, 12, 6, 3950],
+    'Automatic Rifle': [40, 40, 1.5, 6, 16, 4500],
+    'Battle Rifle': [48, 48, 1, 1.9286, 9.5, 1500],
+    'BB Gun': [4, 4, 1, 1.5385, 2, 36],
+    Bozar: [19, 19, 1, 15, 15, 20000],
+    "Christine's COS Silencer Rifle": [62, 62, 2.5, 1.6071, 5.5, 6100],
+    'La Longue Carabine': [35, 35, 1.5, 2.15, 5, 1500],
+    'Light Machine Gun': [21, 21, 1, 12, 15, 5200],
+    'Medicine Stick': [78, 78, 1, 1.3846, 5.5, 20000],
+    Paciencia: [55, 110, 2, 1.184211, 6.2, 12000],
+    Ratslayer: [23, 23, 5, 1.3026, 4.5, 2000],
+    "Survivalist's Rifle": [48, 48, 1, 3.9, 8.5, 5400],
+    'Varmint Rifle': [18, 18, 1, 1.2158, 5.5, 75],
+    '10mm Submachine Gun': [19, 19, 1, 9, 5, 2370],
+    "Vance's 9mm Submachine Gun": [17, 17, 1, 13, 4, 1500],
+    'H&H Tools Nail Gun': [9, 9, 2, 14, 4, 4996],
+    'Silenced .22 SMG': [10, 20, 3, 11, 8, 1850],
+    Sleepytyme: [22, 22, 1, 10, 5, 8250],
+    'Big Boomer': [120, 9, 1, 2.5781, 4, 2500],
+    'Caravan Shotgun': [45, 6, 1, 3.2143, 3, 675],
+    'Dinner Bell': [75, 11, 1, 1.6667, 7.5, 4800],
+    'Riot Shotgun': [67, 10, 1, 4, 5, 5500],
+    'Sawed-Off Shotgun': [100, 7, 1, 2.3438, 4, 1950],
+    'Single Shotgun': [50, 7, 1, 2.5714, 7, 175],
+    'Sturdy Caravan Shotgun': [50, 7, 1, 3.2143, 3, 875],
+    'CZ57 Avenger': [13, 13, 0.5, 30, 18, 8500],
+    FIDO: [36, 18, 0.5, 7, 27, 9500],
+    'K9000 Cyberdog Gun': [26, 13, 0.5, 7, 27, 7500],
+    'Shoulder Mounted Machine Gun': [30, 20, 0, 7, 17, 7500],
+    'Alien Blaster': [75, 50, 100, 1.75, 2, 4000],
+    'Compliance Regulator': [8, 12, 1.5, 3.75, 3, 175],
+    'MF Hyperbreeder Alpha': [25, 25, 2, 7, 7, 8900],
+    'Pew Pew': [75, 50, 2.5, 2, 3, 2500],
+    'Recharger Pistol': [18, 18, 1.2, 5, 7, 2700],
+    'AER14 Prototype': [35, 35, 2, 3, 8.5, 2200],
+    "Elijah's Advanced LAER": [65, 15, 1.5, 2.75, 4, 8500],
+    LAER: [65, 15, 1.5, 2.5, 4, 8000],
+    'Laser RCW': [15, 15, 0.5, 9, 4, 2150],
+    'Recharger Rifle': [12, 12, 1.5, 4.26, 15, 250],
+    'Plasma Defender': [38, 38, 1, 2.5, 2, 3000],
+    'Q-35 Matter Modulator': [40, 62, 2, 2.4, 7, 3000],
+    'YCS/186': [140, 70, 2, 3, 8, 3000],
+    'Heavy Incinerator': [15, 5, 4, 4, 15, 7200],
+    Incinerator: [1, 1, 4, 2, 12, 1300],
+    'Multiplas Rifle': [105, 34, 1, 1, 7, 2500],
+    'Tesla-Beaton Prototype': [90, 45, 2, 1.342105, 8, 12525],
+    'Grenade Machinegun': [50, 0, 1, 3, 15, 5200],
+    'Grenade Rifle': [100, 1, 1, 2.1429, 6, 300],
+    'Red Glare': [40, 0, 0, 4, 20, 15000],
+    Annabelle: [200, 0, 0, 1.8947, 15, 5200],
+    Mercy: [100, 0, 50, 3.1, 15, 5200],
+    'Pulse Grenade': [10, 0, 1, 0.6522, 0.5, 40],
+    'Holy Frag Grenade': [800, 0, 1, 0.6522, 0.5, 500],
+    'Frag Mine': [100, 0, 1, 0.5, 0.5, 75],
+    'Plasma Mine': [150, 0, 1, 0.5, 0.5, 300],
+    'Pulse Mine': [10, 0, 1, 0.5, 0.5, 40],
+    'Tin Grenade': [100, 0, 1, 0.6522, 0.5, 25],
+    Dynamite: [75, 0, 1, 0.4054, 0.3, 25],
+    "Euclid's C-Finder": [0, 0, 50, 0.2027, 15, 1],
+    "Lily's Vertibird Blade": [24, 24, 1, 1.8, 12, 130],
+    'Mysterious Magnum': [42, 42, 1, 2.4375, 4, 3200],
+    Esther: [600, 0, 0, 1.8947, 40, 18000],
+    'Sprtel-Wood 9700': [16, 16, 1, 20, 15, 20000],
+    'Cleansing Flame': [15, 1, 1, 7, 22, 9500],
+    'The Smitty Special': [35, 35, 1, 7, 20, 20000],
+    '25mm Grenade APW': [50, 0, 1, 2.5, 8, 4200],
+    'Time Bomb': [150, 0, 1, 0.3261, 0.5, 750],
+    Chopper: [14, 14, 2, 3.92, 2, 800],
+    '9 Iron': [17, 17, 1, 2.25, 3, 55],
+    'Dress Cane': [22, 35, 1, 2.3077, 3, 40],
+    Chainsaw: [80, 8, 1, 1, 20, 2800],
+    Gehenna: [42, 21, 2, 2.7692, 3, 12000],
+    'Nuka-Breaker': [50, 50, 2, 1.44, 8, 7800],
+    'Greased Lightning': [32, 32, 1, 3, 6, 15000],
+    'Embrace of the Mantis King!': [42, 64, 3, 1.5652, 12, 8500],
+    'Cosmic Knife': [12, 12, 1, 3, 1, 35],
+    'Cosmic Knife Clean': [15, 15, 1.2, 3, 1, 50],
+    'Cosmic Knife Super-Heated': [14, 14, 5, 3, 1, 50],
+    'Knife Spear': [20, 20, 1, 1.8947, 3, 55],
+    'Knife Spear Clean': [25, 25, 1.2, 1.8947, 3, 55],
+    'Gas Bomb': [80, 0, 1, 0.3261, 5, 100],
+    Tomahawk: [30, 30, 1, 0.6585, 0.5, 75],
+    'Yao Guai Gauntlet': [20, 30, 2.5, 1.6304, 10, 150],
+    'Fire Bomb': [20, 0, 1, 0.4054, 0.5, 200],
+    'Proton Axe': [50, 25, 1, 1.9105, 8, 3500],
+    'Protonic Inversal Axe': [58, 45, 1, 1.9105, 8, 4000],
+    "Sonic Emitter - Gabriel's Bark": [55, 25, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Revelation': [31, 18, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Tarantula': [60, 30, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Robo-Scorpion': [65, 30, 1, 1.0345, 2, 3500],
+    'Old Glory': [45, 80, 1.5, 1.8947, 8, 2500],
+    'Arc Welder': [9, 1, 4, 8, 15, 3700],
+    'Flash Bang': [1, 0, 1, 0.6522, 0.5, 50],
+    'Satchel Charge': [250, 0, 1, 0.5, 0.75, 125],
+  };
+  function nvGoldenDrift232(weapons) {
+    const drift = [];
+    for (const n of Object.keys(NV_WEAPON_GOLDEN_232)) {
+      if (!(n in weapons)) {
+        drift.push(`${n}: MISSING from db_nv.js`);
+        continue;
+      }
+      const exp = NV_WEAPON_GOLDEN_232[n];
+      const got = weapons[n];
+      for (let f = 0; f < 6; f++) {
+        if (got[f] !== exp[f])
+          drift.push(`${n} ${FIELD_NAMES_232[f]} expected ${exp[f]} got ${got[f]}`);
+      }
+    }
+    for (const n of Object.keys(weapons))
+      if (!(n in NV_WEAPON_GOLDEN_232)) drift.push(`${n}: UNPINNED extra weapon in db_nv.js`);
     return drift;
   }
 
@@ -44472,18 +44692,22 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     Weight: [0, 35],
     Value: [0, 3000],
   };
-  // FNV — grandfathered ceiling. NV weapon data was NOT re-sourced by this unit
-  // and carries its own (separately suspect) inflation — e.g. Bozar value 75000
-  // — so NV bands only catch gross overflow above the current envelope. A future
-  // NV audit should tighten these; flagged, out of scope here. The plan’s
-  // "same band valid for NV" was refuted by NV’s real 5000–75000 values.
+  // FNV — retuned to the 2026-07-15 fallout.wiki re-source. The corrected NV
+  // table's real envelope is base ≤ 800 (Holy Frag Grenade blast), crit-dmg
+  // ≤ 110, crit-mult ≤ 100 (Alien Blaster), fire-rate ≤ 30 (CZ57 Avenger),
+  // weight ≤ 40 (Esther), value ≤ 20000 (Bozar / Medicine Stick / Two-Step
+  // Goodbye / Sprtel-Wood / The Smitty Special). Bands sit just above that so
+  // the OLD inflation trips: old Bozar value 75000, CZ57 62000, Minigun 22500
+  // all fall outside. (The pre-correction band's fire-rate ceiling of 25 would
+  // itself now fail the corrected CZ57's 30 — the retune is a correctness fix,
+  // not only a tightening.)
   const NV_BANDS_232 = {
-    Base_Damage: [0, 13000],
-    Crit_Damage: [0, 1000],
+    Base_Damage: [0, 1000],
+    Crit_Damage: [0, 200],
     Crit_Multiplier: [0, 100],
-    Attacks_Per_Second: [0, 25],
+    Attacks_Per_Second: [0, 35],
     Weight: [0, 50],
-    Value: [0, 100000],
+    Value: [0, 20000],
   };
   function rangeViolations232(weapons, bands) {
     const v = [];
@@ -44523,31 +44747,143 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 232.9 — [GREEN + game-agnostic] the range guard also runs over the NV
-  //         table (Protocol 38 §4.4) and every NV weapon passes its
-  //         grandfathered bands — proving the guard covers NV and does not
-  //         break the untouched NV build.
+  // 232.9 — [GREEN + game-agnostic] the range guard also runs over the NV table
+  //         (Protocol 38 §4.4) and every CORRECTED NV weapon passes its retuned
+  //         bands — proving the guard covers NV and the re-sourced table sits
+  //         inside a sane envelope.
   {
     const v = rangeViolations232(nvWeapons232, NV_BANDS_232);
     assert(
       v.length === 0,
-      '232.9: [GREEN] every NV weapon stat is within the NV grandfathered bands (guard covers both games) — ' +
+      '232.9: [GREEN] every corrected NV weapon stat is within the retuned NV plausibility bands (guard covers both games) — ' +
         JSON.stringify(v.slice(0, 10))
     );
   }
 
-  // 232.10 — [NV untouched] this unit edited ONLY db_fo3.js. NV still carries
-  //          its own "Bumper Sword"/"Golf Club" (genuine NV weapons — the FO3
-  //          deletion was cross-game-only) and its own un-audited high value
-  //          (Marksman Carbine 5000), and its weapon count is unchanged (192).
-  assert(
-    Object.keys(nvWeapons232).length === 192 &&
-      'Bumper Sword' in nvWeapons232 &&
-      'Golf Club' in nvWeapons232 &&
-      nvWeapons232['Marksman Carbine'] &&
-      nvWeapons232['Marksman Carbine'][5] === 5000,
-    `232.10: [NV untouched] db_nv.js weapon table is unmodified (192 weapons, keeps Bumper Sword/Golf Club and Marksman Carbine value 5000) — got ${Object.keys(nvWeapons232).length}`
-  );
+  // 232.10 — [GREEN] the real shipped db_nv.js weapon table matches the NV pin
+  //          exactly — every one of the 188 weapons' 6 consumed fields, after
+  //          the 2026-07-15 fallout.wiki re-source. Sibling to 232.1 for FO3.
+  {
+    const drift = nvGoldenDrift232(nvWeapons232);
+    assert(
+      drift.length === 0,
+      '232.10: [golden-master] every NV weapon’s 6 consumed stats match the fallout.wiki-verified pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.11 — [RED] a fixture that re-inflates the Bozar value back to the old
+  //          75000 AND silently restores the deleted non-FNV "Golf Club" row
+  //          must fail the pin BY NAME — proving the guard catches a wrong
+  //          number and a resurrected leak, not just a citation label.
+  {
+    const broken = { ...nvWeapons232 };
+    broken['Bozar'] = [19, 19, 1, 15, 15, 75000];
+    broken['Golf Club'] = [18, 18, 1, 2, 2, 75];
+    const drift = nvGoldenDrift232(broken);
+    assert(
+      drift.some(d => d.includes('Bozar') && d.includes('Value') && d.includes('75000')) &&
+        drift.some(d => d.includes('Golf Club') && d.includes('UNPINNED')),
+      '232.11: [RED] the NV golden-master flags a re-inflated Bozar value (75000) and a resurrected non-FNV row by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.12 — [RED] the retuned NV range guard flags a wildly-out-of-band NV
+  //          value — the old Bozar value 75000 (> 20000) and a hypothetical
+  //          CZ57 fire-rate 99 (> 35) — by weapon and field. The inflation class
+  //          the band catches even for a weapon the pin doesn't cover.
+  {
+    const broken = { ...nvWeapons232 };
+    broken['Bozar'] = [19, 19, 1, 15, 15, 75000];
+    broken['CZ57 Avenger'] = [13, 13, 0.5, 99, 18, 8500];
+    const v = rangeViolations232(broken, NV_BANDS_232);
+    assert(
+      v.some(x => x.includes('Bozar') && x.includes('Value=75000')) &&
+        v.some(x => x.includes('CZ57 Avenger') && x.includes('Attacks_Per_Second=99')),
+      '232.12: [RED] the retuned NV plausibility band flags out-of-band NV values (Bozar 75000, CZ57 aps 99) by name — ' +
+        JSON.stringify(v)
+    );
+  }
+
+  // 232.13 — [deletions] the 4 non-FNV rows — Rebound (a chem, not a weapon),
+  //          Pump-Action Shotgun (a Fallout: Brotherhood of Steel weapon), Golf
+  //          Club (a Fallout 76 weapon), and Vance's Lucky Hat Knife (no such
+  //          weapon exists) — are gone from BOTH the db_nv.js WEAPONS.CSV table
+  //          (now exactly 188 weapons) AND the reg_nv.js autocomplete registry
+  //          as WEAPON entries — a half-deletion would leave a suggestible
+  //          weapon with no DB stats. The real Rebound CHEM survives in reg_nv.js
+  //          as an 'aid' entry. Sibling to 232.5 for FO3.
+  {
+    const gone232 = ['Rebound', 'Pump-Action Shotgun', 'Golf Club', "Vance's Lucky Hat Knife"];
+    const regNvRaw232 = readGroup('reg_nv');
+    const stillWeapon232 = gone232.filter(
+      n =>
+        regNvRaw232.includes(`{ name: '${n}', type: 'weapon' }`) ||
+        regNvRaw232.includes(`{ name: "${n}", type: 'weapon' }`)
+    );
+    const reboundAidKept232 = /\{ name: 'Rebound', type: 'aid' \}/.test(regNvRaw232);
+    assert(
+      gone232.every(n => !(n in nvWeapons232)) &&
+        Object.keys(nvWeapons232).length === 188 &&
+        stillWeapon232.length === 0 &&
+        reboundAidKept232,
+      `232.13: [deletions] the 4 non-FNV rows are removed from db_nv.js (now 188 weapons) and from the reg_nv.js weapon registry, and the real Rebound chem survives as an 'aid' — got ${Object.keys(nvWeapons232).length} weapons, still-weapon ${JSON.stringify(stillWeapon232)}, rebound-aid-kept ${reboundAidKept232}`
+    );
+  }
+
+  // 232.14 — [citation] the false blanket "every data row here is sourced from
+  //          fallout.wiki" header claim is GONE from db_nv.js, replaced with a
+  //          dated, honestly-scoped provenance note. Correct-then-cite: the
+  //          citation rides ON the corrected values and does NOT vouch for the
+  //          un-re-sourced PARKED columns / other tables. Sibling to 232.6.
+  {
+    const dbNvRaw232 = readGroup('db_nv');
+    assert(
+      !/every data row here is sourced from fallout\.wiki/.test(dbNvRaw232) &&
+        /re-verified row-by-row against the fallout\.wiki/.test(dbNvRaw232) &&
+        dbNvRaw232.includes('2026-07-15') &&
+        dbNvRaw232.includes('Missile Launcher') &&
+        /NOT[\s\S]*re-sourced/.test(dbNvRaw232),
+      '232.14: [citation] db_nv.js drops the false blanket fallout.wiki claim for a dated, scoped provenance note (names the Missile Launcher rename and the un-re-sourced columns)'
+    );
+  }
+
+  // 232.15 — [collectibles] the NV snow-globe location corrections (Protocol 3):
+  //          Test Site's find-location was CRESCENT CANYON WEST (a player found
+  //          nothing there) — corrected to the LUCKY 38 COCKTAIL LOUNGE; the
+  //          bogus "Lucky 38" globe (not a real snow globe) is renamed to its
+  //          real name "The Strip" (found in Vault 21). Goodsprings stays at the
+  //          CEMETERY — verified correct on the live wiki (the sweep's later
+  //          Doc-Mitchell claim did not hold). All 7 canonical FNV globe names
+  //          present. Regression guard (Protocol 13).
+  {
+    const regNvRaw232b = readGroup('reg_nv');
+    const collMatch232 = regNvRaw232b.match(/collectibles:\s*\[([\s\S]*?)\n {2}\],/);
+    const collBlock232 = collMatch232 ? collMatch232[1] : '';
+    const globeNames232 = (collBlock232.match(/name:\s*'([^']+)'/g) || [])
+      .map(s => s.replace(/name:\s*'|'/g, ''))
+      .sort();
+    const canonical232 = [
+      'Goodsprings',
+      'Hoover Dam',
+      'Mormon Fort',
+      'Mt. Charleston',
+      'Nellis AFB',
+      'Test Site',
+      'The Strip',
+    ].sort();
+    assert(
+      JSON.stringify(globeNames232) === JSON.stringify(canonical232) &&
+        !/name:\s*'Lucky 38'/.test(collBlock232) &&
+        !/CRESCENT CANYON/.test(collBlock232) &&
+        /LUCKY 38 COCKTAIL LOUNGE/.test(collBlock232) &&
+        /VAULT 21/.test(collBlock232) &&
+        /GOODSPRINGS CEMETERY/.test(collBlock232),
+      '232.15: [collectibles] Test Site → Lucky 38 Cocktail Lounge; bogus "Lucky 38" globe renamed to "The Strip" (Vault 21); Goodsprings stays Cemetery; all 7 canonical FNV snow-globe names present — got ' +
+        JSON.stringify(globeNames232)
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
