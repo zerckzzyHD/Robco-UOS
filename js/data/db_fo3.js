@@ -74,16 +74,16 @@ A3-21 Plasma Rifle,50,50,2.5,2,8,2200,0,5,0,0,None,Microfusion Cell
 Gatling Laser,8,6,1.0,20,18,2000,0,6,0,0,Full Auto,Electron Charge Pack
 Mesmetron,1,0,1.0,1.0345,2,500,0,2,0,0,Paralyze/Confuse,None
 Minigun,5,0,0.0,20,18,1000,0,7,0,0,Full Auto,5mm
-Missile Launcher,150,0,0.0,0.5,20,500,0,6,0,0,Splash,Missile
-Fat Man,1600,0,0.0,0.4,30,1000,0,8,0,0,Splash,Mini Nuke
-Rock-It Launcher,50,25,1.0,1.5,8,200,0,5,0,0,Junk Ammo,Junk
+Missile Launcher,150,0,0.0,1.5789,20,500,0,6,0,0,Splash,Missile
+Fat Man,1600,0,0.0,1.5789,30,1000,0,8,0,0,Splash,Mini Nuke
+Rock-It Launcher,50,25,1.0,3.3333,8,200,0,5,0,0,Junk Ammo,Junk
 Flamer,16,1,4.0,8,15,500,0,8,0,0,Fire DoT,Flamer Fuel
 Heavy Incinerator,35,5,4.0,4,15,500,0,8,0,0,Fire DoT,Flamer Fuel
-Frag Grenade,100,0,0.0,1.0,0.5,25,0,0,0,0,Splash,None
-Plasma Grenade,150,0,0.0,1.0,0.5,50,0,0,0,0,Splash,None
-Pulse Grenade,10,0,0.0,1.0,0.5,40,0,0,0,0,EMP/Splash,None
-Bottlecap Mine,500,0,0.0,1.0,0.5,75,0,0,0,0,Triggered/Splash,None
-Frag Mine,100,0,0.0,1.0,0.5,25,0,0,0,0,Triggered/Splash,None
+Frag Grenade,100,0,1.0,0.6522,0.5,25,0,0,0,0,Splash,None
+Plasma Grenade,150,0,1.0,0.6522,0.5,50,0,0,0,0,Splash,None
+Pulse Grenade,10,0,1.0,0.6522,0.5,40,0,0,0,0,EMP/Splash,None
+Bottlecap Mine,500,0,1.0,0.3261,0.5,75,0,0,0,0,Triggered/Splash,None
+Frag Mine,100,0,1.0,0.5,0.5,25,0,0,0,0,Triggered/Splash,None
 Baseball Bat,9,9,1.0,1.4286,3,55,0,3,1.0,20,None,None
 Sledgehammer,20,10,1.0,1.4286,12,130,0,7,1.2,40,Knockdown,None
 Super Sledge,25,25,1.0,1.4286,20,180,0,8,1.2,55,Knockdown,None
@@ -108,7 +108,7 @@ The Mauler,45,0,0.0,1,20,200,75,7,0.7,40,None,None
 Stabhappy,10,15,4.0,3,1,65,0,0,0.6,25,None,None
 Dart Gun,6,12,2.5,6,3,500,0,2,0,0,Cripple Legs,Dart
 Deathclaw Gauntlet,20,30,5.0,1.6304,10,150,75,7,0.7,45,None,None
-Nuka Grenade,501,0,0.0,1.0,0.5,50,0,0,0,0,Splash,None
+Nuka Grenade,501,0,1.0,0.6522,0.5,50,0,0,0,0,Splash,None
 Railway Rifle,30,30,3.0,2,9,200,0,5,0,0,None,Railway Spike
 Chinese Pistol,4,4,1.0,6.0,2,190,0,0,0,0,None,10mm
 Silenced 10mm Pistol,8,5,2.0,6.0,3,250,0,0,0,0,Suppressed,10mm
@@ -119,8 +119,8 @@ Sawed-Off Shotgun,50,0,0.0,2.25,6,190,0,0,0,0,Splash,Shotgun Shell
 Eugene,7,0,0.0,20.0,18,1500,0,0,0,0,Full Auto,5mm
 Vengeance,11,12,1.0,20.0,18,2400,0,0,0,0,None,Electron Charge Pack
 Burnmaster,24,1,4.0,8.0,15,500,0,0,0,0,Fire DoT,Flamer Fuel
-Experimental MIRV,12800,0,0.0,1.579,30,2498,0,0,0,0,Splash,Mini Nuke
-Miss Launcher,200,0,0.0,1.579,15,400,0,0,0,0,Splash,Missile
+Experimental MIRV,12800,0,0.0,1.5789,30,2498,0,0,0,0,Splash,Mini Nuke
+Miss Launcher,200,0,0.0,1.5789,15,400,0,0,0,0,Splash,Missile
 Wazer Wifle,29,28,1.5,2.0455,8,900,0,0,0,0,None,Microfusion Cell
 Smuggler's End,18,18,1.5,6.0,2,450,0,0,0,0,None,Energy Cell
 The Break,6,6,1.0,1.4286,1,50,0,2,1.2,20,None,None
@@ -160,8 +160,8 @@ Destabilizer,30,20,2.0,4.5,7,1199,0,0,0,0,None,Alien Power Module
 Drone Cannon,40,50,1.0,3.3333,18,1999,0,0,0,0,Splash,Alien Power Module
 Drone Cannon Ex-B,40,50,1.0,3.3333,18,1999,0,0,0,0,Splash,Alien Power Module
 Electro-Suppressor,25,4,1.0,2.3077,2,70,0,0,1.0,25,Knockdown,None
-Cryo Grenade,1,0,0.0,0.652,0.5,50,0,0,0,0,Cryo Stun,None
-Cryo Mine,1,0,0.0,0.5,0.5,25,0,0,0,0,Cryo Stun,None
+Cryo Grenade,1,0,1.0,0.6522,0.5,50,0,0,0,0,Cryo Stun,None
+Cryo Mine,1,0,1.0,0.5,0.5,25,0,0,0,0,Cryo Stun,None
 
 [AMMO.CSV]
 Caliber,Subtype,DMG_Multiplier,DT_Modifier,Condition_Degradation,Weight_Per_Unit

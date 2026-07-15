@@ -44180,16 +44180,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'Gatling Laser': [8, 6, 1, 20, 18, 2000],
     Mesmetron: [1, 0, 1, 1.0345, 2, 500],
     Minigun: [5, 0, 0, 20, 18, 1000],
-    'Missile Launcher': [150, 0, 0, 0.5, 20, 500],
-    'Fat Man': [1600, 0, 0, 0.4, 30, 1000],
-    'Rock-It Launcher': [50, 25, 1, 1.5, 8, 200],
+    'Missile Launcher': [150, 0, 0, 1.5789, 20, 500],
+    'Fat Man': [1600, 0, 0, 1.5789, 30, 1000],
+    'Rock-It Launcher': [50, 25, 1, 3.3333, 8, 200],
     Flamer: [16, 1, 4, 8, 15, 500],
     'Heavy Incinerator': [35, 5, 4, 4, 15, 500],
-    'Frag Grenade': [100, 0, 0, 1, 0.5, 25],
-    'Plasma Grenade': [150, 0, 0, 1, 0.5, 50],
-    'Pulse Grenade': [10, 0, 0, 1, 0.5, 40],
-    'Bottlecap Mine': [500, 0, 0, 1, 0.5, 75],
-    'Frag Mine': [100, 0, 0, 1, 0.5, 25],
+    'Frag Grenade': [100, 0, 1, 0.6522, 0.5, 25],
+    'Plasma Grenade': [150, 0, 1, 0.6522, 0.5, 50],
+    'Pulse Grenade': [10, 0, 1, 0.6522, 0.5, 40],
+    'Bottlecap Mine': [500, 0, 1, 0.3261, 0.5, 75],
+    'Frag Mine': [100, 0, 1, 0.5, 0.5, 25],
     'Baseball Bat': [9, 9, 1, 1.4286, 3, 55],
     Sledgehammer: [20, 10, 1, 1.4286, 12, 130],
     'Super Sledge': [25, 25, 1, 1.4286, 20, 180],
@@ -44214,7 +44214,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     Stabhappy: [10, 15, 4, 3, 1, 65],
     'Dart Gun': [6, 12, 2.5, 6, 3, 500],
     'Deathclaw Gauntlet': [20, 30, 5, 1.6304, 10, 150],
-    'Nuka Grenade': [501, 0, 0, 1, 0.5, 50],
+    'Nuka Grenade': [501, 0, 1, 0.6522, 0.5, 50],
     'Railway Rifle': [30, 30, 3, 2, 9, 200],
     'Chinese Pistol': [4, 4, 1, 6, 2, 190],
     'Silenced 10mm Pistol': [8, 5, 2, 6, 3, 250],
@@ -44225,8 +44225,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     Eugene: [7, 0, 0, 20, 18, 1500],
     Vengeance: [11, 12, 1, 20, 18, 2400],
     Burnmaster: [24, 1, 4, 8, 15, 500],
-    'Experimental MIRV': [12800, 0, 0, 1.579, 30, 2498],
-    'Miss Launcher': [200, 0, 0, 1.579, 15, 400],
+    'Experimental MIRV': [12800, 0, 0, 1.5789, 30, 2498],
+    'Miss Launcher': [200, 0, 0, 1.5789, 15, 400],
     'Wazer Wifle': [29, 28, 1.5, 2.0455, 8, 900],
     "Smuggler's End": [18, 18, 1.5, 6, 2, 450],
     'The Break': [6, 6, 1, 1.4286, 1, 50],
@@ -44266,8 +44266,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'Drone Cannon': [40, 50, 1, 3.3333, 18, 1999],
     'Drone Cannon Ex-B': [40, 50, 1, 3.3333, 18, 1999],
     'Electro-Suppressor': [25, 4, 1, 2.3077, 2, 70],
-    'Cryo Grenade': [1, 0, 0, 0.652, 0.5, 50],
-    'Cryo Mine': [1, 0, 0, 0.5, 0.5, 25],
+    'Cryo Grenade': [1, 0, 1, 0.6522, 0.5, 50],
+    'Cryo Mine': [1, 0, 1, 0.5, 0.5, 25],
   };
 
   // The golden-master validator — the chokepoint. Returns a list of drift
@@ -44349,10 +44349,15 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 232.4 — explosives special case: each blast value was pulled from that
-  //         weapon’s OWN fallout.wiki page (the master table lists impact=1),
-  //         and every thrown/placed grenade, mine and nuke-launcher carries
-  //         Crit_Multiplier 0 (explosives cannot critically hit).
+  // 232.4 — explosives special case, all re-sourced from fallout.wiki: blast
+  //         damage pulled from each weapon’s OWN page (the master table lists
+  //         impact=1); fire-rate (APS) and crit-mult read from the master
+  //         table’s Fire-Rate / Crit%Mult columns. The crit nuance the audit
+  //         caught: thrown grenades and placed mines crit at the NORMAL rate
+  //         (Crit%Mult ×1) but deal ZERO bonus crit damage (Crit_Damage 0) —
+  //         so their crit-mult is 1, not 0. ONLY the projectile nukes/missiles
+  //         (Fat Man, Missile/Miss Launcher, Experimental MIRV) truly cannot
+  //         crit (Crit%Mult 0). Field order [base, crit, mult, aps, wt, val].
   {
     const blast232 = {
       'Frag Grenade': 100,
@@ -44367,30 +44372,58 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       'Experimental MIRV': 12800,
       'Rock-It Launcher': 50,
     };
-    const cantCrit232 = [
+    // Fire-rate (Attacks_Per_Second) — the field this cleanup unit re-sourced.
+    const fireRate232 = {
+      'Frag Grenade': 0.6522,
+      'Plasma Grenade': 0.6522,
+      'Pulse Grenade': 0.6522,
+      'Nuka Grenade': 0.6522,
+      'Cryo Grenade': 0.6522,
+      'Frag Mine': 0.5,
+      'Cryo Mine': 0.5,
+      'Bottlecap Mine': 0.3261,
+      'Fat Man': 1.5789,
+      'Missile Launcher': 1.5789,
+      'Miss Launcher': 1.5789,
+      'Experimental MIRV': 1.5789,
+      'Rock-It Launcher': 3.3333,
+    };
+    // Grenades + mines: crit-mult 1 (normal crit chance) AND crit-dmg 0 (no bonus).
+    const critGrenadeMine232 = [
       'Frag Grenade',
       'Plasma Grenade',
       'Pulse Grenade',
       'Nuka Grenade',
+      'Cryo Grenade',
       'Frag Mine',
       'Bottlecap Mine',
-      'Cryo Grenade',
       'Cryo Mine',
-      'Fat Man',
-      'Missile Launcher',
-      'Miss Launcher',
-      'Experimental MIRV',
     ];
+    // Projectile nukes/missiles: genuinely cannot crit — crit-mult 0.
+    const noCrit232 = ['Fat Man', 'Missile Launcher', 'Miss Launcher', 'Experimental MIRV'];
     const badBlast = Object.entries(blast232).filter(
       ([n, b]) => !fo3Weapons232[n] || fo3Weapons232[n][0] !== b
     );
-    const badCrit = cantCrit232.filter(n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 0);
+    const badRate = Object.entries(fireRate232).filter(
+      ([n, r]) => !fo3Weapons232[n] || fo3Weapons232[n][3] !== r
+    );
+    const badGrenCrit = critGrenadeMine232.filter(
+      n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 1 || fo3Weapons232[n][1] !== 0
+    );
+    const badNoCrit = noCrit232.filter(n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 0);
     assert(
-      badBlast.length === 0 && badCrit.length === 0,
-      '232.4: [explosives] per-page blast values pinned and grenades/mines/launchers carry crit-mult 0 — badBlast ' +
+      badBlast.length === 0 &&
+        badRate.length === 0 &&
+        badGrenCrit.length === 0 &&
+        badNoCrit.length === 0,
+      '232.4: [explosives] blast + re-sourced fire-rate pinned; grenades/mines crit ×1 with 0 crit-dmg, projectile nukes crit ×0 — badBlast ' +
         JSON.stringify(badBlast.map(b => b[0])) +
-        ' badCrit ' +
-        JSON.stringify(badCrit)
+        ' badRate ' +
+        JSON.stringify(badRate.map(b => b[0])) +
+        ' badGrenCrit ' +
+        JSON.stringify(badGrenCrit) +
+        ' badNoCrit ' +
+        JSON.stringify(badNoCrit)
     );
   }
 

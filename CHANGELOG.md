@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3258/3258 | Cache: robco-terminal-v2.8.0-r35 -->
+## [Unreleased]<!-- Tests: 3258/3258 | Cache: robco-terminal-v2.8.0-r36 -->
 
 ### Added
 
@@ -58,6 +58,7 @@
 - Fixed the Fallout 3 perk list containing six perks that don't actually exist in Fallout 3 — three made-up "companion" perks the game has no system for, and three weapon-damage perks that are really from New Vegas, not Fallout 3 (Laser Commander among them). Also fixed a perk misnamed "Scavenger" that should have read "Scrounger", and corrected roughly half of the perk list's level requirements (like Cannibal, which now correctly unlocks at level 12 instead of 6), so the ELIGIBLE PERKS lookup now tells you the real level each perk becomes available.
 - Corrected two Fallout 3 bobblehead locations that pointed at the wrong place: the Explosives bobblehead is at the WKML Broadcast Station (in its sealed cistern), not Minefield, and the Unarmed bobblehead is in the unmarked Rockopolis cave, not the Tepid Sewers. Both were checked against the Fallout wiki.
 - Corrected the Fallout 3 weapon list against the official Fallout wiki: dozens of weapons had wrong damage, critical-hit, fire-rate, weight, or value numbers — the sniper rifle was listed as worth 3,500 caps instead of 300, and the 10mm pistol fired far slower than it really does — so barter prices, carry weight, the threat-assessment and weapon-lookup readouts, and the AI's own understanding of your arsenal are all accurate now. Explosive blast damage (frag and plasma grenades, mines, the Fat Man and its unique MIRV) was checked page by page rather than guessed. Also removed four "weapons" that aren't in Fallout 3 at all — a Bumper Sword and Golf Club (both New Vegas weapons), a Plunger, and a Tin Grenade — the same cleanup already done for made-up perks. New Vegas is unaffected.
+- Finished the Fallout 3 weapon-stat correction by fixing the explosives' attack speed and critical-hit behavior, which had been left on old placeholder values: grenades and mines were listed as attacking once per second when the real rates are slower (grenades about two-thirds, the bottlecap mine about a third), and the Fat Man, missile launchers, and their unique variants were far too slow. Grenades and mines were also wrongly marked as unable to land a critical hit — they actually can (they just deal no extra damage on one), so the threat-assessment and weapon-lookup readouts now reflect that correctly. New Vegas is unaffected.
 
 ### Under the Hood
 
