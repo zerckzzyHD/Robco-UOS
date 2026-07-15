@@ -43870,6 +43870,219 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 231 — FO3 Perk Registry: Protocol 3 citation guard + FIX-PERK-
+//  INVENTED / FIX-PERK-LEVELS data-correction regression. Sibling to the
+//  Suite 230 karma citation guard, extended per the FO3_DATA_PROVENANCE
+//  sweep's recommendation (2026-07-15): generalize the per-entry `src:`
+//  requirement to the perk registry, the other surface the sweep found
+//  invented/wrong data concentrated in. Data was corrected FIRST against
+//  the live fallout.wiki "Fallout 3 Perks" page, THEN cited — never the
+//  reverse (Protocol 3).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 231 — FO3 Perk Registry: Protocol 3 citation guard + data-correction regression');
+
+  const vm231 = require('vm');
+  function loadRealFo3Perks231() {
+    const sandbox = { window: {} };
+    vm231.createContext(sandbox);
+    vm231.runInContext(readGroup('reg_fo3'), sandbox);
+    return vm231.runInContext('FALLOUT_REGISTRY.perks', sandbox);
+  }
+  const realPerks231 = loadRealFo3Perks231();
+
+  // The citation-guard validator — the actual chokepoint logic. Returns a
+  // list of violation strings; empty means the dataset is clean. Run
+  // against a deliberately corrupted fixture (231.2) and the real shipped
+  // data (231.3) to prove it fails red and passes green.
+  const FO3_PERK_TYPES_231 = new Set(['regular', 'special', 'quest']);
+  function _validatePerkCitations(perks) {
+    const violations = [];
+    const isCited = src => typeof src === 'string' && /fallout\.wiki/.test(src);
+    const seen = new Set();
+    (perks || []).forEach((p, i) => {
+      if (!isCited(p.src)) violations.push(`perks[${i}] (${p.name}) missing fallout.wiki src`);
+      if (!FO3_PERK_TYPES_231.has(p.type))
+        violations.push(`perks[${i}] (${p.name}) has invalid type "${p.type}"`);
+      if (p.type === 'companion')
+        violations.push(`perks[${i}] (${p.name}) is type "companion" — FO3 has no companion perks`);
+      if ((p.type === 'special' || p.type === 'quest') && p.level !== 0)
+        violations.push(`perks[${i}] (${p.name}) is ${p.type} but level !== 0`);
+      if (p.type === 'regular' && !(parseInt(p.level, 10) > 0))
+        violations.push(`perks[${i}] (${p.name}) is regular but has no positive level`);
+      const key = String(p.name || '').toLowerCase();
+      if (seen.has(key)) violations.push(`perks[${i}] (${p.name}) is a duplicate name`);
+      seen.add(key);
+    });
+    return violations;
+  }
+
+  // 231.1 — RED: a fixture reintroducing one of the F1 fabricated
+  //         "companion perks", one un-cited entry, and one bad-type entry
+  //         must fail every check it breaks by name. Proves the guard
+  //         actually catches the class of defect it exists to prevent.
+  {
+    const brokenPerks231 = [
+      { name: 'Black Widow', type: 'regular', level: 2, src: 'fallout.wiki "Fallout 3 Perks"' },
+      { name: 'Mercy', type: 'companion', level: 0, src: 'fallout.wiki "Fallout 3 Perks"' },
+      { name: 'Ghoul Ecology', type: 'special', level: 0 },
+      { name: 'Cannibal', type: 'bogus', level: 12, src: 'fallout.wiki "Fallout 3 Perks"' },
+    ];
+    const violations2311 = _validatePerkCitations(brokenPerks231);
+    assert(
+      violations2311.some(v => v.includes('Mercy') && v.includes('companion')) &&
+        violations2311.some(
+          v => v.includes('Ghoul Ecology') && v.includes('missing fallout.wiki src')
+        ) &&
+        violations2311.some(v => v.includes('Cannibal') && v.includes('invalid type')),
+      '231.1: [RED] the citation-guard validator flags a fabricated companion perk, an un-cited entry, and an invalid type — ' +
+        JSON.stringify(violations2311)
+    );
+  }
+
+  // 231.2 — GREEN: the validator finds ZERO violations against the REAL,
+  //         shipped FALLOUT_REGISTRY.perks (FO3) data.
+  {
+    const violations2312 = _validatePerkCitations(realPerks231);
+    assert(
+      violations2312.length === 0,
+      '231.2: [GREEN] the citation-guard validator finds zero violations in the real FO3 FALLOUT_REGISTRY.perks data — ' +
+        JSON.stringify(violations2312)
+    );
+  }
+
+  // 231.3 — anti-regression for F1/F2/F3: none of the fabricated /
+  //         cross-game perk names (the 3 invented "companion perks", the
+  //         NV-only "Laser Commander", the misnamed "Scavenger", and the
+  //         two NV-only gender perks "Confirmed Bachelor" / "Cherchez La
+  //         Femme" found live re-verifying this unit — NV registry confirms
+  //         both are New Vegas perks, absent from the live FO3 perks page)
+  //         exist anywhere in the FO3 perk registry.
+  const fo3PerkNames231 = new Set(realPerks231.map(p => p.name));
+  assert(
+    !fo3PerkNames231.has('Mercy') &&
+      !fo3PerkNames231.has('Search and Mark') &&
+      !fo3PerkNames231.has('Sneak Bobblehead Effect') &&
+      !fo3PerkNames231.has('Laser Commander') &&
+      !fo3PerkNames231.has('Scavenger') &&
+      !fo3PerkNames231.has('Confirmed Bachelor') &&
+      !fo3PerkNames231.has('Cherchez La Femme') &&
+      !realPerks231.some(p => p.type === 'companion'),
+    '231.3: [anti-regression] none of the fabricated ("Mercy", "Search and Mark", "Sneak Bobblehead Effect") or cross-game ("Laser Commander", "Scavenger", "Confirmed Bachelor", "Cherchez La Femme") perks exist in the FO3 registry, and no perk carries type "companion" (FO3 has no companion-perk system)'
+  );
+
+  // 231.4 — F3: "Scrounger" (the real FO3 perk "Scavenger" was misnamed
+  //         for) exists at the correct level (8, Luck 5 per fallout.wiki).
+  {
+    const scrounger231 = realPerks231.find(p => p.name === 'Scrounger');
+    assert(
+      scrounger231 && scrounger231.level === 8 && scrounger231.type === 'regular',
+      '231.4: [F3 fix] "Scrounger" (the correctly-named FO3 perk) exists as a regular perk at level 8'
+    );
+  }
+
+  // 231.5 — F4: spot-check a representative sample of the ~28 corrected
+  //         perk levels against the live fallout.wiki "Fallout 3 Perks"
+  //         page (re-verified 2026-07-15), spanning every level tier that
+  //         had a wrong gate.
+  {
+    const byName231 = Object.fromEntries(realPerks231.map(p => [p.name, p]));
+    const expected231 = {
+      'Gun Nut': 2,
+      'Little Leaguer': 2,
+      'Child at Heart': 4,
+      Entomologist: 4,
+      Scoundrel: 4,
+      'Fortune Finder': 6,
+      'Lead Belly': 6,
+      'Strong Back': 8,
+      'Animal Friend': 10,
+      'Mysterious Stranger': 10,
+      'Nerd Rage!': 10,
+      'Night Person': 10,
+      'Mister Sandman': 10,
+      Cannibal: 12,
+      'Life Giver': 12,
+      Pyromaniac: 12,
+      'Robotics Expert': 12,
+      Sniper: 12,
+      'Silent Running': 12,
+      'Action Boy': 16,
+      'Action Girl': 16,
+      'Better Criticals': 16,
+      'Chem Resistant': 16,
+      Infiltrator: 18,
+      'Computer Whiz': 18,
+      'Concentrated Fire': 18,
+      'Light Step': 14,
+      'Master Trader': 14,
+    };
+    const wrong231 = Object.entries(expected231).filter(
+      ([name, lvl]) => !byName231[name] || byName231[name].level !== lvl
+    );
+    assert(
+      wrong231.length === 0,
+      '231.5: [F4 fix] every re-verified perk level matches the live fallout.wiki "Fallout 3 Perks" page — ' +
+        JSON.stringify(wrong231)
+    );
+  }
+
+  // 231.6 — F9: type misclassifications corrected — Cyborg (regular, 14)
+  //         and Almost Perfect (regular, 30) were wrongly "special";
+  //         Pitt Fighter and Survival Expert are quest-reward perks with
+  //         no level gate, not "special" / "regular level:22".
+  {
+    const byName2316 = Object.fromEntries(realPerks231.map(p => [p.name, p]));
+    assert(
+      byName2316['Cyborg'] &&
+        byName2316['Cyborg'].type === 'regular' &&
+        byName2316['Cyborg'].level === 14 &&
+        byName2316['Almost Perfect'] &&
+        byName2316['Almost Perfect'].type === 'regular' &&
+        byName2316['Almost Perfect'].level === 30 &&
+        byName2316['Pitt Fighter'] &&
+        byName2316['Pitt Fighter'].type === 'quest' &&
+        byName2316['Pitt Fighter'].level === 0 &&
+        byName2316['Survival Expert'] &&
+        byName2316['Survival Expert'].type === 'quest' &&
+        byName2316['Survival Expert'].level === 0,
+      '231.6: [F9 fix] Cyborg/Almost Perfect are regular perks (14/30); Pitt Fighter/Survival Expert are quest perks with no level gate'
+    );
+  }
+
+  // 231.7 — every regular perk that only the ELIGIBLE PERKS survey
+  //         (_computeEligiblePerks, ui-render-databank.js) treats as
+  //         level-gated actually carries a positive level, and the total
+  //         perk count reflects the FIX-PERK-INVENTED deletions (62 → 56:
+  //         -3 fabricated companions, -1 NV "Laser Commander", -2 NV gender
+  //         perks found re-verifying this unit; "Scavenger"->"Scrounger"
+  //         is a rename, net zero).
+  assert(
+    realPerks231.length === 56 && realPerks231.every(p => p.type !== 'regular' || p.level > 0),
+    `231.7: FO3 perk registry has 56 entries post-cleanup (was 62) and every regular perk carries a positive level — got ${realPerks231.length}`
+  );
+
+  // 231.8 — NV untouched: the FNV registry still carries "Confirmed
+  //         Bachelor" and "Cherchez La Femme" at level 2 (they are real NV
+  //         perks — only their FO3 cross-game leak was removed) and its
+  //         perk count is unchanged by this unit.
+  {
+    const nvSandbox231 = { window: {} };
+    vm231.createContext(nvSandbox231);
+    vm231.runInContext(readGroup('reg_nv'), nvSandbox231);
+    const nvPerks231 = vm231.runInContext('FALLOUT_REGISTRY.perks', nvSandbox231);
+    const nvByName231 = Object.fromEntries(nvPerks231.map(p => [p.name, p]));
+    assert(
+      nvByName231['Confirmed Bachelor'] &&
+        nvByName231['Confirmed Bachelor'].level === 2 &&
+        nvByName231['Cherchez La Femme'] &&
+        nvByName231['Cherchez La Femme'].level === 2,
+      '231.8: [NV untouched] reg_nv.js still carries "Confirmed Bachelor" and "Cherchez La Femme" at level 2 — this unit only removed their FO3 cross-game leak, NV itself is unmodified'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

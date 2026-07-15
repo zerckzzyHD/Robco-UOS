@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3239/3239 | Cache: robco-terminal-v2.8.0-r32 -->
+## [Unreleased]<!-- Tests: 3247/3247 | Cache: robco-terminal-v2.8.0-r33 -->
 
 ### Added
 
@@ -55,6 +55,7 @@
 - Fixed the Fallout 3 Karma Center's action filter box showing distractingly small text in portrait mode — the wider fix that already sized it correctly in landscape was never applied to portrait, where most people actually use it. It now reads at the same comfortable size in every orientation.
 - Fixed the Fallout 3 Karma Center's action list only being a compact, scrollable box in one screen orientation — the other orientation dumped all of its actions inline instead, pushing everything below it off screen. It's now a bounded, internally-scrolling list in both portrait and landscape, and scrolling past its edges still moves the rest of the screen underneath it.
 - Removed the three karma actions the game itself never gives an exact point value for (a general good deed in a quest, a general evil deed in a quest, and activating Project Purity yourself) from the tappable action list, since tapping them could never actually apply anything. They're kept on record as real, unconfirmed entries — only the unusable buttons are gone.
+- Fixed the Fallout 3 perk list containing five perks that don't actually exist in Fallout 3 — three made-up "companion" perks the game has no system for, and two damage-bonus perks that are really from New Vegas, not Fallout 3. Also fixed a perk misnamed "Scavenger" that should have read "Scrounger", and corrected roughly half of the perk list's level requirements (like Cannibal, which now correctly unlocks at level 12 instead of 6), so the ELIGIBLE PERKS lookup now tells you the real level each perk becomes available.
 
 ### Under the Hood
 
@@ -84,6 +85,7 @@
 - Added a thorough new automated check that boots real save files — current, densely-packed, very old, and deliberately broken — through the app's actual startup and save-import steps and confirms nothing in your campaign ever quietly disappears, resets, or gets corrupted along the way. It found one real gap (the settings/faction fix described above) and is proven to actually catch a dropped field by deliberately breaking one, watching the check fail with the right name, then undoing the break. Also double-checked that a failed save write always tells you loudly and leaves your prior save untouched, and added one more such check for local save-slot writes specifically. Nothing you can see changed beyond the two items called out above.
 - Every Fallout 3 karma fact — hit-squad thresholds, companion requirements, karma titles, and event values — now carries a note pointing at the exact source page it came from, and the build now automatically fails if a new karma fact is ever added without one. This is what let the invented hit-squad and companion mistakes above get caught and fixed for good, and stops the same kind of mistake from quietly shipping again.
 - Corrected the wording the AI itself is given about Fallout 3's irreversible-choice warnings to match the same real hit-squad facts described above, instead of repeating the same made-up threat.
+- Every Fallout 3 perk now carries the same kind of source note the karma facts above got — and the build now automatically fails if a new perk is ever added without one, or if a companion-type perk (which Fallout 3 doesn't have) sneaks back in.
 
 ---
 
