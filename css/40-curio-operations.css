@@ -852,6 +852,15 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
   padding-right: 4px;
   margin-bottom: 8px;
 }
+/* Protocol 17 (audit F-2): the shared .tray-head input[type=search] rule only
+   hits 16px inside 60-fo3-pipboy.css's landscape media query — in portrait
+   this input inherited the plain 14px body size (iOS/Android focus-zoom
+   risk). ID-scoped to this one input only; the same <16px portrait gap on
+   invDrawerSearch/questSearch/perkSearch/notesSearch is a separate, wider
+   follow-up, not folded in here. */
+#karmaEventFilter {
+  font-size: 16px;
+}
 .kc-title-line {
   text-align: center;
   font-size: 13px;
@@ -859,6 +868,67 @@ button.curio-obj.tracker-toggle--inactive .curio-linc--figure i {
   color: var(--bezel-wire);
   text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
   padding: 4px 0 2px;
+}
+/* Owner report: the action rows read as "messy, confusing, not organized or
+   clickable looking" — a transparent inline .tracker-toggle text row with no
+   border/fill. This gives each row a bordered/filled, full-width, obviously
+   tappable affordance (label left, delta badge right) WITHOUT forking a new
+   button component — it still extends .tracker-row/.tracker-toggle/
+   .tracker-meta (Protocol 22), so focus-visible, ≥28px tap target, and
+   keyboard operability (Protocol UI-5) all ride along unchanged. */
+.kc-events .karma-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  border-radius: 3px;
+  background: rgba(var(--robco-green-rgb), 0.07);
+  text-align: left;
+}
+.kc-events .karma-event-row.tracker-toggle--active {
+  cursor: pointer;
+}
+.kc-events .karma-event-row.tracker-toggle--active:hover,
+.kc-events .karma-event-row.tracker-toggle--active:active {
+  background: rgba(var(--robco-green-rgb), 0.18);
+  border-color: var(--robco-green);
+}
+.kc-events .karma-event-row.tracker-toggle--inactive {
+  border-style: dashed;
+  cursor: not-allowed;
+}
+.kc-events .karma-event-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.kc-events .karma-event-label {
+  overflow-wrap: anywhere;
+}
+/* Deliberately monochrome-green regardless of sign (+/-) — the FO3 landscape
+   glass enforces a strict monochrome-green rule (render-integrity.mjs's
+   "GLASS MONOCHROME GREEN" check, Suite 220-adjacent precedent: the whole
+   red/orange accent sweep on that screen was reverted to green with "nothing
+   they warn you about lost its meaning: the numbers, the wording, and the
+   icons are all exactly the same"). The minus sign already conveys a
+   negative delta without needing a second, game-breaking accent color. */
+.kc-events .karma-event-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--robco-green);
+  white-space: nowrap;
 }
 
 /* ════════════════════════════════════════════════════════════════════

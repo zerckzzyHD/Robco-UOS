@@ -43791,6 +43791,82 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         (errMsg230d ? ' — error: ' + errMsg230d : '')
     );
   }
+
+  // 230.15 — [behavioral] Protocol 8 Stage 2 UX polish (owner report: karma
+  //          actions gave no confirmation on tap). applyKarmaEvent() now
+  //          fires the SAME top-right toast a location change uses
+  //          (_locationCardShow, Protocol 22 — never a second toast
+  //          component) with the applied sign/delta and the event's own
+  //          label, exactly once per real apply — and never for a
+  //          null-delta UNVERIFIED no-op.
+  {
+    let errMsg23015 = '';
+    let ok23015 = false;
+    try {
+      const render230e = readGroup('ui-render');
+      const toastCalls23015 = [];
+      const sandbox = {
+        _activeDef: () => ({ karma: realKarma230 }),
+        state: { karma: 990 },
+        document: { getElementById: () => null },
+        saveState: () => {},
+        updateKarmaUI: () => {},
+        renderKarmaCenter: () => {},
+        _locationCardShow: msg => toastCalls23015.push(msg),
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(render230e, 'applyKarmaEvent'), sandbox);
+      vm230.runInContext(`applyKarmaEvent('water_to_beggar')`, sandbox);
+      vm230.runInContext(`applyKarmaEvent('good_quest_act')`, sandbox); // null-delta, must stay silent
+      ok23015 =
+        toastCalls23015.length === 1 &&
+        /KARMA \+50/.test(toastCalls23015[0]) &&
+        toastCalls23015[0].includes('Gave Purified Water to a beggar');
+    } catch (e) {
+      errMsg23015 = e && e.message;
+    }
+    assert(
+      ok23015,
+      '230.15: [behavioral] applyKarmaEvent() fires _locationCardShow (the existing top-right toast) exactly once for a real applied delta, carrying the karma sign/amount and the event label — and never for a null-delta UNVERIFIED no-op' +
+        (errMsg23015 ? ' — error: ' + errMsg23015 : '')
+    );
+  }
+
+  // 230.16 — [static] owner report ("messy, confusing, not organized or
+  //          clickable looking"): each karma action row now renders a
+  //          distinct label/badge structure (karma-event-text/
+  //          karma-event-label/karma-event-badge) instead of bare inline
+  //          tracker-toggle text, and .kc-events .karma-event-row carries a
+  //          real bordered/filled CSS affordance — extends
+  //          .tracker-row/.tracker-toggle rather than forking a new
+  //          component (Protocol 22).
+  {
+    const karmaCenterBody23016 = extractFunctionBody(readGroup('ui-render'), 'renderKarmaCenter');
+    const css23016 = readCss().replace(/\/\*[\s\S]*?\*\//g, '');
+    assert(
+      /class="karma-event-text"/.test(karmaCenterBody23016) &&
+        /class="karma-event-label"/.test(karmaCenterBody23016) &&
+        /class="karma-event-badge/.test(karmaCenterBody23016) &&
+        /onclick="applyKarmaEvent\('\$\{e\.id\}'\)"/.test(karmaCenterBody23016) &&
+        /\.kc-events \.karma-event-row \{[^}]*border:\s*1px solid/.test(css23016) &&
+        /\.kc-events \.karma-event-row \{[^}]*background:/.test(css23016),
+      '230.16: [static] each karma action row carries a distinct label/badge markup structure (karma-event-text/karma-event-label/karma-event-badge) and a real bordered/filled CSS affordance (.kc-events .karma-event-row), not bare inline tracker-toggle text — and the click wiring (onclick="applyKarmaEvent(...)") is unchanged'
+    );
+  }
+
+  // 230.17 — [static] Protocol 17 audit F-2: #karmaEventFilter now carries an
+  //          UNCONDITIONAL 16px font-size rule (css/40-curio-operations.css)
+  //          rather than only inside 60-fo3-pipboy.css's landscape-only
+  //          media query — portrait previously inherited the shared 14px
+  //          body size (iOS/Android focus-zoom risk on the owner's primary
+  //          orientation).
+  {
+    const curioCss23017 = readFile('css/40-curio-operations.css');
+    assert(
+      /#karmaEventFilter\s*\{\s*font-size:\s*16px;\s*\}/.test(curioCss23017),
+      "230.17: [static] #karmaEventFilter carries an unconditional 16px font-size rule in css/40-curio-operations.css (not gated inside 60-fo3-pipboy.css's landscape-only media query) — portrait now clears the iOS/Android focus-zoom threshold too, not just FO3-landscape"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

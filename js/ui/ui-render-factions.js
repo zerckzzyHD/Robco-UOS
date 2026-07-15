@@ -287,6 +287,13 @@ function applyKarmaEvent(eventId) {
   saveState();
   if (typeof updateKarmaUI === 'function') updateKarmaUI();
   renderKarmaCenter();
+  // Owner report: applying an action should confirm itself the same way a
+  // location change does — the existing top-right #locationCard toast
+  // (Protocol 22 — reused exactly as-is, never a second toast component).
+  if (typeof _locationCardShow === 'function') {
+    const sign = ev.delta > 0 ? '+' : '';
+    _locationCardShow('KARMA ' + sign + ev.delta + ' — ' + ev.label);
+  }
 }
 
 // The board, rebuilt (Protocol 22 — extends the existing renderKarmaCenter,
@@ -337,7 +344,9 @@ function renderKarmaCenter() {
     return (
       `<button class="${cls}" ${disabled ? 'disabled' : ''} onclick="applyKarmaEvent('${e.id}')" ` +
       `aria-label="${label} (${badge})${disabled ? ' — value unverified, cannot apply' : ' — apply'}">` +
-      `${label}<span class="tracker-meta">${escapeHtml(metaText)} &middot; ${badge}</span>` +
+      `<span class="karma-event-text"><span class="karma-event-label">${label}</span>` +
+      `<span class="tracker-meta">${escapeHtml(metaText)}</span></span>` +
+      `<span class="karma-event-badge">${badge}</span>` +
       `</button>`
     );
   };

@@ -454,6 +454,7 @@ export default [
         _wireChassisCoreEventBusSubscribers: 'readonly',
         _wireFeedbackEchoSubscribers: 'readonly',
         _wireLocationCardSubscriber: 'readonly',
+        _locationCardShow: 'readonly',
         _initBezelChrome: 'readonly',
         setupHpBarInteraction: 'readonly',
         setupRadBarInteraction: 'readonly',

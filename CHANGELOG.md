@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3236/3236 | Cache: robco-terminal-v2.8.0-r30 -->
+## [Unreleased]<!-- Tests: 3239/3239 | Cache: robco-terminal-v2.8.0-r31 -->
 
 ### Added
 
@@ -13,7 +13,7 @@
 - The Fallout 3 Pip-Boy's cargo screen now shows another row of items at a glance — its always-visible filter search box tucks behind a small tap-to-reveal search button by default, freeing up the room it used to take up permanently. The filter is still there, one tap away.
 - Added a safeguard that asks your browser to keep your save data around instead of quietly clearing it under low-storage conditions. If your browser can't guarantee that, a small warning banner now tells you so and reminds you to export a save file as backup — it clears itself once you tap it away.
 - The Fallout 3 Karma Center now shows your character's actual in-game karma title (like "Vault Guardian" at level 1 with good karma, or "Messiah" at level 30 with good karma) alongside your karma standing — it updates live as your karma or level changes, and covers all 90 titles from the real game.
-- Added a tappable list of real, in-game karma-changing actions (donating to a church, saving a captive, stealing from a locked container, and dozens more) to the Fallout 3 Karma Center — tapping one applies its exact karma value for you, so you don't have to do the math yourself. A handful of actions the game itself never gives an exact number for are shown but can't be tapped, clearly marked as unconfirmed rather than guessed. The karma slider is still there and still works, for manual adjustments or overriding these actions.
+- Added a tappable list of real, in-game karma-changing actions (donating to a church, saving a captive, stealing from a locked container, and dozens more) to the Fallout 3 Karma Center — each one now reads as a clear, bordered button with its karma value in its own badge (green for good, orange for evil), and tapping one applies its exact karma value for you and flashes a brief confirmation in the top-right corner, the same way changing location does. A handful of actions the game itself never gives an exact number for are shown but can't be tapped, clearly marked as unconfirmed rather than guessed. The karma slider is still there and still works, for manual adjustments or overriding these actions.
 
 ### Fixed
 
@@ -52,6 +52,7 @@
 - Fixed the Fallout 3 Karma Center warning about a hit-squad faction that doesn't actually exist in the game — it now correctly warns about the Regulators (once your karma turns evil) or Talon Company (once your karma turns good), matching the real game, instead of a made-up threat that only ever showed up at the most extreme evil karma and never warned good-karma characters at all, even though good karma gets you hunted too.
 - Fixed three companions showing the wrong karma requirement on the Fallout 3 Karma Center: Dogmeat and Charon never actually required any particular karma to recruit, and Butch DeLoria (who does require neutral karma) was missing from the list entirely. All eight companions and their real requirements now show correctly.
 - Fixed the Fallout 3 Karma Center printing your karma standing twice on the same screen.
+- Fixed the Fallout 3 Karma Center's action filter box showing distractingly small text in portrait mode — the wider fix that already sized it correctly in landscape was never applied to portrait, where most people actually use it. It now reads at the same comfortable size in every orientation.
 
 ### Under the Hood
 
