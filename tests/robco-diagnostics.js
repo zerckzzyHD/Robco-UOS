@@ -8456,8 +8456,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 //  cells match existing zones[], coord-based badge source guard,
 //  regression: no name-based badge logic, lincoln check present,
-//  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix.
-//  13 tests
+//  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix,
+//  bobblehead location-canon guard (Explosives→WKML, Unarmed→Rockopolis).
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
@@ -8663,6 +8664,29 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     !/Vault 92 South/.test(fo3RegSrc74) && /'Bethesda Offices East'/.test(fo3RegSrc74),
     "reg_fo3.js: fabricated 'Vault 92 South' replaced by real 'Bethesda Offices East' in the Bethesda Ruins zone (WU-D5)"
   );
+
+  // 74.14  Bobblehead location-canon guard: the Explosives and Unarmed collectible
+  //        location strings were pointing at the wrong in-game place (Explosives at
+  //        'Minefield — House #103', Unarmed at 'Sewers — Beneath Tepid Sewer').
+  //        fallout.wiki-verified (Protocol 3): the Explosives bobblehead is in the
+  //        sealed cistern at WKML Broadcast Station; the Unarmed bobblehead is in the
+  //        unmarked Rockopolis cave. Lock both corrected locations and fail if either
+  //        wrong string ever returns.
+  {
+    const exploLoc74 = (fo3RegSrc74.match(
+      /name:\s*'Explosives'[\s\S]{0,120}?location:\s*'([^']+)'/
+    ) || [])[1];
+    const unarmedLoc74 = (fo3RegSrc74.match(
+      /name:\s*'Unarmed'[\s\S]{0,120}?location:\s*'([^']+)'/
+    ) || [])[1];
+    assert(
+      /WKML BROADCAST STATION/.test(exploLoc74 || '') &&
+        /ROCKOPOLIS/.test(unarmedLoc74 || '') &&
+        !/MINEFIELD/.test(fo3RegSrc74) &&
+        !/TEPID/.test(fo3RegSrc74),
+      "reg_fo3.js: Explosives bobblehead → WKML Broadcast Station, Unarmed bobblehead → Rockopolis (fallout.wiki-verified); wrong 'Minefield'/'Tepid Sewer' strings stay gone"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

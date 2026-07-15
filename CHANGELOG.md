@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3247/3247 | Cache: robco-terminal-v2.8.0-r33 -->
+## [Unreleased]<!-- Tests: 3248/3248 | Cache: robco-terminal-v2.8.0-r34 -->
 
 ### Added
 
@@ -55,7 +55,8 @@
 - Fixed the Fallout 3 Karma Center's action filter box showing distractingly small text in portrait mode — the wider fix that already sized it correctly in landscape was never applied to portrait, where most people actually use it. It now reads at the same comfortable size in every orientation.
 - Fixed the Fallout 3 Karma Center's action list only being a compact, scrollable box in one screen orientation — the other orientation dumped all of its actions inline instead, pushing everything below it off screen. It's now a bounded, internally-scrolling list in both portrait and landscape, and scrolling past its edges still moves the rest of the screen underneath it.
 - Removed the three karma actions the game itself never gives an exact point value for (a general good deed in a quest, a general evil deed in a quest, and activating Project Purity yourself) from the tappable action list, since tapping them could never actually apply anything. They're kept on record as real, unconfirmed entries — only the unusable buttons are gone.
-- Fixed the Fallout 3 perk list containing five perks that don't actually exist in Fallout 3 — three made-up "companion" perks the game has no system for, and two damage-bonus perks that are really from New Vegas, not Fallout 3. Also fixed a perk misnamed "Scavenger" that should have read "Scrounger", and corrected roughly half of the perk list's level requirements (like Cannibal, which now correctly unlocks at level 12 instead of 6), so the ELIGIBLE PERKS lookup now tells you the real level each perk becomes available.
+- Fixed the Fallout 3 perk list containing six perks that don't actually exist in Fallout 3 — three made-up "companion" perks the game has no system for, and three weapon-damage perks that are really from New Vegas, not Fallout 3 (Laser Commander among them). Also fixed a perk misnamed "Scavenger" that should have read "Scrounger", and corrected roughly half of the perk list's level requirements (like Cannibal, which now correctly unlocks at level 12 instead of 6), so the ELIGIBLE PERKS lookup now tells you the real level each perk becomes available.
+- Corrected two Fallout 3 bobblehead locations that pointed at the wrong place: the Explosives bobblehead is at the WKML Broadcast Station (in its sealed cistern), not Minefield, and the Unarmed bobblehead is in the unmarked Rockopolis cave, not the Tepid Sewers. Both were checked against the Fallout wiki.
 
 ### Under the Hood
 
