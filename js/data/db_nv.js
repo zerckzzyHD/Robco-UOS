@@ -27,14 +27,18 @@
 // PROTOCOL 3 (ARMOR.CSV + CHEMS.CSV): re-verified on 2026-07-15 against the
 // fallout.wiki "Fallout: New Vegas Apparel", "Fallout: New Vegas headwear" and
 // "Fallout: New Vegas Consumables" master tables (plus individual item pages for
-// the outliers). ARMOR DT/Weight/Value are verified for 99 of the 103 rows —
+// the outliers). ARMOR DT/Weight/Value are verified for all 100 rows —
 // body armor, clothing AND headwear (the hats live on the separate headwear
-// page; a follow-up pass sourced them). The remaining 4 are LEFT AT THEIR PRIOR
-// VALUES and flagged UNVERIFIED, never guessed: "Wasteland Wanderer Outfit" (a
-// Fallout 3 item, not FNV), "Vault Utility Suit" (no FNV item by that name — the
-// real one is the Vault 3 utility jumpsuit), and "NCR Veteran Ranger Armor" +
-// "Ranger Combat Armor" (duplicate names for the one canonical NCR Ranger combat
-// armor, which is itself already present and verified). ARMOR Type and
+// page; a follow-up pass sourced them). The 4 rows once flagged UNVERIFIED were
+// resolved on 2026-07-15: "Wasteland Wanderer Outfit" IS a real FNV clothing
+// item (Endurance +1 / Agility +1, value 6, weight 2 — worn by Andy Scabb et
+// al.), so it was corrected (value 15→6, effect added) and pinned, NOT deleted;
+// "Vault Utility Suit" was DELETED (no FNV item by that name — the real one is
+// the Vault 3 Utility Jumpsuit, a different entry); and "NCR Veteran Ranger
+// Armor" + "Ranger Combat Armor" were DELETED as duplicate names for the one
+// canonical "NCR Ranger Combat Armor" (already present and verified) — a
+// data-driven alias in lookupItemInDb() still resolves either old name to that
+// canonical row, so no lookup regresses. ARMOR Type and
 // Min_CND_Threshold were NOT re-sourced (PARKED display columns); the Effects
 // column was left as-authored EXCEPT Chinese Stealth Armor, corrected to the
 // real FNV effect (Sneak +5 — the FNV set has no auto-Stealth-Boy, unlike the
@@ -332,8 +336,7 @@ Missile,Standard,1.0,0,1.0,3.0
 
 [ARMOR.CSV]
 Name,Type,DT,Weight,Value,Effects,Min_CND_Threshold
-Wasteland Wanderer Outfit,Light,0,2,15,None,50%
-Vault Utility Suit,Light,0,3,50,None,50%
+Wasteland Wanderer Outfit,Light,0,2,6,+1 END / +1 AGL,50%
 Leather Armor,Light,6,15,160,None,50%
 NCR Trooper Armor,Light,10,26,300,None,50%
 Gecko-Backed Leather Armor,Light,10,15,500,None,50%
@@ -344,11 +347,9 @@ Combat Armor,Medium,15,25,6500,None,50%
 Combat Armor Reinforced,Medium,17,25,8000,None,50%
 Legion Centurion Armor,Medium,18,35,800,None,50%
 Desert Ranger Combat Armor,Medium,22,30,8000,None,50%
-NCR Veteran Ranger Armor,Medium,22,30,9000,None,50%
 Elite Riot Gear,Medium,22,23,12500,+1 PER / +1 CHR,50%
 NCR Salvaged Power Armor,Heavy,20,40,3000,+1 STR,50%
 Brotherhood T-45d Power Armor,Heavy,22,45,4500,+2 STR,50%
-Ranger Combat Armor,Medium,20,30,7500,None,50%
 T-51b Power Armor,Heavy,25,40,5200,+1 STR / +1 CHA / +25 Rad Resist,50%
 Remnants Power Armor,Heavy,28,45,6500,+1 STR / +25 Rad Resist,50%
 Enclave Power Armor,Heavy,32,45,780,+1 STR / +25 Rad Resist,50%
@@ -805,6 +806,19 @@ Power Fist Ported Chambers,Power Fist,Increases attack speed,1500,0
 // Lazy-initializes parsed cache on first call so the CSV is only parsed once.
 let _itemCache = null;
 
+// ── ITEM NAME ALIASES ────────────────────────────────────────
+// Retired/duplicate item names that must still resolve to a canonical DB row.
+// Data-driven (Protocol 22): lookupItemInDb() consults this AFTER an exact match
+// and BEFORE the fuzzy fallback, so a search by a merged-away name deterministically
+// returns the real item's stats. This matters here — the fuzzy pass would otherwise
+// mis-resolve "Ranger Combat Armor" to the LONGER "Desert Ranger Combat Armor"
+// (value 8000), not the canonical "NCR Ranger Combat Armor" (value 7500). NV-scoped
+// data; db_fo3.js keeps its own lookup. Keys are lowercased; values are canonical Names.
+const _itemAliases = {
+  'ncr veteran ranger armor': 'NCR Ranger Combat Armor',
+  'ranger combat armor': 'NCR Ranger Combat Armor',
+};
+
 function _buildItemCache() {
   _itemCache = new Map();
   const tables = [
@@ -863,7 +877,13 @@ function lookupItemInDb(name) {
   // 1. Exact match
   const exact = _itemCache.get(key);
   if (exact) return exact;
-  // 2. Fuzzy fallback: skip very short tokens; substring match (longest name wins)
+  // 2. Alias: a retired/duplicate name resolves to its canonical row
+  const aliasTarget = _itemAliases[key];
+  if (aliasTarget) {
+    const canonical = _itemCache.get(aliasTarget.toLowerCase());
+    if (canonical) return canonical;
+  }
+  // 3. Fuzzy fallback: skip very short tokens; substring match (longest name wins)
   if (key.length < 3) return null;
   let best = null;
   let bestLen = 0;

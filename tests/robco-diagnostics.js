@@ -7887,11 +7887,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     return names;
   }
 
-  // 70.1  ARMOR.CSV row count ≥ 103 (62 original + 41 new unique apparel)
+  // 70.1  ARMOR.CSV row count ≥ 100 (62 original + 41 new unique apparel, minus
+  //        the 3 rows removed in the 2026-07-15 Protocol 3 cleanup: the fake
+  //        "Vault Utility Suit" and the two duplicate NCR-Ranger names now
+  //        aliased to canonical NCR Ranger Combat Armor — see Suite 232.23/232.24)
   const armorRows70 = getArmorRows70(dbNv70);
   assert(
-    armorRows70.length >= 103,
-    `ARMOR.CSV has ≥ 103 entries (found ${armorRows70.length}) — floor guard after unique apparel sweep`
+    armorRows70.length >= 100,
+    `ARMOR.CSV has ≥ 100 entries (found ${armorRows70.length}) — floor guard after unique apparel sweep + 2026-07-15 dedup`
   );
 
   // 70.2  MISC.CSV has Vault 13 Canteen
@@ -44123,7 +44126,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Weapons" master table (explosives' blast pulled per-page), THEN cited
 //  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
 //  a citation label proves nothing about a value; the pin does.
-//  22 tests
+//  24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 232 — FO3 + NV Weapon Data: Protocol 3 golden-master + plausibility guard');
@@ -44952,6 +44955,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   const NV_ARMOR_GOLDEN_232 = {
+    'Wasteland Wanderer Outfit': [0, 2, 6],
     'Leather Armor': [6, 15, 160],
     'NCR Trooper Armor': [10, 26, 300],
     'Gecko-Backed Leather Armor': [10, 15, 500],
@@ -45258,6 +45262,58 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         dbNvRaw.includes('Whiskey Rose') &&
         /NOT[\s\S]*re-sourced/.test(dbNvRaw),
       '232.22: [citation] db_nv.js header carries the dated ARMOR/CHEMS/BESTIARY provenance note (named master tables, UNVERIFIED bestiary, PARKED columns, Whiskey Rose removal)'
+    );
+  }
+
+  // 232.23 — [alias, BEHAVIORAL] the two retired duplicate armor names resolve
+  //          through the REAL lookupItemInDb() to the canonical NCR Ranger Combat
+  //          Armor stats (Weight 30, Value 7500) — proving the data-driven alias
+  //          map works end-to-end. The value distinguishes canonical (7500) from
+  //          the fuzzy-fallback's would-be wrong match Desert Ranger Combat Armor
+  //          (8000), so a green here means the alias fired, not the fuzzy pass.
+  {
+    const vm = require('vm');
+    const sb232 = { console };
+    vm.createContext(sb232);
+    vm.runInContext(readGroup('db_nv'), sb232);
+    const veteran232 = sb232.lookupItemInDb('NCR Veteran Ranger Armor');
+    const ranger232 = sb232.lookupItemInDb('Ranger Combat Armor');
+    const canonical232 = sb232.lookupItemInDb('NCR Ranger Combat Armor');
+    assert(
+      canonical232 &&
+        canonical232.val === 7500 &&
+        canonical232.wgt === 30 &&
+        veteran232 &&
+        veteran232.val === 7500 &&
+        veteran232.wgt === 30 &&
+        veteran232.type === 'armor' &&
+        ranger232 &&
+        ranger232.val === 7500 &&
+        ranger232.wgt === 30 &&
+        ranger232.type === 'armor',
+      `232.23: [alias] "NCR Veteran Ranger Armor" and "Ranger Combat Armor" both resolve via the real lookupItemInDb() to the canonical NCR Ranger Combat Armor (val 7500 / wgt 30 / armor) — got veteran ${JSON.stringify(veteran232)}, ranger ${JSON.stringify(ranger232)}, canonical ${JSON.stringify(canonical232)}`
+    );
+  }
+
+  // 232.24 — [deletions + correction] the Vault Utility Suit row (no such FNV item)
+  //          and the two duplicate NCR-Ranger rows are gone from db_nv.js ARMOR.CSV,
+  //          the canonical NCR Ranger Combat Armor survives, and the newly-verified
+  //          Wasteland Wanderer Outfit is corrected to Value 6 with its +1 END / +1
+  //          AGL effect. Sibling to 232.13 (weapon deletions) / 232.19 (chem deletion).
+  {
+    const gone232b = ['Vault Utility Suit', 'NCR Veteran Ranger Armor', 'Ranger Combat Armor'];
+    const stillPresent232b = gone232b.filter(n => n in nvArmor232);
+    const ww232 = nvArmor232['Wasteland Wanderer Outfit'];
+    const dbNvRaw232b = readGroup('db_nv');
+    assert(
+      stillPresent232b.length === 0 &&
+        'NCR Ranger Combat Armor' in nvArmor232 &&
+        ww232 &&
+        ww232[0] === 0 &&
+        ww232[1] === 2 &&
+        ww232[2] === 6 &&
+        /Wasteland Wanderer Outfit,Light,0,2,6,\+1 END \/ \+1 AGL,50%/.test(dbNvRaw232b),
+      `232.24: [deletions+correction] Vault Utility Suit + the 2 duplicate NCR-Ranger rows removed, canonical NCR Ranger Combat Armor kept, Wasteland Wanderer Outfit corrected to [DT 0, wgt 2, val 6] + effect — still-present ${JSON.stringify(stillPresent232b)}, ww ${JSON.stringify(ww232)}`
     );
   }
 }
