@@ -15139,94 +15139,92 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
-    // All 11 hashes updated together (Karma Engine rebuild, Protocol 8 Stage
-    // 2, v2.9.0): the directive text embeds `${APP_VERSION}` verbatim
-    // (js/services/api-directive.js's persona line), so EVERY row's hash
-    // shifts on any version bump, not just the two FO3 rows whose content
-    // actually changed. The FO3 rows carry an additional, real content
-    // change: ai.irreversibleTriggers was corrected from the fabricated
-    // "Enclave hit squads" / unqualified "Brotherhood Outcasts become
-    // hostile" claims to the real, cited Regulators (-250)/Talon Company
-    // (+250) hunt mechanics — see js/core/state.js and
-    // planning/KARMA_DATA.md. Both are intentional content changes, not
-    // regressions (Protocol 42).
+    // Only the two FO3 rows' hashes changed (Karma Engine rebuild, Protocol
+    // 8 Stage 2, 2.8.5 unreleased work — APP_VERSION stays 2.8.0, this is
+    // NOT a version bump): ai.irreversibleTriggers was corrected from the
+    // fabricated "Enclave hit squads" / unqualified "Brotherhood Outcasts
+    // become hostile" claims to the real, cited Regulators (-250)/Talon
+    // Company (+250) hunt mechanics — see js/core/state.js and
+    // planning/KARMA_DATA.md. An intentional content change, not a
+    // regression (Protocol 42). The 9 FNV rows are byte-identical to their
+    // pre-existing values since FNV's directive text never referenced this.
     const GOLDEN_MATRIX = [
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '25fd49cfb74b3c7ed84c8fd79cd35254afe3534037989ddfcbcb0a5664872d54',
+        sha256: '2fab15de30815451a041e71a48cfb2c5c10830c93302c76f791433fca32b0b13',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '73f6c7455f49e01c48984c4c67b7119b7f0afd9c2eacc4a621ab98a4aacfe861',
+        sha256: '4fe38b6130cb6a5aa53b9eaad79d8f0dea044369f5fab4a55ac3f36d275357f3',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: 'c0fe9352c6fcd759d7d9ac197861e7dc1bbe2797252955fe854184cab307c86f',
+        sha256: 'c08152e192bc3ca88a8c2cee734c0ffb4e684865e7cc75643012e03820a14a3e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'e787ef849e035d8a6af4f2b6eb441a991451259fb1311c1bb235eb0f702e0bb4',
+        sha256: 'f43a208c6c6e1cdb794d530c5c22353f921176ba22f38ce8025d70bdcc61a498',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '661fcf57db6ac94f44e19ca7838b0ac47a5b312b4663bc495bee46ea452091fc',
+        sha256: '5634c2b2c85ad0f848fc269fef7da318f2b9661692d05fb1ea367ae273b5bfe7',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'a847a204368a3de7e42dfe30302bdc87808591b0e5c146fbbc0d934170446402',
+        sha256: 'dda36c2be2bb76069e5e55ca900229a9063b64bc13ba195ec4039250299a9508',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '7d42137bf48eb50a5f35112ba59400385c2931ceda8012311fdd6555a48ba4ea',
+        sha256: '82ba297d3821af528667f684918a99914311e2ffbac27e2a09a1366250e3a05f',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '39dc84b3fbe0599aff1a504dc749d90a7226c8ce6e3f4a5b4de3d24163d410cb',
+        sha256: '86e2affd92e0fab06d2b16fbb73a1bee6c770d42903211611dd6cf19e0a83fd1',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: 'cd7ad05c353e902c5ed1b520d5978a358777de40773a94094bf9b09fd2d8cdb4',
+        sha256: '09a4b018aa2345ee2c22b5f0e7a133b707a6a2b29d270017b51e1d1d9047588f',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '69012e8ff8c67c39b4ed0393b7b987ee20e76ba37122b534384043f4ffa1f168',
+        sha256: 'deb5f7e8be43188b1f4cfd58d0d1dd02e071b2aa854d203ffb4380e184513e74',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'd47b4d9320e6a42f047e67cfee82a3a9e1486e1cda558b883c6e4e011180fb13',
+        sha256: 'f921e9d0a305c3e5452764118edd3e70d09cfd555dd1f48567982aa516b596af',
       },
     ];
 
@@ -19167,8 +19165,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         duplicated/hardcoded here too, which would go stale on every
   //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -19617,8 +19615,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        there per the rotation pattern documented at 151.18; kept generic
   //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 }
 
@@ -20832,12 +20830,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 157.19  APP_VERSION reflects the current version (bumped to 2.9.0 for
-  //         the FO3 Karma Engine rebuild — a new user-facing feature, MINOR
-  //         per Protocol 2; not yet released to main).
+  // 157.19  APP_VERSION is the released version (bumped at the v2.8.0 dev→release cut; Protocol 2)
   assert(
-    /APP_VERSION\s*=\s*'2\.9\.0'/.test(stateSource),
-    '157.19: APP_VERSION is 2.9.0 (current dev version)'
+    /APP_VERSION\s*=\s*'2\.8\.0'/.test(stateSource),
+    '157.19: APP_VERSION is 2.8.0 (released this version)'
   );
 }
 
@@ -21013,8 +21009,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.9\.0-r\d+'/.test(swSource),
-    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.9.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
 
   // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)

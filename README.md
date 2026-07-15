@@ -26,7 +26,7 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 
 [Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
-**Current version: 2.9.0 (in development, on top of "The Physical Machine")**
+**Current version: 2.8.0 — "The Physical Machine"**
 
 ---
 
@@ -366,7 +366,7 @@ The device made physical: the whole UI reframed as a reactive RobCo terminal —
 
 </details>
 
-### Current State (v2.9.0)
+### Current State (v2.8.0)
 
 A **production-quality, two-game browser application** with:
 

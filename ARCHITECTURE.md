@@ -1,6 +1,6 @@
 ﻿# RobCo U.O.S. — System Architecture
 
-> **Version:** 2.9.0
+> **Version:** 2.8.0
 > **Last Updated:** 2026-07-15
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
@@ -1747,7 +1747,7 @@ calls `reconcileEquipped(state)` directly, right beside the `_migrateEventLog` t
 already runs for the same reason, so the claim is true for every load path, including a plain reload.
 Protocol 13-regression-tested (Suite 221, expanded 11→16 tests to cover both follow-ups; Suite 12).
 
-**FO3 Karma Engine (Protocol 8 Stage 2, v2.9.0 — supersedes an earlier, narrower `karmaCompanions` fix):**
+**FO3 Karma Engine (Protocol 8 Stage 2, 2.8.5 unreleased work — supersedes an earlier, narrower `karmaCompanions` fix):**
 a deterministic, offline, zero-AI rebuild of `renderKarmaCenter()` (`js/ui/ui-render-factions.js`),
 replacing a shipped Protocol 3 violation (a fabricated "ENCLAVE HIT SQUAD" threat, three wrong companion
 gates, and zero of the game's 90 level-scaled karma titles) with the real, cited FO3 karma system. All
