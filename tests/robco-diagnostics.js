@@ -26,6 +26,10 @@ const ROOT = path.join(__dirname, '..');
 // ── Terminal helpers ───────────────────────────────────────────
 let passed = 0,
   failed = 0;
+// Set by Suite 28 (Meta guard) from CHANGELOG.md's canonical "Tests: N/N"
+// header; consumed by the end-of-run count reconciliation in RESULTS (the
+// Health-U3 re-point of the old tautological GATE_SUITES self-grep).
+let _canonicalTestCount28 = 0;
 // Promises any suite needs resolved before RESULTS prints/exits (the runner
 // body below is otherwise fully synchronous CommonJS — no top-level await).
 // Suite 137.6's confirmAction() behavioral proof is the sole current user.
@@ -1903,7 +1907,7 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Single-Runner Guard (Group 7)
-//  Verifies that the Node runner contains all gate-guard suites (22-40)
+//  Verifies that no suite can be silently dropped from the canonical runner
 //  and that the canonical test count matches README.md, ARCHITECTURE.md,
 //  and (conditionally, if present) RULES.md and CLAUDE.md.
 //
@@ -1914,108 +1918,26 @@ header('Assets Completeness');
 //  "PS runner contains all suites" assertion below is now inverted into a
 //  regression guard that the mirror stays gone (Protocol 36b escape-ratchet).
 //
+//  Health-U3 slice 1 (2026-07-16): the old GATE_SUITES check — an 84-entry
+//  'Suite N' array grepped against THIS runner's own source — was
+//  TAUTOLOGICAL (verified in the U2 audit): the probe strings were satisfied
+//  by the array literal itself, so deleting any listed suite's entire block
+//  could never fail it. (It was meaningful pre-U-B3, when it probed the
+//  OTHER runner — the deleted PS mirror.) It is REPLACED by the end-of-run
+//  count reconciliation in RESULTS: the number of tests that ACTUALLY
+//  EXECUTED this run must equal the canonical CHANGELOG.md count parsed
+//  below (_canonicalTestCount28). A dropped suite shrinks the runtime count
+//  and fails the gate; an added/removed test without the Protocol 2a doc
+//  sync fails it too — the honor-system count discipline is now mechanical.
+//
 //  NOTE: source-level assert() counts cannot reliably track runtime test
-//  counts because loops multiply results at runtime. The single Node runner
-//  is the canonical source; it must contain every named suite.
-//  7 tests
+//  counts because loops multiply results at runtime — which is exactly why
+//  the reconciliation compares the RUNTIME counters, not source greps.
+//  7 tests (6 here + the end-of-run reconciliation, which executes at
+//  RESULTS after every suite has run and is bookkept to this suite)
 // ══════════════════════════════════════════════════════════════
 header('Meta / Single-Runner Guard');
 {
-  const jsRunner = readFile('tests/robco-diagnostics.js');
-
-  // Structural: the Node runner must contain every gate-guard suite marker (22-40).
-  // A missing marker means a suite was dropped from the canonical runner.
-  const GATE_SUITES = [
-    'Suite 22',
-    'Suite 23',
-    'Suite 24',
-    'Suite 25',
-    'Suite 26',
-    'Suite 27',
-    'Suite 28',
-    'Suite 29',
-    'Suite 30',
-    'Suite 31',
-    'Suite 32',
-    'Suite 33',
-    'Suite 34',
-    'Suite 35',
-    'Suite 36',
-    'Suite 37',
-    'Suite 38',
-    'Suite 39',
-    'Suite 40',
-    'Suite 41',
-    'Suite 49',
-    'Suite 50',
-    'Suite 51',
-    'Suite 52',
-    'Suite 53',
-    'Suite 54',
-    'Suite 55',
-    'Suite 56',
-    'Suite 57',
-    'Suite 58',
-    'Suite 59',
-    'Suite 60',
-    'Suite 61',
-    'Suite 62',
-    'Suite 63',
-    'Suite 64',
-    'Suite 65',
-    'Suite 66',
-    'Suite 67',
-    'Suite 68',
-    'Suite 69',
-    'Suite 70',
-    'Suite 71',
-    'Suite 72',
-    'Suite 73',
-    'Suite 74',
-    'Suite 75',
-    'Suite 76',
-    'Suite 77',
-    'Suite 78',
-    'Suite 79',
-    'Suite 80',
-    'Suite 81',
-    'Suite 82',
-    'Suite 83',
-    'Suite 84',
-    'Suite 85',
-    'Suite 86',
-    'Suite 87',
-    'Suite 88',
-    'Suite 89',
-    'Suite 90',
-    'Suite 91',
-    'Suite 92',
-    'Suite 93',
-    'Suite 94',
-    'Suite 95',
-    'Suite 96',
-    'Suite 97',
-    'Suite 98',
-    'Suite 99',
-    'Suite 100',
-    'Suite 101',
-    'Suite 102',
-    'Suite 103',
-    'Suite 104',
-    'Suite 105',
-    'Suite 106',
-    'Suite 107',
-    'Suite 108',
-    'Suite 109',
-    'Suite 110',
-    'Suite 111',
-  ];
-  const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
-  assert(
-    jsMissing.length === 0,
-    'Node runner contains all gate-guard suites (22-41, 49-100)' +
-      (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
-  );
   // Regression guard (2.8.5 U-B3, Protocol 36b): the PowerShell mirror was
   // deleted and Protocol 15 retired — assert it does not silently creep back.
   assert(
@@ -2043,6 +1965,9 @@ header('Meta / Single-Runner Guard');
     ? String(Math.max(...countMatches.map(m => parseInt(m[1], 10))))
     : '';
   assert(!!canonicalCount, 'CHANGELOG.md contains Tests: N/N header (Protocol 2a)');
+  // Feed the end-of-run count reconciliation (RESULTS) — the Health-U3
+  // re-point of the retired tautological GATE_SUITES self-grep.
+  _canonicalTestCount28 = parseInt(canonicalCount, 10) || 0;
   const readme = readFile('README.md');
   assert(
     !!canonicalCount &&
@@ -7310,10 +7235,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 66 — FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
-//  state.lincolnItems, migration, autoImportState validated map,
-//  reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards,
-//  'other' vocab removed + coercion guard.
-//  20 tests
+//  state.lincolnItems, migration, reg_fo3 array,
+//  GAME_DEFS.FO3.tracksLincoln, render/handler guards, 'other' vocab removed.
+//  Health-U3 slice 1 (2026-07-16): the four static autoImportState() greps
+//  (66.3 plain-object check, 66.4 vocab, 66.5 registry-key filter, 66.20
+//  legacy-'other' coercion — the last satisfiable by a comment) were
+//  CONVERTED to behavioral tests that execute the real function against the
+//  real reg_fo3.js — now Suite 76's 76.12–76.14.
+//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 Lincoln Memorabilia Tracker');
@@ -7344,43 +7273,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 66.3  autoImportState() has lincolnItems plain-object check
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /lincolnItems/.test(importBody) && /Array\.isArray/.test(importBody),
-      'autoImportState() validates lincolnItems as plain object (not array) before importing'
-    );
-  }
-
-  // 66.4  autoImportState() validates vocabulary before accepting disposition values
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /LINCOLN_VOCAB/.test(importBody) &&
-        /hannibal/.test(importBody) &&
-        /washington/.test(importBody),
-      'autoImportState() uses LINCOLN_VOCAB list to validate disposition values (Protocol 24)'
-    );
-  }
-
-  // 66.5  autoImportState() filters keys against registry item names (no arbitrary keys accepted)
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /registryNames/.test(importBody) && /lincolnMemorabilia/.test(importBody),
-      'autoImportState() filters lincolnItems keys against registry names (Protocol 24 — no arbitrary keys)'
-    );
-  }
+  // 66.3–66.5  CONVERTED to behavioral (Health-U3 slice 1) — the plain-object
+  //  check, disposition-vocab validation, and registry-key filtering of the
+  //  autoImportState() Lincoln path are now EXECUTED for real in Suite 76
+  //  (76.12–76.14) against the real reg_fo3.js, replacing the token-presence
+  //  greps that stayed green with the logic inverted.
 
   // 66.6  reg_fo3.js has lincolnMemorabilia array (non-empty)
   assert(
@@ -7496,17 +7393,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     "ui-render.js opts array does not include 'other' option — removed in Change 2"
   );
 
-  // 66.20  autoImportState() coerces legacy 'other' disposition to 'found'
-  {
-    let importBody66b = '';
-    try {
-      importBody66b = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /other.*found|coerced/.test(importBody66b),
-      "autoImportState() coerces legacy 'other' disposition to 'found' for backward-compatibility"
-    );
-  }
+  // 66.20  CONVERTED to behavioral (Health-U3 slice 1) — the legacy-'other'→
+  //  'found' coercion grep (/other.*found|coerced/ — satisfiable by a source
+  //  COMMENT) is now Suite 76's 76.12, which imports {"Lincoln's Repeater":
+  //  "other"} through the real function and asserts the stored disposition.
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -8821,32 +8711,143 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 76 — autoImportState Hardening Guards (F1/F2/F3)
-//  9 tests
+//  Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) —
+//  BEHAVIORAL (Health-U3 slice 1, 2026-07-16).
+//
+//  F1 (status-type whitelist) and F2 (explicit null clears an equipped slot)
+//  were previously asserted by token-presence greps over the function source
+//  — green even with the logic inverted. They now EXECUTE the REAL extracted
+//  autoImportState() body in a vm sandbox against the REAL js/core/state.js +
+//  registry (the Suite 133/229 harness idiom) and assert the actual resulting
+//  state. The Lincoln disposition validation (formerly Suite 66's static
+//  66.3–66.5/66.20 — 66.20 was satisfiable by a comment) folds into the same
+//  harness here, against the REAL reg_fo3.js.
+//
+//  Twin-check (U2 §2 A1, re-verified against source before converting):
+//  - test.html Suite 4 only sets equipped on a FRESH state (preserves a null
+//    headgear; never proves CLEARING a previously-set slot).
+//  - test.html Suite 7's status tests use only valid types.
+//  - test.html Suite 8's 'weird'→BUFF + 'other'→found coverage exercises
+//    sanitizeImportedContainer() — a DIFFERENT function from this one.
+//  - Suite 221.9 proves reconcileEquipped()'s dangling-clear (inventory
+//    omission) — a different mechanism from the explicit-null clear.
+//  - Suite 229.6 proves lincolnItems SURVIVES a registry mismatch — not the
+//    trusted-path validation semantics.
+//  None of the behavioral tests below duplicates existing coverage. F3
+//  (collectibles registry allow-list) already has behavioral twins (Suite
+//  133's collectibles test + 229.7/229.8 + test.html Suite 6), so its static
+//  Protocol-20 pins are KEPT as-is, not re-proven.
+//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3)');
+  header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
   const apiSrc76 = readGroup('api');
   let importBody76 = '';
   try {
     importBody76 = extractFunctionBody(apiSrc76, 'autoImportState');
   } catch (_) {}
 
-  // ── Fix 2: equipped unequip ──────────────────────────────────────────────
+  // ── vm harness (Suite 133/229 idiom: real state.js + real registry +
+  //    real extracted autoImportState body, executed — not grepped) ─────────
+  const vm76 = require('vm');
+  let hNV76 = null;
+  let hFO76 = null;
+  let harnessErr76 = null;
+  function makeHarness76(regStem) {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+    };
+    vm76.createContext(sandbox);
+    vm76.runInContext(stateSource, sandbox);
+    vm76.runInContext(readGroup(regStem), sandbox);
+    vm76.runInContext(
+      'function autoImportState(jsonString)' +
+        importBody76 +
+        '\nthis.autoImportState = autoImportState;',
+      sandbox
+    );
+    return {
+      sandbox,
+      defaults: vm76.runInContext('JSON.parse(JSON.stringify(state))', sandbox),
+    };
+  }
+  try {
+    hNV76 = makeHarness76('reg_nv');
+    hFO76 = makeHarness76('reg_fo3');
+  } catch (e) {
+    harnessErr76 = e;
+  }
+  function live76(h) {
+    return vm76.runInContext('JSON.parse(JSON.stringify(state))', h.sandbox);
+  }
+  function behavior76(label, h, seed, fn) {
+    if (!h) {
+      fail(`${label}  (harness error: ${harnessErr76 && harnessErr76.message})`);
+      return;
+    }
+    try {
+      const s = Object.assign({}, h.defaults, seed || {});
+      vm76.runInContext('state = ' + JSON.stringify(s) + ';', h.sandbox);
+      assert(fn(), label);
+    } catch (e) {
+      fail(`${label}  (runtime error: ${e.message})`);
+    }
+  }
+  // Every weapon/armor name below is ALSO seeded into inventory, so the
+  // reconcileEquipped() pass autoImportState runs afterwards (state.js) can
+  // never be the thing clearing a slot — these tests isolate the
+  // explicit-null 'key in obj' semantics, not the dangling-item reconciler
+  // (that mechanism is Suite 221.9's subject).
+  const EQUIP_SEED76 = {
+    inventory: [
+      { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+      { name: 'Hunting Rifle', qty: 1, wgt: 7, val: 300, type: 'weapon' },
+      { name: 'Leather Armor', qty: 1, wgt: 8, val: 120, type: 'armor' },
+    ],
+    equipped: { weapon: '10mm Pistol', armor: 'Leather Armor', headgear: 'Lucky Shades' },
+  };
 
-  // 76.1  equipped block uses 'key' in obj (key-present test — distinguishes null from absent)
-  assert(
-    /'weapon'\s+in\s+e/.test(importBody76),
-    "autoImportState equipped: 'weapon' in e pattern present (key-present test, not falsy-check)"
+  // ── Fix 2 (F2): explicit null clears an equipped slot — BEHAVIORAL ──────
+  behavior76(
+    "76.1: [behavioral] {equipped:{weapon:null}} CLEARS the equipped weapon slot, while the slots whose keys are absent (armor/headgear) keep their values — the 'key in obj' null-vs-absent semantics, executed for real",
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ equipped: { weapon: null } }));
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === null && eq.armor === 'Leather Armor' && eq.headgear === 'Lucky Shades';
+    }
+  );
+  behavior76(
+    '76.2: [behavioral] explicit null clears ALL THREE slots (weapon/armor/headgear) when the AI sends all three as null — no slot is exempt from the unequip path',
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ equipped: { weapon: null, armor: null, headgear: null } })
+      );
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === null && eq.armor === null && eq.headgear === null;
+    }
+  );
+  behavior76(
+    '76.3: [behavioral] the positive path is unregressed — {equipped:{weapon:"Hunting Rifle"}} re-equips the named (inventory-present) item and leaves the untouched slots alone',
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ equipped: { weapon: 'Hunting Rifle' } }));
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === 'Hunting Rifle' && eq.armor === 'Leather Armor';
+    }
   );
 
-  // 76.2  all three slots use 'in' check
-  assert(
-    /'armor'\s+in\s+e/.test(importBody76) && /'headgear'\s+in\s+e/.test(importBody76),
-    "autoImportState equipped: 'armor' in e and 'headgear' in e also present (all three slots covered)"
-  );
-
-  // 76.3  Regression: old || short-circuit absent from equipped section
+  // 76.4  Regression NEG (kept static — absence can only be grepped): old ||
+  //       short-circuit stays gone from the equipped section
   {
     const eqIdx76 = importBody76.indexOf('parsed.equipped');
     const eqBlock76 = eqIdx76 !== -1 ? importBody76.slice(eqIdx76, eqIdx76 + 400) : '';
@@ -8856,21 +8857,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // ── Fix 3: collectibles registry-validation ──────────────────────────────
+  // ── Fix 3: collectibles registry-validation (kept static — behavioral
+  //    twins already exist: Suite 133 + 229.7/229.8 + test.html Suite 6) ────
 
-  // 76.4  collectibles block references FALLOUT_REGISTRY.collectibles
+  // 76.5  collectibles block references FALLOUT_REGISTRY.collectibles
   assert(
     /FALLOUT_REGISTRY\.collectibles/.test(importBody76),
     'autoImportState collectibles: FALLOUT_REGISTRY.collectibles referenced (registry-validated, not freeform)'
   );
 
-  // 76.5  collectibles block uses Set-based name guard
+  // 76.6  collectibles block uses Set-based name guard
   assert(
     /_collectNames\.has\(c\)/.test(importBody76),
     'autoImportState collectibles: _collectNames.has(c) guard active (hallucinated names rejected)'
   );
 
-  // 76.6  Regression: old permissive c.trim() filter absent from collectibles block
+  // 76.7  Regression: old permissive c.trim() filter absent from collectibles block
   {
     const colIdx76 = importBody76.indexOf('parsed.collectibles');
     const colBlock76 = colIdx76 !== -1 ? importBody76.slice(colIdx76, colIdx76 + 600) : '';
@@ -8880,25 +8882,59 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // ── Fix 1: status type whitelist ─────────────────────────────────────────
-
-  // 76.7  status type assignment uses BUFF/DEBUFF/NEUTRAL whitelist
-  {
-    const stIdx76 = importBody76.indexOf('st.map(item =>');
-    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
-    assert(
-      /\['BUFF',\s*'DEBUFF',\s*'NEUTRAL'\]/.test(stBlock76),
-      'autoImportState status: BUFF/DEBUFF/NEUTRAL whitelist array present in status type assignment'
-    );
-  }
-
-  // 76.8  status uses item.type with .toUpperCase() normalization
-  assert(
-    /String\(item\.type\)\.toUpperCase\(\)/.test(importBody76),
-    'autoImportState status: String(item.type).toUpperCase() present (type normalized to uppercase)'
+  // ── Fix 1 (F1): status-type whitelist — BEHAVIORAL ──────────────────────
+  // ticks: 0 (permanent) throughout, so the tick-down pass that runs after
+  // the status map can never expire the effects under test.
+  behavior76(
+    "76.8: [behavioral] a status type outside the BUFF/DEBUFF/NEUTRAL whitelist ('banana') is coerced to 'BUFF' — never stored raw (broken invalid types would corrupt the tick-down/render contract)",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ status: [{ name: 'Mystery Glow', ticks: 0, type: 'banana' }] })
+      );
+      const st = live76(hNV76).status;
+      return st.length === 1 && st[0].name === 'Mystery Glow' && st[0].type === 'BUFF';
+    }
+  );
+  behavior76(
+    "76.9: [behavioral] lowercase whitelist members are normalized, not rejected — 'debuff' → 'DEBUFF', 'neutral' → 'NEUTRAL' (the String(...).toUpperCase() path, executed)",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          status: [
+            { name: 'Slowed', ticks: 0, type: 'debuff' },
+            { name: 'Focused', ticks: 0, type: 'neutral' },
+          ],
+        })
+      );
+      const st = live76(hNV76).status;
+      return (
+        st.length === 2 &&
+        st.find(e => e.name === 'Slowed').type === 'DEBUFF' &&
+        st.find(e => e.name === 'Focused').type === 'NEUTRAL'
+      );
+    }
+  );
+  behavior76(
+    "76.10: [behavioral] a bare-string status entry is normalized to the full shape { name, ticks: 0, type: 'BUFF' } — the AI's shorthand form never stores a malformed effect",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ status: ['Well Rested'] }));
+      const st = live76(hNV76).status;
+      return (
+        st.length === 1 &&
+        st[0].name === 'Well Rested' &&
+        st[0].ticks === 0 &&
+        st[0].type === 'BUFF'
+      );
+    }
   );
 
-  // 76.9  Regression: raw item.type || 'BUFF' (no whitelist) absent from status section
+  // 76.11  Regression NEG (kept static): raw item.type || 'BUFF' passthrough stays gone
   {
     const stIdx76 = importBody76.indexOf('st.map(item =>');
     const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
@@ -8907,6 +8943,51 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
     );
   }
+
+  // ── Lincoln disposition validation (FO3) — BEHAVIORAL (converted from
+  //    Suite 66's static 66.3–66.5/66.20) ──────────────────────────────────
+  // Seeds set gameContext: 'FO3' so FALLOUT_REGISTRY.game ('FO3', reg_fo3.js)
+  // matches and _registryTrusted holds — these exercise the TRUSTED-path
+  // validation (Suite 229.6 owns the mismatch path).
+  behavior76(
+    "76.12: [behavioral] legacy 'other' Lincoln disposition is coerced to 'found' on import — the real coercion executes, not a comment-satisfiable grep (formerly 66.20)",
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: {} },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'other' } })
+      );
+      return live76(hFO76).lincolnItems["Lincoln's Repeater"] === 'found';
+    }
+  );
+  behavior76(
+    "76.13: [behavioral] Lincoln import keeps ONLY registry-named keys with whitelisted dispositions — an arbitrary AI-injected key and an off-vocabulary disposition are both dropped (formerly 66.4/66.5's grep)",
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: {} },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({
+          lincolnItems: {
+            "Lincoln's Repeater": 'hannibal',
+            'Totally Fake Artifact 76': 'found',
+            "Lincoln's Hat": 'bogus-disposition',
+          },
+        })
+      );
+      const li = live76(hFO76).lincolnItems;
+      return Object.keys(li).length === 1 && li["Lincoln's Repeater"] === 'hannibal';
+    }
+  );
+  behavior76(
+    '76.14: [behavioral] an array-shaped lincolnItems payload is ignored — the plain-object check leaves existing dispositions untouched (formerly 66.3)',
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: { "Lincoln's Hat": 'washington' } },
+    () => {
+      hFO76.sandbox.autoImportState(JSON.stringify({ lincolnItems: ['found', 'hannibal'] }));
+      const li = live76(hFO76).lincolnItems;
+      return Object.keys(li).length === 1 && li["Lincoln's Hat"] === 'washington';
+    }
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -45521,6 +45602,27 @@ Promise.all(_pendingAsync)
     fail('Unhandled error in an async suite: ' + (e && e.message));
   })
   .then(() => {
+    // ── Suite 28 (part 2) — end-of-run count reconciliation ──────────────
+    // Health-U3 slice 1 (2026-07-16, Protocol 36b): replaces Suite 28's old
+    // GATE_SUITES self-grep, which was TAUTOLOGICAL — it searched this
+    // runner's own source for 'Suite N' strings that the GATE_SUITES array
+    // literal itself contained, so deleting any listed suite's whole block
+    // left every probe self-satisfied. The re-point: the number of tests
+    // that ACTUALLY EXECUTED this run must equal the canonical documented
+    // count parsed from CHANGELOG.md in Suite 28. This can genuinely fail:
+    // a silently dropped suite (the class the old check claimed to guard)
+    // shrinks the runtime count; an added/removed test without the Protocol
+    // 2a doc sync diverges it the other way. Runs HERE — after Promise.all —
+    // so every suite (including the deferred async 137.6 proof) has already
+    // recorded its results.
+    header('Meta / Single-Runner Guard — end-of-run count reconciliation (Suite 28)');
+    {
+      const runtimeTotal28 = passed + failed + 1; // +1: this reconciliation assert is itself the run's final test
+      assert(
+        _canonicalTestCount28 > 0 && runtimeTotal28 === _canonicalTestCount28,
+        `runtime-executed test count (${runtimeTotal28}) equals the canonical CHANGELOG.md count (${_canonicalTestCount28}) — a dropped suite or an unsynced Protocol 2a count fails the gate here`
+      );
+    }
     console.log('\n══════════════════════════════════════════════════════════════\n');
     if (failed === 0) {
       console.log(green(`  ALL ${passed} TESTS PASSED — persistence fully verified.`));
