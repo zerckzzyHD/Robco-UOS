@@ -411,12 +411,26 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
   // selection (e.g. STATUS) would otherwise outrank the board the user
   // ACTUALLY switched to (e.g. CHASSIS) purely because querySelector()
   // returns the first DOM match, not the currently-relevant one.
+  // The board the user actually lands on at scrollTop=0 = the FIRST tab-visible
+  // panel that is actually DISPLAYED (not display:none), in DOM order.
+  //  - FO3 landscape: the subtab CSS sets `:not(.subtab-active){display:none}`,
+  //    so the only displayed tab-visible panel IS the active subtab's board —
+  //    this resolves to it exactly as the old subtab-active-first selector did.
+  //  - Flat / FO3-portrait / NV: no subtab CSS applies, so every tab-visible
+  //    panel is stacked and displayed; the user lands on the FIRST one in DOM
+  //    order. A `.subtab-active` class is still JS-stamped on a board that can
+  //    sit far down the stack (a landscape-only visual concept) — before the
+  //    flat view became a bounded scroller the old selector "passed" only
+  //    because the unbounded #fo3BoardScroll spanned the whole document, so a
+  //    subtab-active board buried below the fold still intersected it. Now that
+  //    the scroller is correctly bounded, "the landing board" must be the first
+  //    displayed board the user sees, NOT a subtab-active one below the fold.
+  //    Filtering by real display also drops any stale subtab-active in a hidden
+  //    panel — strictly more robust than the old querySelector-order heuristic.
   const activeRoot =
-    document.querySelector('#fo3BoardScroll [data-subtab].subtab-active.tab-visible') ||
-    document.querySelector('.panel.tab-visible:not([data-subtab])') ||
-    document.querySelector('.panel.tab-visible') ||
-    document.querySelector('#fo3BoardScroll [data-subtab].subtab-active') ||
-    document.body;
+    [...document.querySelectorAll('.panel.tab-visible')].find(
+      el => getComputedStyle(el).display !== 'none'
+    ) || document.body;
 
   const findings = {
     occluded: [],
@@ -502,13 +516,6 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
         findings.occluded.push({
           el: el.tagName + (el.id ? '#' + el.id : ''),
           hit: hit ? hit.tagName + (hit.id ? '#' + hit.id : '') : null,
-          // U8: precise dock-membership check — is the ACTUAL occluding
-          // element (or an ancestor of it) inside the fixed bezel dock
-          // (`.bezel`, index.html)? Captured here (inside the page) because
-          // only the live DOM node, not the tag-name string above, can
-          // answer `.closest('.bezel')` — see filterKnownPreexisting()'s
-          // own header for why this replaced a bare-tag-name allowlist.
-          hitInBezelDock: !!(hit && hit.closest && hit.closest('.bezel')),
         });
       }
     }
@@ -643,85 +650,26 @@ function pageProbe({ contrastSel, spinnerStrippedIds }) {
   return findings;
 }
 
-// U7 — CONFIRMED PRE-EXISTING DEFECT, QUARANTINED AND FLAGGED (NOT A FALSE
-// POSITIVE, NOT SILENCED).
+// Bottom-dock occlusion — FIXED (planning/DOCK_OCCLUSION_PLAN.md).
 //
-// Broadening this check from one FO3-landscape setup to the full 12-load
-// matrix surfaced ~15 raw findings on New Vegas/FO3-portrait the first time
-// it ran (views this check had simply never probed before). Each one was
-// individually investigated (Protocol 27). Almost all of them turned out to
-// be either a real, fixable bug (fixed in this commit — see the U7 report
-// for the full list: the mobile bezel dock's padding-bottom reserve was
-// 12px short of the dock's real height; #cal_year/#stat_rads/#craftQty_*/
-// #scrapQty_* clipped their own values against the native number-spinner
-// reserve; the STATUS-EFFECTS purge button and the quest board's cycle/
-// delete buttons were unreadable against their own background — all fixed
-// with regression coverage, not hidden) or a genuine bug IN THIS CHECK
-// itself (also fixed: type=checkbox/radio false-flagged as truncated text;
-// the world map's pan/zoom SVG wrongly held to a linear-scroll standard; a
-// stale FO3-landscape .subtab-active leaking into the flat/portrait probe;
-// contrast probed on a container button's own inherited colour instead of
-// its actual visible child glyph; and — the one this session introduced
-// itself — a literal curly brace inside a CSS comment that silently broke
-// this file's own findSpinnerStrippedIds() parser).
-//
-// What's left after all of that is ONE remaining, confirmed-real, distinct
-// root cause, not fifteen unrelated ones:
-//
-//   New Vegas / FO3-portrait's bottom bezel dock (`.bezel`) is
-//   `position:fixed` on every viewport under 1000px (css/10-chrome.css) —
-//   deliberate, long-standing, load-bearing chrome, not a bug in itself.
-//   Whatever page content happens to render in that dock's own footprint
-//   AT THE CURRENT SCROLL POSITION gets visually covered by it — confirmed
-//   with a real screenshot (S.P.E.C.I.A.L.'s fader inputs visibly cut off
-//   under the dock on NV's own STAT tab, see the U7 report) and with hard
-//   numbers (the dock renders at up to 112px tall). This reproduces on
-//   MANIFEST/INVENTORY's drawer controls, on the quest board's objective
-//   field, and on SPECIAL's attribute inputs specifically because those
-//   panels' natural (unscrolled) height happens to end inside the dock's
-//   footprint on a 360-412px-tall phone screen — an inherent consequence of
-//   ANY fixed-bottom-bar layout applied to variable-height content, not
-//   something introduced by this session.
-//
-// FIXING this for real means changing how NV's core navigation dock is
-// positioned relative to scrollable content (auto-scroll the landing
-// position, reflow the dock to not float over content, or something
-// similar) — a materially different, riskier change than anything else in
-// this unit, and exactly the kind of unprompted NV redesign this unit's own
-// hard constraint ("NV untouched") exists to prevent. It is NOT allowlisted
-// away as if it were noise — every occurrence is REAL and is logged loudly
-// here and in the U7 report as work this unit found but did not fix, owed
-// its own follow-up unit. ANY finding of ANY kind on the FO3 rail boards
-// (landscape/desktop) still fails the gate normally; nothing here widens
-// beyond the one confirmed root cause.
-//
-// U8 PRECISION FIX (audit punch-list item 1): U7 shipped this filter
-// matching occluders by BARE TAG NAME — the set contained literal 'DIV',
-// 'SPAN', 'NAV' alongside the specific #bezelTelemetry/#navkey-* ids. That
-// meant ANY id-less <div>/<span>/<nav> occluding ANYTHING on the flat view
-// would have been silently forgiven, not just the dock — true today only
-// because every id-less div/span/nav occluder happened to BE the dock; a
-// future, unrelated occlusion with an id-less hit target would have slipped
-// through undetected. Fixed by testing dock MEMBERSHIP directly
-// (hit.closest('.bezel') — captured inside the page in pageProbe(), see
-// `hitInBezelDock` above) instead of the hit element's bare tag name. This
-// is strictly narrower: it matches exactly the dock subtree, nothing else,
-// regardless of the occluder's tag or id.
-function filterKnownPreexisting(where, findings) {
-  if (process.env.RI_NO_ALLOWLIST) return findings; // audit switch — see the U7 report's raw-count methodology
-  // Scoped to the FLAT/legacy switchTab() view only (New Vegas + FO3
-  // portrait — `where` has no "subsystem/SUBTAB" slash there) — the fixed
-  // bezel dock is mobile-only chrome; it never applies to FO3 landscape/
-  // desktop, so those setups keep failing on ANY occlusion, full stop.
-  if (where.includes('/')) return findings;
-  return {
-    ...findings,
-    occluded: findings.occluded.filter(o => !o.hitInBezelDock),
-  };
-}
-
-function recordFindings(results, where, rawFindings) {
-  const findings = filterKnownPreexisting(where, rawFindings);
+// This check formerly quarantined flat-view (New Vegas + FO3-portrait)
+// occlusions whose occluder was inside the fixed bezel dock: broadening the
+// matrix to the full 12-load set had surfaced 14 controls that the 112px
+// position:fixed dock covered at landing scroll (STAT's S.P.E.C.I.A.L.
+// inputs, INVENTORY's drawer controls, the quest objective field,
+// DATABANK's search), because the flat view was a plain document-scroll page
+// with nothing bounding board content above the dock. That root cause is now
+// fixed at the source: the flat mobile view is a bounded 100dvh flex column
+// whose #fo3BoardScroll scroller ends at the dock's top edge (the same
+// app-shell UPLINK and FO3-landscape already use). The quarantine
+// (filterKnownPreexisting + the RI_NO_ALLOWLIST audit switch + the in-page
+// hitInBezelDock capture) is deleted: the 14 occlusions no longer exist, so
+// the check passes WITHOUT any filter, and — the Protocol 13/36b regression
+// guard — any future dock overlap now fails the gate normally, at the exact
+// viewports (NV 360/412, FO3 portrait 360, populated + empty) that failed
+// before the fix. No separate test file is needed; the 12-config matrix
+// already exercises every affected surface.
+function recordFindings(results, where, findings) {
   if (findings.onLandingVisible === false) {
     results.fail(
       '2b. ON-LANDING VISIBLE — ' +

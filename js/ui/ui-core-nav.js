@@ -358,7 +358,18 @@ function _scrollElFor(subsystem) {
     getIdentity().orientation === 'landscape-primary' &&
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(orientation: landscape)').matches;
-  return usesLandscapeShell ? document.getElementById('uiPanel') : null;
+  if (usesLandscapeShell) return document.getElementById('uiPanel');
+  // Flat mobile view (NV mobile + FO3 portrait): the bounded app-shell added
+  // for the bottom-dock occlusion fix (css/10-chrome.css, @media max-width:
+  // 999.98px) makes #fo3BoardScroll the ONE bounded internal scroller instead
+  // of the page itself scrolling — so per-subsystem scroll memory AND the
+  // map's scroll-preservation (both read THIS single lookup, Protocol 22) must
+  // target it, not window. Gated on the same media query the shell is scoped
+  // to, so a >=1000px touch device (no flat shell, page still scrolls) still
+  // falls back to window.
+  const usesFlatShell =
+    typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 999.98px)').matches;
+  return usesFlatShell ? document.getElementById('fo3BoardScroll') : null;
 }
 
 // Saves the CURRENT scroll offset under `subsystem`'s key. null el = the page

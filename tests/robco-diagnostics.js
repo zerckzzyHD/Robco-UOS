@@ -23162,10 +23162,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       return (
         /document\.querySelector\('\.panel\.chat-panel'\)/.test(body) &&
         /\(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\)/.test(body) &&
-        /document\.getElementById\('uiPanel'\)/.test(body)
+        /document\.getElementById\('uiPanel'\)/.test(body) &&
+        // Flat mobile view: the bounded #fo3BoardScroll internal scroller (the
+        // bottom-dock occlusion fix) gated on the (max-width:999.98px) shell
+        // media query — not window, so the map + scroll memory follow it.
+        /document\.getElementById\('fo3BoardScroll'\)/.test(body) &&
+        /\(max-width: 999\.98px\)/.test(body)
       );
     })(),
-    '166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint) and every other subsystem to #uiPanel gated by the SAME desktop matchMedia query used elsewhere (no drifted second breakpoint definition)'
+    '166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint), desktop/FO3-landscape to #uiPanel via their gated matchMedia queries, and the flat mobile view to the bounded #fo3BoardScroll scroller gated on the (max-width:999.98px) shell query (no drifted second breakpoint definition)'
   );
 
   // 166.6  switchTab() saves the outgoing subsystem's scroll BEFORE toggling
@@ -23281,6 +23286,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       const store = {};
       const uiPanelEl = { scrollTop: 0 };
       const chatPanelEl = { scrollTop: 0 };
+      const fo3BoardScrollEl = { scrollTop: 0 };
       const st = { desktop: desktop !== false, landscape: landscape === true, scrollY: 0 };
       const sb = {
         MetaStore: {
@@ -23296,18 +23302,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
             return sel === '.panel.chat-panel' ? chatPanelEl : null;
           },
           getElementById(id) {
-            return id === 'uiPanel' ? uiPanelEl : null;
+            return id === 'uiPanel' ? uiPanelEl : id === 'fo3BoardScroll' ? fo3BoardScrollEl : null;
           },
         },
         window: {
-          // FO3 PIP-BOY BUILD U2 owner-feedback pass: _scrollElFor() now
-          // probes TWO distinct media queries (the pre-existing desktop
-          // pointer/hover query and the new orientation:landscape query) —
-          // the stub must tell them apart instead of collapsing both onto
-          // one `desktop` flag, or the new FO3-landscape branch could never
-          // be exercised independently of the desktop branch.
+          // _scrollElFor() probes THREE distinct media queries: the desktop
+          // pointer/hover query, the orientation:landscape query, and (for the
+          // flat mobile bottom-dock-occlusion shell) a (max-width:999.98px)
+          // query. The stub tells them apart — orientation → landscape flag,
+          // max-width → the negation of the desktop-width flag (mobile width),
+          // everything else → the desktop flag — so each branch is exercised
+          // independently.
           matchMedia(q) {
-            return { matches: /orientation/.test(q) ? st.landscape : st.desktop };
+            if (/orientation/.test(q)) return { matches: st.landscape };
+            if (/max-width/.test(q)) return { matches: !st.desktop };
+            return { matches: st.desktop };
           },
           get scrollY() {
             return st.scrollY;
@@ -23326,7 +23335,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       };
       vm166.createContext(sb);
       vm166.runInContext(src166, sb);
-      return { sb, store, uiPanelEl, chatPanelEl, st };
+      return { sb, store, uiPanelEl, chatPanelEl, fo3BoardScrollEl, st };
     }
 
     let r166 = null,
@@ -23376,15 +23385,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           restored === true && chatPanelEl.scrollTop === 400 && uiPanelEl.scrollTop === 111;
       }
 
-      // 166.15 mobile (no desktop match) uses window.scrollY/scrollTo instead
-      //        of #uiPanel for a tab-gated subsystem
+      // 166.15 flat mobile view (no desktop, no landscape shell) uses the
+      //        bounded #fo3BoardScroll internal scroller (the bottom-dock
+      //        occlusion fix, css/10-chrome.css) for a tab-gated subsystem —
+      //        NOT window.scrollY, which no longer scrolls once the flat view
+      //        is a bounded app-shell. window is left untouched.
       {
-        const { sb, st } = makeSandbox166(false);
-        st.scrollY = 333;
+        const { sb, st, fo3BoardScrollEl } = makeSandbox166(false);
+        fo3BoardScrollEl.scrollTop = 333;
+        st.scrollY = 999; // must NOT be read/written on the flat mobile path
         sb._saveScrollFor('databank');
-        st.scrollY = 0;
+        fo3BoardScrollEl.scrollTop = 0;
         const restored = sb._restoreScrollFor('databank', true);
-        r166.mobileWindowScroll = restored === true && st.scrollY === 333;
+        r166.mobileFlatScroll =
+          restored === true && fo3BoardScrollEl.scrollTop === 333 && st.scrollY === 999;
       }
 
       // 166.16 _saveOutgoingScroll() is a no-op boot-safe guard when nothing
@@ -23430,16 +23444,26 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       }
 
       // 166.19 the SAME mobile width + landscape orientation, but WITHOUT
-      //        identity.orientation (a plain NV-shaped identity) falls back
-      //        to window.scrollY — proving 166.18 is gated on the identity
-      //        DATA, not on the orientation media query alone (Protocol 38).
+      //        identity.orientation (a plain NV-shaped identity) does NOT use
+      //        the FO3 landscape shell's #uiPanel — it uses the flat mobile
+      //        #fo3BoardScroll scroller (any <1000px width is the flat shell,
+      //        regardless of orientation, unless the identity opts into the
+      //        landscape shell). Proves 166.18 is gated on the identity DATA,
+      //        not on the orientation media query alone (Protocol 38): FO3
+      //        landscape → #uiPanel, NV → #fo3BoardScroll.
       {
-        const { sb, st } = makeSandbox166(false, {}, true);
-        st.scrollY = 88;
+        const { sb, st, uiPanelEl, fo3BoardScrollEl } = makeSandbox166(false, {}, true);
+        fo3BoardScrollEl.scrollTop = 88;
+        uiPanelEl.scrollTop = 555; // the FO3-landscape target — must stay untouched for NV
+        st.scrollY = 999; // window — must stay untouched too
         sb._saveScrollFor('operator');
-        st.scrollY = 0;
+        fo3BoardScrollEl.scrollTop = 0;
         const restored = sb._restoreScrollFor('operator', true);
-        r166.landscapeAloneIsNotEnough = restored === true && st.scrollY === 88;
+        r166.landscapeNvUsesFlatScroll =
+          restored === true &&
+          fo3BoardScrollEl.scrollTop === 88 &&
+          uiPanelEl.scrollTop === 555 &&
+          st.scrollY === 999;
       }
     } catch (e) {
       err166 = e;
@@ -23463,8 +23487,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       "166.14: [behavioral] UPLINK's .panel.chat-panel scroll offset round-trips independently of #uiPanel"
     );
     assert(
-      err166 === null && r166 && r166.mobileWindowScroll === true,
-      '166.15: [behavioral] on a mobile (non-desktop) breakpoint, scroll memory reads/writes window.scrollY/scrollTo instead of #uiPanel'
+      err166 === null && r166 && r166.mobileFlatScroll === true,
+      '166.15: [behavioral] on the flat mobile view, scroll memory reads/writes the bounded #fo3BoardScroll internal scroller (the bottom-dock occlusion fix) instead of window.scrollY — and leaves window untouched'
     );
     assert(
       err166 === null && r166 && r166.bootSafeNoop === true,
@@ -23479,8 +23503,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       "166.18: [behavioral, FO3 PIP-BOY BUILD U2 owner-feedback pass] at a mobile width with identity.orientation === 'landscape-primary' AND orientation:landscape matching, #uiPanel (not window.scrollY) is the scroll target — the FO3 landscape shell's own bounded, internally-scrolling region"
     );
     assert(
-      err166 === null && r166 && r166.landscapeAloneIsNotEnough === true,
-      '166.19: [behavioral] the SAME mobile-width landscape orientation with a plain NV-shaped identity (no orientation key) still falls back to window.scrollY — 166.18 is gated on identity data, never orientation alone (Protocol 38)'
+      err166 === null && r166 && r166.landscapeNvUsesFlatScroll === true,
+      '166.19: [behavioral] the SAME mobile-width landscape orientation with a plain NV-shaped identity (no orientation key) uses the flat mobile #fo3BoardScroll scroller, NOT the FO3 landscape shell #uiPanel — 166.18 is gated on identity data, never orientation alone (Protocol 38)'
     );
   }
 }
@@ -42170,28 +42194,38 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     assert(false, '224.12b: skipped — _renderFo3TopStrip extraction failed');
   }
 
-  // 224.13 — U8 audit punch-list item 1 (Protocol 42, highest-value item):
-  //          render-integrity.mjs's filterKnownPreexisting() used to
-  //          allowlist the known bezel-dock occlusion exception by BARE TAG
-  //          NAME (a CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS
-  //          Set containing literal 'DIV'/'SPAN'/'NAV') — which silently
-  //          forgave ANY id-less <div>/<span>/<nav> occluder on the flat
-  //          view, not just the dock. True today only because every id-less
-  //          div/span/nav occluder happened to be the dock — a future,
-  //          unrelated occlusion with an id-less hit target would have
-  //          slipped through undetected (the audit's own flagged latent
-  //          false-confidence gap). Locks that the check now scopes by dock
-  //          MEMBERSHIP (`hit.closest('.bezel')`, captured live in the page
-  //          via pageProbe()'s hitInBezelDock field) and that the old
-  //          bare-tag-name Set is gone for good.
+  // 224.13 — Bottom-dock occlusion FIXED (planning/DOCK_OCCLUSION_PLAN.md,
+  //          Protocol 13/36b escape-ratchet). render-integrity.mjs USED to
+  //          quarantine the flat-view (New Vegas + FO3-portrait) bezel-dock
+  //          occlusions — U7 flagged 14 controls the 112px position:fixed dock
+  //          covered at landing scroll, U8 tightened the allowlist to a precise
+  //          hit.closest('.bezel') dock-membership check (filterKnownPreexisting
+  //          + the RI_NO_ALLOWLIST audit switch + pageProbe()'s hitInBezelDock
+  //          field). That root cause is now fixed at the SOURCE: the flat mobile
+  //          view is a bounded 100dvh flex column whose #fo3BoardScroll scroller
+  //          ends above the fixed dock (css/10-chrome.css), the same app-shell
+  //          UPLINK and FO3-landscape already use — so the 14 occlusions no
+  //          longer exist. The entire quarantine is DELETED: render-integrity
+  //          passes WITHOUT any filter, and any future dock overlap fails the
+  //          gate normally at the exact viewports that failed before the fix.
+  //          This locks the quarantine machinery gone for good, so no allowlist
+  //          of any generation can ever silently mask a real dock occlusion
+  //          again (the escape-ratchet turns the old exception into a hard
+  //          assertion).
   const riSrc224_13 = readFile('tests/render-integrity.mjs');
+  // Match on CODE signatures, not bare words — the file's own header comment
+  // legitimately NAMES the deleted machinery to explain the fix, so we assert
+  // the actual constructs are gone: the function definition, the env read, and
+  // the in-page probe property (none of which can appear in prose).
   assert(
-    riSrc224_13.includes(".closest('.bezel')"),
-    "224.13a: render-integrity.mjs filters occlusion findings by hit.closest('.bezel') dock-membership, not by the occluder's bare tag name"
+    !/function\s+filterKnownPreexisting|process\.env\.RI_NO_ALLOWLIST|hitInBezelDock\s*:/.test(
+      riSrc224_13
+    ),
+    "224.13a: the dock-occlusion quarantine (filterKnownPreexisting() / the RI_NO_ALLOWLIST env switch / pageProbe()'s hitInBezelDock capture) is fully removed from render-integrity.mjs — the flat scroller is now bounded so occlusions no longer exist, and any future dock overlap fails the gate normally instead of being allowlisted away"
   );
   assert(
     !/CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS/.test(riSrc224_13),
-    '224.13b: the old bare-tag-name allowlist Set (CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS) is gone — a future non-dock occlusion whose hit target is an id-less DIV/SPAN/NAV can no longer be silently forgiven'
+    '224.13b: the old bare-tag-name allowlist Set (CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS) remains gone — no quarantine of any generation can silently forgive a dock occlusion'
   );
 }
 

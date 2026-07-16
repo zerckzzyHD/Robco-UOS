@@ -766,25 +766,87 @@ button.lamp {
      restated here (not merged) because .container.machine is more specific
      than the base .machine rule it otherwise inherits from, exactly like
      the desktop gated override above. */
+  /* ══ BOTTOM-DOCK OCCLUSION FIX (Option A′, planning/DOCK_OCCLUSION_PLAN.md)
+     The flat mobile view (New Vegas + FO3-portrait) used to be a plain
+     document-scroll page with the 112px fixed .bezel dock glued over the
+     bottom, so any board content whose natural (unscrolled) height ended
+     inside the dock's footprint was painted, then covered by the dock at
+     landing scroll (14 occluded controls across STAT/INV/DATA/CAMPG).
+     The mobile UPLINK view (css/15-overseer.css) and FO3-landscape
+     (css/60-fo3-pipboy.css) already solved this by making the shell a
+     bounded flex column whose ONE internal scroller ends above the dock —
+     which is exactly why neither of them has the bug. This gives the flat
+     view that same app-shell, reusing #fo3BoardScroll (the wrapper that
+     already holds every board, for every game) as the single scroller.
+     The dock itself is UNCHANGED (still position:fixed;bottom:0 above) — it
+     now floats over the padding-bottom reserve band, never over live
+     content, at every scroll position. Property set deliberately mirrors
+     UPLINK's (height + display:flex + flex-direction) so the two
+     higher-specificity regimes keep overriding cleanly with no divergent
+     property leaking into them (plan §3). NO overflow:hidden here (unlike
+     UPLINK/FO3-landscape): the flat view is the one that carries the
+     registry-autocomplete surface, so .container must never be able to
+     become a clipper under an ambient filter/transform state (plan §5.2).
+     The autocomplete panel is a position:fixed document.body child so it is
+     unaffected regardless, but this keeps the invariant belt-and-suspenders.
+     --dock-h is the single source for the reserve (plan §5.3 — no magic
+     number); it covers the real ~112px dock height plus body's 10px bottom
+     padding offset, verified live at 360/412 by tests/render-integrity.mjs. */
   .container.machine {
-    /* U7 (Protocol 42 — found while verifying the render-integrity matrix's
-       new New Vegas coverage, not something this unit's own work touched):
-       100px under-reserved the fixed bezel dock's REAL rendered height —
-       measured live at 412x915 with a populated save, .bezel is 112px tall,
-       not <=100px, so the last ~12px of whatever panel sits at the bottom
-       of the page (confirmed on S.P.E.C.I.A.L.'s fader inputs) rendered
-       partially UNDER the dock. The comment above (.telemetry's 2-line
-       clamp) only deterministically bounds the LCD ticker strip's own
-       height, not the keycap row + borders + shadow above it, which this
-       measurement includes. 140px gives real margin above the observed
-       110-112px range instead of matching it exactly. render-integrity.mjs
-       (tests/), now covering New Vegas at every mobile size, is what keeps
-       this regression-guarded going forward — no separate test needed. */
-    padding-bottom: 140px;
+    --dock-h: 122px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    /* Retuned from the old 140px end-of-page reserve to the real dock height
+       (via --dock-h): under the bounded-flex model any excess would show as
+       an empty band between the glass and the dock, so it is matched, not
+       over-reserved (plan §5.3/§5.6). */
+    padding-bottom: var(--dock-h);
     border-radius: 10px 10px 0 0;
     box-shadow:
       0 0 16px rgba(0, 0, 0, 0.6),
       inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  /* Flex pass-throughs down to the single scroller. Each is min-height:0 so a
+     tall board can't force the column past 100dvh (the classic flexbox
+     min-content floor). .glass-frame keeps its own position:relative/
+     overflow:hidden/z-index base rule; the absolute .crt-overlay, the
+     ::before vignette and the .sweep ::after are out of flow and unaffected. */
+  .glass-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* The DO-O carrier strip is a flow child of .glass-frame above .main-grid;
+     pin it above the scroller so it never scrolls away or doubles up
+     (plan §5.4). Inert when hidden (uplink / FO3-landscape hide it). */
+  .carrier-strip {
+    flex: 0 0 auto;
+  }
+  .main-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .col-left {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* THE bounded scroller — the region that ends at the dock's top edge, so no
+     board content can ever lay out in the dock's footprint. overflow-x:clip
+     (not the default visible) stops overflow-y:auto from promoting the x-axis
+     to auto and adding a stray horizontal scrollbar (Protocol 17); matches
+     FO3-landscape's #fo3BoardScroll. */
+  #fo3BoardScroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: clip;
+    -webkit-overflow-scrolling: touch;
   }
   /* Bezel fidelity pass — disciplined mobile edge: hide the desktop-only
      decorative flourishes (governor dial, serial plate, field-kit line)
