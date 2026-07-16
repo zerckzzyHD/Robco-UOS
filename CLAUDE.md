@@ -40,7 +40,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 
 **Doc-maintenance rule (LIVE docs):**
 
-- `library/BRAIN_DUMP.md` is the canonical reconstruction doc and future sessions trust it — **a stale brain dump is worse than no brain dump** (it makes sessions confidently wrong). Update it in the same commit whenever something in it stops being true: an architecture change, a new/changed protocol, a shipped roadmap item, a newly-learned recurring gotcha. **★ Hard exit condition:** the 2.8.5 code + test health phase restructures the whole file layout and invalidates large parts of the dump — that phase is **not complete** until the brain dump has been re-baselined against the restructured codebase.
+- `library/BRAIN_DUMP.md` is the canonical reconstruction doc and future sessions trust it — the stale-LIVE-doc rule above applies in full (a stale dump makes sessions confidently wrong). Update it in the same commit whenever something in it stops being true: an architecture change, a new/changed protocol, a shipped roadmap item, a newly-learned recurring gotcha. **★ Hard exit condition:** the 2.8.5 code + test health phase restructures the whole file layout and invalidates large parts of the dump — that phase is **not complete** until the brain dump has been re-baselined against the restructured codebase.
 - `QUEUE.md` is updated in the same commit as any change that actually moves the roadmap.
 - `library/CODE_MAP.md` (new, 2.8.5 U-B2) is updated in the same commit whenever a file is split/added/moved/removed or a major function relocates — see Protocol 46.
 - A **portable brief for an external model** (Gemini/GPT) is NOT a standing doc — it is regenerated fresh from the current brain dump on request, so it is always accurate because it is always new. Never keep a second standing copy of the truth. The generation spec lives in the brain dump ("Generating a portable brief for an external model").
@@ -59,8 +59,7 @@ git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
 - **3276 tests must pass.** If fewer pass, something is broken. Investigate before committing.
-- **Bump `CACHE_NAME` when served files change.** Required when any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). Doc-, config-, and test-only commits skip the check entirely.
-- **Cache-bump guard runs at commit time** — the hook first detects whether any staged file is in the served/precached set. If so, it requires a strict monotonic increase in `CACHE_NAME`. Non-served commits (doc-only, CI, tests) bypass the cache check entirely.
+- **Bump `CACHE_NAME` when a staged file is in the served/precached set** (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`) — the full rule and the automated commit-time guard (strict monotonic increase; non-served commits bypass it) live in **Protocol 1**.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
 ---
@@ -76,7 +75,7 @@ Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **se
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping only when served files change keeps the signal meaningful and avoids spurious update prompts on doc-only or CI-only pushes.
 
-**Automated guard:** The pre-commit hook first checks whether any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). If matched, it requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. Non-served commits (doc-only, CI, tests) skip the cache check entirely. When `APP_VERSION` changes, the revision can reset.
+**Automated guard:** The pre-commit hook checks whether any staged file is in that served/precached set. If so, it requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked (when `APP_VERSION` changes, the revision can reset). Non-served commits (doc-only, CI, tests) skip the cache check entirely.
 
 ---
 
@@ -119,12 +118,12 @@ Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGE
 
 Run this after every test addition or removal. Every hit must show the new count **except** the frozen released-version entry in `CHANGELOG.md` (e.g. `v2.0.1` shows its release-day count of 258 — that is intentional and correct). This command deliberately omits `library/TEST_CATALOG.md` — it is gitignored and may not exist on every machine; sync it by hand when it is present, same as `library/BRAIN_DUMP.md`.
 
-**Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [Unreleased]` section header, **never** on a released version's entry (e.g. `v2.6.0`, `v2.0.1`). Released entries are frozen at the values that were true at their release and must not be modified retroactively. **The one sanctioned exception is a hotfix** (see below), which actively patches a shipped version and therefore updates that version's header comment.
+**Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [Unreleased]` section header, **never** on a released version's entry (e.g. `v2.6.0`, `v2.0.1`) — released entries are frozen at their release-day values and must not be modified retroactively. **The one sanctioned exception is a hotfix** (see below), which actively patches a shipped version and so updates that version's header comment.
 
 **Hotfix model (first-class changelog concept — owner directive 2026-06-30):** Every change lands in exactly one of three places, by its release status:
 
 - **Pre-release change** (work not yet shipped) → the `## [Unreleased]` block, under the normal Keep-a-Changelog categories. At the `dev → main` release it consolidates into the new dated version block.
-- **Post-release fix folded into the live shipped version** (a bug found _after_ that version is on prod, not worth a new version number) → a dedicated **`### Hotfix`** heading **inside that already-released version's block** (e.g. `## [v2.7.0]`). `APP_VERSION` does **not** change; only the cache rev increments (`-r2`, `-r3`, …) as served files change. This is the sanctioned exception to "released entries are frozen": the patched version's header comment (`<!-- … | Tests: N/N | Cache: …-rN -->`) **is** updated to the new test count and cache rev, because the shipped version is being actively patched. The `### Hotfix` heading is a recognized changelog category (guarded by Suite 97) and the in-app viewer renders it like any other category (the `hotfix` tag in `_CHANGELOG_CAT_TAGS`, guarded by Suite 62).
+- **Post-release fix folded into the live shipped version** (a bug found _after_ that version is on prod, not worth a new version number) → a dedicated **`### Hotfix`** heading **inside that already-released version's block** (e.g. `## [v2.7.0]`). `APP_VERSION` does **not** change; only the cache rev increments (`-r2`, `-r3`, …) as served files change. The patched version's header comment (`<!-- … | Tests: N/N | Cache: …-rN -->`) **is** updated to the new test count and cache rev — the sanctioned exception to the frozen-entries rule above, because the shipped version is being actively patched. The `### Hotfix` heading is a recognized changelog category (guarded by Suite 97) and the in-app viewer renders it like any other category (the `hotfix` tag in `_CHANGELOG_CAT_TAGS`, guarded by Suite 62).
 - **Genuinely new version** (a normal `APP_VERSION` bump per Protocol 2) → its own new dated `## [vX.Y.Z]` block.
 
 **Chronological ordering:** `[Unreleased]` entries are kept in chronological order within each category, earliest first (ascending), appended as work lands. Preserve the Keep-a-Changelog category grouping (one `### Added` / `### Changed` / `### Fixed` / `### Under the Hood` heading each, in that standard order) — but within each category, list bullets in the order the changes actually landed, oldest at the top. Use `git log` to settle true chronology when an entry's order is unclear.
@@ -379,43 +378,31 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 ---
 
-## Protocol 29 — Auth Changes Require Real-Device Mobile Verification
+## Protocols 29 / 30 / 31 — Authentication Hard Rules
 
-Any change to authentication or sign-in flow is not "done" until it has been verified on a **real mobile device** — in both a normal browser tab and the installed PWA (add-to-home-screen standalone mode). Emulators and desktop DevTools responsive modes are not sufficient.
+_(Grouped from three separate protocols. All three numbers are retained as labeled sub-rules below so every existing `Protocol 29`, `Protocol 30`, and `Protocol 31` reference still resolves here.)_
 
-**Why:** The test gate and desktop cannot catch OAuth redirect/popup behavior, storage-partitioning bugs, or standalone-mode session-isolation issues. Real-device testing is the only surface that catches these — the r54 mobile sign-in regression (where `getRedirectResult` returned null on mobile) was not visible on desktop or in the test suite at all.
+**Shared mechanism (the root of sub-rules 29 and 30):** GitHub Pages cannot self-host the Firebase `/__/auth/` redirect handler. The redirect flow relies on a cross-origin iframe to `{project}.firebaseapp.com`, which modern mobile browsers block (storage partitioning), causing `getRedirectResult` to return `null` and silently breaking sign-in with no error to the user. This is invisible on desktop and in the test suite — only a real mobile device catches it (the r54 mobile sign-in regression).
 
----
+**Sub-rule 29 — auth changes require real-device mobile verification.** Any change to authentication or sign-in flow is not "done" until it has been verified on a **real mobile device** — in both a normal browser tab and the installed PWA (add-to-home-screen standalone mode). Emulators and desktop DevTools responsive modes are not sufficient: they cannot catch OAuth redirect/popup behavior, storage-partitioning bugs, or standalone-mode session-isolation issues (see the shared mechanism above).
 
-## Protocol 30 — Popup-Only Auth on This Hosting — Redirect Banned
+**Sub-rule 30 — popup-only auth; redirect banned.** Use `linkWithPopup` / `signInWithPopup` **only**. `linkWithRedirect` and `signInWithRedirect` are **prohibited** on this project — the redirect flow hits the shared-mechanism failure above, while the popup flow has no such dependency and works correctly in all environments this app targets.
 
-Use `linkWithPopup` / `signInWithPopup` **only**. `linkWithRedirect` and `signInWithRedirect` are **prohibited** on this project.
-
-**Why:** GitHub Pages cannot self-host the Firebase `/__/auth/` redirect handler. The redirect flow relies on a cross-origin iframe to `{project}.firebaseapp.com`, which modern mobile browsers block (storage partitioning), causing `getRedirectResult` to return `null` and silently breaking sign-in with no error to the user. The popup flow has no such dependency and works correctly in all environments this app targets.
+**Sub-rule 31 — `signInAnonymously` must always be guarded, never unconditional.** The boot anonymous sign-in must be gated behind `auth.authStateReady()` plus an explicit `!auth.currentUser` check (or equivalent guard), never called unconditionally. The Firebase SDK only no-ops `signInAnonymously` for a user who is already anonymous; for a user already signed in with a linked account (e.g. Google), an unconditional call mints a fresh anonymous user and silently replaces the session — wiping sign-in on every reload. This was the root cause of the 5c-ii clobber bug.
 
 ---
 
-## Protocol 31 — `signInAnonymously` Must Always Be Guarded — Never Unconditional
+## Protocol 32 / 33 / 35 — Remote Kill-Switch (three parts)
 
-The boot anonymous sign-in must be gated behind `auth.authStateReady()` plus an explicit `!auth.currentUser` check (or equivalent guard), never called unconditionally.
+_(Formerly three separate protocols. All three numbers are retained as labeled parts below so every existing `Protocol 32`, `Protocol 33`, `Protocol 35`, `Protocol 32/33`, `Protocol 32/35`, and `Protocol 32/33/35` cross-reference — in code comments, `ARCHITECTURE.md`, and the test suite — still resolves here.)_
 
-**Why:** The Firebase SDK only no-ops `signInAnonymously` for a user who is already anonymous. For a user who is already signed in with a linked account (e.g. Google), an unconditional call mints a fresh anonymous user and silently replaces the session — wiping sign-in on every reload. This was the root cause of the 5c-ii clobber bug.
+**Why (shared):** A kill switch lets a broken networked feature be turned off remotely without a redeploy, and a defined fallback keeps the app fully usable when that feature is unavailable. Without these, any new networked feature is a potential outage vector.
 
----
+**Part (a) — Protocol 32: every new network/IO feature ships a flag + graceful fallback.** Any new feature that does network or external I/O — cloud sync, authentication, AI calls, remote config, or any future integration — must be registered with the remote kill-switch config and must define a graceful fallback behavior for when the feature is disabled or failing. (The kill-switch mechanism itself is Phase 5 hardening work; this rule governs all features added from that point forward.)
 
-## Protocol 32 — Every New Network/IO Feature Ships With a Kill-Switch Flag + Graceful Fallback
+**Part (b) — Protocol 33: the boot read is fail-safe.** Reading the remote kill-switch / feature-config on boot must never disable features or black-screen the app if the config is unreachable, malformed, or slow to respond. Always default to last-known-good or features-enabled and remain fully usable offline. The safety mechanism cannot be a new failure mode — if the kill-switch check itself can bring down the app, it is worse than having no kill switch at all.
 
-Any new feature that does network or external I/O — cloud sync, authentication, AI calls, remote config, or any future integration — must be registered with the remote kill-switch config and must define a graceful fallback behavior for when the feature is disabled or failing.
-
-**Why:** A kill switch lets a broken feature be turned off remotely without a redeploy, and a defined fallback keeps the app fully usable when that feature is unavailable. Without these, any new networked feature is a potential outage vector. Note: the kill-switch mechanism itself is part of the Phase 5 hardening work; this protocol governs all features added from that point forward.
-
----
-
-## Protocol 33 — The Kill-Switch Read Is Fail-Safe
-
-Reading the remote kill-switch / feature-config on boot must never disable features or black-screen the app if the config is unreachable, malformed, or slow to respond. Always default to last-known-good or features-enabled and remain fully usable offline.
-
-**Why:** A broken or unreachable config must not become its own outage. The safety mechanism cannot be a new failure mode — if the kill-switch check itself can bring down the app, it is worse than having no kill switch at all.
+**Part (c) — Protocol 35: auto-flip off on detected post-deploy regression.** When a post-deploy regression in a networked/IO feature is detected, the dev process flips that feature's flag to `false` in `/config/flags` via the Firebase console **immediately and automatically** — without waiting for the user — then notifies the user. Restore first, diagnose second; the live-site analogue of Protocol 16 for flaggable features. Order: (1) flip off live, (2) confirm fallback active + app usable, (3) report to user, (4) diagnose/fix/verify, then flip back on. Prefer the remote flag over `git revert` when the break is contained to a flaggable feature (instant, no deploy/cache bump) — the fail-safe read (b) means flipping only disables into the defined fallback, never black-screens, so a flaggable regression never waits on a human round-trip.
 
 ---
 
@@ -433,14 +420,6 @@ When you add a field to `state` (Protocol 4), **state its cloud-sync path in the
 - **Dedicated document (e.g. secrets/settings):** a field synced to its own Firestore doc (like the Gemini key or the key-sync preference) needs its own additive / merge-safe write and an explicit sync-path note in the commit.
 
 **`setDoc` permanence (hard rule):** never write a `saves` document with `setDoc` — saves are created with `addDoc` (additive) and modified by id with `updateDoc`; a blind `setDoc` would clobber a user's campaign with no recovery. Any `setDoc` to a mutable config doc (settings/preferences) must pass `{ merge: true }` so it never erases sibling fields. Both invariants are gate-guarded (Suite 46).
-
----
-
-## Protocol 35 — Auto-Flip the Remote Kill-Switch on Detected Post-Deploy Regression
-
-When a post-deploy regression in a networked/IO feature is detected, the dev process flips that feature's flag to `false` in `/config/flags` via the Firebase console **immediately and automatically** — without waiting for the user — then notifies the user. Restore first, diagnose second; the live-site analogue of Protocol 16 for flaggable features. Order: (1) flip off live, (2) confirm fallback active + app usable, (3) report to user, (4) diagnose/fix/verify, then flip back on. Prefer the remote flag over `git revert` when the break is contained to a flaggable feature (instant, no deploy/cache bump).
-
-**Why:** A flaggable regression should never wait on a human round-trip; the read is fail-safe (Protocol 33) so flipping only disables into a defined fallback, never black-screens.
 
 ---
 
@@ -608,24 +587,19 @@ Protocol 2/2a already require the docs to stay current — but they are **honor-
 
 **Scope decision — `library/BRAIN_DUMP.md` is NOT scanned for PROSE content.** It is gitignored (absent on a clean CI checkout, so the guard would have nothing to read there — and CI is the environment that matters most), and its own "Known documentation drift" ledger deliberately quotes retired/wrong names to warn sessions off them — scanning its prose would false-positive on its most valuable section. It stays governed by its own maintenance rule instead. (Its existence *as a pointer target* — the fact that `CLAUDE.md` names `library/BRAIN_DUMP.md` — IS checked, via check 4 above / Protocol 46.)
 
-**Ratchet intent:** start narrow and earn trust; tighten later. A greedy scanner that flags ordinary prose is worse than no scanner — it gets ignored, then weakened, then it is dead. Only add a new reference form (e.g. backticked architecture entry-point names) once it can be extracted with **zero false positives**; until then, leave it out and say so. This is the enforcement arm of Protocol 2/2a, **not** a replacement — the honor-system rules still stand; this guard just catches the class of drift they could not.
+**Ratchet intent:** start narrow and earn trust; tighten later. A greedy scanner that flags ordinary prose is worse than no scanner — it gets ignored, then weakened, then it is dead. Only add a new reference form (e.g. backticked architecture entry-point names) once it can be extracted with **zero false positives**; until then, leave it out and say so. It does **not** replace the honor-system Protocol 2/2a rules — those still stand; this guard just catches the class of drift they could not.
 
 ---
 
 ## Protocol 46 — Keep the Code Map + Pointer Index Current (the enforcement arm of the library model)
 
-The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if they track the code — the same honor-system risk Protocol 45 was written to catch for `window.*`/file-path/load-order drift applies here too. **When a file is split, added, moved, or removed, or a major function relocates, update `library/CODE_MAP.md` and this file's Reference Pointer Index in the SAME commit.** This is the doc-maintenance obligation the 2.8.5 file restructure (strand A) exists under — a code map that goes stale exactly when the restructure it was built for lands would defeat the point.
+The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if they track the code — the same honor-system risk Protocol 45 catches for `window.*`/file-path/load-order drift. **When a file is split, added, moved, or removed, or a major function relocates, update `library/CODE_MAP.md` and this file's Reference Pointer Index in the SAME commit.** These are high-trust surfaces — a session navigates by them instead of reading whole files — so letting them drift silently is strictly worse than not having them: a session would trust a stale map with no signal that it's wrong. An honor-system "keep it current" rule drifted once already (the `pushToCloud`/`pullFromCloud` incident), so the class of defect gets a Suite 220 gate guard.
 
-**The gitignored-library problem, and how it's solved:** `library/` is gitignored (local-only Claude reference docs — see the 3-class model above), so on a clean CI checkout `library/CODE_MAP.md` and `library/BRAIN_DUMP.md` simply don't exist. A guard that does `fs.existsSync('library/CODE_MAP.md')` would either fail every CI run forever (if it requires existence) or never run at all (if skipped whenever the directory is absent) — the latter is a guard that can never fail, which is worse than no guard because it creates false confidence.
+**The gitignored-`library/` problem:** `library/` is gitignored (local-only Claude reference docs), so on a clean CI checkout `library/CODE_MAP.md` and `library/BRAIN_DUMP.md` simply don't exist. A guard that does `fs.existsSync('library/CODE_MAP.md')` would either fail every CI run forever (if it requires existence) or never run at all (if skipped whenever the directory is absent) — the latter is a guard that can never fail, which is worse than no guard because it creates false confidence.
 
-The fix is `library/MANIFEST.txt` — a small, filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 checks two things (tests 220.7/220.8):
-
-- **220.7 (real everywhere, including CI):** every `library/<file>` pointer path named in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` must appear in `library/MANIFEST.txt`. This catches a pointer added for a file that was never added to the manifest — a typo, or a doc edit that outran the manifest update. It runs identically on CI and locally because the manifest is committed.
-- **220.8 (real only locally — honestly weaker, stated plainly):** when at least one *non-manifest* file exists under `library/` (the owner's machine — `library/MANIFEST.txt` alone is always present, even on CI, since it's committed and git checks out its parent directory; the real "am I on the owner's machine" signal is a second file next to it), the manifest's file list must exactly match `library/`'s real contents. This is the only check that can catch the manifest itself drifting from reality (a file quietly deleted from `library/`, or added without updating the manifest) — it is a no-op on a clean CI checkout, because that drift is invisible there by construction. (This distinction was not obvious at first — a naive "does `library/` exist" check looked CI-safe but actually fails the build on a clean checkout, since `MANIFEST.txt` alone makes the directory exist; caught by directly simulating a clean checkout, not assumed.) **What Suite 220 cannot catch on CI:** whether `library/CODE_MAP.md` (or `BRAIN_DUMP.md`) has gone stale in its own *content* — only that the *filename* a pointer names is a real, manifested one. Content staleness is caught by 220.8 locally, or not at all until the owner's next local gate run.
+**The fix — `library/MANIFEST.txt`:** a small filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 uses it two ways: **220.7** (real on CI and locally, because the manifest is committed) — every `library/<file>` pointer named in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` must appear in the manifest, catching a pointer whose file was never manifested; **220.8** (local-only, a no-op on a clean CI checkout) — the manifest must exactly match `library/`'s real contents, the only check that can catch the manifest itself going stale. Neither can catch *content* staleness inside a doc — only that the *filename* a pointer names is real and manifested. See Suite 220 tests 220.7/220.8 for the full CI-vs-local reasoning.
 
 **How to apply:** whenever `library/` gains or loses a file, update `library/MANIFEST.txt` in the same commit (add/remove one line). Whenever `CLAUDE.md`'s pointer index gains a row naming a new `library/<file>`, that file must already be in the manifest — order matters: manifest first, pointer second, or 220.7 fails the build.
-
-**Why:** this mirrors Protocol 45's own reasoning exactly — an honor-system "keep it current" rule drifted once already (the `pushToCloud`/`pullFromCloud` incident), so the class of defect gets a gate guard at the layer it would escape from. `library/CODE_MAP.md` and the pointer index are new, high-trust surfaces (a session is meant to navigate by them instead of reading whole files) — letting them drift silently would be strictly worse than not having them, because a session would trust a stale map with no signal that it's wrong.
 
 ---
 
@@ -724,49 +698,49 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 | Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match                                                                                                                                         |
 | Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                                                                                                                                                       |
 | Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit                                                                                                                                             |
-| `linkWithRedirect` / `signInWithRedirect` on this project   | GitHub Pages cannot host the Firebase auth redirect handler; mobile browsers block the cross-origin iframe fallback (storage partitioning), so `getRedirectResult` returns `null` — sign-in silently fails (Protocol 30) |
-| Unconditional `signInAnonymously` on boot                   | For a Google-linked user, an unguarded call mints a fresh anonymous user and wipes the signed-in session on every reload (the 5c-ii clobber bug) — always gate on `auth.authStateReady()` + `!auth.currentUser` (Protocol 31) |
-| Writing a non-ASCII file via PowerShell (`Set-Content` / `Out-File` / string + `Set-Content`) | Silently double-encodes every special char: `—`→`â€"`, `▲`→`â–²`, `⚠`→`âš ` — use the Edit tool or Node `fs.writeFileSync(path, content, 'utf8')` instead; Suite 90 guards it (Protocol 39) |
+| `linkWithRedirect` / `signInWithRedirect` on this project   | GitHub Pages can't host the redirect handler; mobile blocks the cross-origin iframe fallback (storage partitioning) → `getRedirectResult` returns `null`, sign-in silently fails. Full mechanism → **Protocol 30** |
+| Unconditional `signInAnonymously` on boot                   | For a Google-linked user, an unguarded call mints a fresh anonymous user and wipes the session on every reload (the 5c-ii clobber bug) — gate on `auth.authStateReady()` + `!auth.currentUser`. Full rule → **Protocol 31** |
+| Writing a non-ASCII file via PowerShell (`Set-Content` / `Out-File` / string + `Set-Content`) | Silently double-encodes every non-ASCII char (`—`→`â€"`, `▲`→`â–²`, `⚠`→`âš `) — use the Edit tool or Node `fs.writeFileSync(path, content, 'utf8')`. Full incident + Suite 90 guard → **Protocol 39** |
 
 ---
 
 ## Architecture Quick Reference
 
-**Script load order** (global scope, not modules — the ACTUAL order from `index.html`; the numbered `js/…` filenames and their order below are machine-checked against `index.html` by Suite 220 / Protocol 45):
+**Script load order** (global scope, not modules — the ACTUAL order from `index.html`; the numbered `js/…` filenames and their order below are machine-checked against `index.html` by Suite 220 / Protocol 45). Full per-file detail (every function → its file) lives in `library/CODE_MAP.md` (derived from source, Protocol 46); the labels below are a scannable index only:
 
 <!-- LOAD-ORDER-GUARD:BEGIN — Suite 220 extracts the numbered `js/….js` items (the subject before each `→`) and asserts they equal the real boot order in index.html (idb → the GAME_FILES manifest → the remaining static tags). Keep this list in sync whenever a `<script>` tag or the GAME_FILES manifest changes. -->
 
-1. `js/core/idb.js` → `window.IdbStore` (IndexedDB durable-shadow engine; first static tag, before the boot manifest)
-2. `js/data/db_nv.js` / `js/data/db_fo3.js` → `databaseCSVs`, `lookupItemInDb()` (per-game CSV data; injected by the `GAME_FILES` manifest in `index.html`, FNV fail-safe)
-3. `js/core/state.js` → `state`, `APP_VERSION`, `GAME_DEFS`, `FACTION_REGISTRY`, `SKILL_KEYS`, `saveState()`, `migrateState()`
-4. `js/data/reg_nv.js` / `js/data/reg_fo3.js` + `js/data/registry-core.js` → `FALLOUT_REGISTRY` (per-game data), `registrySearch()` (read-only engine, never touches state)
-5. `js/ui/ui-audio.js` → all audio functions (`audioCtx`, geiger/tinnitus/CRT hum, limb/wake/boot/level-up sounds, `runBootSequence`, `triggerPhosphorGhost`, `changeOpticsColor`)
-6. `js/ui/ui-render.js` → the render-pipeline hub after the 2.8.5 U-A4 split: only `_updateContextPanels()` (cross-panel visibility glue not owned by one sibling) remains here; every `render*()` panel lives in a `js/ui/ui-render-*.js` sibling below
-7. `js/ui/ui-render-inventory.js` → CARGO MANIFEST & AMMO: `addItem`/`delItem`/`adjItemQty`/`toggleEquipItem`, drawer-filter helpers, `nativeUseItem`, `renderInventory()`, `renderAmmo`/`addAmmo`/`removeAmmo` (2.8.5 U-A4 split)
-8. `js/ui/ui-render-character.js` → CHARACTER & FIELD STATUS: squad roster, the in-game clock/calendar, faction-standing lookup (`FACTION_THRESHOLDS`, `getFactionStanding`), status effects, the PERK loadout rack, the quest DIRECTIVE registry (2.8.5 U-A4 split)
-9. `js/ui/ui-render-record.js` → PERSONAL RECORD: session-stat odometer tally, equipped-gear readout, CURIO collectibles archive, FO3 Lincoln memorabilia, character traits (2.8.5 U-A4 split)
-10. `js/ui/ui-render-ledger.js` → FIELD LEDGER: the shared SHELF/RACK read-tracker renderer (`_renderReadTracker`), skill books, skill magazines, campaign field notes, the campaign status/chronicle event log (2.8.5 U-A4 split)
-11. `js/ui/ui-render-map.js` → CARTOGRAPHY TABLE: the Phosphor Cartography world-map SVG renderer (`renderWorldMap`), zone zoom/travel/visited-marking, arrow-key node navigation (2.8.5 U-A4 split)
-12. `js/ui/ui-render-factions.js` → FACTION REPUTATION & KARMA: the inline fame/infamy editor (`adjustFaction`, `renderFactionRep`), the FO3 Karma Center appendix (2.8.5 U-A4 split)
-13. `js/ui/ui-render-economy.js` → RESOURCE ECONOMY: the CRAFT panel (crafting + scrapping), the native TRADE barter terminal (2.8.5 U-A4 split)
-14. `js/ui/ui-render-loot.js` → ITEM ACQUISITION: the native LOOT add-to-inventory terminal, the Visual Upload OCR preview/confirm/apply flow (2.8.5 U-A4 split)
-15. `js/ui/ui-render-databank.js` → NATIVE DATABANK TOOLS: THREAT assessment, CONSULT lookup, the ELIGIBLE PERKS survey, the DATABANK panel search, the BIO-SCAN medical advisory (2.8.5 U-A4 split)
-16. `js/ui/ui-saves.js` → save slots, file import/export (`handleFileUpload`), rolling backups, registry autocomplete (`initRegistryAutocomplete`, `wireInput`), ammo datalist
-17. `js/ui/ui-account.js` → `renderAccount()`, `renderCloudSavePicker()`, `undoLastSync()`
-18. `js/services/ocr.js` → lazy Tesseract.js OCR (`routeVisualUpload`, `_ensureTesseract`) — never loads Tesseract at boot
-19. `js/core/runtime.js` → `AmbientRuntime`, `initAmbientRuntime` (ambient lifecycle state machine)
-20. `js/ui/ui-core.js` → `AudioSettings`, `appendToChat()`, `loadUI()`, `updateMath()` (the ui-core spine hub; the ui-core-\*.js split below leans on this file)
-21. `js/ui/ui-core-nav.js` → bezel subsystem nav: `selectSubsystem`, `switchTab`, `_syncBezelNav`, `SHORTCUT_ROUTES` (2.8.5 U-A1 split)
-22. `js/ui/ui-core-overseer.js` → Director Uplink: `setOverseerState`, the scope canvas, composer wiring, Tool Deck launcher (2.8.5 U-A1 split)
-23. `js/ui/ui-core-chassis.js` → the Living Core: `_coreRefresh`, `initChassisCore`, System Status, the Service & Fault Console (2.8.5 U-A1 split)
-24. `js/ui/ui-core-modulebay.js` → Module Bay wiring, the phosphor-tube/immersion-dial/wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
-25. `js/ui/ui-core-cmd.js` → the command layer: native stat setters, `COMMAND_REGISTRY`, the core event-bus subscriber wiring (2.8.5 U-A1 split)
-26. `js/dev/test-console.js` → `initTestConsole` (Diagnostic Shell; gated by `_devConsoleUnlocked()`)
-27. `js/services/api.js` → `transmitMessage()` lifecycle (retry/abort, `_resetTransmitUI`), the AI comm-config cache (`_commGet`), `fetchAuthorizedModels()`, `saveApiKeySilent()` — the network-layer hub (2.8.5 U-A3 split)
-28. `js/services/api-directive.js` → `getSystemDirective()` + its 8 `_directive*` section builders (Suite 131 golden-master guarded) (2.8.5 U-A3 split)
-29. `js/services/api-import.js` → `autoImportState()`, `sanitizeImportedContainer()`, `_wireApiEventBusSubscribers()` — the AI→state import path (2.8.5 U-A3 split)
-30. `js/services/api-router.js` → `NATIVE_COMMAND_ROUTER`, `_routeNativeCommand()`, quick-log routing, `transmitTerminal()` — offline/native command routing, never calls the AI (2.8.5 U-A3 split)
-31. `js/services/cloud.js` → ES module (`type="module"`), attaches `window.saveCurrentToCloud` / `window.loadCloudSave` (plus the auth / feature-flag / save-version helpers) — the real manual cloud push/pull entry points (the old `pushToCloud`/`pullFromCloud` names were never real and are retired)
+1. `js/core/idb.js` → IndexedDB durable-shadow engine (first static tag)
+2. `js/data/db_nv.js` / `js/data/db_fo3.js` → per-game CSV item data (GAME_FILES manifest, FNV fail-safe)
+3. `js/core/state.js` → state, GAME_DEFS, saveState, migrateState
+4. `js/data/reg_nv.js` / `js/data/reg_fo3.js` + `js/data/registry-core.js` → read-only registry data + registrySearch
+5. `js/ui/ui-audio.js` → all audio + boot sequence
+6. `js/ui/ui-render.js` → render-pipeline hub
+7. `js/ui/ui-render-inventory.js` → CARGO MANIFEST & AMMO renderers
+8. `js/ui/ui-render-character.js` → CHARACTER & FIELD STATUS renderers
+9. `js/ui/ui-render-record.js` → PERSONAL RECORD renderers
+10. `js/ui/ui-render-ledger.js` → FIELD LEDGER renderers
+11. `js/ui/ui-render-map.js` → CARTOGRAPHY TABLE world-map renderer
+12. `js/ui/ui-render-factions.js` → FACTION REPUTATION & KARMA renderers
+13. `js/ui/ui-render-economy.js` → RESOURCE ECONOMY (CRAFT/TRADE) renderers
+14. `js/ui/ui-render-loot.js` → ITEM ACQUISITION (LOOT/OCR) renderers
+15. `js/ui/ui-render-databank.js` → NATIVE DATABANK TOOLS renderers
+16. `js/ui/ui-saves.js` → save slots, import/export, registry autocomplete
+17. `js/ui/ui-account.js` → account panel + cloud save picker
+18. `js/services/ocr.js` → lazy Tesseract.js OCR (never loads at boot)
+19. `js/core/runtime.js` → AmbientRuntime lifecycle state machine
+20. `js/ui/ui-core.js` → ui-core spine hub (loadUI, appendToChat, updateMath)
+21. `js/ui/ui-core-nav.js` → bezel subsystem nav
+22. `js/ui/ui-core-overseer.js` → Director Uplink presence
+23. `js/ui/ui-core-chassis.js` → Living Core + Service & Fault Console
+24. `js/ui/ui-core-modulebay.js` → Module Bay wiring
+25. `js/ui/ui-core-cmd.js` → command layer + event-bus subscribers
+26. `js/dev/test-console.js` → Diagnostic Shell (initTestConsole)
+27. `js/services/api.js` → transmitMessage network-layer hub
+28. `js/services/api-directive.js` → getSystemDirective + 8 section builders
+29. `js/services/api-import.js` → autoImportState AI→state import path
+30. `js/services/api-router.js` → NATIVE_COMMAND_ROUTER offline routing (never calls the AI)
+31. `js/services/cloud.js` → ES-module manual cloud push/pull
 
 <!-- LOAD-ORDER-GUARD:END -->
 
