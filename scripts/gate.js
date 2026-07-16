@@ -19,17 +19,20 @@
  * canonical Node runner. (This file intentionally carries no reference to the
  * deleted mirror — Suite 50.6 / 128.5 guard that it stays single-runner.)
  *
- * Steps (full; --fast skips steps 5-9; --iter takes the separate fast path):
+ * Steps (full; --fast runs 1-4 + the fast boot smoke; --iter takes its own path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Boot-chain preflight (index.html/sw.js/disk/docs/test.html consistency)
  *   4. Persistence audit — Node runner
+ *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
+ *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
- *   6. Boot smoke test (HTTP)                     ← skipped by --fast
+ *   6. Boot smoke test (HTTP, full)               ← skipped by --fast
  *   7. Render check (360px & 412px)               ← skipped by --fast
  *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
  *   9. Runtime audit — test.html headless         ← skipped by --fast
  *  10. Save-survival (SAVE_INTEGRITY_PASS)         ← skipped by --fast
+ *  11. Offline-first behavioral test (network cut)← skipped by --fast (U1)
  */
 'use strict';
 
@@ -126,6 +129,30 @@ function run(label, cmd) {
   }
 }
 
+// Verify the Playwright Chromium binary is present before any browser check.
+// Used by BOTH the fast commit gate (the boot smoke, U1) and the full push
+// gate (all browser checks) — a browser check with no browser must fail with a
+// clear, actionable message, never a cryptic crash.
+function ensureChromium(context) {
+  console.log(`\n[gate] Playwright Chromium availability${context ? ' (' + context + ')' : ''}`);
+  const chromiumScript =
+    "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
+    "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
+  const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
+    cwd: ROOT,
+    shell: true,
+    stdio: 'pipe',
+    timeout: 10000,
+  });
+  if (pwResult.status !== 0) {
+    const msg = (pwResult.stderr || '').toString().trim();
+    console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
+    console.error('  Run: npx playwright install chromium');
+    process.exit(1);
+  }
+  console.log('  Chromium found.');
+}
+
 // Changed .js/.mjs files vs HEAD (staged, unstaged, and untracked) — used only
 // by the --iter pre-check to lint what changed. Returns [] on any failure, which
 // makes the caller fall back to a full lint.
@@ -199,27 +226,22 @@ run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
 // check were removed — Protocol 15 retired. See the header comment for why.)
 run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
+// ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
+// The whole point of U1: before this, gate:fast opened zero browsers, so
+// commit-green meant only "the source greps clean." This adds a minimal,
+// bounded (~2s) headless check so commit-green means "the shell boots and
+// paints without throwing." It cold-launches its own Chromium (no shared server
+// for a single check) and runs boot-smoke.mjs in --fast mode.
+if (fast) {
+  ensureChromium('commit boot smoke');
+  run('Boot smoke (fast, commit gate)', 'node tests/boot-smoke.mjs --fast');
+}
+
 if (!fast) {
   // ── 5. Playwright Chromium check ──────────────────────────────────────────────
-  console.log('\n[gate] Playwright Chromium availability');
-  const chromiumScript =
-    "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
-    "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
-  const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
-    cwd: ROOT,
-    shell: true,
-    stdio: 'pipe',
-    timeout: 10000,
-  });
-  if (pwResult.status !== 0) {
-    const msg = (pwResult.stderr || '').toString().trim();
-    console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
-    console.error('  Run: npx playwright install chromium');
-    process.exit(1);
-  }
-  console.log('  Chromium found.');
+  ensureChromium();
 
-  // Launch ONE shared Chromium for all four browser checks below (audit #8).
+  // Launch ONE shared Chromium for all the browser checks below (audit #8).
   // Each check connects to it via PW_WS_ENDPOINT; if the shared launch fails for
   // any reason, they fall back to launching their own — identical assertions.
   const sharedOk = startSharedBrowser();
@@ -248,6 +270,14 @@ if (!fast) {
   // boot + import paths and compares the full durable-field inventory — the
   // sacred-data guard. Too slow for gate:fast; runs on the push gate + CI.
   run('Save-survival', 'node tests/save-survival.mjs');
+
+  // ── 11. Offline-first behavioral test (U1, HEALTH_BATCH_PLAN.md §4) ────────────
+  // Loads the app, CUTS the network for real (context.setOffline), reloads, and
+  // asserts the app boots to READY and a native tool (CONSULT) works with zero
+  // network — the offline-first promise proven behaviorally, not by grepping
+  // that the source "looks offline-safe." Push gate only (it registers a real
+  // service worker + reloads — heavier than a commit-boundary smoke).
+  run('Offline-first (network cut)', 'node tests/offline-first.mjs');
 
   stopSharedBrowser();
 }

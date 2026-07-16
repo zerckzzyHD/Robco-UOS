@@ -4509,7 +4509,7 @@ header('Suite 49 — CI / Repo Hardening Guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 50 — Gate Parity Guards (Protocol 36)
 //  Verify that the local gate == CI gate and the escape-ratchet is wired.
-//  8 tests
+//  12 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 50 — Gate Parity Guards (Protocol 36)');
 {
@@ -4530,10 +4530,16 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     'scripts/gate.js enforces ESLint --max-warnings 0 (Protocol 36 — escape-ratchet)'
   );
 
-  // 50.3  boot-smoke.mjs uses an HTTP static server (not file://)
+  // 50.3  boot-smoke.mjs serves the app over HTTP — the static server was
+  //        extracted to the shared tests/static-server.mjs (Protocol 22, U1),
+  //        so http.createServer now lives THERE and boot-smoke imports it.
+  const staticServerSrc50 = readFile('tests/static-server.mjs');
   assert(
-    bootSmokeSrc50.includes('http.createServer') && bootSmokeSrc50.includes('BASE_URL'),
-    'boot-smoke.mjs uses HTTP static server (http.createServer + BASE_URL navigation)'
+    staticServerSrc50.includes('http.createServer') &&
+      /export\s+(async\s+)?function\s+startStaticServer/.test(staticServerSrc50) &&
+      bootSmokeSrc50.includes("from './static-server.mjs'") &&
+      bootSmokeSrc50.includes('startStaticServer'),
+    'boot-smoke.mjs serves over HTTP via the shared static-server.mjs (http.createServer lives there; boot-smoke imports startStaticServer — Protocol 22, no duplicated server)'
   );
 
   // 50.4  package.json has a gate script wiring npm run gate
@@ -4571,6 +4577,40 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
   assert(
     installHooksSrc50.includes('pre-push'),
     'scripts/install-hooks.js installs pre-push hook (Protocol 36 — full gate at push boundary)'
+  );
+
+  // ── U1 (HEALTH_BATCH_PLAN.md §4) — real browser coverage at BOTH boundaries ──
+  // Before U1, gate:fast opened zero browsers, so commit-green meant only "the
+  // source greps clean." These guards keep the two new browser checks wired at
+  // their boundaries so they can never be silently dropped (Protocol 20/36b).
+
+  // 50.9  the fast commit gate runs a browser boot smoke (commit-green = boots)
+  assert(
+    /if \(fast\)/.test(gateSrc50) && /boot-smoke\.mjs --fast/.test(gateSrc50),
+    'scripts/gate.js runs the fast boot smoke (boot-smoke.mjs --fast) in the fast/commit path — commit-green means the shell boots and paints (U1)'
+  );
+
+  // 50.10  the full push gate runs the offline-first behavioral test
+  assert(
+    /offline-first\.mjs/.test(gateSrc50),
+    'scripts/gate.js runs the offline-first behavioral test (offline-first.mjs) in the full/push path (U1)'
+  );
+
+  // 50.11  offline-first.mjs cuts the network for REAL (setOffline — not a mocked
+  //         flag), asserts boot READY offline, and drives a native tool
+  assert(
+    fs.existsSync(path.join(ROOT, 'tests', 'offline-first.mjs')) &&
+      (() => {
+        const s = readFile('tests/offline-first.mjs');
+        return /setOffline\(true\)/.test(s) && /bootScreen/.test(s) && /databankSearch/.test(s);
+      })(),
+    'tests/offline-first.mjs cuts the network (context.setOffline(true)), asserts boot-to-READY offline, and drives a native offline tool (CONSULT databankSearch) — a true cut, not a mock (U1)'
+  );
+
+  // 50.12  boot-smoke.mjs supports the cheap --fast commit-smoke mode
+  assert(
+    /--fast/.test(bootSmokeSrc50) && /const FAST/.test(bootSmokeSrc50),
+    'tests/boot-smoke.mjs supports a --fast commit-smoke mode (cheap functional-paint signal for the commit gate — U1)'
   );
 }
 

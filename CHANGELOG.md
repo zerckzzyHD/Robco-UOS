@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3272/3272 | Cache: robco-terminal-v2.8.0-r41 -->
+## [Unreleased]<!-- Tests: 3276/3276 | Cache: robco-terminal-v2.8.0-r41 -->
 
 ### Added
 
@@ -94,6 +94,7 @@
 - Every Fallout 3 karma fact — hit-squad thresholds, companion requirements, karma titles, and event values — now carries a note pointing at the exact source page it came from, and the build now automatically fails if a new karma fact is ever added without one. This is what let the invented hit-squad and companion mistakes above get caught and fixed for good, and stops the same kind of mistake from quietly shipping again.
 - Corrected the wording the AI itself is given about Fallout 3's irreversible-choice warnings to match the same real hit-squad facts described above, instead of repeating the same made-up threat.
 - Every Fallout 3 perk now carries the same kind of source note the karma facts above got — and the build now automatically fails if a new perk is ever added without one, or if a companion-type perk (which Fallout 3 doesn't have) sneaks back in.
+- The app is now automatically verified to boot and stay fully usable with no internet connection at all. A new test cuts the network completely, reloads the terminal, and confirms it still starts all the way up from its offline cache and that a native tool (the databank lookup) still works — proving the offline-first promise instead of just assuming it. It's proven to actually catch a break by deliberately dropping a core file from the offline cache and watching the test fail, then undoing it. A second, deliberately tiny boot check now also runs the moment any work is committed, so a change that stopped the terminal from starting at all is caught right away instead of later. Nothing you can see changed.
 
 ---
 
