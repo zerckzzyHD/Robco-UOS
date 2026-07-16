@@ -40499,7 +40499,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  library/<file> against it (real on CI AND locally); 220.8 checks the
 //  manifest against library/'s ACTUAL contents when present (real only
 //  locally, where the drift it catches is actually visible).
-//  8 tests.
+//
+//  220.9 (Health-U6 audit follow-up) adds protocol-heading reference
+//  integrity: every "Protocol N" cross-reference across the docs + js/ +
+//  tests/ must resolve to a real heading in CLAUDE.md, with compound/merged
+//  headings (29/30/31, 32/33/35) and body sub-parts (36b, 2a) handled.
+//  9 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
@@ -40721,6 +40726,110 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         "220.8 (local-only): skipped — no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
       );
     }
+  }
+
+  // ── 220.9  every "Protocol N" reference resolves to a real protocol heading ──
+  // WHY (Health-U6 audit follow-up, Protocol 36b escape-ratchet): the U6
+  // consolidation MERGED protocol headings — 29/30/31 into one Authentication
+  // section, 32/33/35 into one Kill-Switch section — and the whole repo relies
+  // on every "Protocol N" cross-reference still landing on a real rule. U6 kept
+  // that property by author discipline; nothing in the gate enforced it, so a
+  // future renumber/merge could silently orphan a reference. This closes that
+  // gap the same way 220.1–220.8 close theirs.
+  //
+  // The DEFINED set is parsed from CLAUDE.md's ACTUAL heading structure, so a
+  // compound heading (Protocols 29 / 30 / 31, Protocol 32 / 33 / 35) defines
+  // EACH number inside it. A reference to a body sub-part (Protocol 36b,
+  // Protocol 2a) resolves by its base number (36, 2), and a retired-but-defined
+  // number (Protocol 15 — RETIRED, still explained under its own heading) counts
+  // as defined. Compound references (Protocol 32/33/35, Protocol 4/UI-6) are
+  // split and every piece must resolve.
+  //
+  // ZERO FALSE POSITIVES is the bar (Protocol 45 discipline): only the literal
+  // token Protocol[s] <id> counts as a reference, and REF_ALLOW_220 carries the
+  // one intentional forward-reference — the not-yet-authored catalog
+  // generator+diff protocol, named by number in CLAUDE.md's 3-class library
+  // model before its heading exists. Remove that entry when the heading lands.
+  {
+    // Scan set: the load-bearing docs + all js + all tests (mirrors the file
+    // set Suite 220 reads, widened to RULES.md / QUEUE.md and tests/ per the
+    // finding). Full-file text, not just comments — proven zero-FP because the
+    // token only appears in prose/comments/descriptions across these files.
+    const REF_DOCS_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md', 'RULES.md', 'QUEUE.md'];
+    const refCorpusFiles220 = [
+      ...REF_DOCS_220,
+      ...allJsFiles().map(f => `js/${f.rel}`),
+      ...fs
+        .readdirSync(path.join(ROOT, 'tests'))
+        .filter(f => /\.(?:js|mjs|html)$/.test(f))
+        .map(f => `tests/${f}`),
+    ];
+
+    // DEFINED set, parsed from CLAUDE.md headings. Stop at the first em-dash
+    // (—) so a title number ("(extends 36b)", a date) can never masquerade
+    // as a defined id.
+    const definedNum220 = new Set();
+    const definedUi220 = new Set();
+    for (const line of docText220['CLAUDE.md'].split(/\r?\n/)) {
+      const h = /^#{2,4}\s+Protocols?\s+([^—]*?)\s*—/.exec(line);
+      if (!h) continue;
+      for (const id of h[1].match(/(?:UI-)?\d+[a-z]?/gi) || []) {
+        if (/^UI-/i.test(id)) definedUi220.add('UI-' + id.replace(/^UI-/i, ''));
+        else definedNum220.add(id.match(/^\d+/)[0]);
+      }
+    }
+
+    // The one sanctioned forward-reference: a planned protocol named by number
+    // in CLAUDE.md's 3-class library model before its heading is authored (the
+    // GENERATED-class catalog generator+diff). Naming a not-yet-created protocol
+    // is intentional, not drift — delete this entry when its heading lands.
+    const REF_ALLOW_220 = new Set(['47']);
+
+    const protoRefRe220 = /\bProtocols?\s+((?:UI-)?\d+[a-z]?(?:\s*\/\s*(?:UI-)?\d+[a-z]?)*)/gi;
+    const danglingRef220 = new Map(); // token → Set(files it appears in)
+    for (const rel of refCorpusFiles220) {
+      const text = readFile(rel);
+      let m;
+      protoRefRe220.lastIndex = 0;
+      while ((m = protoRefRe220.exec(text))) {
+        for (const raw of m[1].split('/')) {
+          const tok = raw.trim();
+          if (!tok) continue;
+          let resolves;
+          if (/^UI-\d+$/i.test(tok)) {
+            resolves = definedUi220.has('UI-' + tok.replace(/^UI-/i, ''));
+          } else {
+            const base = (tok.match(/^\d+/) || [])[0];
+            resolves = !!base && (definedNum220.has(base) || REF_ALLOW_220.has(base));
+          }
+          if (!resolves) {
+            if (!danglingRef220.has(tok)) danglingRef220.set(tok, new Set());
+            danglingRef220.get(tok).add(rel);
+          }
+        }
+      }
+    }
+
+    // Self-integrity: the DEFINED parse must be non-trivial (guards the whole
+    // check against passing vacuously if the heading regex ever matches nothing
+    // — the empty-parse trap 220.6 guards for the load-order block). Requiring
+    // '33' proves a compound heading (32 / 33 / 35) was actually split apart.
+    const defineParseOk220 =
+      definedNum220.size >= 40 &&
+      definedNum220.has('1') &&
+      definedNum220.has('46') &&
+      definedNum220.has('33') &&
+      definedUi220.has('UI-1');
+
+    const danglingList220 = [...danglingRef220.entries()].map(
+      ([t, files]) => `${t} (${[...files].join(', ')})`
+    );
+    assert(
+      defineParseOk220 && danglingRef220.size === 0,
+      '220.9: every "Protocol N" reference across the docs + js/ + tests/ resolves to a real protocol heading in CLAUDE.md (compound headings 29/30/31 & 32/33/35 define each number; sub-parts like 36b/2a resolve by base; forward-ref 47 allowlisted)' +
+        (danglingList220.length ? ' — DANGLING: ' + danglingList220.join('; ') : '') +
+        (!defineParseOk220 ? ' — DEFINED-set parse looks empty/wrong (self-integrity failed)' : '')
+    );
   }
 }
 
