@@ -262,18 +262,22 @@ async function saveToSlot(slotNum) {
   if (typeof window.computeSaveChecksum === 'function') {
     envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
   }
-  const ok =
+  // SAVE_LAYER3: _coldWriteObj returns { ok, idbOk, lsOk } (divergence-honest;
+  // an object is ALWAYS truthy so the check below MUST be `.ok`, never the
+  // bare return — gate-guarded contract). The no-_coldWriteObj fallback IIFE
+  // returns the same shape.
+  const res =
     typeof window._coldWriteObj === 'function'
       ? await window._coldWriteObj(_slotKey(slotNum), 'slot_' + slotNum, envelope)
       : (function () {
           try {
             localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
-            return true;
+            return { ok: true, idbOk: false, lsOk: true };
           } catch (_) {
-            return false;
+            return { ok: false, idbOk: false, lsOk: false };
           }
         })();
-  if (ok) {
+  if (res && res.ok) {
     const el = document.getElementById('slotStatus');
     const ts = new Date(envelope.savedAt).toLocaleTimeString();
     const ctx = envelope.gameContext;
@@ -290,10 +294,129 @@ async function saveToSlot(slotNum) {
     // an event, not a direct call into the core, matching the U8 auto-log
     // emit convention elsewhere in this file).
     RobcoEvents.emit('data.write', { kind: 'local-save' });
+    // SAVE_LAYER3 degraded-write notice — posted AFTER the success line so
+    // the user's mental model stays "saved, with a caveat".
+    _maybePostDegradedWriteNotice(res);
   } else {
     appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
   }
 }
+
+// ── SAVE_LAYER3 degraded-write notice (warning-surface gap #6) ───────────────
+// When only ONE of the two stores accepted a slot write, say which — once per
+// session PER MODE (a module-level latch, reset on reload). A transient SYS
+// chat line, deliberately not a banner: the save DID persist, just without
+// its second copy. Full success stays exactly as quiet, and total failure
+// exactly as loud, as before this notice existed.
+const _degradedWriteNoticeShown = { lsOnly: false, idbOnly: false };
+function _maybePostDegradedWriteNotice(res) {
+  try {
+    if (!res || !res.ok || (res.idbOk && res.lsOk)) return; // full success / total failure
+    if (res.lsOk && !res.idbOk && !_degradedWriteNoticeShown.lsOnly) {
+      _degradedWriteNoticeShown.lsOnly = true;
+      appendToChat(
+        '> [SYS] COLD STORAGE UNAVAILABLE — SLOT HELD IN LOCAL MEMORY ONLY.',
+        'sys',
+        true
+      );
+    } else if (res.idbOk && !res.lsOk && !_degradedWriteNoticeShown.idbOnly) {
+      _degradedWriteNoticeShown.idbOnly = true;
+      appendToChat(
+        '> [SYS] LOCAL MIRROR FULL — SLOT HELD IN COLD STORAGE ONLY. EXPORT A SAVE FILE WHEN CONVENIENT.',
+        'sys',
+        true
+      );
+    }
+  } catch (_) {
+    /* a notice must never break a successful save */
+  }
+}
+
+// ── SAVE_LAYER3 quarantined-record affordances (EXPORT / confirm-gated PURGE) ──
+// The durable recovery surface the READ FAULT banner points at. Read priority:
+// the localStorage envelope (the primary, live-condition key) → the in-memory
+// same-session stash (a boot where the localStorage leg failed) → the durable
+// IDB copy (primary 'quarantine' doc, then the newest stamped overflow entry).
+// Never throws; null = nothing on file.
+async function _readQuarantineEnvelope() {
+  try {
+    const raw = localStorage.getItem('robco_v8_quarantine');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  if (window._quarantinedEnvelope) return window._quarantinedEnvelope;
+  try {
+    if (window.IdbStore) {
+      const env = await window.IdbStore.get('campaign', 'quarantine');
+      if (env) return env;
+      const keys = await window.IdbStore.keys('campaign');
+      const stamped = (keys || [])
+        .filter(k => /^quarantine_\d+$/.test(String(k)))
+        .sort((a, b) => Number(String(b).slice(11)) - Number(String(a).slice(11)));
+      if (stamped.length) return await window.IdbStore.get('campaign', stamped[0]);
+    }
+  } catch (_) {}
+  return null;
+}
+window._readQuarantineEnvelope = _readQuarantineEnvelope;
+
+// EXPORT — non-destructive download of the whole quarantine envelope (the
+// exact corrupt bytes ride in `raw`), using the same data-URI download
+// pattern exportSaveFile uses (Protocol 22). Does NOT clear the quarantine
+// or the banner condition — recovery first, cleanup separately.
+window.exportQuarantinedRecord = async function () {
+  const env = await _readQuarantineEnvelope();
+  if (!env) {
+    appendToChat('> [SYS] NO QUARANTINED RECORD ON FILE.', 'sys', true);
+    return;
+  }
+  const dataStr =
+    'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(env, null, 2));
+  const dl = document.createElement('a');
+  dl.setAttribute('href', dataStr);
+  const d = new Date(env.quarantinedAt || Date.now()).toISOString().split('T')[0];
+  dl.setAttribute('download', 'robco_quarantine_' + d + '.json');
+  dl.click();
+};
+
+// PURGE — the destructive half, confirm-gated (Protocol 34): clears the
+// localStorage key, the in-memory stash, and every IDB quarantine* entry.
+// This is what retires the READ FAULT banner's every-boot re-display.
+window.confirmPurgeQuarantine = async function () {
+  const ok = await confirmAction({
+    title: '> PURGE QUARANTINED RECORD',
+    warning:
+      'Permanently erase the quarantined campaign record?\n\nThis is the unreadable data that was set aside when it could not be loaded. If you may ever want it recovered, EXPORT it first. This cannot be undone.',
+    confirmLabel: 'PURGE',
+  });
+  if (!ok) return;
+  await _purgeQuarantineApply();
+};
+
+// The apply core, separated from the confirm gate for direct testability
+// (the _deleteSlotApply / _restoreBackupApply split precedent).
+async function _purgeQuarantineApply() {
+  try {
+    localStorage.removeItem('robco_v8_quarantine');
+  } catch (_) {}
+  window._quarantinedEnvelope = null;
+  try {
+    if (window.IdbStore) {
+      const keys = await window.IdbStore.keys('campaign');
+      for (const k of keys || []) {
+        if (k === 'quarantine' || /^quarantine_\d+$/.test(String(k))) {
+          await window.IdbStore.remove('campaign', k);
+        }
+      }
+    }
+  } catch (_) {}
+  try {
+    const b = document.getElementById('readFaultBanner');
+    if (b) b.remove();
+  } catch (_) {}
+  appendToChat('> [SYS] QUARANTINED RECORD PURGED.', 'sys', true);
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+window._purgeQuarantineApply = _purgeQuarantineApply;
 
 // ── OVERWRITE (local slot) — confirm-gated, keeps the slot's existing name ───
 // The unified SAVES LIST already offers LOAD/VER per slot; OVERWRITE lets the

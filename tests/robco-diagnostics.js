@@ -17441,12 +17441,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 140.9  CEILING RELIEF / FAIL-SAFE: _coldWriteObj succeeds on either store
-  //         (a localStorage quota failure is non-fatal) + boot kicks the migration
+  //         (a localStorage quota failure is non-fatal) + boot kicks the migration.
+  //         SAVE_LAYER3: the return is the divergence-honest { ok, idbOk, lsOk }
+  //         object — `ok` keeps the exact either-store success basis.
   assert(
-    /return idbOk \|\| lsOk;/.test(coldWrite140) &&
+    /return \{ ok: idbOk \|\| lsOk, idbOk: idbOk, lsOk: lsOk \};/.test(coldWrite140) &&
       /catch \(_\) \{/.test(coldWrite140) &&
       /_migrateColdStoreToIdb\(\)/.test(uiCore140),
-    '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal — ceiling relief); boot fires the migration'
+    '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal — ceiling relief), returning the divergence-honest { ok, idbOk, lsOk }; boot fires the migration'
   );
 
   // 140.10  renderSavesList surfaces IDB-only save slots (oversized saves)
@@ -21591,7 +21593,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        the only path that refreshed the list; a save itself never did)
   {
     const body = extractFunctionBody(uiSaves161, 'saveToSlot');
-    const okIdx = body.indexOf('if (ok) {');
+    // SAVE_LAYER3: the success check is `if (res && res.ok)` — _coldWriteObj
+    // now returns a divergence-honest object, never a bare boolean.
+    const okIdx = body.indexOf('if (res && res.ok) {');
     const renderIdx = body.indexOf('renderSavesList();');
     assert(
       okIdx !== -1 && renderIdx !== -1 && renderIdx > okIdx,
@@ -22536,11 +22540,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         a case-by-case inline style on a specific control, like the
   //         signed-out hint line, is untouched and out of scope here)
   {
+    // SAVE_LAYER3 added a third row template (the QUARANTINED RECORD fault
+    // row) built from the same structural classes — 3 of each, still zero
+    // per-row inline layout styles.
     assert(
-      (uiAcct163.match(/class="save-row"/g) || []).length === 2 &&
-        (uiAcct163.match(/class="save-row-label"/g) || []).length === 2 &&
-        (uiAcct163.match(/class="save-row-actions"/g) || []).length === 2,
-      '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates — no separate inline-styled layout left behind for either'
+      (uiAcct163.match(/class="save-row"/g) || []).length === 3 &&
+        (uiAcct163.match(/class="save-row-label"/g) || []).length === 3 &&
+        (uiAcct163.match(/class="save-row-actions"/g) || []).length === 3,
+      '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for ALL of the local-slot, cloud-save, and quarantined-record row templates — no separate inline-styled layout left behind for any'
     );
   }
 }
@@ -36893,7 +36900,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 159 &&
+        tools212.length === 165 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -36902,7 +36909,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 159 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 165 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +6 SAVE_LAYER3 SAVE INTEGRITY tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36930,7 +36937,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           t.id !== 'a11y-immersion' &&
           t.id !== 'inspect-observers' &&
           t.id !== 'replay-hatch' &&
-          !t.id.startsWith('inspect-') // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
+          !t.id.startsWith('inspect-') && // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
+          t.group !== 'SAVE INTEGRITY' // SAVE_LAYER3's 6 tools landed after U3 (own suite covers them)
       );
       const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
       ok212 =
@@ -37944,9 +37952,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok214 =
         // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
-        // more after this unit shipped, so the registry now totals 159
+        // more after this unit shipped, so the registry now totals 165
         // (61 at this unit's own ship time + 80 U4b + 18 U5).
-        tools214.length === 159 &&
+        tools214.length === 165 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -37959,7 +37967,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (159 tools, after U4b+U5) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (165 tools, after U4b+U5+SAVE_LAYER3) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -38253,7 +38261,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 215.1  every one of the 80 new U4b tool ids is registered exactly once,
-  //        and the full registry now totals 159 (61 from U1/U3/U4a + 80 U4b + 18 U5).
+  //        and the full registry now totals 165 (61 from U1/U3/U4a + 80 U4b + 18 U5 + 6 SAVE_LAYER3).
   {
     let ok215 = false;
     let err215 = null;
@@ -38344,7 +38352,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 159 &&
+        tools215.length === 165 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -38352,7 +38360,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 (after this unit + U5) with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 165 (after this unit + U5 + SAVE_LAYER3) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -39300,7 +39308,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  _shellTier() completely unchanged (still staging-signal-only), so an
 //  unlocked production build shows the shell but renders ONLY tier:'prod'
 //  tools — leak-proof by construction, proved exhaustively below over the
-//  FULL, now-159-tool registry. _fireUnlockCeremony() is the short
+//  FULL, now-165-tool registry. _fireUnlockCeremony() is the short
 //  in-fiction "RESTRICTED ACCESS GRANTED" flourish (a plain animation:,
 //  Protocol UI-9, auto-neutralized by the existing global reduced-motion
 //  block).
@@ -39329,7 +39337,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 216.1  every one of the 18 new U5 tool ids is registered exactly once,
-  //        and the full registry now totals 159 (141 from U1-U4b + 18).
+  //        and the full registry now totals 165 (141 from U1-U4b + 18 U5 + 6 SAVE_LAYER3).
   {
     let ok216 = false;
     let err216 = null;
@@ -39358,7 +39366,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok216 =
         newIds216.length === 18 &&
-        tools216.length === 159 &&
+        tools216.length === 165 &&
         newIds216.every(id => ids216.includes(id)) &&
         new Set(ids216).size === ids216.length;
     } catch (e) {
@@ -39366,7 +39374,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 with no duplicate id' +
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 165 with no duplicate id' +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -39559,7 +39567,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const stagingTools216 = tools216.filter(t => t.tier === 'staging');
       const prodTools216 = tools216.filter(t => t.tier === 'prod');
       ok216 =
-        tools216.length === 159 &&
+        tools216.length === 165 &&
         stagingTools216.length > 0 &&
         prodTools216.length > 0 &&
         stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
@@ -39574,7 +39582,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 159-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
+      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 165-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -40026,7 +40034,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     try {
       const tools216 = _evalRealTools216();
       ok216 =
-        tools216.length === 159 &&
+        tools216.length === 165 &&
         tools216.every(t => !t.destructive || t.tier === 'staging') &&
         tools216.every(
           t =>
@@ -40038,7 +40046,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.18: static leak-proof invariant re-derived against the FULL, final 159-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
+      "216.18: static leak-proof invariant re-derived against the FULL, final 165-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -45578,6 +45586,387 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         ww232[2] === 6 &&
         /Wasteland Wanderer Outfit,Light,0,2,6,\+1 END \/ \+1 AGL,50%/.test(dbNvRaw232b),
       `232.24: [deletions+correction] Vault Utility Suit + the 2 duplicate NCR-Ranger rows removed, canonical NCR Ranger Combat Armor kept, Wasteland Wanderer Outfit corrected to [DT 0, wgt 2, val 6] + effect — still-present ${JSON.stringify(stillPresent232b)}, ww ${JSON.stringify(ww232)}`
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 233 — SAVE_LAYER3: read-side fail-loud (quarantine, banners,
+//  degraded-write notice) — Protocols 13/20/26/33/34/42/44
+//
+//  The Layer-3 hard invariant: a save that cannot be READ is quarantined
+//  whole (bytes preserved, recoverable) and announced — never silently
+//  deleted — and the fail-loud layer itself can NEVER break loading a
+//  valid save or block boot. Static guards lock the source contracts;
+//  the VM behavioral tests run the REAL _hydrateStateFromStorage against
+//  corrupt / valid / helper-throw / eviction fixtures. Browser-level
+//  proof (real banners, real IndexedDB, real chat lines) lives in
+//  tests/save-survival.mjs (full push gate).
+//  14 tests
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 233 — SAVE_LAYER3: read-side fail-loud');
+  const uiCore233 = readFile('js/ui-core.js');
+  const uiSaves233 = readFile('js/ui-saves.js');
+  const uiAcct233 = readFile('js/ui-account.js');
+  const state233 = readFile('js/state.js');
+  const html233 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const hydrate233 = extractFunctionBody(uiCore233, '_hydrateStateFromStorage');
+  const quarantine233 = extractFunctionBody(uiCore233, '_quarantineCorruptContainer');
+  const reconcile233 = extractFunctionBody(uiCore233, '_reconcileMetaFromIdb');
+  const saveToSlot233 = extractFunctionBody(uiSaves233, 'saveToSlot');
+  const coldWrite233 = extractFunctionBody(state233, '_coldWriteObj');
+
+  // 233.1  TEMPLATE INERT (Protocol 20, mirrors 217.7b): the READ FAULT
+  //        banner markup lives inside <template id="readFaultBannerTemplate">
+  //        — inert by default, never a live rendered element — with the
+  //        #readFaultBanner + #readFaultBannerMsg nodes and the shared
+  //        Layer-2 .storage-warning-banner class + role="alert".
+  {
+    const tplIdx233 = html233.indexOf('id="readFaultBannerTemplate"');
+    const tplOpen233 = html233.lastIndexOf('<template', tplIdx233);
+    const tplClose233 = html233.indexOf('</template>', tplIdx233);
+    const tplBody233 = tplOpen233 === -1 ? '' : html233.slice(tplOpen233, tplClose233);
+    assert(
+      tplIdx233 !== -1 &&
+        /id="readFaultBanner"/.test(tplBody233) &&
+        /class="storage-warning-banner"/.test(tplBody233) &&
+        /role="alert"/.test(tplBody233) &&
+        /id="readFaultBannerMsg"/.test(tplBody233),
+      '233.1: #readFaultBanner (+ #readFaultBannerMsg, .storage-warning-banner, role=alert) lives inside the inert <template id="readFaultBannerTemplate"> — never a live rendered banner'
+    );
+  }
+
+  // 233.2  CAPTURE-BEFORE-REMOVE (the "deletion can never silently return"
+  //        lock): both corrupt-catch paths route through
+  //        _quarantineCorruptContainer (no bare removeItem left in the
+  //        hydrate catches), and inside the helper the envelope capture of
+  //        the raw bytes precedes the removeItem.
+  {
+    const captureIdx233 = quarantine233.indexOf('raw: String(rawStr)');
+    const removeIdx233 = quarantine233.indexOf('localStorage.removeItem(sourceKey)');
+    assert(
+      /_quarantineCorruptContainer\('robco_v8', v8Str, e\)/.test(hydrate233) &&
+        /_quarantineCorruptContainer\('robco_v7', v7Str, e\)/.test(hydrate233) &&
+        !/localStorage\.removeItem\('robco_v8'\)/.test(hydrate233) &&
+        !/localStorage\.removeItem\('robco_v7'\)/.test(hydrate233) &&
+        captureIdx233 !== -1 &&
+        removeIdx233 !== -1 &&
+        captureIdx233 < removeIdx233,
+      '233.2: both corrupt-catches quarantine via _quarantineCorruptContainer (no bare removeItem in the hydrate path), and the helper captures the raw bytes into the envelope BEFORE removing the corrupt key'
+    );
+  }
+
+  // 233.3  SPLIT-TRY (trigger narrowed, not widened): the migration helpers
+  //        run OUTSIDE the outer parse try, each in its own fail-soft catch
+  //        that records the fault but never quarantines — a helper bug on a
+  //        VALID save degrades one nicety instead of destroying the campaign.
+  {
+    const outerCatch233 = hydrate233.indexOf("_quarantineCorruptContainer('robco_v8'");
+    const migrateIdx233 = hydrate233.indexOf('window._migrateEventLog(state)');
+    const reconIdx233 = hydrate233.indexOf('reconcileEquipped(state)');
+    const failSoft233 =
+      /_migrateEventLog\(state\);[\s\S]{0,400}catch \(e\) \{[\s\S]{0,400}BOOT MIGRATION FAULT \(eventLog\)/.test(
+        hydrate233
+      ) &&
+      /reconcileEquipped\(state\);[\s\S]{0,400}catch \(e\) \{[\s\S]{0,400}BOOT MIGRATION FAULT \(equipped\)/.test(
+        hydrate233
+      );
+    assert(
+      outerCatch233 !== -1 &&
+        migrateIdx233 > outerCatch233 &&
+        reconIdx233 > outerCatch233 &&
+        failSoft233,
+      '233.3: the v8 fast-path migration helpers (_migrateEventLog / reconcileEquipped) run AFTER the outer parse try in their own fail-soft catches (_recordError, never quarantine) — the helper-bug-deletes-valid-save latent defect is structurally gone'
+    );
+  }
+
+  // 233.4  NEVER OVERWRITE AN UNRESOLVED QUARANTINE: the localStorage leg
+  //        writes only when the key is absent; a second corruption goes to a
+  //        stamped IDB key with a newest-3 sweep; both-legs-failed stashes
+  //        the in-memory fallback for same-session export.
+  assert(
+    /localStorage\.getItem\('robco_v8_quarantine'\) === null/.test(quarantine233) &&
+      /'quarantine_' \+ envelope\.quarantinedAt/.test(quarantine233) &&
+      /stamped\.slice\(3\)/.test(quarantine233) &&
+      /window\._quarantinedEnvelope = envelope/.test(quarantine233),
+    '233.4: an earlier unresolved quarantine is never overwritten (absence-gated setItem; overflow goes to stamped IDB keys swept to newest 3; in-memory fallback when both legs fail)'
+  );
+
+  // 233.5  EVICTION = STRICT THREE-PART AFFIRMATIVE SIGNATURE (Protocol 33
+  //        fail-quiet): the banner requires no-v8 AND no-v7 AND the boot
+  //        marker recovered-from-IDB stash — set ONLY inside
+  //        _reconcileMetaFromIdb's recovery loop (which runs solely for keys
+  //        localStorage lacked), never a later re-read.
+  assert(
+    /!v8Str && !v7Str && window\._bootMarkerRecovered === true/.test(hydrate233) &&
+      /if \(key === 'robco_booted_before'\) window\._bootMarkerRecovered = true;/.test(
+        reconcile233
+      ),
+    '233.5: the EVICTION banner requires the strict three-part signature (no v8 AND no v7 AND the boot marker recovered from IDB this boot, stashed inside the recovery loop itself) — first-boot / swipe-away / post-quarantine / slow-IDB all stay silent'
+  );
+
+  // 233.6  _coldWriteObj CONTRACT (the §6 truthiness hazard, gate-locked):
+  //        the return is the { ok, idbOk, lsOk } object, saveToSlot checks
+  //        `.ok` (never the always-truthy bare object), its no-_coldWriteObj
+  //        fallback returns the same shape, and NO js file calls
+  //        _coldWriteObj inside a bare boolean context.
+  {
+    const bareTruthyCall233 = allJsFiles().some(f => {
+      const src = fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8');
+      return /if \(await (window\.)?_coldWriteObj\(/.test(src);
+    });
+    assert(
+      /return \{ ok: idbOk \|\| lsOk, idbOk: idbOk, lsOk: lsOk \};/.test(coldWrite233) &&
+        /if \(res && res\.ok\) \{/.test(saveToSlot233) &&
+        /return \{ ok: true, idbOk: false, lsOk: true \};/.test(saveToSlot233) &&
+        /return \{ ok: false, idbOk: false, lsOk: false \};/.test(saveToSlot233) &&
+        !bareTruthyCall233,
+      '233.6: _coldWriteObj returns the divergence-honest { ok, idbOk, lsOk }; saveToSlot (and its fallback IIFE) consume `.ok`; no js file treats the always-truthy object return as a bare boolean'
+    );
+  }
+
+  // 233.7  META_MANIFEST registration (Protocol 4/23): both Layer-3 telemetry
+  //        prefs are registered device keys with string type + '' default.
+  assert(
+    /robco_read_fault: \{ type: 'string', default: '', owner: 'ui-core\.js' \}/.test(state233) &&
+      /robco_eviction_detected: \{ type: 'string', default: '', owner: 'ui-core\.js' \}/.test(
+        state233
+      ),
+    "233.7: robco_read_fault + robco_eviction_detected are registered META_MANIFEST device prefs (type 'string', default '', owner ui-core.js)"
+  );
+
+  // 233.8  DIAGNOSTIC SHELL COVERAGE (Protocol 44): all 6 SAVE INTEGRITY
+  //        tools registered; the two banner tools are display-only 'prod';
+  //        PLANT CORRUPT CONTAINER and both degraded-write seam setters are
+  //        'staging' + destructive (they write / degrade campaign data); the
+  //        seam reset is 'staging' non-destructive; the new prefs are covered
+  //        by triggers[] metadata.
+  {
+    const tc233 = readFile('js/test-console.js');
+    const ids233 = [
+      'save-force-read-fault-banner',
+      'save-force-eviction-banner',
+      'save-plant-corrupt-container',
+      'save-degraded-no-idb',
+      'save-degraded-no-ls',
+      'save-degraded-off',
+    ];
+    const allRegistered233 = ids233.every(id => tc233.includes(`id: '${id}'`));
+    const bannerProd233 =
+      /id: 'save-force-read-fault-banner',[\s\S]{0,400}tier: 'prod',\s*\n\s*destructive: false/.test(
+        tc233
+      ) &&
+      /id: 'save-force-eviction-banner',[\s\S]{0,400}tier: 'prod',\s*\n\s*destructive: false/.test(
+        tc233
+      );
+    const stagingDestructive233 =
+      /id: 'save-plant-corrupt-container',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-no-idb',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-no-ls',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-off',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: false/.test(tc233);
+    const triggersCovered233 =
+      /triggers: \['robco_read_fault'\]/.test(tc233) &&
+      /triggers: \['robco_eviction_detected'\]/.test(tc233);
+    assert(
+      allRegistered233 && bannerProd233 && stagingDestructive233 && triggersCovered233,
+      '233.8: all 6 SAVE INTEGRITY shell tools registered with correct Protocol 44 tiering (banners prod/display-only; plant + seam setters staging/destructive; seam reset staging) and the new prefs covered via triggers[]'
+    );
+  }
+
+  // 233.9  DEGRADED-WRITE NOTICE: once-per-session-per-mode latch, both SYS
+  //        wordings, posted inside the success branch (the save DID persist),
+  //        and the plain-success / total-failure paths untouched.
+  assert(
+    /const _degradedWriteNoticeShown = \{ lsOnly: false, idbOnly: false \};/.test(uiSaves233) &&
+      /COLD STORAGE UNAVAILABLE — SLOT HELD IN LOCAL MEMORY ONLY\./.test(uiSaves233) &&
+      /LOCAL MIRROR FULL — SLOT HELD IN COLD STORAGE ONLY\. EXPORT A SAVE FILE WHEN CONVENIENT\./.test(
+        uiSaves233
+      ) &&
+      saveToSlot233.indexOf('_maybePostDegradedWriteNotice(res)') >
+        saveToSlot233.indexOf('[SAVE]') &&
+      /\[ERROR\] Save slot write failed — storage unavailable\./.test(saveToSlot233),
+    '233.9: the degraded-write notice posts once per session per mode from the success branch (after the success line), with both wordings; total failure keeps the loud [ERROR] line'
+  );
+
+  // 233.10 QUARANTINE ROW + AFFORDANCES (Protocol 34): renderSavesList gains
+  //        the [FAULT] QUARANTINED RECORD row wired to the shared reader;
+  //        EXPORT is non-destructive; PURGE routes through confirmAction()
+  //        before the apply core (the destructive-op confirm gate).
+  {
+    const purge233 = extractFunctionBody(uiSaves233, '_purgeQuarantineApply');
+    const confirmPurgeIdx233 = uiSaves233.indexOf('window.confirmPurgeQuarantine');
+    const confirmSlice233 = uiSaves233.slice(confirmPurgeIdx233, confirmPurgeIdx233 + 700);
+    assert(
+      /QUARANTINED RECORD/.test(uiAcct233) &&
+        /window\._readQuarantineEnvelope/.test(uiAcct233) &&
+        /window\.exportQuarantinedRecord\(\)/.test(uiAcct233) &&
+        /window\.confirmPurgeQuarantine\(\)/.test(uiAcct233) &&
+        /confirmAction\(\{/.test(confirmSlice233) &&
+        /if \(!ok\) return;/.test(confirmSlice233) &&
+        /localStorage\.removeItem\('robco_v8_quarantine'\)/.test(purge233),
+      '233.10: the saves list renders the [FAULT] QUARANTINED RECORD row with EXPORT + confirm-gated PURGE (Protocol 34); purge clears the localStorage key, stash, and IDB entries'
+    );
+  }
+
+  // 233.11 [behavioral, VM] CORRUPT CONTAINER → QUARANTINED, NOT DELETED:
+  //        the REAL _hydrateStateFromStorage + _quarantineCorruptContainer,
+  //        fed an unparseable robco_v8, must (a) remove the corrupt key,
+  //        (b) hold the EXACT raw bytes in robco_v8_quarantine, (c) record
+  //        the read fault, and (d) boot a fresh campaign without throwing.
+  function _runHydrateSandbox233(store, extraSetup) {
+    const vm = require('vm');
+    const sandbox = {
+      window: {},
+      console: { error: () => {}, warn: () => {}, log: () => {} },
+      Date: Date,
+      localStorage: {
+        getItem: k => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+        setItem: (k, v) => {
+          store[k] = String(v);
+        },
+        removeItem: k => {
+          delete store[k];
+        },
+        get length() {
+          return Object.keys(store).length;
+        },
+        key: i => Object.keys(store)[i] || null,
+      },
+      document: { getElementById: () => null, body: { prepend: () => {} } },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(readFile('js/state.js'), sandbox);
+    // Spies + the REAL Layer-3 functions extracted from ui-core.js.
+    vm.runInContext(
+      'var _recordedErrors = []; function _recordError(t, m) { _recordedErrors.push(m); }' +
+        'var _bannerCalls = []; function _showReadFaultBanner(kind) { _bannerCalls.push(kind); }',
+      sandbox
+    );
+    vm.runInContext(
+      'function _quarantineCorruptContainer(sourceKey, rawStr, err)' + quarantine233,
+      sandbox
+    );
+    vm.runInContext('function _hydrateStateFromStorage()' + hydrate233, sandbox);
+    if (extraSetup) vm.runInContext(extraSetup, sandbox);
+    vm.runInContext('_hydrateStateFromStorage();', sandbox);
+    return {
+      state: vm.runInContext('state', sandbox),
+      errors: vm.runInContext('_recordedErrors', sandbox),
+      banners: vm.runInContext('_bannerCalls', sandbox),
+      store,
+    };
+  }
+  {
+    let r233a = null;
+    let err233a = '';
+    try {
+      r233a = _runHydrateSandbox233({ robco_v8: '{corrupt bytes####' });
+    } catch (e) {
+      err233a = e && e.message;
+    }
+    let qEnv233 = null;
+    try {
+      qEnv233 = r233a && JSON.parse(r233a.store.robco_v8_quarantine);
+    } catch (_) {}
+    assert(
+      r233a &&
+        !('robco_v8' in r233a.store) &&
+        qEnv233 &&
+        qEnv233.raw === '{corrupt bytes####' &&
+        qEnv233.sourceKey === 'robco_v8' &&
+        r233a.errors.some(m => /READ FAULT/.test(m)) &&
+        r233a.banners.indexOf('corrupt') !== -1 &&
+        r233a.state &&
+        typeof r233a.state.lvl !== 'undefined',
+      '233.11: [behavioral] a corrupt robco_v8 is QUARANTINED (exact bytes preserved in robco_v8_quarantine), the fault is recorded, the READ FAULT banner fires, and boot continues into a fresh campaign — never a silent delete, never a thrown boot' +
+        (err233a ? ' — error: ' + err233a : '')
+    );
+  }
+
+  // 233.12 [behavioral, VM] ⭐ THE LATENT-BUG LOCK (Protocol 42): a migration
+  //        helper that THROWS on a perfectly VALID save no longer deletes or
+  //        quarantines it — the container survives byte-identical, the state
+  //        loads, and the fault is recorded fail-soft. (Under the pre-Layer-3
+  //        code this exact fixture DELETED the save.)
+  {
+    const validContainer233 = JSON.stringify({
+      activeContext: 'FNV',
+      campaigns: { FNV: { gameContext: 'FNV', lvl: 33, caps: 777 } },
+    });
+    let r233b = null;
+    let err233b = '';
+    try {
+      r233b = _runHydrateSandbox233(
+        { robco_v8: validContainer233 },
+        // A helper bug: window._migrateEventLog throws on every call.
+        "window._migrateEventLog = function () { throw new Error('helper bug'); };"
+      );
+    } catch (e) {
+      err233b = e && e.message;
+    }
+    assert(
+      r233b &&
+        r233b.store.robco_v8 === validContainer233 &&
+        !('robco_v8_quarantine' in r233b.store) &&
+        r233b.banners.length === 0 &&
+        r233b.state &&
+        r233b.state.lvl === 33 &&
+        r233b.state.caps === 777 &&
+        r233b.errors.some(m => /BOOT MIGRATION FAULT \(eventLog\)/.test(m)),
+      '233.12: [behavioral] ⭐ a migration-helper THROW on a VALID save keeps the container byte-identical, loads the campaign, records the fault fail-soft, and never quarantines/deletes/banners — the latent split-try defect is dead' +
+        (err233b ? ' — error: ' + err233b : '')
+    );
+  }
+
+  // 233.13 [behavioral, VM] EVICTION SIGNATURE both ways: with the recovery
+  //        stash set + no containers the EVICTION banner fires and the pref
+  //        records; WITHOUT the stash (the swipe-away / first-boot / slow-IDB
+  //        family) the same empty store stays completely silent.
+  {
+    let fired233 = null;
+    let silent233 = null;
+    let err233c = '';
+    try {
+      fired233 = _runHydrateSandbox233({}, 'window._bootMarkerRecovered = true;');
+      silent233 = _runHydrateSandbox233({});
+    } catch (e) {
+      err233c = e && e.message;
+    }
+    assert(
+      fired233 &&
+        fired233.banners.indexOf('evicted') !== -1 &&
+        typeof fired233.store.robco_eviction_detected === 'string' &&
+        silent233 &&
+        silent233.banners.length === 0 &&
+        !('robco_eviction_detected' in silent233.store),
+      '233.13: [behavioral] the EVICTION banner fires only on the affirmative signature (marker recovered from IDB this boot + no containers) and records the pref; the identical empty store WITHOUT the recovery stash boots completely silent' +
+        (err233c ? ' — error: ' + err233c : '')
+    );
+  }
+
+  // 233.14 TAIL RIDER + valid-path cost: the Layer-2 denied branch records
+  //        'denied-noidb' and compounds the banner copy when IndexedDB is
+  //        wholly absent; and the valid-save boot path's ONLY Layer-3 read is
+  //        the single quarantine existence check (no new parse, no new write
+  //        on L2 — the hard-invariant cost bound).
+  {
+    const persist233 = extractFunctionBody(uiCore233, '_requestPersistentStorage');
+    const shower233 = extractFunctionBody(uiCore233, '_showStorageWarningBanner');
+    const qReads233 = (hydrate233.match(/getItem\('robco_v8_quarantine'\)/g) || []).length;
+    assert(
+      /'denied-noidb'/.test(persist233) &&
+        /_showStorageWarningBanner\(result === 'denied-noidb'\)/.test(persist233) &&
+        /_STORAGE_BANNER_NOIDB_MSG/.test(shower233) &&
+        /COLD STORAGE IS OFFLINE/.test(uiCore233) &&
+        qReads233 === 1,
+      "233.14: the Layer-2 tail rider records 'denied-noidb' + compounds the banner copy when IndexedDB is absent, and the valid-save boot path carries exactly ONE quarantine existence check (the L2 near-zero-touch bound)"
     );
   }
 }

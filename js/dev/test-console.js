@@ -2617,6 +2617,104 @@
       action: () => _fireUnlockCeremony(),
     },
 
+    // ── SAVE INTEGRITY (SAVE_LAYER3, Protocol 44) — the read-side fail-loud
+    // surfaces are exactly the hard-to-reproduce boot conditions Protocol 44
+    // exists for (a corrupt container, a host eviction, a one-store-degraded
+    // slot write). Tiering per Protocol 44: the two banner tools are
+    // display-only (write nothing durable) → 'prod'; PLANT CORRUPT CONTAINER
+    // destroys the live campaign container → 'staging' + destructive; the
+    // degraded-write seam causes subsequent slot saves to skip one store
+    // (campaign-data writes with a missing leg) → 'staging' + destructive.
+    {
+      id: 'save-force-read-fault-banner',
+      label: 'FORCE READ-FAULT BANNER',
+      subLabel: "_showReadFaultBanner('corrupt') — display only",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Render the MEMORY CORE READ FAULT boot banner on demand. Display-only — writes nothing durable; tap the banner to dismiss.',
+      triggers: ['robco_read_fault'],
+      action: () => window._showReadFaultBanner && window._showReadFaultBanner('corrupt'),
+    },
+    {
+      id: 'save-force-eviction-banner',
+      label: 'FORCE EVICTION BANNER',
+      subLabel: "_showReadFaultBanner('evicted') — display only",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Render the MEMORY CORE EVICTION DETECTED boot banner on demand. Display-only — writes nothing durable; tap the banner to dismiss.',
+      triggers: ['robco_eviction_detected'],
+      action: () => window._showReadFaultBanner && window._showReadFaultBanner('evicted'),
+    },
+    {
+      id: 'save-plant-corrupt-container',
+      label: 'PLANT CORRUPT CONTAINER',
+      subLabel: 'robco_v8 ← garbage + reload — DESTROYS the live campaign container',
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'True end-to-end READ FAULT repro: overwrite the live campaign container with unparseable garbage and reload. The boot read quarantines the garbage and shows the banner — the LIVE campaign is replaced by it (its last saved bytes end up in the quarantine envelope, recoverable via EXPORT).',
+      triggers: ['robco_read_fault'],
+      action: () => _dshPlantCorruptContainer(),
+    },
+    {
+      id: 'save-degraded-no-idb',
+      label: 'DEGRADED WRITE: NO COLD STORE',
+      subLabel: "__robcoForceColdWriteMode='no-idb'",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Force subsequent slot saves to skip the IndexedDB leg so the COLD STORAGE UNAVAILABLE notice is demonstrable (save a slot to see it). Saves made while forced have no durability shadow — clear with DEGRADED WRITE: OFF.',
+      triggers: [],
+      action: () => {
+        window.__robcoForceColdWriteMode = 'no-idb';
+      },
+    },
+    {
+      id: 'save-degraded-no-ls',
+      label: 'DEGRADED WRITE: NO LOCAL MIRROR',
+      subLabel: "__robcoForceColdWriteMode='no-ls'",
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Force subsequent slot saves to skip the localStorage leg so the LOCAL MIRROR FULL notice is demonstrable (save a slot to see it). Clear with DEGRADED WRITE: OFF.',
+      triggers: [],
+      action: () => {
+        window.__robcoForceColdWriteMode = 'no-ls';
+      },
+    },
+    {
+      id: 'save-degraded-off',
+      label: 'DEGRADED WRITE: OFF',
+      subLabel: '__robcoForceColdWriteMode=null',
+      icon: '⚠',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'staging',
+      destructive: false,
+      tooltip: 'Clear the forced degraded-write seam — slot saves write both stores again.',
+      triggers: [],
+      action: () => {
+        window.__robcoForceColdWriteMode = null;
+      },
+    },
+
     // ── U4b: INLINE DEV-RESET BUTTONS (planning §5) — category:'inline',
     // anchored to a STATIC element on the real panel, mounted by
     // _mountInlineResets() (staging-only by construction). Each reuses the
@@ -3548,6 +3646,23 @@
       /* a console failure must never break boot or leak to production */
     }
     _refresh(panel);
+  }
+
+  // SAVE_LAYER3: true end-to-end READ FAULT repro. Sets window._loadingSave —
+  // the SAME guard every legit persist-then-reload load path uses — BEFORE
+  // touching localStorage, so neither the debounced saveState() nor the
+  // beforeunload flush can re-write robco_v8 over the planted garbage during
+  // the reload (the exact clobber Suite 95.8/95.9 lock against). A REAL page
+  // reload (never _rebootFromConsole's in-place POST replay) — the read fault
+  // only exists on the genuine _hydrateStateFromStorage boot path.
+  function _dshPlantCorruptContainer() {
+    try {
+      window._loadingSave = true;
+      localStorage.setItem('robco_v8', '{{{ CORRUPT MEMORY CORE — unparseable on purpose');
+      window.location.reload();
+    } catch (_) {
+      /* a console failure must never break boot or leak to production */
+    }
   }
 
   // WAKE -> ACTIVE is the one-click undo for the IDLE/STANDBY/SHUTDOWN/OFF force

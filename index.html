@@ -170,6 +170,20 @@
         REGULARLY. (TAP TO DISMISS)
       </div>
     </template>
+    <template id="readFaultBannerTemplate">
+      <!-- SAVE_LAYER3 (read-side fail-loud): ONE template, TWO wordings — the
+           message span is filled at clone time by _showReadFaultBanner() in the
+           ui-core script. READ FAULT: a corrupt campaign container was
+           quarantined (bytes preserved), not erased — re-shows every boot while
+           the quarantine is unresolved (live condition, Layer-2 precedent).
+           EVICTION: the host reclaimed localStorage while the IDB boot marker
+           survived (the strict three-part signature — never on first boot).
+           Reuses the Layer-2 .storage-warning-banner look (Protocol 22). Tap to
+           dismiss for the session. Game-agnostic copy (Protocol 38). -->
+      <div id="readFaultBanner" class="storage-warning-banner" role="alert">
+        <span id="readFaultBannerMsg"></span>
+      </div>
+    </template>
 
     <!-- ════════════════════════════════════════════════════════════════════
          DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay

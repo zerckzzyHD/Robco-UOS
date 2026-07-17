@@ -187,6 +187,17 @@ async function renderSavesList() {
 
   const summaryEl = document.getElementById('sum-saves');
 
+  // SAVE_LAYER3: an unresolved QUARANTINED RECORD surfaces as its own row —
+  // the durable recovery affordance the READ FAULT boot banner points at.
+  // Read via the shared ls → in-memory → IDB reader (ui-saves.js, Protocol 22).
+  // Best-effort: a reader failure just hides the row, never breaks the list.
+  let quarantineEnv = null;
+  try {
+    if (typeof window._readQuarantineEnvelope === 'function') {
+      quarantineEnv = await window._readQuarantineEnvelope();
+    }
+  } catch (_) {}
+
   let cloudSaves = [];
   if (isSignedIn && typeof window.listCloudSaves === 'function') {
     body.innerHTML = emptyState('RETRIEVING ARCHIVES…');
@@ -208,7 +219,9 @@ async function renderSavesList() {
     s => !s.data.gameContext || s.data.gameContext === curCtx
   );
 
-  if (!localSavesShown.length && !cloudSavesShown.length) {
+  // SAVE_LAYER3: a quarantined record keeps the list rendering even with zero
+  // ordinary saves — the most common post-quarantine state is exactly that.
+  if (!localSavesShown.length && !cloudSavesShown.length && !quarantineEnv) {
     const hidden = localHiddenCount + cloudHiddenCount;
     body.innerHTML =
       _archiveHeader +
@@ -222,6 +235,30 @@ async function renderSavesList() {
   }
 
   const rows = [];
+
+  // SAVE_LAYER3 QUARANTINED RECORD row — first, above ordinary saves (a fault
+  // record the user was told to come recover). EXPORT is non-destructive;
+  // PURGE is confirm-gated (Protocol 34). Buttons are <button> (Protocol UI-5)
+  // with literal aria-labels (Protocol UI-3 spirit).
+  if (quarantineEnv) {
+    const qWhen = quarantineEnv.quarantinedAt
+      ? new Date(quarantineEnv.quarantinedAt).toLocaleString()
+      : '';
+    rows.push(
+      '<div class="save-row">' +
+        '<div class="save-row-label">' +
+        '<span class="save-row-tag">[FAULT]</span>' +
+        '<span class="save-row-name">QUARANTINED RECORD' +
+        (qWhen ? ' — ' + escapeHtml(qWhen) : '') +
+        '</span>' +
+        '</div>' +
+        '<div class="save-row-actions">' +
+        '<button class="btn-sm" onclick="window.exportQuarantinedRecord()" aria-label="Export the quarantined campaign record as a file">EXPORT</button>' +
+        '<button class="btn-sm delete-btn" onclick="window.confirmPurgeQuarantine()" aria-label="Permanently purge the quarantined campaign record">PURGE</button>' +
+        '</div>' +
+        '</div>'
+    );
+  }
 
   localSavesShown.forEach(ls => {
     rows.push(

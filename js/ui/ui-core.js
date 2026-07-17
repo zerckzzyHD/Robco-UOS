@@ -306,6 +306,14 @@ async function _reconcileMetaFromIdb() {
     // MetaStore.set restores localStorage AND re-shadows to IDB (idempotent).
     MetaStore.set(key, rec.value);
     recovered++;
+    // SAVE_LAYER3: stash the ONE recovery fact the eviction signature needs —
+    // the boot marker was ABSENT from localStorage this boot (this loop runs
+    // solely for keys localStorage lacked) and came back from IDB. Set here,
+    // at the recovery moment itself (never a later re-read), so a slow-IDB
+    // budget expiry simply leaves it unset and the eviction check stays
+    // silent this boot — false negatives are the accepted direction (never a
+    // late banner popping mid-session).
+    if (key === 'robco_booted_before') window._bootMarkerRecovered = true;
   }
 
   // Direction 2 — BACKFILL (localStorage → IDB, only when IDB lacks the key).
@@ -356,29 +364,56 @@ function _hydrateStateFromStorage() {
 
   let loadedOk = false;
   if (v8Str) {
+    // SAVE_LAYER3 split-try: the OUTER try holds ONLY what genuinely means
+    // "the stored bytes are unreadable" — parse, container-shape access, the
+    // state merge. The post-load migration helpers run OUTSIDE it in their own
+    // fail-soft catches below, so a helper bug on a perfectly VALID save
+    // degrades one nicety instead of quarantining (formerly: DELETING) the
+    // whole campaign — the latent Layer-3 defect this structure fixes.
+    let v8Parsed = false;
     try {
       window.robco_v8 = JSON.parse(v8Str);
       let activeCampaign = window.robco_v8.campaigns[window.robco_v8.activeContext] || {};
       state = { ...state, ...activeCampaign };
       state.gameContext = window.robco_v8.activeContext;
+      v8Parsed = true;
+    } catch (e) {
+      // Capture-then-remove — the corrupt bytes are preserved whole in the
+      // quarantine envelope, never silently destroyed (SAVE_LAYER3).
+      _quarantineCorruptContainer('robco_v8', v8Str, e);
+    }
+    if (v8Parsed) {
       // P4: the v8 fast-path skips migrateState, so run the Terminal Record
       // [T#]→eventLog migration here too — existing v8 saves migrate on load
       // (idempotent + non-lossy; leaves manual notes in campaign_notes).
-      if (typeof window._migrateEventLog === 'function') window._migrateEventLog(state);
-      // Same reason: a save already carrying a stale state.equipped reference
-      // (from before the reconciliation fix, or a hand-edited import) would
-      // otherwise never heal on a plain reload, since this fast-path is the
-      // one that skips migrateState() (which is where reconcileEquipped()
-      // normally runs). No re-render needed here — loadUI() paints fresh
-      // right after boot finishes.
-      if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
+      // Fail-soft (SAVE_LAYER3): a throw here is a helper bug, NOT a corrupt
+      // save — log loudly, boot with the un-helped state, never quarantine.
+      try {
+        if (typeof window._migrateEventLog === 'function') window._migrateEventLog(state);
+      } catch (e) {
+        console.error('[RobCo] _migrateEventLog failed on a valid save (fail-soft):', e);
+        try {
+          _recordError('error', 'BOOT MIGRATION FAULT (eventLog): ' + String(e).slice(0, 200));
+        } catch (_) {}
+      }
+      // Same reason: a stale state.equipped reference would otherwise never
+      // heal on a plain reload — this fast-path skips migrateState() (where
+      // reconcileEquipped() normally runs). loadUI() repaints after boot.
+      try {
+        if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
+      } catch (e) {
+        console.error('[RobCo] reconcileEquipped failed on a valid save (fail-soft):', e);
+        try {
+          _recordError('error', 'BOOT MIGRATION FAULT (equipped): ' + String(e).slice(0, 200));
+        } catch (_) {}
+      }
       loadedOk = true;
-    } catch (e) {
-      console.error('[RobCo] Corrupt robco_v8 — quarantined, booting fresh:', e);
-      localStorage.removeItem('robco_v8');
     }
   }
   if (!loadedOk && v7Str) {
+    // migrateState stays INSIDE this try — it is integral to loading a v7 at
+    // all, and a false positive here now *quarantines* (recoverable) rather
+    // than *deletes* (SAVE_LAYER3).
     try {
       let savedState = JSON.parse(v7Str);
       if (typeof migrateState === 'function')
@@ -395,8 +430,7 @@ function _hydrateStateFromStorage() {
       state.gameContext = window.robco_v8.activeContext;
       loadedOk = true;
     } catch (e) {
-      console.error('[RobCo] Corrupt robco_v7 — quarantined, booting fresh:', e);
-      localStorage.removeItem('robco_v7');
+      _quarantineCorruptContainer('robco_v7', v7Str, e);
     }
   }
   if (!loadedOk) {
@@ -432,6 +466,44 @@ function _hydrateStateFromStorage() {
   getFactionRegistry().forEach(f => {
     if (!state.factions[f.key]) state.factions[f.key] = { fame: 0, infamy: 0 };
   });
+
+  // ── SAVE_LAYER3 read-side fail-loud (banner triggers) ─────────────────────
+  // The valid-save (L2) cost here is ONE localStorage existence check.
+  // Trigger 1 (READ FAULT) re-shows every boot while an unresolved quarantine
+  // exists — an unrecovered campaign-loss artifact is a live condition, the
+  // same rationale as the Layer-2 banner re-showing while persistence is
+  // denied. PURGE (saves list) retires it.
+  // Trigger 2 (EVICTION) requires the affirmative three-part signature: the
+  // boot marker was ABSENT from localStorage pre-reconcile AND recovered from
+  // IDB THIS boot (both collapsed into window._bootMarkerRecovered — set only
+  // inside _reconcileMetaFromIdb's recovery loop, which runs solely for keys
+  // localStorage lacked) AND no campaign container of either vintage exists.
+  // First-ever boots (no marker anywhere), swipe-away no-save boots (marker
+  // present in localStorage), post-quarantine boots (marker present) and
+  // slow-IDB boots (stash unset at budget expiry) all fail the signature and
+  // stay SILENT — false negatives are the accepted, conservative direction.
+  try {
+    let hasQuarantine = false;
+    try {
+      hasQuarantine = localStorage.getItem('robco_v8_quarantine') !== null;
+    } catch (_) {}
+    if (hasQuarantine || window._quarantinedEnvelope) {
+      _showReadFaultBanner('corrupt');
+    } else if (!v8Str && !v7Str && window._bootMarkerRecovered === true) {
+      _showReadFaultBanner('evicted');
+      try {
+        MetaStore.set('robco_eviction_detected', String(Date.now()));
+      } catch (_) {}
+      try {
+        _recordError(
+          'error',
+          'EVICTION DETECTED: host reclaimed localStorage (boot marker recovered from cold storage; no campaign container found)'
+        );
+      } catch (_) {}
+    }
+  } catch (_) {
+    /* the fail-loud layer must never itself break boot (Protocol 33) */
+  }
 }
 
 // ── SAVE_INTEGRITY_PASS Layer 2 — STORAGE PERSISTENCE REQUEST (boot phase) ──
@@ -441,7 +513,7 @@ function _hydrateStateFromStorage() {
 // result; never on granted/unknown. Idempotent (a second call while the
 // banner is already up is a no-op) and dismissible for the session (tap to
 // hide) — the MetaStore record is what stops it from re-prompting every boot.
-function _showStorageWarningBanner() {
+function _showStorageWarningBanner(coldStoreOffline) {
   try {
     if (document.getElementById('storageWarningBanner')) return; // already shown
     const tpl = document.getElementById('storageWarningBannerTemplate');
@@ -449,6 +521,11 @@ function _showStorageWarningBanner() {
     const frag = tpl.content.cloneNode(true);
     const banner = frag.querySelector('#storageWarningBanner');
     if (banner) {
+      // SAVE_LAYER3 tail rider: persistence denied AND IndexedDB wholly
+      // absent = NO durability net at all — compound the copy so the user
+      // knows the cold-storage fallback is offline too (the template's base
+      // copy is untouched for the ordinary denied path).
+      if (coldStoreOffline) banner.textContent = _STORAGE_BANNER_NOIDB_MSG;
       banner.style.display = 'flex';
       banner.addEventListener('click', () => banner.remove());
     }
@@ -456,6 +533,114 @@ function _showStorageWarningBanner() {
   } catch (_) {
     /* a warning banner must never break boot */
   }
+}
+
+// ── SAVE_LAYER3 — READ-SIDE FAIL-LOUD (quarantine + banner) ─────────────────
+// Layer 3 of the SAVE_INTEGRITY_PASS: a save that cannot be READ is set aside
+// whole (quarantined) and announced — never silently deleted. The recovery
+// affordance (EXPORT / confirm-gated PURGE) lives in the saves list
+// (ui-account.js / ui-saves.js); this file owns the boot-read capture and the
+// banner. Wording is game-agnostic (Protocol 38) with no code identifiers in
+// user-facing copy (Protocol 21 spirit).
+const _READ_FAULT_BANNER_MSG =
+  '> MEMORY CORE READ FAULT — PRIOR CAMPAIGN DATA COULD NOT BE READ AND HAS BEEN QUARANTINED, NOT ERASED. RECOVER OR EXPORT IT FROM THE SAVES LIST. (TAP TO DISMISS)';
+const _EVICTION_BANNER_MSG =
+  '> MEMORY CORE EVICTION DETECTED — THE HOST RECLAIMED LOCAL DATA. PRIOR SLOTS AND BACKUPS MAY SURVIVE IN COLD STORAGE — CHECK THE SAVES LIST OR IMPORT A SAVE FILE. (TAP TO DISMISS)';
+const _STORAGE_BANNER_NOIDB_MSG =
+  '> MEMORY CORE UNSTABLE — HOST WILL NOT GUARANTEE PERSISTENCE, AND COLD STORAGE IS OFFLINE. EXPORT A SAVE FILE REGULARLY. (TAP TO DISMISS)';
+
+// Byte-for-byte the Layer-2 shower idiom above (Protocol 22): clone the inert
+// template, fill the message node, display, tap-to-dismiss, prepend — the
+// whole body wrapped so a warning banner can never break boot. Idempotent (a
+// second call while the banner is up is a no-op). kind: 'corrupt' | 'evicted'.
+function _showReadFaultBanner(kind) {
+  try {
+    if (document.getElementById('readFaultBanner')) return; // already shown
+    const tpl = document.getElementById('readFaultBannerTemplate');
+    if (!tpl) return;
+    const frag = tpl.content.cloneNode(true);
+    const banner = frag.querySelector('#readFaultBanner');
+    if (banner) {
+      const msg = banner.querySelector('#readFaultBannerMsg');
+      if (msg) msg.textContent = kind === 'evicted' ? _EVICTION_BANNER_MSG : _READ_FAULT_BANNER_MSG;
+      banner.style.display = 'flex';
+      banner.addEventListener('click', () => banner.remove());
+    }
+    document.body.prepend(frag);
+  } catch (_) {
+    /* a warning banner must never break boot */
+  }
+}
+// Diagnostic Shell trigger entry point (Protocol 44) — display-only.
+window._showReadFaultBanner = _showReadFaultBanner;
+
+// Capture-then-remove — NEVER delete-only (SAVE_LAYER3 hard invariant: no
+// corrupt bytes are destroyed without a preserved copy). The envelope is
+// built from the in-memory string FIRST; the corrupt key is removed BEFORE
+// the quarantine setItem so the copy fits in roughly the freed localStorage
+// footprint (writing first would double the blob's footprint and likely
+// quota-fail). Every step is individually wrapped — the quarantine itself
+// must never become a new boot failure mode (Protocol 33).
+function _quarantineCorruptContainer(sourceKey, rawStr, err) {
+  const envelope = {
+    quarantinedAt: Date.now(),
+    sourceKey: sourceKey,
+    reason: String(err).slice(0, 300),
+    // The exact corrupt bytes, whole — NEVER truncated (a truncated
+    // quarantine is destroyed data with extra steps).
+    raw: String(rawStr),
+  };
+  console.error(
+    '[RobCo] Corrupt ' + sourceKey + ' — quarantined (bytes preserved), booting fresh:',
+    err
+  );
+  try {
+    localStorage.removeItem(sourceKey);
+  } catch (_) {}
+  // localStorage leg — best-effort, and NEVER overwrites an earlier
+  // unresolved quarantine (the first corruption is almost certainly the
+  // long-lived campaign; a later one is at most a short-lived fresh one).
+  let lsHeld = false;
+  try {
+    if (localStorage.getItem('robco_v8_quarantine') === null) {
+      localStorage.setItem('robco_v8_quarantine', JSON.stringify(envelope));
+      lsHeld = true;
+    }
+  } catch (_) {}
+  // IDB leg — the durable, ceiling-free home. Campaign-side data goes to the
+  // 'campaign' store, never 'meta' (Protocol 23 two-store boundary).
+  // Fire-and-forget: no new awaits in boot. A quarantine that couldn't take
+  // the primary localStorage slot goes under a stamped key instead; stamped
+  // extras are swept to the newest 3.
+  try {
+    if (window.IdbStore) {
+      const idbKey = lsHeld ? 'quarantine' : 'quarantine_' + envelope.quarantinedAt;
+      const p = window.IdbStore.set('campaign', idbKey, envelope);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+      if (!lsHeld) {
+        const sweep = window.IdbStore.keys('campaign').then(keys => {
+          const stamped = (keys || [])
+            .filter(k => /^quarantine_\d+$/.test(String(k)))
+            .sort((a, b) => Number(String(b).slice(11)) - Number(String(a).slice(11)));
+          return Promise.all(stamped.slice(3).map(k => window.IdbStore.remove('campaign', k)));
+        });
+        if (sweep && typeof sweep.catch === 'function') sweep.catch(() => {});
+      }
+    }
+  } catch (_) {}
+  // In-memory fallback: if the primary localStorage slot didn't take THIS
+  // envelope, keep it reachable for the saves-list export affordance this
+  // session regardless of how the fire-and-forget IDB write fares.
+  if (!lsHeld) window._quarantinedEnvelope = envelope;
+  try {
+    MetaStore.set('robco_read_fault', String(envelope.quarantinedAt));
+  } catch (_) {}
+  try {
+    _recordError(
+      'error',
+      'READ FAULT: ' + sourceKey + ' unreadable — quarantined, not erased. ' + envelope.reason
+    );
+  } catch (_) {}
 }
 
 // Fire-and-forget: ask the browser to make this origin's storage persistent
@@ -480,9 +665,16 @@ function _requestPersistentStorage() {
         if (!granted) {
           granted = await navigator.storage.persist();
         }
-        const result = granted ? 'granted' : 'denied';
+        let result = granted ? 'granted' : 'denied';
+        // SAVE_LAYER3 tail rider: denied persistence with IndexedDB wholly
+        // absent means the campaign has NO durability net at all — record the
+        // sharper detail and compound the banner copy. Grep-confirmed
+        // (Protocol 8 stage 2): nothing in js/ consumes the exact 'denied'
+        // string, and the behavioral gate's denied-assert runs with
+        // IndexedDB present, where the value stays plain 'denied'.
+        if (result === 'denied' && !window.IdbStore) result = 'denied-noidb';
         MetaStore.set('robco_storage_persisted', result);
-        if (result === 'denied') _showStorageWarningBanner();
+        if (result !== 'granted') _showStorageWarningBanner(result === 'denied-noidb');
       })
       .catch(() => {
         /* a rejected persist()/persisted() call must never surface to boot */

@@ -128,6 +128,14 @@ const META_MANIFEST = {
   // campaign container's durability is a device/browser property, not
   // campaign data.
   robco_storage_persisted: { type: 'string', default: '', owner: 'ui-core.js' },
+  // SAVE_LAYER3 (read-side fail-loud) — telemetry RECORDS, never display
+  // gates (the banners key off live conditions — the quarantine key's
+  // existence, the boot-time eviction signature — never these prefs):
+  // timestamp of the last quarantine event / the last detected eviction.
+  // Device prefs (Protocol 23), inspectable via the Diagnostic Shell and the
+  // error log — mirrors the robco_storage_persisted pattern above.
+  robco_read_fault: { type: 'string', default: '', owner: 'ui-core.js' },
+  robco_eviction_detected: { type: 'string', default: '', owner: 'ui-core.js' },
 };
 // Fire-and-forget write-through of a device-pref op to IndexedDB's 'meta' store
 // (Step 2 · Phase 1 · P1). The ONLY seam through which MetaStore touches IdbStore
@@ -520,21 +528,34 @@ window._coldReadObj = _coldReadObj;
 // Async: durably write a cold-store envelope. IDB 'campaign' is the primary
 // (no ~5MB ceiling); localStorage is a best-effort mirror — a QuotaExceededError
 // there is NON-FATAL because the IDB copy is the durable home (this is the
-// ceiling relief). Returns true if at least one store accepted the write; the
-// caller reports success on that basis. Never throws.
+// ceiling relief). Never throws.
+// SAVE_LAYER3: returns a divergence-honest result object { ok, idbOk, lsOk } —
+// `ok` is true when at least one store accepted the write (the caller's
+// success basis, unchanged); idbOk/lsOk expose WHICH store(s) held it so the
+// UI layer can post the degraded-write notice instead of erasing the
+// divergence. ⚠ CONTRACT (gate-guarded): an object is ALWAYS truthy — callers
+// must check `.ok`, never the bare return (a bare-truthiness caller would
+// report success on total failure).
+// Test seam (Diagnostic Shell, Protocol 44): window.__robcoForceColdWriteMode
+// = 'no-idb' | 'no-ls' forces one leg to report failure so the degraded-write
+// notices are demonstrable on demand (mirrors window.__robcoBootFlavor).
 async function _coldWriteObj(lsKey, idbKey, obj) {
+  const _force = (typeof window !== 'undefined' && window.__robcoForceColdWriteMode) || null;
   let idbOk = false;
   try {
-    if (window.IdbStore) idbOk = (await window.IdbStore.set('campaign', idbKey, obj)) === true;
+    if (window.IdbStore && _force !== 'no-idb')
+      idbOk = (await window.IdbStore.set('campaign', idbKey, obj)) === true;
   } catch (_) {}
   let lsOk = false;
   try {
-    localStorage.setItem(lsKey, JSON.stringify(obj));
-    lsOk = true;
+    if (_force !== 'no-ls') {
+      localStorage.setItem(lsKey, JSON.stringify(obj));
+      lsOk = true;
+    }
   } catch (_) {
     /* quota / private-mode — non-fatal; the IDB copy is the durable home */
   }
-  return idbOk || lsOk;
+  return { ok: idbOk || lsOk, idbOk: idbOk, lsOk: lsOk };
 }
 window._coldWriteObj = _coldWriteObj;
 

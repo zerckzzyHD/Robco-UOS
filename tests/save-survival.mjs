@@ -1263,6 +1263,512 @@ let importAsymmetryResult = null;
   await ctxU.close();
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §A — CORRUPT CONTAINER BOOT (plan L4/L8): the corrupt blob is
+// QUARANTINED (exact bytes), never deleted; the READ FAULT banner shows,
+// re-shows on the next boot while unresolved (L8, silently NOT the eviction
+// signature), and the purge apply-core retires it.
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxQ = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const CORRUPT = '{"activeContext":"FNV","campaigns":{ CORRUPT ###';
+  await ctxQ.addInitScript(v8 => {
+    localStorage.setItem('robco_v8', v8);
+  }, CORRUPT);
+  const page = await ctxQ.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+
+  const q = await page.evaluate(() => ({
+    bootOk: (() => {
+      const bs = document.getElementById('bootScreen');
+      return !bs || getComputedStyle(bs).display === 'none';
+    })(),
+    bannerText: (() => {
+      const b = document.getElementById('readFaultBanner');
+      return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+    })(),
+    // The corrupt bytes must be GONE from robco_v8 — but a fresh-boot
+    // campaign legitimately re-saves a NEW valid container afterwards, so
+    // assert "no longer the corrupt string", not "key absent".
+    v8CorruptGone: (() => {
+      const v = localStorage.getItem('robco_v8');
+      if (v === null) return true;
+      try {
+        JSON.parse(v);
+        return true; // a fresh valid container is fine
+      } catch (_) {
+        return false; // still unparseable = the corrupt bytes survived
+      }
+    })(),
+    quarantineRaw: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('robco_v8_quarantine')).raw;
+      } catch (_) {
+        return null;
+      }
+    })(),
+    readFaultPref: typeof MetaStore !== 'undefined' ? MetaStore.get('robco_read_fault') : null,
+    errorLogged: (() => {
+      try {
+        return JSON.parse(MetaStore.get('robco_error_log') || '[]').some(e =>
+          /READ FAULT/.test(e.msg)
+        );
+      } catch (_) {
+        return false;
+      }
+    })(),
+  }));
+  // NOTE: addInitScript re-seeds the corrupt robco_v8 on EVERY navigation in
+  // this context, so the "v8 removed" assert must run before any reload; the
+  // L8 re-show below tolerates the re-seed (a re-quarantine is also a show).
+  if (q.bootOk) pass('LAYER3 corrupt boot — boot completed (bootScreen cleared), never blocked');
+  else fail('LAYER3 corrupt boot — boot did NOT complete');
+  if (
+    q.bannerText &&
+    /READ FAULT/.test(q.bannerText) &&
+    /QUARANTINED, NOT ERASED/.test(q.bannerText)
+  ) {
+    pass('LAYER3 corrupt boot — READ FAULT banner visible with the quarantined-not-erased copy');
+  } else {
+    fail(`LAYER3 corrupt boot — READ FAULT banner missing/wrong (got: ${q.bannerText})`);
+  }
+  if (q.v8CorruptGone)
+    pass('LAYER3 corrupt boot — the corrupt robco_v8 bytes were removed (capture-then-remove)');
+  else fail('LAYER3 corrupt boot — corrupt robco_v8 still present');
+  if (q.quarantineRaw === CORRUPT) {
+    pass('LAYER3 corrupt boot — robco_v8_quarantine holds the EXACT corrupt bytes (nothing lost)');
+  } else {
+    fail(
+      `LAYER3 corrupt boot — quarantine raw mismatch (got: ${String(q.quarantineRaw).slice(0, 60)})`
+    );
+  }
+  if (q.readFaultPref && q.errorLogged) {
+    pass(
+      'LAYER3 corrupt boot — robco_read_fault pref recorded + READ FAULT in the error ring-buffer (FAULT lamp surface)'
+    );
+  } else {
+    fail(
+      `LAYER3 corrupt boot — telemetry missing (pref=${q.readFaultPref}, errorLogged=${q.errorLogged})`
+    );
+  }
+
+  // L8 re-display + NOT-the-eviction-signature on the next boot.
+  await page.evaluate(() => {
+    window._loadingSave = true; // suppress the unload flush (test-only reload)
+    window.location.reload();
+  });
+  await page.waitForNavigation({ timeout: 10000 }).catch(() => {});
+  await waitBooted(page);
+  const q2 = await page.evaluate(() => ({
+    bannerText: (() => {
+      const b = document.getElementById('readFaultBanner');
+      return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+    })(),
+    evictionPref:
+      typeof MetaStore !== 'undefined' ? MetaStore.get('robco_eviction_detected') : null,
+  }));
+  if (q2.bannerText && /READ FAULT/.test(q2.bannerText)) {
+    pass(
+      'LAYER3 post-quarantine boot (L8) — READ FAULT banner re-shows while the quarantine is unresolved'
+    );
+  } else {
+    fail('LAYER3 post-quarantine boot (L8) — banner did not re-show');
+  }
+  if (!q2.evictionPref && !(q2.bannerText && /EVICTION/.test(q2.bannerText))) {
+    pass('LAYER3 post-quarantine boot (L8) — NOT misread as an eviction (no eviction banner/pref)');
+  } else {
+    fail('LAYER3 post-quarantine boot (L8) — falsely fired the EVICTION signature!');
+  }
+
+  // PURGE apply-core retires the quarantine + the live banner.
+  const purged = await page.evaluate(async () => {
+    await window._purgeQuarantineApply();
+    return {
+      lsGone: localStorage.getItem('robco_v8_quarantine') === null,
+      bannerGone: !document.getElementById('readFaultBanner'),
+    };
+  });
+  if (purged.lsGone && purged.bannerGone) {
+    pass(
+      'LAYER3 purge — _purgeQuarantineApply clears the quarantine key and removes the live banner'
+    );
+  } else {
+    fail(`LAYER3 purge — incomplete (lsGone=${purged.lsGone}, bannerGone=${purged.bannerGone})`);
+  }
+  await ctxQ.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §B — THE HARD-INVARIANT BRANCH (plan L2): a VALID save boots
+// with NO banner, NO quarantine key, NO telemetry writes — byte-level
+// untouched load. Plus the fresh-first-boot (L1) silence.
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxV = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const current = buildCurrentCampaign('FNV', 21);
+  const container = { activeContext: 'FNV', campaigns: { FNV: current } };
+  await ctxV.addInitScript(v8 => {
+    localStorage.setItem('robco_v8', v8);
+  }, JSON.stringify(container));
+  const page = await ctxV.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  const v = await page.evaluate(() => ({
+    lvl: window.snapshotActiveCampaign().campaigns.FNV.lvl,
+    banner: !!document.getElementById('readFaultBanner'),
+    quarantine: localStorage.getItem('robco_v8_quarantine') !== null,
+    readFaultPref: typeof MetaStore !== 'undefined' ? MetaStore.get('robco_read_fault') : null,
+    evictionPref:
+      typeof MetaStore !== 'undefined' ? MetaStore.get('robco_eviction_detected') : null,
+  }));
+  if (v.lvl === current.lvl && !v.banner && !v.quarantine && !v.readFaultPref && !v.evictionPref) {
+    pass(
+      'LAYER3 valid boot (L2, hard invariant) — save loads, NO banner, NO quarantine, NO fault telemetry'
+    );
+  } else {
+    fail(`LAYER3 valid boot (L2) VIOLATED — ${JSON.stringify(v)}`);
+  }
+  await ctxV.close();
+
+  // L1 fresh first boot — completely silent.
+  const ctxF = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const pageF = await ctxF.newPage();
+  await pageF.goto(INDEX_URL);
+  await waitBooted(pageF);
+  const f = await pageF.evaluate(() => ({
+    banner: !!document.getElementById('readFaultBanner'),
+    quarantine: localStorage.getItem('robco_v8_quarantine') !== null,
+  }));
+  if (!f.banner && !f.quarantine) {
+    pass('LAYER3 fresh first boot (L1) — no banner, no quarantine key (silent)');
+  } else {
+    fail(`LAYER3 fresh first boot (L1) — false positive! ${JSON.stringify(f)}`);
+  }
+  await ctxF.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §C — ⭐ MIGRATION-HELPER THROW ON A VALID SAVE (the latent
+// bug, browser-level): window._migrateEventLog is force-replaced with a
+// throwing accessor BEFORE state.js loads (the set is swallowed, every read
+// throws) — the save must survive, load, and stay un-quarantined.
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxH = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const current = buildCurrentCampaign('FNV', 31);
+  const container = { activeContext: 'FNV', campaigns: { FNV: current } };
+  const containerStr = JSON.stringify(container);
+  await ctxH.addInitScript(v8 => {
+    localStorage.setItem('robco_v8', v8);
+    // Replace the helper AFTER every script has loaded (state.js's own global
+    // `function _migrateEventLog` declaration would clobber any accessor set
+    // here) but BEFORE window.onload's boot phases run — DOMContentLoaded
+    // fires between the two.
+    document.addEventListener('DOMContentLoaded', () => {
+      window._migrateEventLog = function () {
+        throw new Error('helper bug (Layer-3 test)');
+      };
+    });
+  }, containerStr);
+  const page = await ctxH.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  const h = await page.evaluate(() => ({
+    // Logical survival (byte-identity is locked by the VM test in the Node
+    // runner — Suite 233.12; here the post-boot debounced autosave may
+    // legitimately re-serialize the same container).
+    v8Lvl: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('robco_v8')).campaigns.FNV.lvl;
+      } catch (_) {
+        return null;
+      }
+    })(),
+    quarantine: localStorage.getItem('robco_v8_quarantine') !== null,
+    banner: !!document.getElementById('readFaultBanner'),
+    lvl: window.snapshotActiveCampaign().campaigns.FNV.lvl,
+    faultLogged: (() => {
+      try {
+        return JSON.parse(MetaStore.get('robco_error_log') || '[]').some(e =>
+          /BOOT MIGRATION FAULT/.test(e.msg)
+        );
+      } catch (_) {
+        return false;
+      }
+    })(),
+  }));
+  if (h.v8Lvl === current.lvl && !h.quarantine && !h.banner && h.lvl === current.lvl) {
+    pass(
+      'LAYER3 helper-throw (⭐ latent-bug lock) — a throwing migration helper on a VALID save: container survives, campaign loaded, no quarantine, no banner'
+    );
+  } else {
+    fail(
+      `LAYER3 helper-throw — VALID SAVE HARMED (v8Lvl=${h.v8Lvl}, quarantine=${h.quarantine}, banner=${h.banner}, lvl=${h.lvl})`
+    );
+  }
+  if (h.faultLogged) {
+    pass('LAYER3 helper-throw — the helper fault was still recorded fail-soft (error ring-buffer)');
+  } else {
+    fail('LAYER3 helper-throw — helper fault silently swallowed (no ring-buffer entry)');
+  }
+  await ctxH.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §D — EVICTION DETECTED (plan L7) + the false-positive family:
+// a real eviction (localStorage wiped, IDB survives) fires the banner; the
+// swipe-away analogue (only the container missing, marker present) is
+// SILENT. The reloads set window._loadingSave first — the same guard every
+// legit persist-then-reload path uses — so the unload flush can't re-write
+// what the test just cleared (harness analogue of Suite 95.8's clobber).
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxE = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const page = await ctxE.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  await page.waitForTimeout(1200); // let runBootSequence set + shadow the boot marker
+
+  const idbReady = await page.evaluate(async () => {
+    if (!window.IdbStore) return false;
+    try {
+      const rec = await window.IdbStore.getRaw('meta', 'robco_booted_before');
+      return !!(rec && typeof rec.value === 'string');
+    } catch (_) {
+      return false;
+    }
+  });
+  if (!idbReady) {
+    note(
+      'LAYER3 eviction — IndexedDB shadow unavailable in this environment; eviction sub-case skipped (recovery impossible = designed silent)'
+    );
+  } else {
+    await page.evaluate(() => {
+      window._loadingSave = true;
+      localStorage.clear(); // the eviction: localStorage gone, IDB survives
+      window.location.reload();
+    });
+    await page.waitForNavigation({ timeout: 10000 }).catch(() => {});
+    await waitBooted(page);
+    const e = await page.evaluate(() => ({
+      bannerText: (() => {
+        const b = document.getElementById('readFaultBanner');
+        return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+      })(),
+      evictionPref:
+        typeof MetaStore !== 'undefined' ? MetaStore.get('robco_eviction_detected') : null,
+      markerRestored:
+        typeof MetaStore !== 'undefined' ? MetaStore.get('robco_booted_before') : null,
+    }));
+    if (e.bannerText && /EVICTION DETECTED/.test(e.bannerText)) {
+      pass(
+        'LAYER3 eviction (L7) — EVICTION DETECTED banner fires on the real three-part signature'
+      );
+    } else {
+      fail(`LAYER3 eviction (L7) — banner missing (got: ${e.bannerText})`);
+    }
+    if (e.evictionPref && e.markerRestored === 'true') {
+      pass(
+        'LAYER3 eviction (L7) — robco_eviction_detected recorded; boot marker restored from cold storage'
+      );
+    } else {
+      fail(
+        `LAYER3 eviction (L7) — telemetry wrong (pref=${e.evictionPref}, marker=${e.markerRestored})`
+      );
+    }
+  }
+  await ctxE.close();
+
+  // False positive (swipe-away analogue): only the container missing, the
+  // boot marker still IN localStorage → not recovered → silent.
+  const ctxS = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const current = buildCurrentCampaign('FNV', 41);
+  await ctxS.addInitScript(
+    v8 => {
+      localStorage.setItem('robco_v8', v8);
+    },
+    JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: current } })
+  );
+  const pageS = await ctxS.newPage();
+  await pageS.goto(INDEX_URL);
+  await waitBooted(pageS);
+  await pageS.waitForTimeout(1200);
+  await pageS.evaluate(() => {
+    window._loadingSave = true;
+    localStorage.removeItem('robco_v8'); // container gone, marker stays
+    window.location.reload();
+  });
+  await pageS.waitForNavigation({ timeout: 10000 }).catch(() => {});
+  // The init script re-seeds robco_v8 on this reload — remove it AGAIN before
+  // boot reads it? Can't (init runs first). Instead assert on what boot SAW:
+  // robco_v8 was re-seeded by addInitScript, so this reload is a VALID boot —
+  // adjust: use a context with no init re-seed for the swipe case.
+  await ctxS.close();
+
+  // Clean swipe-away repro without init-script re-seeding: seed marker only.
+  const ctxS2 = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  await ctxS2.addInitScript(() => {
+    localStorage.setItem('robco_booted_before', 'true'); // marker present in ls
+  });
+  const pageS2 = await ctxS2.newPage();
+  await pageS2.goto(INDEX_URL);
+  await waitBooted(pageS2);
+  const s2 = await pageS2.evaluate(() => ({
+    banner: !!document.getElementById('readFaultBanner'),
+    evictionPref:
+      typeof MetaStore !== 'undefined' ? MetaStore.get('robco_eviction_detected') : null,
+  }));
+  if (!s2.banner && !s2.evictionPref) {
+    pass(
+      'LAYER3 eviction false-positive (swipe-away: marker present, no save) — completely SILENT'
+    );
+  } else {
+    fail(`LAYER3 eviction false-positive — FIRED on the swipe-away case! ${JSON.stringify(s2)}`);
+  }
+  await ctxS2.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §E — CORRUPT v8 + VALID v7 (plan L5): the v7 legacy campaign
+// still loads (unchanged flow) AND the banner still shows — a silent
+// regression to an old campaign is exactly what must not happen.
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctx57 = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const CORRUPT57 = '###not json at all';
+  await ctx57.addInitScript(
+    ({ v8, v7 }) => {
+      localStorage.setItem('robco_v8', v8);
+      localStorage.setItem('robco_v7', v7);
+    },
+    { v8: CORRUPT57, v7: JSON.stringify(OLDEST_V7_RAW) }
+  );
+  const page = await ctx57.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  const r57 = await page.evaluate(() => ({
+    lvl: window.snapshotActiveCampaign().campaigns.FNV.lvl,
+    bannerText: (() => {
+      const b = document.getElementById('readFaultBanner');
+      return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+    })(),
+    quarantineRaw: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('robco_v8_quarantine')).raw;
+      } catch (_) {
+        return null;
+      }
+    })(),
+  }));
+  if (r57.lvl === OLDEST_V7_RAW.lvl) {
+    pass(
+      'LAYER3 corrupt-v8 + valid-v7 (L5) — the v7 legacy campaign still loads (fallback flow unchanged)'
+    );
+  } else {
+    fail(`LAYER3 corrupt-v8 + valid-v7 (L5) — v7 did not load (lvl=${r57.lvl})`);
+  }
+  if (r57.bannerText && /READ FAULT/.test(r57.bannerText) && r57.quarantineRaw === CORRUPT57) {
+    pass(
+      'LAYER3 corrupt-v8 + valid-v7 (L5) — banner shown AND the corrupt v8 bytes quarantined (the newer-campaign regression is not silent)'
+    );
+  } else {
+    fail(
+      `LAYER3 corrupt-v8 + valid-v7 (L5) — banner/quarantine wrong (banner=${!!r57.bannerText})`
+    );
+  }
+  await ctx57.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §F — DEGRADED-WRITE NOTICES (plan W3, gap #6): each divergence
+// mode posts its SYS line once per session; full success stays quiet; total
+// failure keeps today's [ERROR] line (asserted above in the fail-loud audit).
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxW = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const current = buildCurrentCampaign('FNV', 51);
+  await ctxW.addInitScript(
+    v8 => {
+      localStorage.setItem('robco_v8', v8);
+    },
+    JSON.stringify({ activeContext: 'FNV', campaigns: { FNV: current } })
+  );
+  const page = await ctxW.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+
+  const w = await page.evaluate(async () => {
+    const chatText = () => document.getElementById('chatDisplay').textContent;
+    const count = needle => chatText().split(needle).length - 1;
+    const out = {};
+
+    // Mode (b): IDB leg fails — COLD STORAGE UNAVAILABLE, once per session.
+    const realIdbSet = window.IdbStore && window.IdbStore.set;
+    if (window.IdbStore) window.IdbStore.set = () => Promise.reject(new Error('idb down (test)'));
+    await window.saveToSlot(1);
+    out.coldAfterFirst = count('COLD STORAGE UNAVAILABLE');
+    out.successAfterFirst = count('[SAVE]');
+    await window.saveToSlot(1);
+    out.coldAfterSecond = count('COLD STORAGE UNAVAILABLE');
+    if (window.IdbStore) window.IdbStore.set = realIdbSet;
+
+    // Mode (a): localStorage leg fails — LOCAL MIRROR FULL, once per session.
+    const realSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, val) {
+      if (key === 'robco_slot_2') throw new Error('quota (test)');
+      return realSetItem.call(this, key, val);
+    };
+    await window.saveToSlot(2);
+    out.mirrorAfter = count('LOCAL MIRROR FULL');
+    Storage.prototype.setItem = realSetItem;
+
+    // Healthy save: plain success, no NEW degraded lines.
+    const coldBefore = count('COLD STORAGE UNAVAILABLE');
+    const mirrorBefore = count('LOCAL MIRROR FULL');
+    await window.saveToSlot(3);
+    out.healthyAddedDegradedLine =
+      count('COLD STORAGE UNAVAILABLE') !== coldBefore ||
+      count('LOCAL MIRROR FULL') !== mirrorBefore;
+    out.healthySucceeded = count('[SAVE]') >= 4;
+    return out;
+  });
+
+  if (w.coldAfterFirst === 1 && w.successAfterFirst >= 1) {
+    pass(
+      'LAYER3 degraded write (no-IDB) — save succeeds with the COLD STORAGE UNAVAILABLE notice after the success line'
+    );
+  } else {
+    fail(
+      `LAYER3 degraded write (no-IDB) — wrong (cold=${w.coldAfterFirst}, save=${w.successAfterFirst})`
+    );
+  }
+  if (w.coldAfterSecond === 1) {
+    pass(
+      'LAYER3 degraded write (no-IDB) — the notice posts ONCE per session (second degraded save adds no duplicate)'
+    );
+  } else {
+    fail(`LAYER3 degraded write (no-IDB) — duplicate notice (count=${w.coldAfterSecond})`);
+  }
+  if (w.mirrorAfter === 1) {
+    pass(
+      'LAYER3 degraded write (no-LS) — LOCAL MIRROR FULL notice posts once when only cold storage held the save'
+    );
+  } else {
+    fail(`LAYER3 degraded write (no-LS) — wrong (mirror=${w.mirrorAfter})`);
+  }
+  if (!w.healthyAddedDegradedLine && w.healthySucceeded) {
+    pass(
+      'LAYER3 degraded write — a healthy both-stores save stays exactly as quiet as before (no degraded line)'
+    );
+  } else {
+    fail(
+      `LAYER3 degraded write — healthy save wrong (added=${w.healthyAddedDegradedLine}, ok=${w.healthySucceeded})`
+    );
+  }
+  await ctxW.close();
+}
+
 await browser.close();
 
 // ── Verdict summary ────────────────────────────────────────────────────
