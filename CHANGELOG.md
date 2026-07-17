@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3298/3298 | Cache: robco-terminal-v2.8.0-r43 -->
+## [Unreleased]<!-- Tests: 3301/3301 | Cache: robco-terminal-v2.8.0-r44 -->
 
 ### Added
 
@@ -72,6 +72,10 @@
 - Fixed the "SYNC COMPLETE" message appearing even when some of your saves failed to upload. If any save doesn't make it, the summary now says so plainly — telling you how many failed and to retry — instead of falsely reporting a clean finish.
 - Fixed a failed Google sign-in showing nothing at all — you'd tap SIGN IN and, if it failed for a real reason (a blocked popup, no connection, a provider error), nothing visible would happen. A clear "SIGN-IN FAILED" notice now appears so you know to check your connection or popup blocker and try again. Simply closing the sign-in popup yourself stays silent, as before.
 
+### Improved
+
+- Screen-reader users now hear what each field on the terminal is for. Every text box, number field, dropdown, and file picker — your health and level, caps, new inventory and ammo rows, status effects, field notes, the trait filter, the API key and model pickers, the command line, and the loot-image and save-file pickers — now announces its purpose out loud instead of being read as a blank, unlabeled control. Nothing looks any different on screen; this only adds the spoken labels assistive tech relies on.
+
 ### Under the Hood
 
 - Laid invisible groundwork for an upcoming true-to-the-game Fallout 3 Pip-Boy screen layout: gave a handful of existing panels stable internal names and added a new per-game data table describing how they'll eventually group together on that screen. Nothing you can see changed yet — Fallout: New Vegas is completely unaffected.
@@ -106,6 +110,7 @@
 - Added an automated safeguard that fails the build if any internal rule cross-reference ever points at a rule number that doesn't exist. The rulebook tidy-up above merged several rules under shared headings while the rest of the project still refers to them by their old numbers; that all still lined up, but only because it had been checked by hand. It's now checked automatically on every change — across the rulebook, the supporting docs, and the code and test notes — so a future renumber or merge can never quietly leave a reference pointing at nothing. Proven to actually catch a bad reference by deliberately adding one, watching the check fail and name it, then undoing it. Nothing you can see changed.
 - Strengthened the tests guarding how the AI's replies are applied to your campaign: the rules that an explicit "nothing equipped" from the AI really empties that gear slot, that a made-up status-effect category can't be stored, and that Lincoln memorabilia entries are checked against the real item list were previously verified only by scanning the code's text — which could stay green even if the actual behavior broke. Those checks now run the real import step against real game data and verify the outcome, and each one was proven to genuinely catch its bug by deliberately breaking the behavior, watching the test fail, and undoing it. Also replaced a self-satisfied bookkeeping check in the test suite (it could never fail, because it searched its own list for its own entries) with a real one: the number of tests that actually ran must now match the documented count exactly, so a whole block of tests can never silently vanish from the safety net again — proven the same break-then-fix way. Nothing you can see changed.
 - The developer diagnostic panel gained on-demand triggers for every new hard-to-reproduce save-safety condition above (force either warning banner, plant a deliberately corrupt save for a true end-to-end rehearsal, and simulate each one-store-degraded save), and a new suite of automated tests locks the whole layer in: a corrupt save must be quarantined with its exact bytes intact, a healthy save must load with zero warnings, a helper failure on a healthy save must never harm it (proven against the old code, which failed it), the eviction warning must stay silent on every known false-alarm scenario, and each degraded-save notice must appear exactly once. Nothing you can see changed beyond the features described above.
+- Drove the accessibility-warning count the automated build tolerates down from an accepted baseline of forty (a stale figure left over from a much smaller, year-old version of the site) all the way to zero, by giving every form field on the page a proper spoken label (see Improved above) and then tightening the build to accept no unlabeled control at all. A new automated check reads the page directly and fails the build if any text box, dropdown, or file picker ever ships without a real label again — deliberately stricter than the old check, which only looked at the handful of fields visible on the very first screen and missed anything tucked inside a collapsed panel or a different tab. Nothing you can see changed.
 
 ---
 

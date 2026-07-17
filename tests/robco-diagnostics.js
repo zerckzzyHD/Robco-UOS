@@ -27343,7 +27343,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
   assert(
-    /id="stat_lvl"[\s\S]{0,120}max="50"/.test(html184),
+    // [^>]* keeps the scan inside the single <input> tag rather than a brittle
+    // fixed char-window (Protocol 42): U9 added an aria-label between id and
+    // max, which pushed max="50" past the old {0,120} window even though the
+    // invariant still holds. Tag-scoped match is robust to added attributes.
+    /id="stat_lvl"[^>]*max="50"/.test(html184),
     '184.7b: #stat_lvl carries a native max="50" attribute matching MAX_PLAYER_LEVEL, alongside the JS clamp'
   );
 
@@ -46117,6 +46121,113 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       "233.14: the Layer-2 tail rider records 'denied-noidb' + compounds the banner copy when IndexedDB is absent, and the valid-save boot path carries exactly ONE quarantine existence check (the L2 near-zero-touch bound)"
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 234 — Accessibility: every form control has an accessible name
+//  (Health-batch U9, Protocol 36b/42). The push-gate axe check
+//  (tests/a11y-check.mjs) only scans the DEFAULT-boot DOM, so a control
+//  that lives in a CSS-hidden subsystem tab (e.g. #imageInput, #c_caps,
+//  #apiModelInput) can lose its label without axe ever seeing it. This
+//  static guard reads index.html directly and holds the FULL surface —
+//  every <input>/<select>/<textarea> that needs a name must carry a
+//  PROGRAMMATIC one (label[for], wrapping <label>, aria-label,
+//  aria-labelledby, or title). Deliberately STRICTER than axe: a bare
+//  placeholder does NOT count as an accessible name here, so the "give
+//  every input a real label" contract can't silently rot back to
+//  placeholder-only. U9 burned the accepted-violation baseline from 40
+//  (a stale v2.0.1 capture) to 0; 234.2 locks that floor so a re-baseline
+//  can't quietly re-inflate it.
+// ══════════════════════════════════════════════════════════════
+header('Suite 234 — Accessibility: form controls carry an accessible name (U9)');
+{
+  const html234 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+
+  // Every <label for="X"> association in the document.
+  const labelFor234 = new Set();
+  for (const m of html234.matchAll(/<label\b[^>]*\bfor\s*=\s*["']([^"']+)["']/gi)) {
+    labelFor234.add(m[1]);
+  }
+
+  // Input types that convey their own name / need no author-supplied label.
+  const EXEMPT_TYPES_234 = new Set(['hidden', 'submit', 'button', 'reset', 'image']);
+
+  const missing234 = [];
+  let scanned234 = 0;
+  for (const m of html234.matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
+    const tag = m[1].toLowerCase();
+    const attrs = m[2];
+    const typeM = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
+    const type = typeM ? typeM[1].toLowerCase() : tag === 'input' ? 'text' : tag;
+    if (EXEMPT_TYPES_234.has(type)) continue;
+    scanned234++;
+
+    const idM = attrs.match(/\bid\s*=\s*["']([^"']+)["']/i);
+    const id = idM ? idM[1] : null;
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasAriaLabelledby = /\baria-labelledby\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasTitle = /\btitle\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasLabelFor = id && labelFor234.has(id);
+
+    // Implicit wrapping <label>…control…</label>: an open <label> tag with no
+    // intervening </label> before this control's position.
+    const pos = m.index;
+    const lastOpen = html234.lastIndexOf('<label', pos);
+    const lastClose = html234.lastIndexOf('</label>', pos);
+    const wrapped = lastOpen !== -1 && lastOpen > lastClose;
+
+    if (!(hasAriaLabel || hasAriaLabelledby || hasTitle || hasLabelFor || wrapped)) {
+      missing234.push(id ? `#${id}` : `<${tag} type=${type}>`);
+    }
+  }
+
+  // 234.1  No form control may lack a programmatic accessible name.
+  assert(
+    missing234.length === 0,
+    `234.1: every scanned form control in index.html (${scanned234}) has a programmatic accessible name` +
+      (missing234.length ? ` — MISSING: ${missing234.join(', ')}` : '')
+  );
+
+  // 234.2  The accepted-violation baseline stays burned down to zero (U9).
+  const baseline234 = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'tests', 'a11y-baseline.json'), 'utf8')
+  );
+  const baselineTotal234 = Object.values(baseline234).reduce((a, b) => a + b, 0);
+  assert(
+    baselineTotal234 === 0,
+    `234.2: tests/a11y-baseline.json accepts 0 serious/critical violations (U9 floor) — current total ${baselineTotal234}`
+  );
+
+  // 234.3  The exact controls U9 fixed keep their aria-label — the axe-flagged
+  //        boot-visible set plus the hidden-tab set axe never reached.
+  const fixed234 = [
+    'stat_hp_cur',
+    'stat_hp_max',
+    'stat_lvl',
+    'stat_xp',
+    'stat_rads',
+    'newStatusName',
+    'newStatusType',
+    'newItemType',
+    'apiModelInput',
+    'imageInput',
+    'c_caps',
+  ];
+  const stillLabeled234 = fixed234.filter(id => {
+    const idx = html234.indexOf(`id="${id}"`);
+    if (idx === -1) return false;
+    const tagEnd = html234.indexOf('>', idx);
+    const tagStart = html234.lastIndexOf('<', idx);
+    const tagSrc = html234.slice(tagStart, tagEnd);
+    return /\baria-label\s*=\s*["'][^"']*\S/i.test(tagSrc);
+  });
+  assert(
+    stillLabeled234.length === fixed234.length,
+    `234.3: all ${fixed234.length} U9-labeled controls still carry aria-label` +
+      (stillLabeled234.length !== fixed234.length
+        ? ` — lost: ${fixed234.filter(id => !stillLabeled234.includes(id)).join(', ')}`
+        : '')
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

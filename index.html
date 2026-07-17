@@ -914,6 +914,7 @@
                       <input
                         type="number"
                         id="stat_hp_cur"
+                        aria-label="Current hit points"
                         value="100"
                         min="0"
                         class="num num-sm"
@@ -923,6 +924,7 @@
                       <input
                         type="number"
                         id="stat_hp_max"
+                        aria-label="Maximum hit points"
                         value="100"
                         min="1"
                         class="num num-sm"
@@ -974,6 +976,7 @@
                       <input
                         type="number"
                         id="stat_lvl"
+                        aria-label="Character level"
                         value="1"
                         min="1"
                         max="50"
@@ -984,6 +987,7 @@
                       <input
                         type="number"
                         id="stat_xp"
+                        aria-label="Experience points"
                         value="0"
                         min="0"
                         class="num"
@@ -1002,6 +1006,7 @@
                       <input
                         type="number"
                         id="stat_rads"
+                        aria-label="Radiation level"
                         value="0"
                         min="0"
                         class="num num-sm rad-input"
@@ -1875,7 +1880,14 @@
                       <span class="rb-cap"
                         >REQUISITION CREDIT <span class="real-label">(CAPS)</span></span
                       >
-                      <input type="number" id="c_caps" value="0" min="0" oninput="updateMath()" />
+                      <input
+                        type="number"
+                        id="c_caps"
+                        aria-label="Caps (requisition credit)"
+                        value="0"
+                        min="0"
+                        oninput="updateMath()"
+                      />
                       <span class="rb-sub">editable readout — the one caps field in the app</span>
                     </div>
                   </div>
@@ -2035,6 +2047,7 @@
                     <input
                       type="text"
                       id="newAmmoType"
+                      aria-label="New ammo caliber"
                       list="ammoCalibers"
                       placeholder="CALIBER (E.G. 5.56MM)"
                       maxlength="40"
@@ -2045,6 +2058,7 @@
                     <input
                       type="number"
                       id="newAmmoCount"
+                      aria-label="New ammo quantity"
                       placeholder="QTY"
                       min="0"
                       style="width: 50px"
@@ -2067,6 +2081,7 @@
                   <input
                     type="text"
                     id="newItemName"
+                    aria-label="New item designation"
                     placeholder="ITEM DESIGNATION"
                     maxlength="80"
                     style="flex-grow: 1; min-width: 80px"
@@ -2074,6 +2089,7 @@
                   <input
                     type="number"
                     id="newItemQty"
+                    aria-label="New item quantity"
                     placeholder="QTY"
                     min="1"
                     style="width: 48px"
@@ -2081,6 +2097,7 @@
                   <input
                     type="number"
                     id="newItemWeight"
+                    aria-label="New item weight in pounds"
                     placeholder="WT (LBS)"
                     min="0"
                     style="width: 52px"
@@ -2088,12 +2105,14 @@
                   <input
                     type="number"
                     id="newItemValue"
+                    aria-label="New item value"
                     placeholder="VAL"
                     min="0"
                     style="width: 52px"
                   />
                   <select
                     id="newItemType"
+                    aria-label="New item type"
                     style="width: 56px; background: rgba(0, 0, 0, 0.8); font-size: 10px"
                   >
                     <option value="misc">misc</option>
@@ -2534,6 +2553,7 @@
                   <input
                     type="text"
                     id="traitFilter"
+                    aria-label="Filter trait registry"
                     placeholder="⌕ FILTER TRAIT REGISTRY…"
                     maxlength="80"
                     oninput="renderTraits()"
@@ -2560,6 +2580,7 @@
                 <div class="panel-form">
                   <select
                     id="newStatusName"
+                    aria-label="Status effect name"
                     style="
                       flex: 2;
                       background: rgba(0, 0, 0, 0.8);
@@ -2590,11 +2611,13 @@
                   <input
                     type="number"
                     id="newStatusTicks"
+                    aria-label="Status effect duration in ticks"
                     placeholder="TICKS"
                     style="flex: 1; width: 50px"
                   />
                   <select
                     id="newStatusType"
+                    aria-label="Status effect type"
                     style="
                       flex: 1;
                       background: rgba(0, 0, 0, 0.8);
@@ -2756,6 +2779,7 @@
                   <input
                     type="text"
                     id="newCampaignNote"
+                    aria-label="New field note"
                     placeholder="FILE A FIELD NOTE… (ENTER TO ADD)"
                     maxlength="5000"
                     onkeydown="if (event.key === 'Enter') addCampaignNote();"
@@ -3695,6 +3719,7 @@
                           <input
                             type="password"
                             id="apiKeyInput"
+                            aria-label="Gemini API key"
                             placeholder="PASTE GEMINI KEY HERE…"
                             maxlength="200"
                             style="border-color: var(--robco-alert); color: var(--robco-alert)"
@@ -3738,6 +3763,7 @@
 
                         <select
                           id="apiModelInput"
+                          aria-label="AI model selection"
                           style="
                             width: 100%;
                             margin-top: 8px;
@@ -4003,6 +4029,7 @@
                 <input
                   type="file"
                   id="fileInput"
+                  aria-label="Import save file"
                   style="display: none"
                   accept=".json"
                   onchange="handleFileUpload(event)"
@@ -4448,6 +4475,7 @@
                   </div>
                   <textarea
                     id="chatInput"
+                    aria-label="Command or action input"
                     class="composer-input"
                     maxlength="4000"
                     placeholder="ENTER COMMAND OR ACTION (E.G. '> [THREAT] GECKOS')…"
@@ -4507,6 +4535,7 @@
               <input
                 type="file"
                 id="imageInput"
+                aria-label="Loot image for scanning"
                 style="display: none"
                 accept="image/*"
                 onchange="handleImageSelection(event)"
