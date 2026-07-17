@@ -13578,7 +13578,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  location-change path and the AI import path record it via the shared
 //  recordLocationVisit() helper (deduped, permanent), and renderWorldMap reads
 //  locationHistory for CURRENT / VISITED / UNKNOWN status. (Protocol 42 map fix)
-//  8 tests
+//  114.2/2b/2c behavioral (Health-U3 slice 2): recordLocationVisit() executed
+//  in a vm sandbox — dedup, case-folding, no-truncation, null/whitespace no-op.
+//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 114 — Map location discovery persistence');
@@ -13586,9 +13588,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const apiSrc114 = readGroup('api');
   const uiCoreSrc114 = readGroup('ui-core');
   const uiRenderSrc114 = readGroup('ui-render');
-  const recordBody114 = (stateSrc114.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [
-    '',
-  ])[0];
 
   // 114.1  shared helper recordLocationVisit() defined in state.js (Protocol 22/23)
   assert(
@@ -13596,13 +13595,87 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '114.1: recordLocationVisit() helper defined in state.js (single source for map-discovery recording)'
   );
 
-  // 114.2  helper dedups case-insensitively AND is permanent (no destructive cap)
-  assert(
-    /toLowerCase\(\)/.test(recordBody114) &&
-      /\.some\(/.test(recordBody114) &&
-      /state\.locationHistory\.push\(/.test(recordBody114) &&
-      !/slice\(-?\d+\)/.test(recordBody114),
-    '114.2: recordLocationVisit dedups case-insensitively and never truncates (permanent fog-of-war discovery)'
+  // 114.2  helper dedups case-insensitively AND is permanent — CONVERTED TO
+  //        BEHAVIORAL (Health-U3 slice 2). recordLocationVisit() is now
+  //        EXECUTED for real in a vm sandbox (whole state.js loaded), not
+  //        grepped: the old assert (toLowerCase/.some/.push present, no slice)
+  //        stayed green with the dedup predicate inverted or the push
+  //        unreachable — it never proved a single location was actually
+  //        deduped, kept case-insensitively, or preserved. These do.
+  //        (No behavioral twin exists: test.html Suite 7 only proves a changed
+  //        loc lands in history via autoImportState — not dedup, case-folding,
+  //        or no-truncation.)
+  const vm114 = require('vm');
+  let h114 = null;
+  let harnessErr114 = null;
+  try {
+    const sandbox114 = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+      RobcoEvents: { emit: () => {} },
+    };
+    vm114.createContext(sandbox114);
+    vm114.runInContext(stateSrc114, sandbox114);
+    h114 = sandbox114;
+  } catch (e) {
+    harnessErr114 = e;
+  }
+  function rec114(arg) {
+    vm114.runInContext('recordLocationVisit(' + JSON.stringify(arg) + ');', h114);
+  }
+  function hist114() {
+    return vm114.runInContext('JSON.parse(JSON.stringify(state.locationHistory))', h114);
+  }
+  function reset114() {
+    vm114.runInContext('state.locationHistory = [];', h114);
+  }
+  function behav114(label, fn) {
+    if (!h114) {
+      fail(label + '  (harness error: ' + (harnessErr114 && harnessErr114.message) + ')');
+      return;
+    }
+    try {
+      assert(fn(), label);
+    } catch (e) {
+      fail(label + '  (runtime error: ' + e.message + ')');
+    }
+  }
+
+  behav114(
+    '114.2: [behavioral] recordLocationVisit dedups case-insensitively — Goodsprings / goodsprings / GOODSPRINGS collapse to a single entry, keeping the first spelling',
+    () => {
+      reset114();
+      rec114('Goodsprings');
+      rec114('goodsprings');
+      rec114('GOODSPRINGS');
+      const d = hist114();
+      return d.length === 1 && d[0] === 'Goodsprings';
+    }
+  );
+  behav114(
+    '114.2b: [behavioral] 60 distinct visits all persist (no destructive cap) — the earliest discovery is never un-discovered as new locations are found',
+    () => {
+      reset114();
+      for (let i = 0; i < 60; i++) rec114('Loc' + i);
+      const p = hist114();
+      return p.length === 60 && p[0] === 'Loc0' && p[59] === 'Loc59';
+    }
+  );
+  behav114(
+    '114.2c: [behavioral] null / empty / whitespace-only names are ignored (trimmed to empty → early return, no blank entry pushed)',
+    () => {
+      reset114();
+      rec114('Novac');
+      rec114(null);
+      rec114('');
+      rec114('   ');
+      const n = hist114();
+      return n.length === 1 && n[0] === 'Novac';
+    }
   );
 
   // 114.3  manual path: onLocationChange records the LEFT + NEW location via the helper
@@ -27592,7 +27665,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  console" reskin (BUS-10…15). Weigh bridge live beam bend, caps
 //  relocation, CARGO MANIFEST drawer bank + bounded scroll, native
 //  EQUIP + qty steppers, registry-driven SQUAD ROSTER, collapsed
-//  summary lines, id-preservation contract. 24 tests.
+//  summary lines, id-preservation contract. 185.10/11 converted to
+//  behavioral (Health-U3 slice 2): adjItemQty + toggleEquipItem
+//  executed in a vm sandbox (clamp/remove/target-row, equip/toggle/
+//  replace/no-op). 34 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
@@ -27729,35 +27805,214 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '185.9: robco_cargo_drawer is a registered MetaStore device pref, written by setInvFilter() and restored by _restoreDevicePrefs() at boot (Protocol UI-6)'
   );
 
-  // 185.10  per-row quantity ± stepper: adjItemQty(idx, delta) is a new
-  //         native write path — clamped >=0, and hitting 0 removes the row
-  //         entirely (there is no zero-quantity cargo tag).
+  // 185.10 / 185.11  CONVERTED TO BEHAVIORAL (Health-U3 slice 2).
+  //   adjItemQty() and toggleEquipItem() are two native WRITE paths into
+  //   state.inventory (splice-by-index) and state.equipped. The old asserts
+  //   grepped the function bodies for token presence (Math.max(0,…),
+  //   next===0, splice(idx,1), the equipped ternary) — all of which stay
+  //   present while the logic silently targets the WRONG row (the
+  //   filtered-view-index vs _origIdx class Suite 221 polices elsewhere),
+  //   fails to clamp, or emits the wrong slot. There is no behavioral twin
+  //   anywhere (test.html never touches these; the runner never executes
+  //   them). These extract the real bodies and run them in a vm sandbox.
+  const vm185 = require('vm');
   const adjQtyBody185 = extractFunctionBody(render185, 'adjItemQty');
+  const toggleEquipBody185 = extractFunctionBody(render185, 'toggleEquipItem');
+  function makeInvSandbox185(seedState) {
+    const calls = { save: 0, renderInv: 0, renderEq: 0, updateMath: 0, reconcile: 0 };
+    const emitted = [];
+    const sb = {
+      state: seedState,
+      Math,
+      parseInt,
+      String,
+      Array,
+      Number,
+      Boolean,
+      document: { getElementById: () => null },
+      setTimeout: () => {},
+      reconcileEquipped: () => {
+        calls.reconcile++;
+        return false;
+      },
+      renderEquipped: () => {
+        calls.renderEq++;
+      },
+      renderInventory: () => {
+        calls.renderInv++;
+      },
+      updateMath: () => {
+        calls.updateMath++;
+      },
+      saveState: () => {
+        calls.save++;
+      },
+      RobcoEvents: { emit: (name, p) => emitted.push({ name, p }) },
+    };
+    vm185.createContext(sb);
+    vm185.runInContext(
+      'function adjItemQty(idx, delta)' + adjQtyBody185 + '\nthis.adjItemQty = adjItemQty;',
+      sb
+    );
+    vm185.runInContext(
+      'function toggleEquipItem(idx)' +
+        toggleEquipBody185 +
+        '\nthis.toggleEquipItem = toggleEquipItem;',
+      sb
+    );
+    return { sb, calls, emitted };
+  }
+  const EQ_ZERO185 = () => ({ weapon: null, armor: null, headgear: null });
+
+  // 185.10  per-row qty ± stepper — decrement keeps the row + saves once.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 3, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, -1);
+    assert(
+      sb.state.inventory.length === 1 && sb.state.inventory[0].qty === 2 && calls.save === 1,
+      '185.10: [behavioral] adjItemQty(0,-1) decrements a qty-3 row to 2, keeps the row, and calls saveState() exactly once'
+    );
+  }
+  // 185.10b  clamp at 0 — a -5 delta on a qty-1 row removes it (never negative).
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 1, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, -5);
+    assert(
+      sb.state.inventory.length === 0,
+      '185.10b: [behavioral] adjItemQty clamps at 0 — a -5 delta on a qty-1 row removes it entirely, never leaving a negative quantity'
+    );
+  }
+  // 185.10c  hitting 0 splices the TARGETED index (not row 0), leaving the
+  //         others untouched, and runs reconcileEquipped() for dangling equips.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [
+        { name: 'A', qty: 5, type: 'misc' },
+        { name: 'B', qty: 1, type: 'misc' },
+        { name: 'C', qty: 5, type: 'misc' },
+      ],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(1, -1);
+    const names = sb.state.inventory.map(i => i.name);
+    assert(
+      sb.state.inventory.length === 2 &&
+        names[0] === 'A' &&
+        names[1] === 'C' &&
+        calls.reconcile === 1,
+      '185.10c: [behavioral] hitting 0 splices the targeted index (row B), leaves A and C byte-for-byte untouched, and runs reconcileEquipped() (dangling-equip cleanup)'
+    );
+  }
+  // 185.10d  increment arithmetic.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 2, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, 1);
+    assert(
+      sb.state.inventory[0].qty === 3,
+      '185.10d: [behavioral] adjItemQty(0,+1) increments the targeted row quantity to 3'
+    );
+  }
+  // 185.10e  out-of-range index is a safe no-op (no throw, no save).
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 2, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(99, -1);
+    assert(
+      sb.state.inventory.length === 1 && sb.state.inventory[0].qty === 2 && calls.save === 0,
+      '185.10e: [behavioral] adjItemQty on an out-of-range index is a guarded no-op (no throw, no mutation, no save)'
+    );
+  }
+  // 185.10f  static wiring guard retained (Protocol 20 render markup contract).
   assert(
-    /Math\.max\(0, \(parseInt\(it\.qty\) \|\| 0\) \+ delta\)/.test(adjQtyBody185) &&
-      /next === 0/.test(adjQtyBody185) &&
-      /state\.inventory\.splice\(idx, 1\)/.test(adjQtyBody185) &&
-      /saveState\(\)/.test(adjQtyBody185) &&
-      /data-qtyidx=/.test(render185) &&
-      /data-qtydelta=/.test(render185),
-    '185.10: adjItemQty(idx, delta) clamps >=0 and removes the row at 0 — a new native per-row qty ± write path, wired via data-qtyidx/data-qtydelta'
+    /data-qtyidx=/.test(render185) && /data-qtydelta=/.test(render185),
+    '185.10f: adjItemQty is wired to the ± stepper via the data-qtyidx / data-qtydelta attributes (render markup contract)'
   );
 
-  // 185.11  native EQUIP control (closes the U10 audit gap): one equipped
-  //         item per slot family — 'weapon' items occupy state.equipped.weapon,
-  //         'armor' items occupy state.equipped.armor. Tapping the equipped
-  //         item's own button unequips it (toggle), tapping another of the
-  //         same family replaces it (single-apply).
-  const toggleEquipBody185 = extractFunctionBody(render185, 'toggleEquipItem');
+  // 185.11  native EQUIP — equip a weapon, save once, emit item.equipped once.
+  {
+    const { sb, calls, emitted } = makeInvSandbox185({
+      inventory: [{ name: '10mm Pistol', qty: 1, type: 'weapon' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === '10mm Pistol' &&
+        calls.save === 1 &&
+        emitted.length === 1 &&
+        emitted[0].name === 'item.equipped' &&
+        emitted[0].p.slot === 'weapon',
+      '185.11: [behavioral] toggleEquipItem equips a weapon into state.equipped.weapon, saves once, and emits item.equipped{slot:weapon} once'
+    );
+  }
+  // 185.11b  re-tapping the equipped item unequips it (slot→null) and fires
+  //         NO item.equipped (a stamp lands only once, never on unequip).
+  {
+    const { sb, emitted } = makeInvSandbox185({
+      inventory: [{ name: '10mm Pistol', qty: 1, type: 'weapon' }],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === null && emitted.length === 0,
+      '185.11b: [behavioral] re-tapping the equipped item toggles the slot back to null and emits NO item.equipped (equip stamp fires once only)'
+    );
+  }
+  // 185.11c  equipping another item of the same family REPLACES the slot
+  //         (single-apply), rather than stacking.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [
+        { name: '10mm Pistol', qty: 1, type: 'weapon' },
+        { name: 'Hunting Rifle', qty: 1, type: 'weapon' },
+      ],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(1);
+    assert(
+      sb.state.equipped.weapon === 'Hunting Rifle',
+      '185.11c: [behavioral] equipping a second weapon replaces the slot (single-apply per family) — weapon becomes Hunting Rifle'
+    );
+  }
+  // 185.11d  the armor family is independent — an armor item fills
+  //         state.equipped.armor without disturbing the weapon slot.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Leather Armor', qty: 1, type: 'armor' }],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.armor === 'Leather Armor' && sb.state.equipped.weapon === '10mm Pistol',
+      '185.11d: [behavioral] an armor-typed item occupies state.equipped.armor and leaves the weapon slot untouched (per-family slots)'
+    );
+  }
+  // 185.11e  a non-weapon/armor item has no slot family — a guarded no-op.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 1, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === null && sb.state.equipped.armor === null && calls.save === 0,
+      '185.11e: [behavioral] an aid item (no weapon/armor slot family) makes toggleEquipItem a no-op — no equip, no save'
+    );
+  }
+  // 185.11f  static wiring guard retained (Protocol 20 render markup contract).
   assert(
-    /cat === 'weapon' \? 'weapon' : cat === 'armor' \? 'armor' : null/.test(toggleEquipBody185) &&
-      /state\.equipped\[slot\] = state\.equipped\[slot\] === it\.name \? null : it\.name/.test(
-        toggleEquipBody185
-      ) &&
-      /renderEquipped\(\)/.test(toggleEquipBody185) &&
-      /saveState\(\)/.test(toggleEquipBody185) &&
-      /data-equip=/.test(render185),
-    '185.11: toggleEquipItem(idx) writes state.equipped.weapon/.armor (one per slot family, toggle-off on re-tap) — a new native EQUIP write path, wired via data-equip'
+    /data-equip=/.test(render185),
+    '185.11f: toggleEquipItem is wired to the EQUIP control via the data-equip attribute (render markup contract)'
   );
 
   // 185.12  autoImportState()'s AI-write equip path stays intact — the native
