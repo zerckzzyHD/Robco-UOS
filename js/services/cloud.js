@@ -351,6 +351,25 @@ onAuthStateChanged(auth, user => {
   loadRemoteConfig();
 })();
 
+// ── Sign-in cancel classifier (pure) — Gap 5 (warning-surface) ───────────────
+// A user who dismisses the popup is NOT an error — those two codes stay silent.
+// Any OTHER failure (network, blocked popup, provider error) is a real failure
+// the user must see. Pure so the classification is unit-testable without live auth.
+window._isCancelSignInError = function (code) {
+  return code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request';
+};
+
+// Surface a real sign-in failure diegetically at the point of use (Gap 5).
+// Reuses the sanctioned openModal notice — no auth FLOW change (Protocol 30:
+// popup-only stays). Guarded so a missing modal helper never throws.
+function _showSignInFailedNotice() {
+  if (typeof openModal === 'function')
+    openModal({
+      title: '> SIGN-IN',
+      body: 'SIGN-IN FAILED — UPLINK COULD NOT AUTHENTICATE. CHECK POPUP BLOCKING / CONNECTION AND RETRY.',
+    });
+}
+
 // ── Google sign-in: links anonymous → Google; handles collision ──────────────
 // Popup is used unconditionally (mobile + desktop). The redirect flow broke on mobile
 // because modern browsers deny third-party iframe storage to nv-overlord.firebaseapp.com,
@@ -377,14 +396,20 @@ window.signInWithGoogle = async function () {
           // Signed into existing account; local saves are untouched
           if (typeof window.renderAccount === 'function') window.renderAccount();
         } catch (e2) {
-          console.warn('Credential sign-in fallback failed (non-fatal):', e2);
+          // Gap 5 (warning-surface): the collision-recovery sign-in genuinely failed —
+          // surface it, don't leave the user tapping SIGN IN with nothing happening.
+          console.warn('Credential sign-in fallback failed:', e2);
+          _showSignInFailedNotice();
         }
+      } else {
+        // Couldn't extract a credential to complete the collision path — real failure.
+        _showSignInFailedNotice();
       }
-    } else if (
-      e.code !== 'auth/popup-closed-by-user' &&
-      e.code !== 'auth/cancelled-popup-request'
-    ) {
-      console.warn('Google sign-in failed (non-fatal):', e);
+    } else if (!window._isCancelSignInError(e.code)) {
+      // Gap 5 (warning-surface): any non-cancel failure (network, blocked popup,
+      // provider error) must be visible — was console-only before.
+      console.warn('Google sign-in failed:', e);
+      _showSignInFailedNotice();
     }
   }
 };
@@ -654,9 +679,27 @@ window.listCloudSaves = async function () {
     });
     return docs;
   } catch (e) {
-    console.warn('listCloudSaves failed (non-fatal):', e);
-    return [];
+    // Gap 3 (warning-surface): a genuine fetch failure must NOT masquerade as an
+    // empty archive list. Rethrow so the account panel's already-written
+    // "⚠ ARCHIVE LINK FAILED" state renders instead of "NO ARCHIVES ON FILE".
+    // The legitimate empties (feature off / not signed in) are handled by the two
+    // early guard clauses above — only a real Firestore error reaches this catch.
+    console.warn('listCloudSaves fetch failed — surfacing to panel:', e);
+    throw e;
   }
+};
+
+// ── Sync summary line (pure) — Gap 4 (warning-surface) ───────────────
+// "SYNC COMPLETE" must never hide per-save upload failures. Given the tallies,
+// pick an honest summary: only claim COMPLETE when zero uploads failed; on any
+// failure say INCOMPLETE and name the failed count so the user knows to retry.
+// Pure and side-effect-free so the decision is unit-testable without live Firebase.
+window._syncSummaryLine = function (uploaded, skipped, failed) {
+  const base = uploaded + ' uploaded, ' + skipped + ' already synced';
+  if (failed > 0) {
+    return 'SYNC INCOMPLETE — ' + base + ', ' + failed + ' FAILED — RETRY LATER';
+  }
+  return 'SYNC COMPLETE — ' + base;
 };
 
 // ── Sync local saves to cloud (ADDITIVE ONLY — never overwrites) ─────
@@ -747,6 +790,7 @@ window.syncLocalSavesToCloud = async function () {
 
   let uploaded = 0;
   let skipped = 0;
+  let failed = 0;
   const now = Date.now();
 
   for (const ls of localSaves) {
@@ -774,6 +818,9 @@ window.syncLocalSavesToCloud = async function () {
       });
       uploaded++;
     } catch (e) {
+      // Gap 4 (warning-surface): count the failure so the summary can report it —
+      // never silently drop it and still claim "SYNC COMPLETE".
+      failed++;
       console.warn('Upload failed for', ls.localOriginId, e);
     }
   }
@@ -781,7 +828,7 @@ window.syncLocalSavesToCloud = async function () {
   if (typeof openModal === 'function')
     openModal({
       title: '> SYNC TO CLOUD',
-      body: 'SYNC COMPLETE — ' + uploaded + ' uploaded, ' + skipped + ' already synced',
+      body: window._syncSummaryLine(uploaded, skipped, failed),
     });
   if (typeof window.renderSavesList === 'function') window.renderSavesList();
 };

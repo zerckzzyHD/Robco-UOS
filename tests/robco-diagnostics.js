@@ -3403,7 +3403,8 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
 //  SUITE 45 — Google Sign-In + Account Panel (Phase 5c-ii)
 //  Durable identity: Google auth link, collision recovery,
 //  sign-out → re-anon, popup-only flow, ACCOUNT UI panel, boot guard.
-//  15 tests
+//  Plus Gap 5 (warning-surface): real sign-in failures surface a modal.
+//  18 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-ii: Google Sign-In + Account Panel');
 
@@ -3538,6 +3539,77 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
       'cloud.js signInWithGoogle: first await is linkWithPopup (gesture-safe — popup opened with no prior async work)'
     );
   }
+
+  // 45.16  BEHAVIORAL (Gap 5 — warning-surface): the sign-in cancel classifier.
+  //        Only a user-dismissed popup stays silent; every other failure code is a
+  //        real failure the user must be shown. Live signInWithPopup needs Google
+  //        (cannot run in the sandbox — Protocol 13 exemption), but the pure decision
+  //        that gates the modal is unit-testable here.
+  {
+    let cancelFn = null;
+    try {
+      const idx = cloudSource.indexOf('window._isCancelSignInError');
+      if (idx !== -1) {
+        let i = cloudSource.indexOf('{', idx);
+        let depth = 0;
+        const start = i;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            eval('cancelFn = function (code) ' + cloudSource.slice(start, i + 1) + ';');
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (cancelFn) {
+      assert(
+        cancelFn('auth/popup-closed-by-user') === true &&
+          cancelFn('auth/cancelled-popup-request') === true &&
+          cancelFn('auth/network-request-failed') === false &&
+          cancelFn('auth/popup-blocked') === false &&
+          cancelFn('auth/internal-error') === false &&
+          cancelFn(undefined) === false,
+        '_isCancelSignInError: only the two user-cancel codes are silent; network/blocked/unknown/undefined are real failures that must surface (Gap 5)'
+      );
+    } else {
+      fail('_isCancelSignInError could not be evaluated from cloud.js');
+    }
+  }
+
+  // 45.17  STATIC (Gap 5): signInWithGoogle routes non-cancel failures through the
+  //        modal notice instead of console-only — the classifier + the notice must
+  //        both be referenced inside the function body.
+  {
+    let signInBody = '';
+    const idx = cloudSource.indexOf('window.signInWithGoogle');
+    if (idx !== -1) {
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) {
+          signInBody = cloudSource.slice(start, i + 1);
+          break;
+        }
+        i++;
+      }
+    }
+    assert(
+      /_isCancelSignInError/.test(signInBody) && /_showSignInFailedNotice/.test(signInBody),
+      'signInWithGoogle: real (non-cancel) sign-in failures are surfaced via a modal notice, not console-only (Gap 5)'
+    );
+  }
+
+  // 45.18  STATIC (Gap 5): the notice opens a diegetic point-of-use SIGN-IN FAILED
+  //        modal (reuses openModal — no auth-flow change, Protocol 30 popup-only intact).
+  assert(
+    /function _showSignInFailedNotice[\s\S]*?openModal/.test(cloudSource) &&
+      /SIGN-IN FAILED/.test(cloudSource),
+    '_showSignInFailedNotice opens a diegetic SIGN-IN FAILED modal at point of use (Gap 5)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3549,7 +3621,9 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 //  Plus the prod-2.7.0 → 2.8.0 save-migration pre-flight (46.20–46.22): a
 //  released-2.7.0 save is missing eventLog + padBindings; both must default
 //  cleanly with no pre-2.8.0 data loss (Protocol 4/16/34, data-safety-critical).
-//  22 tests
+//  Plus Gap 3/4 (warning-surface): listCloudSaves rethrows on fetch failure and
+//  the sync summary never falsely reports "SYNC COMPLETE".
+//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 
@@ -4044,6 +4118,80 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
         Array.isArray(out.campaign_notes) &&
         out.campaign_notes.some(n => /Deal with Mr House/.test(n)),
       'prod-2.7.0→2.8.0: legacy [T#] notes migrate into eventLog while purely-manual campaign_notes are preserved (no note lost)'
+    );
+  }
+
+  // 46.23  BEHAVIORAL (Gap 4 — warning-surface): the sync summary line must never
+  //        claim "SYNC COMPLETE" when uploads failed. Live uploads need Firebase
+  //        (Protocol 13 sandbox exemption), but the pure message-selection is testable.
+  {
+    let summaryFn = null;
+    try {
+      const idx = cloudSource.indexOf('window._syncSummaryLine');
+      if (idx !== -1) {
+        let i = cloudSource.indexOf('{', idx);
+        let depth = 0;
+        const start = i;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            eval(
+              'summaryFn = function (uploaded, skipped, failed) ' +
+                cloudSource.slice(start, i + 1) +
+                ';'
+            );
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (summaryFn) {
+      // 46.23  zero failures → the honest "SYNC COMPLETE" is allowed
+      const ok = summaryFn(2, 1, 0);
+      assert(
+        /^SYNC COMPLETE/.test(ok) && /2 uploaded/.test(ok) && /1 already synced/.test(ok),
+        '_syncSummaryLine: zero upload failures reports "SYNC COMPLETE" with the upload/skip tallies (Gap 4)'
+      );
+      // 46.24  any failure → NEVER says "SYNC COMPLETE"; names the failed count
+      const bad = summaryFn(2, 0, 2);
+      assert(
+        !/SYNC COMPLETE/.test(bad) && /2 FAILED/.test(bad) && /INCOMPLETE/.test(bad),
+        '_syncSummaryLine: a partial failure never claims "SYNC COMPLETE" and names the failed count (Gap 4)'
+      );
+    } else {
+      fail('_syncSummaryLine could not be evaluated from cloud.js');
+    }
+  }
+
+  // 46.25  STATIC (Gap 3 — warning-surface): listCloudSaves must RETHROW a genuine
+  //        fetch failure (not swallow to []) so the account panel's already-written
+  //        "ARCHIVE LINK FAILED" state is reachable instead of masquerading as
+  //        "NO ARCHIVES ON FILE". The catch body must throw and must not return [].
+  {
+    let listBody = '';
+    const idx = cloudSource.indexOf('window.listCloudSaves');
+    if (idx !== -1) {
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) {
+          listBody = cloudSource.slice(start, i + 1);
+          break;
+        }
+        i++;
+      }
+    }
+    // isolate the catch block only, and strip line comments so prose that merely
+    // MENTIONS "return []" (e.g. describing the early guards) can't trip the guard —
+    // we assert on actual code, not comments (Protocol 42: harden the harness).
+    const catchIdx = listBody.indexOf('catch');
+    const catchBody = (catchIdx !== -1 ? listBody.slice(catchIdx) : '').replace(/\/\/[^\n]*/g, '');
+    assert(
+      /throw\s/.test(catchBody) && !/return\s*\[\s*\]/.test(catchBody),
+      'listCloudSaves: a fetch failure rethrows (does not swallow to []) so ARCHIVE LINK FAILED is reachable (Gap 3)'
     );
   }
 }
