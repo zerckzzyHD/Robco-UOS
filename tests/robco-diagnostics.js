@@ -3039,7 +3039,11 @@ header('Weapon Mods CSV + Registry Parity');
 //  _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
 //  so state→DOM is written first and syncStateFromDom reads back
 //  the new values (not the stale ones from unchanged inputs).
-//  11 tests
+//  42.12–42.15 (U3 slice 3 / B1) execute the real handlers in a vm:
+//  the +80/hours×10 tick math, the HP/limb restore, and the real
+//  loadUI→saveState call order + sleep.completed emit — the mutation
+//  math the static asserts above never run.
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('Native Command Router (Phase 5a)');
 {
@@ -3140,6 +3144,106 @@ header('Native Command Router (Phase 5a)');
       loadIdx !== -1 && saveIdx !== -1 && loadIdx < saveIdx,
       '_nativeWait calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
     );
+  }
+
+  // ── BEHAVIORAL (U3 slice 3 / B1) — run the REAL _nativeSleep / _nativeWait in an
+  //    isolated vm and assert the mutation MATH + the loadUI→saveState call ORDER.
+  //    The static 42.9/42.10/42.11 asserts above prove the tokens are present and
+  //    ordered in SOURCE; they stay green if the [SLEEP] heal math, the tick advance,
+  //    or the limb restore is inverted or dropped. These execute the handlers so a
+  //    wrong tick delta, an un-restored limb, or a save-before-load swap actually fails.
+  {
+    const vm42 = require('vm');
+    function declareFn42(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+
+    // Fresh sandbox per run: injured Courier (10/200 HP, four damaged limbs), a spy
+    // event bus, and order-recording loadUI/saveState/appendToChat stubs.
+    function runNative42(fnName, arg) {
+      const order = [];
+      let emitted = null;
+      const sb = {
+        state: {
+          ticks: 20,
+          hpCur: 10,
+          hpMax: 200,
+          la: 'MAIMED',
+          ra: 'INJURED',
+          ll: 'INJURED',
+          rl: 'OK',
+          hd: 'INJURED',
+        },
+        appendToChat: () => order.push('chat'),
+        RobcoEvents: {
+          emit: (name, payload) => {
+            emitted = { name, payload };
+            order.push('emit');
+          },
+        },
+        loadUI: () => order.push('loadUI'),
+        saveState: () => order.push('saveState'),
+      };
+      vm42.createContext(sb);
+      vm42.runInContext(declareFn42(apiSrc42, fnName), sb);
+      if (arg === undefined) sb[fnName]();
+      else sb[fnName](arg);
+      return { state: sb.state, order, emitted };
+    }
+
+    // 42.12  _nativeSleep advances ticks by exactly +80 (8 hours) — executed, not grepped
+    {
+      const r = runNative42('_nativeSleep');
+      assert(
+        r.state.ticks === 100,
+        `42.12: _nativeSleep() advances ticks by +80 (20 → 100) — real mutation (got ${r.state.ticks})`
+      );
+    }
+
+    // 42.13  _nativeSleep restores HP to hpMax and heals ALL five limbs to 'OK'
+    {
+      const r = runNative42('_nativeSleep');
+      const limbs = [r.state.la, r.state.ra, r.state.ll, r.state.rl, r.state.hd];
+      assert(
+        r.state.hpCur === 200 && limbs.every(l => l === 'OK'),
+        `42.13: _nativeSleep() restores HP to hpMax (200) and heals all limbs to OK (got HP ${r.state.hpCur}, limbs ${limbs.join('/')})`
+      );
+    }
+
+    // 42.14  _nativeSleep calls loadUI() BEFORE saveState() (real order) and emits
+    //        'sleep.completed' with the actual ticksAdded (+80) — the syncStateFromDom
+    //        round-trip guard, proven by recorded call order rather than source indexOf
+    {
+      const r = runNative42('_nativeSleep');
+      const loadAt = r.order.indexOf('loadUI');
+      const saveAt = r.order.indexOf('saveState');
+      assert(
+        loadAt !== -1 &&
+          saveAt !== -1 &&
+          loadAt < saveAt &&
+          r.emitted &&
+          r.emitted.name === 'sleep.completed' &&
+          r.emitted.payload &&
+          r.emitted.payload.ticksAdded === 80,
+        `42.14: _nativeSleep() runs loadUI() before saveState() and emits sleep.completed{ticksAdded:80} (order ${r.order.join('>')}, emit ${r.emitted && r.emitted.name})`
+      );
+    }
+
+    // 42.15  _nativeWait(hours) advances ticks by exactly hours×10 and also runs
+    //        loadUI() before saveState() — 3 Hrs → +30 ticks (20 → 50)
+    {
+      const r = runNative42('_nativeWait', 3);
+      const loadAt = r.order.indexOf('loadUI');
+      const saveAt = r.order.indexOf('saveState');
+      assert(
+        r.state.ticks === 50 && loadAt !== -1 && saveAt !== -1 && loadAt < saveAt,
+        `42.15: _nativeWait(3) advances ticks by +30 (20 → 50) and runs loadUI before saveState (got ticks ${r.state.ticks}, order ${r.order.join('>')})`
+      );
+    }
   }
 }
 
@@ -12410,7 +12514,10 @@ header('Suite 105 — WU-N1 VATS native calculator');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 106 — WU-N2 TRADE native barter terminal (22 tests)
+//  Suite 106 — WU-N2 TRADE native barter terminal (25 tests)
+//  106.23–106.25 (U3 slice 3 / B3) execute the shipped _tradeBuyPrice/
+//  _tradeSellPrice in a vm — exact prices across barter 0/50/100 + the
+//  floor(1)/clamp(0)/margin — the arithmetic 106.4/106.5 only re-implement.
 //  The deterministic, offline barter terminal consuming the WU-D4b coefficients
 //  (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, the price math + its
 //  canon invariants (buy ≥ value, sell < buy), additive + confirm-gated mutation
@@ -12631,6 +12738,84 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
       /trade:\s*'>\s*BARTER UPLINK'/.test(core106),
     "106.22: Tool Deck TRADE row → expandPanelForCategory('trade') → maps trade→inv + '> BARTER UPLINK' (row→panel-open end-to-end)"
   );
+
+  // ── BEHAVIORAL (U3 slice 3 / B3) — run the REAL price functions in an isolated vm
+  //    and assert EXACT prices across the barter curve. 106.4/106.5 above validate the
+  //    coefficient DATA under a test-side re-implementation of the formula — they never
+  //    call the shipped _tradeBuyPrice/_tradeSellPrice, so a sign flip, a wrong clamp,
+  //    or a broken interpolation in the real functions ships green past them. These
+  //    execute the shipped functions (through _tradeBarterCoef/_tradeBarterSkill) so the
+  //    arithmetic itself is guarded, not just the numbers it reads.
+  {
+    const vm106 = require('vm');
+    function declareFn106(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    // Canonical FNV barter block (parsed-data value asserted by 104.5 / 106.4).
+    const BARTER106 = { buyBase: 1.55, sellBase: 0.45, slopePerPoint: 0.0045 };
+
+    // Compute a price by running the SHIPPED functions with the barter skill set to `b`.
+    function priceAt106(fnName, value, b) {
+      const sb = {
+        Math,
+        state: { skills: { barter: b } },
+        getGameContext: () => 'FNV',
+        GAME_DEFS: { FNV: { barter: BARTER106 } },
+      };
+      vm106.createContext(sb);
+      vm106.runInContext(
+        [
+          declareFn106(ren106, '_tradeBarterCoef'),
+          declareFn106(ren106, '_tradeBarterSkill'),
+          declareFn106(ren106, '_tradeBuyPrice'),
+          declareFn106(ren106, '_tradeSellPrice'),
+        ].join('\n'),
+        sb
+      );
+      return sb[fnName](value);
+    }
+
+    // 106.23  BUY price = round(value × (1.55 − 0.0045×barter)), executed at 0/50/100.
+    //   value 200 avoids any .5 rounding ambiguity: b0→310, b50→265, b100→220.
+    {
+      const b0 = priceAt106('_tradeBuyPrice', 200, 0);
+      const b50 = priceAt106('_tradeBuyPrice', 200, 50);
+      const b100 = priceAt106('_tradeBuyPrice', 200, 100);
+      assert(
+        b0 === 310 && b50 === 265 && b100 === 220,
+        `106.23: _tradeBuyPrice(200) executes to 310/265/220 across barter 0/50/100 (got ${b0}/${b50}/${b100})`
+      );
+    }
+
+    // 106.24  SELL price = round(value × (0.45 + 0.0045×barter)), executed at 0/50/100.
+    //   value 200: b0→90, b50→135, b100→180.
+    {
+      const s0 = priceAt106('_tradeSellPrice', 200, 0);
+      const s50 = priceAt106('_tradeSellPrice', 200, 50);
+      const s100 = priceAt106('_tradeSellPrice', 200, 100);
+      assert(
+        s0 === 90 && s50 === 135 && s100 === 180,
+        `106.24: _tradeSellPrice(200) executes to 90/135/180 across barter 0/50/100 (got ${s0}/${s50}/${s100})`
+      );
+    }
+
+    // 106.25  Clamps + margin, executed: buy floored at 1 and sell clamped ≥ 0 for a
+    //   value-0 item; and the vendor margin holds (sell < buy) even at max barter 100.
+    {
+      const buy0 = priceAt106('_tradeBuyPrice', 0, 100);
+      const sell0 = priceAt106('_tradeSellPrice', 0, 100);
+      const buyMax = priceAt106('_tradeBuyPrice', 200, 100);
+      const sellMax = priceAt106('_tradeSellPrice', 200, 100);
+      assert(
+        buy0 === 1 && sell0 === 0 && sellMax < buyMax,
+        `106.25: value-0 buy floors at 1 and sell clamps at 0; sell < buy margin holds at barter 100 (got buy0 ${buy0}, sell0 ${sell0}, ${sellMax} < ${buyMax})`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -19249,7 +19434,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  one-off `/`/`@` override prefixes, quick-log routing (killed/caps/
 //  arrived/rep) onto existing native setters, and a TERMINAL-mode
 //  autocomplete extension of the shared registry-autocomplete singleton.
-//  18 tests
+//  151.19–151.22 (U3 slice 3 / B4) execute the four quick-log tracker
+//  handlers in a vm — kill text + _logEvent, caps mutation + #c_caps
+//  mirror + clamp, trimmed onLocationChange, fame/infamy faction adjust
+//  with the unknown-key fall-through — the mutations 151.9-11 (static)
+//  and 153.3 (spy-router) never run.
+//  22 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 151 — Step 2 Phase 2 B1: Command-Line MODE system');
@@ -19545,6 +19735,142 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
     '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
   );
+
+  // ── BEHAVIORAL (U3 slice 3 / B4) — run the REAL quick-log handlers in an isolated
+  //    vm and assert the actual state mutations + the false-return fall-through. The
+  //    static 151.9/151.10/151.11 asserts above prove the tokens/idioms are present in
+  //    SOURCE, and Suite 153.3 runs _routeQuickLogMulti against a SPY _routeQuickLog —
+  //    so no test executes the four tracker handlers themselves. A wrong caps sign, a
+  //    dropped trim, a swapped fame/infamy field, or an inverted !match guard ships
+  //    green past all of them. These execute the handlers so the mutation is checked.
+  {
+    const vmQL = require('vm');
+    function declareFnQL(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const srcQL = ['_quickLogKill', '_quickLogCaps', '_quickLogLocation', '_quickLogFaction']
+      .map(n => declareFnQL(apiSrc151, n))
+      .join('\n');
+    // Build a sandbox from a spy base + per-test overrides, declare all four handlers,
+    // and return the sandbox so the test can read what mutated.
+    function makeQL(overrides) {
+      const sb = Object.assign(
+        {
+          appendToChat: () => {},
+          saveState: () => {},
+          _logEvent: () => {},
+        },
+        overrides
+      );
+      vmQL.createContext(sb);
+      vmQL.runInContext(srcQL, sb);
+      return sb;
+    }
+
+    // 151.19  _quickLogKill: singular vs counted text, real _logEvent + saveState,
+    //         and an empty target returns false WITHOUT logging (shape matched, content
+    //         didn't — the fall-through convention).
+    {
+      const logged = [];
+      let saves = 0;
+      const sb = makeQL({
+        _logEvent: (type, text) => logged.push({ type, text }),
+        saveState: () => saves++,
+      });
+      const many = sb._quickLogKill(3, 'raiders');
+      const one = sb._quickLogKill(1, 'raider');
+      const empty = sb._quickLogKill(1, '   ');
+      assert(
+        many === true &&
+          one === true &&
+          empty === false &&
+          logged.length === 2 &&
+          logged[0].type === 'kill' &&
+          logged[0].text === 'Killed 3 raiders' &&
+          logged[1].text === 'Killed raider' &&
+          saves === 2,
+        `151.19: _quickLogKill logs "Killed 3 raiders"/"Killed raider" via _logEvent+saveState and returns false (no log) on an empty target (logged ${JSON.stringify(logged.map(l => l.text))}, saves ${saves}, empty ${empty})`
+      );
+    }
+
+    // 151.20  _quickLogCaps: +delta adds and mirrors to #c_caps (the WU-N2 revert guard),
+    //         over-spend clamps at 0, and a zero delta returns false without mutating or saving.
+    //         Each run gets its OWN #c_caps element so the mirrored value is isolated.
+    {
+      let maths = 0;
+      let saves = 0;
+      function runCaps(startCaps, delta) {
+        const capsEl = { value: null };
+        const sb = makeQL({
+          state: { caps: startCaps },
+          document: { getElementById: id => (id === 'c_caps' ? capsEl : null) },
+          updateMath: () => maths++,
+          saveState: () => saves++,
+        });
+        const ret = sb._quickLogCaps(delta);
+        return { ret, caps: sb.state.caps, mirror: capsEl.value };
+      }
+      const add = runCaps(100, 50);
+      const spend = runCaps(30, -500);
+      const zero = runCaps(100, 0);
+      assert(
+        add.ret === true &&
+          add.caps === 150 &&
+          Number(add.mirror) === 150 &&
+          spend.ret === true &&
+          spend.caps === 0 &&
+          zero.ret === false &&
+          zero.caps === 100 &&
+          zero.mirror === null &&
+          maths === 2 &&
+          saves === 2,
+        `151.20: _quickLogCaps(+50) → caps 150 + #c_caps mirror 150; (−500) clamps to 0; (0) returns false and never mutates/mirrors/saves (add ${add.caps}/${add.mirror}, spend ${spend.caps}, zeroOk ${zero.ret}, saves ${saves})`
+      );
+    }
+
+    // 151.21  _quickLogLocation: routes the TRIMMED name through the shared onLocationChange
+    //         setter (owner fix: sets CURRENT location), empty input returns false, no call.
+    {
+      const located = [];
+      const sb = makeQL({ onLocationChange: loc => located.push(loc) });
+      const ok = sb._quickLogLocation('  Novac  ');
+      const empty = sb._quickLogLocation('   ');
+      assert(
+        ok === true && empty === false && located.length === 1 && located[0] === 'Novac',
+        `151.21: _quickLogLocation('  Novac  ') → onLocationChange('Novac') (trimmed, current-location setter) and returns false on empty (located ${JSON.stringify(located)}, empty ${empty})`
+      );
+    }
+
+    // 151.22  _quickLogFaction: a known key (case-insensitive) adjusts fame on 'up' /
+    //         infamy on 'down' by +5 via the shared adjustFaction; an unknown key returns
+    //         false and NEVER invents a faction (the !match guard, executed).
+    {
+      const adjusted = [];
+      const sb = makeQL({
+        getFactionRegistry: () => [{ key: 'ncr', name: 'NCR' }],
+        adjustFaction: (k, f, n) => adjusted.push({ k, f, n }),
+      });
+      const up = sb._quickLogFaction('ncr', 'up');
+      const down = sb._quickLogFaction('NCR', 'down');
+      const unknown = sb._quickLogFaction('legion', 'up');
+      assert(
+        up === true &&
+          down === true &&
+          unknown === false &&
+          adjusted.length === 2 &&
+          adjusted[0].k === 'ncr' &&
+          adjusted[0].f === 'fame' &&
+          adjusted[0].n === 5 &&
+          adjusted[1].f === 'infamy' &&
+          adjusted[1].n === 5,
+        `151.22: _quickLogFaction adjusts fame (up)/infamy (down) +5 on a known key (case-insensitive) and returns false on an unknown key without adjusting (adjusted ${JSON.stringify(adjusted)}, unknown ${unknown})`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
