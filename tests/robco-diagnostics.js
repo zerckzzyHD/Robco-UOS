@@ -712,6 +712,125 @@ guards(fileImportBody, [
   [/autoImportState/, 'calls autoImportState() for game state'],
 ]);
 
+// ── SUITES 4+5 BEHAVIORAL — real export→import round-trip (U3 slice 6) ──────
+// The static guards above prove exportSaveFile()/handleFileUpload() MENTION the
+// right identifiers; they stay green if the export envelope's contract silently
+// drifts from what the import path consumes. The disaster-recovery promise is a
+// user's exported file re-importing LOSSLESSLY — a behavior no in-runner test
+// executed (46.17 proves the cloud CONTAINER round-trip; save-survival.mjs PATH2
+// drives the real handleFileUpload but hand-BUILDS its envelope, so it never
+// runs the real exportSaveFile nor proves export↔import contract compatibility).
+// This runs the REAL exportSaveFile() (state.js) in a vm — capturing the data:
+// URL envelope it emits — then verifies that envelope's integrity seal with the
+// REAL verifySaveEnvelope() and applies it through the REAL shared container
+// core window._writeImportedContainer() (the exact path handleFileUpload uses at
+// ui-saves.js), asserting the campaign + chat + playstyle survive intact. state.js
+// is self-contained in a vm (getGameContext/getFactionRegistry/GAME_DEFS all live
+// there — mirrors Suites 46/133/164); the DOM + localStorage are stubbed. NOTE:
+// sanitizeImportedContainer() lives in api.js and is absent from this state-only
+// sandbox, so _writeImportedContainer falls back to migrate-only apply — the full
+// sanitize+migrate real apply is separately proven by Suite 46.17 and by
+// save-survival.mjs PATH2; the unique thing proven here is the export/import
+// ENVELOPE contract (branch routing + checksum agreement + lossless field round-trip).
+{
+  const vm45 = require('vm');
+  const stateSrc45 = readGroup('state');
+  const appVer45 = (stateSrc45.match(/const APP_VERSION\s*=\s*'([\d.]+)'/) || [])[1];
+  let rt45 = null;
+  let rt45Err = null;
+  try {
+    const ls45 = new Map();
+    const sb45 = {
+      window: {},
+      console: { error() {}, log() {}, warn() {} },
+      localStorage: {
+        getItem: k => (ls45.has(k) ? ls45.get(k) : null),
+        setItem: (k, v) => ls45.set(k, String(v)),
+        removeItem: k => ls45.delete(k),
+      },
+    };
+    sb45.document = {
+      getElementById: () => ({ value: '' }),
+      createElement: () => ({
+        _href: '',
+        setAttribute(k, v) {
+          if (k === 'href') this._href = v;
+        },
+        click() {
+          sb45.window.__capturedHref = this._href;
+        },
+      }),
+    };
+    vm45.createContext(sb45);
+    const driver45 =
+      '\n;(function(){' +
+      'syncStateFromDom = function(){};' + // neutralize the DOM-sync exportSaveFile calls first
+      "state.gameContext = 'FNV';" +
+      'state.caps = 12345;' +
+      'state.lvl = 27;' +
+      "state.inventory = [{ name: 'Round-Trip Rifle', qty: 1, wgt: 4, val: 500, type: 'weapon' }];" +
+      "chatHistory = [{ sender: 'user', text: 'export-import round-trip probe' }];" +
+      'window.robco_v8 = null;' +
+      "localStorage.setItem('robco_playstyle', 'completionist');" +
+      'exportSaveFile();' + // ── REAL export (Suite 4) ──
+      'var envelope = JSON.parse(decodeURIComponent(' +
+      "(window.__capturedHref || '').replace(/^data:text\\/json;charset=utf-8,/, '')));" +
+      'var integrity = window.verifySaveEnvelope(envelope);' + // export/verify checksum agreement
+      "localStorage.removeItem('robco_v8'); localStorage.removeItem('robco_chat');" +
+      'window._writeImportedContainer(envelope);' + // ── REAL shared apply core (Suite 5) ──
+      "var appliedV8 = JSON.parse(localStorage.getItem('robco_v8') || 'null');" +
+      "var appliedChat = JSON.parse(localStorage.getItem('robco_chat') || 'null');" +
+      "var appliedPlaystyle = localStorage.getItem('robco_playstyle');" +
+      'return { envelope: envelope, integrity: integrity, appliedV8: appliedV8,' +
+      ' appliedChat: appliedChat, appliedPlaystyle: appliedPlaystyle };' +
+      '})();';
+    rt45 = vm45.runInContext(stateSrc45 + driver45, sb45);
+  } catch (e) {
+    rt45Err = e;
+  }
+
+  assert(
+    !!rt45 &&
+      !!appVer45 &&
+      rt45.envelope.version === appVer45 &&
+      rt45.envelope.schemaVersion === appVer45,
+    'Suites 4+5 round-trip: exportSaveFile() stamps the running APP_VERSION on both version + schemaVersion' +
+      (rt45Err ? ' — ' + rt45Err.message : '')
+  );
+  assert(
+    !!rt45 &&
+      rt45.envelope.robco_v8.campaigns.FNV.caps === 12345 &&
+      rt45.envelope.robco_v8.campaigns.FNV.inventory[0].name === 'Round-Trip Rifle',
+    'Suites 4+5 round-trip: exportSaveFile() serialises the LIVE campaign (caps + inventory) into the envelope container'
+  );
+  assert(
+    !!rt45 &&
+      rt45.envelope.chat[0].text === 'export-import round-trip probe' &&
+      rt45.envelope.playstyle === 'completionist',
+    'Suites 4+5 round-trip: exportSaveFile() carries the chat history + playstyle verbatim into the envelope'
+  );
+  assert(
+    !!rt45 &&
+      typeof rt45.envelope.checksum === 'string' &&
+      rt45.envelope.checksum.length > 0 &&
+      'robco_v8' in rt45.envelope &&
+      !('state' in rt45.envelope),
+    'Suites 4+5 round-trip: the exported envelope is checksum-sealed AND shaped for the modern robco_v8 import branch (not the legacy parsed.state branch) — export↔import contract holds'
+  );
+  assert(
+    !!rt45 && rt45.integrity.status === 'ok',
+    "Suites 4+5 round-trip: exportSaveFile()'s own checksum verifies against verifySaveEnvelope()'s recompute (status 'ok' — a hash over the wrong fields would read 'checksum_mismatch')"
+  );
+  assert(
+    !!rt45 &&
+      rt45.appliedV8.campaigns.FNV.caps === 12345 &&
+      rt45.appliedV8.campaigns.FNV.inventory[0].name === 'Round-Trip Rifle' &&
+      rt45.appliedChat[0].text === 'export-import round-trip probe' &&
+      rt45.appliedPlaystyle === 'completionist',
+    'Suites 4+5 round-trip: feeding the exported envelope through the REAL _writeImportedContainer() apply core restores the campaign + chat + playstyle LOSSLESSLY (full disaster-recovery round-trip)'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  SUITE 6 — Cloud sync (cloud.js)
 // ══════════════════════════════════════════════════════════════
@@ -23328,7 +23447,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  degrading to SHOW (never hide) a save with no recorded gameContext; (4) the
 //  row's growing button set could clip at 360/412px — rows moved from inline
 //  styles to .save-row/.save-row-actions CSS classes, with flex-wrap letting
-//  buttons wrap onto their own line instead of overflowing. 15 tests
+//  buttons wrap onto their own line instead of overflowing. 15 static tests +
+//  3 behavioral (163.16–163.18, U3 slice 6): the cloud OVERWRITE/DELETE
+//  destructive-op ORDER proven at runtime (archive-before-overwrite that
+//  captures the prior contents; purge-versions-before-parent-delete). 18 tests
+
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -23583,6 +23706,164 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for ALL of the local-slot, cloud-save, and quarantined-record row templates — no separate inline-styled layout left behind for any'
     );
   }
+
+  // ── 163.7 / 163.8 BEHAVIORAL — destructive-op call ORDER at runtime (U3 slice 6)
+  // 163.7 and 163.8 above assert the Protocol-34 ordering via indexOf() over the
+  // function SOURCE ("_pushCloudSaveVersion appears before updateDoc") — which a
+  // reordered call, a stray earlier mention, or a comment can spoof, and which
+  // never proves the archive captured the PRIOR contents. These run the REAL
+  // cloud.js functions (async) in a vm with the firestore primitives stubbed to
+  // record the actual call order (mirrors Suite 46.14's extract-into-vm pattern +
+  // Suite 137's _pendingAsync deferral), proving the data-safety invariant at
+  // runtime: a cloud OVERWRITE archives the prior save BEFORE it replaces it AND
+  // the archive captures the about-to-be-lost contents, and a cloud DELETE purges
+  // every retained version BEFORE deleting the parent doc. (163.12's per-game
+  // renderSavesList() filter needs a real DOM render harness or a source
+  // extraction of the inline predicate — a served-file change — so it is deferred
+  // to a render-harness slice; its verbatim-filter static guard above stands.)
+  _pendingAsync.push(
+    (async () => {
+      const vm163b = require('vm');
+      // _pushCloudSaveVersion is a plain `async function`; overwrite/delete are
+      // `window.X = async function` assignment forms (extractWindowFnBody163).
+      const pushVersionBody163 = extractFunctionBody(cloud163, '_pushCloudSaveVersion');
+      const overwriteBody163 = extractWindowFnBody163(cloud163, 'overwriteCloudSave');
+      const deleteBody163 = extractWindowFnBody163(cloud163, 'deleteCloudSave');
+
+      function buildCloudSandbox163(calls, existingData, listVersions) {
+        let vid = 0;
+        const sb = {
+          console: { warn() {}, log() {}, error() {} },
+          _currentUid: 'uid1',
+          _currentUser: { isAnonymous: false },
+          db: {},
+          CLOUD_SLOT_VERSION_CAP: 5,
+          confirmAction: async () => true,
+          doc: (...a) => ({ __path: a.slice(1).join('/') }),
+          collection: (...a) => ({ __path: a.slice(1).join('/') }),
+          getDoc: async () => ({ exists: () => true, data: () => existingData }),
+          addDoc: async (col, data) => {
+            calls.push({ op: 'addDoc', path: col.__path, robco_v8: data.robco_v8 });
+            return { id: 'v' + ++vid };
+          },
+          getDocs: async () => ({ forEach() {} }),
+          deleteDoc: async ref => {
+            calls.push({ op: 'deleteDoc', path: ref.__path });
+          },
+          updateDoc: async (ref, data) => {
+            calls.push({ op: 'updateDoc', path: ref.__path, versionCount: data.versionCount });
+          },
+          _buildSavePayload: () => ({
+            label: 'My Save',
+            gameContext: 'FNV',
+            contentHash: 'h',
+            robco_v8: { campaigns: { FNV: { caps: 1 } } },
+            chat: [],
+            playstyle: 'any',
+          }),
+          localStorage: { setItem() {} },
+          openModal: () => {},
+          playSyncTone: () => {},
+        };
+        sb.window = {
+          isFeatureEnabled: () => true,
+          renderSavesList: () => {},
+          RobcoEvents: { emit() {} },
+          APP_VERSION: '2.8.0',
+          listCloudSaveVersions: async () => listVersions || [],
+        };
+        return sb;
+      }
+
+      let over163 = null;
+      let del163 = null;
+      let err163 = null;
+      try {
+        // 163.7 — overwriteCloudSave archives the PRIOR contents before overwriting
+        {
+          const calls = [];
+          const existingData = {
+            label: 'My Save',
+            robco_v8: { campaigns: { FNV: { caps: 999 } } }, // PRIOR (about-to-be-replaced) save
+            chat: [],
+            playstyle: 'any',
+            versionCount: 2,
+            savedAt: 1,
+            version: '2.7.0',
+            contentHash: 'old',
+          };
+          const sb = buildCloudSandbox163(calls, existingData, null);
+          vm163b.createContext(sb);
+          vm163b.runInContext(
+            'async function _pushCloudSaveVersion(docId, priorData) ' +
+              pushVersionBody163 +
+              '\nasync function overwriteCloudSave(docId) ' +
+              overwriteBody163 +
+              '\nwindow.__run = overwriteCloudSave;',
+            sb
+          );
+          await sb.window.__run('doc123');
+          over163 = {
+            calls,
+            iAdd: calls.findIndex(c => c.op === 'addDoc'),
+            iUpd: calls.findIndex(c => c.op === 'updateDoc'),
+          };
+        }
+        // 163.8 — deleteCloudSave purges every retained version before parent delete
+        {
+          const calls = [];
+          const sb = buildCloudSandbox163(calls, null, [{ id: 'v1' }, { id: 'v2' }]);
+          vm163b.createContext(sb);
+          vm163b.runInContext(
+            'async function deleteCloudSave(docId) ' +
+              deleteBody163 +
+              '\nwindow.__run = deleteCloudSave;',
+            sb
+          );
+          await sb.window.__run('doc123');
+          del163 = { calls };
+        }
+      } catch (e) {
+        err163 = e;
+      }
+
+      // Self-announce the header (a deferred proof — _pendingAsync holds proofs
+      // from several suites and can resolve in any order; Suite 137 precedent).
+      header(
+        'Suite 163 — Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter'
+      );
+      assert(
+        !!over163 &&
+          over163.iAdd !== -1 &&
+          over163.iUpd !== -1 &&
+          over163.iAdd < over163.iUpd &&
+          over163.calls[over163.iAdd].robco_v8.campaigns.FNV.caps === 999,
+        '163.16 [behavioral]: overwriteCloudSave() archives the PRIOR save (caps 999) via addDoc BEFORE updateDoc replaces it — the archive both runs first AND captures the about-to-be-lost data (Protocol 34 archive-before-overwrite, proven at runtime not by source order)' +
+          (err163 ? ' — ' + err163.message : '')
+      );
+      assert(
+        !!over163 && typeof over163.calls[over163.iUpd].versionCount === 'number',
+        '163.17 [behavioral]: overwriteCloudSave() stamps a numeric versionCount onto the SAME updateDoc write (the VER button reads it later with no extra fetch)'
+      );
+      assert(
+        !!del163 &&
+          (() => {
+            const verDels = del163.calls.filter(
+              c => c.op === 'deleteDoc' && /\/versions\//.test(c.path)
+            );
+            const lastVer = del163.calls.reduce(
+              (acc, c, i) => (c.op === 'deleteDoc' && /\/versions\//.test(c.path) ? i : acc),
+              -1
+            );
+            const parent = del163.calls.findIndex(
+              c => c.op === 'deleteDoc' && !/\/versions\//.test(c.path)
+            );
+            return verDels.length === 2 && lastVer !== -1 && parent !== -1 && lastVer < parent;
+          })(),
+        '163.18 [behavioral]: deleteCloudSave() deletes BOTH retained version docs BEFORE deleting the parent save doc — no version is orphaned (Protocol 34 purge-before-parent-delete, proven at runtime)'
+      );
+    })()
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
