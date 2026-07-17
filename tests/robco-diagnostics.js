@@ -12335,7 +12335,11 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 105 — WU-N1 VATS native calculator (21 tests)
+//  Suite 105 — WU-N1 VATS native calculator (34 tests)
+//  105.22–105.33 (U3 slice 4 / B2) EXECUTE the shipped _vatsCompute in a vm — the
+//  hit-%/AP-cost/damage math was extracted out of the DOM-entangled recomputeVATS()
+//  into a pure helper (Protocol 22/23; behavior-identical), so a sign flip / wrong
+//  clamp order / broken AP formula now fails a real number, not just a token grep.
 //  The deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the
 //  WU-D4a coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions
 //  (combatSkills, vats.regions, vats.apBase/apPerAgility — canon AP formula). Locks:
@@ -12365,6 +12369,14 @@ header('Suite 105 — WU-N1 VATS native calculator');
   try {
     vatsBody = extractFunctionBody(ui105, 'recomputeVATS');
   } catch (_) {}
+  // _vatsCompute uses a destructured param ({ def, ... }), which breaks extractFunctionBody's
+  // first-`{`-is-the-body assumption — grab the whole function via a regex instead (same
+  // pattern the behavioral vm block below uses to load it).
+  const vatsComputeBody = (ui105.match(/function _vatsCompute\([\s\S]*?\n\}/) || [''])[0];
+  // U3 slice 4: the pure math (hit-% clamp, crit bonus, AP formula, region table) was
+  // extracted from recomputeVATS() into the DOM-free _vatsCompute(). The config-token
+  // greps below now search BOTH bodies so they follow the code across the refactor.
+  const vatsMath = vatsBody + '\n' + vatsComputeBody;
 
   // 105.1 FNV combatSkills present with the firearm + melee + unarmed weapon skills
   assert(
@@ -12436,23 +12448,23 @@ header('Suite 105 — WU-N1 VATS native calculator');
   );
   // 105.10 hit-% clamp comes from GAME_DEFS (hitChanceMin/Max), not hardcoded 5/95
   assert(
-    /hitChanceMin/.test(vatsBody) && /hitChanceMax/.test(vatsBody),
-    '105.10: recomputeVATS() reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
+    /hitChanceMin/.test(vatsMath) && /hitChanceMax/.test(vatsMath),
+    '105.10: VATS math reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
   );
   // 105.11 VATS crit bonus comes from the GAME_DEFS coefficient
   assert(
-    /critBonus/.test(vatsBody),
-    '105.11: recomputeVATS() uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
+    /critBonus/.test(vatsMath),
+    '105.11: VATS math uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
   );
   // 105.12 AP pool derived from the canon coefficients
   assert(
-    /apBase/.test(vatsBody) && /apPerAgi/.test(vatsBody),
-    '105.12: recomputeVATS() derives the AP pool from apBase + apPerAgility (canon formula)'
+    /apBase/.test(vatsMath) && /apPerAgi/.test(vatsMath),
+    '105.12: VATS math derives the AP pool from apBase + apPerAgility (canon formula)'
   );
   // 105.13 region table read from GAME_DEFS, not re-hardcoded in ui-core
   assert(
-    /\.regions\b/.test(vatsBody) && !/mod:\s*-40/.test(ui105),
-    '105.13: recomputeVATS() reads vats.regions from GAME_DEFS — no hardcoded region table in ui-core.js (GA-7)'
+    /\.regions\b/.test(vatsMath) && !/mod:\s*-40/.test(ui105),
+    '105.13: VATS math reads vats.regions from GAME_DEFS — no hardcoded region table in ui-core.js (GA-7)'
   );
   // 105.14 MELEE-SCOPE gate shape (§1.6) — playstyle==='melee' || weaponIsMelee, never mode alone
   assert(
@@ -12477,10 +12489,10 @@ header('Suite 105 — WU-N1 VATS native calculator');
       /function lookupWeaponStats\s*\(/.test(dbfo3105),
     '105.17: lookupWeaponStats() defined in both db_nv.js and db_fo3.js'
   );
-  // 105.18 read-only — the calc never writes state (no saveState/pushToCloud in the body)
+  // 105.18 read-only — the calc never writes state (no saveState/pushToCloud in either body)
   assert(
-    !/saveState\s*\(/.test(vatsBody) && !/pushToCloud\s*\(/.test(vatsBody),
-    '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+    !/saveState\s*\(/.test(vatsMath) && !/pushToCloud\s*\(/.test(vatsMath),
+    '105.18: recomputeVATS()/_vatsCompute() are read-only (no saveState/pushToCloud writes)'
   );
   // ── VATS-still-AI retirement (Protocol 42) ───────────────────────────────────
   const api105 = readGroup('api');
@@ -12511,6 +12523,202 @@ header('Suite 105 — WU-N1 VATS native calculator');
     ),
     '105.21: all router-driven natives (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) have a NATIVE_COMMAND_ROUTER entry (native end-to-end, no AI fall-through)'
   );
+
+  // ── Behavioral: run the shipped _vatsCompute in an isolated vm and assert exact math ──
+  // U3 slice 4 (B2): the VATS hit-%/AP-cost/damage math was DOM-entangled inside
+  // recomputeVATS(), so 105.10–105.13 could only GREP for coefficient tokens — a sign flip,
+  // wrong clamp order, or broken AP formula shipped green. The math is now a pure
+  // _vatsCompute(); these tests EXECUTE it and assert the actual numbers (mirrors 107's
+  // _threatCompute conversion). No test.html/vm twin exists for VATS (twin-check per U2 §2).
+  // 105.22 the pure math helper is defined + extractable
+  assert(
+    /function _vatsCompute\b/.test(ui105),
+    '105.22: _vatsCompute() pure math helper defined in ui-core family (extracted from recomputeVATS)'
+  );
+  const vmVats = require('vm');
+  const fnMatch105 = ui105.match(/function _vatsCompute\([\s\S]*?\n\}/);
+  if (!fnMatch105) {
+    fail('105.x: could not extract _vatsCompute from ui-core family');
+  } else {
+    const sb105 = {};
+    vmVats.createContext(sb105);
+    vmVats.runInContext(fnMatch105[0], sb105);
+    const vc = sb105._vatsCompute;
+    assert(
+      typeof vc === 'function' && fnMatch105[0].length > 200,
+      '105.x-guard: _vatsCompute extracted as a non-trivial function (anti-vacuous sentinel)'
+    );
+    // Fixture per-game def: FNV-style AP formula (65 + 3×AGI), 5/95 clamp, 5% crit, 3 regions.
+    const defFix = {
+      vats: {
+        hitChanceMin: 5,
+        hitChanceMax: 95,
+        critBonus: 0.05,
+        apBase: 65,
+        apPerAgility: 3,
+        regions: [
+          { name: 'HEAD', mod: -20, ap: 8 },
+          { name: 'TORSO', mod: 0, ap: 4 },
+          { name: 'LEGS', mod: -10, ap: 3 },
+        ],
+      },
+    };
+
+    // Case 1 — mid-range with a weapon equipped. per5/agi5/skill50/chem0, 30-dmg weapon, DT0.
+    //   apPool = 65 + 3×5 = 80.  base = 5×2 + 5×1.5 + (50+0)/3 = 34.1666…
+    //   HEAD clamp(round(34.17−20))=14 · TORSO clamp(round(34.17))=34 · LEGS clamp(round(24.17))=24
+    //   effDmg = max(1, round(30−0)) = 30.  best DMG/AP region = LEGS (30/3 = 10, the highest).
+    const r1 = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: { name: 'Test Rifle', baseDamage: 30 },
+      targetDT: 0,
+    });
+    // 105.23 AP pool = apBase + apPerAgility × AGI (canon formula, executed not grepped)
+    assert(r1.apPool === 80, `105.23: AP pool = 65 + 3×5 = 80 (got ${r1.apPool})`);
+    // 105.24 base hit-% formula (PER×2 + AGI×1.5 + (skill+chem)/3) with per-region mod + clamp
+    assert(
+      r1.hitRows[0].pct === 14 && r1.hitRows[1].pct === 34 && r1.hitRows[2].pct === 24,
+      `105.24: per-region hit-% = HEAD 14 / TORSO 34 / LEGS 24 (got ${r1.hitRows
+        .map(h => h.pct)
+        .join('/')})`
+    );
+    // 105.25 effective damage = max(1, round(baseDamage − targetDT))
+    assert(
+      r1.ap.effDmg === 30,
+      `105.25: effective damage = round(30 − 0) = 30 (got ${r1.ap.effDmg})`
+    );
+    // 105.26 AP-strike counts = floor(apPool / regionAP); optimal = highest DMG/AP region
+    const legs1 = r1.ap.rows.find(x => x.name === 'LEGS');
+    const torso1 = r1.ap.rows.find(x => x.name === 'TORSO');
+    assert(
+      torso1.strikes === 20 &&
+        legs1.strikes === 26 &&
+        legs1.dpa === 10 &&
+        r1.ap.bestRegion === 'LEGS',
+      `105.26: strikes floor(80/ap) → TORSO 20 / LEGS 26; best DMG/AP region = LEGS (got ${torso1.strikes}/${legs1.strikes}, best ${r1.ap.bestRegion})`
+    );
+    // 105.27 crit % = round(critBonus × 100)
+    assert(r1.critPct === 5, `105.27: crit % = round(0.05 × 100) = 5 (got ${r1.critPct})`);
+
+    // Case 2 — hit-% clamp both ends + no weapon. per10/agi10/skill100/chem0, DT0, stats null.
+    //   base = 20 + 15 + 100/3 = 68.333…  OVER mod +100 → 168 → clamp 95 · UNDER mod −200 → −132 → clamp 5
+    const defClamp = {
+      vats: {
+        hitChanceMin: 5,
+        hitChanceMax: 95,
+        critBonus: 0.05,
+        apBase: 65,
+        apPerAgility: 3,
+        regions: [
+          { name: 'OVER', mod: 100, ap: 4 },
+          { name: 'UNDER', mod: -200, ap: 4 },
+        ],
+      },
+    };
+    const r2 = vc({
+      def: defClamp,
+      per: 10,
+      agi: 10,
+      skillValue: 100,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.28 hit-% clamps to [hitChanceMin, hitChanceMax] at both extremes
+    assert(
+      r2.hitRows[0].pct === 95 && r2.hitRows[1].pct === 5,
+      `105.28: hit-% clamps to 95 (ceiling) / 5 (floor) (got ${r2.hitRows[0].pct}/${r2.hitRows[1].pct})`
+    );
+    // 105.29 no weapon equipped → no AP-strike section fabricated
+    assert(
+      r2.ap === null,
+      `105.29: no weapon → ap section null, no math fabricated (got ${r2.ap})`
+    );
+
+    // Case 3 — target DT ≥ base damage floors effective damage at 1 (no zero/negative).
+    const r3 = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: { name: 'Weak', baseDamage: 10 },
+      targetDT: 50,
+    });
+    // 105.30 effDmg floors at 1 when DT ≥ damage; burst = strikes × 1
+    const torso3 = r3.ap.rows.find(x => x.name === 'TORSO');
+    assert(
+      r3.ap.effDmg === 1 && torso3.burst === torso3.strikes,
+      `105.30: DT≥damage floors effDmg at 1 → burst = strikes×1 (got effDmg ${r3.ap.effDmg}, burst ${torso3.burst}, strikes ${torso3.strikes})`
+    );
+
+    // Case 4 — a region AP of 0 falls back to 1; AGI 0 → apPool = apBase only.
+    const defAp0 = {
+      vats: { apBase: 10, apPerAgility: 0, regions: [{ name: 'Z', mod: 0, ap: 0 }] },
+    };
+    const r4 = vc({
+      def: defAp0,
+      per: 5,
+      agi: 0,
+      skillValue: 0,
+      chemBonus: 0,
+      stats: { name: 'w', baseDamage: 5 },
+      targetDT: 0,
+    });
+    // 105.31 region AP 0/missing → cost 1 (no divide-by-zero); apPool = apBase at AGI 0
+    assert(
+      r4.apPool === 10 && r4.ap.rows[0].ap === 1 && r4.ap.rows[0].strikes === 10,
+      `105.31: apPool = apBase at AGI 0 (10); region ap 0 → 1, strikes floor(10/1)=10 (got apPool ${r4.apPool}, ap ${r4.ap.rows[0].ap}, strikes ${r4.ap.rows[0].strikes})`
+    );
+
+    // Case 5 — chem bonus feeds the skill term of the base hit-% (delta = chem/3).
+    const noChem = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 0,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    const withChem = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 0,
+      chemBonus: 30,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.32 chemBonus adds to the skill term (30 chem → base +10)
+    assert(
+      withChem.base - noChem.base === 10,
+      `105.32: chemBonus feeds the skill term — 30 chem raises base by 10 (got ${withChem.base - noChem.base})`
+    );
+
+    // Case 6 — empty def → the documented canon fallbacks (5/95 clamp, 65+3×AGI, single TORSO region, 5% crit).
+    const r6 = vc({
+      def: {},
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.33 missing GAME_DEFS.vats → canon defaults, still fully usable offline (Protocol 24)
+    assert(
+      r6.apPool === 80 &&
+        r6.hitRows.length === 1 &&
+        r6.hitRows[0].name === 'TORSO' &&
+        r6.critPct === 5,
+      `105.33: empty def → canon fallbacks (apPool 80, single TORSO region, crit 5%) (got apPool ${r6.apPool}, regions ${r6.hitRows.length}, crit ${r6.critPct})`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

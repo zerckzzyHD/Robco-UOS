@@ -463,15 +463,16 @@ function showVATSOverlay() {
   openModal();
 }
 
-// recomputeVATS — recompute and render the V.A.T.S. table from live state + the TARGET DT
-// input. Read-only. Safe to call repeatedly (the DT input's oninput).
-function recomputeVATS() {
-  const out = document.getElementById('vatsResult');
-  if (!out) return;
-
-  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
-  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
-  const v = def.vats || {};
+// _vatsCompute — the PURE V.A.T.S. math (no DOM, no state/localStorage reads). Takes the
+// already-resolved inputs (per-game def + PER/AGI + combat-skill value + chem bonus +
+// weapon stats + target DT) and RETURNS the computed numbers: the AP pool, the per-region
+// hit-% rows, and (when a weapon is equipped) the effective damage + per-region AP-strike
+// rows with the optimal region. recomputeVATS() gathers the DOM/state inputs, calls this,
+// and formats the result — so the calculator's math is behaviorally testable without a DOM
+// (Protocol 22/23; mirrors _threatCompute). This is a byte-for-byte behavior-identical
+// extraction of the math that previously lived inline in recomputeVATS.
+function _vatsCompute({ def, per, agi, skillValue, chemBonus, stats, targetDT }) {
+  const v = (def && def.vats) || {};
   const hitMin = typeof v.hitChanceMin === 'number' ? v.hitChanceMin : 5;
   const hitMax = typeof v.hitChanceMax === 'number' ? v.hitChanceMax : 95;
   const critBonus = typeof v.critBonus === 'number' ? v.critBonus : 0.05;
@@ -480,9 +481,57 @@ function recomputeVATS() {
   const regions =
     Array.isArray(v.regions) && v.regions.length ? v.regions : [{ name: 'TORSO', mod: 0, ap: 4 }];
 
+  const apPool = apBase + apPerAgi * agi;
+
+  // Base hit-% estimate (per-region modifier applied below). Clamp from GAME_DEFS (WU-D4a).
+  const base = per * 2 + agi * 1.5 + (skillValue + chemBonus) / 3;
+  const clamp = pct => Math.min(hitMax, Math.max(hitMin, Math.round(pct)));
+
+  const hitRows = regions.map(r => ({ name: r.name, pct: clamp(base + (r.mod || 0)) }));
+
+  // AP-strike optimizer (exact when a weapon is equipped). effDmg = Base_Damage − target DT.
+  let ap = null;
+  if (stats) {
+    const effDmg = Math.max(1, Math.round((stats.baseDamage || 0) - targetDT));
+    let bestRegion = null;
+    let bestDpa = -1;
+    const rows = regions.map(r => {
+      const apCost = r.ap || 1;
+      const strikes = Math.floor(apPool / apCost);
+      const dpa = effDmg / apCost;
+      if (dpa > bestDpa) {
+        bestDpa = dpa;
+        bestRegion = r.name;
+      }
+      return { name: r.name, ap: apCost, strikes, dpa, burst: strikes * effDmg };
+    });
+    ap = { effDmg, rows, bestRegion };
+  }
+
+  return {
+    apPool,
+    base,
+    hitMin,
+    hitMax,
+    critBonus,
+    hitRows,
+    ap,
+    critPct: Math.round(critBonus * 100),
+  };
+}
+
+// recomputeVATS — recompute and render the V.A.T.S. table from live state + the TARGET DT
+// input. Gathers the DOM/state inputs, delegates the math to _vatsCompute (pure), and
+// formats the result. Read-only. Safe to call repeatedly (the DT input's oninput).
+function recomputeVATS() {
+  const out = document.getElementById('vatsResult');
+  if (!out) return;
+
+  const ctx = typeof getGameContext === 'function' ? getGameContext() : 'FNV';
+  const def = (window.GAME_DEFS && GAME_DEFS[ctx]) || (window.GAME_DEFS && GAME_DEFS.FNV) || {};
+
   const per = parseInt((document.getElementById('s_p') || {}).value) || 5;
   const agi = parseInt((document.getElementById('s_a') || {}).value) || 5;
-  const apPool = apBase + apPerAgi * agi;
 
   const skills = state.skills || {};
   const playstyle = localStorage.getItem('robco_playstyle') || 'any';
@@ -517,48 +566,38 @@ function recomputeVATS() {
     parseInt((document.getElementById('vatsTargetDT') || {}).value) || 0
   );
 
-  // Base hit-% estimate (per-region modifier applied below). Clamp from GAME_DEFS (WU-D4a).
-  const base = per * 2 + agi * 1.5 + (sk.value + chemBonus) / 3;
-  const clamp = pct => Math.min(hitMax, Math.max(hitMin, Math.round(pct)));
+  // Pure math (DOM-free) — see _vatsCompute. This function only gathers inputs & formats.
+  const c = _vatsCompute({ def, per, agi, skillValue: sk.value, chemBonus, stats, targetDT });
+  const apPool = c.apPool;
 
-  const hitRows = regions
+  const hitRows = c.hitRows
     .map(r => {
-      const pct = clamp(base + (r.mod || 0));
-      const bar = '#'.repeat(Math.floor(pct / 10)).padEnd(10, '·');
-      return `  ${r.name.padEnd(7)} [${bar}] ${String(pct).padStart(3)}% EST`;
+      const bar = '#'.repeat(Math.floor(r.pct / 10)).padEnd(10, '·');
+      return `  ${r.name.padEnd(7)} [${bar}] ${String(r.pct).padStart(3)}% EST`;
     })
     .join('\n');
 
-  // AP-strike optimizer (exact when a weapon is equipped). effDmg = Base_Damage − target DT.
+  // AP-strike optimizer (exact when a weapon is equipped).
   let apSection;
-  if (stats) {
-    const effDmg = Math.max(1, Math.round((stats.baseDamage || 0) - targetDT));
-    let bestRegion = null;
-    let bestDpa = -1;
-    const apRows = regions
-      .map(r => {
-        const ap = r.ap || 1;
-        const strikes = Math.floor(apPool / ap);
-        const dpa = effDmg / ap;
-        if (dpa > bestDpa) {
-          bestDpa = dpa;
-          bestRegion = r.name;
-        }
-        return `  ${r.name.padEnd(7)} AP:${String(ap).padStart(2)}  STRIKES:${String(strikes).padStart(2)}  DMG/AP:${dpa.toFixed(1)}  BURST:${strikes * effDmg}`;
-      })
+  if (c.ap) {
+    const apRows = c.ap.rows
+      .map(
+        r =>
+          `  ${r.name.padEnd(7)} AP:${String(r.ap).padStart(2)}  STRIKES:${String(r.strikes).padStart(2)}  DMG/AP:${r.dpa.toFixed(1)}  BURST:${r.burst}`
+      )
       .join('\n');
     apSection =
       `  WEAPON: ${escapeHtml(stats.name)}  (${weaponIsMelee ? 'MELEE/UNARMED — EXACT' : 'RANGED'})\n` +
-      `  BASE DMG:${stats.baseDamage}  − DT:${targetDT}  = EFF DMG:${effDmg}  |  AP POOL:${apPool} (base)\n\n` +
+      `  BASE DMG:${stats.baseDamage}  − DT:${targetDT}  = EFF DMG:${c.ap.effDmg}  |  AP POOL:${apPool} (base)\n\n` +
       apRows +
-      `\n\n  OPTIMAL (dmg/AP): ${bestRegion}`;
+      `\n\n  OPTIMAL (dmg/AP): ${c.ap.bestRegion}`;
   } else {
     apSection = '  Equip a weapon (INV → equip) for exact AP-strike & damage math.';
   }
 
   const chemStr = chemBonus > 0 ? `  (+${chemBonus} CHEM)` : '';
   const skillLabel = `${sk.name.replace(/_/g, ' ').toUpperCase()} ${sk.value}${sk.exact ? '' : ' (est.)'}`;
-  const critPct = Math.round(critBonus * 100);
+  const critPct = c.critPct;
 
   out.innerHTML = `<b>INPUTS</b>
   PER:${per}  AGI:${agi}  SKILL:${skillLabel}${chemStr}
