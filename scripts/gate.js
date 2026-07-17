@@ -43,6 +43,25 @@ const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
 const fast = process.argv.includes('--fast');
+
+// ── CI failure-evidence packaging (Health-batch U4) ──────────────────────────
+// When CI goes red, the failure should be diagnosable from the run itself — no
+// local re-run. Two pieces:
+//   1. Every gate step's full stdout+stderr is teed to a per-step log file under
+//      test-artifacts/gate-logs/ (so the failing test names + output survive as
+//      an uploadable artifact instead of scrolling past in the Actions console).
+//   2. ROBCO_ARTIFACTS_DIR is propagated to the child browser harnesses so their
+//      screenshots + console dumps land in the SAME directory the workflow
+//      uploads (tests/artifacts.mjs).
+// Capture is on in CI (GitHub Actions sets CI=true) or with --capture. Locally
+// without it, steps keep streaming live to the console exactly as before.
+const CAPTURE = !!process.env.CI || process.argv.includes('--capture');
+const ARTIFACTS_DIR = process.env.ROBCO_ARTIFACTS_DIR
+  ? path.resolve(process.env.ROBCO_ARTIFACTS_DIR)
+  : path.join(ROOT, 'test-artifacts');
+process.env.ROBCO_ARTIFACTS_DIR = ARTIFACTS_DIR; // child harnesses inherit this
+const GATE_LOG_DIR = path.join(ARTIFACTS_DIR, 'gate-logs');
+let _stepSeq = 0;
 // Opt-in iteration pre-check (audit #3). NOT a commit/push gate — see the --iter
 // block below. Never wired into a git hook or CI; it cannot satisfy either gate.
 const iter = process.argv.includes('--iter');
@@ -122,9 +141,47 @@ function stopSharedBrowser() {
 
 function run(label, cmd) {
   console.log(`\n[gate] ${label}`);
-  const result = spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+  if (!CAPTURE) {
+    // Local default: stream live to the console, exactly as before.
+    const result = spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+    if (result.status !== 0) {
+      console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
+      process.exit(result.status || 1);
+    }
+    return;
+  }
+  // Capture mode (CI / --capture): pipe the step's output, print it, AND tee it
+  // to a per-step log so a red run leaves the failing test names + output behind
+  // as an uploadable artifact. maxBuffer is raised well above the Node runner's
+  // full multi-thousand-test output so nothing is truncated.
+  const result = spawnSync(cmd, {
+    cwd: ROOT,
+    shell: true,
+    encoding: 'utf8',
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  const out = (result.stdout || '') + (result.stderr || '');
+  process.stdout.write(out);
+  _stepSeq += 1;
+  const slug =
+    String(_stepSeq).padStart(2, '0') +
+    '-' +
+    label
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 50);
+  try {
+    fs.mkdirSync(GATE_LOG_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(GATE_LOG_DIR, slug + '.log'),
+      `$ ${cmd}\n[exit ${result.status}]\n\n${out}`,
+      'utf8'
+    );
+  } catch {
+    /* logging must never break the gate */
+  }
   if (result.status !== 0) {
-    console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
+    console.error(`\n[GATE FAIL] ${label} — exit ${result.status} (log: gate-logs/${slug}.log)`);
     process.exit(result.status || 1);
   }
 }

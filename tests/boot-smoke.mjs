@@ -29,11 +29,13 @@
 
 import { acquireBrowser } from './browser-shared.mjs';
 import { startStaticServer } from './static-server.mjs';
+import { installFailureCapture, trackBrowser, saveFailureArtifacts } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 
 const FAST = process.argv.includes('--fast');
+installFailureCapture(FAST ? 'boot-smoke-fast' : 'boot-smoke');
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'index.html');
 
@@ -66,8 +68,10 @@ function isExpectedNoise(text) {
   return false;
 }
 
+const LABEL = FAST ? 'boot-smoke-fast' : 'boot-smoke';
 const srv = await startStaticServer(ROOT);
 const browser = await acquireBrowser();
+trackBrowser(browser, LABEL);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
 
@@ -106,6 +110,7 @@ if (FAST) {
     pass('Shell booted and painted — bezel nav present + a core board rendered and visible');
   } catch {
     fail('Shell did not paint a core board within 10 s (possible boot throw / black screen)');
+    await saveFailureArtifacts(LABEL, page);
   }
   if (pageErrors.length === 0) {
     pass('No uncaught pageerror during boot');
@@ -127,6 +132,7 @@ if (FAST) {
     fail(
       'Boot sequence did not complete within 5 s (bootScreen still visible — possible black screen)'
     );
+    await saveFailureArtifacts(LABEL, page);
   }
 
   // Small buffer for any deferred post-boot errors

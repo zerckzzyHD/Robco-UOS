@@ -47579,6 +47579,92 @@ header('Suite 234 — Accessibility: form controls carry an accessible name (U9)
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (14 tests)
+//  Protocol 20 static source-invariant guard. U4 made a red CI run
+//  diagnosable from the run itself (screenshots + console dumps + per-step
+//  gate logs uploaded as artifacts). This suite locks that wiring so a future
+//  refactor can't silently drop it and quietly send us back to "re-run it
+//  locally to see why" — the exact escape-ratchet spirit (Protocol 36b) the
+//  unit exists to serve. All static file reads; no browser, so it runs in the
+//  fast gate too. Reads only committed files (present on a clean CI checkout).
+// ══════════════════════════════════════════════════════════════
+header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
+{
+  const read235 = rel => {
+    const p = path.join(ROOT, rel);
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
+  };
+
+  // ── The shared capture helper ──
+  const helper = read235('tests/artifacts.mjs');
+  assert(helper !== null, '235.1: tests/artifacts.mjs (shared failure-capture helper) exists');
+  assert(
+    !!helper &&
+      /export function installFailureCapture/.test(helper) &&
+      /export function trackBrowser/.test(helper) &&
+      /export async function saveFailureArtifacts/.test(helper) &&
+      /export function captureConsole/.test(helper),
+    '235.2: artifacts.mjs exports installFailureCapture + trackBrowser + saveFailureArtifacts + captureConsole'
+  );
+  assert(
+    !!helper && /process\.env\.ROBCO_ARTIFACTS_DIR/.test(helper),
+    '235.3: artifacts.mjs resolves the artifacts dir from ROBCO_ARTIFACTS_DIR (shared with the gate)'
+  );
+  assert(
+    !!helper && /page\.screenshot\(/.test(helper) && /\.console\.log/.test(helper),
+    '235.4: saveFailureArtifacts writes a screenshot + a console-log dump'
+  );
+
+  // ── Every entry-point browser harness is wired for capture ──
+  const CAPTURE_HARNESSES = [
+    'tests/boot-smoke.mjs',
+    'tests/offline-first.mjs',
+    'tests/render-check.mjs',
+    'tests/a11y-check.mjs',
+    'tests/test-html-check.mjs',
+    'tests/save-survival.mjs',
+  ];
+  for (const rel of CAPTURE_HARNESSES) {
+    const src = read235(rel);
+    assert(
+      !!src && /from '\.\/artifacts\.mjs'/.test(src) && /installFailureCapture\(/.test(src),
+      `235: ${rel} imports the capture helper and installs the crash net (installFailureCapture)`
+    );
+  }
+
+  // ── The gate tees per-step logs + shares the artifacts dir with harnesses ──
+  const gate235 = read235('scripts/gate.js');
+  assert(
+    !!gate235 && /process\.env\.ROBCO_ARTIFACTS_DIR\s*=\s*ARTIFACTS_DIR/.test(gate235),
+    '235.11: gate.js propagates ROBCO_ARTIFACTS_DIR so harness artifacts land in the uploaded dir'
+  );
+  assert(
+    !!gate235 &&
+      /GATE_LOG_DIR/.test(gate235) &&
+      /gate-logs/.test(gate235) &&
+      /writeFileSync/.test(gate235),
+    '235.12: gate.js tees each step to a per-step gate-logs file on CI (failing output survives as an artifact)'
+  );
+
+  // ── CI uploads the evidence, only on failure ──
+  const ci235 = read235('.github/workflows/ci.yml');
+  assert(
+    !!ci235 &&
+      /actions\/upload-artifact/.test(ci235) &&
+      /if:\s*failure\(\)/.test(ci235) &&
+      /test-artifacts/.test(ci235),
+    '235.13: ci.yml uploads test-artifacts/ via actions/upload-artifact, only on failure()'
+  );
+
+  // ── The artifacts dir is never committed ──
+  const gitignore235 = read235('.gitignore');
+  assert(
+    !!gitignore235 && /test-artifacts\//.test(gitignore235),
+    '235.14: .gitignore ignores test-artifacts/ (failure evidence is never committed)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

@@ -28,9 +28,12 @@
  */
 
 import { acquireBrowser } from './browser-shared.mjs';
+import { installFailureCapture, trackBrowser } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+
+installFailureCapture('save-survival');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'index.html');
@@ -518,6 +521,7 @@ function buildImportAsymmetryCampaign() {
 // ── Test run ─────────────────────────────────────────────────────────────
 
 const browser = await acquireBrowser();
+trackBrowser(browser, 'save-survival');
 
 // ═══════════════════════════════════════════════════════════════════════
 // PATH 1a — save -> reload (CURRENT fixture, single FNV campaign)

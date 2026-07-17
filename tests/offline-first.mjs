@@ -26,9 +26,12 @@
 
 import { acquireBrowser } from './browser-shared.mjs';
 import { startStaticServer } from './static-server.mjs';
+import { installFailureCapture, trackBrowser, saveFailureArtifacts } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+
+installFailureCapture('offline-first');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'index.html');
@@ -84,6 +87,7 @@ function fail(msg) {
 
 const srv = await startStaticServer(ROOT);
 const browser = await acquireBrowser();
+trackBrowser(browser, 'offline-first');
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 await ctx.addInitScript(save => {
   localStorage.setItem('robco_v8', JSON.stringify(save));
@@ -173,6 +177,7 @@ if (offlineReloadOk) {
     fail(
       'OFFLINE: app did NOT reach READY with the network cut — the offline-first promise is broken'
     );
+    await saveFailureArtifacts('offline-first', page);
   }
 
   // A core board actually rendered offline.

@@ -548,6 +548,7 @@ export default [
       'tests/browser-shared.mjs',
       'tests/save-survival.mjs',
       'tests/offline-first.mjs',
+      'tests/artifacts.mjs',
       'tests/static-server.mjs',
       'tests/_diag*.mjs',
       'planning/', // gitignored scratch/planning scripts — never shipped, not lint-covered

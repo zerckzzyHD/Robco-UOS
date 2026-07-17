@@ -34,6 +34,11 @@ desktop.ini
 # Repomix output (generated artifact — never committed)
 repomix-output.*
 
+# CI failure-evidence (Health-batch U4) — screenshots + console/gate logs written
+# ONLY when a check fails, uploaded by the CI workflow, then swept (Protocol 41).
+# Never committed.
+test-artifacts/
+
 # Logs
 *.log
 npm-debug.log*

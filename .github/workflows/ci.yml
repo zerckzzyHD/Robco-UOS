@@ -57,3 +57,18 @@ jobs:
 
       - name: Run full gate
         run: npm run gate
+
+      # CI failure-evidence packaging (Health-batch U4): when the gate goes red,
+      # upload the evidence the run left behind — per-step gate logs (failing
+      # test names + output) and any Playwright screenshots + console dumps from
+      # the browser checks — so the failure is diagnosable from the run itself,
+      # with no local re-run. Only fires on failure; a green run uploads nothing.
+      # The name is per-OS so the Linux and Windows matrix legs don't collide.
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-evidence-${{ matrix.os }}
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

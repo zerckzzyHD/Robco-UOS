@@ -16,9 +16,12 @@
 
 import { acquireBrowser } from './browser-shared.mjs';
 import { runRenderIntegrity } from './render-integrity.mjs';
+import { installFailureCapture, trackBrowser } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+
+installFailureCapture('render-check');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'index.html');
@@ -43,6 +46,7 @@ function fail(msg) {
 }
 
 const browser = await acquireBrowser();
+trackBrowser(browser, 'render-check');
 
 for (const vp of VIEWPORTS) {
   const ctx = await browser.newContext({ viewport: vp });

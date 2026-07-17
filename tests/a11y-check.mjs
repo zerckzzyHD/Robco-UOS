@@ -17,11 +17,14 @@
  */
 
 import { acquireBrowser } from './browser-shared.mjs';
+import { installFailureCapture, trackBrowser, saveFailureArtifacts } from './artifacts.mjs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
+
+installFailureCapture('a11y');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = path.join(ROOT, 'tests', 'a11y-baseline.json');
@@ -75,6 +78,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 // ── Playwright + axe ─────────────────────────────────────────────────────────
 const browser = await acquireBrowser();
+trackBrowser(browser, 'a11y');
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
 
@@ -91,6 +95,7 @@ try {
   );
 } catch {
   console.error('[a11y] Boot did not complete within 8 s — aborting');
+  await saveFailureArtifacts('a11y', page);
   await ctx.close();
   await browser.close();
   server.close();
