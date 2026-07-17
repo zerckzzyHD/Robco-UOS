@@ -2698,6 +2698,90 @@ header('Render Fan-out (P7-1)');
       'updateMath() contains saveState() AND _updatePanelBadges() — shared-tail invariant intact'
     );
   }
+
+  // 37.17+ CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C3). checkMutator()
+  // above greps each CRUD mutator for the render-token + updateMath() presence +
+  // no-loadUI() — a legitimate architectural guard (kept), but it CANNOT prove
+  // call ORDERING. updateMath() is the single persistence choke point (it calls
+  // saveState()), so a mutator that renders/saves BEFORE it mutates state persists
+  // a STALE save — the exact class that shipped once as the 42.10 mutate-after-save
+  // bug — and every grep above stays green. These EXECUTE representative delete
+  // mutators in an isolated vm with spy render/updateMath fns: they assert the
+  // state array is actually shortened AND that at the moment updateMath() (the save
+  // choke) fires the mutation is ALREADY visible, AND that updateMath() runs AFTER
+  // the panel re-render. Twin-check (U2 §2): no test.html/vm suite executes these
+  // mutators — the only prior coverage was checkMutator's token greps.
+  {
+    const vm37 = require('vm');
+    // Each entry: [fnName, stateKey, renderFn] — a guarded splice-then-render-then-updateMath mutator.
+    const mutators37 = [
+      ['delItem', 'inventory', 'renderInventory'],
+      ['removeStatusEffect', 'status', 'renderStatus'],
+      ['removePerk', 'perks', 'renderPerks'],
+      ['removeCampaignNote', 'campaign_notes', 'renderCampaignNotes'],
+    ];
+    for (const [fn37, key37, render37] of mutators37) {
+      const src37 = uiSrc37.match(new RegExp('function ' + fn37 + '\\([\\s\\S]*?\\n\\}'));
+      if (!src37) {
+        fail(`37.17(${fn37}): could not extract mutator from ui-render family`);
+        continue;
+      }
+      const order37 = [];
+      let snapAtSave37 = null; // deep snapshot of the target array taken WHEN updateMath (the save choke) fires
+      const seed37 = ['A', 'B', 'C', 'D'];
+      const sb37 = {
+        state: { [key37]: seed37.slice() },
+        reconcileEquipped: () => false,
+        renderEquipped: () => order37.push('renderEquipped'),
+        updateMath: () => {
+          order37.push('updateMath');
+          snapAtSave37 = sb37.state[key37].slice();
+        },
+      };
+      // the mutator's own render fn — records order (distinct from updateMath)
+      sb37[render37] = () => order37.push(render37);
+      vm37.createContext(sb37);
+      vm37.runInContext(src37[0], sb37);
+      // remove index 1 ('B')
+      vm37.runInContext(fn37 + '(1);', sb37);
+
+      // sentinel + actual mutation: 'B' is gone, length dropped 4→3
+      assert(
+        src37[0].length > 40 && sb37.state[key37].length === 3 && !sb37.state[key37].includes('B'),
+        `37.17(${fn37}): [behavioral] splices the target row out of state.${key37} (4→${sb37.state[key37].length}, 'B' removed)`
+      );
+      // mutate-BEFORE-save: at updateMath (save choke) time the removal was already applied
+      assert(
+        snapAtSave37 !== null && snapAtSave37.length === 3 && !snapAtSave37.includes('B'),
+        `37.17b(${fn37}): [behavioral] the mutation is visible to updateMath()/saveState() when it fires (no stale save — 42.10 mutate-after-save class)`
+      );
+      // ordering: the panel re-render runs, and updateMath() is the LAST call
+      assert(
+        order37.includes(render37) &&
+          order37[order37.length - 1] === 'updateMath' &&
+          order37.indexOf(render37) < order37.lastIndexOf('updateMath'),
+        `37.17c(${fn37}): [behavioral] ${render37}() runs before updateMath() (render → persist order: [${order37.join(', ')}])`
+      );
+    }
+
+    // guarded mutators are no-ops on an out-of-range index (removeStatusEffect/Perk/Note guard `length > idx`)
+    {
+      const srcRSE = uiSrc37.match(/function removeStatusEffect\([\s\S]*?\n\}/);
+      const order37b = [];
+      const sb37b = {
+        state: { status: ['only'] },
+        renderStatus: () => order37b.push('renderStatus'),
+        updateMath: () => order37b.push('updateMath'),
+      };
+      vm37.createContext(sb37b);
+      vm37.runInContext(srcRSE[0], sb37b);
+      vm37.runInContext('removeStatusEffect(9);', sb37b); // idx 9 out of range
+      assert(
+        sb37b.state.status.length === 1 && order37b.length === 0,
+        `37.17d: [behavioral] removeStatusEffect(out-of-range) is a guarded no-op — no splice, no render, no save (got len=${sb37b.state.status.length}, calls=[${order37b.join(', ')}])`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -7205,50 +7289,140 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // 64.3  commitStat is defined in ui-core.js
   assert(/function commitStat\s*\(/.test(uiCoreSrc64), 'commitStat is defined in ui-core.js');
 
-  // 64.4–64.7: inspect commitStat body — commitStat now DELEGATES its clamp/
-  // save/emit to the shared _nativeSetSpecial() choke point (Native USE +
-  // TERMINAL stat-edits plan, Protocol 22 — one clamp shared by the DOM
-  // onchange path, the USE handler, and the TERMINAL stat grammar), so 64.4–64.6
-  // check the CONCATENATION of both bodies — the same guarantee, just spanning
-  // the two cooperating functions instead of living in commitStat alone.
+  // 64.4–64.7: CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C5). commitStat
+  // DELEGATES its clamp/save/emit to the shared _nativeSetSpecial() choke point
+  // (Native USE + TERMINAL stat-edits, Protocol 22 — one clamp shared by the DOM
+  // onchange path, the USE handler, and the TERMINAL grammar). The OLD checks
+  // grepped a CONCATENATION of both function bodies for Math.max/min /
+  // updateMath / saveState / isNaN tokens — a call-chain break BETWEEN the two
+  // cooperating functions (commitStat computes v but never reaches
+  // _nativeSetSpecial's clamp, or the clamp runs on the wrong operand order) was
+  // invisible: every token stayed present. These EXECUTE the real
+  // _nativeSetSpecial + commitStat in an isolated vm and assert the actual
+  // clamped return value, the persisted state[k], and the updateMath→saveState
+  // order. Twin-check (U2 §2 discipline): no test.html or vm suite runs either
+  // function — the only prior coverage was this suite's greps.
   {
-    let commitStatBody = '';
-    let nativeSetSpecialBody64 = '';
-    try {
-      commitStatBody = extractFunctionBody(uiCoreSrc64, 'commitStat');
-    } catch (_) {}
-    try {
-      nativeSetSpecialBody64 = extractFunctionBody(uiCoreSrc64, '_nativeSetSpecial');
-    } catch (_) {}
-    const combined64 = commitStatBody + '\n' + nativeSetSpecialBody64;
+    const vm64 = require('vm');
+    const fnSpecial64 = uiCoreSrc64.match(/function _nativeSetSpecial\([\s\S]*?\n\}/);
+    const fnCommit64 = uiCoreSrc64.match(/function commitStat\([\s\S]*?\n\}/);
+    if (!fnSpecial64 || !fnCommit64) {
+      fail('64.4-64.7: could not extract _nativeSetSpecial / commitStat from ui-core family');
+    } else {
+      const calls64 = [];
+      const domVals64 = {};
+      const sb64 = {
+        state: { s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5 },
+        document: {
+          getElementById: id => ({
+            get value() {
+              return id in domVals64 ? domVals64[id] : '';
+            },
+            set value(x) {
+              domVals64[id] = x;
+            },
+          }),
+        },
+        RobcoEvents: { emit: () => {} },
+        updateMath: () => calls64.push('updateMath'),
+        saveState: () => calls64.push('saveState'),
+      };
+      vm64.createContext(sb64);
+      vm64.runInContext(fnSpecial64[0] + '\n' + fnCommit64[0], sb64);
+      const setSpecial64 = (k, v) =>
+        vm64.runInContext(`_nativeSetSpecial(${JSON.stringify(k)}, ${JSON.stringify(v)})`, sb64);
+      // commitStat() persists via the choke point but returns nothing — assert on state[k]
+      const commit64 = (id, v) => {
+        calls64.length = 0;
+        vm64.runInContext(
+          `commitStat({ id: ${JSON.stringify(id)}, value: ${JSON.stringify(v)} })`,
+          sb64
+        );
+      };
 
-    // 64.4  1–10 clamp on commit only
-    guards(combined64, [
-      [
-        /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/,
-        'commitStat (via _nativeSetSpecial) clamps value to 1–10 on commit (Math.max/min guard)',
-      ],
+      // sentinel — real, non-trivial functions were extracted (anti-vacuous)
+      assert(
+        typeof sb64._nativeSetSpecial === 'function' &&
+          typeof sb64.commitStat === 'function' &&
+          fnSpecial64[0].length > 200,
+        '64.4-guard: _nativeSetSpecial + commitStat extracted as non-trivial functions (anti-vacuous sentinel)'
+      );
 
-      // 64.5  calls updateMath() for downstream recalcs
-      [
-        /updateMath\s*\(\s*\)/,
-        'commitStat (via _nativeSetSpecial) calls updateMath() to trigger downstream recalcs',
-      ],
+      // 64.4  over-max value is clamped DOWN to 10 (returned, persisted, mirrored to DOM)
+      {
+        const ret = setSpecial64('s', '14');
+        assert(
+          ret === 10 && sb64.state.s === 10 && domVals64.s_s === '10',
+          `64.4: _nativeSetSpecial('s','14') clamps to 10 — return/state[k]/DOM all 10 (got ret=${ret}, state.s=${sb64.state.s}, dom=${domVals64.s_s})`
+        );
+      }
 
-      // 64.6  calls saveState() to persist
-      [
-        /saveState\s*\(\s*\)/,
-        'commitStat (via _nativeSetSpecial) calls saveState() to debounce-persist the new value',
-      ],
-    ]);
+      // 64.5  below-min value 0 is clamped UP to 1 (floor is 1, never 0)
+      {
+        const ret = setSpecial64('p', '0');
+        assert(
+          ret === 1 && sb64.state.p === 1,
+          `64.5: _nativeSetSpecial('p','0') clamps up to 1 (floor, not 0) (got ret=${ret}, state.p=${sb64.state.p})`
+        );
+      }
 
-    // 64.7  isNaN guard reverts to prior state value (not a hard 1)
-    assert(
-      /isNaN\s*\(v\)/.test(combined64) &&
-        /state\s*\[.*k.*\]/.test(combined64) &&
-        /\|\|\s*5/.test(combined64),
-      'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) — regression guard'
-    );
+      // 64.6  negative value is clamped UP to 1 (min-side clamp, executed)
+      {
+        const ret = setSpecial64('e', '-5');
+        assert(
+          ret === 1 && sb64.state.e === 1,
+          `64.6: _nativeSetSpecial('e','-5') clamps up to 1 (got ret=${ret}, state.e=${sb64.state.e})`
+        );
+      }
+
+      // 64.7  empty/NaN reverts to the PRIOR state[k] (not forced to 1) — the documented regression
+      {
+        vm64.runInContext('state.c = 8;', sb64);
+        const ret = setSpecial64('c', '');
+        assert(
+          ret === 8 && sb64.state.c === 8,
+          `64.7: _nativeSetSpecial('c','') on empty input reverts to prior state.c=8 (NOT hard 1) (got ret=${ret}, state.c=${sb64.state.c})`
+        );
+      }
+
+      // 64.7b  an in-range value passes through unchanged (no spurious clamp)
+      {
+        const ret = setSpecial64('i', '6');
+        assert(
+          ret === 6 && sb64.state.i === 6,
+          `64.7b: _nativeSetSpecial('i','6') passes an in-range value through unchanged (got ret=${ret})`
+        );
+      }
+
+      // 64.7c  a genuine commit calls updateMath() THEN saveState() (recalc-then-persist order)
+      {
+        calls64.length = 0;
+        setSpecial64('a', '9');
+        assert(
+          calls64.length === 2 && calls64[0] === 'updateMath' && calls64[1] === 'saveState',
+          `64.7c: a committed SPECIAL edit calls updateMath() then saveState() in that order (got [${calls64.join(', ')}])`
+        );
+      }
+
+      // 64.7d  commitStat(el) reads el.id.slice(2) + el.value and delegates to the clamp choke point
+      {
+        commit64('s_l', '99');
+        assert(
+          sb64.state.l === 10,
+          `64.7d: commitStat({id:'s_l',value:'99'}) delegates to _nativeSetSpecial → persists clamped state.l=10 (got ${sb64.state.l})`
+        );
+      }
+
+      // 64.7e  commitStat on a non-numeric field reverts to the prior value (not 1) via the shared choke point
+      {
+        vm64.runInContext('state.l = 7;', sb64);
+        commit64('s_l', 'abc');
+        assert(
+          sb64.state.l === 7,
+          `64.7e: commitStat({id:'s_l',value:'abc'}) reverts to prior state.l=7 (NaN-revert through the choke point, not hard 1) (got ${sb64.state.l})`
+        );
+      }
+    }
   }
 
   // 64.8  All 7 SPECIAL inputs have inputmode="numeric"
@@ -8002,16 +8176,120 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 69.4  saveState debounced body early-exits when _contextSwitching is set
+  // 69.4  saveState debounced body early-exits when _contextSwitching is set —
+  //        CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C4). The OLD check
+  //        grepped the saveState body for the tokens `_contextSwitching` and
+  //        `return` in the same string — a guard that checked the WRONG flag, was
+  //        placed AFTER the localStorage.setItem (too late), or was `return`-less
+  //        (e.g. `if (…) { }`) all stayed green while a stale debounced write
+  //        clobbered a just-loaded campaign. This EXECUTES the real saveState() in
+  //        an isolated vm (whole state.js loaded, synchronous setTimeout so the
+  //        debounce callback runs inline) and asserts the actual robco_v8 write is
+  //        SKIPPED under _contextSwitching / _loadingSave and PERFORMED when both
+  //        are clear. Twin-check (U2 §2 discipline): no test.html or vm suite runs
+  //        saveState's write-gating — save-survival.mjs proves boot-path survival,
+  //        not the debounce guard; render-check only mentions the flag in a comment.
+  //        (The beforeunload half stays static above + push-gate save-survival, per C4.)
   {
-    // Extract the setTimeout callback body inside saveState
-    const saveStateMatch = stateSrc69.match(
-      /function saveState\s*\(\s*\)([\s\S]*?)(?=\nfunction |\nlet |\nconst |\nvar |$)/
+    const vm69 = require('vm');
+    const setItems69 = [];
+    const store69 = {};
+    const domVals69 = {};
+    let harnessErr69 = null;
+    const sandbox69 = {
+      window: {},
+      document: {
+        getElementById: id => ({
+          get value() {
+            return id in domVals69 ? domVals69[id] : '';
+          },
+          set value(x) {
+            domVals69[id] = x;
+          },
+        }),
+      },
+      localStorage: {
+        getItem: k => (k in store69 ? store69[k] : null),
+        setItem: (k, v) => {
+          store69[k] = v;
+          setItems69.push(k);
+        },
+        removeItem: k => {
+          delete store69[k];
+        },
+      },
+      // synchronous debounce — run the setTimeout callback inline so the write
+      // (or the guarded skip) has resolved by the time saveState() returns
+      setTimeout: fn => {
+        fn();
+        return 1;
+      },
+      clearTimeout: () => {},
+      calendarToTicks: () => 0, // lives in ui-render-character.js, out of this sandbox
+      appendToChat: () => {},
+      loadUI: () => {},
+      expandPanelForCategory: () => {},
+      RobcoEvents: { emit: () => {} },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    try {
+      vm69.createContext(sandbox69);
+      vm69.runInContext(stateSrc69, sandbox69);
+    } catch (e) {
+      harnessErr69 = e;
+    }
+    const saved69 = () => {
+      setItems69.length = 0;
+      vm69.runInContext('saveState();', sandbox69);
+      return setItems69.includes('robco_v8');
+    };
+    function behav69(label, fn) {
+      if (harnessErr69) {
+        fail(label + '  (harness error: ' + harnessErr69.message + ')');
+        return;
+      }
+      try {
+        assert(fn(), label);
+      } catch (e) {
+        fail(label + '  (runtime error: ' + e.message + ')');
+      }
+    }
+
+    behav69(
+      '69.4a: [behavioral] a normal saveState() (both guard flags clear) WRITES robco_v8 to localStorage — the debounce path persists',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '100';
+        return saved69() === true;
+      }
     );
-    const saveBody = saveStateMatch ? saveStateMatch[1] : '';
-    assert(
-      /_contextSwitching/.test(saveBody) && /return/.test(saveBody),
-      'saveState() debounced setTimeout body early-exits when window._contextSwitching is set — prevents pending debounce from clobbering the FO3 write (regression guard)'
+    behav69(
+      '69.4b: [behavioral] with window._contextSwitching = true, saveState() SKIPS the robco_v8 write even though DOM state changed — a pending debounce cannot clobber the deliberate FO3 switch (the r-regression)',
+      () => {
+        sandbox69.window._contextSwitching = true;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '200'; // genuinely changed state — only the guard should block it
+        return saved69() === false;
+      }
+    );
+    behav69(
+      '69.4c: [behavioral] with window._loadingSave = true, saveState() SKIPS the write — a stale debounce cannot land after a save-slot/cloud load (same clobber class)',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = true;
+        domVals69.c_caps = '300';
+        return saved69() === false;
+      }
+    );
+    behav69(
+      '69.4d: [behavioral] once both flags clear again, saveState() resumes WRITING — the guard is transient, not a permanent stuck-off',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '400';
+        return saved69() === true;
+      }
     );
   }
 }
