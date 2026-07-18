@@ -537,6 +537,39 @@
           JSON.stringify(state.inventory.map(i => i.name))
         );
 
+        // AI_OVERSEER Finding 1 — CLASS fix, proven in a real browser: the SAME
+        // reconcile contract now protects every other durable collection. An empty
+        // AI list/object for any of them must delete NOTHING the Courier holds.
+        resetState();
+        state.squad = [
+          { name: 'Boone', hp: 100, hpMax: 100 },
+          { name: 'Veronica', hp: 100, hpMax: 100 },
+        ];
+        state.perks = [{ name: 'Cowboy', rank: 1, level_taken: 6 }];
+        state.quests = [{ name: 'Ghost Town Gunfight', status: 'complete' }];
+        state.ammo = { '5.56mm': 120, '10mm': 45 };
+        autoImportState(JSON.stringify({ squad: [], perks: [], quests: [], status: [], ammo: {} }));
+        assert(
+          state.squad.length === 2 &&
+            state.perks.length === 1 &&
+            state.quests.length === 1 &&
+            state.ammo['5.56mm'] === 120 &&
+            state.ammo['10mm'] === 45,
+          'AI_OVERSEER F1 (class): empty squad/perks/quests/status/ammo from the AI wipe nothing (reconcile, not full-replace)',
+          JSON.stringify({
+            squad: state.squad.length,
+            perks: state.perks.length,
+            quests: state.quests.length,
+            ammo: state.ammo,
+          })
+        );
+        autoImportState(JSON.stringify({ squad: [{ name: 'Cass', hp: 100, hpMax: 100 }] }));
+        assert(
+          state.squad.length === 3 && state.squad.some(m => m.name === 'Cass'),
+          'AI_OVERSEER F1 (class): a new companion merges in without dropping existing ones',
+          JSON.stringify(state.squad.map(m => m.name))
+        );
+
         // ══════════════════════════════════════════════════════════════
         //  Suite 5 — Boundary clamping in autoImportState
         // ══════════════════════════════════════════════════════════════

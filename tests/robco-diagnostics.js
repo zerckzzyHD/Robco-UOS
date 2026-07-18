@@ -9525,7 +9525,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  items. 76.15 is the load-bearing Protocol-13 regression (empty array deletes
 //  nothing); 76.21 is the async confirm-gate proof (removal applies only on
 //  approval).
-//  21 tests
+//  76.22–76.43 (AI_OVERSEER Finding 1 — CLASS fix, 2026-07-18): the SAME
+//  reconcile-and-confirm contract extended to every other durable collection that
+//  shared the full-replace pattern — squad/perks/quests/status/ammo and the
+//  registry-gated trackers (collectibles/traits/skillBooks/magazines/lincolnItems).
+//  One wipe-protection test per field (each red-then-green proven), the additive/
+//  merge behavior, the perk rank-reduction confirm gate (76.43 async), and 76.42
+//  is the ⭐ STATIC RATCHET that fails the build if any durable field is ever again
+//  assigned wholesale from AI-parsed data (state.<field> = parsed.<field> / .map).
+//  44 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
@@ -9722,10 +9730,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     }
   );
 
-  // 76.11  Regression NEG (kept static): raw item.type || 'BUFF' passthrough stays gone
+  // 76.11  Regression NEG (kept static): raw item.type || 'BUFF' passthrough stays gone.
+  //  Anchor updated for the AI_OVERSEER F1 status RECONCILE (the old full-replace
+  //  `st.map(item => ...)` became a merge loop `st.forEach(item => ...)`); the anchor
+  //  MUST resolve (indexOf !== -1) or the negative check would be vacuously true.
   {
-    const stIdx76 = importBody76.indexOf('st.map(item =>');
-    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
+    const stIdx76 = importBody76.indexOf('st.forEach(item =>');
+    assert(
+      stIdx76 !== -1,
+      'autoImportState status merge loop (st.forEach) present — anchor resolves'
+    );
+    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 600) : '';
     assert(
       !/type\s*:\s*item\.type\s*\|\|\s*'BUFF'/.test(stBlock76),
       "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
@@ -9870,6 +9885,346 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     '76.20: autoImportState collects proposed removals and confirm-gates them via _confirmInventoryRemovals()/confirmAction() (Protocol 22/34)'
   );
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  AI_OVERSEER Finding 1 — CLASS FIX (2026-07-18). Inventory (76.15–76.21) was
+  //  the first field fixed; 76.22–76.44 extend the SAME reconcile-and-confirm
+  //  contract to every OTHER durable collection that shared the full-replace-from-
+  //  AI pattern. One behavioral wipe-protection test per field (each proven RED
+  //  against the pre-fix full-replace, GREEN after the reconcile — see the
+  //  session's red-then-green proof), plus the additive/merge behavior, the perk
+  //  confirm gate, and the ⭐ STATIC RATCHET (76.42) that stops the whole class
+  //  from ever returning one field at a time.
+  // ══════════════════════════════════════════════════════════════════════════
+  const SQUAD_SEED76 = {
+    squad: [
+      { name: 'Boone', hp: 100, hpMax: 100, condition: 'Good' },
+      { name: 'Veronica', hp: 100, hpMax: 100, condition: 'Good' },
+    ],
+  };
+  // 76.22 — squad: an EMPTY AI array deletes no companions (the load-bearing wipe guard).
+  behavior76(
+    '76.22: [behavioral] an AI turn returning an EMPTY squad array deletes NO companions — both are kept (AI_OVERSEER F1 squad guard)',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ squad: [] }));
+      return live76(hNV76).squad.length === 2;
+    }
+  );
+  // 76.23 — squad: a SHORT array keeps the omitted companion and updates the named one.
+  behavior76(
+    '76.23: [behavioral] a SHORT squad array ([{Boone,hp:80}]) keeps the omitted Veronica AND updates Boone in place — never a removal-by-omission',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ squad: [{ name: 'Boone', hp: 80, hpMax: 100 }] })
+      );
+      const sq = live76(hNV76).squad;
+      return (
+        sq.length === 2 &&
+        sq.some(m => m.name === 'Veronica') &&
+        sq.find(m => m.name === 'Boone').hp === 80
+      );
+    }
+  );
+  // 76.24 — squad: a NEW companion is added un-gated (additions unregressed).
+  behavior76(
+    '76.24: [behavioral] a new companion ([{Cass}]) is added immediately and existing companions are kept — additions stay un-gated',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ squad: [{ name: 'Cass', hp: 100, hpMax: 100 }] })
+      );
+      const sq = live76(hNV76).squad;
+      return sq.length === 3 && sq.some(m => m.name === 'Cass');
+    }
+  );
+
+  const PERK_SEED76 = {
+    perks: [
+      { name: 'Cowboy', rank: 1, level_taken: 6 },
+      { name: 'Toughness', rank: 2, level_taken: 4 },
+    ],
+  };
+  // 76.25 — perks: an EMPTY AI array wipes no earned perks.
+  behavior76(
+    '76.25: [behavioral] an AI turn returning an EMPTY perks array wipes NO earned perks — both kept (AI_OVERSEER F1 perks guard)',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ perks: [] }));
+      return live76(hNV76).perks.length === 2;
+    }
+  );
+  // 76.26 — perks: a NEW perk / a HIGHER rank applies immediately (progression grows freely).
+  behavior76(
+    '76.26: [behavioral] a new perk and a rank INCREASE apply immediately, un-gated — Cowboy rises 1→2, a new perk is added, Toughness (omitted) is kept',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          perks: [
+            { name: 'Cowboy', rank: 2, level_taken: 6 },
+            { name: 'Bloody Mess', rank: 1, level_taken: 8 },
+          ],
+        })
+      );
+      const pk = live76(hNV76).perks;
+      return (
+        pk.length === 3 &&
+        pk.find(p => p.name === 'Cowboy').rank === 2 &&
+        pk.some(p => p.name === 'Bloody Mess') &&
+        pk.some(p => p.name === 'Toughness' && p.rank === 2)
+      );
+    }
+  );
+  // 76.27 — perks: a rank REDUCTION is deferred to the confirm gate — with no confirm
+  // surface in this harness, the perk is KEPT at its higher rank (never silently reduced).
+  behavior76(
+    '76.27: [behavioral] a rank REDUCTION ([{Toughness,rank:1}]) is confirm-gated — with no confirm surface the rank stays at 2 (never silently reduced)',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+      );
+      const pk = live76(hNV76).perks;
+      return pk.length === 2 && pk.find(p => p.name === 'Toughness').rank === 2;
+    }
+  );
+
+  const QUEST_SEED76 = {
+    quests: [
+      { name: 'Ghost Town Gunfight', status: 'active', objective: 'Defend Goodsprings' },
+      { name: 'They Went That-a-Way', status: 'complete', objective: null },
+    ],
+  };
+  // 76.28 — quests: an EMPTY AI array wipes no quest-log entries.
+  behavior76(
+    '76.28: [behavioral] an AI turn returning an EMPTY quests array wipes NO quest-log entries — both kept, completed entry preserved (AI_OVERSEER F1 quests guard)',
+    hNV76,
+    QUEST_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ quests: [] }));
+      const q = live76(hNV76).quests;
+      return (
+        q.length === 2 && q.some(x => x.name === 'They Went That-a-Way' && x.status === 'complete')
+      );
+    }
+  );
+  // 76.29 — quests: a status change applies to the named quest (lateral, un-gated) and the
+  // omitted quest is kept; a brand-new quest is added.
+  behavior76(
+    '76.29: [behavioral] a quest status change ([Ghost Town Gunfight→complete]) applies in place, the omitted quest is kept, and a new quest is added',
+    hNV76,
+    QUEST_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          quests: [
+            { name: 'Ghost Town Gunfight', status: 'complete' },
+            { name: 'Back in the Saddle', status: 'active' },
+          ],
+        })
+      );
+      const q = live76(hNV76).quests;
+      return (
+        q.length === 3 &&
+        q.find(x => x.name === 'Ghost Town Gunfight').status === 'complete' &&
+        q.some(x => x.name === 'They Went That-a-Way') &&
+        q.some(x => x.name === 'Back in the Saddle')
+      );
+    }
+  );
+
+  const STATUS_SEED76 = {
+    status: [
+      { name: 'Well Rested', ticks: 0, type: 'BUFF' },
+      { name: 'Poisoned', ticks: 5, type: 'DEBUFF' },
+    ],
+  };
+  // 76.30 — status: an EMPTY AI array wipes no active effects (transient, so kept —
+  // native tick-down still expires timed effects naturally; the WIPE is what's closed).
+  behavior76(
+    '76.30: [behavioral] an AI turn returning an EMPTY status array wipes NO active effects — both kept (AI_OVERSEER F1 status treatment: transient, never wiped by omission)',
+    hNV76,
+    STATUS_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ status: [] }));
+      const s = live76(hNV76).status;
+      return (
+        s.length === 2 &&
+        s.some(e => e.name === 'Well Rested') &&
+        s.some(e => e.name === 'Poisoned')
+      );
+    }
+  );
+  // 76.31 — status: a new effect is added and the omitted effect kept (no gate — effects are transient).
+  behavior76(
+    '76.31: [behavioral] a new effect ([Rad Resistance]) is added and the omitted effects are kept — status reductions/expiry are never confirm-gated',
+    hNV76,
+    STATUS_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ status: [{ name: 'Rad Resistance', ticks: 0, type: 'BUFF' }] })
+      );
+      const s = live76(hNV76).status;
+      return s.some(e => e.name === 'Rad Resistance') && s.some(e => e.name === 'Well Rested');
+    }
+  );
+
+  const AMMO_SEED76 = { ammo: { '5.56mm': 120, '10mm': 45 } };
+  // 76.32 — ammo: an EMPTY {} wipes no stockpile (the map-shaped wipe guard).
+  behavior76(
+    '76.32: [behavioral] an AI turn returning an EMPTY ammo object ({}) wipes NO ammo — the whole stockpile survives (AI_OVERSEER F1 ammo treatment)',
+    hNV76,
+    AMMO_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ ammo: {} }));
+      const a = live76(hNV76).ammo;
+      return a['5.56mm'] === 120 && a['10mm'] === 45;
+    }
+  );
+  // 76.33 — ammo: a mentioned caliber applies (up OR down — firing is normal), an omitted
+  // caliber is kept. Reductions are NOT gated (a gate on every shot would be unusable).
+  behavior76(
+    '76.33: [behavioral] a mentioned caliber applies ({10mm:40} — a reduction, un-gated because ammo is consumable) and the omitted 5.56mm is kept',
+    hNV76,
+    AMMO_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ ammo: { '10mm': 40 } }));
+      const a = live76(hNV76).ammo;
+      return a['5.56mm'] === 120 && a['10mm'] === 40;
+    }
+  );
+
+  // Registry-gated trackers — ADD-ONLY (permanent acquisitions). gameContext FNV so
+  // FALLOUT_REGISTRY.game ('FNV', reg_nv.js) matches and _registryTrusted holds.
+  // 76.34 — collectibles: an EMPTY array wipes no found collectibles.
+  behavior76(
+    '76.34: [behavioral] an AI turn returning an EMPTY collectibles array wipes NO found collectibles (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', collectibles: ['Goodsprings'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ collectibles: [] }));
+      const c = live76(hNV76).collectibles;
+      return c.length === 1 && c[0] === 'Goodsprings';
+    }
+  );
+  // 76.35 — collectibles: a valid NEW name unions in; existing kept.
+  behavior76(
+    '76.35: [behavioral] a new valid collectible (Hoover Dam) unions in and the existing one is kept — add-only merge',
+    hNV76,
+    { gameContext: 'FNV', collectibles: ['Goodsprings'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ collectibles: ['Hoover Dam'] }));
+      const c = live76(hNV76).collectibles;
+      return c.length === 2 && c.includes('Goodsprings') && c.includes('Hoover Dam');
+    }
+  );
+  // 76.36 — traits: an EMPTY array wipes no chosen traits.
+  behavior76(
+    '76.36: [behavioral] an AI turn returning an EMPTY traits array wipes NO chosen traits (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', traits: ['Built to Destroy'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ traits: [] }));
+      return live76(hNV76).traits.length === 1;
+    }
+  );
+  // 76.37 — skillBooks: an EMPTY array wipes no read books.
+  behavior76(
+    '76.37: [behavioral] an AI turn returning an EMPTY skillBooks array wipes NO read books (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', skillBooks: ['Tales of a Junktown Jerky Vendor'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ skillBooks: [] }));
+      return live76(hNV76).skillBooks.length === 1;
+    }
+  );
+  // 76.38 — magazines: an EMPTY array wipes no found magazines.
+  behavior76(
+    '76.38: [behavioral] an AI turn returning an EMPTY magazines array wipes NO found magazines (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', magazines: ['Boxing Times'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ magazines: [] }));
+      return live76(hNV76).magazines.length === 1;
+    }
+  );
+  // 76.39 — lincolnItems: an EMPTY object wipes no found memorabilia (FO3 harness).
+  behavior76(
+    '76.39: [behavioral] an AI turn returning an EMPTY lincolnItems object wipes NO found memorabilia (AI_OVERSEER F1 — FO3)',
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: { "Lincoln's Repeater": 'found' } },
+    () => {
+      hFO76.sandbox.autoImportState(JSON.stringify({ lincolnItems: {} }));
+      return Object.keys(live76(hFO76).lincolnItems).length === 1;
+    }
+  );
+  // 76.40 — lincolnItems: a disposition CHANGE applies to the named key (lateral) and the
+  // omitted key is kept.
+  behavior76(
+    '76.40: [behavioral] a Lincoln disposition change (Repeater found→hannibal) applies and an omitted key (Hat) is kept — never a removal-by-omission (FO3)',
+    hFO76,
+    {
+      gameContext: 'FO3',
+      lincolnItems: { "Lincoln's Repeater": 'found', "Lincoln's Hat": 'washington' },
+    },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'hannibal' } })
+      );
+      const li = live76(hFO76).lincolnItems;
+      return (
+        Object.keys(li).length === 2 &&
+        li["Lincoln's Repeater"] === 'hannibal' &&
+        li["Lincoln's Hat"] === 'washington'
+      );
+    }
+  );
+
+  // 76.41 — STATIC: the perk rank-reduction gate + the ONE shared confirm surface are wired.
+  assert(
+    /_perkRemovals/.test(importBody76) &&
+      /_confirmPerkRemovals/.test(importBody76) &&
+      /_confirmDirectorRemovals/.test(apiSrc76),
+    '76.41: autoImportState collects proposed perk rank reductions and confirm-gates them via _confirmPerkRemovals()/_confirmDirectorRemovals() (the ONE shared surface — Protocol 22)'
+  );
+
+  // 76.42 — ⭐ THE RATCHET (Protocol 36b / Protocol 20). A STATIC gate guard that
+  // FAILS THE BUILD if ANY durable-collection state field is (re)introduced as a
+  // wholesale assignment from AI-parsed data — the `state.<field> = parsed.<field>`
+  // or `state.<field> = <rawLocal>.map/filter(...)` shape that every one of these
+  // silent-wipe bugs took at the source. This is what stops the class from
+  // returning one field at a time. Comments are stripped FIRST (code-only scan) so
+  // the reconcile comments that deliberately quote the old shapes never
+  // false-positive — the guard holds at ZERO false positives (verified this session:
+  // against the pre-fix body all 9 wholesale shapes matched; against the fixed body
+  // none do). A NEW durable field written with the same wholesale shape is caught here.
+  {
+    const _stripComments76 = s =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const _codeOnly76 = _stripComments76(importBody76);
+    const _DURABLE76 =
+      'inventory|squad|perks|quests|status|ammo|collectibles|traits|skillBooks|magazines|lincolnItems';
+    const _wholesaleParsed76 = new RegExp('state\\.(' + _DURABLE76 + ')\\s*=\\s*parsed\\.', 'g');
+    const _wholesaleMapped76 = new RegExp(
+      'state\\.(' + _DURABLE76 + ')\\s*=\\s*\\w+\\s*\\.(map|filter)\\s*\\(',
+      'g'
+    );
+    const _pm76 = _codeOnly76.match(_wholesaleParsed76) || [];
+    const _mm76 = _codeOnly76.match(_wholesaleMapped76) || [];
+    assert(
+      _pm76.length === 0 && _mm76.length === 0,
+      '76.42: [STATIC RATCHET] no durable-collection field is assigned wholesale from AI-parsed data (state.<field> = parsed.<field> or = <raw>.map/filter) — every such field MUST reconcile (AI_OVERSEER F1 class guard)' +
+        (_pm76.length || _mm76.length ? ' — found: ' + _pm76.concat(_mm76).join(', ') : '')
+    );
+  }
+
   // ── CONFIRM-GATE BEHAVIORAL (async) — the removal APPLIES only on approval ────
   // Builds a self-contained sandbox (real state.js + reg + the REAL extracted
   // autoImportState AND _confirmInventoryRemovals) with a stubbed confirmAction so
@@ -9897,12 +10252,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     vm76.runInContext(readGroup('reg_nv'), sb);
     // Neutralize the debounced localStorage writer (no localStorage in-sandbox).
     vm76.runInContext('saveState = function(){};', sb);
+    // AI_OVERSEER F1 (class fix): _confirmInventoryRemovals/_confirmPerkRemovals now
+    // delegate to the ONE shared _confirmDirectorRemovals surface (Protocol 22), so
+    // that must be declared here too or the delegating wrappers throw ReferenceError.
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmDirectorRemovals'), sb);
     vm76.runInContext(declareFn76(apiSrc76, '_confirmInventoryRemovals'), sb);
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmPerkRemovals'), sb);
     vm76.runInContext(declareFn76(apiSrc76, 'autoImportState'), sb);
     vm76.runInContext(
       'state.inventory = [' +
         "{name:'10mm Pistol',qty:1,wgt:3,val:100,type:'weapon'}," +
-        "{name:'Stimpak',qty:5,wgt:0,val:0,type:'aid'}];",
+        "{name:'Stimpak',qty:5,wgt:0,val:0,type:'aid'}];" +
+        "state.perks = [{name:'Toughness',rank:2,level_taken:4}];",
       sb
     );
     return sb;
@@ -9954,6 +10315,40 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         approveOk && dropOk && keepOk && !errG76,
         '76.21: [behavioral async] the confirm gate applies a removal ONLY on approval — APPROVE reduces Stimpak 5→2, APPROVE+qty0 drops the 10mm Pistol, KEEP leaves both items untouched' +
           (errG76 ? ' — ' + errG76.message : '')
+      );
+    })()
+  );
+  // 76.43 — the PERK rank-reduction gate through the SAME shared surface: APPROVE
+  // lowers the rank, KEEP retains it. Proves the generalized _confirmDirectorRemovals
+  // drives a second collection, not just inventory (Protocol 22).
+  _pendingAsync.push(
+    (async () => {
+      let approveP76 = null;
+      let keepP76 = null;
+      let errP76 = null;
+      try {
+        const sbYes = makeGateSandbox76(true);
+        sbYes.autoImportState(
+          JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+        );
+        await flush76();
+        approveP76 = vm76.runInContext('JSON.parse(JSON.stringify(state.perks))', sbYes);
+        const sbNo = makeGateSandbox76(false);
+        sbNo.autoImportState(
+          JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+        );
+        await flush76();
+        keepP76 = vm76.runInContext('JSON.parse(JSON.stringify(state.perks))', sbNo);
+      } catch (e) {
+        errP76 = e;
+      }
+      header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
+      const approveOkP = approveP76 && approveP76.length === 1 && approveP76[0].rank === 1;
+      const keepOkP = keepP76 && keepP76.length === 1 && keepP76[0].rank === 2;
+      assert(
+        approveOkP && keepOkP && !errP76,
+        '76.43: [behavioral async] the perk confirm gate (same shared surface) applies a RANK REDUCTION only on approval — APPROVE lowers Toughness 2→1, KEEP leaves it at rank 2 (AI_OVERSEER F1)' +
+          (errP76 ? ' — ' + errP76.message : '')
       );
     })()
   );
@@ -11408,10 +11803,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       'autoImportState magazines block filters to registry names (magNames.has(m))',
     ],
 
-    // 87.15  magazines import dedups
+    // 87.15  magazines import merges into state (AI_OVERSEER F1 ADD-ONLY reconcile —
+    //  the old wholesale `state.magazines = raw.filter(...)` was replaced by an
+    //  add-only union `state.magazines = _mergedMags` so a short/empty AI array can
+    //  no longer wipe found magazines; registry filtering + dedup still apply).
     [
-      /state\.magazines\s*=\s*raw\.filter/,
-      'autoImportState assigns state.magazines from registry-filtered dedup (state.magazines = raw.filter)',
+      /state\.magazines\s*=\s*_mergedMags/,
+      'autoImportState assigns state.magazines from an add-only registry-filtered merge (state.magazines = _mergedMags)',
     ],
   ]);
 
@@ -16624,95 +17022,96 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
-    // ALL 11 rows' hashes changed (AI_OVERSEER Finding 1 fix, 2026-07-18 —
-    // APP_VERSION stays 2.8.0, this is 2.8.5 unreleased work, NOT a version
-    // bump): the "Inventory & Squad Persistence" instruction in the STATIC
-    // _directiveCoreTracking() section was rewritten. It previously told the AI
-    // "you MUST return the ENTIRE inventory array" — the upstream cause of the
-    // silent item-deletion path (a short/empty array full-replaced state). It now
-    // instructs the AI to report ONLY changed items and to express a removal as a
-    // reduced qty (confirm-gated on import). Because that text is static and rides
-    // in every directive, every ctx/playstyle/playthrough/campaign combination's
-    // hash moved. An intentional content change, not a regression (Protocol 42) —
-    // see js/services/api-directive.js and js/services/api-import.js. Regenerated
-    // via the same in-sandbox getSystemDirective() the matrix below hashes.
+    // ALL 11 rows' hashes changed AGAIN (AI_OVERSEER Finding 1 — CLASS fix,
+    // 2026-07-18 — APP_VERSION stays 2.8.0, 2.8.5 unreleased work, NOT a version
+    // bump). The first pass (8f834e6) rewrote the "Inventory & Squad Persistence"
+    // instruction; this pass extends the same root-cause fix to the OTHER
+    // full-replace fields by rewriting three more instructions that told the AI to
+    // resend whole arrays: the "Always return the FULL state.factions object"
+    // (_directiveFactions), "Always return the FULL state.perks array" and "Always
+    // return the FULL state.quests array" (_directiveSystems) lines now instruct
+    // the AI to report ONLY what CHANGED (matching the inventory rule). Because that
+    // text rides in every directive, every ctx/playstyle/playthrough/campaign
+    // combination's hash moved. An intentional content change, not a regression
+    // (Protocol 42) — see js/services/api-directive.js and js/services/api-import.js.
+    // Regenerated via the same in-sandbox getSystemDirective() the matrix below hashes.
     const GOLDEN_MATRIX = [
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '2f4495824d3fd76a8cf7524f8e415b98f03f831c9f473fd81c4356ce6b4acaae',
+        sha256: '293578576d7ac6bb402d84547ed74231635844d8e6e31ec3c966913cd07cbf4b',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '9416119ded40111401df53afcb14f92dbe8de98d29a67093517a5d0fe88456ec',
+        sha256: 'd096891983140ec6e375ae85e1d3fb2c87d7a48a422853320db731e719a9ad15',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '9d61046212fc63b2cb78173f28a28c8717a5632dfef73bb1575a37615543f757',
+        sha256: '04496ccd2cadd219f3915ac9b4d5ccc57ffe7024cdd76628684d0250ae010646',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'adbdd07a20af8c715c9043e6f63c56ec30c68780e4beb356a1420ea71ca7e9ed',
+        sha256: '9b7043dc71a62cd97eb89081bd6057ec1ec7d4c3743d193b4d7bd432573fe7ef',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '6e07afb083cf50d659f3469ac48a743bb7c1849254a28e94976ef37e6b6308f6',
+        sha256: '73e0e58cca5bd69d21302f0ed1915c60a2b568ae53dcb90d7999aa3ce4dae3eb',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: '2a3eeb74994bfac454563d212ef28930eee35f3a137c70dab703908d269c2b2e',
+        sha256: '11bd0f54a3eaa4faef8ecdc895d8a4f31d028ef128c22bba4fe3e118f5227412',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: 'a2494613dae8bba13aeab661dde07b22651702e6b0814e681958383aaaba7a9c',
+        sha256: '436932f3cdfc95556b97dc2a3deed1faa425024f31cc1fc7c150d8e5b5de5901',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'be7d0c1b2552de24357f8b06aff88e6c52a272c3bab6ff28719a60e3d5aea049',
+        sha256: '3dc4ebcd962fe17e189366cd65e970253df72990a6f2e31c0d9202862502af09',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '2093b8711257c1af799de943b5090068f59abb072562f36027a68e7949a2b868',
+        sha256: '93fc9e309ba4b9d0ed7131f54ad7acabd2f6248b0f062b644850ae89864c1aba',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '774918a93a40f82fbc08d8b170d52379524e8f7f87cf9057b03c8220db98ebb3',
+        sha256: '061e9eee1d1c296e6d9b8624f1479ce6e853b46a1e0ba58f74aec7b80fcd13fd',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'be313c356e71134f09c2820ddb44734115f564d94fa2b8addfafada63aea99eb',
+        sha256: '18eddc2ef837d75ce7ea4aa2f2f4207a009637e2182aa998cb91665ab8379e71',
       },
     ];
 
@@ -33063,8 +33462,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '196.5: cycleQuestStatus() emits quest.status on a genuine complete/failed transition'
     );
   }
+  // AI_OVERSEER F1 (quests reconcile): the quest-status diff moved from the old
+  // full-replace loop (`prev`/`curr` over questsBefore) to the per-quest merge
+  // (`existing`/`prevStatus`/`norm`) — the emit contract is unchanged, only the
+  // local names, so this anchor tracks the new shape.
   assert(
-    /if \(prev && prev\.status !== curr\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(
+    /if \(existing && prevStatus !== norm\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(
       apiSrc196
     ),
     '196.6: the AI quest-status-diff in autoImportState() also emits quest.status (same event as the native cycle key)'

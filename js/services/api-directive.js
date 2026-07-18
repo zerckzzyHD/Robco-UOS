@@ -160,7 +160,7 @@ function _directiveFactions(ctx) {
 ### **Faction Standing System**
 ${GAME_DEFS[ctx].ai.factionSystemText}
 Whenever a faction's standing changes (quest completed, action taken, territory entered), update the relevant faction in state.factions by adjusting fame and/or infamy. Both are non-negative integers.
-Always return the FULL state.factions object in the state node — never return a partial object or omit unchanged factions.`;
+Report ONLY the factions whose standing CHANGED this turn — never resend the whole object. Return each changed faction with its new fame/infamy totals. Factions you do not mention are left exactly as they are; do NOT resend unchanged factions to "preserve" them.`;
 }
 
 // Perk / Quest / Equipped / Session-Statistics systems + the G2 point-of-no-return
@@ -171,15 +171,14 @@ function _directiveSystems(ctx) {
 ### **Perk System**
 state.perks tracks acquired perks as [{name, rank, level_taken}].
 Perks are earned every 2 levels starting at level 2. On [LEVEL UP]: if the Courier's new level is even (2, 4, 6...), award one perk appropriate to their build and S.P.E.C.I.A.L. Add it to state.perks with the correct rank and level_taken.
-Always return the FULL state.perks array in the state node — never return a partial array or omit existing perks.
+Report ONLY the perks that CHANGED this turn — never resend the whole array. To award a perk or raise its rank, return that one perk with its new rank and level_taken. Perks you do not mention are left exactly as they are; do NOT resend existing perks to "preserve" them, and NEVER return an empty perks array to mean "nothing changed" — omit the perks field entirely instead. (Lowering a rank will ask the Courier to CONFIRM before it applies, so a mistaken reduction is harmless.)
 
 ### **Quest Log System**
 state.quests tracks active quests as [{name, status, objective, factions}].
 - status: "active" | "complete" | "failed"
 - objective: current short description of what the Courier must do next (1 sentence)
 - factions: comma-separated faction keys involved (e.g. "NCR, Legion"), or null
-When the Courier starts, advances, completes, or fails a quest, return the updated state.quests array.
-Always return the FULL state.quests array — never omit existing quests. Preserve completed/failed entries.
+When the Courier starts, advances, completes, or fails a quest, return ONLY that quest with its new status/objective — never resend the whole array. Quests you do not mention are left exactly as they are, including completed/failed ones; do NOT resend existing quests to "preserve" them, and NEVER return an empty quests array to mean "nothing changed" — omit the quests field entirely instead.
 
 ### **Equipped Items System**
 state.equipped tracks: {weapon: string|null, armor: string|null, headgear: string|null}

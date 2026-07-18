@@ -7,7 +7,8 @@
 // static <script> tag — api*.js family, loads late in the boot chain right
 // before cloud.js (see index.html load order).
 // EXPOSES: autoImportState(), sanitizeImportedContainer(),
-// _wireApiEventBusSubscribers(), _confirmInventoryRemovals().
+// _wireApiEventBusSubscribers(), _confirmDirectorRemovals(),
+// _confirmInventoryRemovals(), _confirmPerkRemovals().
 // GOTCHA: never use recursive key transformation on AI JSON here (Protocol
 // 24 / Prohibited Patterns) — every field below is an explicit, named
 // mapping (parsed.<key> → state.<key>) with its own type coercion/clamp.
@@ -201,52 +202,109 @@ function _wireApiEventBusSubscribers() {
   });
 }
 
-// ── INVENTORY REMOVAL CONFIRM GATE (AI_OVERSEER Finding 1) ────────────────────
-// The AI's inventory array is a PROPOSAL, never an assignment (autoImportState
-// applies additions directly but DEFERS every proposed removal here). This is
-// Protocol 34's DNA — "cloud writes are additive; destructive ops are confirm-
-// gated" — applied to inventory: a destructive write to the Courier's durable
-// items is NEVER silent. Reuses confirmAction() (Protocol 22 — the same diegetic
-// confirm the level-up / WIPE flows use). `removals` is [{name, from, to}] where
-// `to` is the proposed new quantity (0 = drop the item entirely).
+// ── DIRECTOR REMOVAL CONFIRM GATE (AI_OVERSEER Finding 1) ─────────────────────
+// The ONE shared confirm surface for every AI-proposed DESTRUCTIVE change to a
+// durable collection (Protocol 22 — one modal, described per collection, never a
+// fork per field). This is Protocol 34's DNA — "cloud writes are additive;
+// destructive ops are confirm-gated" — applied to the AI-import path: a
+// destructive write to the Courier's durable data is NEVER silent. Reuses
+// confirmAction() (the same diegetic confirm the level-up / WIPE flows use).
+//
+// `opts`:
+//   • noun   — what is being reduced, for the prose ('items', 'perks', …)
+//   • logTag — the [TAG] on the applied-change chat line ('INVENTORY', 'PERKS', …)
+//   • lines  — pre-formatted diegetic bullet lines describing each reduction
+//   • onApprove — callback that performs the actual state mutation IFF approved
 //
 // SAFETY DEFAULT: if no confirm surface exists (headless import, an old cached
-// client, any context without confirmAction), the items are simply KEPT — the
-// removal is dropped, never applied unconfirmed. Keeping an item the AI wanted
-// gone is a harmless, user-reversible outcome; silently deleting one is not.
-function _confirmInventoryRemovals(removals) {
-  if (!Array.isArray(removals) || !removals.length) return;
-  if (typeof confirmAction !== 'function') return; // no confirm surface → keep items
-  const lines = removals.map(r =>
-    r.to <= 0 ? `• ${r.name} ×${r.from} → REMOVED` : `• ${r.name}: qty ${r.from} → ${r.to}`
-  );
+// client, any context without confirmAction), the change is simply DROPPED — the
+// data is KEPT, never reduced unconfirmed. Keeping data the AI wanted gone is a
+// harmless, user-reversible outcome; silently destroying it is not.
+function _confirmDirectorRemovals(opts) {
+  if (!opts || !Array.isArray(opts.lines) || !opts.lines.length) return;
+  if (typeof confirmAction !== 'function') return; // no confirm surface → keep data
   confirmAction({
-    title: '> DIRECTOR INVENTORY REQUEST',
+    title: '> DIRECTOR ' + (opts.title || 'STATE REQUEST'),
     warning:
-      'The Director wants to take items the Courier is currently carrying:\n' +
-      lines.join('\n') +
-      '\n\nApprove this removal? Choosing KEEP ITEMS leaves your inventory untouched.',
-    confirmLabel: 'APPROVE REMOVAL',
-    cancelLabel: 'KEEP ITEMS',
+      'The Director wants to reduce or remove ' +
+      opts.noun +
+      ' the Courier currently has:\n' +
+      opts.lines.join('\n') +
+      '\n\nApprove this change? Choosing KEEP leaves your ' +
+      opts.noun +
+      ' untouched.',
+    confirmLabel: 'APPROVE',
+    cancelLabel: 'KEEP',
   }).then(ok => {
-    if (!ok) return; // Courier declined — items retained, nothing written
-    if (!Array.isArray(state.inventory)) return;
-    removals.forEach(r => {
-      const key = String(r.name).toLowerCase();
-      if (r.to <= 0) {
-        state.inventory = state.inventory.filter(it => String(it.name).toLowerCase() !== key);
-      } else {
-        const it = state.inventory.find(x => String(x.name).toLowerCase() === key);
-        if (it) it.qty = r.to;
-      }
-    });
-    // The removed item may have been equipped — clear any now-dangling slot
-    // through the ONE shared reconciler (Protocol 22), then persist + repaint.
+    if (!ok) return; // Courier declined — data retained, nothing written
+    opts.onApprove();
+    // A removed item may have been equipped — clear any now-dangling slot through
+    // the ONE shared reconciler (Protocol 22), then persist + repaint.
     if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
     if (typeof saveState === 'function') saveState();
     if (typeof loadUI === 'function') loadUI();
     if (typeof appendToChat === 'function')
-      appendToChat('> [INVENTORY] Director-requested removal applied.', 'sys', true);
+      appendToChat(
+        '> [' + (opts.logTag || 'STATE') + '] Director-requested change applied.',
+        'sys',
+        true
+      );
+  });
+}
+
+// INVENTORY confirm gate — a thin describe-and-apply wrapper over the shared
+// surface above. `removals` is [{name, from, to}] where `to` is the proposed new
+// quantity (0 = drop the item entirely).
+function _confirmInventoryRemovals(removals) {
+  if (!Array.isArray(removals) || !removals.length) return;
+  const lines = removals.map(r =>
+    r.to <= 0 ? `• ${r.name} ×${r.from} → REMOVED` : `• ${r.name}: qty ${r.from} → ${r.to}`
+  );
+  _confirmDirectorRemovals({
+    title: 'INVENTORY REQUEST',
+    noun: 'items',
+    logTag: 'INVENTORY',
+    lines,
+    onApprove: () => {
+      if (!Array.isArray(state.inventory)) return;
+      removals.forEach(r => {
+        const key = String(r.name).toLowerCase();
+        if (r.to <= 0) {
+          state.inventory = state.inventory.filter(it => String(it.name).toLowerCase() !== key);
+        } else {
+          const it = state.inventory.find(x => String(x.name).toLowerCase() === key);
+          if (it) it.qty = r.to;
+        }
+      });
+    },
+  });
+}
+
+// PERKS confirm gate — a rank REDUCTION is durable-progression loss (AI_OVERSEER
+// Finding 1). `removals` is [{name, from, to}] where `to` is the proposed lower
+// rank. Reuses the shared surface above (Protocol 22).
+function _confirmPerkRemovals(removals) {
+  if (!Array.isArray(removals) || !removals.length) return;
+  const lines = removals.map(r =>
+    r.to <= 0 ? `• ${r.name} (rank ${r.from}) → REMOVED` : `• ${r.name}: rank ${r.from} → ${r.to}`
+  );
+  _confirmDirectorRemovals({
+    title: 'PROGRESSION REQUEST',
+    noun: 'perks',
+    logTag: 'PERKS',
+    lines,
+    onApprove: () => {
+      if (!Array.isArray(state.perks)) return;
+      removals.forEach(r => {
+        const key = String(r.name).toLowerCase();
+        if (r.to <= 0) {
+          state.perks = state.perks.filter(p => String(p.name).toLowerCase() !== key);
+        } else {
+          const p = state.perks.find(x => String(x.name).toLowerCase() === key);
+          if (p) p.rank = r.to;
+        }
+      });
+    },
   });
 }
 
@@ -391,23 +449,46 @@ function autoImportState(jsonString) {
 
     let st = parsed.status || parsed.Status || parsed.STATUS;
     if (st && Array.isArray(st)) {
-      // FEEDBACK ANIMATION WAVE 3 (#28 TUNGSTEN WARM-UP): captured BEFORE the
-      // wholesale AI overwrite below (the item.added/#18 AI-path precedent) so
-      // an AI turn that resends the SAME status array unchanged never replays
-      // the animation for effects the player already had.
+      // ── STATUS RECONCILE (AI_OVERSEER Finding 1, status treatment) ──────────
+      // Active effects are TRANSIENT (they wear off) — NOT durable progression. So
+      // unlike inventory/perks, a reduction here is normal play (a buff ticking
+      // down) and is NEVER confirm-gated (a gate would prompt on every expiring
+      // effect — unusable). What IS closed is the silent WIPE: the old
+      // `state.status = st.map(...)` full-replace let an empty/short AI array erase
+      // active effects on a do-nothing turn. Now the AI array is a PROPOSAL merged
+      // against current effects: an effect it MENTIONS is added or updated in place
+      // (incl. reduced ticks — wearing off is fine); an effect it OMITS is KEPT
+      // (the native tick-down below still expires timed effects naturally); an
+      // empty array wipes nothing.
+      // The #28 TUNGSTEN WARM-UP animation set is still captured BEFORE the merge
+      // so a resend never replays it for effects the player already had (Protocol 22).
       const _statusNamesBefore = new Set(
         (state.status || []).map(e => String(e.name).toLowerCase())
       );
-      state.status = st.map(item => {
-        if (typeof item === 'string') return { name: item, ticks: 0, type: 'BUFF' };
-        return {
-          name: item.name || 'Unknown',
-          ticks: parseInt(item.ticks) || 0,
-          type: ['BUFF', 'DEBUFF', 'NEUTRAL'].includes(String(item.type || '').toUpperCase())
-            ? String(item.type).toUpperCase()
-            : 'BUFF',
-        };
+      const _curStatus = Array.isArray(state.status) ? state.status.slice() : [];
+      const _statusByName = new Map(_curStatus.map(e => [String(e.name).toLowerCase(), e]));
+      st.forEach(item => {
+        const norm =
+          typeof item === 'string'
+            ? { name: item, ticks: 0, type: 'BUFF' }
+            : {
+                name: item.name || 'Unknown',
+                ticks: parseInt(item.ticks) || 0,
+                type: ['BUFF', 'DEBUFF', 'NEUTRAL'].includes(String(item.type || '').toUpperCase())
+                  ? String(item.type).toUpperCase()
+                  : 'BUFF',
+              };
+        const key = String(norm.name).toLowerCase();
+        const existing = _statusByName.get(key);
+        if (!existing) {
+          _curStatus.push(norm);
+          _statusByName.set(key, norm);
+        } else {
+          existing.ticks = norm.ticks;
+          existing.type = norm.type;
+        }
       });
+      state.status = _curStatus;
       state.status.forEach(eff => {
         if (!_statusNamesBefore.has(String(eff.name).toLowerCase())) {
           RobcoEvents.emit('effect.applied', { name: eff.name, type: eff.type });
@@ -521,16 +602,37 @@ function autoImportState(jsonString) {
       }
     }
     if (parsed.squad && Array.isArray(parsed.squad)) {
-      state.squad = parsed.squad.map(m => ({
-        name: String(m.name || ''),
-        hp: parseInt(m.hp) || 0,
-        hpMax: parseInt(m.hpMax) || 100,
-        ammo: parseInt(m.ammo) || 0,
-        condition: String(m.condition || 'Good'),
-        weapon: m.weapon ? String(m.weapon) : null,
-        dt: m.dt !== undefined ? parseInt(m.dt) || 0 : undefined,
-        affinity: m.affinity !== undefined ? parseInt(m.affinity) || 0 : undefined,
-      }));
+      // ── SQUAD RECONCILE (AI_OVERSEER Finding 1, squad treatment) ────────────
+      // Companions are durable roster data. The old `state.squad = parsed.squad
+      // .map(...)` full-replace let a short/empty AI array silently drop
+      // companions. Now the AI array is a PROPOSAL merged by name: a companion it
+      // names is added, or its combat fields (HP/condition/etc.) updated in place;
+      // a companion it OMITS is KEPT (never dropped by omission). HP changes are
+      // normal combat and are NOT gated. A companion is only ever removed from the
+      // roster natively (dismissal), never silently by the AI.
+      const _curSquad = Array.isArray(state.squad) ? state.squad.slice() : [];
+      const _squadByName = new Map(_curSquad.map(m => [String(m.name).toLowerCase(), m]));
+      parsed.squad.forEach(m => {
+        const norm = {
+          name: String(m.name || ''),
+          hp: parseInt(m.hp) || 0,
+          hpMax: parseInt(m.hpMax) || 100,
+          ammo: parseInt(m.ammo) || 0,
+          condition: String(m.condition || 'Good'),
+          weapon: m.weapon ? String(m.weapon) : null,
+          dt: m.dt !== undefined ? parseInt(m.dt) || 0 : undefined,
+          affinity: m.affinity !== undefined ? parseInt(m.affinity) || 0 : undefined,
+        };
+        const key = String(norm.name).toLowerCase();
+        const existing = _squadByName.get(key);
+        if (!existing) {
+          _curSquad.push(norm);
+          _squadByName.set(key, norm);
+        } else {
+          Object.assign(existing, norm);
+        }
+      });
+      state.squad = _curSquad;
     }
     // P4: the AI NO LONGER overwrites the manual notebook — campaign_notes is now
     // purely user-owned (player authority). Any campaign_notes the AI returns are
@@ -549,32 +651,80 @@ function autoImportState(jsonString) {
     }
     // Perks (v1.6.4+)
     if (parsed.perks && Array.isArray(parsed.perks)) {
-      state.perks = parsed.perks.map(p => ({
-        name: p.name || 'Unknown',
-        rank: parseInt(p.rank) || 1,
-        level_taken: parseInt(p.level_taken) || 0,
-      }));
+      // ── PERK RECONCILE (AI_OVERSEER Finding 1, perks treatment) ─────────────
+      // Perks are durable PROGRESSION. The old `state.perks = parsed.perks.map(...)`
+      // full-replace let a short/empty AI array wipe earned perks. Now the AI array
+      // is a PROPOSAL merged by name: a NEW perk, or a HIGHER rank of one already
+      // held, applies immediately (progression only grows freely); a LOWER rank is
+      // a destructive reduction → DEFERRED to the confirm gate; an OMITTED perk is
+      // KEPT (never dropped by omission).
+      const _curPerks = Array.isArray(state.perks) ? state.perks.slice() : [];
+      const _perkByName = new Map(_curPerks.map(p => [String(p.name).toLowerCase(), p]));
+      const _perkRemovals = [];
+      parsed.perks.forEach(p => {
+        const norm = {
+          name: p.name || 'Unknown',
+          rank: parseInt(p.rank) || 1,
+          level_taken: parseInt(p.level_taken) || 0,
+        };
+        const key = String(norm.name).toLowerCase();
+        const existing = _perkByName.get(key);
+        if (!existing) {
+          _curPerks.push(norm);
+          _perkByName.set(key, norm);
+        } else if (norm.rank > existing.rank) {
+          existing.rank = norm.rank;
+          existing.level_taken = norm.level_taken;
+        } else if (norm.rank < existing.rank) {
+          _perkRemovals.push({ name: existing.name, from: existing.rank, to: norm.rank });
+        }
+        // norm.rank === existing.rank → unchanged, no-op.
+      });
+      state.perks = _curPerks;
+      // Deferred confirm gate for any proposed rank reductions (async, non-blocking).
+      if (_perkRemovals.length && typeof _confirmPerkRemovals === 'function') {
+        _confirmPerkRemovals(_perkRemovals);
+      }
     }
 
     // Quest Log (#1)
     if (parsed.quests && Array.isArray(parsed.quests)) {
-      const questsBefore = JSON.parse(window._lastStateBeforeSync || '{}').quests || [];
-      state.quests = parsed.quests.map(q => ({
-        name: q.name || 'Unknown',
-        status: (() => {
-          const s = (q.status || '').toLowerCase();
-          return ['active', 'complete', 'failed'].includes(s) ? s : 'active';
-        })(),
-        objective: q.objective || null,
-        factions: q.factions || null,
-      }));
-      // Auto-log quest status changes + audio feedback
-      state.quests.forEach(curr => {
-        const prev = questsBefore.find(bq => bq.name.toLowerCase() === curr.name.toLowerCase());
-        if (prev && prev.status !== curr.status) {
-          _logEvent('quest', `Quest: "${curr.name}" → ${curr.status.toUpperCase()}`);
-          // Quest audio — fire appropriate tone on terminal
-          const newStatus = curr.status.toUpperCase();
+      // ── QUEST RECONCILE (AI_OVERSEER Finding 1, quests treatment) ───────────
+      // Quests are durable log data. The old `state.quests = parsed.quests.map(...)`
+      // full-replace let a short/empty AI array wipe the quest log. Now the AI
+      // array is a PROPOSAL merged by name: a NEW quest is added; an existing
+      // quest's fields (status/objective/factions) are updated in place; a quest it
+      // OMITS is KEPT (the log can never shrink via the AI). A status change
+      // (active↔complete↔failed) is a LATERAL state change, never a destructive
+      // removal, so it is NOT gated — it still fires the same auto-log / audio /
+      // stamp feedback the native cycleQuestStatus() path does (Protocol 22).
+      const _curQuests = Array.isArray(state.quests) ? state.quests.slice() : [];
+      const _questByName = new Map(_curQuests.map(q => [String(q.name).toLowerCase(), q]));
+      parsed.quests.forEach(q => {
+        const norm = {
+          name: q.name || 'Unknown',
+          status: (() => {
+            const s = (q.status || '').toLowerCase();
+            return ['active', 'complete', 'failed'].includes(s) ? s : 'active';
+          })(),
+          objective: q.objective || null,
+          factions: q.factions || null,
+        };
+        const key = String(norm.name).toLowerCase();
+        const existing = _questByName.get(key);
+        const prevStatus = existing ? existing.status : null;
+        if (!existing) {
+          _curQuests.push(norm);
+          _questByName.set(key, norm);
+        } else {
+          existing.status = norm.status;
+          existing.objective = norm.objective;
+          existing.factions = norm.factions;
+        }
+        // Auto-log + audio + stamp on a genuine status change of an existing quest.
+        if (existing && prevStatus !== norm.status) {
+          _logEvent('quest', `Quest: "${norm.name}" → ${norm.status.toUpperCase()}`);
+          const newStatus = norm.status.toUpperCase();
           if (
             (newStatus === 'COMPLETED' || newStatus === 'COMPLETE') &&
             typeof playQuestCompleteSound === 'function'
@@ -583,20 +733,19 @@ function autoImportState(jsonString) {
           } else if (newStatus === 'FAILED' && typeof playQuestFailSound === 'function') {
             playQuestFailSound();
           }
-          // FEEDBACK ANIMATION WAVE 1 (#23 CASE-CLOSED STAMP / #24 FILAMENT
-          // DIE) — the SAME quest.status event the native cycleQuestStatus()
-          // emits (ui-render.js), so the annunciator/home animation react
-          // identically to an AI-driven status change (Protocol 22).
-          if (curr.status === 'complete' || curr.status === 'failed') {
+          // FEEDBACK ANIMATION WAVE 1 (#23 CASE-CLOSED STAMP / #24 FILAMENT DIE) —
+          // the SAME quest.status event the native cycleQuestStatus() emits.
+          if (norm.status === 'complete' || norm.status === 'failed') {
             RobcoEvents.emit('quest.status', {
-              name: curr.name,
-              status: curr.status,
-              prevStatus: prev.status,
+              name: norm.name,
+              status: norm.status,
+              prevStatus,
             });
-            _pendingQuestStamp = { name: curr.name, status: curr.status };
+            _pendingQuestStamp = { name: norm.name, status: norm.status };
           }
         }
       });
+      state.quests = _curQuests;
     }
 
     // Equipped Items (#2)
@@ -628,9 +777,22 @@ function autoImportState(jsonString) {
         state.stats.damageDealt += parseInt(parsed.stats.damageDealt) || 0;
     }
 
-    // Ammo tracking — object mapping ammo type to count
+    // Ammo tracking — object mapping ammo type to count.
+    // ── AMMO RECONCILE (AI_OVERSEER Finding 1, ammo treatment) ────────────────
+    // Ammo is CONSUMABLE (rounds fire every combat turn) — like effect ticks, a
+    // reduction is normal play, so it is NEVER confirm-gated (a gate would prompt
+    // on every shot — unusable). The old `state.ammo = parsed.ammo` full-replace
+    // let an empty {} or a dropped caliber silently wipe the whole stockpile. Now
+    // the AI object is a PROPOSAL merged by caliber: a caliber it names is set to
+    // the reported count (up OR down — firing is normal); a caliber it OMITS is
+    // KEPT (an empty {} wipes nothing).
     if (parsed.ammo && typeof parsed.ammo === 'object' && !Array.isArray(parsed.ammo)) {
-      state.ammo = parsed.ammo;
+      if (!state.ammo || typeof state.ammo !== 'object' || Array.isArray(state.ammo))
+        state.ammo = {};
+      Object.keys(parsed.ammo).forEach(cal => {
+        const n = parseInt(parsed.ammo[cal]);
+        if (!Number.isNaN(n)) state.ammo[cal] = Math.max(0, n);
+      });
     }
 
     // ── STATE DIFF DISPLAY (shows what changed this sync) ────────────────────
@@ -798,17 +960,27 @@ function autoImportState(jsonString) {
     // Flat array of collected item name strings. Registry defines what names are valid;
     // state only tracks which have been found. DLC collectibles slot in via registry only.
     if (_registryTrusted && parsed.collectibles && Array.isArray(parsed.collectibles)) {
+      // ── COLLECTIBLE RECONCILE (AI_OVERSEER Finding 1) — ADD-ONLY ────────────
+      // Collectibles are PERMANENT acquisitions — you never un-collect a snow
+      // globe. The old `state.collectibles = parsed.collectibles.filter(...)`
+      // full-replace let a short/empty AI array wipe them. Now the AI path is
+      // ADD-ONLY: a valid new name is unioned in; the AI can never shrink the set
+      // by resending a shorter array; a name it OMITS is KEPT. The native toggle
+      // is the only removal path.
       const _collectNames =
         typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.collectibles)
           ? new Set(FALLOUT_REGISTRY.collectibles.map(c => c.name))
           : new Set();
       const _collectBefore = new Set((state.collectibles || []).map(n => n.toLowerCase()));
-      const _collectSeen = new Set();
-      state.collectibles = parsed.collectibles.filter(c => {
-        if (typeof c !== 'string' || !_collectNames.has(c) || _collectSeen.has(c)) return false;
-        _collectSeen.add(c);
-        return true;
+      const _mergedCollect = Array.isArray(state.collectibles) ? state.collectibles.slice() : [];
+      const _collectSeen = new Set(_mergedCollect.map(n => String(n).toLowerCase()));
+      parsed.collectibles.forEach(c => {
+        if (typeof c !== 'string' || !_collectNames.has(c)) return;
+        if (_collectSeen.has(c.toLowerCase())) return;
+        _collectSeen.add(c.toLowerCase());
+        _mergedCollect.push(c);
       });
+      state.collectibles = _mergedCollect;
       // FEEDBACK ANIMATION WAVE 1 (#22 EXHIBIT LIGHT-UP) — the SAME
       // collectible.acquired event the native toggleCollectible() emits
       // (ui-render.js), fired only for genuinely NEW names so an AI resend
@@ -827,23 +999,40 @@ function autoImportState(jsonString) {
     {
       const raw = _g(parsed, 'lincolnItems');
       if (_registryTrusted && raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        // ── LINCOLN RECONCILE (AI_OVERSEER Finding 1) ─────────────────────────
+        // Lincoln memorabilia is a durable found/disposition map. The old
+        // full-replace (`state.lincolnItems = validated`) let a short/empty AI
+        // object drop found items. Now it MERGES: a valid key is added, or its
+        // disposition UPDATED in place (found → hannibal/leroy/washington is a
+        // legitimate lateral change, not a removal); a key the AI OMITS is KEPT.
+        // A key is never dropped by omission.
         const LINCOLN_VOCAB = ['found', 'hannibal', 'leroy', 'washington'];
         const registryNames =
           typeof FALLOUT_REGISTRY !== 'undefined' &&
           Array.isArray(FALLOUT_REGISTRY.lincolnMemorabilia)
             ? new Set(FALLOUT_REGISTRY.lincolnMemorabilia.map(i => i.name))
             : new Set();
-        const validated = {};
+        const _mergedLincoln =
+          state.lincolnItems &&
+          typeof state.lincolnItems === 'object' &&
+          !Array.isArray(state.lincolnItems)
+            ? Object.assign({}, state.lincolnItems)
+            : {};
         Object.keys(raw).forEach(k => {
           const coerced = raw[k] === 'other' ? 'found' : raw[k];
-          if (registryNames.has(k) && LINCOLN_VOCAB.includes(coerced)) validated[k] = coerced;
+          if (registryNames.has(k) && LINCOLN_VOCAB.includes(coerced)) _mergedLincoln[k] = coerced;
         });
-        state.lincolnItems = validated;
+        state.lincolnItems = _mergedLincoln;
       }
     }
 
     // Validated array: accept only entries matching a registry trait name (FNV); dedup.
     // Rejects arbitrary AI-injected names (Protocol 24).
+    // ── TRAIT RECONCILE (AI_OVERSEER Finding 1) — ADD-ONLY ────────────────────
+    // Traits are PERMANENT character-creation choices. The old full-replace
+    // (`state.traits = raw.filter(...)`) let a short/empty array wipe them. Now the
+    // AI path is ADD-ONLY: a valid new trait is unioned in; the AI can never shrink
+    // the set; a trait it OMITS is KEPT.
     {
       const raw = _g(parsed, 'traits');
       if (_registryTrusted && Array.isArray(raw)) {
@@ -851,16 +1040,22 @@ function autoImportState(jsonString) {
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.traits)
             ? new Set(FALLOUT_REGISTRY.traits.map(t => t.name))
             : new Set();
-        const seen = new Set();
-        state.traits = raw.filter(t => {
-          if (typeof t !== 'string' || !traitNames.has(t) || seen.has(t)) return false;
-          seen.add(t);
-          return true;
+        const _mergedTraits = Array.isArray(state.traits) ? state.traits.slice() : [];
+        const _seenTraits = new Set(_mergedTraits.map(t => String(t).toLowerCase()));
+        raw.forEach(t => {
+          if (typeof t !== 'string' || !traitNames.has(t) || _seenTraits.has(t.toLowerCase()))
+            return;
+          _seenTraits.add(t.toLowerCase());
+          _mergedTraits.push(t);
         });
+        state.traits = _mergedTraits;
       }
     }
 
     // Validated array: accept only entries matching a registry skill-book name (both games); dedup.
+    // ── SKILL-BOOK RECONCILE (AI_OVERSEER Finding 1) — ADD-ONLY ───────────────
+    // Reading a skill book is PERMANENT. Same ADD-ONLY union as traits — a valid
+    // new book is added; the AI can never shrink the read set; an OMITTED book is KEPT.
     {
       const raw = _g(parsed, 'skillBooks');
       if (_registryTrusted && Array.isArray(raw)) {
@@ -868,16 +1063,22 @@ function autoImportState(jsonString) {
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.skillBooks)
             ? new Set(FALLOUT_REGISTRY.skillBooks.map(b => b.name))
             : new Set();
-        const seen = new Set();
-        state.skillBooks = raw.filter(b => {
-          if (typeof b !== 'string' || !bookNames.has(b) || seen.has(b)) return false;
-          seen.add(b);
-          return true;
+        const _mergedBooks = Array.isArray(state.skillBooks) ? state.skillBooks.slice() : [];
+        const _seenBooks = new Set(_mergedBooks.map(b => String(b).toLowerCase()));
+        raw.forEach(b => {
+          if (typeof b !== 'string' || !bookNames.has(b) || _seenBooks.has(b.toLowerCase())) return;
+          _seenBooks.add(b.toLowerCase());
+          _mergedBooks.push(b);
         });
+        state.skillBooks = _mergedBooks;
       }
     }
 
     // Validated array: accept only entries matching a registry magazine name (FNV only); dedup.
+    // ── MAGAZINE RECONCILE (AI_OVERSEER Finding 1) — ADD-ONLY ─────────────────
+    // The magazines tracker is collection progress ([n/total], Protocol UI-4) —
+    // permanent, like skill books. Same ADD-ONLY union: a valid new magazine is
+    // added; the AI can never shrink the set; an OMITTED magazine is KEPT.
     {
       const raw = _g(parsed, 'magazines');
       if (_registryTrusted && Array.isArray(raw)) {
@@ -885,12 +1086,14 @@ function autoImportState(jsonString) {
           typeof FALLOUT_REGISTRY !== 'undefined' && Array.isArray(FALLOUT_REGISTRY.magazines)
             ? new Set(FALLOUT_REGISTRY.magazines.map(m => m.name))
             : new Set();
-        const seen = new Set();
-        state.magazines = raw.filter(m => {
-          if (typeof m !== 'string' || !magNames.has(m) || seen.has(m)) return false;
-          seen.add(m);
-          return true;
+        const _mergedMags = Array.isArray(state.magazines) ? state.magazines.slice() : [];
+        const _seenMags = new Set(_mergedMags.map(m => String(m).toLowerCase()));
+        raw.forEach(m => {
+          if (typeof m !== 'string' || !magNames.has(m) || _seenMags.has(m.toLowerCase())) return;
+          _seenMags.add(m.toLowerCase());
+          _mergedMags.push(m);
         });
+        state.magazines = _mergedMags;
       }
     }
 
