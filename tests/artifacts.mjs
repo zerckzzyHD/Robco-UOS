@@ -101,7 +101,34 @@ export async function saveFailureArtifacts(label, page, consoleBuf) {
   }
   try {
     if (page && !(page.isClosed && page.isClosed())) {
-      await page.screenshot({ path: `${base}.png`, fullPage: true, timeout: 5000 });
+      // Anti-flake for the capture itself (Health-batch U5). A fullPage
+      // screenshot of a page with a CONTINUOUSLY-repainting canvas (the CRT
+      // overlay + the overseer scope, both rAF-driven) can burn the whole
+      // bounded window on a slow CI runner — the reported "screenshot hangs on
+      // the animated canvas" symptom. Two freezes make the capture
+      // deterministic, and BOTH live only on this failure-evidence path, so
+      // neither changes a single assertion anywhere:
+      //   1. emulateMedia(reduced-motion) — the app's _scopeShouldAnimate() /
+      //      _coreShouldAnimate() gates stop scheduling rAF within one frame, so
+      //      the canvas loops go quiet. Best-effort; a tiny settle lets the
+      //      in-flight frame cancel.
+      //   2. animations:'disabled' — Playwright's own switch that fast-forwards
+      //      CSS/Web animations to a finished frame for the capture.
+      // The existing timeout:5000 stays as the hard bound: even if a freeze
+      // somehow doesn't take, capture can never hang the run — it fails soft and
+      // we keep the console log.
+      try {
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.waitForTimeout(50);
+      } catch {
+        /* emulateMedia unsupported/closed — fall through, still bounded below */
+      }
+      await page.screenshot({
+        path: `${base}.png`,
+        fullPage: true,
+        timeout: 5000,
+        animations: 'disabled',
+      });
     }
   } catch {
     /* closed / detached / wedged page — skip the screenshot, keep the log */

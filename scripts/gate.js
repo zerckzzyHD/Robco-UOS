@@ -44,6 +44,29 @@ const os = require('os');
 const ROOT = path.join(__dirname, '..');
 const fast = process.argv.includes('--fast');
 
+// ── Per-step wall-time profiling (Health-batch U5) ───────────────────────────
+// Measurement only — this records how long each gate step takes and prints a
+// breakdown table at the end. It changes NOTHING about what any step asserts.
+// A step's duration is captured around its child-process spawn (run()) or around
+// the browser launch/warmup helpers, so the table shows exactly where the gate's
+// wall-time actually goes. Always on (cheap), so every gate run leaves a real
+// breakdown behind instead of a guessed one.
+const _timings = [];
+function printTimingTable() {
+  if (!_timings.length) return;
+  const total = _timings.reduce((a, t) => a + t.ms, 0);
+  const w = Math.max(..._timings.map(t => t.label.length), 5);
+  console.log('\n[gate] ── per-step wall-time (U5 profiling) ' + '─'.repeat(Math.max(0, 30)));
+  for (const t of _timings) {
+    const secs = (t.ms / 1000).toFixed(2).padStart(7);
+    const pct = ((t.ms / total) * 100).toFixed(1).padStart(5);
+    console.log(`[gate]   ${t.label.padEnd(w)}  ${secs}s  ${pct}%`);
+  }
+  console.log(`[gate]   ${'TOTAL'.padEnd(w)}  ${(total / 1000).toFixed(2).padStart(7)}s  100.0%`);
+  console.log('[gate] ' + '─'.repeat(72));
+}
+process.on('exit', printTimingTable);
+
 // ── CI failure-evidence packaging (Health-batch U4) ──────────────────────────
 // When CI goes red, the failure should be diagnosable from the run itself — no
 // local re-run. Two pieces:
@@ -141,9 +164,12 @@ function stopSharedBrowser() {
 
 function run(label, cmd) {
   console.log(`\n[gate] ${label}`);
+  const _t0 = process.hrtime.bigint();
+  const _rec = () => _timings.push({ label, ms: Number(process.hrtime.bigint() - _t0) / 1e6 });
   if (!CAPTURE) {
     // Local default: stream live to the console, exactly as before.
     const result = spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+    _rec();
     if (result.status !== 0) {
       console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
       process.exit(result.status || 1);
@@ -160,6 +186,7 @@ function run(label, cmd) {
     encoding: 'utf8',
     maxBuffer: 128 * 1024 * 1024,
   });
+  _rec();
   const out = (result.stdout || '') + (result.stderr || '');
   process.stdout.write(out);
   _stepSeq += 1;
@@ -191,6 +218,7 @@ function run(label, cmd) {
 // gate (all browser checks) — a browser check with no browser must fail with a
 // clear, actionable message, never a cryptic crash.
 function ensureChromium(context) {
+  const _t0 = process.hrtime.bigint();
   console.log(`\n[gate] Playwright Chromium availability${context ? ' (' + context + ')' : ''}`);
   const chromiumScript =
     "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
@@ -208,6 +236,10 @@ function ensureChromium(context) {
     process.exit(1);
   }
   console.log('  Chromium found.');
+  _timings.push({
+    label: 'Chromium availability' + (context ? ' (' + context + ')' : ''),
+    ms: Number(process.hrtime.bigint() - _t0) / 1e6,
+  });
 }
 
 // Changed .js/.mjs files vs HEAD (staged, unstaged, and untracked) — used only
@@ -301,7 +333,12 @@ if (!fast) {
   // Launch ONE shared Chromium for all the browser checks below (audit #8).
   // Each check connects to it via PW_WS_ENDPOINT; if the shared launch fails for
   // any reason, they fall back to launching their own — identical assertions.
+  const _tShared = process.hrtime.bigint();
   const sharedOk = startSharedBrowser();
+  _timings.push({
+    label: 'Shared Chromium launch/warmup',
+    ms: Number(process.hrtime.bigint() - _tShared) / 1e6,
+  });
   console.log(
     sharedOk
       ? '\n[gate] Shared Chromium launched — the four browser checks reuse one browser.'

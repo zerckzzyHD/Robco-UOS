@@ -47579,7 +47579,7 @@ header('Suite 234 — Accessibility: form controls carry an accessible name (U9)
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (14 tests)
+//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (16 tests)
 //  Protocol 20 static source-invariant guard. U4 made a red CI run
 //  diagnosable from the run itself (screenshots + console dumps + per-step
 //  gate logs uploaded as artifacts). This suite locks that wiring so a future
@@ -47613,6 +47613,24 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
   assert(
     !!helper && /page\.screenshot\(/.test(helper) && /\.console\.log/.test(helper),
     '235.4: saveFailureArtifacts writes a screenshot + a console-log dump'
+  );
+  // ── Anti-flake for the capture itself (Health-batch U5) ──
+  // The failure-evidence screenshot is fullPage on a page whose CRT + overseer
+  // canvases repaint continuously via rAF. On a slow CI runner a live capture
+  // can burn the whole bounded window (the "screenshot hangs on the animated
+  // canvas" flake). saveFailureArtifacts freezes the page for the capture in two
+  // coverage-neutral ways (this path is never asserted on). Lock both so a
+  // refactor can't silently drop the freeze and let the flake back in.
+  assert(
+    !!helper && /animations:\s*'disabled'/.test(helper) && /timeout:\s*5000/.test(helper),
+    "235.4b: the failure screenshot passes animations:'disabled' (freezes CSS/Web animations for the capture) AND keeps the bounded timeout:5000 (a freeze that doesn't take can never hang the run)"
+  );
+  assert(
+    !!helper &&
+      /emulateMedia\(\{\s*reducedMotion:\s*'reduce'\s*\}\)/.test(helper) &&
+      helper.indexOf("emulateMedia({ reducedMotion: 'reduce' })") <
+        helper.indexOf('page.screenshot('),
+    "235.4c: saveFailureArtifacts emulates reduced-motion BEFORE the screenshot — the app's _scopeShouldAnimate()/_coreShouldAnimate() gates stop scheduling rAF, quieting the CRT/overseer canvases so the capture is deterministic"
   );
 
   // ── Every entry-point browser harness is wired for capture ──
