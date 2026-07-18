@@ -50,7 +50,7 @@
 **Why `css/` is flat with numbered names but `js/` got subfolders (2.8.5 U-A2):** different problems, different fixes. In CSS, file ORDER is semantics — equal-specificity ties resolve by source order, which is exactly the hazard this split has to stay safe against. Subfoldering the split (`css/base/`, `css/panels/`, …) would fragment and hide the one property that must stay obvious: what loads after what. A flat directory with a gapped numeric prefix (05, 10, 15, … 99) makes the cascade order visible in the file listing itself, with no config to read — and `99-mobile.css` sitting alone at the end says "always last" without anyone needing to know why. The gaps (multiples of 5) let a future file be inserted between two existing ones without renumbering the set. `js/` has no such constraint — a function defined later still resolves correctly when called — so its files group into subfolders by responsibility instead, which is the more useful axis there.
 
 ```
-├── index.html          ~55KB  DOM structure + all inline event handlers
+├── index.html          DOM structure + all inline event handlers
 ├── css/                       13 order-prefixed files (2.8.5 U-A2 split + the FO3 Pip-Boy build), source order = cascade order
 │   ├── 05-base.css              Tokens, reset, layout, app-shell
 │   ├── 10-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
@@ -67,46 +67,46 @@
 │   └── 99-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
 ├── js/                        Reorganized into subfolders by responsibility (2.8.5 U-A2)
 │   ├── data/                  Fallout game content: item DBs + registries
-│   │   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
-│   │   ├── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
-│   │   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
-│   │   ├── reg_fo3.js      ~46KB  FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
-│   │   └── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
+│   │   ├── db_nv.js        FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── db_fo3.js       FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── reg_nv.js       FNV registry data (perks/quests/locations/collectibles/traits/magazines)
+│   │   ├── reg_fo3.js      FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
+│   │   └── registry-core.js Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
 │   ├── core/                  The engine: campaign state, ambient runtime, storage layer
-│   │   ├── state.js        7.6KB  State definition, persistence, migration
-│   │   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
-│   │   └── idb.js          ~4KB   Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
+│   │   ├── state.js        State definition, persistence, migration
+│   │   ├── runtime.js      Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
+│   │   └── idb.js          Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
 │   ├── ui/                    UI lifecycle hub, panels, render/audio/save/account modules
-│   │   ├── ui-core.js      ~111KB Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
-│   │   ├── ui-core-nav.js  ~21KB  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
-│   │   ├── ui-core-overseer.js ~34KB Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
-│   │   ├── ui-core-chassis.js ~42KB THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
-│   │   ├── ui-core-modulebay.js ~51KB Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
-│   │   ├── ui-core-cmd.js  ~95KB  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
-│   │   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
-│   │   ├── ui-render.js    ~2KB   Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
-│   │   ├── ui-render-inventory.js ~22KB Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
-│   │   ├── ui-render-character.js ~32KB Character & Field Status — squad, clock/calendar, faction standing, status effects, perks, quests
-│   │   ├── ui-render-record.js ~17KB Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
-│   │   ├── ui-render-ledger.js ~15KB Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
-│   │   ├── ui-render-map.js   ~27KB Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
-│   │   ├── ui-render-factions.js ~13KB Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
-│   │   ├── ui-render-economy.js ~25KB Resource Economy — Craft panel, native Trade barter terminal
-│   │   ├── ui-render-loot.js  ~19KB Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
-│   │   ├── ui-render-databank.js ~25KB Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
-│   │   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
-│   │   └── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
+│   │   ├── ui-core.js      Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
+│   │   ├── ui-core-nav.js  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
+│   │   ├── ui-core-overseer.js Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   │   ├── ui-core-chassis.js THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
+│   │   ├── ui-core-modulebay.js Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   │   ├── ui-core-cmd.js  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
+│   │   ├── ui-audio.js     Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
+│   │   ├── ui-render.js    Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+│   │   ├── ui-render-inventory.js Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
+│   │   ├── ui-render-character.js Character & Field Status — squad, clock/calendar, faction standing, status effects, perks, quests
+│   │   ├── ui-render-record.js Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
+│   │   ├── ui-render-ledger.js Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
+│   │   ├── ui-render-map.js   Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
+│   │   ├── ui-render-factions.js Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
+│   │   ├── ui-render-economy.js Resource Economy — Craft panel, native Trade barter terminal
+│   │   ├── ui-render-loot.js  Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
+│   │   ├── ui-render-databank.js Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
+│   │   ├── ui-saves.js     Save slots, file import/export, rolling backups, registry autocomplete
+│   │   └── ui-account.js   Account panel, cloud save picker, undo-sync
 │   ├── services/               Everything that talks to the outside world
-│   │   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
-│   │   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
+│   │   ├── api.js          System directive, autoImportState, transmitMessage
+│   │   ├── cloud.js        Firebase push/pull (ES module)
 │   │   └── ocr.js                Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
 │   ├── dev/                    Dev-only tooling
-│   │   └── test-console.js ~5KB   Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
+│   │   └── test-console.js Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
 │   └── vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
-├── sw.js               2.0KB  Service worker (cache-first for same-origin)
+├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    36KB    3404-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    3411-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -114,11 +114,12 @@
 │   └── artifacts.mjs           CI failure-evidence capture (Health-batch U4): shared helper that screenshots + dumps console for any failing browser check into test-artifacts/ (uploaded by CI on failure) — wired into every browser harness
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
+│   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
-├── CHANGELOG.md        ~74KB  Full version history
-├── assets/              68KB  PWA icon + app-shortcut icons
-├── manifest.json       592B   PWA manifest
+├── CHANGELOG.md        Full version history
+├── assets/              PWA icon + app-shortcut icons
+├── manifest.json       PWA manifest
 └── ARCHITECTURE.md     THIS FILE
 ```
 
@@ -516,7 +517,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 237 suites / 3404 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
+**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 237 suites / 3411 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
 
 **Diagnostic Shell U1 (`planning/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
@@ -3282,7 +3283,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3404-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3411-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

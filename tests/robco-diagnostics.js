@@ -2165,9 +2165,10 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 30 — Phase 1b Guards
-//  Input maxlength caps, enforcing CSP (Stage 2), monotonic cache
-//  guard in pre-commit hook, proactive localStorage quota warning.
-//  5 tests
+//  Input maxlength caps, enforcing CSP (Stage 2), the branch-agnostic
+//  cache-bump guard (exercised behaviourally in a throwaway git repo),
+//  proactive localStorage quota warning.
+//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 1b Guards');
 
@@ -2192,13 +2193,120 @@ guards(htmlSource, [
   ],
 ]);
 
-// 30.3 Pre-commit hook enforces monotonic rev increase
+// 30.3a–30.3d  BEHAVIORAL cache-bump guard (Defect-1 fix, r-review).
+//   The old 30.3 merely grepped the installed hook for the textual pattern
+//   "LOCAL_N -gt ORIGIN_N" — it proved a comparison EXISTED, not that it compared
+//   against the RIGHT baseline. That guard compared against origin/main and was
+//   therefore INERT on dev (local rev is always > main's), so a green 30.3 was
+//   flattering a broken mechanism. This replaces it with a real red-then-green
+//   run of the ACTUAL production guard (scripts/cache-bump-guard.js) inside a
+//   throwaway git repo: served file staged + CACHE_NAME unchanged from HEAD must
+//   FAIL; a changed CACHE_NAME must PASS; an unreachable HEAD baseline must PASS
+//   (fail-safe); a non-served commit must SKIP. Proven by running it, not grepping.
 {
-  const hookPath = path.join(ROOT, '.git', 'hooks', 'pre-commit');
-  const hookSource = fs.existsSync(hookPath) ? fs.readFileSync(hookPath, 'utf8') : '';
+  const os30 = require('os');
+  const cp30 = require('child_process');
+  const guard30 = path.join(ROOT, 'scripts', 'cache-bump-guard.js');
+  // Scrub GIT_* from the env so the child git/guard operate on the temp repo,
+  // never the parent repo's index (git sets GIT_DIR/GIT_INDEX_FILE when it runs
+  // a hook, and those must not leak into the throwaway repo).
+  const env30 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/.test(k)) env30[k] = process.env[k];
+
+  const SW = v => "const CACHE_NAME = 'robco-terminal-v9.9.9-r" + v + "';\n";
+  const g = (repo, args) =>
+    cp30.spawnSync('git', args, { cwd: repo, env: env30, encoding: 'utf8' });
+  const commit = repo =>
+    g(repo, [
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=test',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'x',
+    ]);
+  const runGuard = repo =>
+    cp30.spawnSync('node', [guard30], { cwd: repo, env: env30, encoding: 'utf8' }).status;
+
+  let redStatus = null;
+  let greenStatus = null;
+  let failsafeStatus = null;
+  let skipStatus = null;
+  let setupErr = null;
+  const roots30 = [];
+  try {
+    // ── Repo A: sw.js IS committed at HEAD (r1). Covers red / green / skip. ──
+    const a = fs.mkdtempSync(path.join(os30.tmpdir(), 'robco-cacheguard-a-'));
+    roots30.push(a);
+    g(a, ['init', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SW('1'), 'utf8');
+    fs.writeFileSync(path.join(a, 'index.html'), 'a', 'utf8');
+    fs.writeFileSync(path.join(a, 'README.md'), 'r', 'utf8');
+    g(a, ['add', '-A']);
+    commit(a);
+
+    // RED: change a served file (index.html), stage it, leave CACHE_NAME at HEAD.
+    fs.writeFileSync(path.join(a, 'index.html'), 'b', 'utf8');
+    g(a, ['add', 'index.html']);
+    redStatus = runGuard(a); // expect non-zero (served staged, CACHE == HEAD)
+
+    // GREEN: bump CACHE_NAME to r2 and stage it alongside the served change.
+    g(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SW('2'), 'utf8');
+    g(a, ['add', 'sw.js', 'index.html']);
+    greenStatus = runGuard(a); // expect 0 (CACHE differs from HEAD)
+
+    // SKIP: stage only a NON-served file — the guard must not require a bump.
+    g(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'README.md'), 'r2', 'utf8');
+    g(a, ['add', 'README.md']);
+    skipStatus = runGuard(a); // expect 0 (no served file staged)
+
+    // ── Repo B: sw.js NOT in HEAD → baseline unreachable → fail-safe PASS. ──
+    const b = fs.mkdtempSync(path.join(os30.tmpdir(), 'robco-cacheguard-b-'));
+    roots30.push(b);
+    g(b, ['init', '-q']);
+    fs.writeFileSync(path.join(b, 'index.html'), 'a', 'utf8');
+    g(b, ['add', '-A']);
+    commit(b); // HEAD has no sw.js
+    fs.writeFileSync(path.join(b, 'index.html'), 'b', 'utf8');
+    fs.writeFileSync(path.join(b, 'sw.js'), SW('1'), 'utf8'); // valid format, new file
+    g(b, ['add', '-A']);
+    failsafeStatus = runGuard(b); // expect 0 (no baseline; warn + pass)
+  } catch (e) {
+    setupErr = (e && e.message) || String(e);
+  } finally {
+    for (const r of roots30) {
+      try {
+        fs.rmSync(r, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
+
   assert(
-    /LOCAL_N.*-gt.*ORIGIN_N|-gt.*ORIGIN_N.*LOCAL_N/.test(hookSource),
-    'pre-commit hook enforces strict monotonic rev increase (LOCAL_N -gt ORIGIN_N)'
+    setupErr === null && redStatus !== 0,
+    '30.3a: [behavioral] cache-bump guard FAILS when a served file is staged and CACHE_NAME is unchanged from HEAD (branch-agnostic — the real Protocol 1 invariant)' +
+      (setupErr ? ' — setup error: ' + setupErr : ' — guard exited ' + redStatus)
+  );
+  assert(
+    setupErr === null && greenStatus === 0,
+    '30.3b: [behavioral] cache-bump guard PASSES once CACHE_NAME differs from HEAD (red-then-green proof)' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
+  );
+  assert(
+    setupErr === null && failsafeStatus === 0,
+    '30.3c: [behavioral] cache-bump guard PASSES (fail-safe) when HEAD:sw.js baseline is unreachable — a missing baseline never blocks a commit' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
+  );
+  assert(
+    setupErr === null && skipStatus === 0,
+    '30.3d: [behavioral] cache-bump guard SKIPS (passes) when no served/precached file is staged' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
   );
 }
 
@@ -2216,8 +2324,9 @@ assert(
 //  bump (never a bare push to main); deploy keeps a defense-in-depth
 //  success+main job guard + manual dispatch;
 //  hook-install and boot-smoke scripts exist;
-//  pre-commit hook is conditional (served-file gate).
-//  14 tests
+//  the cache-bump gate is delegated to the Node guard (served-file gate);
+//  gate.js messages describe the single Node runner.
+//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CI/CD Automation Guards');
 
@@ -2312,21 +2421,30 @@ assert(
   );
 }
 
-// 31.10 scripts/pre-commit gates cache-bump on staged served files (conditional)
+// 31.10 pre-commit delegates the cache-bump gate to the Node guard, which detects
+//       staged served files via git diff --cached (conditional Protocol 1)
 {
   const hookSource = readFile('scripts/pre-commit');
+  const guardSource = readFile('scripts/cache-bump-guard.js');
   assert(
-    /git diff --cached --name-only/.test(hookSource) && /SERVED=/.test(hookSource),
-    'scripts/pre-commit gates cache-bump check on staged served files via git diff --cached (conditional Protocol 1)'
+    /node\s+scripts\/cache-bump-guard\.js/.test(hookSource) &&
+      /diff --cached --name-only/.test(guardSource) &&
+      /SERVED_RE/.test(guardSource),
+    'scripts/pre-commit invokes node scripts/cache-bump-guard.js, which gates on staged served files via git diff --cached (conditional Protocol 1)'
   );
 }
 
-// 31.11 scripts/pre-commit has SKIP branch for non-served commits
+// 31.11 the guard has a SKIP branch for non-served commits AND compares the staged
+//       CACHE_NAME against THIS branch's own HEAD (git show HEAD:sw.js) — never
+//       against origin/main, and with no monotonic-rev arithmetic (Defect-1 fix)
 {
-  const hookSource = readFile('scripts/pre-commit');
+  const guardSource = readFile('scripts/cache-bump-guard.js');
   assert(
-    /SKIP.*No served|cache bump not required/.test(hookSource),
-    'scripts/pre-commit has SKIP branch — non-served commits bypass the cache-bump check'
+    /cache bump not required|\[SKIP\]/.test(guardSource) &&
+      /show HEAD:sw\.js/.test(guardSource) &&
+      !/show\s+origin\/main|origin\/main:sw/.test(guardSource) &&
+      !/ORIGIN_N/.test(guardSource),
+    'cache-bump guard SKIPs non-served commits and compares against HEAD (branch-agnostic) — never a `git show origin/main` baseline, no ORIGIN_N monotonic arithmetic'
   );
 }
 
@@ -2361,6 +2479,19 @@ assert(
       /conclusion\s*==\s*['"]success['"]/.test(deploySource) &&
       /head_branch\s*==\s*['"]main['"]/.test(deploySource),
     'deploy.yml keeps workflow_dispatch (manual rollback) + defense-in-depth job guard (CI success + main)'
+  );
+}
+
+// 31.15 gate.js user-facing messages describe ONE runner (Defect-3 fix, r-review).
+//       The PowerShell mirror was deleted and Protocol 15 retired in 2.8.5 U-B3,
+//       but the --iter block still told the user the commit/push gates "run both
+//       test runners." A message that contradicts the mechanism is exactly the
+//       "green flatters a broken story" failure this project guards against.
+{
+  const gateSrc = readFile('scripts/gate.js');
+  assert(
+    !/both\s+(?:test\s+)?runners/i.test(gateSrc),
+    'scripts/gate.js contains no "both runners" / "both test runners" message — the second runner was deleted (Protocol 15 retired, single Node runner)'
   );
 }
 
@@ -42169,7 +42300,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  integrity: every "Protocol N" cross-reference across the docs + js/ +
 //  tests/ must resolve to a real heading in CLAUDE.md, with compound/merged
 //  headings (29/30/31, 32/33/35) and body sub-parts (36b, 2a) handled.
-//  9 tests.
+//  220.10 (r-review Defect-2) proves 220.9's report names its allowlisted
+//  forward-references (Protocol 47) explicitly instead of overstating.
+//  220.11 (r-review Defect-4) guards that the ARCHITECTURE.md File Map
+//  carries no hardcoded byte/KB sizes. 220.12 (r-review) guards that
+//  CLAUDE.md's gate block pushes to dev, not main (Protocol 43).
+//  12 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
@@ -42452,6 +42588,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
     const protoRefRe220 = /\bProtocols?\s+((?:UI-)?\d+[a-z]?(?:\s*\/\s*(?:UI-)?\d+[a-z]?)*)/gi;
     const danglingRef220 = new Map(); // token → Set(files it appears in)
+    const allowlistedHits220 = new Set(); // tokens that resolve ONLY via REF_ALLOW_220
     for (const rel of refCorpusFiles220) {
       const text = readFile(rel);
       let m;
@@ -42465,7 +42602,13 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
             resolves = definedUi220.has('UI-' + tok.replace(/^UI-/i, ''));
           } else {
             const base = (tok.match(/^\d+/) || [])[0];
-            resolves = !!base && (definedNum220.has(base) || REF_ALLOW_220.has(base));
+            const definedDirect = !!base && definedNum220.has(base);
+            // Distinguish "resolves to a real heading" from "only survived because
+            // it is an allowlisted forward-reference" — the latter is reported
+            // explicitly below instead of being folded into a blanket pass.
+            const allowlisted = !!base && !definedDirect && REF_ALLOW_220.has(base);
+            if (allowlisted) allowlistedHits220.add(base);
+            resolves = definedDirect || allowlisted;
           }
           if (!resolves) {
             if (!danglingRef220.has(tok)) danglingRef220.set(tok, new Set());
@@ -42489,12 +42632,77 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     const danglingList220 = [...danglingRef220.entries()].map(
       ([t, files]) => `${t} (${[...files].join(', ')})`
     );
+    // Defect-2 fix (r-review): report the allowlisted forward-references EXPLICITLY
+    // rather than letting a blanket "every reference resolves" claim quietly absorb
+    // them. A reference on the allowlist did NOT resolve to a real heading — it was
+    // deliberately excused because its heading is not authored yet (Protocol 47, the
+    // reserved catalog generator). Saying so keeps the pass honest about what it
+    // actually verified vs. what it waived.
+    const allowlistNote220 = allowlistedHits220.size
+      ? ' — ALLOWLISTED forward-reference(s), reserved and NOT verified as resolving: ' +
+        [...allowlistedHits220].sort((a, b) => Number(a) - Number(b)).join(', ')
+      : ' — no allowlisted exceptions were applied';
     assert(
       defineParseOk220 && danglingRef220.size === 0,
-      '220.9: every "Protocol N" reference across the docs + js/ + tests/ resolves to a real protocol heading in CLAUDE.md (compound headings 29/30/31 & 32/33/35 define each number; sub-parts like 36b/2a resolve by base; forward-ref 47 allowlisted)' +
+      '220.9: every "Protocol N" reference across the docs + js/ + tests/ either resolves to a real heading in CLAUDE.md OR is an explicitly allowlisted forward-reference (compound headings 29/30/31 & 32/33/35 define each number; sub-parts like 36b/2a resolve by base)' +
+        allowlistNote220 +
         (danglingList220.length ? ' — DANGLING: ' + danglingList220.join('; ') : '') +
         (!defineParseOk220 ? ' — DEFINED-set parse looks empty/wrong (self-integrity failed)' : '')
     );
+
+    // 220.10  Defect-2 regression (r-review): the 220.9 report must not overstate.
+    //   Protocol 47 is referenced by number in CLAUDE.md's 3-class library model but
+    //   has no heading yet (reserved) — so it MUST show up as an applied allowlist
+    //   exception, and the report string MUST name it explicitly rather than folding
+    //   it into a blanket "every reference resolves." This is the exact overstatement
+    //   the review flagged; the test fails if the report reverts to hiding it.
+    assert(
+      allowlistedHits220.has('47') &&
+        /ALLOWLISTED/.test(allowlistNote220) &&
+        /\b47\b/.test(allowlistNote220),
+      '220.10: the 220.9 report names its allowlisted forward-reference(s) explicitly (Protocol 47, reserved) instead of overstating that every reference resolves'
+    );
+
+    // 220.11  Defect-4 regression (r-review): ARCHITECTURE.md's File Map must carry
+    //   NO hardcoded byte/KB size annotations. Those are script-computable facts that
+    //   rotted badly (state.js "7.6KB" when it was 116K, etc.); deleting the column
+    //   is the fix, and this guard fails the build if a size string creeps back into
+    //   the file-map rows so the rot cannot silently restart.
+    {
+      const archSrc220 = docText220['ARCHITECTURE.md'];
+      const fileMapStart = archSrc220.indexOf('## File Map');
+      const afterMap = archSrc220.indexOf('## Script Load Order', fileMapStart);
+      const fileMapBlock =
+        fileMapStart >= 0
+          ? archSrc220.slice(fileMapStart, afterMap > 0 ? afterMap : fileMapStart + 4000)
+          : '';
+      // A size annotation is a standalone number immediately followed by a byte unit
+      // (KB / MB / B), e.g. "7.6KB", "~111KB", "592B", "2.2M". Real prose numbers
+      // (versions, "360px", "3404 tests") never carry these units in this block.
+      const sizeToken220 = /(?:^|\s|~)\d[\d.]*\s*(?:KB|MB|GB|B)\b/;
+      assert(
+        fileMapStart >= 0 && !sizeToken220.test(fileMapBlock),
+        '220.11: ARCHITECTURE.md File Map carries no hardcoded KB/byte size annotations (size column deleted — script-computable rot cannot restart)'
+      );
+    }
+
+    // 220.12  Branch-consistency regression (r-review): CLAUDE.md's Pre-Commit /
+    //   Pre-Push Gate code block must push to `dev` (the working branch, Protocol 43),
+    //   never `origin main`. Sessions were handed directly conflicting branch
+    //   instructions (top block said push main; Protocol 43 says main is release-only).
+    {
+      const claudeSrc220 = docText220['CLAUDE.md'];
+      const gateBlockM = /## Pre-Commit \/ Pre-Push Gate[\s\S]*?```powershell([\s\S]*?)```/.exec(
+        claudeSrc220
+      );
+      const gateBlock = gateBlockM ? gateBlockM[1] : '';
+      assert(
+        !!gateBlock &&
+          /git push origin dev\b/.test(gateBlock) &&
+          !/git push origin main\b/.test(gateBlock),
+        '220.12: CLAUDE.md Pre-Commit/Pre-Push Gate block pushes to origin dev (Protocol 43 working branch), not origin main'
+      );
+    }
   }
 }
 

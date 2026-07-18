@@ -1,65 +1,12 @@
 #!/bin/sh
 
 # ── Protocol 1 guard: cache bump required only when served/precached files change ──
-# Served/precached set: index.html, sw.js, manifest.json, icon*.png, css/, js/
-# EXTEND THIS LIST if a new served-file type is ever added (e.g. fonts/, icons/ subdir, .webmanifest).
-SERVED=$(git diff --cached --name-only | grep -E '^(index\.html|sw\.js|manifest\.json|icon[^/]*\.png|css/|js/)' || true)
-if [ -n "$SERVED" ]; then
-  ORIGIN_CACHE=$(git show origin/main:sw.js 2>/dev/null | grep "^const CACHE_NAME" | sed "s/.*'\([^']*\)'.*/\1/")
-  LOCAL_CACHE=$(git show :sw.js 2>/dev/null | grep "^const CACHE_NAME" | sed "s/.*'\([^']*\)'.*/\1/")
-  if [ -z "$LOCAL_CACHE" ]; then
-    LOCAL_CACHE=$(grep "^const CACHE_NAME" sw.js 2>/dev/null | sed "s/.*'\([^']*\)'.*/\1/")
-  fi
-
-  # Format: robco-terminal-v{APP_VERSION}-r{N}
-  VALID_FMT="^robco-terminal-v[0-9][^[:space:]]*-r[0-9][0-9]*$"
-
-  if [ -z "$ORIGIN_CACHE" ]; then
-    # Origin unreachable — validate format only
-    if echo "$LOCAL_CACHE" | grep -qE "$VALID_FMT"; then
-      echo "  [WARN]  origin/main unreachable -- CACHE_NAME format OK: $LOCAL_CACHE"
-    else
-      echo ""
-      echo "  [FAIL]  CACHE_NAME missing or invalid: '$LOCAL_CACHE'"
-      echo "  Expected format: robco-terminal-v{APP_VERSION}-r{N}"
-      echo "  Bump CACHE_NAME in sw.js (Protocol 1), then stage and commit again."
-      echo ""
-      exit 1
-    fi
-  else
-    # Parse APP_VERSION and rev number from both strings
-    ORIGIN_VER=$(echo "$ORIGIN_CACHE" | sed 's/robco-terminal-v\([^-]*\)-r[0-9]*/\1/')
-    LOCAL_VER=$(echo "$LOCAL_CACHE"  | sed 's/robco-terminal-v\([^-]*\)-r[0-9]*/\1/')
-    ORIGIN_N=$(echo "$ORIGIN_CACHE"  | sed 's/.*-r\([0-9]*\)$/\1/')
-    LOCAL_N=$(echo "$LOCAL_CACHE"    | sed 's/.*-r\([0-9]*\)$/\1/')
-
-    if [ "$LOCAL_VER" = "$ORIGIN_VER" ]; then
-      # Same APP_VERSION: rev must strictly increase (new N > origin N)
-      if ! [ "$LOCAL_N" -gt "$ORIGIN_N" ] 2>/dev/null; then
-        echo ""
-        echo "  [FAIL]  CACHE_NAME rev not strictly incremented (Protocol 1 — monotonic guard)!"
-        echo "  Staged:       $LOCAL_CACHE  (r${LOCAL_N})"
-        echo "  origin/main:  $ORIGIN_CACHE  (r${ORIGIN_N})"
-        echo ""
-        echo "  N must be > $ORIGIN_N. Increment the -rN suffix, run: git add sw.js, then commit again."
-        echo ""
-        exit 1
-      fi
-    else
-      # Different APP_VERSION: N can reset — just verify valid format
-      if ! echo "$LOCAL_CACHE" | grep -qE "$VALID_FMT"; then
-        echo ""
-        echo "  [FAIL]  CACHE_NAME invalid after version change: '$LOCAL_CACHE'"
-        echo "  Expected format: robco-terminal-v{APP_VERSION}-r{N}"
-        echo ""
-        exit 1
-      fi
-    fi
-    echo "  [PASS]  CACHE_NAME bumped: $ORIGIN_CACHE -> $LOCAL_CACHE"
-  fi
-else
-  echo "  [SKIP]  No served/precached file staged — cache bump not required."
-fi
+# Branch-agnostic (Protocol 43): the staged sw.js CACHE_NAME must DIFFER from THIS
+# branch's own HEAD value whenever a served/precached file is staged. The full logic
+# lives in Node (scripts/cache-bump-guard.js) so it is exercised behaviourally by the
+# gate (Suite 30) instead of by grepping shell text. Non-served commits skip; an
+# unreachable HEAD baseline warns and passes (fail-safe). See Protocol 1.
+node scripts/cache-bump-guard.js || exit 1
 # ── End Protocol 1 guard ──────────────────────────────────────────────────────
 
 # ── Q3 — Secret scan: block staged private keys and Google API keys ──────────

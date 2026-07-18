@@ -274,8 +274,8 @@ function changedLintFiles() {
 if (iter) {
   console.log('\n[gate] ITERATION PRE-CHECK (--iter) — fast inner-loop feedback ONLY.');
   console.log('[gate] Does NOT replace the commit gate (npm run gate:fast) or the');
-  console.log('[gate] push gate (npm run gate). Commit still runs both test runners;');
-  console.log('[gate] push still runs both runners + every browser check.\n');
+  console.log('[gate] push gate (npm run gate). Commit still runs the full Node test');
+  console.log('[gate] runner; push runs the Node runner + every browser check.\n');
 
   const changed = changedLintFiles();
   if (changed.length) {
