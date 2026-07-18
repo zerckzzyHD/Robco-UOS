@@ -7,7 +7,7 @@
 // static <script> tag — api*.js family, loads late in the boot chain right
 // before cloud.js (see index.html load order).
 // EXPOSES: autoImportState(), sanitizeImportedContainer(),
-// _wireApiEventBusSubscribers().
+// _wireApiEventBusSubscribers(), _confirmInventoryRemovals().
 // GOTCHA: never use recursive key transformation on AI JSON here (Protocol
 // 24 / Prohibited Patterns) — every field below is an explicit, named
 // mapping (parsed.<key> → state.<key>) with its own type coercion/clamp.
@@ -201,6 +201,55 @@ function _wireApiEventBusSubscribers() {
   });
 }
 
+// ── INVENTORY REMOVAL CONFIRM GATE (AI_OVERSEER Finding 1) ────────────────────
+// The AI's inventory array is a PROPOSAL, never an assignment (autoImportState
+// applies additions directly but DEFERS every proposed removal here). This is
+// Protocol 34's DNA — "cloud writes are additive; destructive ops are confirm-
+// gated" — applied to inventory: a destructive write to the Courier's durable
+// items is NEVER silent. Reuses confirmAction() (Protocol 22 — the same diegetic
+// confirm the level-up / WIPE flows use). `removals` is [{name, from, to}] where
+// `to` is the proposed new quantity (0 = drop the item entirely).
+//
+// SAFETY DEFAULT: if no confirm surface exists (headless import, an old cached
+// client, any context without confirmAction), the items are simply KEPT — the
+// removal is dropped, never applied unconfirmed. Keeping an item the AI wanted
+// gone is a harmless, user-reversible outcome; silently deleting one is not.
+function _confirmInventoryRemovals(removals) {
+  if (!Array.isArray(removals) || !removals.length) return;
+  if (typeof confirmAction !== 'function') return; // no confirm surface → keep items
+  const lines = removals.map(r =>
+    r.to <= 0 ? `• ${r.name} ×${r.from} → REMOVED` : `• ${r.name}: qty ${r.from} → ${r.to}`
+  );
+  confirmAction({
+    title: '> DIRECTOR INVENTORY REQUEST',
+    warning:
+      'The Director wants to take items the Courier is currently carrying:\n' +
+      lines.join('\n') +
+      '\n\nApprove this removal? Choosing KEEP ITEMS leaves your inventory untouched.',
+    confirmLabel: 'APPROVE REMOVAL',
+    cancelLabel: 'KEEP ITEMS',
+  }).then(ok => {
+    if (!ok) return; // Courier declined — items retained, nothing written
+    if (!Array.isArray(state.inventory)) return;
+    removals.forEach(r => {
+      const key = String(r.name).toLowerCase();
+      if (r.to <= 0) {
+        state.inventory = state.inventory.filter(it => String(it.name).toLowerCase() !== key);
+      } else {
+        const it = state.inventory.find(x => String(x.name).toLowerCase() === key);
+        if (it) it.qty = r.to;
+      }
+    });
+    // The removed item may have been equipped — clear any now-dangling slot
+    // through the ONE shared reconciler (Protocol 22), then persist + repaint.
+    if (typeof reconcileEquipped === 'function') reconcileEquipped(state);
+    if (typeof saveState === 'function') saveState();
+    if (typeof loadUI === 'function') loadUI();
+    if (typeof appendToChat === 'function')
+      appendToChat('> [INVENTORY] Director-requested removal applied.', 'sys', true);
+  });
+}
+
 // ── AI JSON → STATE FIELD MAPPING ─────────────────────────────────────────────
 // Called from transmitMessage() (api.js) with the raw JSON string of the AI's
 // "state" node, and from cloud-pull / file-import paths. Every field is mapped
@@ -369,14 +418,25 @@ function autoImportState(jsonString) {
     let inv = parsed.inventory || parsed.Inventory || parsed.inv;
     if (inv && Array.isArray(inv)) {
       if (!state.ammo) state.ammo = {};
-      // FEEDBACK ANIMATION WAVE 2 (#18 MANIFEST PUNCH) — captured BEFORE the
-      // merge so the AI resending its whole inventory array each turn never
-      // replays the animation for items the player already had (the
-      // collectible.acquired/quest.status AI-path precedent, Protocol 22).
+      // ── INVENTORY RECONCILE (Protocol 24 + Protocol 34 DNA) — AI_OVERSEER F1 ──
+      // The AI's inventory array is a PROPOSAL, never an assignment. The old code
+      // did a wholesale `state.inventory =` of `inv.map(...)` — a FULL REPLACE — so an empty or short
+      // array from a do-nothing turn (a failed repair, an aborted craft) silently
+      // WIPED natively-held items with no confirmation and no undo. Real,
+      // unrecoverable item loss during ordinary play (audit Finding 1). Now:
+      //   • ADDITIONS (a name not currently held, or a higher qty than held) are
+      //     non-destructive → applied immediately. Narrative looting is unchanged.
+      //   • REMOVALS (a lower qty than held, incl. qty 0) are DESTRUCTIVE → NOT
+      //     applied here; deferred to _confirmInventoryRemovals() (confirm gate).
+      //   • Items the proposal does NOT mention are UNCHANGED and kept — an
+      //     omitted item is NEVER treated as a removal (the directive now tells
+      //     the AI to report only what CHANGED — api-directive.js).
+      // The #18 MANIFEST PUNCH animation set is still captured BEFORE the merge so
+      // a resend never replays it for items the player already had (Protocol 22).
       const _invNamesBefore = new Set(
         (state.inventory || []).map(it => String(it.name).toLowerCase())
       );
-      state.inventory = inv
+      const _proposed = inv
         .map(it => {
           let wgt = parseFloat(it.wgt ?? it.weight ?? 0) || 0;
           let val = parseInt(it.val ?? it.value ?? 0) || 0;
@@ -390,23 +450,59 @@ function autoImportState(jsonString) {
               if (type === 'misc' && dbHit.type !== 'misc') type = dbHit.type;
             }
           }
+          // Preserve an EXPLICIT qty 0 — it is the AI's "drop this item" signal and
+          // must survive to the reconcile as a removal. Only a missing/NaN qty
+          // defaults to 1 (a looted item with no count is one). Never negative.
+          // (The old `parseInt(it.qty) || 1` silently turned a 0 into a 1, which
+          // would have defeated qty-0 removals — AI_OVERSEER F1.)
+          const _q = parseInt(it.qty);
           return {
             name: it.name ?? '',
-            qty: parseInt(it.qty) || 1,
+            qty: Number.isNaN(_q) ? 1 : Math.max(0, _q),
             wgt: wgt,
             val: val,
             type: type,
           };
         })
         .filter(it => {
-          // Belt-and-suspenders: AI may still return ammo in inventory array
-          // Silently reroute to state.ammo instead of letting it pollute state.inventory
+          // Belt-and-suspenders: AI may still return ammo in inventory array.
+          // Ammo is additive-by-nature (caliber counts) — reroute to state.ammo
+          // and never treat it as an inventory removal.
           if (it.type === 'ammo') {
             state.ammo[it.name] = (state.ammo[it.name] || 0) + (it.qty || 1);
             return false;
           }
           return true;
         });
+      // Merge the proposal against current holdings: apply additions in place,
+      // collect removals for the confirm gate, keep everything unmentioned.
+      const _curInv = Array.isArray(state.inventory) ? state.inventory.slice() : [];
+      const _curByName = new Map(_curInv.map(it => [String(it.name).toLowerCase(), it]));
+      const _invRemovals = [];
+      _proposed.forEach(p => {
+        const key = String(p.name).toLowerCase();
+        const existing = _curByName.get(key);
+        if (!existing) {
+          // Brand-new item → non-destructive addition, apply now. A phantom
+          // qty-0 entry for an item the Courier doesn't hold is a no-op (nothing
+          // to add and nothing to remove) — never pushed as a 0-count ghost.
+          if (p.qty > 0) {
+            _curInv.push(p);
+            _curByName.set(key, p);
+          }
+        } else if (p.qty > existing.qty) {
+          // Quantity increase → addition; take the new total + refreshed metadata.
+          existing.qty = p.qty;
+          existing.wgt = p.wgt;
+          existing.val = p.val;
+          existing.type = p.type;
+        } else if (p.qty < existing.qty) {
+          // Quantity reduction (incl. 0) → DESTRUCTIVE → defer to the confirm gate.
+          _invRemovals.push({ name: existing.name, from: existing.qty, to: p.qty });
+        }
+        // p.qty === existing.qty → unchanged, no-op.
+      });
+      state.inventory = _curInv;
       state.inventory.forEach(it => {
         if (!_invNamesBefore.has(String(it.name).toLowerCase())) {
           RobcoEvents.emit('item.added', {
@@ -417,6 +513,12 @@ function autoImportState(jsonString) {
           });
         }
       });
+      // Deferred confirm gate for any proposed removals (async, non-blocking).
+      // typeof-guarded so a headless/import context with no confirm surface keeps
+      // the items rather than throwing — a destructive write is never silent.
+      if (_invRemovals.length && typeof _confirmInventoryRemovals === 'function') {
+        _confirmInventoryRemovals(_invRemovals);
+      }
     }
     if (parsed.squad && Array.isArray(parsed.squad)) {
       state.squad = parsed.squad.map(m => ({

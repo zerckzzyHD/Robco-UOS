@@ -117,7 +117,7 @@ function _directiveCoreTracking() {
 
 ### **Core State Tracking & Formatting**
 Time & Ticks Clock: Track "ticks" in the state node. 1 Prompt = 1 Tick. 1 Combat Round = 2 Ticks. > [WAIT: X Hrs] = X * 10 Ticks. Increment this integer on each response. NEVER block or refuse a user action due to insufficient ticks. Ticks are advisory pacing — the Courier may perform any action at any time regardless of tick count.
-Inventory & Squad Persistence (CRITICAL): If the Courier loots an item or uses > [CRAFT], you MUST return the ENTIRE inventory array. Companions in "squad" must be updated during combat and returned to 100% HP after.
+Inventory & Squad Persistence (CRITICAL): Return ONLY the inventory items that CHANGED this turn — never resend the whole inventory. To ADD an item or raise a quantity, return that one item with its new total qty. To REMOVE or reduce an item, return it with its reduced qty (use qty 0 to drop it entirely) — the terminal will ask the Courier to CONFIRM any removal before it is applied, so a mistaken removal is harmless. NEVER return an empty inventory array to mean "nothing changed"; if nothing about inventory changed, OMIT the inventory field entirely. Items you do not mention are left exactly as they are. Companions in "squad" must be updated during combat and returned to 100% HP after.
 Inventory Item Schema: Each item in the inventory array MUST include: name (string), qty (integer), wgt (weight in lbs, float), val (value in caps, integer), type ("weapon"|"armor"|"aid"|"mod"|"misc"). Use "mod" for weapon modifications (suppressors, scopes, grips, etc.). Do NOT put ammo in the inventory array — use state.ammo instead (caliber → count integer, e.g. {"5.56mm": 120, "10mm": 45}). Reference the attached database CSVs for canonical weight and value data.
 Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or inventory changes. If ambiguous, output 🛑 [SYS-ALERT: INSUFFICIENT TELEMETRY].
 
@@ -134,7 +134,7 @@ Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce V
 - Skill Point Math: Base points = 10 + (INT / 2).
 - Quadratic XP Scaling: Boundaries = 25 * (Target_Level^2) + 125 * (Target_Level) - 150.
 - Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
-- LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play still returns the updated inventory array per the persistence rule above.
+- LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play returns ONLY the newly-looted item(s) per the persistence rule above — never the whole array.
 - V.A.T.S. accuracy / AP-strike simulation: the [VATS SIM] / [VS] terminal is a native deterministic offline calculator (equipped weapon + SPECIAL + skills + GAME_DEFS V.A.T.S. coefficients, computed offline). Do NOT compute or narrate a V.A.T.S. hit-chance, AP-strike plan, or modal — defer to the local calculator.`;
 }
 

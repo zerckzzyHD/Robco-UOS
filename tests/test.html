@@ -510,6 +510,33 @@
           JSON.stringify(state.equipped)
         );
 
+        // AI_OVERSEER Finding 1 — the inventory RECONCILE contract, proven in a
+        // real browser: the AI array is a proposal, never a full replace. An empty
+        // (or short) AI array must delete NOTHING the Courier natively holds;
+        // additions still merge in (narrative looting). Removals are confirm-gated
+        // — with no confirm surface on this page they are simply kept.
+        resetState();
+        state.inventory = [
+          { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+          { name: 'Stimpak', qty: 5, wgt: 0.5, val: 75, type: 'aid' },
+        ];
+        autoImportState(JSON.stringify({ inventory: [] }));
+        assert(
+          state.inventory.length === 2 &&
+            state.inventory.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+            state.inventory.some(i => i.name === 'Stimpak' && i.qty === 5),
+          'AI_OVERSEER F1: an empty AI inventory array deletes nothing (reconcile, not full-replace)',
+          JSON.stringify(state.inventory.map(i => i.name + 'x' + i.qty))
+        );
+        autoImportState(
+          JSON.stringify({ inventory: [{ name: 'Combat Knife', qty: 1, type: 'weapon' }] })
+        );
+        assert(
+          state.inventory.length === 3 && state.inventory.some(i => i.name === 'Combat Knife'),
+          'AI_OVERSEER F1: a newly-looted item merges in without dropping existing items',
+          JSON.stringify(state.inventory.map(i => i.name))
+        );
+
         // ══════════════════════════════════════════════════════════════
         //  Suite 5 — Boundary clamping in autoImportState
         // ══════════════════════════════════════════════════════════════

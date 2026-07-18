@@ -9517,7 +9517,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  (collectibles registry allow-list) already has behavioral twins (Suite
 //  133's collectibles test + 229.7/229.8 + test.html Suite 6), so its static
 //  Protocol-20 pins are KEPT as-is, not re-proven.
-//  14 tests
+//
+//  76.15–76.21 (AI_OVERSEER Finding 1, 2026-07-18): the inventory silent-deletion
+//  guard. autoImportState() now reconciles the AI inventory array as a PROPOSAL
+//  (additions applied, removals confirm-gated) instead of full-replacing
+//  state.inventory — an empty/short AI array can no longer wipe natively-held
+//  items. 76.15 is the load-bearing Protocol-13 regression (empty array deletes
+//  nothing); 76.21 is the async confirm-gate proof (removal applies only on
+//  approval).
+//  21 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
@@ -9767,6 +9775,187 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       const li = live76(hFO76).lincolnItems;
       return Object.keys(li).length === 1 && li["Lincoln's Hat"] === 'washington';
     }
+  );
+
+  // ── INVENTORY RECONCILE / SILENT-DELETION GUARD (AI_OVERSEER Finding 1) ──────
+  // The AI inventory array is a PROPOSAL reconciled against current state, never a
+  // full replace. These execute the REAL autoImportState() against real state.js +
+  // reg_nv.js. The seed always holds two natively-owned items so a wipe is visible.
+  const INV_SEED76 = {
+    inventory: [
+      { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+      { name: 'Stimpak', qty: 5, wgt: 0, val: 0, type: 'aid' },
+    ],
+  };
+  // 76.15 — THE load-bearing regression (Protocol 13): an AI turn returning an
+  // EMPTY inventory array must NOT delete natively-held items. Proven red against
+  // the pre-fix full-replace (state.inventory = inv.map(...) wiped both to []),
+  // green after the reconcile.
+  behavior76(
+    '76.15: [behavioral] an AI turn returning an EMPTY inventory array ({inventory:[]}) deletes NOTHING — both natively-held items survive (AI_OVERSEER F1 — the silent-item-deletion guard)',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [] }));
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 2 &&
+        inv.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5)
+      );
+    }
+  );
+  // 76.16 — a SHORT array that mentions only a reduced-qty item is a proposed
+  // REMOVAL: it is confirm-gated (deferred), so NOTHING is applied synchronously —
+  // the unmentioned item is kept AND the reduced item keeps its full qty until the
+  // Courier confirms. (No confirm surface in this harness → items retained.)
+  behavior76(
+    '76.16: [behavioral] a SHORT array proposing a qty reduction ({inventory:[{Stimpak,qty:2}]}) removes nothing synchronously — the unmentioned 10mm Pistol is kept and Stimpak stays at qty 5 (reduction deferred to the confirm gate)',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 2 &&
+        inv.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5)
+      );
+    }
+  );
+  // 76.17 — ADDITIONS stay un-gated (narrative looting unchanged): a new item
+  // merges in alongside the existing holdings.
+  behavior76(
+    '76.17: [behavioral] a new item ({inventory:[{Combat Knife,qty:1}]}) is added immediately and the existing items are kept — narrative looting is unregressed',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ inventory: [{ name: 'Combat Knife', qty: 1, type: 'weapon' }] })
+      );
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 3 &&
+        inv.some(i => i.name === '10mm Pistol') &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5) &&
+        inv.some(i => i.name === 'Combat Knife' && i.qty === 1)
+      );
+    }
+  );
+  // 76.18 — a qty INCREASE is a non-destructive addition, applied immediately.
+  behavior76(
+    '76.18: [behavioral] a qty increase ({inventory:[{Stimpak,qty:9}]}) is applied immediately (non-destructive) — Stimpak rises 5 → 9, no confirm needed',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 9 }] }));
+      const inv = live76(hNV76).inventory;
+      return inv.length === 2 && inv.find(i => i.name === 'Stimpak').qty === 9;
+    }
+  );
+
+  // 76.19 — STATIC (Protocol 20 escape-ratchet): the old full-replace assignment
+  // (state.inventory = inv...) is gone; the raw AI array `inv` is never assigned
+  // to state.inventory wholesale.
+  assert(
+    !/state\.inventory\s*=\s*inv\b/.test(importBody76),
+    '76.19: autoImportState no longer assigns the raw AI array to state.inventory (old full-replace removed — AI_OVERSEER F1)'
+  );
+  // 76.20 — STATIC: the reconcile + confirm-gate wiring is present (a deferred
+  // removal path and the reused confirmAction() surface).
+  assert(
+    /_invRemovals/.test(importBody76) &&
+      /_confirmInventoryRemovals/.test(importBody76) &&
+      /confirmAction\(/.test(apiSrc76),
+    '76.20: autoImportState collects proposed removals and confirm-gates them via _confirmInventoryRemovals()/confirmAction() (Protocol 22/34)'
+  );
+
+  // ── CONFIRM-GATE BEHAVIORAL (async) — the removal APPLIES only on approval ────
+  // Builds a self-contained sandbox (real state.js + reg + the REAL extracted
+  // autoImportState AND _confirmInventoryRemovals) with a stubbed confirmAction so
+  // both the APPROVE and KEEP paths execute for real. Deferred onto _pendingAsync
+  // (the Suite 137 idiom) because the confirm gate resolves on a microtask.
+  function declareFn76(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function makeGateSandbox76(confirmResolves) {
+    const sb = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+      confirmAction: () => Promise.resolve(confirmResolves),
+    };
+    vm76.createContext(sb);
+    vm76.runInContext(stateSource, sb);
+    vm76.runInContext(readGroup('reg_nv'), sb);
+    // Neutralize the debounced localStorage writer (no localStorage in-sandbox).
+    vm76.runInContext('saveState = function(){};', sb);
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmInventoryRemovals'), sb);
+    vm76.runInContext(declareFn76(apiSrc76, 'autoImportState'), sb);
+    vm76.runInContext(
+      'state.inventory = [' +
+        "{name:'10mm Pistol',qty:1,wgt:3,val:100,type:'weapon'}," +
+        "{name:'Stimpak',qty:5,wgt:0,val:0,type:'aid'}];",
+      sb
+    );
+    return sb;
+  }
+  // Flush the microtask queue so the confirm gate's confirmAction().then(...)
+  // (the stub resolves synchronously) has run before we read state back.
+  const flush76 = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+  _pendingAsync.push(
+    (async () => {
+      let approveInv = null;
+      let keepInv = null;
+      let dropInv = null;
+      let errG76 = null;
+      try {
+        // APPROVE: a proposed qty reduction is applied after the Courier approves.
+        const sbYes = makeGateSandbox76(true);
+        sbYes.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+        await flush76();
+        approveInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbYes);
+        // APPROVE + qty 0: the item is dropped entirely on approval.
+        const sbDrop = makeGateSandbox76(true);
+        sbDrop.autoImportState(JSON.stringify({ inventory: [{ name: '10mm Pistol', qty: 0 }] }));
+        await flush76();
+        dropInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbDrop);
+        // KEEP: the same reduction proposal is declined → nothing changes.
+        const sbNo = makeGateSandbox76(false);
+        sbNo.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+        await flush76();
+        keepInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbNo);
+      } catch (e) {
+        errG76 = e;
+      }
+      header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
+      const approveOk =
+        approveInv &&
+        approveInv.length === 2 &&
+        approveInv.find(i => i.name === 'Stimpak').qty === 2;
+      const dropOk =
+        dropInv && dropInv.length === 1 && !dropInv.some(i => i.name === '10mm Pistol');
+      const keepOk =
+        keepInv &&
+        keepInv.length === 2 &&
+        keepInv.find(i => i.name === 'Stimpak').qty === 5 &&
+        keepInv.some(i => i.name === '10mm Pistol');
+      assert(
+        approveOk && dropOk && keepOk && !errG76,
+        '76.21: [behavioral async] the confirm gate applies a removal ONLY on approval — APPROVE reduces Stimpak 5→2, APPROVE+qty0 drops the 10mm Pistol, KEEP leaves both items untouched' +
+          (errG76 ? ' — ' + errG76.message : '')
+      );
+    })()
   );
 }
 
@@ -16435,92 +16624,95 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
-    // Only the two FO3 rows' hashes changed (Karma Engine rebuild, Protocol
-    // 8 Stage 2, 2.8.5 unreleased work — APP_VERSION stays 2.8.0, this is
-    // NOT a version bump): ai.irreversibleTriggers was corrected from the
-    // fabricated "Enclave hit squads" / unqualified "Brotherhood Outcasts
-    // become hostile" claims to the real, cited Regulators (-250)/Talon
-    // Company (+250) hunt mechanics — see js/core/state.js and
-    // planning/2.8.5/data/FO3/KARMA_DATA.md. An intentional content change, not a
-    // regression (Protocol 42). The 9 FNV rows are byte-identical to their
-    // pre-existing values since FNV's directive text never referenced this.
+    // ALL 11 rows' hashes changed (AI_OVERSEER Finding 1 fix, 2026-07-18 —
+    // APP_VERSION stays 2.8.0, this is 2.8.5 unreleased work, NOT a version
+    // bump): the "Inventory & Squad Persistence" instruction in the STATIC
+    // _directiveCoreTracking() section was rewritten. It previously told the AI
+    // "you MUST return the ENTIRE inventory array" — the upstream cause of the
+    // silent item-deletion path (a short/empty array full-replaced state). It now
+    // instructs the AI to report ONLY changed items and to express a removal as a
+    // reduced qty (confirm-gated on import). Because that text is static and rides
+    // in every directive, every ctx/playstyle/playthrough/campaign combination's
+    // hash moved. An intentional content change, not a regression (Protocol 42) —
+    // see js/services/api-directive.js and js/services/api-import.js. Regenerated
+    // via the same in-sandbox getSystemDirective() the matrix below hashes.
     const GOLDEN_MATRIX = [
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '2fab15de30815451a041e71a48cfb2c5c10830c93302c76f791433fca32b0b13',
+        sha256: '2f4495824d3fd76a8cf7524f8e415b98f03f831c9f473fd81c4356ce6b4acaae',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '4fe38b6130cb6a5aa53b9eaad79d8f0dea044369f5fab4a55ac3f36d275357f3',
+        sha256: '9416119ded40111401df53afcb14f92dbe8de98d29a67093517a5d0fe88456ec',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: 'c08152e192bc3ca88a8c2cee734c0ffb4e684865e7cc75643012e03820a14a3e',
+        sha256: '9d61046212fc63b2cb78173f28a28c8717a5632dfef73bb1575a37615543f757',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'f43a208c6c6e1cdb794d530c5c22353f921176ba22f38ce8025d70bdcc61a498',
+        sha256: 'adbdd07a20af8c715c9043e6f63c56ec30c68780e4beb356a1420ea71ca7e9ed',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '5634c2b2c85ad0f848fc269fef7da318f2b9661692d05fb1ea367ae273b5bfe7',
+        sha256: '6e07afb083cf50d659f3469ac48a743bb7c1849254a28e94976ef37e6b6308f6',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'dda36c2be2bb76069e5e55ca900229a9063b64bc13ba195ec4039250299a9508',
+        sha256: '2a3eeb74994bfac454563d212ef28930eee35f3a137c70dab703908d269c2b2e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '82ba297d3821af528667f684918a99914311e2ffbac27e2a09a1366250e3a05f',
+        sha256: 'a2494613dae8bba13aeab661dde07b22651702e6b0814e681958383aaaba7a9c',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '86e2affd92e0fab06d2b16fbb73a1bee6c770d42903211611dd6cf19e0a83fd1',
+        sha256: 'be7d0c1b2552de24357f8b06aff88e6c52a272c3bab6ff28719a60e3d5aea049',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '09a4b018aa2345ee2c22b5f0e7a133b707a6a2b29d270017b51e1d1d9047588f',
+        sha256: '2093b8711257c1af799de943b5090068f59abb072562f36027a68e7949a2b868',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'deb5f7e8be43188b1f4cfd58d0d1dd02e071b2aa854d203ffb4380e184513e74',
+        sha256: '774918a93a40f82fbc08d8b170d52379524e8f7f87cf9057b03c8220db98ebb3',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'f921e9d0a305c3e5452764118edd3e70d09cfd555dd1f48567982aa516b596af',
+        sha256: 'be313c356e71134f09c2820ddb44734115f564d94fa2b8addfafada63aea99eb',
       },
     ];
 
@@ -42908,10 +43100,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 221.9  Behavioral (VM sandbox, REAL source, Suite 133 harness pattern):
-  //        the AI resends a full inventory array WITHOUT the previously-
-  //        equipped item, and omits 'equipped' entirely this turn — the
-  //        real autoImportState() still clears the now-dangling reference.
+  // 221.9  Behavioral (VM sandbox, REAL source) — CONTRACT FLIP (AI_OVERSEER
+  //        Finding 1, 2026-07-18). Before the fix, an AI turn that resent
+  //        inventory WITHOUT a previously-held, equipped item DELETED that item
+  //        (full replace) and reconcileEquipped() then cleared the dangling slot.
+  //        That deletion-by-omission was the very silent-item-loss bug. Under the
+  //        new reconcile an OMITTED item is UNCHANGED (never a removal), so the
+  //        held item SURVIVES and its equipped slot stays valid — this asserts the
+  //        omission path can no longer silently destroy a held item. (The
+  //        reconcileEquipped-clears-a-confirmed-removal path is proven in Suite
+  //        76.21; native depletion paths in 221.8/221.12.)
   {
     const vm = require('vm');
     let after221d = null;
@@ -42939,17 +43137,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           "state.equipped = {weapon:'Old Rifle',armor:null,headgear:null};",
         sandbox
       );
+      // AI reports only a newly-looted item (per the new directive) and omits the
+      // held 'Old Rifle' and 'equipped' entirely.
       const aiJson = JSON.stringify({
         inventory: [{ name: 'Laser Pistol', qty: 1, wgt: 3, val: 50, type: 'weapon' }],
       });
       sandbox.autoImportState(aiJson);
-      after221d = vm.runInContext('state.equipped', sandbox);
+      after221d = {
+        inventory: vm.runInContext('JSON.parse(JSON.stringify(state.inventory))', sandbox),
+        equipped: vm.runInContext('state.equipped', sandbox),
+      };
     } catch (e) {
       errMsg221d = e && e.message;
     }
     assert(
-      after221d && after221d.weapon === null,
-      "221.9: [behavioral] the REAL autoImportState() clears state.equipped.weapon when the AI resends inventory without the equipped item and omits 'equipped' entirely" +
+      after221d &&
+        after221d.inventory.length === 2 &&
+        after221d.inventory.some(i => i.name === 'Old Rifle') &&
+        after221d.inventory.some(i => i.name === 'Laser Pistol') &&
+        after221d.equipped.weapon === 'Old Rifle',
+      '221.9: [behavioral] the REAL autoImportState() KEEPS a held, equipped item the AI omits (never a removal-by-omission) — the item survives and its equipped slot stays valid (AI_OVERSEER F1 contract flip)' +
         (errMsg221d ? ' — error: ' + errMsg221d : '')
     );
   }

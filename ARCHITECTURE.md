@@ -106,7 +106,7 @@
 ├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    3411-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    3418-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -517,7 +517,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 237 suites / 3411 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
+**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 237 suites / 3418 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
 
 **Diagnostic Shell U1 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
@@ -1741,7 +1741,8 @@ showing a deleted item). `reconcileEquipped(s)` (`js/core/state.js`) is the one 
 it — `delItem()`/`adjItemQty()`/`nativeUseItem()` (`js/ui/ui-render-inventory.js`), `_craftConsume()`
 (shared by CRAFT ingredient consumption and SCRAP) and `doSell()` (`js/ui/ui-render-economy.js`), and
 `autoImportState()` (`js/services/api-import.js`, validating the AI's equipped slots against whatever
-inventory it just replaced wholesale, even when the AI omits `equipped` that turn) — and `migrateState()`
+inventory it just reconciled — additions merged, removals confirm-gated (AI_OVERSEER Finding 1) — even
+when the AI omits `equipped` that turn) — and `migrateState()`
 also calls it on every load. An independent audit (`planning/2.8.5/audits/AUDIT_U9_bugfixes.md`) found two follow-ups
 after the first pass: `nativeUseItem()` (consuming an aid item to depletion) was a missed removal path
 (closed above — benign in practice, since USE only ever removes `'aid'`-type rows and only `weapon`/`armor`
@@ -2501,7 +2502,7 @@ JSON string → parse
   → Map factions via FACTION_REGISTRY.forEach
   → Map skills via SKILL_KEYS.forEach
   → Map status effects (normalize to {name, ticks, type})
-  → Map inventory (direct array replace)
+  → Reconcile inventory (additions merged in place; qty reductions/removals confirm-gated — AI_OVERSEER F1, never a full-replace)
   → Map squad (direct array replace)
   → Map campaign_notes (direct replace)
   → Map perks (normalized {name, rank, level_taken})
@@ -3153,6 +3154,12 @@ causing a full DOM reparse on every iteration.
 **What happened:** Token triage accidentally dropped the inventory payload during looting.
 **Fix:** Added a critical directive forcing the AI to always return the full inventory array.
 **Lesson:** Token optimization must never silently drop critical state.
+**Superseded (2026-07-18, AI_OVERSEER Finding 1):** that "always return the ENTIRE inventory array"
+directive later became the root cause of a worse bug — a full-replace import meant a short/empty AI array
+from a do-nothing turn silently wiped natively-held items. The directive now instructs the AI to report
+only what CHANGED, and `autoImportState()` reconciles that as a proposal (additions merged, removals
+confirm-gated) instead of assigning it wholesale. The v1.5.6 lesson still holds; the mechanism that
+enforced it moved from "AI resends everything" to "native state is authoritative; AI proposes deltas."
 
 ### 5. The Cloud Sync Spam (v1.6.0)
 
@@ -3283,7 +3290,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3411-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3418-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

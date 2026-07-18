@@ -11,7 +11,7 @@
     "js/ui/ui-render-record.js": 3
   },
   "serviceCallsView": {
-    "js/services/api-import.js": 1,
+    "js/services/api-import.js": 2,
     "js/services/api-router.js": 13,
     "js/services/api.js": 1,
     "js/services/cloud.js": 10,
