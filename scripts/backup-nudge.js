@@ -140,17 +140,28 @@ function main() {
   if (newest <= 0) return; // nothing readable — can't determine — stay silent
 
   // 4. Nudge only when something is genuinely newer than the last sync.
+  //    Audience is the AGENT session running the push (it sees stdout), NOT the
+  //    owner (who is phone-first and never reads terminal output) — so the copy
+  //    is an instruction to the session, per Protocol 48.
   if (newest > lastSyncMs) {
-    const line = '-'.repeat(64);
+    const line = '-'.repeat(72);
+    const syncCmd =
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' +
+      path.join(BACKUP_REPO, 'sync.ps1') +
+      '"';
     process.stdout.write(
       '\n' +
         line +
         '\n' +
-        '  BACKUP REMINDER (Protocol 48) — reminder only; your push is proceeding.\n' +
-        '  Your local-only artifacts (library/, planning/, memory) have changed\n' +
-        '  since the last archive sync. They live nowhere but this machine.\n' +
-        '  When convenient, refresh the private archive: run sync.ps1 in your\n' +
-        '  local archive working copy.\n' +
+        '  AGENT ACTION (Protocol 48) — this reminder never blocks the push.\n' +
+        '  The local-only artifacts (library/, planning/, memory) have changed\n' +
+        '  since the last archive sync, and they exist nowhere but this machine.\n' +
+        '  Run the archive sync yourself before finishing, from the Bash tool:\n' +
+        '    ' +
+        syncCmd +
+        '\n' +
+        '  If it genuinely cannot be run from this machine/shell, say so in your\n' +
+        '  final report — do not silently skip it.\n' +
         line +
         '\n'
     );
