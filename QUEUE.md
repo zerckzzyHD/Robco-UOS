@@ -5,7 +5,7 @@ This is written for you to read on your phone. It's in execution order, top to b
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⬜ queued.
 
-_Last rewritten in full: 2026-07-15. Last updated: 2026-07-18 — two things at once: (1) marked the **entire 2.8.5 code + test health round (U1–U12) SHIPPED**, plus the UI-truthfulness fixes and the **Protocol 23 architecture-conformance enforcement** capstone; and (2) a **full ordering evaluation** of the whole roadmap — the floating end-of-round deliverables, the leftovers, and the pre-3.0 items are now each placed in dependency order with a one-line "why it sits here," and the one real mis-ordering (list virtualization) was moved to its foundation. Pinned to `bf8f188` (the re-baselined brain dump's baseline)._
+_Last rewritten in full: 2026-07-15. Last updated: 2026-07-18 — three passes now: (1) marked the **entire 2.8.5 code + test health round (U1–U12) SHIPPED**, plus the UI-truthfulness fixes and the **Protocol 23 architecture-conformance enforcement** capstone; (2) a **full ordering evaluation** of the whole roadmap — the floating end-of-round deliverables, the leftovers, and the pre-3.0 items each placed in dependency order with a "why it sits here," and the one real mis-ordering (list virtualization) moved to its foundation; and (3) a **placement pass for a new batch from two external AI reviews** — near-term LIVE-SAVE DURABILITY (data-safety, runs first), the rules/governance restructure (delete the test-count bookkeeping, path-scoped rules + a retirement rule, a first staged trim, the re-pin), two cheap cleanups, two consciously-unversioned items, and the native ES-modules migration bundled into 3.0. Each new item was verified against real code before earning its slot. The tail was regrouped into four ordered groups; item D moved next to the Atlas; the three owner-dropped ideas were recorded as closed. Pinned to `bf8f188` (re-pin owed after the rules restructure — see tail item R4)._
 
 ---
 
@@ -20,6 +20,8 @@ _Last rewritten in full: 2026-07-15. Last updated: 2026-07-18 — two things at 
 - **The data-provenance program is SHIPPED** — every game database across BOTH games re-sourced to `fallout.wiki` and locked behind automated guards, and the Fallout 3 karma engine rebuilt.
 - **A warning-surface inventory ran (2026-07-16)** — findings became the shipped read-side/UI-truthfulness fixes plus criteria folded into the 2.9.0 round. Full analysis: `planning/WARNING_SURFACE_INVENTORY.md`.
 - **The end-of-round deliverables are now placed and ordered** — the blind workflow review (after its 4 process refreshes), an optional system-model review, and the ROBCO SYSTEM ATLAS — all as the 2.8.5 capstone, not floating.
+- **A new near-term batch (from two external AI reviews) is now placed** — first **LIVE-SAVE DURABILITY** (the live campaign container has no IndexedDB shadow; the only pending item that can cost real data), then the **rules/governance restructure**: delete the test-count bookkeeping, break the one big rulebook into a short universal contract + surface-scoped notes, add the project's first-ever **retirement rule** (a way to REMOVE a guard, not only add one), a first staged trim, and a re-pin of all local-only docs. Two cheap cleanups and two consciously-unversioned items ride along. The tail below is now four ordered groups (data-safety → governance → small fixes → deliverables).
+- **The native ES-modules migration is now on the map — bundled into 3.0** alongside Fallout 4 (same boot surface, opened once), because a module can only touch what it imports, which finally makes the layering rule structural instead of scanner-enforced. Still no build step, ever.
 - **After that is 2.9.0** — the big one: gameplay systems, ambient life, and the "it's a real operating system" round. Its hardening gate (which burns down that baselined architecture debt) sits BEFORE the OS services that would otherwise multiply it — a load-bearing order.
 - **Then 3.0** is Fallout 4 as a real playable third game.
 - **A "for fun" recreation prompt sits dead last**, by your own placement.
@@ -58,7 +60,7 @@ Everything below expands each of those.
 
 # 🔄 2.8.5 — "Code + Test Health", then Fallout 3 (essentially complete on `dev` — release + a short tail remain)
 
-This whole version is about making the foundation solid **before** stacking more on top. The items run **in this order on purpose.** Nearly all of it has now shipped on `dev`; what's left is the per-game legacy/schematic layout (item 6), a short tail of leftovers, and the end-of-round review/synthesis deliverables — all placed in order at the bottom of this version's block.
+This whole version is about making the foundation solid **before** stacking more on top. The items run **in this order on purpose.** Nearly all of it has now shipped on `dev`; what's left is the per-game legacy/schematic layout (item 6) plus a four-group tail at the bottom of this version's block: the near-term **data-safety** work (LIVE-SAVE DURABILITY first), the **rules/governance restructure** (from the two external reviews), a short run of **small leftovers**, and the **end-of-round review/synthesis deliverables** — all placed in dependency order.
 
 ## 1. ✅ The code + test health phase — the spine (SHIPPED, 2026-07-12)
 
@@ -210,25 +212,83 @@ This strand ran in full as a numbered twelve-unit round. What it delivered, in p
 
 **Done means:** each game has a working, current schematic-mode layout alongside its full machine.
 
+**⚠ Scheduling note (2026-07-18 placement pass).** This is cosmetic/clarity UI work. The near-term data-safety item **A1 (LIVE-SAVE DURABILITY)** in the tail below should be scheduled **ahead** of it — data-safety outranks cosmetics (the precedent that let the save-integrity pass jump ahead of the Fallout 3 cosmetic queue). The two are independent, so this is a priority note, not a dependency: do A1 first, this whenever.
+
 ---
 
-# ⬜ 2.8.5 tail — leftovers, then the end-of-round deliverables (ORDERED)
+# ⬜ 2.8.5 tail — near-term data-safety, the rules restructure, small leftovers, then the end-of-round deliverables (ORDERED)
 
-Everything above has shipped. This block is the rest of 2.8.5, sequenced **foundations-first**: the small residual fixes run first (they're cheap and unblock nothing downstream), then the review/synthesis deliverables that are meant to look back over the whole finished round — so they run once there's a finished round to look at.
+Everything in the 2.8.5 blocks above has shipped. This block is the rest of the near-term work, **in execution order top to bottom**, sequenced highest-severity-first: the one item that can cost real data, then its recoverable data-safety sibling, then the rules/governance restructure the two external reviews prompted, then the small residual fixes, then the re-pin that stamps the result, and finally the review/synthesis deliverables that look back over the finished round. The letter IDs below are **stable tags, not alphabetical** — later items were slotted in where they belong in the order, not appended, so the letters no longer run A-B-C top to bottom. Only the code tail (the data-safety items + small fixes, plus the schematic layout in the 2.8.5 block above) gates the `dev → main` release; the governance restructure and the end-of-round deliverables can land around it.
 
-## The leftovers — small residual fixes (run these first, in this order)
+_Placed 2026-07-18 from two external AI reviews (`planning/ATLAS_ECOSYSTEM_REVIEW.md` + the synthesis). Each new item below was checked against the real code before it earned its slot; where verification changed the scope, the verdict is stated inline._
 
-These are genuinely small. They're ordered data-safety → test-health → perf → hygiene, but any of them can ride an ordinary commit; none blocks the others.
+## Group 1 — Data safety (runs first; outranks everything else in the tail)
 
-### A. ⬜ Save-integrity Layer 3 — the write-side quarantine follow-up
+### A1. ⬜ LIVE-SAVE DURABILITY — give the live campaign container an IndexedDB shadow
+
+**What it is.** `saveState()` writes the active campaign container (`robco_v8`) to **localStorage only** — confirmed in code (`js/core/state.js`, the debounced writer). Save slots and rolling backups already get an IndexedDB durability shadow with a rehydrate path; the LIVE container is the one copy with no cold-storage twin. Under storage pressure (Android especially, and iOS Safari's roughly two-week eviction) localStorage can be reclaimed — and nothing is shadowing the live container when it is.
+
+**The real exposure — measured, not worst-cased.** Rolling backups DO reach IndexedDB and CAN be rehydrated, so a live-container eviction costs "everything since the **last rolling backup**," not the whole campaign. That bounds the damage — but it is still the **only item on this entire list that can cost the user real, unrecoverable data**, which is why it goes first.
+
+**What it depends on.** The existing IDB cold-store engine (`js/core/idb.js`) — the same shadow-write plumbing the slots and rolling backups already use. No missing foundation.
+
+**Why it sits first — and ahead of the schematic layout.** Data-safety outranks cosmetics: the exact precedent that let the save-integrity pass jump ahead of the Fallout 3 cosmetic queue ("a browser silently eating a campaign is worse than an item list being one row short"). It should be scheduled **before** the 2.8.5 schematic layout (item 6), which is cosmetic and independent of it.
+
+**Done means:** the live `robco_v8` container is durably shadowed to IndexedDB on save (additive only, Protocol 34), an eviction-then-rehydrate path is behaviorally tested (Protocol 13), and a recovered-after-eviction live container is surfaced in the terminal's own voice, never silently swallowed.
+
+### A2. ⬜ Save-integrity Layer 3 — the write-side quarantine follow-up (was tail item A)
 
 **What it is.** Layer 3 made the READ side fail loud (a corrupt campaign is quarantined, not deleted). This closes a residual on the WRITE side the same pass exposed: a **valid, healthy old save can still be wrongly quarantined if the migration WRITE hits a storage quota** mid-upgrade. The read path can't tell "the bytes are corrupt" from "the bytes were fine but the re-write ran out of room," so a quota-failed migration currently looks identical to corruption and the good save gets quarantined.
 
 **What it depends on.** Layer 3 (shipped) — this is its direct residual, nothing else.
 
-**Why it's first.** It's the only leftover that can cost a user real data (a healthy save wrongly sidelined). Same principle that let save-integrity jump ahead of cosmetics: data-safety outranks polish. Small, but highest of the small.
+**Why it's second, not first.** It's data-safety too, but the damage is **recoverable** — a wrongly-quarantined save is sidelined under a quarantine key with EXPORT, not destroyed. So it sits just behind A1, the one item whose damage is unrecoverable. Same governing principle for both: data-safety outranks polish.
 
 **Done means:** a quota failure during a migration write is distinguished from genuine corruption — the healthy save is preserved and retried/surfaced, never quarantined as if it were corrupt.
+
+## Group 2 — The rules & governance restructure (near-term; prompted by the two external reviews)
+
+Two external AI reviews independently pushed on the project's own rulebook and bookkeeping. These four run in order: the delete clears a dead obligation, the restructure changes how rules are RETRIEVED (not just written), the trim cuts on top of the restructure, and the re-pin stamps the result to one baseline. None of the four gates the release; they pay down process debt.
+
+### R1. ⬜ DELETE THE TEST-COUNT BOOKKEEPING — retire Protocol 2a
+
+**What it is.** The hardcoded assertion count (3411 today) is hand-synced across 8+ files on every test add or remove (Protocol 2a). **Both** external reviewers condemned it independently, from opposite directions — one as pointless ritual, one as a tax on every commit. The count guards **no behavior**: the runner's exit status is the only thing that actually matters. This retires Protocol 2a and the whole synchronization obligation, and strips the hand-synced count out of the docs that carry it.
+
+**Interaction to respect (flagged in this ordering pass).** This partly **deprecates item D below** (the TEST_CATALOG generator). D's headline rationale was "stop hand-syncing the catalog's count." With the count obligation gone, D shrinks to generating the per-suite **content** only (for the ATLAS assurance view) — see D's reduced scope.
+
+**Why it's near-term.** It removes friction from every future commit, and it's a precondition for an honest restructure (R2) — no point re-encoding a bookkeeping rule you're about to delete.
+
+**Done means:** Protocol 2a is retired (its number retired-not-reused, per the Protocol 15 precedent), no doc carries a hand-synced test count, and the gate still fails loudly on any real test failure.
+
+### R2. ⬜ RULES RESTRUCTURE — path-scoped memory + a retirement rule
+
+**What it is.** Replace "every session reads the whole rulebook" with a short **universal contract** every session loads, plus **subsystem-scoped notes** pulled in only when the relevant surface is touched — save/state, service worker/deploy, auth/cloud, UI/mobile, game data, audio. The reviewers' rationale, sharpened: _written is not retrieved._ A rule buried in a large document loses to the rules sitting next to where a session is actually working.
+
+**The RETIREMENT RULE (new governance — load-bearing).** Bundled in: a defined way for a guard or protocol to be **removed** when the risk it covered is gone. The project has an escape-ratchet (Protocol 36b) that only ever ADDS guards; it has never had a counterpart that removes them, so weight only accretes. The retirement rule is that counterpart. It already has both examples on file — a remove-case: Protocol 15 (runner parity) was retired once its risk vanished; and a keep-case: the architecture-conformance baseline must NOT be retired until native ES modules make the layering structurally enforced (see the 3.0 ES-modules item — that's the retirement rule working in the _keep_ direction).
+
+**What it depends on.** R1 first (don't restructure around a rule you're deleting).
+
+**Done means:** a short universal contract plus surface-scoped notes exist and are retrieved by surface-touched, and a retirement rule is written with at least one keep-example and one remove-example.
+
+### R3. ⬜ FIRST STAGED TRIM — the incremental cut, built on the restructure
+
+**What it is.** Explicitly **NOT** a single large amputation. Take the cuts both reviews justify, let the restructure (R2) shrink the document naturally, then reassess. Each step reversible.
+
+**Why staged.** A one-shot cut of a load-bearing rulebook is how a real guard gets dropped by accident. Incremental and reversible means every removal is a decision, not a casualty.
+
+**Done means:** one reversible reduction has landed on top of the restructure, and the next cut is left to a fresh reassessment rather than pre-committed here.
+
+### R4. ⬜ THE RE-PIN PASS — stamp the local-only artifacts to one commit
+
+**What it is.** Brain dump, code map, test catalog, `QUEUE.md`, and the archive all stamped to ONE commit (today's pin, `bf8f188`, predates this work).
+
+**Why it sits AFTER the restructure (owner constraint, honored).** Pinning before the rules rewrite would pin documents we're about to rewrite — the brain dump and code map describe the very protocols R1–R3 change. So the re-pin lands **immediately after the restructure**, the most literal reading of the owner's "after the rules restructure." The cheap Group-3 fixes and the deliverables' own generators (D, I) may nudge the baseline again afterward — that's exactly what the Atlas's "marked degraded when the repo moves" rule handles, and the portable brief (H) is generated fresh each time regardless. So this is the clean baseline the round settles on, not a promise nothing moves after it.
+
+**Done means:** all five artifacts carry the same commit stamp, and the downstream deliverables read from that single baseline.
+
+## Group 3 — Small residual fixes (cheap; each can ride any ordinary commit)
+
+These are genuinely small and unblock nothing downstream; they're grouped here so they don't scatter. The two "cheap cleanup" items the reviews raised (E and M) fold into whichever commit is convenient.
 
 ### B. ⬜ The deferred U3 render-harness test slice
 
@@ -247,27 +307,35 @@ U8 measured the app as already lean and deferred exactly two real wins. On the o
 
 **Done means (C1):** the cloud connection is warmed lazily, measured before/after.
 
-### D. ⬜ The TEST_CATALOG generator — stop hand-maintaining a doc that has drifted twice
+_(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, but its own rationale is "best done just before the Atlas," so this ordering pass moved it into Group 4 next to the ATLAS. It's still tail item D; see there.)_
 
-**What it is.** `library/TEST_CATALOG.md` is GENERATED-class **in intent** but hand-synced **today**, and it has drifted twice (its headline stale at 3107, then 3358, while reality was 3392). This builds the generator that produces it from the test runner and gate-diffs it against the committed copy — turning it from a standing lie-in-waiting into a computed artifact.
+### E. ⬜ The dead RECIPES.CSV tables — BOTH game databases (widened from "FO3 only")
 
-**What it depends on.** The runner (exists). The one thing genuinely gating it is a **design decision, not a missing foundation**: `library/` is gitignored, so a naive gate-diff can't run on a clean CI checkout (the same gitignored-`library/`-vs-CI-diff tension the doc-integrity guards already navigate). Resolve that, and the generator is straightforward.
-
-**Why it sits with the deliverables.** It's the concrete first instance of the exact principle the ROBCO SYSTEM ATLAS formalizes — **generate what a script can compute; never hand-maintain it.** Best done alongside/just before the Atlas so they share the "generation over maintenance" plumbing rather than inventing it twice.
-
-**Done means:** the catalog is regenerated from the runner and gate-checked against its committed copy; no human ever hand-edits a count in it again.
-
-### E. ⬜ The FO3 RECIPES dead reference
-
-**What it is.** A dead internal RECIPES reference left over from the data-provenance sweep — pure hygiene, affects nothing the user sees.
+**What it is.** A dead `RECIPES.CSV` table sits in **both** game databases — `js/data/db_nv.js` and `js/data/db_fo3.js` — each already tagged `PARKED-FOR-REMOVAL` in its own reserved-column ledger, with **zero code consumers**: crafting reads the registries (`reg_nv.js` / `reg_fo3.js`, the `recipes[]` / `breakdowns[]` arrays), never these CSV tables. It's the Protocol 22 duplicate-source flag, pure hygiene, nothing the user sees. (Verification 2026-07-18 widened this from the original "FO3 RECIPES reference" — the dead table is in New Vegas's database too.)
 
 **What it depends on.** Nothing. It can ride any commit.
 
-**Done means:** the dead reference is removed and nothing else changes.
+**Done means:** both `RECIPES.CSV` tables are removed, the reserved-column ledgers updated to match, and nothing else changes.
 
-## The end-of-round deliverables — run once the round is finished (ORDERED)
+### M. ⬜ The map renderer's boxed-grid residue — mostly already gone
 
-These look back over the completed 2.8.5 round, so they're sequenced last. They're analysis/synthesis, not code, so **none of them gates the `dev → main` release** — the release can ship whenever the code tail (leftovers above + the schematic layout) is done; these can land around it.
+**What it is.** A reviewer flagged "orphaned `_MAP_ABBREV` / boxed-grid references in the map renderer." Verification (2026-07-18) found the headline symbol is **already deleted and guarded**: `_MAP_ABBREV` / `_mapAbbrev` no longer exists in `js/ui/ui-render-map.js` (nodes plot at real `gridRow` / `gridCol`), and Suite 189.1 fails the build if it ever returns. What actually remains is a little boxed-grid CSS (`.map-cell` and siblings in `css/25-toolbar.css`) — **some of it deliberately reused** by the current SVG map, plus a couple of purely historical comments. So the real job is far thinner than stated.
+
+**What it depends on.** Nothing. It's a cheap cleanup that folds into any commit.
+
+**Done means:** the truly-dead boxed-grid CSS classes (the ones with no remaining consumer) and the stale comments are removed; the classes the SVG map still reuses are left alone; `_MAP_ABBREV` needs no action (already gone).
+
+### K. ⬜ The backup script's single-shell dependency
+
+**What it is.** `sync.ps1` (Protocol 48's local-only-artifact backup) runs correctly only from a **Bash-launched** `powershell.exe` — the PowerShell-tool sandbox (user `rog-ally\kadyn`) cannot see `AppData\Roaming\Claude`, so memory discovery finds nothing and the sync fails loudly there. That "works from one shell, not the other" quirk is a single point of failure for the only off-machine backup of `library/`, `planning/`, and the agent memory.
+
+**What it depends on.** Nothing structural. **Note:** a concurrent session is actively fixing this script — this slot exists so the item isn't lost if that fix doesn't fully close the shell dependency.
+
+**Done means:** the backup sync succeeds from any shell the harness can invoke (or fails safe with a clear reported reason), with no reliance on a single shell being able to see the memory store.
+
+## Group 4 — The end-of-round deliverables (run once the round is finished; ORDERED)
+
+These look back over the completed 2.8.5 round, so they're sequenced last. They're analysis/synthesis, not code, so **none of them gates the `dev → main` release** — the release can ship whenever the code tail (Groups 1 and 3 above + the schematic layout) is done; these can land around it. The re-pin pass (R4) runs at the end of the governance chain (Group 2) — the stamped baseline these deliverables settle on, with the Atlas re-pinning at its own generation time.
 
 ### F. ⬜ First: the four process refreshes (the workflow review's foundation)
 
@@ -301,6 +369,18 @@ These look back over the completed 2.8.5 round, so they're sequenced last. They'
 **Why it's optional.** Only worth running if you actually want an outside eye on the model; the synthesis was explicit that a ceremonial review isn't worth its cost.
 
 **Done means (if run):** a small, question-scoped external pass returns findings in the required claim → provenance → falsification format, or it isn't run at all.
+
+### D. ⬜ Just before the Atlas: the TEST_CATALOG generator — REDUCED SCOPE after R1
+
+**What it is.** `library/TEST_CATALOG.md` is GENERATED-class **in intent** but hand-synced **today**, and it drifted twice (its headline stale at 3107, then 3358, while reality was 3392). This builds the generator that produces it from the test runner and gate-diffs it against the committed copy.
+
+**⚠ Scope reduced by R1 (the ordering pass flagged this).** R1 deletes the whole test-count bookkeeping, so the "stop hand-syncing the COUNT" half of this item's original rationale is gone. What's left is generating the per-suite **content** (each suite's coverage narration) — which is exactly what the ATLAS assurance view (I) consumes. So D is no longer a count-chasing chore; it's the first concrete instance of "generate what a script can compute" and the plumbing the Atlas reuses.
+
+**What it depends on.** The runner (exists) and R1 (so it isn't built to chase a count that no longer exists). The one genuine gate is a **design decision, not a missing foundation**: `library/` is gitignored, so a naive gate-diff can't run on a clean CI checkout (the same gitignored-`library/`-vs-CI tension the doc-integrity guards already navigate). Resolve that and the generator is straightforward.
+
+**Why it sits here.** Best done alongside/just before the Atlas so they share the "generation over maintenance" plumbing rather than inventing it twice — which is why this ordering pass moved it out of the early leftovers and next to I.
+
+**Done means:** the catalog's per-suite content is regenerated from the runner and gate-checked against its committed copy; no human hand-edits it again.
 
 ### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph
 
@@ -514,6 +594,19 @@ This is a curated, combined list of gameplay and immersion features, all built o
 
 **Why Fallout 4 is "design-only" until now.** The engine already carries a Fallout 4 definition that proves the multi-game abstraction works — but it's intentionally unreachable (you can't select it) until the real data and content exist. When Fallout 4 is first added but not yet populated, the preserved "no data yet" warning template fires on selection. A note for scope: this used to be briefly slated for earlier, then deliberately moved back to 3.0 — Fallout 4 isn't playable until its data exists, so building its UI now would mean building panels for data that doesn't exist yet.
 
+## ⬜ Bundled with 3.0 — the native ES modules migration
+
+**What it is.** Convert the app from global-scope `<script>` files (the current load-order-dependent boot) to native `<script type="module">` with real `import`/`export`. It rides **with** the Fallout 4 round, not before or after — the full reasoning matters, so here it is in four parts:
+
+- **(a) Why bundled with the third game.** Both the ES-modules migration and adding Fallout 4 **rewrite the same boot / load-order surface** — the script manifest, the boot sequence, the game-file selection. Doing them separately pays that cost and risk **twice**, against the exact same code. Bundling them means the boot surface is opened once.
+- **(b) The payoff is ENFORCEMENT.** A module can only touch what it imports. That finally makes the layering rule (**render must not write saves; services must not call render** — Protocol 23) **structurally enforced** rather than merely written and scanned for. Today the architecture-conformance gate (Suite 236) is a _static scanner_ that blocks new violations; modules make the boundary a _language-level fact_. This is also the retirement-rule keep-case (see R2): the conformance baseline that freezes the existing 46 crossings **must not be deleted in any trim until this lands** — its risk is live until the boundary is structural. That is the retirement rule working in the _keep_ direction.
+- **(c) It is NOT a build step.** Native `<script type="module">` needs **no bundler** — the repo stays the deployed artifact, exactly as today. "No build step" remains **permanent project policy** and must never be read as "no modules." Modules are a browser-native feature; the deploy model is unchanged.
+- **(d) Until it lands, the conformance baseline stays.** Restated because it's load-bearing: no trim (R3 or any future one) may delete the architecture-conformance baseline until modules make the layering structural. This is the single explicit dependency between the near-term rules restructure and the 3.0 round.
+
+**Why it sits here and not earlier.** It wants the boot surface open anyway (which 3.0 does), and its enforcement payoff is most valuable right when a third game is multiplying the number of files that could violate the layering. Doing it before 3.0 would open the boot surface twice; doing it after would mean Fallout 4's new files land on the old un-enforced boundary first.
+
+**Done means:** the app boots from native ES modules with no bundler and no build step, the render→save / service→render boundary is import-enforced (not just scanner-enforced), and the now-redundant static conformance baseline can finally be retired under the retirement rule.
+
 **After Fallout 4 ships:** a parity retrofit pass backports any gold-standard per-game ideas discovered while building Fallout 4 back into New Vegas and Fallout 3.
 
 **Done means:** Fallout 4 is a selectable, fully-built third machine.
@@ -525,6 +618,28 @@ This is a curated, combined list of gameplay and immersion features, all built o
 **What it is.** An open-ended, for-fun analysis exercise: pick existing features and imagine rebuilding each from the ground up into the best possible version. Four tiers — Quick, Medium, Ambitious, and one Mega — each a from-scratch reimagining of a _different existing_ feature (not new inventions), each given the same full treatment (what, why, how, what's better, how it fits, the tradeoff, effort/risk, and whether it needs the full plan-build-audit workflow).
 
 **Why it's dead last.** By your own placement — it's just for fun, and it runs after everything, including the release. Analysis only.
+
+---
+
+# ⬜ Unversioned — recorded, not yet scheduled (with the reason each has no version)
+
+_This is NOT the "parked drawer." The standing rule is that nothing sits vaguely parked — so each item here carries an explicit reason it has no version yet AND what would earn it one. They are consciously unscheduled, not forgotten. Both arrived in the 2026-07-18 placement pass from the two external reviews._
+
+## ⬜ CSS cascade cleanup — replace specificity-bump ancestor selectors with native `@layer`
+
+**What it is.** The stylesheets lean on ancestor-selector specificity bumps to win the cascade in places; native CSS `@layer` would express the same precedence declaratively, without the fragile specificity arithmetic.
+
+**Why it's unversioned.** It's **legitimate but expensive, and nothing is forcing it** — no feature is blocked, no bug traces to it, and it touches the whole cascade at once (high blast radius for a pure refactor). Assigning it a version now would be inventing urgency it doesn't have.
+
+**What would earn it a slot.** A UI/CSS pass that's already opening the cascade — the natural host is the **2.9.0 UI-consistency audit** (which already adds cross-panel style guards) or the Round-2 deep-polish program. When one of those opens the stylesheets anyway, this rides along instead of being its own risky standalone pass.
+
+## ⬜ Wire manual inventory quantity / equip changes into the event log
+
+**What it is.** Manual inventory changes don't reach the Terminal Record (`state.eventLog`). **Verified against `js/ui/ui-render-inventory.js` (2026-07-18) — the gap is real, the reviewer cited docs but the claim holds against code:** adding an item (`item.added`), the quantity ± stepper (`adjItemQty`, which emits nothing at all), and equip (`item.equipped`) all fire **animation/echo handlers only** — no `_logEvent` call. By contrast craft, scrap, trade, sleep, level-up, kills and caps DO log. So a player who manually adjusts their cargo gets a transient on-screen echo but no durable record, while nearly every other native action is recorded.
+
+**Why it's unversioned.** It earned its slot (verification passed) but there's **no version pressure** and it's small. Forcing it into a version now would be presumptuous.
+
+**What would earn it a slot — and the natural home.** The **2.9.0 Terminal Record consolidation** (the canonical campaign-history surface) plus the **inventory-panel rebuild** in the 2.9.0 gameplay set both already establish native, manual, no-AI logging — this is a clean fold-in there (add three `_logEvent` calls at the existing `addItem` / `adjItemQty` / `toggleEquipItem` write points). Left unassigned per the placement directive until that work opens the surface.
 
 ---
 
@@ -542,6 +657,9 @@ _Finished or ruled out — listed briefly so they don't resurface as pending._
 - **Voice input** — sidelined (browser speech is finicky and real scope); on file as a future wildcard only.
 - **Day/night cycle** — cut (see WASTELAND UPLINK above for the history).
 - **Companion memory, the streaming two-phase narrator, Web Workers, and DLC map zones** — moved out to the Fallout 4 round (3.0), where the heavier AI and data work belongs.
+- **Transactional comma-separated commands** — ruled out (owner, 2026-07-18). The current partial-success behavior is **correct**: if you type four comma-separated commands and one has a typo, the other three should still apply. Making the batch all-or-nothing would be a regression, not a fix.
+- **Consolidating the ~50 device-preference keys into one master key** — ruled out (owner, 2026-07-18). One master key **increases blast radius on a bad write** — a single corrupt write could take out every preference at once, where today the keys fail independently. The spread-out keys are the safer design.
+- **Precaching the OCR engine** — ruled out (owner, 2026-07-18). The **lazy first-use fetch stays** — the OCR engine (Tesseract) is only pulled when the user actually scans, and precaching it would bloat every install for a feature most sessions never touch.
 
 ---
 
