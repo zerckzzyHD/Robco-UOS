@@ -1,0 +1,21 @@
+{
+  "__doc__": "Accepted Protocol 23 violation baseline (tests/arch-conformance-check.js / Suite 236). Counts are per-file forbidden cross-layer call sites. The gate fails on any NEW violation beyond these counts; it never fails when the count shrinks. This is the countable debt the 2.9.0 hardening gate burns down by inverting these edges onto the event bus. Regenerate with: node tests/arch-conformance-check.js --write-baseline",
+  "renderWritesState": {
+    "js/ui/ui-render-character.js": 2,
+    "js/ui/ui-render-economy.js": 4,
+    "js/ui/ui-render-factions.js": 2,
+    "js/ui/ui-render-inventory.js": 3,
+    "js/ui/ui-render-ledger.js": 2,
+    "js/ui/ui-render-loot.js": 2,
+    "js/ui/ui-render-map.js": 2,
+    "js/ui/ui-render-record.js": 3
+  },
+  "serviceCallsView": {
+    "js/services/api-import.js": 1,
+    "js/services/api-router.js": 13,
+    "js/services/api.js": 1,
+    "js/services/cloud.js": 10,
+    "js/services/ocr.js": 1
+  },
+  "registryMutatesState": {}
+}

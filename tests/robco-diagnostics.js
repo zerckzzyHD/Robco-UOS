@@ -47759,6 +47759,104 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 236 — Static Architectural Conformance (Protocol 23 enforcement)
+//
+//  Protocol 23 ("rendering only renders · state.js owns state · registry is
+//  read-only · services don't own the view") was RIGHT as intent but UNENFORCED
+//  in practice — an architecture review measured ~20 saveState() calls from
+//  render files and ~26 render*()/loadUI() calls from service files, producing
+//  real UI↔services dependency cycles. An external ecosystem review independently
+//  proposed exactly this mechanism (planning/ATLAS_ECOSYSTEM_SYNTHESIS.md §C.1).
+//  This suite turns the honor-system rule into an executable one.
+//
+//  BASELINE, don't block-everything: the violations already exist, so a check
+//  that simply failed on them could never ship. Following the accepted-baseline
+//  pattern from the a11y burn-down (U9), the CURRENT violations are captured in
+//  tests/arch-conformance-baseline.json so the gate stays GREEN today; the gate
+//  FAILS only on a NEW violation beyond the baseline (the debt can't grow). The
+//  baseline is the countable debt the 2.9.0 hardening gate burns down by
+//  inverting these edges onto the event bus — this unit does NOT fix the debt.
+//
+//  Zero false positives is the bar (Protocol 45): the scanner strips comments
+//  and string literals before matching, so a token in prose/a string is never
+//  counted. The scan + diff logic lives in tests/arch-conformance-check.js
+//  (also runnable standalone for the red-then-green proof). 6 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 236 — Static Architectural Conformance (Protocol 23 enforcement)');
+
+  const archCheckPath = path.join(ROOT, 'tests', 'arch-conformance-check.js');
+  assert(
+    fs.existsSync(archCheckPath),
+    '236.1: tests/arch-conformance-check.js (the scanner) exists'
+  );
+
+  const arch = require('./arch-conformance-check.js');
+  const current236 = arch.scanAll();
+  const baseline236 = arch.loadBaseline();
+
+  assert(
+    baseline236 && baseline236 !== 'INVALID' && typeof baseline236 === 'object',
+    '236.2: tests/arch-conformance-baseline.json exists and is valid JSON'
+  );
+  assert(
+    !!baseline236 &&
+      baseline236 !== 'INVALID' &&
+      arch.RULES.every(r => baseline236[r.key] && typeof baseline236[r.key] === 'object'),
+    '236.3: baseline declares all three rule maps (renderWritesState, serviceCallsView, registryMutatesState)'
+  );
+
+  const { newViolations: nv236 } = arch.diff(
+    current236,
+    baseline236 === 'INVALID' ? {} : baseline236
+  );
+
+  // Make the visible debt countable in the runner output (task requirement).
+  const totals236 = arch.RULES.map(r => `${r.key}=${arch.ruleTotal(current236[r.key])}`).join(', ');
+  console.log(`  [arch] Protocol 23 debt now baselined: ${totals236}`);
+  if (nv236.length)
+    for (const v of nv236)
+      console.log(
+        `  [arch] NEW VIOLATION: ${v.rule} — ${v.file} has ${v.current} (baseline ${v.baseline})`
+      );
+
+  // ── The three enforced rules — one aggregate assert each. The assert COUNT is
+  // fixed (independent of how many violations exist) so the Suite 28 end-of-run
+  // count reconciliation stays stable as the 2.9.0 debt burns down. ──
+  const nvFor = key => nv236.filter(v => v.rule === key);
+  assert(
+    nvFor('renderWritesState').length === 0,
+    '236.4: RULE — render files must not write state (no saveState() from js/ui/ui-render*.js); no NEW violation beyond baseline' +
+      (nvFor('renderWritesState').length
+        ? ' — ' +
+          nvFor('renderWritesState')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+  assert(
+    nvFor('serviceCallsView').length === 0,
+    '236.5: RULE — services must not call the view (no render*()/loadUI() from js/services/**); no NEW violation beyond baseline' +
+      (nvFor('serviceCallsView').length
+        ? ' — ' +
+          nvFor('serviceCallsView')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+  assert(
+    nvFor('registryMutatesState').length === 0,
+    '236.6: RULE — registry is read-only (no saveState()/state assignment from reg_*.js/registry-core.js); no NEW violation beyond baseline (baseline is 0)' +
+      (nvFor('registryMutatesState').length
+        ? ' — ' +
+          nvFor('registryMutatesState')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
