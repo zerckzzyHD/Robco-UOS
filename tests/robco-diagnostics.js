@@ -48005,6 +48005,80 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 237 — Local-artifact backup nudge (Protocol 48)
+//
+//  Protocol 48 adds a pre-push REMINDER to refresh the private archive when the
+//  local-only artifacts (library/, planning/, memory) have changed since the
+//  last sync. Those artifacts live nowhere but the owner's machine — the public
+//  repo gitignores them — so a machine loss destroys them. The reminder must be
+//  a NUDGE, never a gate: it can never fail or block a push, and on any machine
+//  where it can't determine state (no private archive, unresolved path, git
+//  unavailable) it stays silent and lets the push proceed (Protocol 33 DNA).
+//
+//  This suite locks the invariant that must never silently break: the nudge
+//  cannot fail a push. Both the static contract (no non-zero exit, a top-level
+//  catch, a non-blocking hook invocation that keeps the full gate) and the real
+//  behavior (bogus path → exit 0; default resolution → exit 0) are asserted.
+//  8 tests.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 237 — Local-artifact backup nudge (Protocol 48)');
+
+  const nudgePath237 = path.join(ROOT, 'scripts', 'backup-nudge.js');
+  const nudgeExists237 = fs.existsSync(nudgePath237);
+  assert(nudgeExists237, '237.1: scripts/backup-nudge.js exists (Protocol 48 nudge script)');
+
+  const nudgeSrc237 = nudgeExists237 ? fs.readFileSync(nudgePath237, 'utf8') : '';
+  assert(
+    nudgeExists237 && !/process\.exit\(\s*[1-9]/.test(nudgeSrc237),
+    '237.2: the nudge never exits non-zero — no process.exit() with a non-zero code (fail-safe: it can never fail a push)'
+  );
+  assert(
+    nudgeExists237 && /\bcatch\b/.test(nudgeSrc237),
+    '237.3: the nudge wraps its logic in a top-level catch so an unexpected error can never escape to the shell'
+  );
+
+  const prePush237 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+  assert(
+    /node\s+scripts\/backup-nudge\.js/.test(prePush237),
+    '237.4: the pre-push hook invokes node scripts/backup-nudge.js'
+  );
+  assert(
+    /node\s+scripts\/backup-nudge\.js\s*\|\|\s*true/.test(prePush237),
+    '237.5: the pre-push nudge invocation is non-blocking (suffixed with `|| true`) so even a crashing node cannot fail the push'
+  );
+  assert(
+    /npm run gate\b/.test(prePush237),
+    '237.6: the pre-push hook still runs the full gate — the nudge was ADDED, not swapped in for the gate'
+  );
+
+  // ── Behavioral fail-safe: the script must exit 0 no matter what. ──
+  const { spawnSync: spawn237 } = require('child_process');
+  const bogus237 = spawn237('node', ['scripts/backup-nudge.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+    env: { ...process.env, ROBCO_BACKUP_REPO: path.join(ROOT, 'no', 'such', 'archive', 'xyz') },
+  });
+  assert(
+    bogus237.status === 0,
+    '237.7: with the archive repo pointed at a non-existent path the nudge exits 0 (cannot determine state, stays silent, push proceeds)'
+  );
+
+  const dflt237 = spawn237('node', ['scripts/backup-nudge.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert(
+    dflt237.status === 0,
+    '237.8: with default resolution the nudge exits 0 whether or not the private archive is present — it never blocks a push'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

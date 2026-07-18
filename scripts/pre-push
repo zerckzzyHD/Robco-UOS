@@ -5,3 +5,12 @@
 # before anything reaches origin. CI runs the same gate — parity holds here.
 npm run gate || exit 1
 # ── End pre-push gate ─────────────────────────────────────────────────────────
+
+# ── Local-artifact backup NUDGE (Protocol 48) — NEVER a blocker ───────────────
+# A fail-safe reminder to refresh the private archive when the local-only
+# artifacts (library/, planning/, memory) have changed since the last sync. It
+# can never fail or block a push: the script always exits 0, and the trailing
+# `|| true` is a second guarantee that even a crashing node cannot break the
+# push. On a machine without the private backup it stays completely silent.
+node scripts/backup-nudge.js || true
+# ── End backup nudge ──────────────────────────────────────────────────────────

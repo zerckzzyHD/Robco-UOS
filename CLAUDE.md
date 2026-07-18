@@ -54,11 +54,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (3396 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (3404 tests via gate:fast)
 git push origin main  # CACHE_NAME must already be bumped (Protocol 1)
 ```
 
-- **3396 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **3404 tests must pass.** If fewer pass, something is broken. Investigate before committing.
 - **Bump `CACHE_NAME` when a staged file is in the served/precached set** (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`) — the full rule and the automated commit-time guard (strict monotonic increase; non-served commits bypass it) live in **Protocol 1**.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
@@ -151,7 +151,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 3396 tests must pass
+- [ ] Run `git commit` — 3404 tests must pass
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -165,7 +165,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (3396 tests) → Protocol 2
+- [ ] Lint, format, commit (3404 tests) → Protocol 2
 
 ---
 
@@ -201,7 +201,7 @@ Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a *
 
 1. **Opus — Diagnose & Plan.** Opus investigates the actual code and git history, identifies the root cause, and writes a concrete plan: exact files, selectors, and line numbers; the change and its rationale; desktop/regression safety; and explicit verification steps. No edits in this stage.
 
-2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 3396-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
+2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 3404-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
 
 3. **Opus — Audit before done.** Opus independently reviews the actual committed diff and the verification evidence against the original root cause: is the issue fully resolved, nothing regressed, and is the change actually live on the deployed branch (origin/main) and site — not just a local/worktree commit? If anything falls short, loop back to stage 2. The task is "done" only after this audit passes.
 
@@ -229,7 +229,7 @@ Dispatch reports must be formatted for mobile reading: lead with a one-line summ
 
 Any change touching `index.html`, `css/`, or render JS (`ui-render.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
-The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 3396-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
+The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 3404-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
 ---
 
@@ -548,7 +548,7 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 **Same bar on both branches — there is no "looser" branch.** Every existing rule and protocol applies **identically on `dev`** as on `main`. `dev` is held to the same standard as `main` in every respect. In particular, on **every** `dev` commit and push:
 
-- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, the canonical Node test runner (`tests/robco-diagnostics.js`) green (236 suites, 3396 tests), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
+- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, the canonical Node test runner (`tests/robco-diagnostics.js`) green (237 suites, 3404 tests), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
 - **Protocol 1** (bump `CACHE_NAME` when a served/precached file changes) applies.
 - **Protocol 2 / 2a** (docs updated + test-count and suite-count synced across every location) applies.
 - **Protocol 38** (game-agnostic feature code), **39** (UTF-8 source integrity), **41** (end-of-task cleanup sweep), **42** (fix flaws found during testing/verification in the same commit), and the **Protocol 36b** escape-ratchet all apply.
@@ -600,6 +600,28 @@ The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if t
 **The fix — `library/MANIFEST.txt`:** a small filename-only list, **committed** as the one sanctioned exception to the `library/` gitignore (`library/*` + `!library/MANIFEST.txt`). Suite 220 uses it two ways: **220.7** (real on CI and locally, because the manifest is committed) — every `library/<file>` pointer named in `CLAUDE.md` / `ARCHITECTURE.md` / `README.md` must appear in the manifest, catching a pointer whose file was never manifested; **220.8** (local-only, a no-op on a clean CI checkout) — the manifest must exactly match `library/`'s real contents, the only check that can catch the manifest itself going stale. Neither can catch *content* staleness inside a doc — only that the *filename* a pointer names is real and manifested. See Suite 220 tests 220.7/220.8 for the full CI-vs-local reasoning.
 
 **How to apply:** whenever `library/` gains or loses a file, update `library/MANIFEST.txt` in the same commit (add/remove one line). Whenever `CLAUDE.md`'s pointer index gains a row naming a new `library/<file>`, that file must already be in the manifest — order matters: manifest first, pointer second, or 220.7 fails the build.
+
+---
+
+## Protocol 48 — Back Up the Local-Only Artifacts
+
+_(Protocol 47 is reserved for the future GENERATED test-catalog generator referenced in the 3-class library model — see the Reference Pointer Index header. This is the next free number.)_
+
+Three classes of artifact exist **only on the owner's local machine** and are **not on GitHub**: `library/` (the local-only Claude reference docs — brain dump, code map, test catalog, manifest), `planning/` (the whole gitignored build-queue tree — plans, audits, slates, mockups), and the orchestrator's persistent **memory** folder (the agent's `memory/` under the Claude session store). The public repo gitignores all three, so **a machine loss destroys them with no recovery path** — they exist nowhere else.
+
+A private GitHub repo (`zerckzzyHD/robco-uos-local-archive`, confirmed PRIVATE) is the only backup. Its working copy lives at `C:\Dev\!GEM\_robco-local-backup\`, and `sync.ps1` in that folder refreshes it: it mirrors `library/` and `planning/`, **discovers** the memory folder at runtime (no hardcoded GUIDs), stamps the archive with the public repo's current HEAD, then commits and pushes. It **fails loudly (non-zero exit, nothing pushed)** if any source is missing/empty or no memory folder is found — it never pushes a silent partial backup.
+
+**How it's run:** from a shell that can see the memory store. The PowerShell *tool* in this harness runs in a sandbox that cannot see `AppData\Roaming\Claude`, so run it via the Bash tool: `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Dev\!GEM\_robco-local-backup\sync.ps1"`. Test hooks: `-MemoryBase <path>`, `-NoPush`. (Full run-environment detail: the `backup-archive-repo` memory.)
+
+**When it MUST be run** — concretely, not vaguely:
+
+- After **any** change to a `library/` or `planning/` doc.
+- After **any** memory update (a new/edited/deleted memory file).
+- At the **end of any round, re-pin, or multi-step task pass** — before considering the task done — even if you believe nothing local-only changed, as a catch-all.
+
+**Automated nudge (never a blocker).** The pre-push hook runs `node scripts/backup-nudge.js` **after** the gate, suffixed with `|| true`. It is a fail-safe REMINDER, never a gate (Protocol 33 DNA): it can never fail or block a push (it always exits 0, and `|| true` is a second guarantee), and if it cannot determine state for any reason — the private archive isn't present, a path doesn't resolve, git is unavailable, anything unexpected — it stays **silent** and lets the push proceed. On a machine without the private backup a developer sees no difference at all. When the local-only artifacts have changed since the archive's last sync it prints a short reminder to run `sync.ps1`. Guarded by Suite 237.
+
+**Why:** these three artifact classes are load-bearing for every future session (the brain dump, the code map, the planning queue, the orchestrator's own memory) yet exist on exactly one disk. The earlier version of `sync.ps1` hardcoded a session-GUID path that could silently back up **nothing** when the GUID changed — a backup that quietly protects nothing is worse than none, because it removes the pressure to notice. The rewrite fails loudly instead, and this protocol plus the nudge make the "actually run it" step a standing discipline rather than a thing remembered by luck.
 
 ---
 
@@ -748,4 +770,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8`. Debounced 500ms writes with dirty-check. Flushed immediately on `beforeunload`.
 
-**Test suite:** 3396 tests across 236 suites in the single canonical Node runner `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.) Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** 3404 tests across 237 suites in the single canonical Node runner `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.) Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
