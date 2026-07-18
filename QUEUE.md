@@ -5,20 +5,22 @@ This is written for you to read on your phone. It's in execution order, top to b
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⬜ queued.
 
-_Last rewritten in full: 2026-07-15. Last updated: 2026-07-16 — folded in the warning-surface inventory's recommendations (`planning/WARNING_SURFACE_INVENTORY.md`): two new near-term units plus criteria added to the 2.9.0 round._
+_Last rewritten in full: 2026-07-15. Last updated: 2026-07-18 — two things at once: (1) marked the **entire 2.8.5 code + test health round (U1–U12) SHIPPED**, plus the UI-truthfulness fixes and the **Protocol 23 architecture-conformance enforcement** capstone; and (2) a **full ordering evaluation** of the whole roadmap — the floating end-of-round deliverables, the leftovers, and the pre-3.0 items are now each placed in dependency order with a one-line "why it sits here," and the one real mis-ordering (list virtualization) was moved to its foundation. Pinned to `bf8f188` (the re-baselined brain dump's baseline)._
 
 ---
 
 ## Where we are right now (the 5-second version)
 
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas overhaul, the offline native calculators, the Diagnostic Shell, the ambient runtime, the living core — all live.
-- **The brain dump is done** (the deep Claude-facing reconstruction of the project) and this roadmap file is its phone-readable companion.
-- **2.8.5's spine — the code + test health restructure — is SHIPPED** (2026-07-12). The heavier test-health/perf/a11y/bundle-size work under that same version number is deliberately deferred to a later pass (your call: stop at the spine, ship Fallout 3 next).
-- **The Fallout 3 device skin program is COMPLETE** (2.8.5 item 4) — units U0-U9, the bottom-dock occlusion fix, and the final skin-architecture extraction pass have all shipped on `dev` (the Pip-Boy spine, the weathered device casing, the six re-laid-out landscape boards, the scroll-trap fix, a real render-integrity guard that now checks 12 configs across both games, Fable's final Vault Boy figure with the whole U7 audit punch-list closed out, the fixed bottom-dock no longer overlapping board content on mobile, and — last — the extraction measurement that proved the per-game abstraction held). MANIFEST density (the item list being ~half a row short of the mockup) is **deferred to just before the Fallout 4 round** by your call. The extraction pass also named the one small FO4-readiness refactor to do before 3.0 — the "machine-family skin re-key" (its own ⬜ unit near the 3.0 section below).
-- **The save-integrity pass is SHIPPED** (item 5) — both layers: an automated save-contract/upgrade-path survival test with real fixtures, and the `navigator.storage.persist()` request plus the "memory core unstable" warning when the browser denies it. It passed its own independent audit.
-- **The data-provenance program is SHIPPED** — an unplanned but important content-correctness sweep that grew out of the Enclave-karma bug: the Fallout 3 karma engine was rebuilt (a made-up "Enclave hit squad" warning replaced with the real Regulators/Talon threat plus all 90 level-titles), then every game database across BOTH games was re-sourced to `fallout.wiki` and locked behind automated guards.
-- **A warning-surface inventory ran (2026-07-16)** — a systematic sweep asking "the 'memory core unstable' banner proves the app CAN warn — what else hits a risky or degraded condition and stays silent?" Its findings became two new near-term ⬜ units below (read-side save integrity; UI truthfulness fixes) plus criteria folded into the 2.9.0 round. The full analysis is `planning/WARNING_SURFACE_INVENTORY.md`.
-- **After that is 2.9.0** — the big one: gameplay systems, ambient life, and the "it's a real operating system" round.
+- **The brain dump is done and just RE-BASELINED** (2026-07-18, pinned to `bf8f188`) — the deep Claude-facing reconstruction of the project, now reshaped to hold only the un-derivable WHY (everything a script could compute was cut and replaced with a pointer). This roadmap file is its phone-readable companion.
+- **2.8.5 is now essentially DONE on `dev`** — the whole version, not just the spine. The code+test-health restructure, the library/token split, the Fallout 3 Pip-Boy skin, the data-provenance re-sourcing, all three save-integrity layers, the UI-truthfulness fixes, **and the entire U1–U12 health round** have landed. What's genuinely left before the release: the per-game legacy/schematic layout, a short tail of small leftovers, and the end-of-round review/synthesis deliverables. All expanded below in order.
+- **The Fallout 3 device skin program is COMPLETE** (item 4) — units U0-U9, the bottom-dock occlusion fix, and the final skin-architecture extraction pass all shipped on `dev`. MANIFEST density (the item list being ~half a row short of the mockup) is **deferred to just before the Fallout 4 round** by your call. The extraction pass named the one small FO4-readiness refactor to do before 3.0 — the "machine-family skin re-key" (its own ⬜ unit near the 3.0 section below).
+- **All three save-integrity layers are SHIPPED** — the write-side survival test + `persist()` request (Layers 1–2), and the read-side fail-loud pass (Layer 3): a corrupt campaign is now QUARANTINED not deleted, with READ FAULT / EVICTION boot banners, and a latent bug that could have deleted a HEALTHY save was found and fixed.
+- **The whole U1–U12 code + test health round is SHIPPED** — real offline-first + boot-smoke behavioral tests (green now means "it boots and paints," not just "the source greps clean"), static→behavioral test conversions, CI failure-evidence capture, gate profiling, protocol consolidation, the dev console stripped from the player build, measured perf, accessibility driven 40→**0**, and the security/offline/code-quality sweeps. **Capstone: Protocol 23 is now ENFORCED** by a static architecture-conformance gate — the render→state debt is baselined (20 render→save + 26 service→view + 0 registry) and can only shrink.
+- **The data-provenance program is SHIPPED** — every game database across BOTH games re-sourced to `fallout.wiki` and locked behind automated guards, and the Fallout 3 karma engine rebuilt.
+- **A warning-surface inventory ran (2026-07-16)** — findings became the shipped read-side/UI-truthfulness fixes plus criteria folded into the 2.9.0 round. Full analysis: `planning/WARNING_SURFACE_INVENTORY.md`.
+- **The end-of-round deliverables are now placed and ordered** — the blind workflow review (after its 4 process refreshes), an optional system-model review, and the ROBCO SYSTEM ATLAS — all as the 2.8.5 capstone, not floating.
+- **After that is 2.9.0** — the big one: gameplay systems, ambient life, and the "it's a real operating system" round. Its hardening gate (which burns down that baselined architecture debt) sits BEFORE the OS services that would otherwise multiply it — a load-bearing order.
 - **Then 3.0** is Fallout 4 as a real playable third game.
 - **A "for fun" recreation prompt sits dead last**, by your own placement.
 
@@ -54,9 +56,9 @@ Everything below expands each of those.
 
 ---
 
-# ⏭️ 2.8.5 — "Code + Test Health", then Fallout 3
+# 🔄 2.8.5 — "Code + Test Health", then Fallout 3 (essentially complete on `dev` — release + a short tail remain)
 
-This whole version is about making the foundation solid **before** stacking more on top. The items run **in this order on purpose.**
+This whole version is about making the foundation solid **before** stacking more on top. The items run **in this order on purpose.** Nearly all of it has now shipped on `dev`; what's left is the per-game legacy/schematic layout (item 6), a short tail of leftovers, and the end-of-round review/synthesis deliverables — all placed in order at the bottom of this version's block.
 
 ## 1. ✅ The code + test health phase — the spine (SHIPPED, 2026-07-12)
 
@@ -78,12 +80,25 @@ The rules doc used to carry a giant suite-by-suite test history loaded into ever
 
 **Still generated-in-name-only:** the test catalog is hand-synced today, not actually auto-generated from the test runner — that generator is explicitly a separate, later unit, same as originally scoped.
 
-**c) ⬜ Test-health pass — NOT done, deferred to a later pass.**
-This strand (real assertion-strength audit, coverage-preserving dedup, rebalancing brittle string-match tests toward behavioral ones, flaky-test hardening, gate profiling) did **not** run in this unit, beyond one concrete, related win: **the redundant PowerShell test-runner mirror was deleted** (it caught nothing the Node runner couldn't — its "behavioral" tests just shelled out to Node with a reconstructed sandbox — while costing ~13× the runtime and double the authoring cost of every test), which cut the fast gate from roughly 35s to roughly 12.7s and retired Protocol 15 (the project's first deliberate protocol retirement).
+**c) ✅ Test-health pass — SHIPPED as the U1–U12 health round (2026-07-18).**
+This strand ran in full as a numbered twelve-unit round. What it delivered, in plain English:
 
-**Folded audits — also NOT done, deferred with strand (c):** the expanded token-usage audit, the performance audit, the accessibility audit, the code-quality audit, the test-strength audit, the leftover offline-network sweep, the asset/bundle-size and caching audit, the dependency/security hygiene pass, and the protocol-consolidation pass. None of these ran in this unit.
+- **U1 — offline-first is now a real behavioral test, plus a fast boot-smoke at the COMMIT boundary.** Before this, committing green only meant "the source greps clean" — not one of the 234 suites opened a browser. Now a headless browser actually cuts the network, loads the app, and proves it reaches READY, paints a real screen, and a native tool still works with no network — and a lightweight boot check runs at commit time, so **green finally means "it boots and paints."** This closed the single biggest honesty gap in the whole gate.
+- **U2 — assertion-strength / dedup audit.** Read every static suite and ranked them. Verdict: about **92% of the "75% static" tests are legitimately static** and pull their weight; the false-confidence problem was real but concentrated in a small set — which became U3's hit-list rather than a mass rewrite.
+- **U3 (six slices) — static→behavioral conversions.** The concentrated weak spots were rebuilt to actually EXECUTE the code instead of grepping the source text: AI-save-import, map-visit memory, inventory write paths, sleep/wait, trade prices (which had been faking the math on the TEST side!), quick-log trackers, V.A.T.S. (extracting a pure combat-math function so it's genuinely run and checked), SPECIAL clamps, the save clobber-guard, delete-before-save ordering, the export→import round-trip, and cloud overwrite/delete protection. A static test proves the code LOOKS right; these prove it IS right.
+- **U4 — CI failure-evidence capture.** When CI goes red it now uploads a screenshot + console + per-check log, so a failure is diagnosable without a re-run.
+- **U5 — gate profiling + a flake fix.** Measured every gate step's wall-time (render-integrity ~51%, save-survival ~37% — nothing safe to cut) and fixed an animated-screenshot flake by freezing motion before capture.
+- **U6 — protocol consolidation.** Merged Protocols 32/33/35 and grouped 29/30/31 losslessly (~1,074 tokens saved every session, every old number still resolves) and added the **protocol-reference guard** so every "Protocol N" reference must point at a real heading — doc drift now ratchets like code drift.
+- **U7 — the ~204 KB dev console is stripped from the PLAYER build only,** with a deploy-fails-safe assertion; dev/staging keep it. Prod ships lighter and the console can't leak.
+- **U8 — performance: measured, already lean** (first paint ~70 ms); nothing safe to cut. Two real wins were deliberately deferred (gate the cloud warm-up; virtualize long lists — both placed in order below).
+- **U9 — accessibility 40 → 0.** The old "40 violations" baseline turned out to be **v2.0.1 ghosts** in a stale file; the 23 genuinely-missing form labels were fixed, and the gate now enforces a true zero.
+- **U10 — offline sweep: airtight** (all 47 core files precached; every online feature properly isolated).
+- **U11 — dependency / security: 0 vulnerabilities;** Firebase/Tesseract pinned or self-hosted; escaping verified.
+- **U12 — code-quality: already clean,** nothing to remove — recorded as evidence the sweep ran.
 
-**Two test-health items now have a named home here (2026-07-13):** a **real offline-first behavioural test** (does the app actually boot and stay usable offline — not just "the source looks right") and **CI failure-evidence packaging** (when CI goes red, capture the screenshots/logs/artifacts so the failure is diagnosable without a re-run) both belong to this deferred test-health pass — neither is a new unit. The gate review (2026-07-13) put it bluntly: the test count measures how _greppable_ the source is, not that the app _works_ — roughly 65-75% of the suite is static source-text analysis and nothing opens a browser at commit time, which is exactly how an entire panel once rendered invisible under a green gate. The `render-integrity.mjs` guard — "make green mean the user can see it" — is the #1 leverage point and the pattern the rest of this pass should follow. (Consequence worth stating plainly so it isn't treated as a headline metric: the raw test count is not a measure of correctness.)
+**★ The capstone — Protocol 23 is now ENFORCED (SHIPPED, Suite 236).** For years Protocol 23 ("rendering only renders; state.js owns state; services don't own the view") was right as intent but the code violated it. A static architecture-conformance scanner now **blocks new cross-layer violations at the gate.** Existing debt is baselined, not retroactively rewritten, so the number can only shrink: **20 render→save calls, 26 service→view calls, 0 registry violations.** (The external ecosystem review independently named this the single highest-value mechanism it could recommend.) This baselined debt is what the 2.9.0 hardening gate burns down — which is exactly why that gate must run before the OS services (see the ordering note in the 2.9.0 block).
+
+**The one-line takeaway:** the raw test count was never a measure of correctness; this round moved the needle from "the source greps clean" toward "the app demonstrably works," and made the gate honest about which it is.
 
 **Why it sat first.** This was the spine. Everything after it — Fallout 3, the schematic layout, and the entire 2.9.0 round — would otherwise have been built on a codebase that was about to be torn apart and reassembled. Building Fallout 3 first would have meant building it twice.
 
@@ -93,15 +108,13 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **Done means (as actually delivered):** files are navigable and headed, dead code is gone, the rules doc is lean with the catalog moved out, a doc-reference integrity gate now catches drift automatically, the redundant test runner is gone with zero coverage loss, and the brain dump is re-baselined. The newcomer docs and the full test-health pass are explicitly not part of "done" here — they're queued, not forgotten.
 
-## 2. ⬜ Performance / accessibility / asset-and-bundle-size work (deferred past the spine — see item 1c)
+## 2. ✅ Performance / accessibility / asset-and-bundle-size work (SHIPPED — folded into the U1–U12 round)
 
-**What it is.** With the codebase clean, measure and actually improve real load performance, accessibility beyond the current baseline, and the size of what ships to the device.
+**What it was.** With the codebase clean, measure and actually improve real load performance, accessibility beyond the current baseline, and the size of what ships to the device.
 
-**Why it exists.** Mobile-primary means load time and payload size matter on a phone. Safer and easier to do once the code is restructured.
+**How it shipped.** This turned out to BE the back half of the U1–U12 round rather than a separate unit: **U7** stripped the 204 KB dev console from the player build (real payload cut), **U8** measured mobile boot and found it already lean (~70 ms first paint — no safe cuts, honestly reported, two wins deferred), and **U9** drove accessibility from a stale "40" to a true **0** and locked the gate to that floor. Every improvement is measured, not guessed — the explicit bar this item set for itself.
 
-**Status.** Not started. This is the deferred half of item 1's strand (c) — high-value, not spine — and now sits behind Fallout 3 rather than in front of it, per the owner's exit line.
-
-**Done means:** measured, real improvements — not guesses.
+**Done means:** measured, real improvements. Met.
 
 ## 3. ✅ Brain-dump update — re-baselined on the clean codebase (SHIPPED, 2026-07-12)
 
@@ -155,7 +168,7 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **~3272 tests** across the program (the same gate the rest of the project runs).
 
-**Small residuals still open (honest, low-priority):** New Vegas bestiary numbers are left as approximations on purpose — the game scales them by level, so there's no single wiki value to pin them to. There's also a dead internal RECIPES reference and a stale `library/TEST_CATALOG.md` to tidy in a later housekeeping pass — neither affects the app.
+**Small residuals still open (honest, low-priority):** New Vegas bestiary numbers are left as approximations on purpose — the game scales them by level, so there's no single wiki value to pin them to. Two other residuals from this sweep are now formally placed in the **2.8.5 tail** block below rather than "a later housekeeping pass": the dead internal RECIPES reference (tail item E) and the stale hand-maintained `library/TEST_CATALOG.md` (tail item D — which fixes the drift at the root by generating it instead of tidying it by hand). Neither affects the app.
 
 **Done means:** every game database across both games reads from the wiki, the corrections are guarded so they can't silently drift back, and the karma engine tells the truth. Shipped.
 
@@ -177,25 +190,127 @@ This strand (real assertion-strength audit, coverage-preserving dedup, rebalanci
 
 **Shipped (2026-07-16, dev — all three pieces plus the tail item):** the corrupt-save handler now quarantines the exact bytes (localStorage + a durable IndexedDB copy, never overwriting an earlier unresolved quarantine) instead of deleting; a QUARANTINED RECORD row in the saves list carries EXPORT + confirm-gated PURGE; the READ FAULT banner re-shows every boot until resolved; the EVICTION banner fires only on the strict three-part signature (boot marker absent from local storage AND recovered from cold storage this boot AND no campaign of either vintage) so first boots / swipe-aways / post-quarantine / slow-storage boots stay silent; degraded slot writes post a once-per-session notice naming which store held the save; and the compounded "cold storage offline" wording landed on the Layer-2 banner. The diagnosis also found and fixed a latent second defect: the old catch wrapped the post-load migration helpers, so a helper bug on a VALID save would have deleted it — helpers now fail soft, locked by a behavioral test proven red against the old code. Both banner branches, the valid-save no-banner path, the eviction false-positive family, and both degraded-write modes are behaviorally tested (Suite 233 + save-survival LAYER3 sections), with Diagnostic Shell triggers for every hard-to-reproduce condition.
 
-## ⬜ UI truthfulness fixes — stop reporting success on a partial or failed operation
+## ✅ UI truthfulness fixes — stop reporting success on a partial or failed operation (SHIPPED)
 
-**What it is.** Three tiny fixes from the same warning-surface inventory, grouped as one small batch because they share one theme: the UI currently reports success — or "nothing here" — when the truth is "the operation failed."
+**What it was.** Three tiny fixes from the warning-surface inventory, grouped because they shared one theme: the UI was reporting success — or "nothing here" — when the truth was "the operation failed." All three shipped alongside the read-side save pass.
 
-- **A failed cloud-archive fetch must not masquerade as "NO ARCHIVES ON FILE."** The saves list already has a fully-built "ARCHIVE LINK FAILED" state — but it's unreachable, because the fetch swallows every error and returns an empty list. A user whose connection hiccups is currently told they have no cloud saves at all — the scariest possible mislabel, since it reads as "your saves are gone." Fix: let the failure reach the failure state that's already written. No new UI needed.
-- **"SYNC COMPLETE" must not hide failures.** Per-save upload failures are silently left out of the sync summary — two of four saves can fail and the user is still told sync completed. Fix: count the failures and say so, and never say COMPLETE when the count is nonzero.
-- **A real Google sign-in failure must show something.** A user cancelling the popup is rightly silent, but a genuine failure (network, blocked popup, provider error) currently shows nothing at all — the user taps SIGN IN and nothing visibly happens. Fix: a clear failure notice at the point of use. (Touching sign-in re-triggers the real-device mobile verification rule, Protocol 29.)
+- **A failed cloud-archive fetch no longer masquerades as "NO ARCHIVES ON FILE."** The saves list's already-built "ARCHIVE LINK FAILED" state was unreachable because the fetch swallowed every error and returned an empty list — so a connection hiccup read as "your cloud saves are gone." The failure now reaches the failure state that was already written.
+- **"SYNC COMPLETE" no longer hides failures.** Per-save upload failures were silently left out of the summary — two of four could fail and you'd still be told sync completed. It now counts the failures and never says COMPLETE when the count is nonzero.
+- **A real Google sign-in failure now shows something.** Cancelling the popup stays rightly silent, but a genuine failure (network, blocked popup, provider error) — which previously showed nothing at all — now surfaces a clear notice at the point of use. (Re-verified on a real device per Protocol 29.)
 
-**Why it sits here.** Each is tiny and none needs new UI — they reconnect or one-line existing surfaces — so they batch into one small near-term unit alongside the read-side pass above rather than waiting for the 2.9.0 audits. Source: `planning/WARNING_SURFACE_INVENTORY.md`.
+**Done means:** none of the three flows can report success (or an innocent empty state) when the operation actually failed. Met. Source: `planning/WARNING_SURFACE_INVENTORY.md`.
 
-**Done means:** none of the three flows can report success (or an innocent empty state) when the operation actually failed.
-
-## 6. Legacy / schematic per-game layout
+## 6. ⬜ Legacy / schematic per-game layout
 
 **What it is.** The plain, flat, chrome-less "schematic" fallback layout — the dense engineering-diagram view — brought current and made correct and dynamic for every game. As the fancy hardware boards were built, this fallback layout drifted; this fixes it so it reflects the current feature set and adapts per game like the immersive panels do.
 
 **Why it exists.** A flat, high-clarity, high-density alternative to the full hardware dressing already exists in one place (the Module Bay's schematic view). This formalizes it per game. The fuller "schematic mode on every tab" formalization is split off into the OS round (2.9.0); this 2.8.5 unit is about making the flat layout correct and dynamic for all games.
 
+**Why it sits here (foundation-before-consumer — VERIFIED CORRECT).** This is the direct foundation for the 2.9.0 OS round's "schematic-mode formalization" (which makes it a first-class OS concept on every tab). Getting the flat layout correct and dynamic per game FIRST means the 2.9.0 formalization builds on a correct base instead of formalizing a drifted one. The order (this in 2.8.5, formalization in 2.9.0) is right as-is — no change.
+
 **Done means:** each game has a working, current schematic-mode layout alongside its full machine.
+
+---
+
+# ⬜ 2.8.5 tail — leftovers, then the end-of-round deliverables (ORDERED)
+
+Everything above has shipped. This block is the rest of 2.8.5, sequenced **foundations-first**: the small residual fixes run first (they're cheap and unblock nothing downstream), then the review/synthesis deliverables that are meant to look back over the whole finished round — so they run once there's a finished round to look at.
+
+## The leftovers — small residual fixes (run these first, in this order)
+
+These are genuinely small. They're ordered data-safety → test-health → perf → hygiene, but any of them can ride an ordinary commit; none blocks the others.
+
+### A. ⬜ Save-integrity Layer 3 — the write-side quarantine follow-up
+
+**What it is.** Layer 3 made the READ side fail loud (a corrupt campaign is quarantined, not deleted). This closes a residual on the WRITE side the same pass exposed: a **valid, healthy old save can still be wrongly quarantined if the migration WRITE hits a storage quota** mid-upgrade. The read path can't tell "the bytes are corrupt" from "the bytes were fine but the re-write ran out of room," so a quota-failed migration currently looks identical to corruption and the good save gets quarantined.
+
+**What it depends on.** Layer 3 (shipped) — this is its direct residual, nothing else.
+
+**Why it's first.** It's the only leftover that can cost a user real data (a healthy save wrongly sidelined). Same principle that let save-integrity jump ahead of cosmetics: data-safety outranks polish. Small, but highest of the small.
+
+**Done means:** a quota failure during a migration write is distinguished from genuine corruption — the healthy save is preserved and retried/surfaced, never quarantined as if it were corrupt.
+
+### B. ⬜ The deferred U3 render-harness test slice
+
+**What it is.** One slice of the U3 static→behavioral conversion round was deferred: converting the render-harness-dependent suites to actually drive the render path rather than grep it. The rest of U3's six slices shipped; this is the one left on the bench.
+
+**What it depends on.** U3 (shipped) and the existing render-integrity harness (exists) — no missing foundation, it's just unfinished U3 work.
+
+**Done means:** the deferred render-path suites execute the real render and assert the result, matching the behavioral bar the rest of U3 set.
+
+### C. ⬜ The two deferred U8 perf wins — SPLIT, because one of them belongs to 2.9.0
+
+U8 measured the app as already lean and deferred exactly two real wins. On the ordering evaluation these do **not** belong in the same place:
+
+- **C1 — gate the cloud warm-up (near-term, here).** A small, self-contained win: don't warm up the cloud connection until it's actually needed. Depends only on U8's measurement (done). No downstream consumer. Runs here.
+- **C2 — virtualize long lists (MOVED to 2.9.0 — see the flag below).** ⚠ This one was going to be a standalone near-term perf pass, but the 2.9.0 inventory-panel rebuild **also** virtualizes long lists as its stated foundation. Doing it twice — once against today's flat list, then again when that list is rebuilt — is a Protocol 22 parallel-implementation trap: the near-term version would be thrown away. So list virtualization is **re-sequenced into the 2.9.0 inventory-panel foundation** and built once, there. (This is the one genuine mis-ordering the evaluation found: a perf win sitting in front of the very rebuild that would redo it.)
+
+**Done means (C1):** the cloud connection is warmed lazily, measured before/after.
+
+### D. ⬜ The TEST_CATALOG generator — stop hand-maintaining a doc that has drifted twice
+
+**What it is.** `library/TEST_CATALOG.md` is GENERATED-class **in intent** but hand-synced **today**, and it has drifted twice (its headline stale at 3107, then 3358, while reality was 3392). This builds the generator that produces it from the test runner and gate-diffs it against the committed copy — turning it from a standing lie-in-waiting into a computed artifact.
+
+**What it depends on.** The runner (exists). The one thing genuinely gating it is a **design decision, not a missing foundation**: `library/` is gitignored, so a naive gate-diff can't run on a clean CI checkout (the same gitignored-`library/`-vs-CI-diff tension the doc-integrity guards already navigate). Resolve that, and the generator is straightforward.
+
+**Why it sits with the deliverables.** It's the concrete first instance of the exact principle the ROBCO SYSTEM ATLAS formalizes — **generate what a script can compute; never hand-maintain it.** Best done alongside/just before the Atlas so they share the "generation over maintenance" plumbing rather than inventing it twice.
+
+**Done means:** the catalog is regenerated from the runner and gate-checked against its committed copy; no human ever hand-edits a count in it again.
+
+### E. ⬜ The FO3 RECIPES dead reference
+
+**What it is.** A dead internal RECIPES reference left over from the data-provenance sweep — pure hygiene, affects nothing the user sees.
+
+**What it depends on.** Nothing. It can ride any commit.
+
+**Done means:** the dead reference is removed and nothing else changes.
+
+## The end-of-round deliverables — run once the round is finished (ORDERED)
+
+These look back over the completed 2.8.5 round, so they're sequenced last. They're analysis/synthesis, not code, so **none of them gates the `dev → main` release** — the release can ship whenever the code tail (leftovers above + the schematic layout) is done; these can land around it.
+
+### F. ⬜ First: the four process refreshes (the workflow review's foundation)
+
+**What it is.** The blind workflow review (G, next) reviews the Dispatch multi-model workflow itself — and a review is only as good as the inputs it reviews. Four things must be refreshed to current truth FIRST, or the review critiques a stale process:
+
+1. **The session-launch discipline** — the spec-lock / consolidate-before-starting rule (Protocols 8 + 28), brought current.
+2. **The plain-English reporting standard** — the phone-formatted "it's live, here's how to test it" reporting rule (Protocol 9), brought current.
+3. **Protocol-consolidation as evidence the process PRUNES** — U6 is the proof the workflow can remove weight losslessly, not only add it; that becomes an explicit input to the review.
+4. **Copy-paste-block delivery** — the standard for handing ready-to-paste blocks (to the owner, and to external models), brought current.
+
+**What it depends on.** The round being done (so the refreshes describe the real, current process).
+
+**Why it's first among the deliverables.** It's the literal foundation of G — the review can't be trustworthy against a stale picture of its own subject.
+
+**Done means:** all four are current and written down, ready to be handed to the review as its inputs.
+
+### G. ⬜ Then: the blind workflow review
+
+**What it is.** A blind (independent, no-peeking-at-the-answer) review of the Dispatch three-model workflow — is Fable/Opus/Sonnet actually pulling its weight, are the hand-offs clean, where does the process leak or waste.
+
+**What it depends on.** The four refreshes (F) — that's the whole reason F sits in front of it.
+
+**Done means:** a verdict on the workflow with concrete, checkable findings, run against the current (refreshed) process — not a stale one.
+
+### H. ⬜ Optional: the system-model review (owner-gated)
+
+**What it is.** An OPTIONAL external review of the project's system MODEL (its representation of itself), run only if you want it. Per the ecosystem synthesis, it must be kept **small and question-scoped** (a large-context review degrades and tends to adopt your own errors rather than catch them).
+
+**What it depends on.** A **portable brief generated fresh from the now-pinned brain dump** (the §20 spec in the brain dump). That foundation is available now — the brain dump was just re-baselined and pinned to `bf8f188` — so this is unblocked whenever you want it. It is **not** a standing doc: it's generated fresh each time so it's always accurate because it's always new.
+
+**Why it's optional.** Only worth running if you actually want an outside eye on the model; the synthesis was explicit that a ceremonial review isn't worth its cost.
+
+**Done means (if run):** a small, question-scoped external pass returns findings in the required claim → provenance → falsification format, or it isn't run at all.
+
+### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph
+
+**What it is.** The synthesis deliverable from the ecosystem cross-review (`planning/ATLAS_ECOSYSTEM_SYNTHESIS.md`): a single generated representation of the whole system, offering **8 views over one graph** — and, load-bearing, the **assurance view is one of those eight** (generated FROM the test suite's structure so it can never drift from what's actually guarded). The governing rule from the synthesis: **generate everything a script can compute; hand-maintain only the un-derivable WHY.**
+
+**What it depends on.** (1) The **pinned baseline** — every Atlas artifact is anchored to one commit and marked degraded when the repo moves (available now, `bf8f188`). (2) The **architecture-conformance scanner** (shipped, Suite 236) and a cheap **dependency-structure matrix**, which are the deterministic inputs the assurance/dependency views are generated from. (3) The **TEST_CATALOG generator** (D) — same "generate, don't maintain" plumbing, which is why D is best done just before this.
+
+**Why it's last.** It's the capstone that represents the finished round, and it wants the round finished and pinned to represent it honestly. Its foundations all exist now, so nothing blocks it once the round settles.
+
+**Done means:** one generated Atlas, pinned to a baseline, with 8 views (assurance among them) that are computed from source rather than hand-authored — so it can't rot the way the docs it replaces did.
 
 ---
 
@@ -219,7 +334,7 @@ This is deliberate planning, not busywork — the round touches gameplay and the
 
 **What the hardening gate must close (from the architecture review):**
 
-- **The UI↔services dependency cycles.** The render layer has quietly become a _second state manager_: render files call `saveState()` directly (~22 calls across 8 files) and there are ~31 service→view (`render*()` / `loadUI()`) call sites across 5 service files, producing real bidirectional cycles. ⚠ **This means CLAUDE.md Protocol 23 — "rendering only renders; state.js owns state; services don't own the view" — is RIGHT as intent but currently UNENFORCED: the code violates it.** The fix is **enforcement, not softening the rule** — invert the edges so services emit and the UI subscribes, then add a gate guard that fails when a render file writes a save or a service calls a render function. This is the single highest-damage governance-debt item in the project today (a stray `saveState()` on a render path is a data-loss / trust risk, not just an afternoon).
+- **The UI↔services dependency cycles.** The render layer had quietly become a _second state manager_: render files call `saveState()` directly and services reach back into `render*()` / `loadUI()`, producing real bidirectional cycles. ✅ **UPDATE (2026-07-18):** the ENFORCEMENT half of this already shipped in the U1–U12 capstone — a static architecture-conformance gate (Suite 236) now **blocks any NEW cross-layer violation**, and the existing debt is measured and **baselined at 20 render→save + 26 service→view + 0 registry** (it can only shrink from here). ⚠ Protocol 23 is therefore **no longer unenforced** — the rule now bites. What this gate item still owes is the **burn-down**: actually invert the baselined edges (services emit, the UI subscribes) so the baseline counts drop toward zero, not just hold. This is still the single highest-damage governance-debt item — a stray `saveState()` on a render path is a data-loss / trust risk — but the ratchet that stops it getting WORSE is already live; the remaining work is paying down the 46 crossings that predate it.
 - **Bootstrap isolation.** ~45 boot-phase calls sit under ONE outer try/catch with zero per-phase isolation — a mid-boot throw can leave the app half-initialized. Add per-phase guards so a failing phase is isolated and surfaced, never silently swallowed, and classified fatal-versus-degradable: a degradable failure leaves unrelated functions usable with one clear, persistent notice; a fatal one stops the app pretending it's ready and shows a recovery path instead. Fail loudly, never silently — this is an acceptance criterion for this item, not a new audit.
 - **Event-bus hardening.** `RobcoEvents` has no `off` / `once` / dedup and swallows listener errors silently — fine at today's scale, a latent bug factory once dozens of OS subscribers pile on. Harden it before the OS round widens it, and while hardening it, fix the silent-swallow: a thrown event handler must not prevent unrelated handlers from running, and the failure must surface somewhere a session can see it rather than vanishing.
 - **The one escaped interval.** The AmbientRuntime heartbeat is already the single scheduler (one 250ms interval driving ~13 observers); exactly ONE stray `setInterval` escaped it. Fold it in so the "one heartbeat" invariant is actually true.
@@ -227,7 +342,7 @@ This is deliberate planning, not busywork — the round touches gameplay and the
 
 **Post-deploy TRUTH — the release-integrity gap this round also closes.** Everything the project verifies today answers _"is the repository correct?"_ — offline boot, persisted state, render integrity, the Linux/Windows gate (**pre-deploy confidence**). **Not one check answers _"did the user receive it?"_** — the expected version is live, the service worker actually installs, assets cache without a redirect failure, one critical workflow renders on the DEPLOYED site (**post-deploy truth**). The two can disagree while everything stays green — and they already have: a staging service worker silently failed to install because `sw.js` precached an `index.html` that redirects (browsers refuse to cache a redirect), so "REBOOT TERMINAL" did nothing and users sat on stale code **under a green gate.** Protocol 11 already requires deploy verification, but it is honor-system, so it drifts. The hardening gate turns that one already-proven failure mode into an automated post-deploy check — and when it catches a service-worker install/update failure, the **user** must be shown it, not just a log: detection is not degradation, knowing it failed and telling the user are two different jobs. **This is the home for the "post-deploy verification" idea — release/deployment integrity, not a new initiative or protocol.**
 
-**Why the order is load-bearing:** invert the cycles and harden the boundary FIRST, then the CLI / filesystem / peripheral bus / distribution network each plug into a clean seam instead of deepening three existing cycles.
+**⭐ Why the order is load-bearing (VERIFIED CORRECT — do not reorder).** Every headline OS feature in this round — the CLI, the DIR filesystem, the Peripheral Bus, the Distribution Network — is a **new service that renders.** The measured baseline (20 render→save + 26 service→view, now enforced by Suite 236) is exactly the seam those services plug into. Build the services first and each one lands on the debt and **multiplies it** — four more services adding their own render→save and service→view crossings on top of 46. Burn the baseline down FIRST (invert the cycles, harden the event bus, isolate boot, fold the stray interval) and the services plug into a clean seam instead. The conformance gate already stops the debt getting _worse_; this ordering is what stops the OS round from _inheriting_ it. The hardening gate MUST sit before any OS service — this dependency is the reason the whole round is sequenced planning → hardening → build, and it is correct as written.
 
 ## Then the build
 
@@ -282,7 +397,7 @@ This is a curated, combined list of gameplay and immersion features, all built o
 
 15. **Dialogue / speech-check helper.** Given your Speech, Barter, and skills, show which dialogue checks you'd pass. Canon-sourced where the data exists.
 
-**The foundation these sit on — the inventory panel + loadout overhaul.** Before crafting (7) and the loadout manager (11) can land, the inventory panel itself is rebuilt from a flat list into a sort/search toolbar, a per-row inspect drawer (surfacing item weight/value/effect from the database), an in-panel loadout header (total weight versus max, value, count), and per-row equip — with long lists virtualized for performance. Critical discipline: the underlying inventory data stays untouched; everything is derived at display time, so saves and cloud round-trip with zero migration risk. This foundation is built first, then crafting and loadouts layer on.
+**The foundation these sit on — the inventory panel + loadout overhaul.** Before crafting (7) and the loadout manager (11) can land, the inventory panel itself is rebuilt from a flat list into a sort/search toolbar, a per-row inspect drawer (surfacing item weight/value/effect from the database), an in-panel loadout header (total weight versus max, value, count), and per-row equip — with long lists virtualized for performance. Critical discipline: the underlying inventory data stays untouched; everything is derived at display time, so saves and cloud round-trip with zero migration risk. This foundation is built first, then crafting and loadouts layer on. **⚠ Ordering note (2026-07-18): the deferred U8 "virtualize long lists" perf win lands HERE, not as a near-term standalone.** This rebuild replaces the list-rendering path anyway, so virtualizing today's flat list first would just be thrown away when this lands — a Protocol 22 double-build. Build the virtualization once, as part of this foundation.
 
 **One combined ENCOUNTER flow.** V.A.T.S., threat assessment, the combat log, and looting are treated as one guided combat loop reachable from a single ENCOUNTER entry point — assess the enemy, its stats pre-fill V.A.T.S., the fight auto-logs, defeat rolls into loot. The individual pieces stay independently reachable for edge cases (loot a container with no fight, assess without engaging, log a narrative kill by hand).
 
