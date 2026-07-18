@@ -1773,6 +1773,136 @@ let importAsymmetryResult = null;
   await ctxW.close();
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §G — ⭐ F1: WRITE-side failure ≠ READ-side failure on the
+// legacy v7→v8 migration (real page). A VALID robco_v7 whose migration WRITE
+// (setItem 'robco_v8') fails must NOT be quarantined — the original bytes stay
+// intact and still loadable, the campaign boots WITH the data, and the failure
+// is surfaced loudly (MIGRATION WRITE FAULT) rather than misreported as a READ
+// fault. Under the pre-F1 code this exact fixture quarantined the healthy v7.
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxF1 = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const v7 = buildCurrentCampaign('FNV', 61); // lvl = 10 + 61 = 71, modern shape (no flat nf keys)
+  const v7Str = JSON.stringify(v7);
+  await ctxF1.addInitScript(raw => {
+    localStorage.setItem('robco_v7', raw);
+    // Force ONLY the robco_v8 migration write to fail (quota); every other key
+    // still writes, so quarantine/telemetry writes are never masked.
+    document.addEventListener('DOMContentLoaded', () => {
+      const realSet = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, val) {
+        if (k === 'robco_v8') {
+          const e = new Error('quota (F1 test)');
+          e.name = 'QuotaExceededError';
+          throw e;
+        }
+        return realSet.call(this, k, val);
+      };
+    });
+  }, v7Str);
+  const page = await ctxF1.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  const r = await page.evaluate(
+    expectedStr => ({
+      bootOk: (() => {
+        const bs = document.getElementById('bootScreen');
+        return !bs || getComputedStyle(bs).display === 'none';
+      })(),
+      v7Intact: localStorage.getItem('robco_v7') === expectedStr,
+      quarantine: localStorage.getItem('robco_v8_quarantine') !== null,
+      loadedLvl: window.snapshotActiveCampaign().campaigns.FNV.lvl,
+      readFaultBanner: !!document.getElementById('readFaultBanner'),
+      writeFaultLogged: (() => {
+        try {
+          return JSON.parse(MetaStore.get('robco_error_log') || '[]').some(e =>
+            /MIGRATION WRITE FAULT/.test(e.msg)
+          );
+        } catch (_) {
+          return false;
+        }
+      })(),
+    }),
+    v7Str
+  );
+  if (r.bootOk) pass('LAYER3 F1 write-fail — boot completed, never blocked/black-screened');
+  else fail('LAYER3 F1 write-fail — boot did NOT complete');
+  if (r.v7Intact && !r.quarantine) {
+    pass(
+      'LAYER3 F1 write-fail — the HEALTHY robco_v7 is left byte-intact and is NOT quarantined (write failure ≠ read failure)'
+    );
+  } else {
+    fail(
+      `LAYER3 F1 write-fail — healthy v7 harmed (intact=${r.v7Intact}, quarantined=${r.quarantine})`
+    );
+  }
+  if (r.loadedLvl === v7.lvl) {
+    pass(
+      'LAYER3 F1 write-fail — the campaign still boots WITH the migrated data (lvl 71), not a fresh blank campaign'
+    );
+  } else {
+    fail(
+      `LAYER3 F1 write-fail — did not boot with the v7 data (lvl=${r.loadedLvl}, expected ${v7.lvl})`
+    );
+  }
+  if (r.writeFaultLogged && !r.readFaultBanner) {
+    pass(
+      'LAYER3 F1 write-fail — surfaced loudly as a MIGRATION WRITE FAULT (FAULT ring), NOT the misleading READ FAULT banner'
+    );
+  } else {
+    fail(
+      `LAYER3 F1 write-fail — wrong surface (writeFaultLogged=${r.writeFaultLogged}, readFaultBanner=${r.readFaultBanner})`
+    );
+  }
+  await ctxF1.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SAVE_LAYER3 §H — F1 regression: a genuinely UNREADABLE v7 must STILL be
+// quarantined (Layer-3 read-side behaviour unchanged by the F1 split).
+// ═══════════════════════════════════════════════════════════════════════
+{
+  const ctxH2 = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const CORRUPT_V7 = '{unreadable v7 at boot ####';
+  await ctxH2.addInitScript(raw => {
+    localStorage.setItem('robco_v7', raw);
+  }, CORRUPT_V7);
+  const page = await ctxH2.newPage();
+  await page.goto(INDEX_URL);
+  await waitBooted(page);
+  const r = await page.evaluate(() => ({
+    bannerText: (() => {
+      const b = document.getElementById('readFaultBanner');
+      return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+    })(),
+    quarantineRaw: (() => {
+      try {
+        const env = JSON.parse(localStorage.getItem('robco_v8_quarantine'));
+        return { raw: env.raw, sourceKey: env.sourceKey };
+      } catch (_) {
+        return null;
+      }
+    })(),
+  }));
+  if (
+    r.quarantineRaw &&
+    r.quarantineRaw.raw === CORRUPT_V7 &&
+    r.quarantineRaw.sourceKey === 'robco_v7' &&
+    r.bannerText &&
+    /READ FAULT/.test(r.bannerText)
+  ) {
+    pass(
+      'LAYER3 F1 regression — a genuinely unreadable v7 is STILL quarantined (exact bytes, READ FAULT banner); the F1 split did not weaken read-side quarantine'
+    );
+  } else {
+    fail(
+      `LAYER3 F1 regression — unreadable v7 not quarantined correctly (${JSON.stringify(r.quarantineRaw)}, banner=${!!r.bannerText})`
+    );
+  }
+  await ctxH2.close();
+}
+
 await browser.close();
 
 // ── Verdict summary ────────────────────────────────────────────────────

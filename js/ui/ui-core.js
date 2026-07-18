@@ -411,26 +411,59 @@ function _hydrateStateFromStorage() {
     }
   }
   if (!loadedOk && v7Str) {
-    // migrateState stays INSIDE this try — it is integral to loading a v7 at
-    // all, and a false positive here now *quarantines* (recoverable) rather
-    // than *deletes* (SAVE_LAYER3).
+    // SAVE_LAYER3 F1 — separate a READ/PARSE failure from a WRITE-side failure
+    // on the legacy migration path. ONLY the JSON.parse sits in the
+    // quarantine-triggering catch: a v7 whose BYTES are unreadable is genuinely
+    // corrupt → quarantine is correct. But if the v7 PARSES FINE and then
+    // migrateState throws, or the migrated v8 container cannot be PERSISTED
+    // (quota), the original robco_v7 bytes are HEALTHY — they are left exactly
+    // where they are, never quarantined, still loadable next boot — and the
+    // failure is surfaced LOUDLY instead of swallowed. "couldn't read it"
+    // (quarantine) is a different failure from "couldn't save it" (fail loud).
+    let v7Parsed = null;
+    let v7Unreadable = false;
     try {
-      let savedState = JSON.parse(v7Str);
-      if (typeof migrateState === 'function')
-        savedState = migrateState(savedState.version || '1.0', savedState);
-
-      window.robco_v8 = {
-        activeContext: savedState.gameContext || 'FNV',
-        campaigns: {},
-      };
-      window.robco_v8.campaigns[window.robco_v8.activeContext] = savedState;
-      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
-
-      state = { ...state, ...savedState };
-      state.gameContext = window.robco_v8.activeContext;
-      loadedOk = true;
+      v7Parsed = JSON.parse(v7Str);
     } catch (e) {
+      // Genuinely unreadable bytes → quarantine (preserved whole, not erased).
+      v7Unreadable = true;
       _quarantineCorruptContainer('robco_v7', v7Str, e);
+    }
+    if (!v7Unreadable) {
+      try {
+        let savedState =
+          typeof migrateState === 'function'
+            ? migrateState(v7Parsed.version || '1.0', v7Parsed)
+            : v7Parsed;
+
+        window.robco_v8 = {
+          activeContext: savedState.gameContext || 'FNV',
+          campaigns: {},
+        };
+        window.robco_v8.campaigns[window.robco_v8.activeContext] = savedState;
+
+        // WRITE-side: a quota/persist failure here must NOT quarantine — the
+        // original robco_v7 is untouched and still loadable next boot. Fail
+        // LOUD (fault + banner), then still boot with the in-memory migrated
+        // campaign so the user sees their data THIS session; the untouched v7
+        // is retried (idempotently) on the next boot.
+        try {
+          localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+        } catch (writeErr) {
+          _reportMigrationWriteFault('robco_v7', writeErr);
+        }
+
+        state = { ...state, ...savedState };
+        state.gameContext = window.robco_v8.activeContext;
+        loadedOk = true;
+      } catch (migErr) {
+        // migrateState (or the container build) threw on a save that PARSED
+        // FINE — a migration bug, NOT unreadable bytes. Do NOT quarantine;
+        // leave robco_v7 intact for recovery once the bug is fixed. Fail LOUD
+        // and fall through to a fresh boot (state was not mutated above, so the
+        // fresh branch wraps pristine defaults, never partial data).
+        _reportMigrationWriteFault('robco_v7', migErr);
+      }
     }
   }
   if (!loadedOk) {
@@ -459,7 +492,15 @@ function _hydrateStateFromStorage() {
     state.factions.house.fame = state.sf || 0; // sf/si → house (Mr. House)
     state.factions.house.infamy = state.si || 0;
     ['nf', 'ni', 'lf', 'li', 'sf', 'si', 'ncr', 'leg'].forEach(k => delete state[k]);
-    localStorage.setItem('robco_v7', JSON.stringify(state));
+    // SAVE_LAYER3 F1 hardening (Protocol 42): the in-memory faction migration
+    // above already applied — this setItem only PERSISTS it. Wrapped so a quota
+    // failure here can never throw out of boot (the F1 write-fault path now
+    // reaches this line with a healthy campaign under storage pressure, where
+    // an unwrapped throw would black-screen; next boot re-runs this idempotent
+    // migration). The migrated state is fully usable this session regardless.
+    try {
+      localStorage.setItem('robco_v7', JSON.stringify(state));
+    } catch (_) {}
   }
   // Ensure all 14 faction keys exist (handles older saves missing new factions)
   if (!state.factions) state.factions = _buildFactions();
@@ -640,6 +681,39 @@ function _quarantineCorruptContainer(sourceKey, rawStr, err) {
       'error',
       'READ FAULT: ' + sourceKey + ' unreadable — quarantined, not erased. ' + envelope.reason
     );
+  } catch (_) {}
+}
+
+// SAVE_LAYER3 F1 — a WRITE-side failure on a save that READ FINE. The original
+// bytes are HEALTHY and are NEVER quarantined; but the migrated result could
+// not be persisted (quota), or a migrateState bug threw, so the failure is
+// surfaced LOUDLY rather than swallowed — the Layer-1 fail-loud bar. This is
+// deliberately NOT the quarantine path: "couldn't read it" quarantines the
+// unreadable bytes; "couldn't save it" leaves the healthy save alone and just
+// tells the user. Reuses the Layer-2 storage-warning banner (a persistence
+// failure is exactly what it announces — Protocol 22, no new banner) plus the
+// FAULT-lamp error ring. Wholly wrapped: the fail-loud layer must never itself
+// break boot (Protocol 33).
+function _reportMigrationWriteFault(sourceKey, err) {
+  try {
+    console.error(
+      '[RobCo] ' +
+        sourceKey +
+        ' migration WRITE failed — original bytes left intact (NOT quarantined):',
+      err
+    );
+  } catch (_) {}
+  try {
+    _recordError(
+      'error',
+      'MIGRATION WRITE FAULT: ' +
+        sourceKey +
+        ' read fine but the upgraded save could not be persisted — original left intact, not quarantined. ' +
+        String(err).slice(0, 200)
+    );
+  } catch (_) {}
+  try {
+    _showStorageWarningBanner();
   } catch (_) {}
 }
 

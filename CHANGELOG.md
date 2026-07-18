@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3392/3392 | Cache: robco-terminal-v2.8.0-r46 -->
+## [Unreleased]<!-- Tests: 3396/3396 | Cache: robco-terminal-v2.8.0-r47 -->
 
 ### Added
 
@@ -71,6 +71,7 @@
 - Fixed your cloud saves list showing "NO ARCHIVES ON FILE" — as if your account had none — when the app simply couldn't reach the cloud. A genuine connection failure now shows a clear "ARCHIVE LINK FAILED" message instead, so a network hiccup can never be mistaken for your saves being gone.
 - Fixed the "SYNC COMPLETE" message appearing even when some of your saves failed to upload. If any save doesn't make it, the summary now says so plainly — telling you how many failed and to retry — instead of falsely reporting a clean finish.
 - Fixed a failed Google sign-in showing nothing at all — you'd tap SIGN IN and, if it failed for a real reason (a blocked popup, no connection, a provider error), nothing visible would happen. A clear "SIGN-IN FAILED" notice now appears so you know to check your connection or popup blocker and try again. Simply closing the sign-in popup yourself stays silent, as before.
+- Fixed a healthy older save being wrongly set aside as "unreadable" when the problem was actually that the app couldn't _save_ the upgraded copy (for example, when device storage is full). The terminal now tells the difference: a save it genuinely can't read is still quarantined and recoverable, but a save it read perfectly and simply couldn't re-store is left exactly where it was — untouched and still loadable next time — while a small warning tells you the write didn't go through and to free up space or export a backup. Your loaded campaign stays fully usable for the rest of the session either way.
 
 ### Improved
 

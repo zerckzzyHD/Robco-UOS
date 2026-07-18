@@ -47189,6 +47189,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   const html233 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const hydrate233 = extractFunctionBody(uiCore233, '_hydrateStateFromStorage');
   const quarantine233 = extractFunctionBody(uiCore233, '_quarantineCorruptContainer');
+  const reportFault233 = extractFunctionBody(uiCore233, '_reportMigrationWriteFault');
   const reconcile233 = extractFunctionBody(uiCore233, '_reconcileMetaFromIdb');
   const saveToSlot233 = extractFunctionBody(uiSaves233, 'saveToSlot');
   const coldWrite233 = extractFunctionBody(state233, '_coldWriteObj');
@@ -47422,11 +47423,18 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // Spies + the REAL Layer-3 functions extracted from ui-core.js.
     vm.runInContext(
       'var _recordedErrors = []; function _recordError(t, m) { _recordedErrors.push(m); }' +
-        'var _bannerCalls = []; function _showReadFaultBanner(kind) { _bannerCalls.push(kind); }',
+        'var _bannerCalls = []; function _showReadFaultBanner(kind) { _bannerCalls.push(kind); }' +
+        'var _storageBannerCalls = 0; function _showStorageWarningBanner(x) { _storageBannerCalls++; }',
       sandbox
     );
     vm.runInContext(
       'function _quarantineCorruptContainer(sourceKey, rawStr, err)' + quarantine233,
+      sandbox
+    );
+    // SAVE_LAYER3 F1: the real write-fault reporter (write-side failures route
+    // here, never to quarantine) — extracted from source, same as the others.
+    vm.runInContext(
+      'function _reportMigrationWriteFault(sourceKey, err)' + reportFault233,
       sandbox
     );
     vm.runInContext('function _hydrateStateFromStorage()' + hydrate233, sandbox);
@@ -47436,6 +47444,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       state: vm.runInContext('state', sandbox),
       errors: vm.runInContext('_recordedErrors', sandbox),
       banners: vm.runInContext('_bannerCalls', sandbox),
+      storageBanners: vm.runInContext('_storageBannerCalls', sandbox),
       store,
     };
   }
@@ -47543,6 +47552,145 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         /COLD STORAGE IS OFFLINE/.test(uiCore233) &&
         qReads233 === 1,
       "233.14: the Layer-2 tail rider records 'denied-noidb' + compounds the banner copy when IndexedDB is absent, and the valid-save boot path carries exactly ONE quarantine existence check (the L2 near-zero-touch bound)"
+    );
+  }
+
+  // 233.15 F1 SPLIT — WRITE-side ≠ READ-side on the legacy migration path
+  //        (static): only JSON.parse(v7Str) sits in the quarantine catch; the
+  //        migrateState call + the robco_v8 persist run AFTER it, and a write
+  //        failure routes to _reportMigrationWriteFault (fail-loud, never
+  //        quarantine). The reporter reuses the Layer-2 storage banner + the
+  //        FAULT ring and NEVER calls _quarantineCorruptContainer.
+  {
+    const parseIdx233 = hydrate233.indexOf('v7Parsed = JSON.parse(v7Str)');
+    const v7QuarIdx233 = hydrate233.indexOf("_quarantineCorruptContainer('robco_v7', v7Str, e)");
+    const v7SetIdx233 = hydrate233.indexOf(
+      "localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8))"
+    );
+    const writeFaultCallIdx233 = hydrate233.indexOf(
+      "_reportMigrationWriteFault('robco_v7', writeErr)"
+    );
+    const migFaultCallIdx233 = hydrate233.indexOf("_reportMigrationWriteFault('robco_v7', migErr)");
+    assert(
+      parseIdx233 !== -1 &&
+        v7QuarIdx233 !== -1 &&
+        v7SetIdx233 !== -1 &&
+        // parse (quarantine-eligible) comes BEFORE the migration write
+        parseIdx233 < v7SetIdx233 &&
+        // both write-side throw sites report loud, not quarantine
+        writeFaultCallIdx233 !== -1 &&
+        migFaultCallIdx233 !== -1 &&
+        // the reporter is loud (fault + storage banner) and never quarantines
+        /MIGRATION WRITE FAULT/.test(reportFault233) &&
+        /_showStorageWarningBanner\(\)/.test(reportFault233) &&
+        !/_quarantineCorruptContainer/.test(reportFault233),
+      '233.15: F1 — the v7 path quarantines ONLY on a parse failure; a migrateState throw or a robco_v8 persist failure routes to _reportMigrationWriteFault (loud: FAULT ring + storage banner), never to quarantine — "couldn\'t read it" ≠ "couldn\'t save it"'
+    );
+  }
+
+  // 233.16 [behavioral, VM] ⭐ F1 red-then-green: a VALID robco_v7 whose
+  //        migration WRITE (setItem 'robco_v8') fails (quota) is NOT
+  //        quarantined — the original v7 bytes stay intact and still loadable,
+  //        the campaign still boots WITH the data (not fresh), and the failure
+  //        is surfaced loudly (MIGRATION WRITE FAULT + storage banner, NOT the
+  //        READ FAULT banner). Under the pre-F1 code this exact fixture
+  //        quarantined the healthy v7 and booted fresh.
+  {
+    const VALID_V7_16 = JSON.stringify({ gameContext: 'FNV', lvl: 27, caps: 900 });
+    let r233d = null;
+    let err233d = '';
+    try {
+      r233d = _runHydrateSandbox233(
+        { robco_v7: VALID_V7_16 },
+        // Force ONLY the robco_v8 migration write to fail; every other key still
+        // writes normally (so quarantine/telemetry writes are not masked).
+        'var _origSet16 = localStorage.setItem;' +
+          'localStorage.setItem = function (k, v) {' +
+          "  if (k === 'robco_v8') { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }" +
+          '  return _origSet16.call(localStorage, k, v);' +
+          '};'
+      );
+    } catch (e) {
+      err233d = e && e.message;
+    }
+    assert(
+      r233d &&
+        r233d.store.robco_v7 === VALID_V7_16 &&
+        !('robco_v8_quarantine' in r233d.store) &&
+        !('robco_v8' in r233d.store) &&
+        r233d.state &&
+        r233d.state.lvl === 27 &&
+        r233d.state.caps === 900 &&
+        r233d.errors.some(m => /MIGRATION WRITE FAULT/.test(m)) &&
+        r233d.storageBanners >= 1 &&
+        r233d.banners.length === 0,
+      '233.16: [behavioral] ⭐ a VALID v7 with a failing migration WRITE (quota) is NEVER quarantined — original v7 bytes intact, campaign booted WITH the data (lvl 27), loud MIGRATION WRITE FAULT + storage banner, and NO read-fault banner' +
+        (err233d ? ' — error: ' + err233d : '')
+    );
+  }
+
+  // 233.17 [behavioral, VM] F1 — a VALID v7 on which migrateState() THROWS is a
+  //        migration bug, not unreadable bytes: NOT quarantined, the original
+  //        robco_v7 left intact for recovery once the bug is fixed, surfaced
+  //        loudly (MIGRATION WRITE FAULT + storage banner, no READ FAULT).
+  {
+    const VALID_V7_17 = JSON.stringify({ gameContext: 'FNV', lvl: 22, caps: 500, __v7probe: true });
+    let r233e = null;
+    let err233e = '';
+    try {
+      r233e = _runHydrateSandbox233(
+        { robco_v7: VALID_V7_17 },
+        // Make migrateState throw ONLY on the probed v7 payload, so the
+        // fresh-boot fallback's own migrateState(APP_VERSION, default) still
+        // works (a blanket throw would just black-screen the fresh path).
+        'var _origMig17 = migrateState;' +
+          'migrateState = function (v, s) {' +
+          "  if (s && s.__v7probe) throw new Error('migrate bug (F1)');" +
+          '  return _origMig17.apply(this, arguments);' +
+          '};'
+      );
+    } catch (e) {
+      err233e = e && e.message;
+    }
+    assert(
+      r233e &&
+        r233e.store.robco_v7 === VALID_V7_17 &&
+        !('robco_v8_quarantine' in r233e.store) &&
+        r233e.errors.some(m => /MIGRATION WRITE FAULT/.test(m)) &&
+        r233e.storageBanners >= 1 &&
+        r233e.banners.length === 0,
+      '233.17: [behavioral] a migrateState() throw on a VALID v7 is treated as a migration bug, NOT corrupt bytes — the original robco_v7 is left intact (never quarantined) and the fault is surfaced loudly (no READ FAULT banner)' +
+        (err233e ? ' — error: ' + err233e : '')
+    );
+  }
+
+  // 233.18 [behavioral, VM] REGRESSION — a genuinely UNREADABLE v7 must STILL
+  //        quarantine (Layer-3 behaviour unchanged by F1): the parse-failure
+  //        branch preserves the exact bytes, fires the READ FAULT banner, and
+  //        removes the corrupt key — and does NOT mistake it for a write fault.
+  {
+    let r233f = null;
+    let err233f = '';
+    try {
+      r233f = _runHydrateSandbox233({ robco_v7: '{unreadable v7 ####' });
+    } catch (e) {
+      err233f = e && e.message;
+    }
+    let qEnv233f = null;
+    try {
+      qEnv233f = r233f && JSON.parse(r233f.store.robco_v8_quarantine);
+    } catch (_) {}
+    assert(
+      r233f &&
+        !('robco_v7' in r233f.store) &&
+        qEnv233f &&
+        qEnv233f.raw === '{unreadable v7 ####' &&
+        qEnv233f.sourceKey === 'robco_v7' &&
+        r233f.errors.some(m => /READ FAULT/.test(m)) &&
+        r233f.banners.indexOf('corrupt') !== -1 &&
+        r233f.storageBanners === 0,
+      '233.18: [behavioral] REGRESSION — a genuinely unreadable v7 is STILL quarantined (exact bytes preserved, READ FAULT banner, corrupt key removed) and is NOT misrouted to the write-fault path — Layer-3 read-side behaviour is unchanged by F1' +
+        (err233f ? ' — error: ' + err233f : '')
     );
   }
 }
