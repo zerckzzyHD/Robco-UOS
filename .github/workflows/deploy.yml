@@ -54,6 +54,16 @@ jobs:
           cp -r assets css js _site/
           cp CHANGELOG.md _site/
 
+      - name: Strip dev-only Diagnostic Shell from the production artifact
+        # The Diagnostic Shell (js/dev/test-console.js, ~204 KB) is dev/staging-only
+        # tooling that production visitors can never open (the unlock minigame ships
+        # later). Remove it — and its <script> tag + sw.js precache entry — from the
+        # _site/ artifact ONLY (never the repo, never Cloudflare staging, which keeps
+        # the shell via cf-staging-build.mjs). The script exits non-zero if any
+        # reference survives OR any remaining precache entry dangles, so a half-strip
+        # can never publish (all-or-nothing SW precache → black screen). Health-U7.
+        run: node scripts/prod-strip-devshell.mjs _site
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 

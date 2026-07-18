@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3383/3383 | Cache: robco-terminal-v2.8.0-r45 -->
+## [Unreleased]<!-- Tests: 3386/3386 | Cache: robco-terminal-v2.8.0-r46 -->
 
 ### Added
 
@@ -75,6 +75,7 @@
 ### Improved
 
 - Screen-reader users now hear what each field on the terminal is for. Every text box, number field, dropdown, and file picker — your health and level, caps, new inventory and ammo rows, status effects, field notes, the trait filter, the API key and model pickers, the command line, and the loot-image and save-file pickers — now announces its purpose out loud instead of being read as a blank, unlabeled control. Nothing looks any different on screen; this only adds the spoken labels assistive tech relies on.
+- The terminal now downloads about 204 KB less on your first visit — a developer-only diagnostic console that players can never open is no longer shipped in the public build, so the site loads a little lighter, especially on mobile. Nothing you can see or do changes.
 
 ### Under the Hood
 

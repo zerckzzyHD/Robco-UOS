@@ -1409,7 +1409,7 @@ window.onload = async function () {
     initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
     initAmbientRuntime(); // Ambient Runtime — the single-heartbeat scheduler; owns the app's one setInterval and drives every ambient observer
     initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
-    initTestConsole(); // staging/dev-only Test Console — no-ops (stays hidden) on production
+    if (typeof initTestConsole === 'function') initTestConsole(); // staging/dev-only Test Console — hidden on prod, which STRIPS the file (Health-U7); typeof guard prevents a ReferenceError → black screen (Protocol 33, Suite 149.17)
     _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
     _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
     _restoreOpticsPreference();

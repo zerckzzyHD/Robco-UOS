@@ -553,6 +553,7 @@ export default [
       'tests/_diag*.mjs',
       'planning/', // gitignored scratch/planning scripts — never shipped, not lint-covered
       'scripts/cf-staging-build.mjs',
+      'scripts/prod-strip-devshell.mjs', // Health-U7 prod build-strip (ESM build tooling, never shipped) — behaviorally gate-guarded by Suite 149.19
       'js/vendor/', // vendored third-party dependency (Visual Upload OCR, Unit 1) — not our code
     ],
   },

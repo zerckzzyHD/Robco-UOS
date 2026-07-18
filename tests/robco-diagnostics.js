@@ -19490,7 +19490,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Developer Console: the ONE canonical dev/debug console (16 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console (19 tests)
 // ──────────────────────────────────────────────────────────────
 //  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
 //  This IS the canonical developer/debug console the roadmap's hacking
@@ -19756,6 +19756,82 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !/saveState|robco_v8|localStorage\./.test(rebootFn149 + wakeFn149),
     '149.16: REBOOT resets the boot screen then replays window.runBootSequence(); WAKE → ACTIVE force-states back to ACTIVE (the undo for the IDLE/STANDBY/SHUTDOWN/OFF buttons); neither touches the campaign save (owner report fix)'
   );
+
+  // 149.17  GRACEFUL ABSENCE (Health-U7, Protocol 33): window.onload invokes the
+  //         console behind a `typeof … === 'function'` guard, NOT a bare call.
+  //         The prod deploy STRIPS js/dev/test-console.js from the published
+  //         artifact (scripts/prod-strip-devshell.mjs), so on prod
+  //         `initTestConsole` is undefined — a bare call would throw a
+  //         ReferenceError inside onload → black screen. `typeof` on an
+  //         undeclared identifier is legal JS and never throws. Locks the fix
+  //         so a future refactor can't reintroduce the bare call. (149.5 above
+  //         still passes — the guarded line still contains `initTestConsole();`.)
+  assert(
+    /if \(typeof initTestConsole === 'function'\) initTestConsole\(\);/.test(uiCore149),
+    "149.17: window.onload calls initTestConsole() behind a `typeof initTestConsole === 'function'` guard (graceful-absence on the prod build that strips the shell — never a bare call that would ReferenceError → black screen)"
+  );
+
+  // 149.18  the prod-strip mechanism exists and is wired into the prod deploy
+  //         ONLY: scripts/prod-strip-devshell.mjs is committed and deploy.yml
+  //         runs it against _site; cf-staging-build.mjs never strips, so the
+  //         Cloudflare staging build keeps the shell fully working (owner tooling).
+  {
+    const deployYml149 = readFile('.github/workflows/deploy.yml');
+    const cfStaging149 = readFile('scripts/cf-staging-build.mjs');
+    assert(
+      fs.existsSync(path.join(ROOT, 'scripts/prod-strip-devshell.mjs')) &&
+        /node scripts\/prod-strip-devshell\.mjs _site/.test(deployYml149) &&
+        !/prod-strip-devshell/.test(cfStaging149),
+      '149.18: scripts/prod-strip-devshell.mjs exists and deploy.yml runs it against _site (prod artifact only); cf-staging-build.mjs never strips (staging keeps the shell)'
+    );
+  }
+
+  // 149.19  BEHAVIORAL (Health-U7): running the strip script against a staged
+  //         copy removes the shell file + its <script> tag + its sw.js precache
+  //         entry, and leaves a self-consistent artifact — every REMAINING
+  //         precache entry still resolves to a real file (the all-or-nothing
+  //         SW-install landmine turned into a hard build gate). The script exits
+  //         non-zero on any inconsistency, so execFileSync throws if it's off.
+  {
+    const os = require('os');
+    const cp = require('child_process');
+    let ok = false;
+    let detail = '';
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'u7strip-'));
+    try {
+      // Build a realistic staged tree: an empty placeholder for every precache
+      // entry (so the script's file-existence check has a real tree to walk),
+      // then the REAL index.html + sw.js written over the top so the strip
+      // operates on genuine markup.
+      const entries = [...sw149.matchAll(/'(\.\/[^']*)'/g)].map(m => m[1]);
+      for (const entry of entries) {
+        if (entry === './') continue;
+        const p = path.join(tmp, entry.slice(2));
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, '', 'utf8');
+      }
+      fs.writeFileSync(path.join(tmp, 'index.html'), index149, 'utf8');
+      fs.writeFileSync(path.join(tmp, 'sw.js'), sw149, 'utf8');
+      cp.execFileSync('node', [path.join(ROOT, 'scripts/prod-strip-devshell.mjs'), tmp], {
+        stdio: 'pipe',
+      });
+      const strippedIndex = fs.readFileSync(path.join(tmp, 'index.html'), 'utf8');
+      const strippedSw = fs.readFileSync(path.join(tmp, 'sw.js'), 'utf8');
+      ok =
+        !fs.existsSync(path.join(tmp, 'js/dev/test-console.js')) &&
+        !/<script[^>]*src=["']js\/dev\/test-console\.js["']/.test(strippedIndex) &&
+        !/['"]\.\/js\/dev\/test-console\.js['"]/.test(strippedSw);
+    } catch (e) {
+      detail = ' — ' + (e.stderr ? e.stderr.toString() : e.message);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+    assert(
+      ok,
+      '149.19: prod-strip-devshell.mjs removes the shell file + <script> tag + sw.js precache entry from a staged copy and leaves a self-consistent artifact (no surviving executable/precache reference; every remaining precache entry resolves)' +
+        detail
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
