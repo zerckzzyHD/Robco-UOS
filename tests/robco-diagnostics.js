@@ -147,7 +147,7 @@ function readFile(rel) {
 //
 // GROUP_OVERRIDES exists for the one case the plain glob can't handle: a
 // split whose sibling files intentionally don't share a `<stem>-*.js`
-// filename prefix (see planning/CODE_HEALTH_PLAN.md §2.3 — the proposed
+// filename prefix (see planning/2.8.5/plans/CODE_HEALTH_PLAN.md §2.3 — the proposed
 // api.js split into ai-directive.js / ai-import.js / native-router.js does
 // NOT follow the stem-prefix convention §2 states as governing). Empty
 // today because no file has split yet; a future split unit adds one entry
@@ -16441,7 +16441,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // fabricated "Enclave hit squads" / unqualified "Brotherhood Outcasts
     // become hostile" claims to the real, cited Regulators (-250)/Talon
     // Company (+250) hunt mechanics — see js/core/state.js and
-    // planning/KARMA_DATA.md. An intentional content change, not a
+    // planning/2.9.0/data/FO3/KARMA_DATA.md. An intentional content change, not a
     // regression (Protocol 42). The 9 FNV rows are byte-identical to their
     // pre-existing values since FNV's directive text never referenced this.
     const GOLDEN_MATRIX = [
@@ -19645,7 +19645,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // the STATE SETUP/RESETS/FIXTURES/INLINE apparatus (~80 registry entries +
   // their _dsh*-prefixed helper functions) explicitly reads/writes campaign
   // state and calls saveState() — that is the entire point of a cheat/reset/
-  // fixture tool, per planning/DIAGNOSTIC_SHELL_PLAN.md §4 and the file's own
+  // fixture tool, per planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4 and the file's own
   // updated header comment. 149.9/149.13 below still hold the ORIGINAL
   // Hard-Boundary/game-agnostic invariant for everything BEFORE that block —
   // the runtime/immersion-only console this suite was written to guard —
@@ -27378,7 +27378,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)
-//  Owner-approved mockup: planning/mockups/tempo-dial.html. Replaces the
+//  Owner-approved mockup: planning/2.8.0/mockups/tempo-dial.html. Replaces the
 //  decorative-dial-plus-vertical-list from Suite 178/179 with a true rotary
 //  dial: the 5 playthroughType positions ring the knob on a gauge arc and
 //  the needle (the knob's own rotation) always points at the active one.
@@ -27657,7 +27657,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const uiCore181 = readGroup('ui-core');
   const css181 = readCss();
 
-  // 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md §3
+  // 181.1  the full fixed-id set from planning/2.8.0/plans/PHASE3_OPERATOR_PLAN.md §3
   //        still exists verbatim — the load-bearing constraint loadUI()/
   //        updateMath() do direct getElementById() on every render.
   const FIXED_IDS_181 = [
@@ -32796,7 +32796,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
 //  quest.status/location.visited + the collectible.acquired AI-path emit),
 //  and the 8 Tier-S flagship home-panel animations
-//  (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1). Extended with two
+//  (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1). Extended with two
 //  owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
 //  CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
 //  (196.29 — a pre-existing transmitMessage() gap, not a Wave 1 regression).
@@ -33415,8 +33415,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 197 — FEEDBACK ANIMATION WAVE 2: the 9 Tier-A animations + the
-//  one new additive item.added emit (planning/FEEDBACK_ANIMATION_BUILD_
-//  PLAN.md — WAVE 2). item.added fires from three call sites (addItem()'s
+//  one new additive item.added emit (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md
+//  — WAVE 2). item.added fires from three call sites (addItem()'s
 //  manual path, doLoot()'s loot-apply path, and the AI inventory-merge diff
 //  in autoImportState(), Protocol 14 AI-contract precedent). The 9 home-
 //  panel reactions live in _wireCoreEventBusSubscribers() (ui-core.js);
@@ -33873,8 +33873,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 199 — FEEDBACK ANIMATION WAVE 3: the 13 remaining Tier-B/C
-//  animations + the 5 new additive emits (planning/FEEDBACK_ANIMATION_
-//  BUILD_PLAN.md — WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
+//  animations + the 5 new additive emits (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md
+//  — WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
 //  WRAP shipped early as free companions of #4/#6 in WAVE 1). The 5 new
 //  emits (karma.tier/item.equipped/effect.applied/effect.expiring/
 //  weight.seized) fire at their existing setters (U7/U8 precedent); the 13
@@ -35693,7 +35693,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §7 Stage 1: vendor + lazy-load
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §7 Stage 1: vendor + lazy-load
 //  self-hosted Tesseract.js, the 'wasm-unsafe-eval' CSP addition, the
 //  install-safe SW caching split (small shims in ASSETS, heavy core+lang
 //  runtime-best-effort only), and a raw-text-dump proof wired into the
@@ -35959,7 +35959,7 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §3.3/3.4/3.5: the deterministic,
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §3.3/3.4/3.5: the deterministic,
 //  game-agnostic _parseOcrText() (js/ocr.js), the confirm-gated preview
 //  modal (renderVisualParsePreview/_confirmVisualParse), and the validated
 //  additive apply (_visualParseInventoryMerge/applyVisualParse, both
@@ -36477,7 +36477,7 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §4: the two fail-open feature flags
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §4: the two fail-open feature flags
 //  (visualOcr primary / visualAiVision fallback, js/cloud.js), the hybrid
 //  router (routeVisualUpload(), js/ocr.js) wired into the REAL composer [+]
 //  attach flow (handleImageSelection(), js/ui-saves.js), the TRY AI VISION
@@ -36965,7 +36965,7 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 // ══════════════════════════════════════════════════════════════
 //  Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5): campaign ignition,
 //  Director greeting, firmware flash, long-absence recalibration, SEAT verb
-//  planning/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
+//  planning/2.8.0/slates/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
 //  skippable commissioning ceremony replacing wipeTerminal()'s two bare chat
 //  lines), M2 Director on the Wire (consumes the previously-orphaned
 //  identity.overseer.greeting), M3 Firmware Flash (a post-update boot POST
@@ -37541,7 +37541,7 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 209 — MOBILE DENSITY STANDARD, TIER-1 (planning/MOBILE_DENSITY_PLAN.md
+//  Suite 209 — MOBILE DENSITY STANDARD, TIER-1 (planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md
 //  §2/§3, owner-approved Tier-1 only): a small mobile-only spacing-token scale
 //  (--d-board-pad-block/-btm/-inline, --d-board-gap, --d-section-gap,
 //  --d-subtitle-mb) plus the 8 concrete F1-F8 fixes (shared board shell,
@@ -37705,7 +37705,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage) (14 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage) (14 tests)
 // ──────────────────────────────────────────────────────────────
 //  The Developer Console (Suite 149) is re-founded on a data-driven
 //  DIAGNOSTIC_SHELL_TOOLS registry that auto-filters by a two-signal
@@ -37731,7 +37731,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   const index210 = readFile('index.html');
 
   // 210.1  DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
-  //        migrated controls (planning/DIAGNOSTIC_SHELL_PLAN.md §1.3).
+  //        migrated controls (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §1.3).
   {
     const ids210 = [
       'inspect-runtime-state',
@@ -38114,7 +38114,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage) (13 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage) (13 tests)
 // ──────────────────────────────────────────────────────────────
 //  U1's document-flow <details class="panel"> (which shoved the whole
 //  machine down on mobile whenever the console mounted) is replaced by a
@@ -38477,7 +38477,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
 //  (16 tests)
 // ──────────────────────────────────────────────────────────────
 //  ~45 new registry entries under category:'triggers' — fire any of the 33
@@ -39370,7 +39370,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
 //  (16 tests)
 // ──────────────────────────────────────────────────────────────
 //  Two U4a deliverables: (1) EVERY registry `group` (not just the top-level
@@ -39922,7 +39922,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES +
-//  submenu visual hierarchy (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
+//  submenu visual hierarchy (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
 //  Protocol 8 Sonnet stage) (16 tests — 14 initial + 2 Protocol 42
 //  regressions found by this unit's own live Playwright verification: the
 //  DOM-sync revert bug in the fixture/FRESH START preset, and the shell's
@@ -40995,7 +40995,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock
-//  ceremony + FINAL leak-proof audit (planning/DIAGNOSTIC_SHELL_PLAN.md
+//  ceremony + FINAL leak-proof audit (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md
 //  §4/§7/§11 U5, Protocol 8 Sonnet stage) (22 tests)
 // ──────────────────────────────────────────────────────────────
 //  18 new registry entries: 8 tier:'staging' feature-flag override toggles
@@ -42721,7 +42721,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  stubs) clear the stale reference. It also locks that the v8 BOOT
 //  fast-path (js/ui/ui-core.js _hydrateStateFromStorage(), which
 //  deliberately skips migrateState()) reconciles too — an independent
-//  audit (planning/AUDIT_U9_bugfixes.md, F1/F2) found nativeUseItem was a
+//  audit (planning/2.8.5/audits/AUDIT_U9_bugfixes.md, F1/F2) found nativeUseItem was a
 //  missed removal path, and that a plain reload of an existing save did
 //  NOT actually self-heal a stale reference as the original commit claimed
 //  (the v8 fast-path skipped migrateState, where the heal lived).
@@ -44216,7 +44216,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     assert(false, '224.12b: skipped — _renderFo3TopStrip extraction failed');
   }
 
-  // 224.13 — Bottom-dock occlusion FIXED (planning/DOCK_OCCLUSION_PLAN.md,
+  // 224.13 — Bottom-dock occlusion FIXED (planning/2.9.0/plans/DOCK_OCCLUSION_PLAN.md,
   //          Protocol 13/36b escape-ratchet). render-integrity.mjs USED to
   //          quarantine the flat-view (New Vegas + FO3-portrait) bezel-dock
   //          occlusions — U7 flagged 14 controls the 112px position:fixed dock
@@ -44788,8 +44788,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         already use (one code path, Protocol 22/24) — dashed outline +
   //         a blinking CRIPPLED text label, never a colour change (the same
   //         owner correction as G-5). U8 replaced the U6 placeholder with
-  //         Fable's approved VARIANT A drawing (planning/mockups/fo3/fo3-
-  //         status-figure.html); the outer <g data-limb="..."> wrapper
+  //         Fable's approved VARIANT A drawing
+  //         (planning/2.9.0/mockups/FO3/fo3-status-figure.html); the outer <g data-limb="..."> wrapper
   //         (toggled by loadUI()) now contains a nested <g class="limbline">
   //         (the drawn outline) rather than carrying both attributes on the
   //         same element, so the apply logic (227.6c) — the one thing this
@@ -45040,7 +45040,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
   // 227.15 — U9 (Protocol 8 stage 2 round 3, Protocol 13 regression for the
   //          owner-reported mirrored-limb-controls bug, root-caused in
-  //          planning/AUDIT_FO3_U8.md): the box grid columns were on the
+  //          planning/2.9.0/audits/FO3/AUDIT_FO3_U8.md): the box grid columns were on the
   //          OPPOSITE side from the anatomically-drawn (front-facing) figure
   //          limb they toggle — L.ARM/L.LEG sat in the left column beside
   //          the figure's RIGHT-side `la`/`ll` groups, and vice versa. Fixed
@@ -45325,7 +45325,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 229 — autoImportState() registry/game-context trust guard
-//  (Protocol 42 defense-in-depth — planning/AUDIT_registry_leak.md §2/§4).
+//  (Protocol 42 defense-in-depth — planning/2.9.0/audits/AUDIT_registry_leak.md §2/§4).
 //  FALLOUT_REGISTRY is a boot-time-only global (index.html's GAME_FILES
 //  manifest loads exactly one of reg_nv.js/reg_fo3.js); every known
 //  cross-game load path already reboots before autoImportState() can run
@@ -46219,7 +46219,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
   // The golden fixture: every FO3 weapon's 6 consumed fields, pinned to the
   // values re-verified against fallout.wiki on 2026-07-15 (see
-  // planning/FO3_WEAPON_DATA.md). Field order: [Base_Damage, Crit_Damage,
+  // planning/2.9.0/data/FO3/FO3_WEAPON_DATA.md). Field order: [Base_Damage, Crit_Damage,
   // Crit_Multiplier, Attacks_Per_Second, Weight, Value].
   const FO3_WEAPON_GOLDEN_232 = {
     '10mm Pistol': [9, 9, 1, 6, 3, 225],
@@ -46361,7 +46361,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // The NV golden fixture: every NV weapon's 6 consumed fields, pinned to the
   // values re-verified against the fallout.wiki "Fallout: New Vegas Weapons"
   // master table on 2026-07-15 (thrown/placed/launched explosives' blast pulled
-  // from each weapon's own page; see planning/NV_DATA_PROVENANCE.md). Same shape
+  // from each weapon's own page; see planning/2.9.0/data/FNV/NV_DATA_PROVENANCE.md). Same shape
   // and field order as the FO3 pin: [Base_Damage, Crit_Damage, Crit_Multiplier,
   // Attacks_Per_Second, Weight, Value].
   const NV_WEAPON_GOLDEN_232 = {
@@ -48122,7 +48122,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 //  in practice — an architecture review measured ~20 saveState() calls from
 //  render files and ~26 render*()/loadUI() calls from service files, producing
 //  real UI↔services dependency cycles. An external ecosystem review independently
-//  proposed exactly this mechanism (planning/ATLAS_ECOSYSTEM_SYNTHESIS.md §C.1).
+//  proposed exactly this mechanism (planning/2.9.0/audits/ATLAS_ECOSYSTEM_SYNTHESIS.md §C.1).
 //  This suite turns the honor-system rule into an executable one.
 //
 //  BASELINE, don't block-everything: the violations already exist, so a check
