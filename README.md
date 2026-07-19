@@ -113,6 +113,7 @@ Nine capabilities, each with a graceful fallback when the device/browser doesn't
 ### 💾 Saves & Cloud
 
 - **Auto-save** (debounced localStorage), **A/B/C slots**, **file export/import** with version migration, **rolling backups** with FNV-1a checksums.
+- **Live-campaign durability mirror** — the campaign you're actively playing is continuously shadowed into IndexedDB (the same durable store slots and backups already use), so if a phone reclaims the browser's local storage under memory pressure, your campaign is automatically restored on the next startup instead of starting over. Recovery-only and one-directional (a saved-behind mirror can never overwrite newer progress), and a graceful no-op when IndexedDB is unavailable.
 - **Save version history** — each slot retains up to 5 prior revisions in IndexedDB (riding its headroom, never the localStorage ceiling); view and restore any earlier version from the saves list. Restoring is confirm-gated and takes a rolling backup first; if IndexedDB is unavailable the feature is simply not offered and save/load is unchanged.
 - **Full backup bundle** — a one-file "EXPORT FULL BACKUP" of your entire history (live campaign + all slots with their version rings + rolling backups + chat + playstyle), version-stamped and checksummed. IMPORT SAVE auto-detects a bundle and restores it — confirm-gated, integrity-checked (a bad or edited file is refused with no partial apply), and a rolling backup of your current state is taken first. Campaign/save data only — device preferences are never included (the two-store boundary holds).
 - **Read-side fail-loud save integrity (Layer 3)** — a save that can't be read at boot is **quarantined whole, never deleted**: the exact bytes are preserved (localStorage + a durable IndexedDB copy), a READ FAULT banner announces it every boot until resolved, and a QUARANTINED RECORD row in the saves list offers EXPORT (recover the raw data) and confirm-gated PURGE. A detected storage **eviction** (the browser reclaimed local data while the cold-storage boot marker survived) gets its own banner — gated behind a strict signature so a new visitor never sees a false alarm. Slot saves that only ONE of the two stores accepted post a once-per-session degraded-write notice instead of reporting plain success.
@@ -151,7 +152,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 | **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
 | **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
 | **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + Playwright                                | 3453-test Node gate + boot-smoke / render / a11y checks                     |
+| **Testing**     | Node + Playwright                                | 3470-test Node gate + boot-smoke / render / a11y checks                     |
 
 ### Per-game data system
 
@@ -221,7 +222,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (3453 tests, 238 suites — the single canonical runner)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (3470 tests, 239 suites — the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
 ├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
@@ -329,7 +330,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3453-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3470-test count in sync and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -394,7 +395,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list, read-side fail-loud integrity (corrupt saves quarantined + recoverable, eviction detection, degraded-write notices)
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **3453 tests across 238 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — **3470 tests across 239 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

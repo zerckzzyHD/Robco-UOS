@@ -806,6 +806,102 @@ async function writeCloudQueue(arr) {
 }
 window.writeCloudQueue = writeCloudQueue;
 
+// ── LIVE CONTAINER DURABILITY MIRROR (Step 2 · Phase 1 · P8) ──────────────────
+// The live campaign container (localStorage 'robco_v8' — the campaign being played
+// RIGHT NOW) was the ONE cold-store entry with no IndexedDB durability shadow: save
+// slots + rolling backups are mirrored into the 'campaign' object store (P3), but the
+// live container lived only in localStorage. On Android, under storage pressure, the
+// host can evict localStorage — and because rolling backups snap only on a state-
+// REPLACING load (not per edit), the realistic loss was "everything since the last
+// rolling backup." This mirror closes that gap: it shadows the live container into the
+// SAME 'campaign' store (key 'live') that already holds the slots/backups (Protocol 22
+// — extends the existing cold store, never a second durability mechanism), IDB-ONLY —
+// localStorage 'robco_v8' stays the synchronous authority and working store.
+//
+// FRESHNESS / RESTORE DIRECTION (Protocol 34 — the "stale mirror clobbers newer local"
+// guard): the restore is pure RECOVERY, never a merge, and is consulted ONLY when
+// localStorage has NO 'robco_v8' at all (the eviction / first-boot signature). When
+// localStorage HAS the container it ALWAYS wins and the mirror is never read — so a
+// stale mirror can NEVER overwrite a newer localStorage value. This is the identical
+// "localStorage wins" rule the P2 meta reconcile uses (_reconcileMetaFromIdb). There
+// is no timestamp comparison to get wrong because there is no comparison: present ⇒
+// local wins; absent ⇒ the mirror is the only container that exists.
+//
+// FAIL-SAFE (Protocol 33): IndexedDB absent / blocked / slow / corrupt ⇒ the mirror
+// write no-ops and the restore yields nothing, so boot is byte-identical to a pure-
+// localStorage build (and the existing eviction banner still fires). The mirror write
+// is fire-and-forget (never awaited on the hot path), so it cannot jank a modest
+// Android device. Game-agnostic (Protocol 38): plain campaign data, no game literals.
+const LIVE_MIRROR_IDB_KEY = 'live';
+
+// Fire-and-forget: shadow the in-memory live container into IDB 'campaign'/'live'.
+// IDB-only (the caller writes localStorage separately). No-op + never throws when
+// IndexedDB or the container is absent. Called from saveState()'s debounced write
+// (post dirty-check, so only genuinely-changed content is mirrored) AND from the
+// visibilitychange→hidden / unload flush — where, unlike a localStorage-only async
+// flush, 'hidden' fires while the page is still fully alive, so the async put has a
+// real chance to complete before a mobile background-kill (the reliable flush path).
+window.mirrorLiveContainer = function () {
+  try {
+    if (typeof window === 'undefined' || !window.IdbStore || !window.robco_v8) return;
+    const p = window.IdbStore.set('campaign', LIVE_MIRROR_IDB_KEY, window.robco_v8);
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (_) {
+    /* durability mirror is best-effort — never let it break a save */
+  }
+};
+
+// Async: RECOVERY ONLY. If localStorage already holds 'robco_v8', returns false
+// IMMEDIATELY without reading the mirror (localStorage wins — no stale-overwrite is
+// possible). Otherwise, if the IDB mirror holds a shape-valid, checksum-verified v8
+// container, it is written back into localStorage so the UNCHANGED synchronous
+// _hydrateStateFromStorage() then loads it on its normal v8 path — and returns true.
+// The integrity gate mirrors _reconcileMetaFromIdb: a corrupt mirror record is skipped,
+// never restored. Never throws; any failure leaves localStorage untouched and yields
+// false, so boot degrades exactly to a pure-localStorage build (eviction banner fires).
+window.restoreLiveContainerFromIdb = async function () {
+  try {
+    if (typeof window === 'undefined' || !window.IdbStore) return false;
+    let ls = null;
+    try {
+      ls = localStorage.getItem('robco_v8');
+    } catch (_) {}
+    if (ls !== null) return false; // localStorage present → it wins; the mirror is never read
+    let rec = null;
+    try {
+      rec = await window.IdbStore.getRaw('campaign', LIVE_MIRROR_IDB_KEY);
+    } catch (_) {}
+    const container = rec && typeof rec === 'object' ? rec.value : null;
+    // Shape gate: must look like a v8 container (defends against a junk/foreign record).
+    if (
+      !container ||
+      typeof container !== 'object' ||
+      !container.campaigns ||
+      typeof container.campaigns !== 'object'
+    ) {
+      return false;
+    }
+    // Integrity gate (same idiom as _reconcileMetaFromIdb): never restore a corrupt
+    // record. _wrap() stamped the checksum as computeSaveChecksum(container, [], '').
+    if (
+      rec.checksum &&
+      typeof window.computeSaveChecksum === 'function' &&
+      window.computeSaveChecksum(container, [], '') !== rec.checksum
+    ) {
+      return false;
+    }
+    try {
+      localStorage.setItem('robco_v8', JSON.stringify(container));
+      window._liveContainerRecovered = true;
+      return true;
+    } catch (_) {
+      return false; // localStorage itself unwritable (private mode) — leave boot to degrade
+    }
+  } catch (_) {
+    return false;
+  }
+};
+
 // ── FACTION REGISTRY ─────────────────────────────────────────────
 const FACTION_REGISTRY = [
   { key: 'ncr', name: 'NCR', tier: 'major' },
@@ -2292,6 +2388,10 @@ function saveState() {
       }
       localStorage.setItem('robco_v8', _saveStr);
       _lastSaveStr = _saveStr;
+      // P8: shadow the just-written live container into IDB (fire-and-forget, IDB-only).
+      // Runs ONLY after the dirty-check passed, so only genuinely-changed content is
+      // mirrored. Fail-safe: no-ops when IndexedDB is absent (Protocol 33).
+      if (typeof window.mirrorLiveContainer === 'function') window.mirrorLiveContainer();
     } catch (e) {
       // #18 localStorage Quota Detection — warn Courier on storage full
       if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {

@@ -2816,11 +2816,15 @@ assert(
 );
 
 // 35.5 beforeunload flush writes robco_v8, not robco_v7 (P7-8)
+// The flush body was factored into the shared _flush() closure (single source for
+// the beforeunload + visibilitychange→hidden triggers, Protocol 22) — inspect it
+// there, and confirm beforeunload is still wired to it.
 {
-  const blIdx = uiSrc35.indexOf("addEventListener('beforeunload'");
-  const blSnippet = blIdx >= 0 ? uiSrc35.slice(blIdx, blIdx + 350) : '';
+  const flushBody35 = extractFunctionBody(uiSrc35, '_flushUnload');
   assert(
-    blSnippet.includes('robco_v8') && !blSnippet.includes('robco_v7'),
+    flushBody35.includes('robco_v8') &&
+      !flushBody35.includes('robco_v7') &&
+      /addEventListener\('beforeunload',\s*_flushUnload\)/.test(uiSrc35),
     'beforeunload flush writes robco_v8, not robco_v7 (P7-8)'
   );
 }
@@ -8413,15 +8417,16 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'onGameContextChange() sets window._contextSwitching = true before reload — guards beforeunload/saveState from clobbering the switch (regression guard)'
   );
 
-  // 69.3  beforeunload handler early-exits when _contextSwitching is set
+  // 69.3  beforeunload flush early-exits when _contextSwitching is set
   {
-    // Find the beforeunload callback body
-    const buMatch = uiCoreSrc69.match(
-      /addEventListener\s*\(\s*['"]beforeunload['"]\s*,\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\}\s*\)/
-    );
-    const buBody = buMatch ? buMatch[1] : '';
+    // The flush body now lives in the shared _flush() closure (fed by both the
+    // beforeunload and visibilitychange→hidden triggers, Protocol 22) — the guard
+    // is asserted there, plus that beforeunload is still wired to it.
+    const buBody = extractFunctionBody(uiCoreSrc69, '_flushUnload');
     assert(
-      /_contextSwitching/.test(buBody) && /return/.test(buBody),
+      /_contextSwitching/.test(buBody) &&
+        /return/.test(buBody) &&
+        /addEventListener\('beforeunload',\s*_flushUnload\)/.test(uiCoreSrc69),
       'beforeunload handler early-exits when window._contextSwitching is set — prevents clobbering the deliberate FO3 write (regression guard)'
     );
   }
@@ -12691,11 +12696,12 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
     );
   }
 
-  // 95.9  STATIC ORDER GUARD — in the beforeunload handler the guard return must come
-  //       BEFORE the robco_v8 write, so a refactor cannot move the write above the guard.
+  // 95.9  STATIC ORDER GUARD — in the flush the guard return must come BEFORE the
+  //       robco_v8 write, so a refactor cannot move the write above the guard. The
+  //       flush body is the shared _flush() closure (beforeunload + visibilitychange
+  //       both call it, Protocol 22) — assert the ordering inside it.
   {
-    const bi = uiCore95.indexOf("addEventListener('beforeunload'");
-    const handler = bi !== -1 ? uiCore95.slice(bi, bi + 800) : '';
+    const handler = extractFunctionBody(uiCore95, '_flushUnload');
     const guardIdx = handler.search(/_loadingSave[\s\S]{0,40}?return/);
     const writeIdx = handler.indexOf("setItem('robco_v8'");
     assert(
@@ -17262,9 +17268,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // (_applyRailGrouping()) — bumped again, same reason. FO3 PIP-BOY BUILD U2
     // owner-feedback pass added one more (_applyFo3NavLabels()) — bumped again, same reason.
     // SAVE_INTEGRITY_PASS added one more (_requestPersistentStorage()) — bumped again, same reason.
+    // P8 live-container recovery added one more (await _restoreLiveContainerFromIdb()) — bumped again, same reason.
     assert(
-      onloadLineCount < 58,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 58)`
+      onloadLineCount < 61,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 61)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -39218,7 +39225,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 165 &&
+        tools212.length === 166 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -39227,7 +39234,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 165 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +6 SAVE_LAYER3 SAVE INTEGRITY tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 166 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -40270,9 +40277,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok214 =
         // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
-        // more after this unit shipped, so the registry now totals 165
-        // (61 at this unit's own ship time + 80 U4b + 18 U5).
-        tools214.length === 165 &&
+        // more after this unit shipped, so the registry now totals 166
+        // (61 at this unit's own ship time + 80 U4b + 18 U5 + 1 P8 eviction-recovery trigger).
+        tools214.length === 166 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -40285,7 +40292,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (165 tools, after U4b+U5+SAVE_LAYER3) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (166 tools, after U4b+U5+SAVE_LAYER3) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -40579,7 +40586,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 215.1  every one of the 80 new U4b tool ids is registered exactly once,
-  //        and the full registry now totals 165 (61 from U1/U3/U4a + 80 U4b + 18 U5 + 6 SAVE_LAYER3).
+  //        and the full registry now totals 166 (61 from U1/U3/U4a + 80 U4b + 18 U5 + 7 SAVE INTEGRITY [6 SAVE_LAYER3 + 1 P8]).
   {
     let ok215 = false;
     let err215 = null;
@@ -40670,7 +40677,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 165 &&
+        tools215.length === 166 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -40678,7 +40685,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 165 (after this unit + U5 + SAVE_LAYER3) with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 166 (after this unit + U5 + SAVE_LAYER3) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -41626,7 +41633,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  _shellTier() completely unchanged (still staging-signal-only), so an
 //  unlocked production build shows the shell but renders ONLY tier:'prod'
 //  tools — leak-proof by construction, proved exhaustively below over the
-//  FULL, now-165-tool registry. _fireUnlockCeremony() is the short
+//  FULL, now-166-tool registry. _fireUnlockCeremony() is the short
 //  in-fiction "RESTRICTED ACCESS GRANTED" flourish (a plain animation:,
 //  Protocol UI-9, auto-neutralized by the existing global reduced-motion
 //  block).
@@ -41655,7 +41662,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 216.1  every one of the 18 new U5 tool ids is registered exactly once,
-  //        and the full registry now totals 165 (141 from U1-U4b + 18 U5 + 6 SAVE_LAYER3).
+  //        and the full registry now totals 166 (141 from U1-U4b + 18 U5 + 7 SAVE INTEGRITY [6 SAVE_LAYER3 + 1 P8]).
   {
     let ok216 = false;
     let err216 = null;
@@ -41684,7 +41691,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok216 =
         newIds216.length === 18 &&
-        tools216.length === 165 &&
+        tools216.length === 166 &&
         newIds216.every(id => ids216.includes(id)) &&
         new Set(ids216).size === ids216.length;
     } catch (e) {
@@ -41692,7 +41699,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 165 with no duplicate id' +
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 166 with no duplicate id' +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -41885,7 +41892,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const stagingTools216 = tools216.filter(t => t.tier === 'staging');
       const prodTools216 = tools216.filter(t => t.tier === 'prod');
       ok216 =
-        tools216.length === 165 &&
+        tools216.length === 166 &&
         stagingTools216.length > 0 &&
         prodTools216.length > 0 &&
         stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
@@ -41900,7 +41907,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 165-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
+      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 166-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -42352,7 +42359,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     try {
       const tools216 = _evalRealTools216();
       ok216 =
-        tools216.length === 165 &&
+        tools216.length === 166 &&
         tools216.every(t => !t.destructive || t.tier === 'staging') &&
         tools216.every(
           t =>
@@ -42364,7 +42371,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.18: static leak-proof invariant re-derived against the FULL, final 165-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
+      "216.18: static leak-proof invariant re-derived against the FULL, final 166-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -48637,7 +48644,7 @@ header('Suite 234 — Accessibility: form controls carry an accessible name (U9)
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (16 tests)
+//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (17 tests)
 //  Protocol 20 static source-invariant guard. U4 made a red CI run
 //  diagnosable from the run itself (screenshots + console dumps + per-step
 //  gate logs uploaded as artifacts). This suite locks that wiring so a future
@@ -48737,6 +48744,18 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
   assert(
     !!gitignore235 && /test-artifacts\//.test(gitignore235),
     '235.14: .gitignore ignores test-artifacts/ (failure evidence is never committed)'
+  );
+
+  // ── The gate CLEARS the evidence dir at the START of every run ──
+  // Without this, stale artifacts from an earlier failed run are indistinguishable
+  // from a fresh failure — "files present ⇒ the last run failed" would be a lie.
+  // The rmSync must precede step 1 (ESLint) so no step's fresh output is caught.
+  assert(
+    !!gate235 &&
+      /fs\.rmSync\(ARTIFACTS_DIR,\s*\{\s*recursive:\s*true,\s*force:\s*true\s*\}\)/.test(gate235) &&
+      gate235.indexOf('fs.rmSync(ARTIFACTS_DIR') !== -1 &&
+      gate235.indexOf('fs.rmSync(ARTIFACTS_DIR') < gate235.indexOf('// ── 1. ESLint'),
+    '235.15: gate.js clears test-artifacts/ at the start of every run (before step 1) so "files present ⇒ the last run failed" is a true signal'
   );
 }
 
@@ -49194,6 +49213,299 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       '238.12: [Protocol 20] button.blue-btn renders as the shared phosphor pill (transparent fill, --bezel-wire outline, 999px radius) — it can never silently revert to the solid-blue rectangle or fall back to unstyled defaults'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 239 — LIVE CONTAINER DURABILITY MIRROR (Step 2 · Phase 1 · P8).
+//  The live campaign container (localStorage 'robco_v8') now shadows into the
+//  IDB 'campaign'/'live' key so an Android localStorage eviction that spares
+//  IndexedDB recovers the campaign instead of booting empty. 16 tests: 10 static
+//  guards (mirror hooked on the debounced save, recovery-only restore, bounded
+//  fail-safe boot phase, visibilitychange flush, Diagnostic Shell trigger) + 6
+//  behavioral (RED→GREEN eviction recovery, localStorage-wins-never-clobbered,
+//  shape + integrity gates, mirror write, deep round-trip). Protocols 22/33/34.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 239 — live container durability mirror (P8 eviction recovery)');
+
+  const stateSrc239 = readGroup('state');
+  const uiCoreSrc239 = readGroup('ui-core');
+  const dshSrc239 = readGroup('test-console');
+
+  // ── Static guards (10) ──────────────────────────────────────────────────────
+  // mirror/restore are window-assigned (window.X = [async] function) — use the
+  // assignment-form extractor, not extractFunctionBody (which finds `function X`).
+  const mirrorBody239 = extractAssignedFunction(stateSrc239, 'mirrorLiveContainer').body;
+  const restoreBody239 = extractAssignedFunction(stateSrc239, 'restoreLiveContainerFromIdb').body;
+  const saveBody239 = extractFunctionBody(stateSrc239, 'saveState');
+  const flushFamily239 = uiCoreSrc239; // _wireUnloadFlush lives in the ui-core family
+
+  // 239.1  state.js defines + exposes window.mirrorLiveContainer
+  assert(
+    /window\.mirrorLiveContainer\s*=\s*function/.test(stateSrc239) && mirrorBody239.length > 0,
+    '239.1: state.js defines + exposes window.mirrorLiveContainer (IDB durability shadow of the live container)'
+  );
+
+  // 239.2  state.js defines + exposes window.restoreLiveContainerFromIdb
+  assert(
+    /window\.restoreLiveContainerFromIdb\s*=\s*async function/.test(stateSrc239) &&
+      restoreBody239.length > 0,
+    '239.2: state.js defines + exposes window.restoreLiveContainerFromIdb (async boot-time recovery)'
+  );
+
+  // 239.3  the mirror is fire-and-forget + IDB-ONLY: it writes the 'campaign'/'live'
+  //        key from window.robco_v8 and swallows the promise (never awaited, no LS write)
+  assert(
+    /IdbStore\.set\('campaign',\s*LIVE_MIRROR_IDB_KEY,\s*window\.robco_v8\)/.test(mirrorBody239) &&
+      /\.catch\(/.test(mirrorBody239) &&
+      !/localStorage\.setItem/.test(mirrorBody239),
+    "239.3: mirrorLiveContainer writes IDB 'campaign'/'live' from window.robco_v8, fire-and-forget, and never writes localStorage (IDB-only shadow)"
+  );
+
+  // 239.4  the debounced saveState() fires the mirror AFTER the localStorage write +
+  //        dirty-check (only genuinely-changed content is mirrored — no hot-path waste)
+  {
+    const lsIdx239 = saveBody239.indexOf("localStorage.setItem('robco_v8'");
+    const mirrorIdx239 = saveBody239.indexOf('window.mirrorLiveContainer()');
+    assert(
+      lsIdx239 !== -1 && mirrorIdx239 !== -1 && mirrorIdx239 > lsIdx239,
+      '239.4: saveState() calls window.mirrorLiveContainer() AFTER the debounced localStorage write (past the dirty-check — only changed content is shadowed)'
+    );
+  }
+
+  // 239.5  RECOVERY-ONLY: restore returns false the instant localStorage holds
+  //        robco_v8, WITHOUT reading the mirror — the "localStorage wins" guard that
+  //        makes a stale-mirror clobber impossible (Protocol 34, the bitter-irony trap)
+  assert(
+    /localStorage\.getItem\('robco_v8'\)/.test(restoreBody239) &&
+      /if\s*\(ls !== null\)\s*return false/.test(restoreBody239),
+    '239.5: restoreLiveContainerFromIdb short-circuits (returns false, mirror never read) whenever localStorage still holds robco_v8 — localStorage always wins, so a stale mirror can never overwrite a newer local value'
+  );
+
+  // 239.6  restore reads the FULL envelope (getRaw) so it can verify the checksum,
+  //        and gates on both container shape and checksum before trusting the mirror
+  assert(
+    /getRaw\('campaign',\s*LIVE_MIRROR_IDB_KEY\)/.test(restoreBody239) &&
+      /container\.campaigns/.test(restoreBody239) &&
+      /computeSaveChecksum\(container,\s*\[\],\s*''\)\s*!==\s*rec\.checksum/.test(restoreBody239),
+    '239.6: restore reads the raw envelope (getRaw), then gates on container shape AND checksum before restoring — a junk or corrupt mirror record is skipped, never restored'
+  );
+
+  // 239.7  boot AWAITS the recovery BEFORE _hydrateStateFromStorage() reads the
+  //        container. Scoped to the window.onload body (the function DEFINITIONS of
+  //        both appear earlier in the file, so a whole-file indexOf would be wrong).
+  {
+    const onloadIdx239 = uiCoreSrc239.indexOf('window.onload = async function');
+    const onloadBody239 =
+      onloadIdx239 !== -1 ? uiCoreSrc239.slice(onloadIdx239, onloadIdx239 + 4000) : '';
+    const restoreCall239 = onloadBody239.indexOf('await _restoreLiveContainerFromIdb()');
+    const hydrateCall239 = onloadBody239.indexOf('_hydrateStateFromStorage()');
+    assert(
+      restoreCall239 !== -1 && hydrateCall239 !== -1 && restoreCall239 < hydrateCall239,
+      '239.7: window.onload awaits _restoreLiveContainerFromIdb() BEFORE _hydrateStateFromStorage() — the recovered container is in localStorage by the time hydration reads it'
+    );
+  }
+
+  // 239.8  the boot phase is BOUNDED + fail-safe: a slow/hung IndexedDB can never
+  //        delay boot (Promise.race against a timeout budget; resolves, never rejects)
+  {
+    const phaseBody239 = extractFunctionBody(uiCoreSrc239, '_restoreLiveContainerFromIdb');
+    assert(
+      /Promise\.race/.test(phaseBody239) &&
+        /_LIVE_RESTORE_BUDGET_MS/.test(phaseBody239) &&
+        /setTimeout/.test(phaseBody239),
+      '239.8: [Protocol 33] the _restoreLiveContainerFromIdb boot phase is bounded (Promise.race vs _LIVE_RESTORE_BUDGET_MS) so a slow/hung IndexedDB can never delay boot'
+    );
+  }
+
+  // 239.9  the unload flush also fires the mirror on visibilitychange→hidden — the
+  //        reliable mobile durability path (async put can complete before a bg-kill)
+  {
+    const wireBody239 = extractFunctionBody(flushFamily239, '_wireUnloadFlush');
+    assert(
+      /addEventListener\('visibilitychange'/.test(wireBody239) &&
+        /visibilityState === 'hidden'/.test(wireBody239) &&
+        /mirrorLiveContainer\(\)/.test(wireBody239),
+      '239.9: _wireUnloadFlush wires a visibilitychange→hidden flush that fires mirrorLiveContainer() — the reliable mobile path (page still alive, async put can land before an OS kill)'
+    );
+  }
+
+  // 239.10  Protocol 44: the hard-to-reproduce recovery path ships a Diagnostic Shell
+  //         trigger, tiered staging + destructive (it drops robco_v8 and reloads)
+  assert(
+    /id:\s*'save-simulate-eviction-recovery'/.test(dshSrc239) &&
+      /_dshSimulateEviction/.test(dshSrc239) &&
+      /function _dshSimulateEviction/.test(dshSrc239) &&
+      /tier:\s*'staging'/.test(
+        dshSrc239.slice(
+          dshSrc239.indexOf("id: 'save-simulate-eviction-recovery'"),
+          dshSrc239.indexOf("id: 'save-simulate-eviction-recovery'") + 700
+        )
+      ),
+    '239.10: [Protocol 44] the eviction+recovery path registers a staging/destructive Diagnostic Shell trigger (save-simulate-eviction-recovery → _dshSimulateEviction)'
+  );
+
+  // ── Behavioral (6) — eval the real mirror/restore against a mock IdbStore ─────
+  _pendingAsync.push(
+    (async () => {
+      const _bvm239 = require('vm');
+      const _lsStore239 = Object.create(null);
+      const _mockLS239 = {
+        getItem: k => (_lsStore239[k] !== undefined ? String(_lsStore239[k]) : null),
+        setItem: (k, v) => {
+          _lsStore239[k] = String(v);
+        },
+        removeItem: k => {
+          delete _lsStore239[k];
+        },
+      };
+      // Faithful mock of the IDB 'campaign' cold store: set() stamps a checksum via
+      // the SAME computeSaveChecksum idb.js's _wrap() uses, so restore's integrity
+      // gate exercises the real verification path (Protocol 22 — no forked hash).
+      const _idbCampaign239 = Object.create(null);
+      let _win239 = null;
+      const _mockIdb239 = {
+        set(store, key, value) {
+          let checksum = '';
+          try {
+            checksum = _win239.computeSaveChecksum(value, [], '');
+          } catch (_) {}
+          _idbCampaign239[key] = {
+            value: JSON.parse(JSON.stringify(value)),
+            checksum,
+            mt: 1,
+          };
+          return Promise.resolve(true);
+        },
+        getRaw(store, key) {
+          return Promise.resolve(_idbCampaign239[key] || null);
+        },
+      };
+
+      let _ctx239 = null;
+      let _setupErr239 = null;
+      try {
+        const _s = readGroup('state');
+        const _hStart = _s.indexOf('function _fnv1a32');
+        const _hEnd = _s.indexOf('// ── FACTION REGISTRY');
+        _ctx239 = {
+          window: {},
+          localStorage: _mockLS239,
+          JSON,
+          Math,
+          String,
+          Array,
+          Object,
+          parseInt,
+          isNaN,
+          Date,
+          Promise,
+          setTimeout,
+          console: { warn: () => {}, error: () => {} },
+        };
+        _bvm239.createContext(_ctx239);
+        _bvm239.runInContext('var APP_VERSION = "2.0.1";\n' + _s.slice(_hStart, _hEnd), _ctx239);
+        _win239 = _ctx239.window;
+        _win239.IdbStore = _mockIdb239;
+      } catch (e) {
+        _setupErr239 = e;
+      }
+
+      if (
+        !_ctx239 ||
+        !_win239 ||
+        typeof _win239.mirrorLiveContainer !== 'function' ||
+        typeof _win239.restoreLiveContainerFromIdb !== 'function' ||
+        typeof _win239.computeSaveChecksum !== 'function'
+      ) {
+        for (let i = 0; i < 6; i++)
+          fail(`239.B behavioral (setup failed${_setupErr239 ? ': ' + _setupErr239.message : ''})`);
+        return;
+      }
+
+      const _sample239 = () => ({
+        activeContext: 'FNV',
+        campaigns: { FNV: { lvl: 12, name: 'Courier Six', caps: 4200 } },
+      });
+
+      // 239.11  MIRROR WRITE: mirrorLiveContainer shadows window.robco_v8 into
+      //         IDB 'campaign'/'live' (getRaw returns the container + a checksum).
+      _win239.robco_v8 = _sample239();
+      _win239.mirrorLiveContainer();
+      const _rec239 = await _mockIdb239.getRaw('campaign', 'live');
+      assert(
+        _rec239 &&
+          _rec239.value &&
+          _rec239.value.campaigns.FNV.name === 'Courier Six' &&
+          typeof _rec239.checksum === 'string' &&
+          _rec239.checksum.length > 0,
+        "239.11: mirrorLiveContainer writes the live container into IDB 'campaign'/'live' with a checksum (the durability shadow the live campaign never had)"
+      );
+
+      // 239.12  RED→GREEN EVICTION RECOVERY (the mandatory test): localStorage
+      //         evicted (robco_v8 cleared) but IDB intact → restore recovers the
+      //         campaign into localStorage instead of leaving it empty.
+      delete _lsStore239['robco_v8']; // simulate the Android eviction (IDB mirror survives)
+      const _preEvict239 = _mockLS239.getItem('robco_v8');
+      const _recovered239 = await _win239.restoreLiveContainerFromIdb();
+      const _postRestore239 = _mockLS239.getItem('robco_v8');
+      assert(
+        _preEvict239 === null &&
+          _recovered239 === true &&
+          _postRestore239 !== null &&
+          JSON.parse(_postRestore239).campaigns.FNV.name === 'Courier Six',
+        '239.12: [RED→GREEN] with localStorage evicted but IndexedDB intact, restore recovers the live campaign back into localStorage (boots recovered, not empty)'
+      );
+
+      // 239.13  DEEP ROUND-TRIP: the recovered container is byte-identical to the
+      //         original — recovery restores the WHOLE campaign, not a partial.
+      assert(
+        JSON.stringify(JSON.parse(_postRestore239)) === JSON.stringify(_sample239()),
+        '239.13: the recovered container deep-equals the original live container — the full campaign survives the mirror→evict→restore round-trip'
+      );
+
+      // 239.14  LOCALSTORAGE WINS (the mandatory anti-clobber test): a NEWER
+      //         localStorage container must NEVER be replaced by an OLDER mirror.
+      //         Mirror holds the old campaign; localStorage holds a fresher one →
+      //         restore returns false and leaves localStorage byte-unchanged.
+      const _fresh239 = {
+        activeContext: 'FNV',
+        campaigns: { FNV: { lvl: 99, name: 'FRESHER LOCAL', caps: 9000 } },
+      };
+      _mockLS239.setItem('robco_v8', JSON.stringify(_fresh239)); // newer local present
+      // (the mirror still holds the OLD 'Courier Six' container from 239.11)
+      const _clobber239 = await _win239.restoreLiveContainerFromIdb();
+      const _afterLocal239 = JSON.parse(_mockLS239.getItem('robco_v8'));
+      assert(
+        _clobber239 === false && _afterLocal239.campaigns.FNV.name === 'FRESHER LOCAL',
+        '239.14: [ANTI-CLOBBER] when localStorage already holds a container, restore returns false and never touches it — a stale mirror can never overwrite the newer local value (Protocol 34)'
+      );
+
+      // 239.15  SHAPE GATE: a junk mirror record (no campaigns object) is refused,
+      //         localStorage is left empty (never restored from garbage).
+      _idbCampaign239['live'] = { value: { not: 'a container' }, checksum: '', mt: 1 };
+      delete _lsStore239['robco_v8'];
+      const _junk239 = await _win239.restoreLiveContainerFromIdb();
+      assert(
+        _junk239 === false && _mockLS239.getItem('robco_v8') === null,
+        '239.15: a shape-invalid mirror record (no campaigns) is refused — restore returns false and leaves localStorage empty rather than restoring garbage'
+      );
+
+      // 239.16  INTEGRITY GATE: a container with a TAMPERED checksum is refused,
+      //         localStorage stays empty (a corrupt mirror is never trusted).
+      _idbCampaign239['live'] = {
+        value: _sample239(),
+        checksum: 'deadbeef', // deliberately wrong
+        mt: 1,
+      };
+      delete _lsStore239['robco_v8'];
+      const _corrupt239 = await _win239.restoreLiveContainerFromIdb();
+      assert(
+        _corrupt239 === false && _mockLS239.getItem('robco_v8') === null,
+        '239.16: a mirror record whose checksum does not verify is refused — restore returns false and localStorage stays empty (corrupt shadow never restored)'
+      );
+    })()
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

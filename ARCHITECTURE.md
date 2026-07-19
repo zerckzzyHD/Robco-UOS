@@ -106,7 +106,7 @@
 ├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    3453-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    3470-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -517,7 +517,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 238 suites / 3453 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
+**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 239 suites / 3470 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
 
 **Diagnostic Shell U1 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
@@ -2247,8 +2247,8 @@ initRegistryAutocomplete()  ← called once in window.onload
 ```
 User interaction / AI sync
   → syncStateFromDom()          // Reads DOM inputs → state object (immediate)
-  → saveState()                 // Debounced (500ms) localStorage.setItem('robco_v7', ...)
-  → beforeunload handler        // Flushes pending save immediately on tab close
+  → saveState()                 // Debounced (500ms) localStorage.setItem('robco_v8', ...) + IDB 'live' mirror (P8)
+  → beforeunload / visibilitychange:hidden  // Flushes pending save + mirrors on tab close / mobile background (_flushUnload)
 ```
 
 ### Load Flow (window.onload in ui-core.js)
@@ -2310,12 +2310,54 @@ un-archived legacy faction key that every other arrival path already
 normalized (confirmed behaviourally, no field was ever dropped — see
 `tests/save-survival.mjs` PATH2).
 
+### Live Container Durability Mirror (Step 2 · Phase 1 · P8)
+
+The live campaign container (`robco_v8` — the campaign being played _right now_)
+was the one cold-store entry with **no IndexedDB durability shadow**: save slots
+and rolling backups mirror into the `'campaign'` object store (P3), but the live
+container lived only in localStorage, so an Android storage-pressure eviction
+dropped every edit since the last rolling backup (backups snap only on a
+state-_replacing_ load, not per edit). P8 closes that gap by shadowing the live
+container into the **same `'campaign'` store, key `'live'`** (Protocol 22 —
+extends the existing cold store, no second mechanism), IDB-only; localStorage
+`robco_v8` stays the synchronous authority and working store.
+
+- **Write path** — `window.mirrorLiveContainer()` (state.js) is a fire-and-forget
+  IDB-only put, called from `saveState()`'s debounced write (after the
+  dirty-check, so only changed content is mirrored) and from the flush closure
+  wired to **`beforeunload` _and_ `visibilitychange → hidden`** (`_flushUnload`,
+  ui-core.js). The `hidden` trigger is the reliable mobile path: it fires while
+  the page is still alive, so the async put has a real chance to complete before
+  an OS background-kill (unlike `beforeunload`, where an async write typically
+  cannot finish — the known, documented residual).
+- **Restore path** — `window.restoreLiveContainerFromIdb()` (state.js) is an
+  awaited, **bounded** (`Promise.race` vs a timeout) boot phase run from
+  `window.onload` _before_ `_hydrateStateFromStorage()`. It is **recovery-only**
+  and one-directional: it returns immediately _without reading the mirror_
+  whenever localStorage still holds `robco_v8` (localStorage always wins), so a
+  stale mirror can never overwrite a newer local value (Protocol 34). Only when
+  localStorage is empty (the eviction/first-boot signature) does it read the
+  mirror, gate it on container shape **and** a verified checksum (the same idiom
+  as `_reconcileMetaFromIdb`), and write it back into localStorage — after which
+  the unchanged synchronous hydration loads it on its normal v8 path and the
+  campaign boots recovered instead of empty.
+- **Fail-safe (Protocol 33)** — IndexedDB absent / blocked / slow / corrupt ⇒ the
+  mirror write no-ops and the restore yields nothing, so boot is byte-identical
+  to a pure-localStorage build and the eviction banner (below) still fires.
+- **Residual gap** — edits in the final debounce window (< ~500 ms) before a
+  `beforeunload`-only exit that never fired `visibilitychange → hidden` first.
+  The mirror only matters at a _later_ eviction boot, by which time it holds the
+  last debounced-write's content, so realistic loss shrinks from "everything
+  since the last rolling backup" to at most that last sub-second window.
+- **On-demand repro** — the Diagnostic Shell's `SIMULATE EVICTION + RECOVER` tool
+  (staging, destructive) writes the mirror, drops `robco_v8`, and reloads
+  (Protocol 44). Guarded by Suite 239 (RED→GREEN recovery + the anti-clobber
+  "localStorage wins" invariant).
+
 ### Storage Durability (Layer 2 — SAVE_INTEGRITY_PASS)
 
-The live campaign container (`robco_v8`) is **localStorage-only** — unlike
-cold store (save slots / rolling backups), it has no IndexedDB durability
-shadow, so it is the single most storage-pressure-vulnerable piece of durable
-data in the app (e.g. iOS Safari's low-storage/~2-week-unopened eviction).
+Layer 2 asks the host not to evict this origin in the first place — complementary
+to the P8 mirror above, which recovers the live container _after_ an eviction.
 `_requestPersistentStorage()` (ui-core.js) is a fire-and-forget boot phase,
 called from `window.onload` right after `_hydrateStateFromStorage()`, that
 asks the browser to make this origin's storage persistent
@@ -3291,7 +3333,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3453-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3470-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

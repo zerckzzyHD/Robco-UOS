@@ -2668,6 +2668,20 @@
       action: () => _dshPlantCorruptContainer(),
     },
     {
+      id: 'save-simulate-eviction-recovery',
+      label: 'SIMULATE EVICTION + RECOVER',
+      subLabel: 'mirror → drop robco_v8 → reload — campaign recovers from the IDB shadow',
+      icon: '♻',
+      category: 'triggers',
+      group: 'SAVE INTEGRITY',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'True end-to-end P8 durability repro: write the live container to its IndexedDB shadow, then remove it from localStorage and reload — simulating an Android storage eviction that spared IndexedDB. Boot recovers the campaign from the shadow instead of starting empty (no EVICTION banner). If IndexedDB is unavailable, the reload boots empty exactly as before the fix.',
+      triggers: [],
+      action: () => _dshSimulateEviction(),
+    },
+    {
       id: 'save-degraded-no-idb',
       label: 'DEGRADED WRITE: NO COLD STORE',
       subLabel: "__robcoForceColdWriteMode='no-idb'",
@@ -3659,6 +3673,28 @@
     try {
       window._loadingSave = true;
       localStorage.setItem('robco_v8', '{{{ CORRUPT MEMORY CORE — unparseable on purpose');
+      window.location.reload();
+    } catch (_) {
+      /* a console failure must never break boot or leak to production */
+    }
+  }
+
+  // P8: true end-to-end EVICTION + RECOVERY repro. Writes the live container to its
+  // IDB durability shadow (awaited, so it has landed), THEN removes robco_v8/robco_v7
+  // from localStorage and reloads — simulating an Android storage-pressure eviction
+  // that spared IndexedDB. On the reload, _restoreLiveContainerFromIdb() finds
+  // localStorage empty, restores the container from the mirror, and the campaign boots
+  // recovered instead of empty (no EVICTION banner). Sets window._loadingSave — the
+  // SAME guard the corrupt-container tool uses — so neither the debounced saveState()
+  // nor the unload flush re-writes robco_v8 over the simulated eviction before reload.
+  async function _dshSimulateEviction() {
+    try {
+      if (window.IdbStore && window.robco_v8) {
+        await window.IdbStore.set('campaign', 'live', window.robco_v8);
+      }
+      window._loadingSave = true;
+      localStorage.removeItem('robco_v8');
+      localStorage.removeItem('robco_v7');
       window.location.reload();
     } catch (_) {
       /* a console failure must never break boot or leak to production */

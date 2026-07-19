@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Tests: 3453/3453 | Cache: robco-terminal-v2.8.0-r50 -->
+## [Unreleased]<!-- Tests: 3470/3470 | Cache: robco-terminal-v2.8.0-r51 -->
 
 ### Added
 
@@ -17,6 +17,7 @@
 - If your save data ever can't be read at startup (storage corruption — rare, but real), it's now set aside whole and recoverable instead of silently wiped. A warning banner tells you what happened, and a QUARANTINED RECORD entry appears in the saves list with an EXPORT button (download the set-aside data so it can be recovered) and a PURGE button (permanently discard it, behind a confirmation step). The warning re-appears every startup until you resolve it, so a lost campaign can never slip by unnoticed. Loading a healthy save is completely unaffected.
 - The terminal now notices when your browser has quietly reclaimed its local data under storage pressure: instead of silently starting you over like a brand-new visitor, a warning banner on the next startup tells you what happened and points you at your surviving cold-storage save slots and backups. Deliberately conservative about false alarms — a genuinely new visitor, a first install after closing the tab early, or a slow device will never see it.
 - Saving to a slot now tells you when only one of the terminal's two storage systems actually held the save — a one-time notice per session says whether the slot is held in local memory only or in cold storage only, so a quietly failing device can't pile up under-protected saves without you knowing. A healthy save stays exactly as quiet as before, and a fully failed save stays exactly as loud.
+- Your active, in-progress campaign is now protected against the one storage failure that could still lose recent play: on phones, the browser can quietly reclaim the terminal's fast local storage when the device is low on space. Your save slots and automatic backups already survive that, but the campaign you're playing right this second did not — so anything since your last automatic backup could be lost. The terminal now keeps a continuously-updated duplicate of your live campaign in a second, sturdier storage area, and if the fast storage is ever wiped, your campaign is automatically restored from that duplicate on the next startup instead of starting you over. The duplicate is refreshed as you play and again whenever you switch away from or close the terminal — the moment a phone is most likely to reclaim memory. It's carefully one-directional: a restore only ever happens when the live campaign is genuinely missing, so a saved-behind duplicate can never overwrite newer progress. If your device has no second storage area available, nothing changes and the terminal works exactly as before.
 
 ### Fixed
 

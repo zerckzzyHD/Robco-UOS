@@ -298,6 +298,22 @@ if (iter) {
   process.exit(0);
 }
 
+// ── 0. Clean the failure-evidence dir at the START of every gate run ──────────
+// test-artifacts/ is gitignored failure evidence (Suite 235.14): screenshots,
+// console dumps, and per-step gate logs written by the browser harnesses when a
+// check fails. It was never cleared between runs, so stale artifacts from an
+// earlier failed run were indistinguishable from a fresh failure — "files present
+// ⇒ the last run failed" was NOT a true signal. Clearing it before any step runs
+// makes that signal honest. Fail-safe (mirrors the gate's own DNA): a cleanup
+// error never aborts the gate — the worst case is a stale artifact, exactly the
+// pre-existing behavior. Runs after the --iter early-exit (iter is a dev pre-check,
+// not a real gate) so it covers every actual commit/push gate run (fast + full).
+try {
+  fs.rmSync(ARTIFACTS_DIR, { recursive: true, force: true });
+} catch {
+  /* never let evidence cleanup abort the gate */
+}
+
 // ── 1. ESLint ─────────────────────────────────────────────────────────────────
 run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
 

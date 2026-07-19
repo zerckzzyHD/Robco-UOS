@@ -1520,42 +1520,126 @@ let importAsymmetryResult = null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// SAVE_LAYER3 §D — EVICTION DETECTED (plan L7) + the false-positive family:
-// a real eviction (localStorage wiped, IDB survives) fires the banner; the
-// swipe-away analogue (only the container missing, marker present) is
-// SILENT. The reloads set window._loadingSave first — the same guard every
-// legit persist-then-reload path uses — so the unload flush can't re-write
-// what the test just cleared (harness analogue of Suite 95.8's clobber).
+// SAVE_LAYER3 §D — EVICTION DETECTED (plan L7) + the P8 live-container recovery
+// that now sits IN FRONT of it. Two distinct outcomes after a localStorage
+// eviction where IndexedDB survives:
+//   L7a (P8 recovery) — the live-container IDB mirror ('campaign'/'live')
+//     survived → the campaign is silently RECOVERED into localStorage on the
+//     next boot and NO eviction banner fires (the whole point of P8: recovery,
+//     not a scary "your data is gone" banner when the data is actually safe).
+//   L7b (eviction fallback) — nothing is recoverable (the live mirror is gone
+//     too, only the 'meta' boot marker survived) → the EVICTION DETECTED banner
+//     fires on the real three-part signature, exactly as before P8.
+// The reloads set window._loadingSave first — the same guard every legit
+// persist-then-reload path uses — so the unload flush can't re-write what the
+// test just cleared (harness analogue of Suite 95.8's clobber).
 // ═══════════════════════════════════════════════════════════════════════
 {
   const ctxE = await browser.newContext({ viewport: { width: 412, height: 900 } });
+  const evSeed = 57;
+  const evExpectedLvl = 10 + evSeed; // buildCurrentCampaign: lvl = 10 + seed → 67
+  // NOTE: deliberately NOT addInitScript — an init script re-runs on the reload and
+  // would re-seed robco_v8, masking the eviction (the exact footgun the swipe-away
+  // case below documents). We install the campaign via evaluate (once) instead.
   const page = await ctxE.newPage();
   await page.goto(INDEX_URL);
   await waitBooted(page);
   await page.waitForTimeout(1200); // let runBootSequence set + shadow the boot marker
 
-  const idbReady = await page.evaluate(async () => {
-    if (!window.IdbStore) return false;
-    try {
+  // Install a real campaign as the live container, then shadow it to IDB via the
+  // REAL production function the debounced save + the flush both call (Suite 239.4
+  // covers the saveState→mirror wiring statically; here we prove the end-to-end
+  // eviction→recovery, so we drive mirrorLiveContainer() directly).
+  const mirrorWritten = await page.evaluate(
+    async campaign => {
+      if (!window.IdbStore || typeof window.mirrorLiveContainer !== 'function')
+        return { idb: false, mirror: false, marker: false };
+      window.robco_v8 = { activeContext: 'FNV', campaigns: { FNV: campaign } };
+      localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+      window.mirrorLiveContainer();
+      await new Promise(r => setTimeout(r, 400)); // let the async IDB put land
+      const live = await window.IdbStore.getRaw('campaign', 'live');
       const rec = await window.IdbStore.getRaw('meta', 'robco_booted_before');
-      return !!(rec && typeof rec.value === 'string');
-    } catch (_) {
-      return false;
-    }
-  });
-  if (!idbReady) {
+      return {
+        idb: true,
+        mirror: !!(live && live.value && live.value.campaigns),
+        marker: !!(rec && typeof rec.value === 'string'),
+      };
+    },
+    buildCurrentCampaign('FNV', evSeed)
+  );
+  if (!mirrorWritten.idb || !mirrorWritten.marker) {
     note(
-      'LAYER3 eviction — IndexedDB shadow unavailable in this environment; eviction sub-case skipped (recovery impossible = designed silent)'
+      'LAYER3 eviction — IndexedDB shadow unavailable in this environment; eviction sub-cases skipped (recovery impossible = designed silent)'
     );
   } else {
+    // ── L7a: mirror survives → RECOVERED, no banner ──────────────────────────
+    if (mirrorWritten.mirror) {
+      pass('LAYER3 P8 (L7a) — mirrorLiveContainer() shadowed the live container to IDB');
+    } else {
+      fail('LAYER3 P8 (L7a) — mirrorLiveContainer() did NOT write the live-container IDB mirror');
+    }
     await page.evaluate(() => {
       window._loadingSave = true;
-      localStorage.clear(); // the eviction: localStorage gone, IDB survives
+      localStorage.clear(); // eviction: localStorage gone, IDB (incl. the live mirror) survives
       window.location.reload();
     });
     await page.waitForNavigation({ timeout: 10000 }).catch(() => {});
     await waitBooted(page);
-    const e = await page.evaluate(() => ({
+    const a = await page.evaluate(() => ({
+      lvl:
+        window.robco_v8 &&
+        window.robco_v8.campaigns &&
+        window.robco_v8.campaigns.FNV &&
+        window.robco_v8.campaigns.FNV.lvl,
+      recoveredFlag: window._liveContainerRecovered === true,
+      lsHasV8: localStorage.getItem('robco_v8') !== null,
+      bannerText: (() => {
+        const b = document.getElementById('readFaultBanner');
+        return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
+      })(),
+    }));
+    if (a.lvl === evExpectedLvl && a.recoveredFlag && a.lsHasV8) {
+      pass(
+        `LAYER3 P8 (L7a) — localStorage evicted but the IDB mirror survived → the campaign is recovered into localStorage (lvl ${evExpectedLvl}), not booted empty`
+      );
+    } else {
+      fail(
+        `LAYER3 P8 (L7a) — recovery failed (lvl=${a.lvl}, expected ${evExpectedLvl}, recoveredFlag=${a.recoveredFlag}, lsHasV8=${a.lsHasV8})`
+      );
+    }
+    if (!(a.bannerText && /EVICTION DETECTED/.test(a.bannerText))) {
+      pass(
+        'LAYER3 P8 (L7a) — no EVICTION banner when the campaign was recovered (recovery, not a false alarm)'
+      );
+    } else {
+      fail(
+        'LAYER3 P8 (L7a) — EVICTION banner wrongly fired even though the campaign was recovered'
+      );
+    }
+  }
+  await ctxE.close();
+
+  // ── L7b: nothing recoverable (mirror gone too) → EVICTION banner fires ──────
+  if (mirrorWritten.idb && mirrorWritten.marker) {
+    const ctxB = await browser.newContext({ viewport: { width: 412, height: 900 } });
+    const pageB = await ctxB.newPage();
+    await pageB.goto(INDEX_URL);
+    await waitBooted(pageB);
+    await pageB.waitForTimeout(1200); // shadow the boot marker
+    await pageB.evaluate(async () => {
+      window._loadingSave = true;
+      // Remove the live mirror too, so there is genuinely nothing to recover — the
+      // eviction banner is the correct response only when recovery is impossible.
+      try {
+        if (window.IdbStore) await window.IdbStore.remove('campaign', 'live');
+      } catch (_) {}
+      localStorage.clear(); // localStorage gone; only the 'meta' boot marker survives in IDB
+      window.location.reload();
+    });
+    await pageB.waitForNavigation({ timeout: 10000 }).catch(() => {});
+    await waitBooted(pageB);
+    const e = await pageB.evaluate(() => ({
       bannerText: (() => {
         const b = document.getElementById('readFaultBanner');
         return b && getComputedStyle(b).display !== 'none' ? b.textContent : null;
@@ -1567,22 +1651,22 @@ let importAsymmetryResult = null;
     }));
     if (e.bannerText && /EVICTION DETECTED/.test(e.bannerText)) {
       pass(
-        'LAYER3 eviction (L7) — EVICTION DETECTED banner fires on the real three-part signature'
+        'LAYER3 eviction (L7b) — EVICTION DETECTED banner fires when nothing is recoverable (the real three-part signature)'
       );
     } else {
-      fail(`LAYER3 eviction (L7) — banner missing (got: ${e.bannerText})`);
+      fail(`LAYER3 eviction (L7b) — banner missing (got: ${e.bannerText})`);
     }
     if (e.evictionPref && e.markerRestored === 'true') {
       pass(
-        'LAYER3 eviction (L7) — robco_eviction_detected recorded; boot marker restored from cold storage'
+        'LAYER3 eviction (L7b) — robco_eviction_detected recorded; boot marker restored from cold storage'
       );
     } else {
       fail(
-        `LAYER3 eviction (L7) — telemetry wrong (pref=${e.evictionPref}, marker=${e.markerRestored})`
+        `LAYER3 eviction (L7b) — telemetry wrong (pref=${e.evictionPref}, marker=${e.markerRestored})`
       );
     }
+    await ctxB.close();
   }
-  await ctxE.close();
 
   // False positive (swipe-away analogue): only the container missing, the
   // boot marker still IN localStorage → not recovered → silent.

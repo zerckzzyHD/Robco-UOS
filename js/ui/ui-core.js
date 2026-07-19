@@ -375,6 +375,26 @@ function _hydrateMetaFromIdb() {
   }
 }
 
+// Awaited boot phase (P8 live-container recovery). BOUNDED so a slow/hung
+// IndexedDB can never delay boot: it races window.restoreLiveContainerFromIdb()
+// (state.js — the data-layer recovery) against a short budget, after which boot
+// proceeds on localStorage exactly as today (fail-safe default — a still-pending
+// restore simply finishes harmlessly, or not, in the background). Never rejects;
+// resolves immediately when the recovery helper is absent (byte-identical boot).
+const _LIVE_RESTORE_BUDGET_MS = 1000;
+function _restoreLiveContainerFromIdb() {
+  try {
+    if (typeof window === 'undefined' || typeof window.restoreLiveContainerFromIdb !== 'function')
+      return Promise.resolve();
+    return Promise.race([
+      window.restoreLiveContainerFromIdb().catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, _LIVE_RESTORE_BUDGET_MS)),
+    ]);
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
+
 function _hydrateStateFromStorage() {
   // Snapshot current state as rolling backup before any boot migration (Protocol: Rolling Backups)
   if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
@@ -1429,7 +1449,14 @@ function _wireUnloadFlush() {
   // verification pass once hit this exact clobber with the guard missing
   // (harness-only — every shipped reload path was already guarded — see
   // Suite 95.8/95.9, the regression locks for this pattern).
-  window.addEventListener('beforeunload', () => {
+  // Shared flush body: fold the pending debounced save into robco_v8, write
+  // localStorage synchronously, then fire the P8 IDB durability mirror. The mirror
+  // is fire-and-forget: on 'visibilitychange → hidden' (the reliable mobile path)
+  // the page is still fully alive, so the async put has a real chance to complete
+  // before a background-kill; on 'beforeunload' the async put likely will NOT
+  // finish (an unavoidable, documented residual — see the report), but firing it is
+  // harmless and the localStorage write below is synchronous and always lands.
+  function _flushUnload() {
     clearTimeout(_saveTimer);
     if (window._contextSwitching || window._loadingSave) return;
     if (!window.robco_v8)
@@ -1445,8 +1472,20 @@ function _wireUnloadFlush() {
       // last debounced saveState() may not have flushed. No UI is possible
       // during unload; console.error is the loud, auditable trail (never a
       // silent swallow, Protocol 42).
-      console.error('[RobCo] beforeunload flush failed (quota?):', e);
+      console.error('[RobCo] flush failed (quota?):', e);
     }
+    // P8: shadow the flushed container into IDB. On the hidden path this is the
+    // durability write that actually survives a mobile OS kill.
+    if (typeof window.mirrorLiveContainer === 'function') window.mirrorLiveContainer();
+  }
+  window.addEventListener('beforeunload', _flushUnload);
+  // 'visibilitychange → hidden' is far more reliable than 'beforeunload' on mobile
+  // (which frequently never fires on an OS-initiated background-kill) AND fires
+  // while the page can still run async work — so it is the primary durability-flush
+  // trigger. Independent of the AmbientRuntime's own visibility→STANDBY observer
+  // (that owns ambient lifecycle; this owns durability) — the two never conflict.
+  document.addEventListener('visibilitychange', () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') _flushUnload();
   });
 }
 
@@ -1471,6 +1510,8 @@ window.onload = async function () {
     _wireLocationCardSubscriber(); // LOCATION CONFIRMATION CARD: top-right arrival toast
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
     await _hydrateMetaFromIdb();
+    // P8: recover the live container from its IDB shadow if localStorage was evicted (bounded, fail-safe, recovery-only — see the boot phase).
+    await _restoreLiveContainerFromIdb();
     _hydrateStateFromStorage();
     _requestPersistentStorage(); // SAVE_INTEGRITY_PASS Layer 2: fire-and-forget, never blocks boot
     if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
