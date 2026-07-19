@@ -149,6 +149,14 @@ const CHAT_MAX = 200; // max messages kept in memory; last 50 written to localSt
 // runtime's tier check. enterStandby/exitStandby no longer manage those intervals.
 let _standbyActive = false;
 let sessionStart = 0;
+// AI_OVERSEER Finding 7: the delayed wake "COURIER RETURNED" print is coalesced
+// through this single pending-timer handle. A rapid sleep→wake→sleep→wake (common on
+// mobile: keyboard show/hide and paired blur+visibilitychange events can fire two
+// STANDBY→ACTIVE crossings within the 650ms wake window) used to stack two delayed
+// prints — the "printed TWICE consecutively" the audit flagged. exitStandby() now
+// clears any pending print before scheduling a new one, and enterStandby() cancels a
+// pending print outright (a wake that immediately re-sleeps never announces a return).
+let _wakeTimer = null;
 
 // Uptime-clock observer tick: refresh the HH:MM:SS since-boot readout. tier 'minimal'
 // (baseline telemetry — never dial-quieted), cadence 1000ms, awake states only.
@@ -185,6 +193,12 @@ function _tickMemCycle() {
 function enterStandby() {
   if (_standbyActive) return;
   _standbyActive = true;
+  // AI_OVERSEER Finding 7: cancel any pending wake "COURIER RETURNED" print — the
+  // terminal went back to standby before it fired, so the return never happened.
+  if (_wakeTimer && typeof clearTimeout === 'function') {
+    clearTimeout(_wakeTimer);
+    _wakeTimer = null;
+  }
   document.body.classList.add('standby');
   geigerRunning = false;
   if (geigerTimeout) {
@@ -228,7 +242,12 @@ function exitStandby() {
   _standbyActive = false;
   if (_isShuttingDown()) return; // fire time for the tone is now — skip it too
   playWakeTone();
-  setTimeout(() => {
+  // AI_OVERSEER Finding 7: coalesce — if a wake print from a just-prior wake is still
+  // pending (a rapid sleep→wake→sleep→wake within the 650ms window), drop it so only
+  // ONE "COURIER RETURNED" ever lands, never two consecutively.
+  if (_wakeTimer && typeof clearTimeout === 'function') clearTimeout(_wakeTimer);
+  _wakeTimer = setTimeout(() => {
+    _wakeTimer = null;
     // Re-check AT THIS ACTION'S OWN FIRE TIME: a shutdown that landed sometime
     // during the 650ms window (after the tone already played above) still
     // must not surface the ramp/chat/geiger-resync — the shutdown-crt

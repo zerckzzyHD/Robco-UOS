@@ -17022,7 +17022,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
-    // ALL 11 rows' hashes changed AGAIN (AI_OVERSEER Finding 1 — CLASS fix,
+    // AI_OVERSEER Finding 4 (persona game-agnostic, 2026-07-19): ONLY the two FO3
+    // rows' hashes moved this pass. The player noun is now per-game DATA
+    // (GAME_DEFS[ctx].identity.playerNoun — api-directive.js/state.js): FNV resolves
+    // to 'Courier' so every FNV directive stays byte-identical (all 9 FNV hashes
+    // UNCHANGED — the golden-master proves the fix is a no-op for the existing game),
+    // while FO3 now correctly says 'Lone Wanderer' instead of 'Courier' throughout,
+    // so both FO3 hashes changed. An intentional content change, not a regression
+    // (Protocol 42/14). Regenerated via the same in-sandbox getSystemDirective().
+    //
+    // Prior pass — ALL 11 rows' hashes changed (AI_OVERSEER Finding 1 — CLASS fix,
     // 2026-07-18 — APP_VERSION stays 2.8.0, 2.8.5 unreleased work, NOT a version
     // bump). The first pass (8f834e6) rewrote the "Inventory & Squad Persistence"
     // instruction; this pass extends the same root-cause fix to the OTHER
@@ -17104,14 +17113,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '061e9eee1d1c296e6d9b8624f1479ce6e853b46a1e0ba58f74aec7b80fcd13fd',
+        sha256: 'c4aa6bb684ed40744eaaeaa1a67fc6d6f70a993a090e0821debbc54013a84dc9',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '18eddc2ef837d75ce7ea4aa2f2f4207a009637e2182aa998cb91665ab8379e71',
+        sha256: 'c6e6ac56cab846e02d43dd358f88ed2b21273158672ffb0281f8bdc9069488a0',
       },
     ];
 
@@ -20653,7 +20662,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       isShuttingDownBody150
     ) &&
       /if \(_isShuttingDown\(\)\) return;[\s\S]*?playWakeTone\(\);/.test(exitStandbyBody150) &&
-      /setTimeout\(\(\) => \{\s*\n(?:\s*\/\/.*\n)*\s*if \(_isShuttingDown\(\)\) return;/.test(
+      // AI_OVERSEER Finding 7: a `_wakeTimer = null;` bookkeeping line (coalescing the
+      // delayed print) may precede the shutdown re-check inside the timer body — the
+      // shutdown guard is still the first EFFECTIVE statement, which is what matters.
+      /setTimeout\(\(\) => \{\s*\n(?:\s*(?:\/\/.*|_wakeTimer = null;)\n)*\s*if \(_isShuttingDown\(\)\) return;/.test(
         exitStandbyBody150
       ),
     "150.5: _isShuttingDown() is re-checked at each half's own fire time in exitStandby() — synchronously before playWakeTone(), and again as the first statement inside the delayed setTimeout body — so a shutdown landing either as a direct edge OR mid-window both no-op their half of the wake sequence"
@@ -20735,6 +20747,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     }
     const src150 =
       'var _standbyActive = false;\n' +
+      // AI_OVERSEER Finding 7: the wake-print coalescing handle exitStandby()/
+      // enterStandby() now reference (clearTimeout is typeof-guarded, so the sandbox
+      // needs no clearTimeout stub).
+      'var _wakeTimer = null;\n' +
       declareFn150(uiCore150, '_isShuttingDown') +
       '\n' +
       declareFn150(uiCore150, 'enterStandby') +
@@ -48894,6 +48910,290 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
     dflt237.status === 0,
     '237.8: with default resolution the nudge exits 0 whether or not the private archive is present — it never blocks a push'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 238 — AI/Overseer pass, user-visible half (AI_OVERSEER audit
+//  Findings 2/3/4/7 + the modal-button restyle). Persona game-agnostic,
+//  retry echo collapse + failure-severity split, ambient-chatter thinning,
+//  and the phosphor-pill modal buttons.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 238 — AI/Overseer pass: persona / retry / ambient / modal buttons');
+
+  const apiSrc238 = readGroup('api');
+  const stateSrc238 = readGroup('state');
+  const uiCoreSrc238 = readGroup('ui-core');
+  const cssSrc238 = readCss();
+
+  // ── Finding 4: persona is per-game DATA (playerNoun), never hardcoded ────────
+  // Build the REAL GAME_DEFS + REAL directive builders in a vm sandbox (the Suite
+  // 131 harness) and compose the directive for FNV and FO3, proving the AI is told
+  // the correct player title per game (Protocol 14 — AI-contract safety).
+  {
+    const vm = require('vm');
+    const builderNames238 = [
+      '_directiveConstraints',
+      '_directivePersonaAndContract',
+      '_directiveCoreTracking',
+      '_directiveSkills',
+      '_directiveFactions',
+      '_directiveSystems',
+      '_directiveTrackers',
+      '_directiveInjectionBoundary',
+    ];
+    let sandbox238 = null;
+    let harnessErr238 = null;
+    try {
+      const _declFull = (src, name) => {
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + extractFunctionBody(src, name);
+      };
+      const allFnSrc238 = builderNames238
+        .concat(['getSystemDirective'])
+        .map(n => _declFull(apiSrc238, n))
+        .join('\n\n');
+      const stateSandbox238 = { window: {} };
+      vm.createContext(stateSandbox238);
+      vm.runInContext(stateSrc238, stateSandbox238);
+      sandbox238 = {
+        state: {},
+        GAME_DEFS: stateSandbox238.window.GAME_DEFS,
+        APP_VERSION: stateSandbox238.window.APP_VERSION || '2.8.0',
+        localStorage: { getItem: () => null },
+        _commGet: () => null,
+        console,
+      };
+      vm.createContext(sandbox238);
+      vm.runInContext(allFnSrc238 + '\nthis.getSystemDirective = getSystemDirective;', sandbox238);
+    } catch (e) {
+      harnessErr238 = e;
+    }
+
+    // 238.1  playerNoun is present + correct on every game's identity block
+    if (sandbox238) {
+      const gd = sandbox238.GAME_DEFS;
+      assert(
+        gd.FNV.identity.playerNoun === 'Courier' &&
+          gd.FO3.identity.playerNoun === 'Lone Wanderer' &&
+          gd.FO4.identity.playerNoun === 'Sole Survivor',
+        '238.1: GAME_DEFS[ctx].identity.playerNoun is per-game (Courier / Lone Wanderer / Sole Survivor) — the AI persona is DATA, not a hardcoded literal (Finding 4)'
+      );
+    } else {
+      fail(`238.1 (harness error: ${harnessErr238 && harnessErr238.message})`);
+    }
+
+    // 238.2  the composed directive addresses the player by the right per-game title
+    if (sandbox238) {
+      try {
+        sandbox238.state = { gameContext: 'FNV' };
+        const fnvDir = sandbox238.getSystemDirective.call(sandbox238);
+        sandbox238.state = { gameContext: 'FO3' };
+        const fo3Dir = sandbox238.getSystemDirective.call(sandbox238);
+        assert(
+          fnvDir.includes('Courier') &&
+            !fnvDir.includes('Lone Wanderer') &&
+            fo3Dir.includes('Lone Wanderer') &&
+            !fo3Dir.includes('Courier') &&
+            fo3Dir.includes('LONE WANDERER'),
+          '238.2: [behavioral] getSystemDirective() calls an FNV player "Courier" and an FO3 player "Lone Wanderer" (incl. the uppercase Tactical Constraint) — no "Courier" leaks into an FO3 directive (Finding 4, Protocol 14)'
+        );
+      } catch (e) {
+        fail(`238.2 (runtime error: ${e.message})`);
+      }
+    } else {
+      fail('238.2 (harness unavailable)');
+    }
+
+    // 238.3  the directive builders take the noun as a parameter and getSystemDirective
+    //        sources it from GAME_DEFS[ctx].identity.playerNoun (not a hardcode)
+    {
+      const gsdBody238 = extractFunctionBody(apiSrc238, 'getSystemDirective');
+      assert(
+        /GAME_DEFS\[ctx\]\.identity\s*&&\s*GAME_DEFS\[ctx\]\.identity\.playerNoun/.test(
+          gsdBody238
+        ) &&
+          /_directivePersonaAndContract\(ctx,\s*noun\)/.test(gsdBody238) &&
+          /_directiveCoreTracking\(noun\)/.test(gsdBody238) &&
+          /_directiveSystems\(ctx,\s*noun\)/.test(gsdBody238) &&
+          /_directiveTrackers\(ctx,\s*noun\)/.test(gsdBody238),
+        '238.3: getSystemDirective() resolves the player noun from GAME_DEFS[ctx].identity.playerNoun and threads it into every builder that names the player (Finding 4, Protocol 38)'
+      );
+    }
+  }
+
+  // 238.4  the Director-removal confirm modal copy addresses the player by their
+  //        per-game title (getIdentity().playerNoun), never a hardcoded "the Courier"
+  {
+    const confirmBody238 = extractFunctionBody(apiSrc238, '_confirmDirectorRemovals');
+    assert(
+      /getIdentity\(\)/.test(confirmBody238) &&
+        /playerNoun/.test(confirmBody238) &&
+        !/the Courier currently has/.test(confirmBody238),
+      '238.4: _confirmDirectorRemovals() sources the player title from getIdentity().playerNoun — the modal no longer hardcodes "the Courier currently has" (Finding 4)'
+    );
+  }
+
+  // ── Finding 2: one send = one echo + one status line (no re-echo pile-up) ────
+  const tmBody238 = extractFunctionBody(apiSrc238, 'transmitMessage');
+
+  // 238.5  the retry path no longer re-enters transmitMessage() (the exact
+  //        mechanism that re-echoed the user line every attempt is gone)
+  assert(
+    !/document\.getElementById\('chatInput'\)\.value\s*=\s*_lastUser\.text/.test(tmBody238) &&
+      /setTimeout\(_doAttempt,/.test(tmBody238),
+    '238.5: transmitMessage() retries re-run only the inner _doAttempt() ladder — the old "write last user text back into #chatInput + call transmitMessage() again" re-entry (which re-echoed the message) is gone (Finding 2)'
+  );
+
+  // 238.6  the user line is echoed exactly ONCE, and retries mutate it in place +
+  //        keep a SINGLE status line (helpers present; no per-attempt re-echo)
+  {
+    const echoCount238 = (
+      tmBody238.match(/appendToChat\(`> \$\{displayUserText\}`, 'user'\)/g) || []
+    ).length;
+    assert(
+      echoCount238 === 1 && /_addRelayHop/.test(tmBody238) && /_setRetryStatus/.test(tmBody238),
+      '238.6: transmitMessage() echoes the user line exactly once and threads retries through _addRelayHop (in-place ">" accumulation) + _setRetryStatus (one mutating status line) — never a fresh echo per attempt (Finding 2)'
+    );
+  }
+
+  // ── Finding 3: transient failures self-heal; FATAL stays for real faults ─────
+  // 238.7  an exhausted transient/network drop reads as SIGNAL LOST + fully-usable-
+  //        offline, NOT FATAL EXCEPTION; genuinely fatal faults keep FATAL EXCEPTION
+  assert(
+    /SIGNAL LOST/.test(tmBody238) &&
+      /FULLY USABLE OFFLINE/.test(tmBody238) &&
+      /JSON PARSE FAILURE/.test(tmBody238) &&
+      /NO API KEY DETECTED/.test(apiSrc238) &&
+      /if \(_isTransient\)/.test(tmBody238),
+    '238.7: a recoverable/transient network failure renders as a self-healing SIGNAL LOST (fully usable offline), gated on _isTransient — FATAL EXCEPTION is reserved for genuinely fatal faults (JSON parse, missing key) (Finding 3)'
+  );
+
+  // ── Finding 7: ambient-chatter thinning ─────────────────────────────────────
+  const importBody238 = extractFunctionBody(apiSrc238, 'autoImportState');
+
+  // 238.8  the DELTA line no longer watches 'ticks' (a lone tick increment used to
+  //        print a DELTA every single turn — pure noise)
+  assert(
+    /\['lvl', 'xp', 'hpCur', 'hpMax', 'caps', 'rads', 'karma'\]\.forEach/.test(importBody238) &&
+      !/'karma', 'ticks'\]\.forEach/.test(importBody238),
+    "238.8: the DELTA-line watched-keys list excludes 'ticks' — a do-nothing turn (which only ticks the clock) no longer prints a DELTA line (Finding 7)"
+  );
+
+  // 238.9  the "PIP-BOY DATA SYNCED" text confirmation is throttled by a counter
+  //        (occasional, not every sync) — the sync tone still fires every sync
+  assert(
+    /_aiSyncCount/.test(apiSrc238) &&
+      /_aiSyncCount === 1 \|\| _aiSyncCount % 6 === 0/.test(importBody238) &&
+      /playSyncTone/.test(importBody238),
+    '238.9: the "PIP-BOY DATA SYNCED" text line is throttled via _aiSyncCount (first sync + every 6th), while playSyncTone() still confirms every sync (Finding 7)'
+  );
+
+  // 238.10  the Overseer idle-blip rotation is thinned (slower cadence, lower chance)
+  {
+    const blipIdx238 = uiCoreSrc238.indexOf("id: 'overseer-idle-blip'");
+    const blipBlock238 = blipIdx238 !== -1 ? uiCoreSrc238.slice(blipIdx238, blipIdx238 + 700) : '';
+    assert(
+      /cadenceMs:\s*60000/.test(blipBlock238) && /Math\.random\(\) > 0\.25/.test(blipBlock238),
+      '238.10: the overseer-idle-blip observer is thinned to a 60s cadence + 25% fire-chance so diagnostic blips read as texture, not noise (Finding 7)'
+    );
+  }
+
+  // 238.11  [behavioral] the wake "COURIER RETURNED" print is coalesced — a rapid
+  //         sleep→wake→sleep→wake within the 650ms window lands exactly ONE line,
+  //         not two consecutively (the audit's double-print). Runs the REAL
+  //         enterStandby()/exitStandby() bodies in a vm with setTimeout deferred.
+  {
+    const vm238 = require('vm');
+    function declareFn238(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      return 'function ' + name + src.slice(parenIdx, braceIdx) + extractFunctionBody(src, name);
+    }
+    const src238 =
+      'var _standbyActive = false;\nvar _wakeTimer = null;\n' +
+      declareFn238(uiCoreSrc238, '_isShuttingDown') +
+      '\n' +
+      declareFn238(uiCoreSrc238, 'enterStandby') +
+      '\n' +
+      declareFn238(uiCoreSrc238, 'exitStandby');
+
+    const calls238 = { chat: [] };
+    let pending238 = [];
+    const sb238 = {
+      console: { warn() {} },
+      AmbientRuntime: { getState: () => 'ACTIVE' },
+      document: {
+        body: {
+          classList: { add() {}, remove() {}, contains: () => false },
+        },
+        getElementById: () => ({ value: '0' }),
+      },
+      geigerRunning: true,
+      geigerTimeout: null,
+      _geigerCurrentRate: 0,
+      crtHumGain: null,
+      audioCtx: null,
+      stopHeartbeat() {},
+      playWakeTone() {},
+      appendToChat(text) {
+        calls238.chat.push(text);
+      },
+      setGeigerRate() {},
+      updateMath() {},
+      // Defer: collect the delayed wake bodies; run them only after the rapid
+      // cycles are done (mimicking real timers that all fire ~650ms later).
+      setTimeout(fn) {
+        const h = { fn, cancelled: false };
+        pending238.push(h);
+        return h;
+      },
+      clearTimeout(h) {
+        if (h) h.cancelled = true;
+      },
+    };
+    let err238 = null;
+    try {
+      vm238.createContext(sb238);
+      vm238.runInContext(src238, sb238);
+      // Rapid sleep→wake→sleep→wake, all within one 650ms window (nothing fired yet).
+      sb238.enterStandby();
+      sb238.exitStandby(); // schedules print A
+      sb238.enterStandby(); // cancels print A
+      sb238.exitStandby(); // schedules print B
+      // The window elapses — run whatever timers are still live.
+      pending238.forEach(h => {
+        if (!h.cancelled) h.fn();
+      });
+    } catch (e) {
+      err238 = e;
+    }
+    const returned238 = calls238.chat.filter(t => /COURIER RETURNED/.test(t)).length;
+    assert(
+      !err238 && returned238 === 1,
+      '238.11: [behavioral] a rapid sleep→wake→sleep→wake within the wake window prints exactly ONE "COURIER RETURNED" line (the pending print is coalesced/cancelled) — never the two-consecutive prints the audit flagged (Finding 7)' +
+        (err238 ? ' — ' + err238.message : ` — got ${returned238}`)
+    );
+  }
+
+  // ── Modal buttons (Protocol 20 static guard) ────────────────────────────────
+  // 238.12  button.blue-btn is the shared phosphor-pill vocabulary (transparent +
+  //         --bezel-wire outline + pill radius), NOT the old solid-blue rectangle
+  //         and NOT an unstyled default — so it can't silently regress either way.
+  {
+    const blueIdx238 = cssSrc238.indexOf('button.blue-btn {');
+    const blueRule238 = blueIdx238 !== -1 ? cssSrc238.slice(blueIdx238, blueIdx238 + 220) : '';
+    assert(
+      blueRule238.length > 0 &&
+        /background:\s*transparent/.test(blueRule238) &&
+        /border:\s*1px solid var\(--bezel-wire\)/.test(blueRule238) &&
+        /border-radius:\s*999px/.test(blueRule238) &&
+        !/background:\s*var\(--robco-blue\)/.test(blueRule238),
+      '238.12: [Protocol 20] button.blue-btn renders as the shared phosphor pill (transparent fill, --bezel-wire outline, 999px radius) — it can never silently revert to the solid-blue rectangle or fall back to unstyled defaults'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

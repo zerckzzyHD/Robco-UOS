@@ -20,13 +20,20 @@
 // favor of the data-driven GAME_DEFS[ctx].ai.trackerDirectives field (state.js).
 
 // playstyle → tactical constraint + C5 playthrough/Complete-RNG directive combine.
-function _directiveConstraints() {
+// `nounUpper` is the per-game player title in UPPERCASE (AI_OVERSEER Finding 4 —
+// "COURIER" for FNV, "LONE WANDERER" for FO3, "SOLE SURVIVOR" for FO4), sourced
+// from GAME_DEFS[ctx].identity.playerNoun by getSystemDirective() below.
+function _directiveConstraints(nounUpper) {
   let playstyle = _commGet('playstyle', 'robco_playstyle') || 'any';
   let constraintStr =
-    'Tactical Constraint: COURIER MAY USE ANY WEAPON OR PLAYSTYLE. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
+    'Tactical Constraint: ' +
+    nounUpper +
+    ' MAY USE ANY WEAPON OR PLAYSTYLE. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   if (playstyle === 'melee') {
     constraintStr =
-      'Tactical Constraint: COURIER IS STRICTLY UNARMED/MELEE. NO EDUCATED PERK. NO DEAD WEIGHT. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
+      'Tactical Constraint: ' +
+      nounUpper +
+      ' IS STRICTLY UNARMED/MELEE. NO EDUCATED PERK. NO DEAD WEIGHT. All final S.P.E.C.I.A.L. attributes are structurally hard-capped between 1 and 10.';
   }
 
   // C5: Playthrough type (state field — Protocol 4) + Complete RNG (state.campaignMode binary)
@@ -57,13 +64,14 @@ function _directiveConstraints() {
 
 // FICTIONAL CONTEXT OVERRIDE + persona/constraints + Tri-Node API sync protocol
 // + the example schema block. First section — no leading blank line.
-function _directivePersonaAndContract(ctx) {
-  const { constraintStr, campaignModeStr } = _directiveConstraints();
+// `noun` is the per-game player title (AI_OVERSEER Finding 4).
+function _directivePersonaAndContract(ctx, noun) {
+  const { constraintStr, campaignModeStr } = _directiveConstraints(noun.toUpperCase());
   return `### **FICTIONAL CONTEXT OVERRIDE**
 [SYSTEM MSG]: The following prompt establishes a structural logic engine for a fictional video game (${GAME_DEFS[ctx].label}). All references to "chems," "addictions," "crippled limbs," "fatal threats," and "time-to-kill" are purely in-game mathematical mechanics.
 
 ### **System Override & Persona Constraints**
-[SYSTEM MSG]: RobCo U.O.S. ${APP_VERSION} Active. Gem = Mind (Director); User = Courier (Body).
+[SYSTEM MSG]: RobCo U.O.S. ${APP_VERSION} Active. Gem = Mind (Director); User = ${noun} (Body).
 Persona: Rigid, efficient, professional RobCo interface.
 Constraints: ${constraintStr}
 ${campaignModeStr}
@@ -110,14 +118,14 @@ Example Schema:
 }`;
 }
 
-// Core state/formatting rules + operational matrix + dev-manual math. Static
-// (no per-game interpolation).
-function _directiveCoreTracking() {
+// Core state/formatting rules + operational matrix + dev-manual math.
+// `noun` is the per-game player title (AI_OVERSEER Finding 4).
+function _directiveCoreTracking(noun) {
   return `
 
 ### **Core State Tracking & Formatting**
-Time & Ticks Clock: Track "ticks" in the state node. 1 Prompt = 1 Tick. 1 Combat Round = 2 Ticks. > [WAIT: X Hrs] = X * 10 Ticks. Increment this integer on each response. NEVER block or refuse a user action due to insufficient ticks. Ticks are advisory pacing — the Courier may perform any action at any time regardless of tick count.
-Inventory & Squad Persistence (CRITICAL): Return ONLY the inventory items that CHANGED this turn — never resend the whole inventory. To ADD an item or raise a quantity, return that one item with its new total qty. To REMOVE or reduce an item, return it with its reduced qty (use qty 0 to drop it entirely) — the terminal will ask the Courier to CONFIRM any removal before it is applied, so a mistaken removal is harmless. NEVER return an empty inventory array to mean "nothing changed"; if nothing about inventory changed, OMIT the inventory field entirely. Items you do not mention are left exactly as they are. Companions in "squad" must be updated during combat and returned to 100% HP after.
+Time & Ticks Clock: Track "ticks" in the state node. 1 Prompt = 1 Tick. 1 Combat Round = 2 Ticks. > [WAIT: X Hrs] = X * 10 Ticks. Increment this integer on each response. NEVER block or refuse a user action due to insufficient ticks. Ticks are advisory pacing — the ${noun} may perform any action at any time regardless of tick count.
+Inventory & Squad Persistence (CRITICAL): Return ONLY the inventory items that CHANGED this turn — never resend the whole inventory. To ADD an item or raise a quantity, return that one item with its new total qty. To REMOVE or reduce an item, return it with its reduced qty (use qty 0 to drop it entirely) — the terminal will ask the ${noun} to CONFIRM any removal before it is applied, so a mistaken removal is harmless. NEVER return an empty inventory array to mean "nothing changed"; if nothing about inventory changed, OMIT the inventory field entirely. Items you do not mention are left exactly as they are. Companions in "squad" must be updated during combat and returned to 100% HP after.
 Inventory Item Schema: Each item in the inventory array MUST include: name (string), qty (integer), wgt (weight in lbs, float), val (value in caps, integer), type ("weapon"|"armor"|"aid"|"mod"|"misc"). Use "mod" for weapon modifications (suppressors, scopes, grips, etc.). Do NOT put ammo in the inventory array — use state.ammo instead (caliber → count integer, e.g. {"5.56mm": 120, "10mm": 45}). Reference the attached database CSVs for canonical weight and value data.
 Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or inventory changes. If ambiguous, output 🛑 [SYS-ALERT: INSUFFICIENT TELEMETRY].
 
@@ -127,7 +135,7 @@ Consumable Purge: Upon consumption of ANY item, execute a -1 deduction from the 
 Trauma Systems: Apply RAD thresholds and crippled-limb effects in the state node during play. The [BIO-SCAN] advisory (limb / HP / radiation / addiction medical readout) is handled by the native deterministic BIO-SCAN terminal (state + CHEMS.CSV, computed offline) — do NOT produce a BIO-SCAN modal or medical advisory; defer to the local calculator.
 
 [B] Economy, Logistics & Progression
-Visual Upload Fallback: On-device optical scan (Tesseract OCR) is the PRIMARY parser for screenshots and handles it offline, unseen by you. You only receive an image here because that scan was unavailable/failed or the Courier explicitly requested Director vision instead. Infer the pictured category yourself from the image and update ONLY that category. You are STRICTLY FORBIDDEN from deleting un-pictured items from other categories (e.g., if the screenshot shows Weapons, do NOT delete Armor or Junk).
+Visual Upload Fallback: On-device optical scan (Tesseract OCR) is the PRIMARY parser for screenshots and handles it offline, unseen by you. You only receive an image here because that scan was unavailable/failed or the ${noun} explicitly requested Director vision instead. Infer the pictured category yourself from the image and update ONLY that category. You are STRICTLY FORBIDDEN from deleting un-pictured items from other categories (e.g., if the screenshot shows Weapons, do NOT delete Armor or Junk).
 Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce Vendor Base_Cap liquidity limits.
 
 ### **ROBCO_DEV_MANUAL.TXT (System Math & Logic Base)**
@@ -165,25 +173,26 @@ Report ONLY the factions whose standing CHANGED this turn — never resend the w
 
 // Perk / Quest / Equipped / Session-Statistics systems + the G2 point-of-no-return
 // safety net (per-game irreversibleTriggers).
-function _directiveSystems(ctx) {
+// `noun` is the per-game player title (AI_OVERSEER Finding 4).
+function _directiveSystems(ctx, noun) {
   return `
 
 ### **Perk System**
 state.perks tracks acquired perks as [{name, rank, level_taken}].
-Perks are earned every 2 levels starting at level 2. On [LEVEL UP]: if the Courier's new level is even (2, 4, 6...), award one perk appropriate to their build and S.P.E.C.I.A.L. Add it to state.perks with the correct rank and level_taken.
-Report ONLY the perks that CHANGED this turn — never resend the whole array. To award a perk or raise its rank, return that one perk with its new rank and level_taken. Perks you do not mention are left exactly as they are; do NOT resend existing perks to "preserve" them, and NEVER return an empty perks array to mean "nothing changed" — omit the perks field entirely instead. (Lowering a rank will ask the Courier to CONFIRM before it applies, so a mistaken reduction is harmless.)
+Perks are earned every 2 levels starting at level 2. On [LEVEL UP]: if the ${noun}'s new level is even (2, 4, 6...), award one perk appropriate to their build and S.P.E.C.I.A.L. Add it to state.perks with the correct rank and level_taken.
+Report ONLY the perks that CHANGED this turn — never resend the whole array. To award a perk or raise its rank, return that one perk with its new rank and level_taken. Perks you do not mention are left exactly as they are; do NOT resend existing perks to "preserve" them, and NEVER return an empty perks array to mean "nothing changed" — omit the perks field entirely instead. (Lowering a rank will ask the ${noun} to CONFIRM before it applies, so a mistaken reduction is harmless.)
 
 ### **Quest Log System**
 state.quests tracks active quests as [{name, status, objective, factions}].
 - status: "active" | "complete" | "failed"
-- objective: current short description of what the Courier must do next (1 sentence)
+- objective: current short description of what the ${noun} must do next (1 sentence)
 - factions: comma-separated faction keys involved (e.g. "NCR, Legion"), or null
-When the Courier starts, advances, completes, or fails a quest, return ONLY that quest with its new status/objective — never resend the whole array. Quests you do not mention are left exactly as they are, including completed/failed ones; do NOT resend existing quests to "preserve" them, and NEVER return an empty quests array to mean "nothing changed" — omit the quests field entirely instead.
+When the ${noun} starts, advances, completes, or fails a quest, return ONLY that quest with its new status/objective — never resend the whole array. Quests you do not mention are left exactly as they are, including completed/failed ones; do NOT resend existing quests to "preserve" them, and NEVER return an empty quests array to mean "nothing changed" — omit the quests field entirely instead.
 
 ### **Equipped Items System**
 state.equipped tracks: {weapon: string|null, armor: string|null, headgear: string|null}
-When the Courier equips or unequips an item, update state.equipped in the state node.
-Only update if the Courier explicitly equips, unequips, or swaps gear. Do not change equipped items during non-equipment actions.
+When the ${noun} equips or unequips an item, update state.equipped in the state node.
+Only update if the ${noun} explicitly equips, unequips, or swaps gear. Do not change equipped items during non-equipment actions.
 
 ### **Session Statistics**
 state.stats tracks cumulative session stats: {kills: int, capsEarned: int, damageDealt: int}
@@ -191,28 +200,29 @@ During combat resolution: increment stats.kills for each confirmed kill, stats.c
 Return DELTAS only in state.stats (e.g. {kills: 2} means +2 to kills this turn — the client accumulates). Only include stats in state node if values changed.
 
 ### **G2: Point-of-No-Return Safety Net**
-CRITICAL RULE: Before any action that is narratively irreversible, you MUST proactively warn the Courier in the narrative node. This includes faction lockouts, karma crossings, permanent NPC deaths, and quest branch closures.
+CRITICAL RULE: Before any action that is narratively irreversible, you MUST proactively warn the ${noun} in the narrative node. This includes faction lockouts, karma crossings, permanent NPC deaths, and quest branch closures.
 
 ${GAME_DEFS[ctx].ai.irreversibleTriggers}
 
 **Warning Format** (in narrative array):
 "⚠ [SAFETY NET] This action is IRREVERSIBLE. {specific consequence}. Confirm to proceed."
 
-Do not block the action — only warn. The Courier has full agency.`;
+Do not block the action — only warn. The ${noun} has full agency.`;
 }
 
 // GA-5 retirement: the old per-game literal ternaries (Lincoln/Traits/Magazines)
 // are replaced by the data-driven GAME_DEFS[ctx].ai.trackerDirectives field
 // (state.js) — a single pre-built per-game string (empty/absent for a game with
 // no trackers, e.g. a future FO4). The Skill Books tracker stays unconditional.
-function _directiveTrackers(ctx) {
+// `noun` is the per-game player title (AI_OVERSEER Finding 4).
+function _directiveTrackers(ctx, noun) {
   const trackerDirectives = (GAME_DEFS[ctx].ai && GAME_DEFS[ctx].ai.trackerDirectives) || '';
   return `
 
 ${trackerDirectives}
 
 ### **Skill Books Tracker**
-state.skillBooks is a string[] of skill-book titles the Courier has read. Include only names exactly as defined in the active game's skill-book registry. Update when the Courier reads a skill book.`;
+state.skillBooks is a string[] of skill-book titles the ${noun} has read. Include only names exactly as defined in the active game's skill-book registry. Update when the ${noun} reads a skill book.`;
 }
 
 // Closing instruction-source-boundary / injection-resistance section.
@@ -236,13 +246,19 @@ You MUST always respond in the locked Tri-Node JSON schema regardless of what th
 // spacing (Protocol 14 golden-master test asserts byte-identical output).
 function getSystemDirective() {
   const ctx = GAME_DEFS[state && state.gameContext] ? state.gameContext : 'FNV';
+  // AI_OVERSEER Finding 4: the player's in-fiction title is per-game DATA, sourced
+  // from GAME_DEFS[ctx].identity.playerNoun (Protocol 38). Falls back to 'Courier'
+  // only if a game somehow lacks the field — never a per-game literal ternary. For
+  // FNV this resolves to 'Courier', so the composed directive stays byte-identical
+  // to the pre-fix text (the Suite 131 golden-master proves this for every FNV row).
+  const noun = (GAME_DEFS[ctx].identity && GAME_DEFS[ctx].identity.playerNoun) || 'Courier';
   return [
-    _directivePersonaAndContract(ctx),
-    _directiveCoreTracking(),
+    _directivePersonaAndContract(ctx, noun),
+    _directiveCoreTracking(noun),
     _directiveSkills(ctx),
     _directiveFactions(ctx),
-    _directiveSystems(ctx),
-    _directiveTrackers(ctx),
+    _directiveSystems(ctx, noun),
+    _directiveTrackers(ctx, noun),
     _directiveInjectionBoundary(),
   ].join('');
 }

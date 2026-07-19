@@ -216,9 +216,10 @@ function _resetTransmitUI(btn, uiPanel, isVatsScanning) {
 // Called with no argument (every existing call site), behavior is byte-identical
 // to before B1 — this is a pure additive parameter.
 async function transmitMessage(overrideText) {
-  if (!transmitMessage._inRetry) transmitMessage._retryCount = 0;
-  transmitMessage._inRetry = false;
-
+  // AI_OVERSEER Finding 2: retries no longer re-enter transmitMessage() (which
+  // re-echoed the user line every attempt) — the attempt ladder below re-runs only
+  // the network call. The old transmitMessage._inRetry / _retryCount statics are
+  // gone; the ladder tracks its own attempt count in a closure.
   const inputEl = document.getElementById('chatInput');
   const userText = (typeof overrideText === 'string' ? overrideText : inputEl.value).trim();
   if (!userText && !attachedImageData) return;
@@ -365,201 +366,251 @@ async function transmitMessage(overrideText) {
     return;
   }
 
-  try {
-    // AbortController for cancel button + 45s timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
-    btn.textContent = '✕';
-    btn.setAttribute('aria-label', 'Cancel transmission');
-    btn.disabled = false;
-    btn.onclick = () => {
-      controller.abort();
-    };
+  // ── ATTEMPT LADDER (AI_OVERSEER Findings 2 + 3) ─────────────────────────────
+  // The user's line is echoed exactly ONCE (above). A transient/429 failure re-runs
+  // ONLY the network attempt (_doAttempt) — never the whole transmitMessage — so the
+  // message is never re-printed. Across attempts the ladder:
+  //   • mutates the echoed user line IN PLACE, prepending one more "> " each retry
+  //     (a deliberate relay-hop read, owner-approved; visual only — never written to
+  //     chatHistory, so the API payload and any reload/log replay keep the single "> ");
+  //   • keeps ONE status line underneath counting the attempt (1/3 → 2/3 → 3/3),
+  //     cleared on success or replaced by the error on failure — instead of the old
+  //     one-echo-plus-one-status-line PER attempt pile-up (Finding 2).
+  // Finding 3: an exhausted transient/network failure now reads as a self-healing
+  // SIGNAL LOST that reassures the terminal is fully usable offline — FATAL EXCEPTION
+  // is reserved for genuinely fatal faults (missing key, JSON parse, transmit-setup).
+  const _chatBox = document.getElementById('chatDisplay');
+  const _userEchoEl = _chatBox ? _chatBox.lastElementChild : null;
+  let _statusEl = null; // the single retry/status line (display-only, never in history)
+  let _retryAttempt = 0;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': rawKey },
-        signal: controller.signal,
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [
-              { text: getSystemDirective() },
-              { text: databaseCSVs }, // always present — guaranteed model attention
-            ],
-          },
-          contents: apiContents,
-          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
-        }),
-      }
-    );
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      let _isKeyErr = false;
-      if (response.status === 400) {
-        try {
-          const _errBody = await response.json();
-          const _es = _errBody?.error?.status;
-          const _em = (_errBody?.error?.message || '').toLowerCase();
-          _isKeyErr =
-            (_es === 'INVALID_ARGUMENT' &&
-              (_em.includes('api key') || _em.includes('api_key_invalid'))) ||
-            _es === 'PERMISSION_DENIED';
-        } catch (_) {}
-      }
-      throw new Error(
-        _isKeyErr ? `API Key Error ${response.status}` : `API Error ${response.status}`
-      );
+  const _fmt = txt => (typeof escapeAndFormat === 'function' ? escapeAndFormat(txt) : String(txt));
+  // Show or update the ONE status line. First call appends it display-only
+  // (isHistoryLoad=true — kept out of chatHistory/robco_chat); later calls mutate
+  // that same element in place, so retries never stack lines.
+  function _setRetryStatus(text) {
+    if (!_statusEl) {
+      appendToChat(text, 'sys', true);
+      _statusEl = _chatBox ? _chatBox.lastElementChild : null;
+    } else {
+      const body = _statusEl.querySelector('.msg-content');
+      if (body) body.innerHTML = _fmt(text);
+      if (_chatBox) _chatBox.scrollTop = _chatBox.scrollHeight;
     }
-    transmitMessage._retryCount = 0;
-    const data = await response.json();
-    let aiText = data.candidates[0].content.parts[0].text
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
+  }
+  // Remove the display-only status line (used before a persisted terminal line —
+  // success reply, cancel, auth-reject, or the final error — so nothing dangles).
+  function _clearRetryStatus() {
+    if (_statusEl && typeof _statusEl.remove === 'function') _statusEl.remove();
+    _statusEl = null;
+  }
+  // Prepend one more relay-hop "> " to the echoed user line (visual only).
+  function _addRelayHop(hops) {
+    if (!_userEchoEl) return;
+    const body = _userEchoEl.querySelector('.msg-content');
+    if (body) body.innerHTML = _fmt('> '.repeat(hops + 1) + displayUserText);
+  }
 
+  async function _doAttempt() {
+    let _willRetry = false;
     try {
-      const parsedNode = JSON.parse(aiText);
-      if (!_validateTriNode(parsedNode)) {
+      // AbortController for cancel button + 45s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      btn.textContent = '✕';
+      btn.setAttribute('aria-label', 'Cancel transmission');
+      btn.disabled = false;
+      btn.onclick = () => {
+        controller.abort();
+      };
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': rawKey },
+          signal: controller.signal,
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [
+                { text: getSystemDirective() },
+                { text: databaseCSVs }, // always present — guaranteed model attention
+              ],
+            },
+            contents: apiContents,
+            generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+          }),
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let _isKeyErr = false;
+        if (response.status === 400) {
+          try {
+            const _errBody = await response.json();
+            const _es = _errBody?.error?.status;
+            const _em = (_errBody?.error?.message || '').toLowerCase();
+            _isKeyErr =
+              (_es === 'INVALID_ARGUMENT' &&
+                (_em.includes('api key') || _em.includes('api_key_invalid'))) ||
+              _es === 'PERMISSION_DENIED';
+          } catch (_) {}
+        }
+        throw new Error(
+          _isKeyErr ? `API Key Error ${response.status}` : `API Error ${response.status}`
+        );
+      }
+      // Reached the relay — the ladder is done retrying; drop the status line.
+      _clearRetryStatus();
+      const data = await response.json();
+      let aiText = data.candidates[0].content.parts[0].text
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+
+      try {
+        const parsedNode = JSON.parse(aiText);
+        if (!_validateTriNode(parsedNode)) {
+          appendToChat(
+            '> ⚠ [SYS-ALERT] DIRECTOR LINK RETURNED MALFORMED TELEMETRY — NOTHING APPLIED.',
+            'sys'
+          );
+        } else {
+          if (parsedNode.modal && parsedNode.modal.title) {
+            document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
+            let mContent = document.getElementById('modalContent');
+            // WU-N2 retired the AI TRADE modal (barter is a native offline terminal) and
+            // the AI->native survey Part C.1 retired the AI GPS modal (cartography is a
+            // native offline view, Suite 202) — every remaining AI modal renders as plain
+            // TEXT; the directive (above) forbids the AI from ever emitting anything else.
+            mContent.innerText = Array.isArray(parsedNode.modal.content)
+              ? parsedNode.modal.content.join('\n')
+              : parsedNode.modal.content;
+            document.getElementById('sysModal').style.display = 'flex';
+          }
+
+          let narrativeContent =
+            parsedNode.narrative ||
+            parsedNode.narrative_array ||
+            parsedNode.text ||
+            parsedNode.message;
+          if (narrativeContent) {
+            appendToChat(
+              Array.isArray(narrativeContent) ? narrativeContent.join('\n') : narrativeContent,
+              'ai'
+            );
+          } else if (!parsedNode.modal) {
+            appendToChat('> SYS-ALERT: Missing narrative and modal nodes.', 'sys');
+          }
+
+          if (parsedNode.state) {
+            autoImportState(JSON.stringify(parsedNode.state));
+          }
+        } // end _validateTriNode else
+      } catch (e) {
+        // Genuinely fatal — the relay answered but the payload was unparseable.
         appendToChat(
-          '> ⚠ [SYS-ALERT] DIRECTOR LINK RETURNED MALFORMED TELEMETRY — NOTHING APPLIED.',
+          `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+            .toString(16)
+            .toUpperCase()
+            .padStart(4, '0')} — MODULE: COMM_LINK — JSON PARSE FAILURE`,
           'sys'
         );
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        _clearRetryStatus();
+        appendToChat('> TRANSMISSION CANCELLED.', 'sys');
       } else {
-        if (parsedNode.modal && parsedNode.modal.title) {
-          document.getElementById('modalTitle').innerText = '> ' + parsedNode.modal.title;
-          let mContent = document.getElementById('modalContent');
-          // WU-N2 retired the AI TRADE modal (barter is a native offline terminal) and
-          // the AI->native survey Part C.1 retired the AI GPS modal (cartography is a
-          // native offline view, Suite 202) — every remaining AI modal renders as plain
-          // TEXT; the directive (above) forbids the AI from ever emitting anything else.
-          mContent.innerText = Array.isArray(parsedNode.modal.content)
-            ? parsedNode.modal.content.join('\n')
-            : parsedNode.modal.content;
-          document.getElementById('sysModal').style.display = 'flex';
-        }
+        const _isKeyError = /API Key Error/.test(error.message || '');
+        const _codeMatch = error.message && error.message.match(/API (?:Key )?Error (\d+)/);
+        const _code = _codeMatch ? parseInt(_codeMatch[1]) : 0;
 
-        let narrativeContent =
-          parsedNode.narrative ||
-          parsedNode.narrative_array ||
-          parsedNode.text ||
-          parsedNode.message;
-        if (narrativeContent) {
-          appendToChat(
-            Array.isArray(narrativeContent) ? narrativeContent.join('\n') : narrativeContent,
-            'ai'
-          );
-        } else if (!parsedNode.modal) {
-          appendToChat('> SYS-ALERT: Missing narrative and modal nodes.', 'sys');
-        }
-
-        if (parsedNode.state) {
-          autoImportState(JSON.stringify(parsedNode.state));
-        }
-      } // end _validateTriNode else
-    } catch (e) {
-      appendToChat(
-        `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
-          .toString(16)
-          .toUpperCase()
-          .padStart(4, '0')} — MODULE: COMM_LINK — JSON PARSE FAILURE`,
-        'sys'
-      );
-    }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      appendToChat('> TRANSMISSION CANCELLED.', 'sys');
-    } else {
-      const _isKeyError = /API Key Error/.test(error.message || '');
-      const _codeMatch = error.message && error.message.match(/API (?:Key )?Error (\d+)/);
-      const _code = _codeMatch ? parseInt(_codeMatch[1]) : 0;
-
-      if (_isKeyError || _code === 401 || _code === 403) {
-        // Auth failure — never retry; key must be re-entered
-        transmitMessage._retryCount = 0;
-        transmitMessage._inRetry = false;
-        appendToChat('> ⚠ DIRECTOR ACCESS KEY REJECTED — RE-ENTER ACCESS KEY.', 'sys');
-      } else if (_code === 429) {
-        // Rate limit / quota — bounded exponential backoff
-        const _attempt = (transmitMessage._retryCount || 0) + 1;
-        if (_attempt <= _AI_RETRY_MAX) {
-          transmitMessage._retryCount = _attempt;
-          const _delay =
-            _AI_RETRY_DELAYS_MS[_attempt - 1] ||
-            _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
-          appendToChat(
-            `> [SYS] RATE LIMIT HIT — retrying in ${_delay / 1000}s (${_attempt}/${_AI_RETRY_MAX})...`,
-            'sys',
-            true
-          );
-          transmitMessage._inRetry = true;
-          setTimeout(() => {
-            const _lastUser = chatHistory.filter(m => m.sender === 'user').slice(-1)[0];
-            if (_lastUser) {
-              document.getElementById('chatInput').value = _lastUser.text;
-              transmitMessage();
-            }
-          }, _delay);
-        } else {
-          transmitMessage._retryCount = 0;
-          transmitMessage._inRetry = false;
-          // PROTOCOL 32/35: once the bounded backoff is exhausted, record the failure
-          // against the aiChat feature rather than retrying forever — this is the local
-          // half of the auto-flip-on-regression path (Protocol 35 flips the remote
-          // kill-switch off for everyone; this call only degrades the current session).
-          if (typeof window._recordFeatureFailure === 'function')
-            window._recordFeatureFailure(
-              'aiChat',
-              '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
+        if (_isKeyError || _code === 401 || _code === 403) {
+          // Auth failure — never retry; key must be re-entered
+          _clearRetryStatus();
+          appendToChat('> ⚠ DIRECTOR ACCESS KEY REJECTED — RE-ENTER ACCESS KEY.', 'sys');
+        } else if (_code === 429) {
+          // Rate limit / quota — bounded exponential backoff
+          const _attempt = _retryAttempt + 1;
+          if (_attempt <= _AI_RETRY_MAX) {
+            _retryAttempt = _attempt;
+            const _delay =
+              _AI_RETRY_DELAYS_MS[_attempt - 1] ||
+              _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
+            _addRelayHop(_attempt);
+            _setRetryStatus(
+              `> [SYS] RATE LIMIT — RETRANSMITTING ${_attempt}/${_AI_RETRY_MAX} (${_delay / 1000}s)…`
             );
-          appendToChat(
-            '> ⚠ RATE LIMIT / QUOTA EXCEEDED — DIRECTOR LINK QUOTA REACHED. AWAIT QUOTA RESET.',
-            'sys'
-          );
-        }
-      } else {
-        // 5xx / network error — transient, bounded exponential backoff
-        const _isTransient = (_code >= 500 && _code < 600) || _code === 0;
-        const _attempt = (transmitMessage._retryCount || 0) + 1;
-        if (_isTransient && _attempt <= _AI_RETRY_MAX) {
-          transmitMessage._retryCount = _attempt;
-          const _delay =
-            _AI_RETRY_DELAYS_MS[_attempt - 1] ||
-            _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
-          appendToChat(
-            `> [SYS] RETRANSMITTING... (attempt ${_attempt}/${_AI_RETRY_MAX}, delay ${_delay / 1000}s)`,
-            'sys',
-            true
-          );
-          transmitMessage._inRetry = true;
-          setTimeout(() => {
-            const _lastUser = chatHistory.filter(m => m.sender === 'user').slice(-1)[0];
-            if (_lastUser) {
-              document.getElementById('chatInput').value = _lastUser.text;
-              transmitMessage();
-            }
-          }, _delay);
-        } else {
-          transmitMessage._retryCount = 0;
-          transmitMessage._inRetry = false;
-          if (typeof window._recordFeatureFailure === 'function')
-            window._recordFeatureFailure(
-              'aiChat',
-              '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
+            _willRetry = true;
+            setTimeout(_doAttempt, _delay);
+          } else {
+            // PROTOCOL 32/35: once the bounded backoff is exhausted, record the failure
+            // against the aiChat feature rather than retrying forever — this is the local
+            // half of the auto-flip-on-regression path (Protocol 35 flips the remote
+            // kill-switch off for everyone; this call only degrades the current session).
+            if (typeof window._recordFeatureFailure === 'function')
+              window._recordFeatureFailure(
+                'aiChat',
+                '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
+              );
+            _clearRetryStatus();
+            appendToChat(
+              '> ⚠ RATE LIMIT / QUOTA EXCEEDED — DIRECTOR LINK QUOTA REACHED. AWAIT QUOTA RESET.',
+              'sys'
             );
-          appendToChat(
-            `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
-              .toString(16)
-              .toUpperCase()
-              .padStart(4, '0')} — MODULE: COMM_LINK — ${error.message}`,
-            'sys'
-          );
+          }
+        } else {
+          // 5xx / network error — transient, bounded exponential backoff
+          const _isTransient = (_code >= 500 && _code < 600) || _code === 0;
+          const _attempt = _retryAttempt + 1;
+          if (_isTransient && _attempt <= _AI_RETRY_MAX) {
+            _retryAttempt = _attempt;
+            const _delay =
+              _AI_RETRY_DELAYS_MS[_attempt - 1] ||
+              _AI_RETRY_DELAYS_MS[_AI_RETRY_DELAYS_MS.length - 1];
+            _addRelayHop(_attempt);
+            _setRetryStatus(
+              `> [SYS] SIGNAL DROPPED — RETRANSMITTING ${_attempt}/${_AI_RETRY_MAX} (${_delay / 1000}s)…`
+            );
+            _willRetry = true;
+            setTimeout(_doAttempt, _delay);
+          } else {
+            if (typeof window._recordFeatureFailure === 'function')
+              window._recordFeatureFailure(
+                'aiChat',
+                '>> DIRECTOR LINK PAUSED — REPEATED FAULTS. REBOOT TO RETRY. <<'
+              );
+            _clearRetryStatus();
+            if (_isTransient) {
+              // Finding 3: a recoverable/transient network drop (5xx or a bare
+              // "Failed to fetch", _code 0) is NOT a fatal fault — the app is fine.
+              // Self-healing, reassuring language instead of FATAL EXCEPTION.
+              appendToChat(
+                '> ⚠ SIGNAL LOST — DIRECTOR LINK COULD NOT REACH THE RELAY. LOCAL TERMINAL FULLY USABLE OFFLINE — TRANSMIT AGAIN TO RETRY.',
+                'sys'
+              );
+            } else {
+              // A genuine, non-transient hard fault (e.g. an unexpected API error
+              // code) keeps the FATAL EXCEPTION framing — the severity IS fatal here.
+              appendToChat(
+                `> ⚠ FATAL EXCEPTION AT 0x${Math.floor(Math.random() * 0xffff)
+                  .toString(16)
+                  .toUpperCase()
+                  .padStart(4, '0')} — MODULE: COMM_LINK — ${error.message}`,
+                'sys'
+              );
+            }
+          }
         }
       }
+    } finally {
+      // Undim/reset ONLY when the ladder is finished — a scheduled retry keeps the
+      // terminal in its sending state so it doesn't flicker between attempts.
+      if (!_willRetry) _resetTransmitUI(btn, uiPanel, isVatsScanning);
     }
-  } finally {
-    _resetTransmitUI(btn, uiPanel, isVatsScanning);
   }
+
+  _doAttempt();
 }

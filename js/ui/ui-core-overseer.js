@@ -371,10 +371,13 @@ function initOverseerScope() {
       id: 'overseer-idle-blip',
       states: ['ACTIVE', 'IDLE'],
       tier: 'balanced',
-      cadenceMs: 35000,
+      // AI_OVERSEER Finding 7 — thinned so the blips read as texture, not noise:
+      // cadence raised 35s → 60s and fire-chance lowered 40% → 25%, so a diagnostic
+      // blip lands roughly every ~4 min of idle listening instead of every ~1.5 min.
+      cadenceMs: 60000,
       onTick: () => {
         if (_scopeState !== 'listening') return;
-        if (Math.random() > 0.6) return;
+        if (Math.random() > 0.25) return;
         const id = typeof getIdentity === 'function' ? getIdentity() : null;
         const bank = (id && id.persona && id.persona.blipBank) || [];
         if (!bank.length) return;

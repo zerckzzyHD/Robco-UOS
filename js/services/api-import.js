@@ -16,6 +16,15 @@
 // state keys unvalidated; that is exactly what this file exists to prevent.
 
 /* global playQuestCompleteSound, playQuestFailSound, playFactionThresholdSound */
+
+// AI_OVERSEER Finding 7 — ambient-chatter throttle. The "PIP-BOY DATA SYNCED WITH
+// ROBCO MAINFRAME" text line used to print after EVERY successful AI sync, so it
+// dominated the transcript. The audible sync tone (#33, playSyncTone) still confirms
+// every sync; the TEXT confirmation is now occasional — the first sync of the session
+// and every 6th after — so it reads as texture, not noise. A counter (not
+// Math.random) keeps the throttle deterministic and testable.
+let _aiSyncCount = 0;
+
 // Type-coerces and validates a robco_v8 container before writing to localStorage.
 // Defense in depth for the cloud pull / file import fast-paths that bypass autoImportState.
 // Contract: raw strings live in state; render functions (renderInventory, renderQuests, etc.)
@@ -223,12 +232,19 @@ function _wireApiEventBusSubscribers() {
 function _confirmDirectorRemovals(opts) {
   if (!opts || !Array.isArray(opts.lines) || !opts.lines.length) return;
   if (typeof confirmAction !== 'function') return; // no confirm surface → keep data
+  // AI_OVERSEER Finding 4: address the player by their per-game title (Courier /
+  // Lone Wanderer / Sole Survivor), sourced from GAME_DEFS[ctx].identity via
+  // getIdentity() (Protocol 38) — never a hardcoded "Courier".
+  const _id = typeof getIdentity === 'function' ? getIdentity() : null;
+  const _playerNoun = (_id && _id.playerNoun) || 'Courier';
   confirmAction({
     title: '> DIRECTOR ' + (opts.title || 'STATE REQUEST'),
     warning:
       'The Director wants to reduce or remove ' +
       opts.noun +
-      ' the Courier currently has:\n' +
+      ' the ' +
+      _playerNoun +
+      ' currently has:\n' +
       opts.lines.join('\n') +
       '\n\nApprove this change? Choosing KEEP leaves your ' +
       opts.noun +
@@ -800,7 +816,13 @@ function autoImportState(jsonString) {
       try {
         const before = JSON.parse(window._lastStateBeforeSync);
         let changes = [];
-        ['lvl', 'xp', 'hpCur', 'hpMax', 'caps', 'rads', 'karma', 'ticks'].forEach(k => {
+        // AI_OVERSEER Finding 7: 'ticks' is DELIBERATELY excluded from the DELTA line.
+        // The directive increments ticks every single turn (1 prompt = 1 tick), so a
+        // watched 'ticks' made the DELTA line fire on EVERY turn — even a do-nothing
+        // turn — as a bare "ticks: N→N+1", pure noise. The DELTA now surfaces only
+        // when something the player actually cares about changed. Ticks stay visible
+        // in the vitals readout; they are advisory pacing, not a change worth a line.
+        ['lvl', 'xp', 'hpCur', 'hpMax', 'caps', 'rads', 'karma'].forEach(k => {
           if (before[k] !== state[k]) changes.push(`${k}: ${before[k]}→${state[k]}`);
         });
         ['s', 'p', 'e', 'c', 'i', 'a', 'l'].forEach(k => {
@@ -1125,7 +1147,13 @@ function autoImportState(jsonString) {
     // alter it even if it tried.
 
     loadUI();
-    appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
+    // AI_OVERSEER Finding 7: the text confirmation is throttled (see _aiSyncCount
+    // note at file top) — occasional, not every turn. The sync TONE below still
+    // fires every sync as the primary confirmation.
+    _aiSyncCount++;
+    if (_aiSyncCount === 1 || _aiSyncCount % 6 === 0) {
+      appendToChat('> PIP-BOY DATA SYNCED WITH ROBCO MAINFRAME <<', 'sys', true);
+    }
 
     // #33 Sync tone — subtle two-note confirmation after state loads
     if (typeof playSyncTone === 'function') playSyncTone();

@@ -987,6 +987,12 @@ const GAME_DEFS = {
       machine: 'salvaged-terminal',
       material: 'scavenged-steel',
       structuralMode: 'bay',
+      // AI_OVERSEER Finding 4: the player's in-fiction title, read by the AI
+      // system directive (api-directive.js) and the Director-removal confirm copy
+      // (api-import.js) so the AI never calls an FO3 player "Courier". Per-game
+      // design DATA, exactly like the ambient blip banks (Protocol 38 + its
+      // identity-block extension) — feature code interpolates it, never hardcodes it.
+      playerNoun: 'Courier',
       persona: {
         texture: 'uplink-scratchy',
         cadence:
@@ -1194,6 +1200,9 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       machine: 'pipboy-3000',
       material: 'vaulttec-molded',
       structuralMode: 'bay',
+      // AI_OVERSEER Finding 4: FO3's player is the Lone Wanderer — never "Courier"
+      // (New Vegas). See the FNV playerNoun note above.
+      playerNoun: 'Lone Wanderer',
       persona: {
         texture: 'vault-institutional',
         cadence:
@@ -1844,7 +1853,7 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       // do not "clean up".
       trackerDirectives: `### **Lincoln Memorabilia Tracker (FO3 only)**
 state.lincolnItems maps each collected Lincoln artifact name to its disposition: found (have it, undecided) | hannibal (gave/sold to Hannibal Hamlin, Temple of the Union) | leroy (sold to Leroy Walker, Lincoln Memorial) | washington (sold to Abraham Washington, Rivet City) | other (kept/dropped/sold to generic trader).
-Update state.lincolnItems when the Courier acquires or sells any Lincoln artifact. Omit this field entirely for FNV.
+Update state.lincolnItems when the Lone Wanderer acquires or sells any Lincoln artifact. Omit this field entirely for FNV.
 
 
 
@@ -1906,6 +1915,9 @@ Update state.lincolnItems when the Courier acquires or sells any Lincoln artifac
       machine: 'pipboy-3000-mk4',
       material: 'vaulttec-mk4',
       structuralMode: 'bay',
+      // AI_OVERSEER Finding 4: FO4's player is the Sole Survivor. Design-only entry
+      // (unreachable at runtime) — present so the N-game abstraction stays proven.
+      playerNoun: 'Sole Survivor',
       persona: {
         texture: 'mk4-clean',
         cadence:

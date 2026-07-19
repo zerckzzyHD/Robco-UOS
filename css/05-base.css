@@ -312,12 +312,37 @@ button.action-btn:hover {
   filter: brightness(1.1);
 }
 
+/* AI_OVERSEER item 1 — modal/action button vocabulary.
+   This class was formerly a solid bright-blue rectangle (background:var(--robco-blue),
+   the only blue control in an otherwise phosphor-green/amber interface) — the owner
+   called it "completely outdated." It now REUSES the existing modern pill vocabulary
+   the OVERSEER control, the circular composer +/?/send buttons (.icon-btn-round), the
+   [ PURGE ] control, and the bezel nav keycaps already share (Protocol 22): a
+   transparent fill with a thin "over-the-wire" outline (--bezel-wire — amber on FNV,
+   phosphor green by default, amber on FO3) and rounded pill edges, filling on hover.
+   The class name is kept (a rename would churn 6 call sites across index.html + 3 JS
+   files for no user-visible gain); it is no longer "blue" in any sense. Every current
+   consumer — the confirm dialogs (confirmAction: level-up / WIPE / AI removal gates),
+   the visual-parse (loot) modal, the modal CLOSE button, REBOOT TERMINAL, and the
+   bezel directory items — inherits this one shared style, so there is no second button
+   look to keep in sync. Guarded by Suite 238 (static: can't silently revert to the
+   solid-blue fill or fall back to unstyled defaults). */
 button.blue-btn {
-  background: var(--robco-blue);
-  color: #000;
+  background: transparent;
+  border: 1px solid var(--bezel-wire);
+  color: var(--bezel-wire);
+  border-radius: 999px;
 }
 button.blue-btn:hover {
-  filter: brightness(1.3);
+  background: var(--bezel-wire);
+  color: #000;
+  filter: none;
+}
+/* Protocol 17: a focus ring that does not rely on colour alone — an outward
+   glow + offset outline visible in both the resting and hover states. */
+button.blue-btn:focus-visible {
+  outline: 2px solid var(--bezel-wire);
+  outline-offset: 2px;
 }
 
 button.limb-ok {
