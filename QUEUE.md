@@ -273,7 +273,7 @@ _A new item **A0** was added at the front of this group on 2026-07-18 — it jum
 
 Two external AI reviews independently pushed on the project's own rulebook and bookkeeping. These four run in order: the delete clears a dead obligation, the restructure changes how rules are RETRIEVED (not just written), the trim cuts on top of the restructure, and the re-pin stamps the result to one baseline. None of the four gates the release; they pay down process debt.
 
-### R1. ⬜ DELETE THE TEST-COUNT BOOKKEEPING — retire Protocol 2a
+### R1. ✅ DELETE THE TEST-COUNT BOOKKEEPING — retire Protocol 2a _(done 2026-07-20)_
 
 **What it is.** The hardcoded assertion count (3411 today) is hand-synced across 8+ files on every test add or remove (Protocol 2a). **Both** external reviewers condemned it independently, from opposite directions — one as pointless ritual, one as a tax on every commit. The count guards **no behavior**: the runner's exit status is the only thing that actually matters. This retires Protocol 2a and the whole synchronization obligation, and strips the hand-synced count out of the docs that carry it.
 

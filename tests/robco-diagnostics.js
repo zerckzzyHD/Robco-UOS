@@ -26,10 +26,6 @@ const ROOT = path.join(__dirname, '..');
 // ── Terminal helpers ───────────────────────────────────────────
 let passed = 0,
   failed = 0;
-// Set by Suite 28 (Meta guard) from CHANGELOG.md's canonical "Tests: N/N"
-// header; consumed by the end-of-run count reconciliation in RESULTS (the
-// Health-U3 re-point of the old tautological GATE_SUITES self-grep).
-let _canonicalTestCount28 = 0;
 // Promises any suite needs resolved before RESULTS prints/exits (the runner
 // body below is otherwise fully synchronous CommonJS — no top-level await).
 // Suite 137.6's confirmAction() behavioral proof is the sole current user.
@@ -2048,9 +2044,23 @@ header('Assets Completeness');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 28 — Meta / Single-Runner Guard (Group 7)
-//  Verifies that no suite can be silently dropped from the canonical runner
-//  and that the canonical test count matches README.md, ARCHITECTURE.md,
-//  and (conditionally, if present) RULES.md and CLAUDE.md.
+//  Guards that the deleted PowerShell runner mirror stays deleted.
+//
+//  R1 (2026-07-20): Protocol 2a (test-count sync) is RETIRED, so the
+//  cross-file count assertions that used to live here — CHANGELOG.md's
+//  "Tests: N/N" header vs README.md / ARCHITECTURE.md / RULES.md /
+//  CLAUDE.md — are REMOVED, along with the end-of-run runtime-count
+//  reconciliation they fed (see RESULTS). Retiring a rule means removing
+//  its enforcement, not just its prose (Protocol 49). The count guarded no
+//  behaviour: the runner's exit status is the only thing that ever mattered.
+//
+//  HONEST NOTE ON LOST COVERAGE: the reconciliation also incidentally
+//  caught a silently DROPPED SUITE (a smaller runtime total than the
+//  documented one). That coverage is genuinely gone. It is not replaced by
+//  a generated count, because a self-updating baseline regenerates to match
+//  whatever actually ran and therefore can never notice that less ran —
+//  the drop-detection was entirely parasitic on the number being HAND-set.
+//  Restoring it needs a mechanism that does not route through a count.
 //
 //  2.8.5 U-B3: the PowerShell mirror (tests/robco-diagnostics.ps1) was
 //  DELETED — it caught nothing the Node runner cannot (its "behavioral"
@@ -2059,23 +2069,10 @@ header('Assets Completeness');
 //  "PS runner contains all suites" assertion below is now inverted into a
 //  regression guard that the mirror stays gone (Protocol 36b escape-ratchet).
 //
-//  Health-U3 slice 1 (2026-07-16): the old GATE_SUITES check — an 84-entry
-//  'Suite N' array grepped against THIS runner's own source — was
-//  TAUTOLOGICAL (verified in the U2 audit): the probe strings were satisfied
-//  by the array literal itself, so deleting any listed suite's entire block
-//  could never fail it. (It was meaningful pre-U-B3, when it probed the
-//  OTHER runner — the deleted PS mirror.) It is REPLACED by the end-of-run
-//  count reconciliation in RESULTS: the number of tests that ACTUALLY
-//  EXECUTED this run must equal the canonical CHANGELOG.md count parsed
-//  below (_canonicalTestCount28). A dropped suite shrinks the runtime count
-//  and fails the gate; an added/removed test without the Protocol 2a doc
-//  sync fails it too — the honor-system count discipline is now mechanical.
+//  Health-U3 slice 1 (2026-07-16) retired the old GATE_SUITES self-grep as
+//  TAUTOLOGICAL and re-pointed it at an end-of-run count reconciliation;
+//  R1 (2026-07-20) then retired that reconciliation too, with Protocol 2a.
 //
-//  NOTE: source-level assert() counts cannot reliably track runtime test
-//  counts because loops multiply results at runtime — which is exactly why
-//  the reconciliation compares the RUNTIME counters, not source greps.
-//  7 tests (6 here + the end-of-run reconciliation, which executes at
-//  RESULTS after every suite has run and is bookkept to this suite)
 // ══════════════════════════════════════════════════════════════
 header('Meta / Single-Runner Guard');
 {
@@ -2086,58 +2083,18 @@ header('Meta / Single-Runner Guard');
     'PowerShell test-runner mirror (tests/robco-diagnostics.ps1) stays deleted (Protocol 15 retired — single Node runner)'
   );
 
-  // Canonical count in CHANGELOG.md matches README.md and ARCHITECTURE.md (Protocol 2a).
-  // The CHANGELOG header format is: <!-- Tests: N/N | Cache: ... -->
-  // Protocol 42 fix (v2.8.0-r3 hotfix): this used to take the FIRST "Tests: N/N"
-  // match in the file, which is always the [Unreleased] header — correct only by
-  // coincidence, since every prior push happened to leave Unreleased's count equal
-  // to the latest released block's count. The Hotfix model (Protocol 2a) explicitly
-  // freezes the Unreleased header while a hotfix updates the ALREADY-RELEASED
-  // block's header instead, so a hotfix that changes the total test count (like
-  // this one, Suite 219) legitimately diverges the two — the first-match read then
-  // picks the stale, frozen Unreleased number instead of the real current count.
-  // Fixed to take the MAXIMUM across every "Tests: N/N" header in the file: the
-  // total only ever grows within a release cycle, so the max is always the
-  // genuinely-current count, whether that's Unreleased (the normal case) or a
-  // just-hotfixed released block (this case).
+  // R1 (2026-07-20, Protocol 49): retirement-regression guard. Protocol 2a is
+  // retired — assert the count-sync obligation does not silently creep back into
+  // the docs the way the deleted PS mirror could have. CHANGELOG.md's RELEASED
+  // version blocks legitimately keep their frozen release-day "Tests: N/N"
+  // headers (that is HISTORY, not an obligation); what must NOT return is a LIVE
+  // count on the [Unreleased] header, which is the one that had to be hand-synced
+  // on every single test change.
   const changelog = readFile('CHANGELOG.md');
-  const countMatches = [...changelog.matchAll(/Tests:\s*(\d+)\/\d+/g)];
-  const canonicalCount = countMatches.length
-    ? String(Math.max(...countMatches.map(m => parseInt(m[1], 10))))
-    : '';
-  assert(!!canonicalCount, 'CHANGELOG.md contains Tests: N/N header (Protocol 2a)');
-  // Feed the end-of-run count reconciliation (RESULTS) — the Health-U3
-  // re-point of the retired tautological GATE_SUITES self-grep.
-  _canonicalTestCount28 = parseInt(canonicalCount, 10) || 0;
-  const readme = readFile('README.md');
+  const unreleasedHeader = (changelog.match(/^## \[Unreleased\].*$/m) || [''])[0];
   assert(
-    !!canonicalCount &&
-      (readme.includes(canonicalCount + ' tests') || readme.includes(canonicalCount + '-test')),
-    `README.md contains CHANGELOG.md canonical test count (${canonicalCount})`
-  );
-  const arch = readFile('ARCHITECTURE.md');
-  assert(
-    !!canonicalCount && arch.includes(canonicalCount),
-    `ARCHITECTURE.md contains canonical test count (${canonicalCount})`
-  );
-
-  // Conditional: RULES.md and CLAUDE.md are untracked local files (absent on CI/fresh clone).
-  // If present, assert their count matches; if absent, skip gracefully (pass trivially).
-  const rulesPath = path.join(ROOT, 'RULES.md');
-  const rulesExists = fs.existsSync(rulesPath);
-  const rulesSrc = rulesExists ? fs.readFileSync(rulesPath, 'utf8') : null;
-  const rulesCountM = rulesSrc ? rulesSrc.match(/\b(\d+)\s*tests?\b/) : null;
-  assert(
-    !rulesExists || (!!rulesCountM && rulesCountM[1] === canonicalCount),
-    `RULES.md test count matches canonical (${canonicalCount}) — skipped if absent`
-  );
-  const claudePath = path.join(ROOT, 'CLAUDE.md');
-  const claudeExists = fs.existsSync(claudePath);
-  const claudeSrc = claudeExists ? fs.readFileSync(claudePath, 'utf8') : null;
-  const claudeCountM = claudeSrc ? claudeSrc.match(/\b(\d+)\s*tests?\b/) : null;
-  assert(
-    !claudeExists || (!!claudeCountM && claudeCountM[1] === canonicalCount),
-    `CLAUDE.md test count matches canonical (${canonicalCount}) — skipped if absent`
+    !/Tests:\s*\d+/.test(unreleasedHeader),
+    'CHANGELOG.md [Unreleased] header carries no live test count (Protocol 2a retired — released blocks keep their frozen historical counts)'
   );
 }
 
@@ -42969,35 +42926,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '219.6: every key _systemStatusFlagKeys() returns is rendered as its own ENABLED/DISABLED breaker in the rack — no silent per-flag drop'
   );
 
-  // 219.7  PROTOCOL 42 — while shipping this very hotfix (a net test-count
-  //        change), Suite 28's "canonical test count" reader was found to read
-  //        only the FIRST "Tests: N/N" header in CHANGELOG.md (always the
-  //        [Unreleased] header) — correct only by coincidence, since every prior
-  //        push happened to leave Unreleased's count equal to the latest
-  //        released block's count. The Hotfix model (Protocol 2a) explicitly
-  //        freezes Unreleased while a hotfix updates the ALREADY-RELEASED
-  //        block's header instead, so a hotfix that changes the total test
-  //        count (this one) legitimately diverges the two, and the old
-  //        first-match read picked the stale, frozen number. REAL shipped-code
-  //        defect (the gate runs on every commit) — fixed in the SAME commit
-  //        to take the MAXIMUM across every header, and locked
-  //        here with a behavioral proof against a synthetic frozen-Unreleased /
-  //        hotfixed-released pair.
-  {
-    const synthetic219 =
-      '## [Unreleased]<!-- Tests: 2938/2938 | Cache: x -->\n\n## [v2.8.0]<!-- Tests: 2944/2944 | Cache: y -->\n';
-    const matches219 = [...synthetic219.matchAll(/Tests:\s*(\d+)\/\d+/g)];
-    const max219 = matches219.length
-      ? String(Math.max(...matches219.map(m => parseInt(m[1], 10))))
-      : '';
-    const suite28Src219 = readFile('tests/robco-diagnostics.js');
-    assert(
-      max219 === '2944' &&
-        /matchAll\(\/Tests:\\s\*\(\\d\+\)\\\/\\d\+\/g\)/.test(suite28Src219) &&
-        /Math\.max\(\.\.\.countMatches\.map/.test(suite28Src219),
-      '219.7: PROTOCOL 42 — Suite 28\'s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2944, the current value, not 2938, the first/stale match) — the bug this hotfix\'s own net test-count change exposed'
-    );
-  }
+  // 219.7  REMOVED by R1 (2026-07-20, Protocol 49). It was a behavioral proof
+  //        that Suite 28's canonical-count reader took the MAXIMUM across every
+  //        CHANGELOG.md "Tests: N/N" header rather than the first (stale) match.
+  //        That reader was deleted with Protocol 2a, so this test now guards
+  //        nothing — a guard whose subject no longer exists is retired with it,
+  //        not left asserting against dead code.
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -50107,27 +50041,11 @@ Promise.all(_pendingAsync)
     fail('Unhandled error in an async suite: ' + (e && e.message));
   })
   .then(() => {
-    // ── Suite 28 (part 2) — end-of-run count reconciliation ──────────────
-    // Health-U3 slice 1 (2026-07-16, Protocol 36b): replaces Suite 28's old
-    // GATE_SUITES self-grep, which was TAUTOLOGICAL — it searched this
-    // runner's own source for 'Suite N' strings that the GATE_SUITES array
-    // literal itself contained, so deleting any listed suite's whole block
-    // left every probe self-satisfied. The re-point: the number of tests
-    // that ACTUALLY EXECUTED this run must equal the canonical documented
-    // count parsed from CHANGELOG.md in Suite 28. This can genuinely fail:
-    // a silently dropped suite (the class the old check claimed to guard)
-    // shrinks the runtime count; an added/removed test without the Protocol
-    // 2a doc sync diverges it the other way. Runs HERE — after Promise.all —
-    // so every suite (including the deferred async 137.6 proof) has already
-    // recorded its results.
-    header('Meta / Single-Runner Guard — end-of-run count reconciliation (Suite 28)');
-    {
-      const runtimeTotal28 = passed + failed + 1; // +1: this reconciliation assert is itself the run's final test
-      assert(
-        _canonicalTestCount28 > 0 && runtimeTotal28 === _canonicalTestCount28,
-        `runtime-executed test count (${runtimeTotal28}) equals the canonical CHANGELOG.md count (${_canonicalTestCount28}) — a dropped suite or an unsynced Protocol 2a count fails the gate here`
-      );
-    }
+    // R1 (2026-07-20, Protocol 49): the end-of-run count reconciliation that
+    // used to run HERE — runtime-executed total vs the hand-synced CHANGELOG.md
+    // count — was REMOVED with Protocol 2a. Retiring a rule removes its
+    // enforcement, not just its prose. See Suite 28's header for the honest
+    // note on the suite-drop coverage that went with it.
     console.log('\n══════════════════════════════════════════════════════════════\n');
     if (failed === 0) {
       console.log(green(`  ALL ${passed} TESTS PASSED — persistence fully verified.`));

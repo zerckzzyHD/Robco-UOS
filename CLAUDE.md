@@ -35,7 +35,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 **The 3-class library maintenance model (2.8.5 U-B1):** every doc under `library/` and `planning/` falls into exactly one of three classes, and the class dictates how it's kept current:
 
 - **LIVE** — actively maintained, gate-guarded where possible: `library/BRAIN_DUMP.md`, `library/TEST_CATALOG.md` (today — see GENERATED below), `library/CODE_MAP.md`, `QUEUE.md`, this Reference Pointer Index. A stale LIVE doc is worse than no doc at all — it makes a session confidently wrong. Update in the same commit whenever something it describes stops being true.
-- **GENERATED** — never hand-maintained; produced from source by a script and diffed against the committed copy in the gate (Protocol 47). `library/TEST_CATALOG.md` is GENERATED-class **in intent** but is still hand-maintained **today** — 2.8.5 U-B1 only relocated its content out of `CLAUDE.md`'s tail; the generator itself is a separate, later unit and is explicitly out of scope here. Until that unit lands, sync it by hand exactly like a LIVE doc (Protocol 2a).
+- **GENERATED** — never hand-maintained; produced from source by a script and diffed against the committed copy in the gate (Protocol 47). `library/TEST_CATALOG.md` is GENERATED-class **in intent** but is still hand-maintained **today** — 2.8.5 U-B1 only relocated its content out of `CLAUDE.md`'s tail; the generator itself is a separate, later unit and is explicitly out of scope here. Until that unit lands, maintain its per-suite CONTENT by hand like a LIVE doc. It carries no test count — Protocol 2a is retired.
 - **ARCHIVE** — frozen point-in-time snapshots: the audits, plans, mockups, and slates under `planning/`. These carry a "snapshot as of DATE — not current truth" framing and are never updated to track current code; their reasoning is reused as historical input, never trusted as current fact. The pre-2.8.0 audits (`planning/2.8.0/audits/CODE_QUALITY_AUDIT.md`, `planning/2.8.0/audits/PERFORMANCE_AUDIT.md`, `planning/2.8.0/audits/ACCESSIBILITY_AUDIT.md`, `planning/2.8.0/audits/TEST_STRENGTH_AUDIT.md`, `planning/2.8.0/audits/TOKEN_USAGE_AUDIT.md`, `planning/2.8.0/audits/UI_CONSISTENCY_AUDIT.md`, `planning/2.8.0/audits/CLOUD_AUDIT.md`, `planning/2.8.0/audits/FILE_AUDIT.md`) are ARCHIVE-class — they audited a codebase roughly 30% smaller than today's; do not trust their measurements or reuse their proposals without re-verifying against current code. (They live under `2.8.0/` because they were the analysis phase that PRODUCED the 2.8.0 overhaul — the version whose work they were part of — even though they measure the earlier v2.6.0/v2.7.0 code.)
 
 **Doc-maintenance rule (LIVE docs):**
@@ -54,11 +54,11 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
 git add -A
-git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (3495 tests via gate:fast)
+git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (gate:fast)
 git push origin dev  # dev is the working branch (Protocol 43); main is release-only. CACHE_NAME must already be bumped if a served file changed (Protocol 1)
 ```
 
-- **3495 tests must pass.** If fewer pass, something is broken. Investigate before committing.
+- **The runner must exit clean.** Any failure is a real failure — investigate before committing. Do not track or assert a test COUNT (Protocol 2a, retired): the exit status is the signal.
 - **Bump `CACHE_NAME` when a staged file is in the served/precached set** (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`) — the full rule and the automated commit-time guard (the staged `CACHE_NAME` must differ from this branch's own HEAD value; non-served commits bypass it) live in **Protocol 1**.
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
@@ -95,28 +95,7 @@ After every meaningful commit, update these files **in the same commit:**
 
 **README Currency (strengthens Protocol 2's README clause — owner):** `README.md` must stay a **holistically accurate** picture of what the site actually IS — not merely the test-count/feature-table numbers. Whenever a change makes the README's description, feature list, supported games, architecture, file structure, script load order, version, or Current-State inaccurate, fix those sections **in the same commit**. The comprehensive holistic rewrite lands at the release (WU-VER) so it reflects the final shipped state; every prior unit keeps the README from drifting in the meantime.
 
-### Protocol 2a — Test Count Sync
-
-Whenever tests are **added or removed**, update the hardcoded count in **every** location below in the **same commit** as the test change. No deferred updates.
-
-| File                          | Location to update                                                                                                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLAUDE.md`                   | Pre-commit gate code block · Pre-commit gate note · Protocol 4 checklist · Protocol 5 checklist · Architecture Quick Reference's one-line test-suite summary (count + suite count if suites changed) — this file is the canonical source for all protocol content |
-| `library/TEST_CATALOG.md`     | Every per-suite catalog entry (2.8.5 U-B1 relocated the full catalog here from `CLAUDE.md`'s tail). Hand-synced today, same as a LIVE doc — see the 3-class model above. **Not CI-gated**: `library/` is gitignored (mirrors the existing `library/BRAIN_DUMP.md` carve-out — absent on a clean CI checkout), so this is a local-machine sync discipline, not a gate check, until a future unit adds a generator + resolves the gitignore-vs-gate-diff tension |
-| `RULES.md`                    | The one "N tests" quick-fact line — `RULES.md` is a deliberate pointer file (see its own header); it carries no other protocol content to sync                        |
-| `README.md`                   | Technology stack table · File structure comment · Commit workflow block · Current State bullet                                                                         |
-| `ARCHITECTURE.md`             | Pre-commit checklist (`all N+ tests`)                                                                                                                                  |
-| `CHANGELOG.md`                | **Current Unreleased section header only** (`## [v2.5.0] — Unreleased<!-- Tests: N/N \| Cache: ... -->`). Released version entries (e.g. `v2.0.1`) are frozen at their release-day values — never update them retroactively. |
-| `tests/robco-diagnostics.js`  | Per-suite `// N tests` comments at the top of each suite block (the single canonical runner)                                                                            |
-| `tests/test.html`             | `Suites: N` header-comment marker (Protocol 40) — must equal the actual `section('…')` count; update when a runtime suite is added/removed                              |
-
-**How to find all stale counts before committing:**
-
-```powershell
-Select-String -Path "RULES.md","CLAUDE.md","README.md","ARCHITECTURE.md","CHANGELOG.md","tests/robco-diagnostics.js","tests/test.html" -Pattern "\d+[- ]tests?|Suites:\s*\d+" | Select-Object Filename,LineNumber,Line
-```
-
-Run this after every test addition or removal. Every hit must show the new count **except** the frozen released-version entry in `CHANGELOG.md` (e.g. `v2.0.1` shows its release-day count of 258 — that is intentional and correct). This command deliberately omits `library/TEST_CATALOG.md` — it is gitignored and may not exist on every machine; sync it by hand when it is present, same as `library/BRAIN_DUMP.md`.
+### Changelog placement model (was Protocol 2a's second half — kept, it is not bookkeeping)
 
 **Changelog versioning model:** Per-push test-count and cache-rev updates go on the current `## [Unreleased]` section header, **never** on a released version's entry (e.g. `v2.6.0`, `v2.0.1`) — released entries are frozen at their release-day values and must not be modified retroactively. **The one sanctioned exception is a hotfix** (see below), which actively patches a shipped version and so updates that version's header comment.
 
@@ -127,6 +106,20 @@ Run this after every test addition or removal. Every hit must show the new count
 - **Genuinely new version** (a normal `APP_VERSION` bump per Protocol 2) → its own new dated `## [vX.Y.Z]` block.
 
 **Chronological ordering:** `[Unreleased]` entries are kept in chronological order within each category, earliest first (ascending), appended as work lands. Preserve the Keep-a-Changelog category grouping (one `### Added` / `### Changed` / `### Fixed` / `### Under the Hood` heading each, in that standard order) — but within each category, list bullets in the order the changes actually landed, oldest at the top. Use `git log` to settle true chronology when an entry's order is unclear.
+
+---
+
+### Protocol 2a — Test Count Sync — RETIRED (2026-07-20, roadmap item R1)
+
+**RETIRED.** This protocol required the hardcoded assertion count to be hand-synced across eight-plus locations (`CLAUDE.md`, `RULES.md`, `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `tests/robco-diagnostics.js`, `tests/test.html`, `library/TEST_CATALOG.md`) in the same commit as every test addition or removal.
+
+**Why it was retired.** Two external reviews condemned it independently, from opposite directions — one as ritual that protects no behaviour, the other as a tax that actively penalises good testing hygiene. Two reviewers with opposing agendas landing on the same rule is the strongest signal this process produces. The reasoning the owner approved: **the test count is inventory, not confidence.** Repeating a number in eight files teaches no engineering fact and guards no behaviour — the runner's exit status is the only thing that ever mattered. A number that must be hand-copied to eight places on every test change is a rule that makes the right thing expensive.
+
+Per the Protocol 15 precedent, the number is **retired, not reused, and not renumbered**, so every existing `Protocol 2a` cross-reference still resolves here. Its second half — the changelog placement / hotfix / chronological-ordering model — was **never bookkeeping** and survives, immediately above, under Protocol 2.
+
+**What was removed with it** (retirement means removing the enforcement, not just the prose — Protocol 49): Suite 28's cross-file count assertions and its end-of-run count reconciliation, which compared the runtime test total against the hand-synced `CHANGELOG.md` header. That reconciliation also incidentally caught a *silently dropped suite* — real value, now gone with it. It is recorded honestly rather than quietly replaced: the drop-detection was entirely parasitic on the hand-synced number, and a **generated** count could not have preserved it (a self-updating baseline regenerates to match whatever ran, so it can never notice that less ran). If suite-drop detection is wanted back, it needs a mechanism that does not route through a count. `tests/test.html`'s `Suites: N` marker (Protocol 40) is deliberately **kept** — see that protocol for the reasoning.
+
+**No count is maintained anywhere.** Where a doc needs to describe the suite, describe it qualitatively. The per-suite `// N tests` comments still present in `tests/robco-diagnostics.js` are unmaintained historical narration as of this retirement — do not sync them, and do not trust them.
 
 ---
 
@@ -151,7 +144,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`
-- [ ] Run `git commit` — 3495 tests must pass
+- [ ] Run `git commit` — the test gate must pass clean
 - [ ] Update `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md` → Protocol 2
 
 ---
@@ -165,7 +158,7 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 - [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
 - [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
 - [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (3495 tests) → Protocol 2
+- [ ] Lint, format, commit (gate must pass clean) → Protocol 2
 
 ---
 
@@ -201,7 +194,7 @@ Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a *
 
 1. **Opus — Diagnose & Plan.** Opus investigates the actual code and git history, identifies the root cause, and writes a concrete plan: exact files, selectors, and line numbers; the change and its rationale; desktop/regression safety; and explicit verification steps. No edits in this stage.
 
-2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, 3495-test gate, Protocol 2/2a docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
+2. **Sonnet — Review & Implement.** Sonnet first critically reviews the Opus plan against the current files (line numbers drift, selectors go stale, diagnoses can be wrong) and corrects any discrepancy. Then it implements, runs the full pre-commit gate (lint, format, Protocol 1 cache bump, the test gate, Protocol 2 docs), and verifies the user-facing result by actually rendering/exercising it at the real target (e.g. a 360/412px mobile viewport) — never from headless width measurements alone.
 
 3. **Opus — Audit before done.** Opus independently reviews the actual committed diff and the verification evidence against the original root cause: is the issue fully resolved, nothing regressed, and is the change actually pushed to the branch it belongs on — `origin/dev` during normal work (Protocol 43), `origin/main` only at a version release — and not just a local/worktree commit? For a release, confirm it is live on the production site too. If anything falls short, loop back to stage 2. The task is "done" only after this audit passes.
 
@@ -229,7 +222,7 @@ Dispatch reports must be formatted for mobile reading: lead with a one-line summ
 
 Any change touching `index.html`, `css/`, or render JS (`ui-render.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
-The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the 3495-test pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
+The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
 ---
 
@@ -247,7 +240,7 @@ Never run two sessions that commit/push this repo at the same time — sequence 
 
 ## Protocol 13 — Regression Test Required
 
-When a bug is fixed, add a regression test in the **same commit** that would have caught it, and re-sync the count per Protocol 2a. **No bug fix ships without a guarding test — this is mandatory.** The only permitted exemption is when the bug genuinely cannot be reproduced in the test sandbox (e.g. requires a live network, real browser API, or hardware-specific behavior); in that case the commit message must explicitly state the reason.
+When a bug is fixed, add a regression test in the **same commit** that would have caught it. **No bug fix ships without a guarding test — this is mandatory.** The only permitted exemption is when the bug genuinely cannot be reproduced in the test sandbox (e.g. requires a live network, real browser API, or hardware-specific behavior); in that case the commit message must explicitly state the reason.
 
 ---
 
@@ -283,7 +276,7 @@ Keep durable project facts current (repo path, APP_VERSION, cache rev, architect
 
 ## Protocol 19 — Batch Before Push
 
-Do not push incrementally after each sub-task when multiple related changes are queued. Complete all queued/related work first, run the full pre-commit test gate **once**, then push a single time. Every push must have the entire test suite passing and the test count synced everywhere per Protocol 2a. Prefer fewer, complete, verified pushes over many partial ones.
+Do not push incrementally after each sub-task when multiple related changes are queued. Complete all queued/related work first, run the full pre-commit test gate **once**, then push a single time. Every push must have the entire test suite passing. Prefer fewer, complete, verified pushes over many partial ones.
 
 ---
 
@@ -497,7 +490,7 @@ All source files are UTF-8. The app is intentionally full of non-ASCII character
 - `tests/test-html-check.mjs` runs `test.html` **headless in the full gate** and fails if any suite fails, if the audit throws, or if the declared `Suites: N` marker ≠ the suites actually executed.
 - **Suite 96** (Node runner) statically guards that `test.html` loads the current boot chain, exercises the current entry points, stays game-agnostic, carries no dead stubs, keeps its suite-count marker honest, and that the gate still invokes the headless runner.
 
-This is folded into Protocol 2a: `tests/test.html` is in the test-count/suite-sync table below, and the `Select-String` drift scan includes it.
+The `Suites: N` marker is checked against the suites actually executed, in this file alone — see the enforcement note above. (It survived the Protocol 2a retirement deliberately: it is a self-consistency check inside one file, not a cross-file count sync.)
 
 ---
 
@@ -534,7 +527,7 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 - **Investigate before classifying.** Determine whether the issue is a real shipped-code path or only a harness artifact. State the verdict explicitly (in the commit/report).
 - **Real shipped path affected → FIX** the code and add a test proving the fixed behavior.
 - **Harness-only (no shipped path affected) → still add a test** that documents and locks the invariant, so the latent footgun cannot silently become a live bug later. Say "harness-only" explicitly; do not pretend it was a product bug, and do not skip the test.
-- The added test goes in the Node runner (`tests/robco-diagnostics.js`) and the counts sync per Protocol 2a.
+- The added test goes in the Node runner (`tests/robco-diagnostics.js`).
 
 **Why:** The test suite is only as honest as its response to its own findings. Silently routing around a flaw the tests exposed defeats the gate. Every flaw the process surfaces must ratchet the net finer — the same escape-ratchet principle as Protocol 36b, extended from "escaped to production / CI" to "surfaced during development."
 
@@ -548,9 +541,9 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 **Same bar on both branches — there is no "looser" branch.** Every existing rule and protocol applies **identically on `dev`** as on `main`. `dev` is held to the same standard as `main` in every respect. In particular, on **every** `dev` commit and push:
 
-- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, the canonical Node test runner (`tests/robco-diagnostics.js`) green (240 suites, 3495 tests), plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
+- The **full pre-commit / pre-push gate** runs and must pass exactly as on `main`: ESLint with **zero** errors/warnings, Prettier clean, the canonical Node test runner (`tests/robco-diagnostics.js`) green, plus the push-boundary browser checks — boot-smoke, render-check, the a11y baseline-diff, and the `tests/test.html` runtime audit.
 - **Protocol 1** (bump `CACHE_NAME` when a served/precached file changes) applies.
-- **Protocol 2 / 2a** (docs updated + test-count and suite-count synced across every location) applies.
+- **Protocol 2** (docs updated in the same commit) applies.
 - **Protocol 38** (game-agnostic feature code), **39** (UTF-8 source integrity), **41** (end-of-task cleanup sweep), **42** (fix flaws found during testing/verification in the same commit), and the **Protocol 36b** escape-ratchet all apply.
 - Every other protocol (13 regression test, 14 AI-contract safety, 19 batch-before-push, 20 static source-invariant guards, etc.) applies unchanged. (Protocol 15 — runner parity — is retired; see its section above.)
 
@@ -572,9 +565,9 @@ Any new **ambient, conditional, time-gated, view-once, or otherwise hard-to-repr
 
 ---
 
-## Protocol 45 — Documentation Reference Integrity (the enforcement arm of Protocol 2/2a)
+## Protocol 45 — Documentation Reference Integrity (the enforcement arm of Protocol 2)
 
-Protocol 2/2a already require the docs to stay current — but they are **honor-system** rules, and the docs drifted anyway (the cloud push/pull globals `pushToCloud` / `pullFromCloud` were documented for months but never existed under those names; the script load-order list silently omitted `idb.js` / `ocr.js` / `runtime.js` / `test-console.js`). Per the escape-ratchet (Protocol 36b), a class of defect that escapes every layer gets a **gate guard** at the layer it escaped from. Doc drift escaped every layer, so it gets one. **Suite 220** (Node runner) **fails the build** when a load-bearing doc names code that does not exist.
+Protocol 2 already requires the docs to stay current — but they are **honor-system** rules, and the docs drifted anyway (the cloud push/pull globals `pushToCloud` / `pullFromCloud` were documented for months but never existed under those names; the script load-order list silently omitted `idb.js` / `ocr.js` / `runtime.js` / `test-console.js`). Per the escape-ratchet (Protocol 36b), a class of defect that escapes every layer gets a **gate guard** at the layer it escaped from. Doc drift escaped every layer, so it gets one. **Suite 220** (Node runner) **fails the build** when a load-bearing doc names code that does not exist.
 
 **What it checks (deliberately NARROW — precision over recall):**
 
@@ -587,7 +580,7 @@ Protocol 2/2a already require the docs to stay current — but they are **honor-
 
 **Scope decision — `library/BRAIN_DUMP.md` is NOT scanned for PROSE content.** It is gitignored (absent on a clean CI checkout, so the guard would have nothing to read there — and CI is the environment that matters most), and its own "Known documentation drift" ledger deliberately quotes retired/wrong names to warn sessions off them — scanning its prose would false-positive on its most valuable section. It stays governed by its own maintenance rule instead. (Its existence *as a pointer target* — the fact that `CLAUDE.md` names `library/BRAIN_DUMP.md` — IS checked, via check 4 above / Protocol 46.)
 
-**Ratchet intent:** start narrow and earn trust; tighten later. A greedy scanner that flags ordinary prose is worse than no scanner — it gets ignored, then weakened, then it is dead. Only add a new reference form (e.g. backticked architecture entry-point names) once it can be extracted with **zero false positives**; until then, leave it out and say so. It does **not** replace the honor-system Protocol 2/2a rules — those still stand; this guard just catches the class of drift they could not.
+**Ratchet intent:** start narrow and earn trust; tighten later. A greedy scanner that flags ordinary prose is worse than no scanner — it gets ignored, then weakened, then it is dead. Only add a new reference form (e.g. backticked architecture entry-point names) once it can be extracted with **zero false positives**; until then, leave it out and say so. It does **not** replace the honor-system Protocol 2 rules — those still stand; this guard just catches the class of drift they could not.
 
 ---
 
@@ -629,6 +622,28 @@ A private GitHub repo (`zerckzzyHD/robco-uos-local-archive`, confirmed PRIVATE) 
 **Why:** these three artifact classes are load-bearing for every future session (the brain dump, the code map, the planning queue, the orchestrator's own memory) yet exist on exactly one disk. The earlier version of `sync.ps1` hardcoded a session-GUID path that could silently back up **nothing** when the GUID changed — a backup that quietly protects nothing is worse than none, because it removes the pressure to notice. The rewrite fails loudly instead; making the sync an agent obligation (with a nudge trigger and an upward-report fallback) means the backup happens on its own instead of depending on a phone-first owner remembering a terminal command he never sees.
 
 **`planning/` is ARCHIVE-class → additive-only in the backup.** Because `planning/` is frozen point-in-time snapshots (the 3-class library model), the sync mirrors it **additively for `planning/` only** — once a planning file is captured it is **never removed** from the archive, even if it later disappears locally. So the owner can safely **clear `planning/` locally** after a document has served its purpose: the archive (and its git history) keeps it forever, and future sessions recover it from there. One consequence to remember: a **rename or reorg** of `planning/` reads to an additive mirror as *delete-old + add-new*, so the archive would otherwise accumulate both the old and new paths indefinitely. Reconcile a reorg **once, deliberately**: run the sync, then prune the stale old-path copies from the archive working tree and commit that — a working-tree tidy, not a loss of record (git history still holds the old paths).
+
+---
+
+## Protocol 49 — The Retirement Rule (the counterpart to the escape-ratchet)
+
+_(Protocol 47 is reserved for the future GENERATED test-catalog generator; 48 is the backup protocol. This is the next free number.)_
+
+**A guard or rule may be retired when the risk it covers no longer exists, or was never real.** Retiring it means **removing its enforcement too, not just its prose** — a rule whose text is deleted but whose gate check survives is worse than either, because the check now enforces something no session can read or reason about.
+
+**Why this exists.** Protocol 36b (the escape-ratchet) only ever ADDS guards: every escape permanently tightens the net. That is correct and stays. But a ratchet with no counterpart means weight only ever accretes — the rulebook grows monotonically whether or not the risks it encodes are still live, and eventually the cost of reading it exceeds the value of what it protects. This is the release valve. The two protocols are deliberately asymmetric: adding a guard is cheap and automatic, removing one is deliberate and must be argued.
+
+**How to retire (the Protocol 15 / 2a precedent):**
+
+- State the date and the reasoning **in place**, where the protocol used to be. Do not delete the section.
+- **Do not renumber and do not reuse the number** — an old cross-reference in a code comment, a commit message, or another doc must still resolve.
+- **Remove the enforcement in the same commit** — the gate check, the hook, the CI step. Name what was removed.
+- **Say what coverage is genuinely lost.** If the retired guard incidentally protected something real, record that plainly instead of quietly pretending the removal was free.
+- Historical records are **not** obligations: a frozen release-day snapshot (e.g. a `CHANGELOG.md` version header's test count) stays exactly as it is. Retiring an ongoing rule never rewrites history.
+
+**It cuts both ways — the keep-case is as load-bearing as the remove-case.** The **architecture-conformance baseline must NOT be retired**: its risk is still live. The layering it enforces (Protocol 23) is today a convention held up by that baseline alone, and it stays that way until the native ES-modules migration at 3.0 makes the boundaries structurally enforced by the module graph itself. Only then does the guard become redundant. Retiring it before that point would remove the only thing holding the layering up — the exact failure this rule is designed to prevent when applied carelessly.
+
+**Worked examples on file:** *remove* — Protocol 15 (runner parity), retired once the second runner was deleted and there was no parity left to police; Protocol 2a (test-count sync), retired because the risk it claimed to cover was never real. *keep* — the architecture-conformance baseline, above.
 
 ---
 
@@ -726,7 +741,6 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 | Recursive key transformation on AI JSON responses           | Use explicit field mapping in `autoImportState()`                                                                                                                                                      |
 | Silent drops of inventory during token triage               | Inventory must always be returned when relevant keywords match                                                                                                                                         |
 | Auto-push to cloud on stat changes                          | Cloud sync is manual button only                                                                                                                                                                       |
-| Leave stale test counts in docs after adding/removing tests | Protocol 2a requires all counts updated in the same commit                                                                                                                                             |
 | `linkWithRedirect` / `signInWithRedirect` on this project   | GitHub Pages can't host the redirect handler; mobile blocks the cross-origin iframe fallback (storage partitioning) → `getRedirectResult` returns `null`, sign-in silently fails. Full mechanism → **Protocol 30** |
 | Unconditional `signInAnonymously` on boot                   | For a Google-linked user, an unguarded call mints a fresh anonymous user and wipes the session on every reload (the 5c-ii clobber bug) — gate on `auth.authStateReady()` + `!auth.currentUser`. Full rule → **Protocol 31** |
 | Writing a non-ASCII file via PowerShell (`Set-Content` / `Out-File` / string + `Set-Content`) | Silently double-encodes every non-ASCII char (`—`→`â€"`, `▲`→`â–²`, `⚠`→`âš `) — use the Edit tool or Node `fs.writeFileSync(path, content, 'utf8')`. Full incident + Suite 90 guard → **Protocol 39** |
@@ -777,4 +791,4 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 
 **State persistence:** `localStorage` key `robco_v8` (the synchronous authority). Debounced 500ms writes with dirty-check. Flushed on `beforeunload` **and** `visibilitychange → hidden` (the reliable mobile path). Also mirrored fire-and-forget into the IndexedDB `'campaign'` store (key `'live'`, P8 durability shadow) so an Android localStorage eviction that spares IndexedDB is recovered on the next boot — recovery-only, so a stale mirror never overwrites a newer local value (Protocol 34; state.js `mirrorLiveContainer`/`restoreLiveContainerFromIdb`).
 
-**Test suite:** 3495 tests across 240 suites in the single canonical Node runner `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.) Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).
+**Test suite:** a large behavioural + static-invariant suite in the single canonical Node runner `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.) Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in `library/TEST_CATALOG.md` (gitignored, local-only, read on demand; see the Reference Pointer Index above and the 3-class library maintenance model there).

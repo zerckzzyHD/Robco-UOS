@@ -141,18 +141,18 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### Technology Stack
 
-| Layer           | Technology                                       | Purpose                                                                     |
-| --------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
-| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                   |
-| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                   |
-| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                       |
-| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                        |
-| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback) |
-| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                       |
-| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
-| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
-| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + Playwright                                | 3495-test Node gate + boot-smoke / render / a11y checks                     |
+| Layer           | Technology                                       | Purpose                                                                         |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                       |
+| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                       |
+| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                           |
+| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                            |
+| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback)     |
+| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                           |
+| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                              |
+| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                                 |
+| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                                 |
+| **Testing**     | Node + Playwright                                | Node gate (behavioural + static invariants) + boot-smoke / render / a11y checks |
 
 ### Per-game data system
 
@@ -222,7 +222,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (3495 tests, 240 suites — the single canonical runner)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
 ├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
@@ -330,7 +330,7 @@ Commits and pushes are blocked unless the gate is green. The pre-commit hook run
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 3495-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps the docs current and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
@@ -395,7 +395,7 @@ A **production-quality, two-game browser application** with:
 - **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list, read-side fail-loud integrity (corrupt saves quarantined + recoverable, eviction detection, degraded-write notices)
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **3495 tests across 240 suites** in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — a broad behavioural and static-invariant suite in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 
