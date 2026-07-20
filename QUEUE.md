@@ -616,20 +616,18 @@ This is deliberate planning, not busywork — the round touches gameplay and the
 
 **⭐ Why the order is load-bearing (VERIFIED CORRECT — do not reorder).** Every headline OS feature in this round — the CLI, the DIR filesystem, the Peripheral Bus, the Distribution Network — is a **new service that renders.** The measured baseline (20 render→save + 26 service→view, now enforced by Suite 236) is exactly the seam those services plug into. Build the services first and each one lands on the debt and **multiplies it** — four more services adding their own render→save and service→view crossings on top of 46. Burn the baseline down FIRST (invert the cycles, harden the event bus, isolate boot, fold the stray interval) and the services plug into a clean seam instead. The conformance gate already stops the debt getting _worse_; this ordering is what stops the OS round from _inheriting_ it. The hardening gate MUST sit before any OS service — this dependency is the reason the whole round is sequenced planning → hardening → build, and it is correct as written.
 
-## Also in this round: ⬜ APP CHECK — the enforcement flip + the debug-token rotation
+## Also in this round: ⬜ APP CHECK — rotate the debug token
 
-Two Firebase App Check items, tracked as one entry because they touch the same credential surface. Neither is large; one carries a hard external dependency that must not be forgotten.
+**Enforcement is DONE — settled 2026-07-20, owner-confirmed.** App Check has been enforced since 2026-07-01; the closed list below is correct. The long-parked MONITORING→ENFORCE reminder was stale — it had been telling sessions to perform work completed weeks earlier — and has been retired from memory. **There is no flip to perform and no console mode to go and check.** What remains is one credential item.
 
-**1. The enforcement flip (the long-parked reminder).** Flip App Check from **MONITORING** to **ENFORCE** once the Firebase console shows verified requests sitting at roughly **90%+** — so unverified clients are actually rejected rather than merely counted. **Check the console's real mode first:** the "Closed / off the board" list below records App Check as "enforced since 2026-07-01, passive watch only," and that claim has never been re-verified against the console, while the parked reminder says the opposite. Settle which is true, then either flip it or correct the record — do not act on either claim as given.
-
-**2. ⚠ Rotate the App Check DEBUG TOKEN — and this one gates the Museum.** A security scan (2026-07-20) found an App Check **debug token committed in the private local-archive repo** (Protocol 48's `robco-uos-local-archive`). A debug token **allows a client to bypass App Check verification entirely** — it is a real credential, not a config value.
+**⚠ Rotate the App Check DEBUG TOKEN — and this one gates the Museum.** A security scan (2026-07-20) found an App Check **debug token committed in the private local-archive repo** (Protocol 48's `robco-uos-local-archive`). A debug token **allows a client to bypass App Check verification entirely** — it is a real credential, not a config value.
 
 - **Exposure today is LOW** and there is no emergency: the archive repo is **private**, and this is a **debug** token, not a production credential.
 - **But it MUST be rotated before the archive repo is ever made public** — revoke the old token in the Firebase console's App Check debug-token list, issue a fresh one, and keep it out of every committed file.
-- **Therefore the rotation is a hard prerequisite of publishing the Museum (item P)**, which is built out of that archive. The enforcement flip above is _not_ a Museum prerequisite; the token rotation is. Recording the dependency here is the point of this entry — it must not survive only as conversation.
+- **Therefore the rotation is a hard prerequisite of publishing the Museum (item P)**, which is built out of that archive. Recording the dependency here is the point of this entry — it must not survive only as conversation.
 - **The app repo itself is already clean.** `js/services/cloud.js` sets `FIREBASE_APPCHECK_DEBUG_TOKEN = true` on localhost only, so the SDK mints a throwaway token per session and nothing is hardcoded here. The exposure is archive-side, not app-side.
 
-**Done means:** the console's enforcement mode is deliberate and recorded truthfully in this file, the old debug token is revoked and replaced, and no debug token sits in any repo that could ever become public.
+**Done means:** the old debug token is revoked and replaced, and no debug token sits in any repo that could ever become public.
 
 ---
 
@@ -861,7 +859,7 @@ _Finished or ruled out — listed briefly so they don't resurface as pending._
 - **The AI → native + oversight audit** — it ran; it produced the 2.8.0 native conversions.
 - **The save-import behavioral test and the Phase-0 foundations** (the AI-directive and boot decompositions, the event bus, the settings/campaign boundary, the native-input-path audit) — shipped in 2.8.0.
 - **Main-revert cloud-save compatibility check** — done; the cutover was executed.
-- **App Check enforcement** — recorded here as enforced since 2026-07-01, passive watch only. ⚠ **Re-opened:** that claim conflicts with a parked MONITORING→ENFORCE reminder and has not been re-verified against the console, and a separate debug-token rotation is now outstanding — both are tracked in the App Check entry in the 2.9.0 round.
+- **App Check enforcement** — enforced since 2026-07-01, passive watch only. **Confirmed settled 2026-07-20:** the conflicting parked MONITORING→ENFORCE reminder was stale, not a contradiction, and has been retired. This entry was correct all along. A separate **debug-token rotation** is outstanding and gates Museum publication — see the App Check entry in the 2.9.0 round.
 - **Pop-up card standardization** — the design audit swept it: transient pop-ups already use the compact toast, and the persistent "cargo seized" status stays as-is by your decision. A test guards it.
 - **Voice input** — sidelined (browser speech is finicky and real scope); on file as a future wildcard only.
 - **Day/night cycle** — cut (see WASTELAND UPLINK above for the history).
