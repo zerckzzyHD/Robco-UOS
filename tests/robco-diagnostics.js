@@ -129,6 +129,31 @@ function readFile(rel) {
   return fs.readFileSync(abs, 'utf8');
 }
 
+// ── Rulebook read helpers (2.8.5 U-R2, the rules restructure) ────
+// The rulebook is no longer one file. CLAUDE.md carries the universal
+// contract; rules/*.md carry the surface-scoped subsystem notes. Any test
+// asking "is rule X codified?" must look across BOTH, or the restructure
+// would silently break it — the guard follows the content it guards.
+function ruleNoteFiles() {
+  const dir = path.join(ROOT, 'rules');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter(f => f.endsWith('.md'))
+    .sort()
+    .map(f => `rules/${f}`);
+}
+
+function rulebookFiles() {
+  return ['CLAUDE.md', ...ruleNoteFiles()];
+}
+
+function readRulebook() {
+  return rulebookFiles()
+    .map(f => readFile(f))
+    .join('\n');
+}
+
 // ── Logical-bundle read helper (2.8.5 U-A0) ─────────────────────
 // A content-location test asserts "literal L lives somewhere in the ui-core
 // FAMILY", not "literal L lives in this one exact file". readGroup(stem)
@@ -12766,13 +12791,13 @@ header('Suite 96 — test.html Runtime Mirror Parity');
     '96.7: tests/test-html-check.mjs exists and scripts/gate.js runs it (test.html executed in gate)'
   );
 
-  // 96.8  Protocol 40 is codified in RULES.md and CLAUDE.md
+  // 96.8  Protocol 40 is codified in RULES.md and the rulebook (CLAUDE.md + rules/*.md)
   {
     const rules96 = readFile('RULES.md');
-    const claude96 = readFile('CLAUDE.md');
+    const claude96 = readRulebook();
     assert(
       /Protocol 40/.test(rules96) && /Protocol 40/.test(claude96),
-      '96.8: Protocol 40 (test.html sync) present in RULES.md and CLAUDE.md'
+      '96.8: Protocol 40 (test.html sync) present in RULES.md and the rulebook (CLAUDE.md + rules/*.md)'
     );
   }
 }
@@ -21766,7 +21791,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const audio154 = readGroup('ui-audio');
   const state154 = readGroup('state');
   const css154 = readCss();
-  const claude154 = readFile('CLAUDE.md');
+  const claude154 = readRulebook();
 
   // 154.1  the bay chrome + all 6 SLOT sub-panels are present, each a real
   //        sub-panel (data-sub-id) defaulting OPEN on first boot (owner decision)
@@ -22030,11 +22055,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 154.18  Protocol 25 sanctioned-exception clause + the UI-1 clarification are
-  //         both recorded in CLAUDE.md (this reframe's own authorization + guardrails)
+  //         both recorded in the rulebook (this reframe's own authorization + guardrails)
   assert(
     /Sanctioned exception — owner-approved redesigns/.test(claude154) &&
       /internal headings use the sub-panel/.test(claude154),
-    '154.18: CLAUDE.md records the Protocol 25 sanctioned-exception clause and the Protocol UI-1 sub-panel-heading clarification'
+    '154.18: the rulebook (CLAUDE.md + rules/*.md) records the Protocol 25 sanctioned-exception clause and the Protocol UI-1 sub-panel-heading clarification'
   );
 
   // 154.19  Protocol 42 fix (found during this unit's gate render-check): the
@@ -22309,7 +22334,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const core155 = readGroup('ui-core');
   const state155 = readGroup('state');
   const css155 = readCss();
-  const claude155 = readFile('CLAUDE.md');
+  const claude155 = readRulebook();
   const rules155 = readFile('RULES.md');
 
   // 155.1  the chassis subheader from the mockup's bay-head row is present
@@ -22512,7 +22537,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     /everything remembers on reload/i.test(claude155) &&
       !/the files are kept identical for protocol sections/.test(claude155) &&
       !/the files are kept identical for protocol sections/.test(rules155),
-    '155.16: CLAUDE.md records the new reload-persistence standing rule, and the stale "RULES.md and CLAUDE.md are kept identical" sentence is corrected'
+    '155.16: the rulebook records the new reload-persistence standing rule, and the stale "RULES.md and CLAUDE.md are kept identical" sentence is corrected'
   );
 }
 
@@ -37837,7 +37862,7 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
   const stateSrc208 = readGroup('state');
   const css208 = readCss();
   const cssStripped208 = css208.replace(/\/\*[\s\S]*?\*\//g, '');
-  const claudeSrc208 = readFile('CLAUDE.md');
+  const claudeSrc208 = readRulebook();
 
   const ignitionBody208 = extractFunctionBody(coreSrc208, '_runCampaignIgnition');
   const wipeBody208 = extractFunctionBody(coreSrc208, 'wipeTerminal');
@@ -38359,13 +38384,13 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
     '208.26: toggleMasterMute() fires the SEAT flourish only on the reseat (un-mute) branch, never on eject (mute)'
   );
 
-  // 208.27 static — CLAUDE.md documents SEAT as adopted at this unit
+  // 208.27 static — the rulebook documents SEAT as adopted at this unit
   //         (Protocol UI-9).
   assert(
     /Protocol UI-9 — Motion-Verb Grammar \(adopted at the Design Overhaul DO-N unit, SWEEP token; SEAT adopted at the Ceremony Moments Wave 1 unit\)/.test(
       claudeSrc208
     ) && /\*\*SEAT\*\* \(introduced at Ceremony Moments Wave 1, M5\)/.test(claudeSrc208),
-    '208.27: CLAUDE.md’s Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit'
+    '208.27: the rulebook’s Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit'
   );
 
   // ── CROSS-CUTTING ────────────────────────────────────────────────────────
@@ -39352,7 +39377,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
   header('Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44');
   const testConsole212 = readGroup('test-console');
-  const claude212 = readFile('CLAUDE.md');
+  const claude212 = readRulebook();
 
   // Live-evaluate the REAL DIAGNOSTIC_SHELL_TOOLS array (the eval-sandbox
   // technique Suite 210 already established) — every assertion below reads
@@ -39979,7 +40004,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 212.15  Protocol 44 is documented in CLAUDE.md (canonical) with its
+  // 212.15  Protocol 44 is documented in the rulebook (canonical) with its
   //         enforcement mechanism.
   assert(
     /## Protocol 44 — Every Hard-to-Trigger Feature Ships a Diagnostic Shell Trigger/.test(
@@ -39987,7 +40012,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     ) &&
       /triggers:\s*\[\.\.\.\]/.test(claude212) &&
       /RobcoEvents\.emit\('<name>', …\)/.test(claude212),
-    '212.15: Protocol 44 is documented in CLAUDE.md (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
+    '212.15: Protocol 44 is documented in the rulebook (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
   );
 
   // 212.16  BEHAVIORAL: _replayAbsence(), run against a synthetic
@@ -43141,7 +43166,13 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
 
-  const DOC_FILES_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md'];
+  // 2.8.5 U-R2 (the rules restructure): the scanned set follows the rule text.
+  // CLAUDE.md kept the universal contract and shed every surface-scoped
+  // protocol into rules/*.md — so the doc-drift guard scans the notes too.
+  // Scanning only CLAUDE.md after the split would have quietly halved this
+  // suite's coverage while still reporting green (Protocol 49: moving content
+  // moves its enforcement in the same commit).
+  const DOC_FILES_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md', ...ruleNoteFiles()];
   const docText220 = {};
   for (const d of DOC_FILES_220) docText220[d] = readFile(d);
   const docBlob220 = DOC_FILES_220.map(d => docText220[d]).join('\n');
@@ -43205,8 +43236,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'tests/robco-diagnostics.ps1',
   ]);
   {
+    // U-R2: `rules/<note>.md` joins the scanned prefixes so a retrieval-map row
+    // or a cross-note pointer naming a subsystem note that does not exist fails
+    // the build — the same drift class, one directory later.
     const pathRe =
-      /(?<![.\w/])(?:js|css|tests|scripts)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html)\b/g;
+      /(?<![.\w/])(?:js|css|tests|scripts|rules)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html|md)\b/g;
     const missingPath = new Set();
     let m;
     while ((m = pathRe.exec(docBlob220))) {
@@ -43255,12 +43289,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     return dedupeConsec220(out);
   };
 
-  // ── 220.3  CLAUDE.md load-order block == the real boot order ──
+  // ── 220.3  the rulebook's load-order block == the real boot order ──
+  // U-R2: the block moved from CLAUDE.md's Architecture Quick Reference into
+  // rules/file-layout.md (its actual subsystem). The marker pair moved with it
+  // verbatim, and so does this check — the guard tracks the block, not the file
+  // it used to sit in.
   {
-    const o = extractDocOrder220(docText220['CLAUDE.md']);
+    const o = extractDocOrder220(docText220['rules/file-layout.md']);
     assert(
       o !== null && JSON.stringify(o) === JSON.stringify(canonicalOrder220),
-      '220.3: CLAUDE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order (idb → GAME_FILES → static tags)'
+      '220.3: rules/file-layout.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order (idb → GAME_FILES → static tags)'
     );
   }
 
@@ -43387,7 +43425,14 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // set Suite 220 reads, widened to RULES.md / QUEUE.md and tests/ per the
     // finding). Full-file text, not just comments — proven zero-FP because the
     // token only appears in prose/comments/descriptions across these files.
-    const REF_DOCS_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md', 'RULES.md', 'QUEUE.md'];
+    const REF_DOCS_220 = [
+      'CLAUDE.md',
+      ...ruleNoteFiles(), // U-R2: the subsystem notes are rulebook text too
+      'ARCHITECTURE.md',
+      'README.md',
+      'RULES.md',
+      'QUEUE.md',
+    ];
     const refCorpusFiles220 = [
       ...REF_DOCS_220,
       ...allJsFiles().map(f => `js/${f.rel}`),
@@ -43400,14 +43445,32 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     // DEFINED set, parsed from CLAUDE.md headings. Stop at the first em-dash
     // (—) so a title number ("(extends 36b)", a date) can never masquerade
     // as a defined id.
+    // U-R2: parsed from the WHOLE rulebook's heading structure (CLAUDE.md's
+    // universal contract + every rules/*.md subsystem note), because that is
+    // where the headings now live. definedIn220 records WHICH file defines each
+    // id, so 220.13 can prove no number is defined twice.
     const definedNum220 = new Set();
     const definedUi220 = new Set();
-    for (const line of docText220['CLAUDE.md'].split(/\r?\n/)) {
-      const h = /^#{2,4}\s+Protocols?\s+([^—]*?)\s*—/.exec(line);
-      if (!h) continue;
-      for (const id of h[1].match(/(?:UI-)?\d+[a-z]?/gi) || []) {
-        if (/^UI-/i.test(id)) definedUi220.add('UI-' + id.replace(/^UI-/i, ''));
-        else definedNum220.add(id.match(/^\d+/)[0]);
+    const definedIn220 = new Map(); // id → [files that define it]
+    for (const rel of rulebookFiles()) {
+      for (const line of readFile(rel).split(/\r?\n/)) {
+        const h = /^#{2,4}\s+Protocols?\s+([^—]*?)\s*—/.exec(line);
+        if (!h) continue;
+        for (const id of h[1].match(/(?:UI-)?\d+[a-z]?/gi) || []) {
+          let key;
+          if (/^UI-/i.test(id)) {
+            key = 'UI-' + id.replace(/^UI-/i, '');
+            definedUi220.add(key);
+          } else {
+            key = id.match(/^\d+/)[0];
+            definedNum220.add(key);
+          }
+          // Set, not array: a number legitimately appears twice in ONE file
+          // (Protocol 2 and the retired Protocol 2a both reduce to base "2").
+          // The drift 220.13 hunts is the SAME number defined in TWO files.
+          if (!definedIn220.has(key)) definedIn220.set(key, new Set());
+          definedIn220.get(key).add(rel);
+        }
       }
     }
 
@@ -43532,6 +43595,47 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           /git push origin dev\b/.test(gateBlock) &&
           !/git push origin main\b/.test(gateBlock),
         '220.12: CLAUDE.md Pre-Commit/Pre-Push Gate block pushes to origin dev (Protocol 43 working branch), not origin main'
+      );
+    }
+
+    // 220.13  U-R2 structural guard: every protocol number is defined in exactly
+    //   ONE rulebook file. The restructure's whole safety property is "each rule
+    //   lives in exactly one place" — the moment a protocol is copy-pasted into
+    //   a second note, the two copies start drifting and a session gets whichever
+    //   one it happened to load. Cross-references between notes are fine and
+    //   expected; a duplicated HEADING is not.
+    {
+      const dupes220 = [...definedIn220.entries()]
+        .filter(([, files]) => files.size > 1)
+        .map(([id, files]) => `${id} (${[...files].join(' + ')})`);
+      assert(
+        dupes220.length === 0,
+        '220.13: every protocol number is defined by a heading in exactly one rulebook file (CLAUDE.md or one rules/*.md note) — no rule exists in two places to drift apart' +
+          (dupes220.length ? ' — DUPLICATED: ' + dupes220.join('; ') : '')
+      );
+    }
+
+    // 220.14  U-R2 structural guard: the retrieval map is honest. Every
+    //   `rules/<note>.md` CLAUDE.md routes a session to must exist on disk, and
+    //   every note that exists must be reachable from the map — a note nothing
+    //   points at is a rule nobody retrieves, which is the exact failure the
+    //   restructure was built to fix ("written is not retrieved").
+    {
+      const claudeSrc220 = docText220['CLAUDE.md'];
+      const mapped220 = new Set(
+        (claudeSrc220.match(/rules\/[A-Za-z0-9_-]+\.md/g) || []).map(s => s.trim())
+      );
+      const onDisk220 = new Set(ruleNoteFiles());
+      const unreachable220 = [...onDisk220].filter(f => !mapped220.has(f));
+      const phantom220 = [...mapped220].filter(f => !onDisk220.has(f));
+      assert(
+        onDisk220.size >= 5 && unreachable220.length === 0 && phantom220.length === 0,
+        '220.14: CLAUDE.md reaches every rules/*.md subsystem note and names none that is missing (the retrieval map is the only way a session finds a scoped rule)' +
+          (unreachable220.length
+            ? ' — UNREACHABLE from CLAUDE.md: ' + unreachable220.join(', ')
+            : '') +
+          (phantom220.length ? ' — NAMED but absent: ' + phantom220.join(', ') : '') +
+          (onDisk220.size < 5 ? ' — rules/ looks empty or missing' : '')
       );
     }
   }

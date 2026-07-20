@@ -283,7 +283,19 @@ Two external AI reviews independently pushed on the project's own rulebook and b
 
 **Done means:** Protocol 2a is retired (its number retired-not-reused, per the Protocol 15 precedent), no doc carries a hand-synced test count, and the gate still fails loudly on any real test failure.
 
-### R2. ⬜ RULES RESTRUCTURE — path-scoped memory + a retirement rule
+### R2. ✅ RULES RESTRUCTURE — path-scoped memory + a retirement rule _(done 2026-07-20)_
+
+**Shipped.** `CLAUDE.md` is now a short universal contract plus a **retrieval map**; every
+surface-scoped protocol moved into ten `rules/*.md` subsystem notes, each rule in exactly one
+place, nothing deleted. Suite 220 moved with the content (it scans the notes, reads the
+load-order block from `rules/file-layout.md`, and resolves protocol references across the whole
+rulebook) and gained two structural guards: **220.13** (no protocol number defined in two files)
+and **220.14** (the retrieval map reaches every note and names none that is missing). The
+retirement rule shipped ahead of schedule as **Protocol 49** in the R1 commit. The proposed
+cuts are written down, not applied — see the R3 candidate list in
+`planning/2.8.5/plans/R2_RESTRUCTURE_SUMMARY.md`.
+
+<details><summary>Original entry</summary>
 
 **What it is.** Replace "every session reads the whole rulebook" with a short **universal contract** every session loads, plus **subsystem-scoped notes** pulled in only when the relevant surface is touched — save/state, service worker/deploy, auth/cloud, UI/mobile, game data, audio. The reviewers' rationale, sharpened: _written is not retrieved._ A rule buried in a large document loses to the rules sitting next to where a session is actually working.
 
@@ -292,6 +304,8 @@ Two external AI reviews independently pushed on the project's own rulebook and b
 **What it depends on.** R1 first (don't restructure around a rule you're deleting).
 
 **Done means:** a short universal contract plus surface-scoped notes exist and are retrieved by surface-touched, and a retirement rule is written with at least one keep-example and one remove-example.
+
+</details>
 
 ### R3. ⬜ FIRST STAGED TRIM — the incremental cut, built on the restructure
 

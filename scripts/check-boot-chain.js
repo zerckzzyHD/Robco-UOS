@@ -7,7 +7,7 @@
  *   1. index.html's static <script> tags + the GAME_FILES boot manifest
  *   2. sw.js's ASSETS precache list
  *   3. the physical js/*.js files on disk
- *   4. the CLAUDE.md / ARCHITECTURE.md LOAD-ORDER-GUARD doc blocks
+ *   4. the rules/file-layout.md / ARCHITECTURE.md LOAD-ORDER-GUARD doc blocks
  *   5. tests/test.html's boot chain
  * plus repomix.config.json's pack coverage (Protocol 37), plus (2.8.5 U-A2)
  * the CSS split's <link> order in index.html and its sw.js precache coverage.
@@ -192,7 +192,7 @@ const assetsBlock = /const ASSETS\s*=\s*\[([\s\S]*?)\];/.exec(swText);
   ok(included, 'repomix.config.json include[] still packs js/** (Protocol 37)');
 }
 
-// ── CHECK F/G: CLAUDE.md and ARCHITECTURE.md LOAD-ORDER-GUARD blocks ───────
+// ── CHECK F/G: rules/file-layout.md + ARCHITECTURE.md LOAD-ORDER-GUARD blocks ──
 // match the real canonical order (mirrors Suite 220.3/220.4).
 function extractDocOrder(text) {
   const b = /LOAD-ORDER-GUARD:BEGIN([\s\S]*?)LOAD-ORDER-GUARD:END/.exec(text);
@@ -207,7 +207,9 @@ function extractDocOrder(text) {
   }
   return dedupeConsec(out);
 }
-for (const doc of ['CLAUDE.md', 'ARCHITECTURE.md']) {
+// U-R2: the block moved out of CLAUDE.md into its own subsystem note when the
+// rulebook was split; the preflight follows the block, not the old filename.
+for (const doc of ['rules/file-layout.md', 'ARCHITECTURE.md']) {
   const order = extractDocOrder(read(doc));
   ok(
     order !== null && JSON.stringify(order) === JSON.stringify(canonicalOrder),

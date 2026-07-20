@@ -228,6 +228,18 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
+├── CLAUDE.md               Agent rulebook — the universal contract + the retrieval map
+├── rules/                  Subsystem rule notes, loaded only when that surface is touched
+│   ├── state-and-save.md      State fields, saves, migration, durability
+│   ├── deploy-and-cache.md    Service worker, CACHE_NAME, deploy verification
+│   ├── auth-and-cloud.md      Auth hard rules, cloud write safety, kill-switch
+│   ├── ui-and-mobile.md       Panels, mobile baseline, UX stability, the UI-* protocols
+│   ├── audio.md               Adding an audio source
+│   ├── game-data.md           Provenance + game-agnostic feature code
+│   ├── ai-contract.md         Tri-Node schema safety + AI determinism
+│   ├── file-layout.md         Boot order (machine-checked), repomix, UTF-8 integrity
+│   ├── testing-and-gates.md   Static guards, test.html sync, Diagnostic Shell triggers
+│   └── docs-and-library.md    Changelog style, doc-reference integrity, the library model
 └── assets/                 PWA icon + app-shortcut icons, ocr/ (vendored OCR language data)
 ```
 

@@ -1,10 +1,14 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.8.0
-> **Last Updated:** 2026-07-15
+> **Last Updated:** 2026-07-20
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
+>
+> **Rules live elsewhere.** The agent rulebook is `CLAUDE.md` (the universal contract + a
+> retrieval map) plus `rules/*.md` (subsystem notes, loaded per surface touched). This
+> document describes how the system IS built; the rulebook says how it must be changed.
 
 ---
 
@@ -1022,7 +1026,7 @@ Reskins the Comm-Link (`.col-right`) into the mockup's **DIRECTOR UPLINK**: a ph
 oscilloscope `<canvas id="overseerScope">` whose waveform reacts to the **real** AI/chat
 lifecycle, a `.ovs-head`/`.scope-meta` status strip, and (on mobile) a self-contained UPLINK
 view that fixes the pre-DO-O "infinite scroll" problem. Protocol UI-10 (Overseer Presence) is
-adopted at this unit — see `CLAUDE.md`.
+adopted at this unit — see `rules/ui-and-mobile.md`.
 
 **A reskin, not a fork (Protocol 22):** `appendToChat()` and `transmitMessage()` are the exact
 same functions as before, hooked at two points each — no parallel chat pipeline exists.

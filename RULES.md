@@ -7,11 +7,21 @@
 ---
 
 RULES.md and CLAUDE.md were near-identical twins; the full rule text now lives
-in **`CLAUDE.md`** only, so there is one source of truth and no drift. All
-protocols — including **Protocol 38** (game-agnostic feature code),
-**Protocol 40** (keep `tests/test.html` in sync), and **Protocol 44** (every
-hard-to-trigger feature ships a Diagnostic Shell trigger) — are defined
-there.
+in the **rulebook** only, so there is one source of truth and no drift.
+
+The rulebook is two layers (2.8.5 roadmap item R2 — *written is not the same as
+retrieved*):
+
+- **`CLAUDE.md`** — the universal contract: the rules that apply to all work
+  whatever it touches, plus the **retrieval map**. Read every session.
+- **`rules/*.md`** — surface-scoped subsystem notes, loaded only when that
+  surface is touched. Protocols still live at their own numbers, each in exactly
+  one place. **Protocol 38** (game-agnostic feature code) is in
+  `rules/game-data.md`; **Protocol 40** (keep `tests/test.html` in sync) and
+  **Protocol 44** (every hard-to-trigger feature ships a Diagnostic Shell
+  trigger) are in `rules/testing-and-gates.md`.
+
+Start at `CLAUDE.md` and let its retrieval map pick your notes.
 
 Quick facts (see `CLAUDE.md` for the authoritative detail):
 
