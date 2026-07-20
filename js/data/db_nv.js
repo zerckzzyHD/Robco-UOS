@@ -54,7 +54,7 @@
 // variant, so no single canonical wiki value exists to pin them to. Treat the
 // bestiary numbers as UNVERIFIED.
 //
-// The remaining tables (AMMO/MISC/RECIPES/QUEST_ITEMS/VENDORS/WEAPON_MODS) are
+// The remaining tables (AMMO/MISC/QUEST_ITEMS/VENDORS/WEAPON_MODS) are
 // still NOT re-verified — do not read this note as vouching for them.
 //
 // ── RESERVED-COLUMN REGISTER (Step 2 Phase 0 U11 / FP-DATA-8) ──────────────
@@ -74,9 +74,12 @@
 //                       sibling to lookupWeaponStats()/lookupBestiaryEntry() exists; DT is
 //                       the highest-priority target (armor DT is looked up nowhere today)
 //   CHEMS.CSV         Duration                          → PARKED (BIO-SCAN expiry countdown)
-//   RECIPES.CSV       ALL COLUMNS                        → PARKED-FOR-REMOVAL — doCraft/doScrap
-//                       read reg_nv.js recipes[]/breakdowns[] instead; this table has zero
-//                       consumers (not merely reserved — Protocol 22 duplicate-source flag)
+//   (RECIPES.CSV      REMOVED 2026-07-19 — it was PARKED-FOR-REMOVAL with zero code
+//                       consumers: doCraft/doScrap read reg_nv.js recipes[]/breakdowns[],
+//                       and no lookup*()/get*() parser here ever named the section. It
+//                       survived only inside the databaseCSVs string handed to the AI —
+//                       a Protocol 22 duplicate data source competing with the registry
+//                       the natives actually use. Suite 9.10 fails the build if it returns.)
 //   QUEST_ITEMS.CSV   Tradeable                          → PARKED (TRADE v2 quest-item filter)
 //   VENDORS.CSV       Repair_Skill                        → PARKED (vendor repair action)
 //                     Restock_Days/Accepted_Currencies    → target: TRADE v2 (FP-DATA-8)
@@ -607,19 +610,6 @@ Pre-War Money,0.0,10,Currency
 NCR Money,0.0,40,Currency
 Legion Coin,0.0,50,Currency
 Vault 13 Canteen,1,2,Aid
-
-[RECIPES.CSV]
-Recipe_Name,Skill_Req,Components,Output,Quarantine_Cap
-Weapon Repair Kit,Repair 50,1 Scrap Electronics / 1 Scrap Metal,1 Weapon Repair Kit,5
-Doctor's Bag (crafted),Medicine 45,1 Surgical Tubing / 1 Wonderglue / 2 Stimpak,1 Doctor's Bag,3
-Frag Grenade (crafted),Explosives 35,1 Tin Can / 1 Scrap Metal,1 Frag Grenade,10
-Molotov Cocktail,Survival 25,1 Whiskey / 1 Duct Tape,1 Molotov Cocktail,10
-Nuka Grenade,Repair 45,1 Empty Nuka-Cola Bottle / 1 Fission Battery / 1 Abraxo Cleaner,1 Nuka Grenade,5
-Homemade Knife,Survival 25,1 Tin Can,1 Homemade Knife,3
-Hand-Loaded .308,Repair 55,1 .308 Casing / Powder / Lead,10x .308 Standard,20
-Hand-Loaded .44,Repair 55,1 .44 Casing / Powder / Lead,10x .44 Standard,20
-Snakebite Tourniquet,Survival 45,1 Leather Belt / 1 Duct Tape,1 Snakebite Tourniquet,5
-Wasteland Omelet,Survival 50,2 Brahmin Egg,1 Wasteland Omelet,3
 
 [QUEST_ITEMS.CSV]
 Name,Associated_Quest,Tradeable,Special_Property,Weight

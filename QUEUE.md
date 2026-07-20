@@ -5,7 +5,7 @@ This is written for you to read on your phone. It's in execution order, top to b
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⬜ queued.
 
-_Last rewritten in full: 2026-07-15. Last updated: 2026-07-18 — four passes now: (1) marked the **entire 2.8.5 code + test health round (U1–U12) SHIPPED**, plus the UI-truthfulness fixes and the **Protocol 23 architecture-conformance enforcement** capstone; (2) a **full ordering evaluation** of the whole roadmap — the floating end-of-round deliverables, the leftovers, and the pre-3.0 items each placed in dependency order with a "why it sits here," and the one real mis-ordering (list virtualization) moved to its foundation; (3) a **placement pass for a new batch from two external AI reviews** — near-term LIVE-SAVE DURABILITY (data-safety, runs first), the rules/governance restructure (delete the test-count bookkeeping, path-scoped rules + a retirement rule, a first staged trim, the re-pin), two cheap cleanups, two consciously-unversioned items, and the native ES-modules migration bundled into 3.0; and (4) a **placement pass for the 2026-07-18 live AI test** — the AI/Overseer audit (`planning/2.8.5/audits/AI_OVERSEER_AUDIT.md`) yielded **A0** (confirmed real item-loss, jumps to the front of Group 1 ahead of live-save durability) plus the **N** unit (Findings 2–8, non-gating), the **Museum** (item P, built before the 2.8.5 release), and the **test-artifacts self-cleaning** ride-along (item O). Each new item was verified against real code before earning its slot. The tail was regrouped into four ordered groups; item D moved next to the Atlas; the three owner-dropped ideas were recorded as closed. Pinned to `bf8f188` (re-pin owed after the rules restructure — see tail item R4)._
+_Last rewritten in full: 2026-07-15. Last updated: **2026-07-19** — a Group-3 batch pass plus a truthfulness sweep of the tail. **Group 1 (data safety) is now COMPLETE** — A0, A1 and A2 had all shipped but were still showing unticked, as had **O** and both batches of **N**; all six are now marked. Of the Group-3 batch: **E** (dead RECIPES.CSV tables, both games) and **K** (the backup script) shipped; **M** was re-audited and closed as already-done with nothing orphaned left to remove; **B** landed one of its four deferred conversions and the rest is now a named list rather than a vague bucket; and **C1** was deliberately NOT done — investigation found it collides with Protocol 29 and Protocol 33, so its entry now carries the blockers instead of a false "small win" framing. Prior passes (2026-07-18) —_ (1) marked the **entire 2.8.5 code + test health round (U1–U12) SHIPPED**, plus the UI-truthfulness fixes and the **Protocol 23 architecture-conformance enforcement** capstone; (2) a **full ordering evaluation** of the whole roadmap — the floating end-of-round deliverables, the leftovers, and the pre-3.0 items each placed in dependency order with a "why it sits here," and the one real mis-ordering (list virtualization) moved to its foundation; (3) a **placement pass for a new batch from two external AI reviews** — near-term LIVE-SAVE DURABILITY (data-safety, runs first), the rules/governance restructure (delete the test-count bookkeeping, path-scoped rules + a retirement rule, a first staged trim, the re-pin), two cheap cleanups, two consciously-unversioned items, and the native ES-modules migration bundled into 3.0; and (4) a **placement pass for the 2026-07-18 live AI test** — the AI/Overseer audit (`planning/2.8.5/audits/AI_OVERSEER_AUDIT.md`) yielded **A0** (confirmed real item-loss, jumps to the front of Group 1 ahead of live-save durability) plus the **N** unit (Findings 2–8, non-gating), the **Museum** (item P, built before the 2.8.5 release), and the **test-artifacts self-cleaning** ride-along (item O). Each new item was verified against real code before earning its slot. The tail was regrouped into four ordered groups; item D moved next to the Atlas; the three owner-dropped ideas were recorded as closed. Pinned to `bf8f188` (re-pin owed after the rules restructure — see tail item R4).\_
 
 ---
 
@@ -223,11 +223,13 @@ Everything in the 2.8.5 blocks above has shipped. This block is the rest of the 
 
 _Placed 2026-07-18 from two external AI reviews (`planning/2.8.5/audits/ATLAS_ECOSYSTEM_REVIEW.md` + the synthesis). Each new item below was checked against the real code before it earned its slot; where verification changed the scope, the verdict is stated inline._
 
-## Group 1 — Data safety (runs first; outranks everything else in the tail)
+## Group 1 — Data safety ✅ COMPLETE (A0, A1, A2 all shipped)
 
 _A new item **A0** was added at the front of this group on 2026-07-18 — it jumped ahead of A1 (live-save durability) because it is confirmed **real, unrecoverable item loss during ordinary play**, with no external precondition. A1 needs a storage-eviction event and its damage is bounded; A0 fires on any AI turn. Source: `planning/2.8.5/audits/AI_OVERSEER_AUDIT.md` (Finding 1)._
 
-### A0. ⬜ AI INVENTORY-OVERWRITE GUARD — stop an AI turn from silently deleting items (Finding 1) ⚠ JUMPS THE QUEUE
+### A0. ✅ AI INVENTORY-OVERWRITE GUARD — stop an AI turn from silently deleting items (Finding 1) — SHIPPED
+
+**Shipped (2026-07-18/19, `8f834e6` + `36926f0`).** The inventory array became a reconciled _proposal_ instead of a full replace, and the follow-up commit widened the same treatment to **every** AI full-replace-from-response field — the class fix, not just the one reported symptom. Guarding regression tests landed with both commits (Protocol 13/14).
 
 **What it is.** The AI-import path does a **full replace** of `state.inventory`, not a merge: when an AI response contains an `inventory` array, `autoImportState()` (`js/services/api-import.js`, ~line 379) runs `state.inventory = inv.map(...)` — the entire durable inventory is overwritten by whatever the AI returned this turn. An empty array wipes everything. The directive itself (`js/services/api-directive.js`, ~line 120) commands the AI to "return the ENTIRE inventory array" on any inventory-touching turn, so a turn where the model misjudges — e.g. a **failed** repair and an **aborted** craft — and emits a short or empty array **deletes real items from state**. The `[DELTA] inventory: 1→0 items` line the owner saw was telling the truth: the item was genuinely removed, not miscounted.
 
@@ -241,7 +243,9 @@ _A new item **A0** was added at the front of this group on 2026-07-18 — it jum
 
 **Done means:** an AI turn can no longer silently delete items the player natively holds; net removals are either reconciled against a real narrative signal or confirm-gated; a red-then-green regression test locks it.
 
-### A1. ⬜ LIVE-SAVE DURABILITY — give the live campaign container an IndexedDB shadow
+### A1. ✅ LIVE-SAVE DURABILITY — give the live campaign container an IndexedDB shadow — SHIPPED
+
+**Shipped (2026-07-19, `7a99731`, item P8).** The live `robco_v8` container is now mirrored fire-and-forget into the IndexedDB `'campaign'` store (key `'live'`), so an Android/iOS localStorage eviction that spares IndexedDB is recovered on the next boot. Recovery-only by design — a stale mirror can never overwrite a newer local value (Protocol 34).
 
 **What it is.** `saveState()` writes the active campaign container (`robco_v8`) to **localStorage only** — confirmed in code (`js/core/state.js`, the debounced writer). Save slots and rolling backups already get an IndexedDB durability shadow with a rehydrate path; the LIVE container is the one copy with no cold-storage twin. Under storage pressure (Android especially, and iOS Safari's roughly two-week eviction) localStorage can be reclaimed — and nothing is shadowing the live container when it is.
 
@@ -253,7 +257,9 @@ _A new item **A0** was added at the front of this group on 2026-07-18 — it jum
 
 **Done means:** the live `robco_v8` container is durably shadowed to IndexedDB on save (additive only, Protocol 34), an eviction-then-rehydrate path is behaviorally tested (Protocol 13), and a recovered-after-eviction live container is surfaced in the terminal's own voice, never silently swallowed.
 
-### A2. ⬜ Save-integrity Layer 3 — the write-side quarantine follow-up (was tail item A)
+### A2. ✅ Save-integrity Layer 3 — the write-side quarantine follow-up — SHIPPED
+
+**Shipped (2026-07-18, `db15f8d`).** A quota-failed migration WRITE is now separated from genuine read-side corruption, so a healthy old save can no longer be quarantined just because the re-write ran out of room.
 
 **What it is.** Layer 3 made the READ side fail loud (a corrupt campaign is quarantined, not deleted). This closes a residual on the WRITE side the same pass exposed: a **valid, healthy old save can still be wrongly quarantined if the migration WRITE hits a storage quota** mid-upgrade. The read path can't tell "the bytes are corrupt" from "the bytes were fine but the re-write ran out of room," so a quota-failed migration currently looks identical to corruption and the good save gets quarantined.
 
@@ -305,28 +311,47 @@ Two external AI reviews independently pushed on the project's own rulebook and b
 
 ## Group 3 — Small residual fixes + non-gating near-term units (nothing here unblocks downstream)
 
-Grouped by one shared property: **none of it gates the `dev → main` release and none unblocks anything downstream.** Most are genuinely small (B, C1, E, M, K, O) and fold into whichever commit is convenient. Three are larger but still non-gating and so live here rather than earning their own release-blocking slot: **N** (the AI/Overseer pass, Findings 2–8), and **P** (the Museum, which additionally carries a "build before the 2.8.5 release" timing note so its first run backfills every version). The two "cheap cleanup" items the reviews raised (E and M) fold into whichever commit is convenient.
+Grouped by one shared property: **none of it gates the `dev → main` release and none unblocks anything downstream.** Most are genuinely small (B, C1, E, M, K, O) and fold into whichever commit is convenient. Three are larger but still non-gating and so live here rather than earning their own release-blocking slot: **N** (the AI/Overseer pass, Findings 2–8), and **P** (the Museum, which additionally carries a "build before the 2.8.5 release" timing note so its first run backfills every version).
 
-### B. ⬜ The deferred U3 render-harness test slice
+**Status after the 2026-07-19 batch pass:** ✅ **E, M, K, O, N** are closed — M as "already done, nothing orphaned left to remove," the rest as real changes. 🔄 **B** landed one of its four deferred conversions (179.4, the one making an unproven safety claim); the remainder is scoped in its entry. ⚠ **C1** was investigated and deliberately **not** done — it is not the small win the entry claimed, and its entry now carries the two blocking reasons. Still open in this group: **B** (remainder), **C1** (re-scoped), **P** (the Museum).
+
+### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
 
 **What it is.** One slice of the U3 static→behavioral conversion round was deferred: converting the render-harness-dependent suites to actually drive the render path rather than grep it. The rest of U3's six slices shipped; this is the one left on the bench.
 
-**What it depends on.** U3 (shipped) and the existing render-integrity harness (exists) — no missing foundation, it's just unfinished U3 work.
+**The deferral is now traced to its source, so the slice is a known list rather than a vague bucket.** It came out of the U3 slice-6 commit (`7030103`), whose body reads: _"DEFER 163.12 (renderSavesList per-game filter) — needs a DOM render harness or a source extraction (served-file change); kept its verbatim-filter static guard, flagged for a render-harness slice."_ The wider hit-list is `TEST_STRENGTH_U2.md`'s CONVERT ledger: **163.12** (`renderSavesList` per-game filter), **226.11** (inventory detail-pane mutator wiring — greps four mutator names _anywhere_ in the file, so dead or wrong-index wiring stays green), **179.4** (`renderCartDeck` escaping), and **210.7 / 211.4** (Diagnostic Shell filter-before-DOM-insertion).
 
-**Done means:** the deferred render-path suites execute the real render and assert the result, matching the behavioral bar the rest of U3 set.
+**✅ Landed this pass — 179.4, chosen because it was the one making a SAFETY claim it could not actually prove.** Two of its six regexes (`escapeHtml(label.toUpperCase())` / `escapeHtml(sub)`) asserted XSS safety by grepping for the call text — which proves the call is _spelled_ somewhere in the body, not that escaping _happens_. `renderCartDeck()` is now executed in a `vm` sandbox (the Suite 177 `renderAccount` pattern) against a hostile `GAME_DEFS` fixture, and the assertions read the markup it really produced: **179.4** checks structure/wiring/ARIA and `--cart-stack-depth` off the real output, and new **179.4b** proves a `<img src=x onerror=…>` label is escaped — no raw `<img>` tag, hostile string never surviving verbatim. The sandbox wires the **real** `escapeHtml` lifted from `ui-core.js` (Suite 177 stubs it as a pass-through, which is fine there but would have voided the whole point here). Red-then-green verified: with escaping removed, a live `<img>` reaches the deck markup and 179.4b fails.
+
+**⬜ Still on the bench, and why each one is more than a copy of the above.** **163.12** is the one the original commit called out: `renderSavesList` was judged to need "a DOM render harness **or a source extraction (served-file change)**" — i.e. it may not be `vm`-extractable without editing shipped JS, which turns a test-only change into a Protocol 1 cache-bumping one. That is a scoping decision worth making deliberately, not sliding into at the end of a cleanup batch. **226.11** and **210.7/211.4** need a fuller synthetic-DOM harness (event dispatch and a mount pipeline, not just an `innerHTML` sink), which is a harness-building unit rather than a per-suite conversion.
+
+**Done means:** the remaining deferred render-path suites execute the real render and assert the result, matching the behavioral bar the rest of U3 set.
 
 ### C. ⬜ The two deferred U8 perf wins — SPLIT, because one of them belongs to 2.9.0
 
 U8 measured the app as already lean and deferred exactly two real wins. On the ordering evaluation these do **not** belong in the same place:
 
-- **C1 — gate the cloud warm-up (near-term, here).** A small, self-contained win: don't warm up the cloud connection until it's actually needed. Depends only on U8's measurement (done). No downstream consumer. Runs here.
+- **C1 — gate the cloud warm-up (near-term, here).** ⚠ **NOT DONE — deliberately, and it needs re-scoping before anyone attempts it (verified 2026-07-19).** The queue described this as "a small, self-contained win." Reading U8's own commit (`49a37cc`) and `cloud.js` says otherwise; the deferred item is written there as _"Defer the eager Firebase/cloud boot chain until cloud features are used (auth path → Protocol 29 real-device verification, Protocol 31 guard)"_ — U8 itself flagged it as behaviour-changing and owed its own verified pass. Two hard blockers, both concrete:
+
+  **(a) It is an auth-path change, and Protocol 29 makes real-device verification a condition of "done."** The chain being deferred is `initializeAppCheck` → `getAuth` → `onAuthStateChanged` → the Protocol-31-guarded `signInAnonymously`. Protocol 29 says an auth change is not done until verified on a real mobile device in **both** a browser tab and the installed PWA — precisely because this class of bug is invisible on desktop and to the whole test suite (the r54 regression). No session without a phone in hand can close it, so shipping it here would mean marking done something that by rule isn't.
+
+  **(b) It collides head-on with Protocol 33.** `cloud.js` calls `loadRemoteConfig()` at boot (line ~351), which is the remote kill-switch read (Protocol 32/33/35). Deferring the boot chain until "cloud features are used" would mean a player who never touches cloud features **never reads the flag doc at all** — so a kill switch flipped to disable a broken `aiChat` or `visualOcr` would never reach them. That guts the ability to disable a broken feature remotely without a redeploy, which is the entire point of Protocol 32/35. Any real version of C1 has to keep the flag read (and the LKG path) at boot while deferring only the auth/App Check/Firestore weight — a genuinely different and larger change than "warm up lazily."
+
+  **Also worth stating plainly: the measured payoff is small.** U8 found the chain "runs in the BACKGROUND and never gates READY," with FCP already ~73 ms. So this trades a real Protocol 29 + Protocol 33 risk surface for a win U8 could not measure at the visible boot. Re-scoped, it belongs with the 2.9.0 hardening gate's boot-isolation work, where per-phase boot guards are already being built — not as a near-term one-liner.
+
 - **C2 — virtualize long lists (MOVED to 2.9.0 — see the flag below).** ⚠ This one was going to be a standalone near-term perf pass, but the 2.9.0 inventory-panel rebuild **also** virtualizes long lists as its stated foundation. Doing it twice — once against today's flat list, then again when that list is rebuilt — is a Protocol 22 parallel-implementation trap: the near-term version would be thrown away. So list virtualization is **re-sequenced into the 2.9.0 inventory-panel foundation** and built once, there. (This is the one genuine mis-ordering the evaluation found: a perf win sitting in front of the very rebuild that would redo it.)
 
 **Done means (C1):** the cloud connection is warmed lazily, measured before/after.
 
 _(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, but its own rationale is "best done just before the Atlas," so this ordering pass moved it into Group 4 next to the ATLAS. It's still tail item D; see there.)_
 
-### E. ⬜ The dead RECIPES.CSV tables — BOTH game databases (widened from "FO3 only")
+### E. ✅ The dead RECIPES.CSV tables — BOTH game databases — SHIPPED (2026-07-19)
+
+**Zero consumers re-verified from code before deleting anything (Protocol 27), not taken on the doc's word.** Neither `db_nv.js` nor `db_fo3.js` names `[RECIPES.CSV]` in any parser: `_buildItemCache()` and `getTradeCatalog()` iterate explicit section lists that never included it, and no `lookup*()`/`get*()` accessor referenced it. Crafting reads `reg_nv.js`/`reg_fo3.js` `recipes[]`/`breakdowns[]`, as documented.
+
+**The one real consumer was the AI, and that made deleting it better rather than riskier.** `databaseCSVs` is injected wholesale into the Gemini `systemInstruction` (`api.js`), so the table was costing tokens on every call (bring-your-own-key — the owner pays) to hand the model a _second, competing_ recipe list for a system the natives now own. That is precisely the Finding-8 directive-authority problem, so removing it is aligned with the AI/Overseer pass, not a regression. Deleting the FO3 table also cleared the fabricated "Abraxo Cleaner Bomb" row whose Output was a non-existent "Tin Grenade" (`AUDIT_fo3_weapons` §2).
+
+**Done:** both tables removed; the reserved-column ledgers in both files and in `ARCHITECTURE.md` updated to record the removal and why; Suites **9.10 / 19.10** invert the old "must contain" assertion into a must-NOT-exist guard, so re-adding either table fails the build (Protocol 36b escape-ratchet, the same shape used when the PowerShell runner was deleted).
 
 **What it is.** A dead `RECIPES.CSV` table sits in **both** game databases — `js/data/db_nv.js` and `js/data/db_fo3.js` — each already tagged `PARKED-FOR-REMOVAL` in its own reserved-column ledger, with **zero code consumers**: crafting reads the registries (`reg_nv.js` / `reg_fo3.js`, the `recipes[]` / `breakdowns[]` arrays), never these CSV tables. It's the Protocol 22 duplicate-source flag, pure hygiene, nothing the user sees. (Verification 2026-07-18 widened this from the original "FO3 RECIPES reference" — the dead table is in New Vegas's database too.)
 
@@ -334,7 +359,13 @@ _(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, b
 
 **Done means:** both `RECIPES.CSV` tables are removed, the reserved-column ledgers updated to match, and nothing else changes.
 
-### M. ⬜ The map renderer's boxed-grid residue — mostly already gone
+### M. ✅ The map renderer's boxed-grid residue — CLOSED, nothing left to remove (verified 2026-07-19)
+
+**Verdict: already fully done by an earlier pass; no change made, deliberately.** Re-audited from the code rather than the queue entry. `_MAP_ABBREV`/`_mapAbbrev` is gone and guarded (Suite 189.1), as recorded. The remaining question was the boxed-grid CSS — and every class the entry suspected (`.map-cell`, `.map-detail-row`, `.map-mark-visited`, `.map-legend`, `.map-toggle-btn`, `.map-you-marker`) **is already deleted**; none of them exists in any stylesheet.
+
+Exactly four `.map-*` classes survive repo-wide, and **all four have live consumers** — `.map-back-btn` and `.map-collectible-badge` (`css/25-toolbar.css`, both used by `ui-render-map.js`, deliberately reused verbatim by the reskinned sector sheet per Protocol 22) and `.map-caption` / `.map-svg-wrap` (`css/45-databank.css`, the current SVG node-map). Nothing is orphaned, so nothing was removed.
+
+**The "purely historical comments" were left in place on purpose.** The `25-toolbar.css` block comment is what records _which_ two classes survived the boxed-grid retirement and _why_ (the Protocol 22 reuse decision) — deleting it would strip the only explanation for why two lone `.map-*` rules sit in a toolbar sheet, and invite a future session to "clean up" two live classes. That is load-bearing WHY, not residue. Same for the Suite 189.1 comment.
 
 **What it is.** A reviewer flagged "orphaned `_MAP_ABBREV` / boxed-grid references in the map renderer." Verification (2026-07-18) found the headline symbol is **already deleted and guarded**: `_MAP_ABBREV` / `_mapAbbrev` no longer exists in `js/ui/ui-render-map.js` (nodes plot at real `gridRow` / `gridCol`), and Suite 189.1 fails the build if it ever returns. What actually remains is a little boxed-grid CSS (`.map-cell` and siblings in `css/25-toolbar.css`) — **some of it deliberately reused** by the current SVG map, plus a couple of purely historical comments. So the real job is far thinner than stated.
 
@@ -342,7 +373,17 @@ _(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, b
 
 **Done means:** the truly-dead boxed-grid CSS classes (the ones with no remaining consumer) and the stale comments are removed; the classes the SVG map still reuses are left alone; `_MAP_ABBREV` needs no action (already gone).
 
-### K. ⬜ The backup script's single-shell dependency
+### K. ✅ The backup script's single-shell dependency — SHIPPED (2026-07-19)
+
+**The shell dependency itself was already closed by the concurrent session, and that is now VERIFIED rather than assumed.** `Get-LocalModeBases` probes both the `AppData\Roaming\Claude` junction _and_ the real physical path globbed from `AppData\Local\Packages\Claude*\LocalCache\Roaming\Claude\…` (no hash hardcoded). Measured from both shells: the sandboxed PowerShell tool sees the Roaming junction as **absent** but the packaged path as **present**, so discovery succeeds either way. A full `-NoPush` run now captures all 5 stores / 92 files identically from both shells.
+
+**But verifying it surfaced the real remaining danger, which is what this unit actually fixed.** `memory/` is MIRRORED — the sync wipes it and re-mirrors only what _this_ run discovered. "No store found anywhere" already failed loudly; a **partial** capture did not, and could not, because the cli-project store lives outside `AppData` and is visible to _every_ shell. So a blind shell would find _something_, skip the loud-failure path, wipe the local-agent-mode store out of the archive, and report "sync complete" — a backup quietly protecting less than it did yesterday, which is exactly the Protocol 48 failure mode.
+
+**Fix — a shrink guard.** Each run records the store labels it captured to `memory/_CAPTURED_STORES.txt` (machine-readable, kept separate from the human `_CAPTURE_MANIFEST.txt` so it never parses report text). The next run compares against it **before clearing anything**, and on any missing store exits non-zero having touched nothing — naming the missing store(s), listing what it did find, and naming the correct shell and exact command. `-AllowStoreLoss` accepts a deliberate removal and re-baselines. A missing baseline file is not a failure.
+
+**Proven, not assumed:** simulating a blind shell (`-MemoryBase` pointed at a non-existent path) trips the guard, exits 1, and leaves all five store folders intact in the archive.
+
+**One real bug found while verifying, fixed in the same pass (Protocol 42).** From the Bash-launched shell the local-agent-mode store was captured **twice** ("6 stores, 166 files" for 5 real stores). Physical-path de-duplication silently fails here: `Get-Item().FullName` echoes the path as given rather than resolving a reparse point in an _ancestor_ directory — and the junction is on `AppData\Roaming\Claude`, not on the leaf — so the two routes to one store produce two different strings. De-duplication now also keys on the store **label** (which carries the session GUID / project slug and is therefore already unique per real store regardless of route). Both shells now report an identical 5 stores / 92 files.
 
 **What it is.** `sync.ps1` (Protocol 48's local-only-artifact backup) runs correctly only from a **Bash-launched** `powershell.exe` — the PowerShell-tool sandbox (user `rog-ally\kadyn`) cannot see `AppData\Roaming\Claude`, so memory discovery finds nothing and the sync fails loudly there. That "works from one shell, not the other" quirk is a single point of failure for the only off-machine backup of `library/`, `planning/`, and the agent memory.
 
@@ -350,7 +391,9 @@ _(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, b
 
 **Done means:** the backup sync succeeds from any shell the harness can invoke (or fails safe with a clear reported reason), with no reliance on a single shell being able to see the memory store.
 
-### O. ⬜ Test-artifacts folder self-cleaning — make "files present" a true failure signal (ride-along)
+### O. ✅ Test-artifacts folder self-cleaning — make "files present" a true failure signal — SHIPPED
+
+**Shipped.** `scripts/gate.js` now clears `test-artifacts/` at the start of every real gate run (after the `--iter` early-exit, so it covers both the fast commit gate and the full push gate), fail-safe so a cleanup error can never abort the gate. Guarded by Suite 235.15. "Files present ⇒ the last run failed" is now a true signal.
 
 **What it is.** `test-artifacts/` accumulates failure screenshots and console logs and is **never cleared**, so stale files from days ago are indistinguishable from a real recent failure. Right now it holds leftover `cap-verify-01.*` files from verifying the capture mechanism. Fix: clear the folder at the **start** of every gate run, so its contents always describe the most recent run and "files present ⇒ the last run failed" becomes a true signal. Today that signal means nothing.
 
@@ -358,7 +401,9 @@ _(Item D — the TEST_CATALOG generator — used to sit here in the leftovers, b
 
 **Done means:** the gate empties `test-artifacts/` before it runs, the leftover `cap-verify-01.*` files are gone, and a non-empty folder after a run reliably means that run captured a failure.
 
-### N. ⬜ The AI / Overseer pass — Findings 2–8 (UX-truthfulness + directive cost; non-gating)
+### N. ✅ The AI / Overseer pass — Findings 2–8 — SHIPPED (both batches)
+
+**Shipped in two batches.** Batch 1 (`3b3331d`) covered the user-visible pass — per-game persona, in-place retry echo, correct failure severity on a transient blip, thinned ambient chatter, and the modal-button restyle (Findings 2/3/4/7). Batch 2 (`01c23b4`) covered in-place change cards instead of a tab-jump, the truthful log export, and the directive-authority sweep (Findings 5/6/8 + the Finding-4 leftover). Findings 2–8 are closed; Finding 1 shipped separately as **A0** above.
 
 **What it is.** The remaining seven findings from the 2026-07-18 AI/Overseer audit (`planning/2.8.5/audits/AI_OVERSEER_AUDIT.md`) — everything except Finding 1, which was carved out as **A0** above because it jumps the queue. This is a real multi-part unit (larger than the cheap one-liners around it in Group 3), grouped here because **none of it gates the release and none of it unblocks anything downstream** — it's the AI experience catching up to the fact that the terminal, not the AI, is now the primary surface. Verified against the owner's live screenshots and the current code; suggested internal ordering:
 

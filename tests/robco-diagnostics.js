@@ -947,13 +947,26 @@ const REQUIRED_TABLES = [
   '[BESTIARY.CSV]',
   '[CHEMS.CSV]',
   '[MISC.CSV]',
-  '[RECIPES.CSV]',
   '[QUEST_ITEMS.CSV]',
   '[VENDORS.CSV]',
 ];
 for (const tbl of REQUIRED_TABLES) {
   assert(dbSource.includes(tbl), `db_nv.js contains ${tbl} section`);
 }
+
+// 9.10  DELETION REGRESSION (2.8.5 tail item E) — the [RECIPES.CSV] table must
+// stay gone. It was PARKED-FOR-REMOVAL with zero code consumers: doCraft/doScrap
+// read reg_nv.js recipes[]/breakdowns[], and no lookup*()/get*() parser in this
+// file ever named the section, so it reached only the AI inside the databaseCSVs
+// system-instruction string — a Protocol 22 duplicate data source competing with
+// the registry the native crafting path actually uses. Inverting the old
+// "REQUIRED_TABLES contains it" assertion into a must-NOT-exist guard is the
+// Protocol 36b escape-ratchet shape used when the PowerShell runner was deleted:
+// a removal is only real if re-adding it fails the build.
+assert(
+  !dbSource.includes('[RECIPES.CSV]'),
+  '9.10: db_nv.js has NO [RECIPES.CSV] table (removed — zero consumers, registry is the source of truth)'
+);
 
 // 9.4 lookupItemInDb must be referenced in db_nv.js (item weight/value cache integrity)
 assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in db_nv.js");
@@ -1458,13 +1471,22 @@ const FO3_REQUIRED_TABLES = [
   '[BESTIARY.CSV]',
   '[CHEMS.CSV]',
   '[MISC.CSV]',
-  '[RECIPES.CSV]',
   '[QUEST_ITEMS.CSV]',
   '[VENDORS.CSV]',
 ];
 for (const tbl of FO3_REQUIRED_TABLES) {
   assert(dbFo3Source.includes(tbl), `db_fo3.js contains ${tbl} section`);
 }
+
+// 19.10  DELETION REGRESSION (2.8.5 tail item E) — the FO3 [RECIPES.CSV] twin of
+// Suite 9.10. Same zero-consumer reasoning; additionally, this table carried the
+// fabricated "Abraxo Cleaner Bomb" row whose Output was a non-existent "Tin
+// Grenade" (AUDIT_fo3_weapons §2 — Tin Grenade was itself deleted from WEAPONS as
+// a non-FO3 row), so the deletion also closed a dangling invented-data reference.
+assert(
+  !dbFo3Source.includes('[RECIPES.CSV]'),
+  '19.10: db_fo3.js has NO [RECIPES.CSV] table (removed — zero consumers, registry is the source of truth)'
+);
 
 // 19.4 lookupItemInDb must be referenced in db_fo3.js
 assert(/lookupItemInDb/.test(dbFo3Source), "'lookupItemInDb' function exists in db_fo3.js");
@@ -27717,7 +27739,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Removing the override lets the label fall back to var(--robco-dark) — the
 //  SAME theme-matched dark partner the base button rule already reuses
 //  everywhere else (Protocol 22), verified by real WCAG contrast math below.
-//  18 tests
+//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
@@ -27768,20 +27790,100 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 179.4  every generated cartridge button carries a --stack-index custom
+  // 179.4  [BEHAVIORAL — 2.8.5 tail item B, the deferred U3 render-harness slice]
+  //        Every generated cartridge button carries a --stack-index custom
   //        property, keeps the UNCHANGED _seatGameCartridge(ctx) onclick wiring
   //        (Protocol 22 — tapping a peeking cartridge still swaps games), real
   //        radio ARIA, and escapes the game label/tape text (XSS safety).
+  //
+  //        WHY THIS ONE IS BEHAVIORAL: this used to be six regexes over the
+  //        function's SOURCE TEXT. Two of them (`escapeHtml(label.toUpperCase())`
+  //        / `escapeHtml(sub)`) claimed an XSS-safety property — and a source
+  //        grep cannot prove escaping actually happens, only that the call is
+  //        spelled correctly somewhere in the body. A wrong-order or
+  //        double-unescape refactor would keep the grep green while shipping the
+  //        hole. So renderCartDeck() is now EXECUTED in a vm sandbox (the Suite
+  //        177 renderAccount pattern) against a hostile GAME_DEFS fixture, and
+  //        the assertions read the markup it actually produced.
+  //
+  //        NOTE the sandbox wires the REAL escapeHtml() lifted from ui-core.js —
+  //        Suite 177's harness stubs it as a pass-through, which is fine there
+  //        (177 asserts copy, not safety) but would silently void the whole
+  //        point here.
   {
-    const renderBody179 = extractFunctionBody(core179, 'renderCartDeck');
+    const vm = require('vm');
+    const _decl179 = (src, name) => {
+      const body = extractFunctionBody(src, name);
+      const s = src.indexOf('function ' + name);
+      const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+      return 'function ' + name + p + body;
+    };
+
+    // A hostile label + tape string: if either reaches the DOM unescaped, the
+    // rendered markup contains a live <img onerror=...> node.
+    const XSS179 = '<img src=x onerror="alert(1)">';
+    const deck179 = {
+      innerHTML: '',
+      style: {
+        _p: {},
+        setProperty(k, v) {
+          this._p[k] = v;
+        },
+      },
+    };
+    const sandbox179 = {
+      console,
+      state: { gameContext: 'FNV' },
+      GAME_DEFS: {
+        FNV: { label: 'New Vegas', theme: { cartridgeTape: 'NV-01' } },
+        FO3: { label: XSS179, theme: { cartridgeTape: XSS179 } },
+        FO4: { label: 'Fallout 4', designOnly: true, theme: { cartridgeTape: 'F4' } },
+      },
+      document: { getElementById: id => (id === 'cartDeck' ? deck179 : null) },
+    };
+    vm.createContext(sandbox179);
+    let err179;
+    try {
+      vm.runInContext(
+        _decl179(readGroup('ui-core'), 'escapeHtml') +
+          '\n' +
+          _decl179(core179, '_seatableGames') +
+          '\n' +
+          _decl179(core179, 'renderCartDeck') +
+          '\nrenderCartDeck();',
+        sandbox179
+      );
+    } catch (e) {
+      err179 = e;
+    }
+    const deckHtml179 = deck179.innerHTML;
+
+    // (a) structure + wiring, read off the real output
     assert(
-      /style="--stack-index:\$\{i\}"/.test(renderBody179) &&
-        /onclick="_seatGameCartridge\('\$\{escapeHtml\(g\)\}'\)"/.test(renderBody179) &&
-        /role="radio"/.test(renderBody179) &&
-        /aria-checked="\$\{seated\}"/.test(renderBody179) &&
-        /escapeHtml\(label\.toUpperCase\(\)\)/.test(renderBody179) &&
-        /escapeHtml\(sub\)/.test(renderBody179),
-      '179.4: renderCartDeck() stamps --stack-index per button, keeps the unchanged _seatGameCartridge(ctx) onclick + role=radio/aria-checked, and escapes the rendered label/tape text'
+      !err179 &&
+        /style="--stack-index:0"/.test(deckHtml179) &&
+        /style="--stack-index:1"/.test(deckHtml179) &&
+        /onclick="_seatGameCartridge\('FNV'\)"/.test(deckHtml179) &&
+        /role="radio"/.test(deckHtml179) &&
+        /aria-checked="true"/.test(deckHtml179) &&
+        /aria-checked="false"/.test(deckHtml179) &&
+        deck179.style._p['--cart-stack-depth'] === '2',
+      '179.4: [behavioral] renderCartDeck() output stamps --stack-index per button, keeps the _seatGameCartridge(ctx) onclick + role=radio/aria-checked, and sets --cart-stack-depth to the seatable count (designOnly games excluded)' +
+        (err179 ? ' — ' + err179.message : '')
+    );
+
+    // (b) the XSS claim, now actually proven against rendered markup.
+    //     Deliberately NOT asserting `!/onerror=/` — the CORRECTLY escaped text
+    //     still contains the literal substring `onerror=&quot;`, so that check
+    //     would fail on safe output. What actually matters is that no raw `<img`
+    //     TAG is produced and the hostile string never survives verbatim.
+    assert(
+      !err179 &&
+        deckHtml179.includes(XSS179) === false &&
+        !/<img/i.test(deckHtml179) &&
+        /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/i.test(deckHtml179),
+      '179.4b: [behavioral] a hostile game label/tape string is HTML-escaped in renderCartDeck()’s real output — the raw string never survives and no live <img> tag reaches the deck markup' +
+        (err179 ? ' — ' + err179.message : '')
     );
   }
 

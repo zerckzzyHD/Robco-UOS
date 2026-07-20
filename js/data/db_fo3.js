@@ -18,7 +18,7 @@
 // weapon's own page; see planning/FO3_WEAPON_DATA.md). Four non-FO3 rows
 // (Bumper Sword, Golf Club, Plunger, Tin Grenade) were removed. The PARKED
 // columns (Req_Unarmed/Req_STR/Reach/Special_Attack_AP) were NOT re-sourced,
-// and the other tables below (ARMOR/AMMO/CHEMS/BESTIARY/RECIPES/…) are NOT yet
+// and the other tables below (ARMOR/AMMO/CHEMS/BESTIARY/…) are NOT yet
 // re-verified — do not read this note as vouching for them. This file is a
 // typist for wiki data, never an authority that invents or edits Fallout facts.
 //
@@ -40,9 +40,14 @@
 //                       sibling to lookupWeaponStats()/lookupBestiaryEntry() exists; DT is
 //                       the highest-priority target (armor DT is looked up nowhere today)
 //   CHEMS.CSV         Duration                          → PARKED (BIO-SCAN expiry countdown)
-//   RECIPES.CSV       ALL COLUMNS                        → PARKED-FOR-REMOVAL — doCraft/doScrap
-//                       read reg_fo3.js recipes[] instead; this table has zero consumers
-//                       (not merely reserved — Protocol 22 duplicate-source flag)
+//   (RECIPES.CSV      REMOVED 2026-07-19 — it was PARKED-FOR-REMOVAL with zero code
+//                       consumers: doCraft/doScrap read reg_fo3.js recipes[], and no
+//                       lookup*()/get*() parser here ever named the section. It survived
+//                       only inside the databaseCSVs string handed to the AI — a Protocol
+//                       22 duplicate data source competing with the registry the natives
+//                       actually use, and its "Abraxo Cleaner Bomb" row was a fabricated
+//                       recipe outputting a non-existent "Tin Grenade" (AUDIT_fo3_weapons
+//                       §2). Suite 19.10 fails the build if it returns.)
 //   QUEST_ITEMS.CSV   Tradeable                          → PARKED (TRADE v2 quest-item filter)
 //   VENDORS.CSV       Repair_Skill                        → PARKED (vendor repair action)
 //                     Restock_Days/Accepted_Currencies    → target: TRADE v2 (FP-DATA-8)
@@ -378,17 +383,6 @@ Coolant Cap,0.5,2,Junk
 Bottle Cap,0.0,1,Currency
 RadAway (empty),0.5,5,Junk
 Scrap Electronics,0.5,25,Electronics
-
-[RECIPES.CSV]
-Recipe_Name,Skill_Req,Components,Output,Quarantine_Cap
-Bottlecap Mine,Repair 25,1 Bottle Cap / 1 Sensor Module,1 Bottlecap Mine,5
-Dart Gun,Repair 25,1 Surgical Tubing / 1 Toy Car / 1 Radscorpion Poison Gland,1 Dart Gun,3
-Rock-It Launcher,Repair 25,1 Conductor / 1 Vacuum Cleaner / 1 Leaf Blower,1 Rock-It Launcher,2
-Shishkebab,Repair 35,1 Lawnmower Blade / 1 Motorcycle Fuel Tank,1 Shishkebab,2
-Deathclaw Gauntlet,Repair 45,1 Deathclaw Hand / 1 Leather Belt / 1 Medical Brace,1 Deathclaw Gauntlet,2
-Nuka Grenade,Explosives 45,1 Nuka-Cola Quantum / 1 Tin Can,1 Nuka Grenade,5
-Railway Rifle,Repair 35,1 Fission Battery / 1 Pressure Cooker / 1 Crutch,1 Railway Rifle,2
-Abraxo Cleaner Bomb,Explosives 25,1 Tin Can / 1 Abraxo Cleaner,1 Tin Grenade,10
 
 [QUEST_ITEMS.CSV]
 Name,Associated_Quest,Tradeable,Special_Property,Weight
