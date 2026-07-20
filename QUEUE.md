@@ -47,6 +47,21 @@ Everything below expands each of those.
 
 **Done means:** it's live on production. It is.
 
+## Design Overhaul protocol amendments — what's landed, what's still pending
+
+_(Moved here from the rulebook at R3, 2026-07-20 — it tracks roadmap status, not a rule, so it
+belongs on the board rather than inside a protocol.)_ The owner approved a batch of rule changes
+for the Design Overhaul program; each folds in with the unit that first depends on it.
+
+- **✅ Adopted at DO-K:** the `GAME_DEFS[ctx].identity` block as the one per-game design-data home (`rules/game-data.md`, Protocol 38).
+- **✅ Adopted at DO-N:** Protocol 25's sanctioned-exception clause extended site-wide, plus explicit authorization to replace the tab bar with the bezel subsystem nav; **Protocol UI-7** (Device Chrome / Bezel Standard); **Protocol UI-9** (Motion-Verb Grammar — the SWEEP token).
+- **✅ Adopted at Ceremony Moments Wave 1:** UI-9's **SEAT** token.
+- **✅ Adopted at DO-O:** **Protocol UI-10** (Overseer Presence — the Director Uplink reskin is its first build).
+- **⬜ Still pending:** UI-9's **WAKE / FAULT / BREATHE** tokens; **UI-8** (the Centering Rule as its own formal protocol — DO-N's bezel already follows it informally); Protocol 10 (UI Verification) amended into a per-machine × per-breakpoint render matrix (gates DO-M); and the new Design-Unit Workflow protocol.
+
+Every adopted item lives in `rules/ui-and-mobile.md`. The full text of each still-pending
+amendment is in `planning/2.8.0/plans/DESIGN_OVERHAUL_BUILD_PLAN.md` §8.
+
 ---
 
 # ✅ Brain dump (SHIPPED, and maintained from here on)
@@ -307,13 +322,36 @@ cuts are written down, not applied — see the R3 candidate list in
 
 </details>
 
-### R3. ⬜ FIRST STAGED TRIM — the incremental cut, built on the restructure
+### R3. ✅ FIRST STAGED TRIM — the incremental cut, built on the restructure _(done 2026-07-20)_
+
+**Shipped, as one reversible commit.** The owner reviewed the R2 candidate list and approved a
+modified version of it. **Retired outright:** Protocol 18 (Memory Maintenance — duplicated the
+agent harness's own memory instructions) and the "Pending protocol amendments" ledger inside
+Protocol 38 (roadmap state, not a rule — **relocated** to the 2.8.0 section of this file, not
+deleted). **Compressed:** Protocol 8's "Why" paragraph to one sentence (keeping the point about
+why Fable is named explicitly) and Protocol 9's mobile-formatting paragraph, merged into the
+paragraph above it. **Converted, not deleted:** Protocols 5 and 6 — their step-by-step checklists
+had gone actively wrong (both still named `ui-render.js`, split into nine files at U-A4) and are
+now pointers to `library/CODE_MAP.md`, which is derived from source. **Deliberately kept, with
+the decision recorded in place so it is not re-litigated:** Protocol 12 (No Concurrent Pushes),
+Protocol 37 (repomix config), and Protocol 45's reasoning paragraphs. No gate check, hook, or
+test enforced any retired item — they were prose only — so nothing was removed from the gate.
+
+<details><summary>Original entry</summary>
 
 **What it is.** Explicitly **NOT** a single large amputation. Take the cuts both reviews justify, let the restructure (R2) shrink the document naturally, then reassess. Each step reversible.
 
 **Why staged.** A one-shot cut of a load-bearing rulebook is how a real guard gets dropped by accident. Incremental and reversible means every removal is a decision, not a casualty.
 
 **Done means:** one reversible reduction has landed on top of the restructure, and the next cut is left to a fresh reassessment rather than pre-committed here.
+
+</details>
+
+**Noted for a future stage, deliberately NOT acted on at R3** (scope discipline — the owner must
+be able to judge whether this cut mattered before the next one is proposed):
+
+- **`RULES.md`** is now a 32-line pointer file whose entire content is "read `CLAUDE.md`". It duplicates the R2 explanation a third time (after `CLAUDE.md`'s own preamble and `library/CODE_MAP.md`'s). It cannot simply be deleted — Suite 89.12 asserts it contains "Protocol 38" and Suite 220.9 scans it — so retiring it is a real Protocol 49 job with enforcement to remove, not a delete.
+- **The per-suite `// N tests` comments** in `tests/robco-diagnostics.js` are explicitly unmaintained as of the Protocol 2a retirement, and the rulebook says not to trust them. Dead narration that a session can still mistake for fact.
 
 ### R4. ⬜ THE RE-PIN PASS — stamp the local-only artifacts to one commit
 

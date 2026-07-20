@@ -10,24 +10,35 @@
 
 ## Protocol 5 — Adding a New UI Panel
 
-- [ ] Add `<details class="panel">` block in `index.html`
-- [ ] Create `render*()` function in `ui-render.js`
-- [ ] Call `render*()` from `loadUI()` in `ui-core.js`
-- [ ] If it shows a count: add entry to `_updatePanelBadges()` in `ui-core.js`
-- [ ] If AI changes should auto-expand it: add key to `expandPanelForCategory()` map in `ui-core.js`
-- [ ] If it has a text input with autocomplete: call `wireInput()` in `initRegistryAutocomplete()` in `ui-saves.js`
-- [ ] Bump `CACHE_NAME` → Protocol 1
-- [ ] Lint, format, commit (gate must pass clean) → Protocol 2
+**A new panel must be wired into every panel-wiring point, not just rendered.** The authoritative
+list of those points — the render-pipeline fan-out, the badge map, the AI auto-expand map, the
+autocomplete wiring — is **`library/CODE_MAP.md` § Render Pipeline → "Panel wiring points"**,
+which is derived from source rather than transcribed. Read it before adding a panel, and trust
+it over any prose here (Protocol 3, code beats documentation). Then: `CACHE_NAME` bump (Protocol
+1), docs (Protocol 2), rendered verification at 360/412px and desktop (Protocol 10), panel
+heading standard (Protocol UI-1), sub-panel persistence (Protocol UI-2).
+
+> **Converted from a checklist to a pointer at R3 (2026-07-20).** The old step list named
+> `render*()` in `ui-render.js` — true until the render layer was split (U-A1, U-A2, U-A4) and
+> false ever since: the pipeline is now nine `ui-render-*.js` files. A checklist that goes stale
+> on every refactor is worse than none, because a session follows it confidently into the wrong
+> file. The steps were not deleted; they were replaced by the one place that cannot rot the same
+> way. The rule — _wire every point, don't just render_ — is what actually mattered and is kept.
 
 ---
 
 ## Protocol 6 — Adding a Registry Autocomplete Input
 
-1. Add `<input type="text" id="newXxxName" ...>` in `index.html`
-2. In `initRegistryAutocomplete()` in `ui-saves.js`, add: `wireInput('newXxxName', 'category');`
-3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (`reg_nv.js` / `reg_fo3.js`)
-4. Create `addXxx()` function in `ui-render.js` mirroring `addPerk()` / `addQuest()` pattern
-5. Bump `CACHE_NAME` → Protocol 1
+**An autocomplete input is wired, not styled** — adding the `<input>` to `index.html` does
+nothing on its own. The real wiring points (`initRegistryAutocomplete()` / `wireInput()`, the
+per-game `FALLOUT_REGISTRY` categories, and the `addX`/`delX`/`toggleX` CRUD naming convention
+its handler must follow) are in **`library/CODE_MAP.md` § Registry** and **§ Render Pipeline**,
+derived from source. A new category must be added to **both** per-game data files
+(`js/data/reg_nv.js` / `reg_fo3.js`) or it silently returns no suggestions in the other game
+(Protocol 38). Then bump `CACHE_NAME` (Protocol 1).
+
+> **Converted from a checklist to a pointer at R3 (2026-07-20)** — same reason as Protocol 5: it
+> still pointed `addXxx()` at `ui-render.js`, which no longer holds any `addX` function.
 
 ---
 

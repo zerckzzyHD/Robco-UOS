@@ -60,6 +60,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Audio model** — the `AudioSettings` cache, `ensureAudioCtx()`, every sound-trigger function, the mute-guard pattern | `library/CODE_MAP.md` § Audio (`js/ui/ui-audio.js`) |
 | **Two-store boundary** — campaign state (`state` / `robco_v8`) vs. device prefs (`MetaStore` / `META_MANIFEST`) | `library/CODE_MAP.md` § Two-Store Boundary; the rule itself is Protocol 23 below |
 | **Render pipeline** — `loadUI()`, every `render*()` function and its panel, the CRUD helpers | `library/CODE_MAP.md` § Render Pipeline (`js/ui/ui-render.js`) |
+| **Adding a UI panel or a registry autocomplete input** — every wiring point (render fn, `loadUI()` fan-out, badge map, AI auto-expand map, autocomplete) | `library/CODE_MAP.md` § Render Pipeline → "Panel wiring points" and § Registry — these are the Protocol 5 / 6 authority (R3), derived from source |
 | **Diagnostic Shell** — the `DIAGNOSTIC_SHELL_TOOLS` registry, the `prod`/`staging` tiering rule, `initTestConsole()` | `library/CODE_MAP.md` § Diagnostic Shell (`js/dev/test-console.js`) |
 | **Test system** — how the gate runs, the single Node runner, suite numbering | `library/CODE_MAP.md` § Test System; per-suite detail in `library/TEST_CATALOG.md` |
 | **Full per-suite test catalog** — every suite's coverage, every work-unit's build narration (large; read only when suite-level detail is actually needed) | `library/TEST_CATALOG.md` (gitignored, local-only) |
@@ -270,7 +271,7 @@ Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a *
 
 **Spec lock — no mid-run changes.** Lock the full specification before a Dispatch session starts. Do not send new requirements or tweaks to a session that is already running — it may commit and push before incorporating them, producing partial or inconsistent results that need cleanup passes. If the spec must change, wait until the session is idle and issue one complete follow-up; never stack instructions onto an in-flight push.
 
-**Why:** Fable generates the design/creative direction and the in-fiction voice; Opus reasons deeper at higher cost; Sonnet implements efficiently at lower cost. Naming all three keeps the design stage visible — a session reading a two-model protocol would wrongly believe the mockups and house voice appear from nowhere. The review stage catches plan drift before it lands; the audit stage catches incomplete fixes and false "verified" passes (which previously caused repeated "still broken" cycles) before they reach the user.
+**Why:** Fable is named as a first-class stage — not folded into an implicit two-model track — because the approved mockups and the house voice come from somewhere, and a session reading a two-model protocol would wrongly believe they appear from nowhere; the review and audit stages catch plan drift and false "verified" passes before they reach the user.
 
 ---
 
@@ -278,15 +279,15 @@ Non-trivial work run via Dispatch uses a multi-stage model hand-off. This is a *
 
 When work is run via Dispatch, never finish a task or complete a git push silently. After every completed task AND after every git push, report back to the user on Dispatch in plain English: what was done and why, the commit reference and what it changed, confirmation that the push landed on its branch (`origin/dev` during normal work; `origin/main` only at a version release — Protocol 43) and whether a reload / "Reboot Terminal" update is needed to see it, and anything the user should check. Keep it readable for a non-developer — same plain-English style as the changelog. Every time, no exceptions.
 
-Because the Dispatch user typically cannot view the code or repo directly, any push that changes user-facing behavior must be reported with an explicit "it's live — here's what changed and exactly how to test it" message (live confirmation plus step-by-step test instructions), not just a commit summary.
-
-Dispatch reports must be formatted for mobile reading: lead with a one-line summary of what changed, keep it short and scannable (no walls of text, no code dumps or file paths), clearly state what was updated, and give the exact steps to test it. Optimize for a phone screen.
+Because the Dispatch user typically cannot view the code or repo directly and reads on a phone, any push that changes user-facing behavior must be reported with an explicit "it's live — here's what changed and exactly how to test it" message: a one-line summary first, then short scannable prose (no walls of text, no code dumps or file paths) and the exact steps to test it — not just a commit summary.
 
 ---
 
 ## Protocol 12 — No Concurrent Pushes
 
 Never run two sessions that commit/push this repo at the same time — sequence them to avoid branch/worktree collisions. Combined with the Protocol 8 audit gate, only one change lands at a time.
+
+> **Considered for retirement at R3 (2026-07-20) and deliberately KEPT** — a Protocol 49 keep-case, recorded here so it is not re-litigated. The candidate list argued nothing enforces it and no incident is on file. Both are true and neither is the point: this rule governs the orchestrator's dispatch decisions *daily* — it is consulted every time a second session is about to be launched — and duplicate or overlapping session launches HAVE caused real collisions on this project. It is one sentence, and it is load-bearing for how work is handed out.
 
 ---
 
@@ -299,12 +300,6 @@ Do not push incrementally after each sub-task when multiple related changes are 
 ## Protocol 28 — Usage Efficiency
 
 Treat model usage as a budget — and the burden of efficiency is on the orchestrator (Dispatch), NOT the user. The user may send scattered, evolving requests across many separate messages; that is expected and fine, and the user is never required to be focused or to send a complete spec upfront. It is Dispatch's job to absorb that input, consolidate related requests, wait for a natural lull, and lock ONE complete specification before starting a session (per the Protocol 8 spec-lock) — rather than firing each fragment into a running session and causing cleanup passes. Prefer one complete, verified pass over many partial pushes; reuse a session or diagnosis that already holds the context instead of re-running it; do not spin up a new session for a trivial edit; batch related work (Protocol 19). Every avoidable cleanup pass is wasted spend.
-
----
-
-## Protocol 18 — Memory Maintenance
-
-Keep durable project facts current (repo path, APP_VERSION, cache rev, architecture decisions, recurring engineering gotchas). Do not store transient task state or temporary implementation details.
 
 ---
 
@@ -364,6 +359,16 @@ A private GitHub repo (`zerckzzyHD/robco-uos-local-archive`, confirmed PRIVATE) 
 
 Retired in place. Numbers are never reused and never renumbered, so every existing
 cross-reference still resolves here (Protocol 49).
+
+---
+
+### Protocol 18 — Memory Maintenance — RETIRED (2026-07-20, roadmap item R3)
+
+**RETIRED.** This protocol read: *"Keep durable project facts current (repo path, APP_VERSION, cache rev, architecture decisions, recurring engineering gotchas). Do not store transient task state or temporary implementation details."*
+
+**Why it was retired.** It is generic agent guidance, not a project rule — the same instruction (keep memories current, don't store transient task state) already arrives with every session in the agent harness's own memory instructions, in more detail and closer to the tool that acts on it. Repeating it in the rulebook teaches nothing project-specific and costs every session the read. **Coverage lost: none** — the rule still reaches every session, just from its natural home.
+
+**Enforcement removed: none existed.** No gate check, hook, or test ever referenced this protocol; it was prose only.
 
 ---
 
