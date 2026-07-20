@@ -26413,8 +26413,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         resetIdx172 > checkIdx172 &&
         /setTimeout\(\(\) => \{\s*_restoringPanels = false;/.test(wirePanelBody172) &&
         /MetaStore\.set\('robco_bay_opened', 'true'\)/.test(wirePanelBody172) &&
-        /if \(typeof renderModuleBay === 'function'\) renderModuleBay\(\);/.test(wirePanelBody172),
-      '172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop — marking robco_bay_opened + syncing content via renderModuleBay() while restoring'
+        // AMENDED at 2.8.5 item 6. This clause used to require the restore
+        // branch to sync via a bare `renderModuleBay()` — which, it turned out,
+        // was asserting the DEFECT: renderModuleBay() never reads
+        // robco_bay_view, so the persisted Bay/Schematic choice was silently
+        // dropped on every reload (see 241.13 for the full mechanism). The
+        // branch now routes through the shared _applyBayView(), which calls
+        // renderModuleBay() itself on the 'bay' branch — so the syncing this
+        // test was written to guarantee still happens, for the 'bay' case
+        // byte-identically, and the view choice is honoured as well.
+        /_applyBayView\(/.test(wirePanelBody172),
+      '172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop — marking robco_bay_opened + syncing content through the shared _applyBayView() while restoring'
     );
   }
 
@@ -50281,6 +50290,333 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
         /COURIER RETURNED/.test(none240),
       '240.24: [behavioral, Finding 4 leftover] the wake line prints the ACTIVE game\'s player title — "COURIER RETURNED" for one game, "LONE WANDERER RETURNED" for another (and never "Courier" there), with the absence-guarded fallback still printing a sane line when no identity is available' +
         (err240c ? ' — ' + err240c.message : ` — got FO3: ${fo3240}`)
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 241 — 2.8.5 item 6: the Schematic View, made correct + per-game
+//  The Module Bay's flat fallback had drifted as the hardware boards grew.
+//  Four confirmed defects, each locked here (Protocol 13/42):
+//    (a) a hardcoded "13 CHANNEL CHIPS"/"13 rows" caption when #chipGrid holds
+//        14 — a COUNT IN A STRING, so the view silently began lying the moment
+//        a chip was added; the row was also inert (it told the reader to go
+//        back to the bay, contradicting "SAME CONTROLS").
+//    (b) SLOT 05's real payload (key, model, handshake) and the whole SVC TRAY
+//        had NO schematic representation — and because the view choice
+//        persists (Protocol UI-6), a technician could be stuck in a view with
+//        no way to reach their own API key.
+//    (c) renderModuleBay() re-synced CHECKBOXES only, so the bay's PRINT-RATE
+//        slider/readout went stale after a schematic edit until a reload.
+//    (d) zero per-game adaptation — no GAME_DEFS/getIdentity/[data-game] read
+//        anywhere in the renderer or its CSS.
+//  241.1 is the load-bearing one: a PARITY guard. Every prior test asserted
+//  only that named setters were PRESENT, which is exactly why boards could be
+//  added to the bay for months with nothing going red.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 241 — 2.8.5 item 6: Schematic View correctness + per-game framing');
+  const html241 = readFile('index.html');
+  const core241 = readGroup('ui-core');
+  const state241 = readFile('js/core/state.js');
+  const css241 = readCss();
+  const schemFn241 = (core241.match(
+    /function renderBaySchematic\(\)[\s\S]*?\nwindow\.renderBaySchematic/
+  ) || [''])[0];
+  const chipFn241 = (core241.match(
+    /function _schemChipRows\(\)[\s\S]*?\nwindow\._schemChipRows/
+  ) || [''])[0];
+
+  // ── 241.1  PARITY (the escape-ratchet guard, Protocol 36b) ──────────────
+  // Every interactive control the bay owns must be reachable from the flat
+  // view — by name, or by a documented derivation. Anything deliberately left
+  // out must be named here with a reason, so an omission is always a decision
+  // somebody wrote down rather than drift nobody noticed.
+  const bayRegion241 = html241.slice(
+    html241.indexOf('id="bayContent"'),
+    html241.indexOf('id="baySchematic"')
+  );
+  // Controls excluded on purpose. These are NOT drift:
+  //   - the visually-hidden real controls the bay's custom widgets already
+  //     drive (they are the same prefs the schematic rows write), and
+  //   - the optics tube buttons, whose PHOSPHOR TUBE <select> row is the flat
+  //     equivalent (the schematic is the plain-control projection by design).
+  const SCHEM_EXCLUDED_241 = [
+    'opticsColorInput', // driven by the PHOSPHOR TUBE select row
+    'immersionSelect', // driven by the ATMOSPHERIC REGULATOR select row
+    'opticsFamilyTube',
+    'opticsFamilyTray',
+  ];
+  const bayControlIds241 = [];
+  const ctrlRe241 = /<(input|select|button)\b[^>]*\bid="([A-Za-z0-9_-]+)"/g;
+  let m241;
+  while ((m241 = ctrlRe241.exec(bayRegion241)) !== null) bayControlIds241.push(m241[2]);
+  // A chip is covered by derivation: _schemChipRows() enumerates #chipGrid's
+  // input.chip-input nodes at render time, so it needs no per-id mention.
+  const chipIds241 = [];
+  const chipRe241 = /<input\b[^>]*\bid="([A-Za-z0-9_-]+)"[^>]*class="chip-input"/g;
+  let c241;
+  while ((c241 = chipRe241.exec(bayRegion241)) !== null) chipIds241.push(c241[1]);
+  const uncovered241 = bayControlIds241.filter(
+    id =>
+      !SCHEM_EXCLUDED_241.includes(id) &&
+      !chipIds241.includes(id) &&
+      !schemFn241.includes(id) &&
+      !core241.includes('BAY_CHECKBOX_SYNC_MAP') === false &&
+      !new RegExp(`['"]${id}['"]`).test(schemFn241) &&
+      !new RegExp(`\\b${id}\\b`).test(schemFn241)
+  );
+  // The controls the schematic reaches through its own named setters rather
+  // than by element id (the original 11 rows predate the proxy shape).
+  const SETTER_BACKED_241 = {
+    highLumenToggle: 'toggleHighLumen',
+    masterMuteToggle: 'toggleMasterMute',
+    radioToggle: 'toggleRadio',
+    wakeLockToggle: 'toggleWakeLock',
+    hapticToggle: 'toggleHaptic',
+    hardwareSfxToggle: '_schemSetHardwareSfx',
+    geminiKeySyncToggle: '_schemSetGeminiSync',
+    typerSpeedSlider: 'robco_typer_speed',
+  };
+  const reallyUncovered241 = uncovered241.filter(id => {
+    const setter = SETTER_BACKED_241[id];
+    return !(setter && schemFn241.includes(setter));
+  });
+  assert(
+    chipIds241.length > 0 && reallyUncovered241.length === 0,
+    '241.1: [PARITY] every interactive control in #bayContent is reachable from the Schematic View — by id, by named setter, or by the #chipGrid derivation — with intentional omissions named in SCHEM_EXCLUDED_241' +
+      (reallyUncovered241.length ? ` — UNCOVERED: ${reallyUncovered241.join(', ')}` : '')
+  );
+
+  // ── 241.2  defect (b): the two boards that had NO representation at all ──
+  assert(
+    /apiKeyInput/.test(schemFn241) &&
+      /apiModelInput/.test(schemFn241) &&
+      /btnFetchModels/.test(schemFn241) &&
+      /ejectHolotapeBtn/.test(schemFn241) &&
+      /holotapeFormatSelect/.test(schemFn241) &&
+      /btnInstallPwa/.test(schemFn241),
+    '241.2: the Schematic View reaches SLOT 05 (key, model, handshake) and the SVC TRAY (holotape + format, PWA install) — the boards that previously had no flat representation, leaving a persisted-schematic user unable to reach their own API key'
+  );
+
+  // ── 241.3  defect (a): the chip list is DERIVED, never a counted string ──
+  assert(
+    /getElementById\('chipGrid'\)/.test(chipFn241) &&
+      /querySelectorAll\('input\.chip-input'\)/.test(chipFn241) &&
+      !/13 rows|13 CHANNEL CHIPS/.test(core241) &&
+      !/\b1[0-9] CHANNEL CHIPS\b/.test(schemFn241),
+    '241.3: the channel chips are derived live from #chipGrid (no hardcoded count anywhere) — the old "13 CHANNEL CHIPS"/"13 rows" caption was already wrong for the 14 real chips, because the count lived in a string'
+  );
+
+  // ── 241.4  [behavioral] N chips in → N operable rows out ────────────────
+  // Proves the derivation actually runs, and that a future 15th chip needs no
+  // change here — run against a stub DOM with a deliberately ODD chip count so
+  // the assertion cannot accidentally pass against a hardcoded 13 or 14.
+  {
+    let rows241 = -1;
+    let err241 = null;
+    const CHIPS_241 = 17;
+    try {
+      const vm241 = require('vm');
+      const stubChips = [];
+      for (let i = 0; i < CHIPS_241; i++) {
+        stubChips.push({
+          id: 'muteStub' + i + 'Toggle',
+          checked: i % 2 === 0,
+          className: 'chip-input',
+        });
+      }
+      const sb241 = {
+        escapeHtml: s => String(s),
+        document: {
+          getElementById: id =>
+            id === 'chipGrid'
+              ? {
+                  querySelectorAll: () => stubChips,
+                  querySelector: sel => {
+                    const m = /for="([^"]+)"/.exec(sel);
+                    const which = m ? m[1] : '';
+                    return {
+                      textContent: which.toUpperCase() + 'CH-' + which.slice(-7, -6),
+                      querySelector: () => ({ textContent: 'CH-01' }),
+                    };
+                  },
+                }
+              : null,
+        },
+        window: {},
+      };
+      vm241.createContext(sb241);
+      vm241.runInContext(chipFn241 + '\n;globalThis.__out = _schemChipRows();', sb241);
+      rows241 = (sb241.__out.match(/class="schem-row"/g) || []).length;
+    } catch (e) {
+      err241 = e;
+    }
+    assert(
+      !err241 && rows241 === CHIPS_241,
+      `241.4: [behavioral] _schemChipRows() emits exactly one operable row per #chipGrid chip — ${CHIPS_241} stub chips produced ${rows241} rows, so a future chip appears in the flat view with no code change` +
+        (err241 ? ' — ' + err241.message : '')
+    );
+  }
+
+  // ── 241.5  defect (c): the non-checkbox re-sync, and ONE apply function ──
+  assert(
+    /function _syncBayValueControls\(\)/.test(core241) &&
+      /typerSpeedSlider/.test(core241) &&
+      /function renderModuleBay\(\)[\s\S]{0,900}_syncBayValueControls\(\)/.test(core241) &&
+      // the boot-restore path must ROUTE THROUGH the same function, not keep a
+      // second copy of the formatting (Protocol 22 / UI-6 one-apply-function)
+      !/const savedSpeed = parseFloat\(MetaStore\.get\('robco_typer_speed'/.test(core241),
+    '241.5: renderModuleBay() re-syncs the non-checkbox bay controls via the shared _syncBayValueControls(), and the boot restore routes through that same function instead of formatting the readout a second time — closes the PRINT-RATE TRIM staleness the checkbox-only sync map left open'
+  );
+
+  // ── 241.6  [behavioral] the slider + readout actually repaint ────────────
+  {
+    let sliderVal241 = null;
+    let labelText241 = null;
+    let err241b = null;
+    try {
+      const vm241b = require('vm');
+      const syncFn241 = (core241.match(/function _syncBayValueControls\(\)[\s\S]*?\n\}/) || [
+        '',
+      ])[0];
+      const nodes241 = {
+        typerSpeedSlider: { value: '1' },
+        typerSpeedVal: { textContent: '1.00×' },
+      };
+      const sb241b = {
+        MetaStore: { get: () => '2.25' },
+        document: { getElementById: id => nodes241[id] || null },
+        window: {},
+      };
+      vm241b.createContext(sb241b);
+      vm241b.runInContext(syncFn241 + '\n;_syncBayValueControls();', sb241b);
+      sliderVal241 = nodes241.typerSpeedSlider.value;
+      labelText241 = nodes241.typerSpeedVal.textContent;
+    } catch (e) {
+      err241b = e;
+    }
+    assert(
+      !err241b && sliderVal241 === '2.25' && /^2\.25/.test(labelText241),
+      `241.6: [behavioral] _syncBayValueControls() repaints BOTH the bay slider and its numeric readout from the stored pref (got value=${sliderVal241}, label=${labelText241}) — the exact staleness a Schematic View trim edit used to leave behind` +
+        (err241b ? ' — ' + err241b.message : '')
+    );
+  }
+
+  // ── 241.7  defect (d): per-game framing is DATA, with a generic fallback ─
+  assert(
+    /const SCHEMATIC_FALLBACK = \{/.test(core241) &&
+      /function _schematicFraming\(\)/.test(core241) &&
+      /getIdentity\(\)/.test(core241) &&
+      /id\.schematic/.test(core241) &&
+      !/schematic[\s\S]{0,200}gameContext ===/.test(core241),
+    '241.7: the Schematic View reads its per-game framing from GAME_DEFS via getIdentity().schematic with a literal generic SCHEMATIC_FALLBACK — data, never a per-game code branch (Protocol 38 / UI-7)'
+  );
+
+  // ── 241.8  every game declares the block, design-only ones included ──────
+  // FO4 is designOnly and unreachable at runtime; it must still carry a valid
+  // entry so the N-game abstraction stays proven rather than assumed.
+  {
+    const ids241 = state241.match(/identity: \{[\s\S]*?\n {6}schematic: \{[\s\S]*?\n {6}\}/g) || [];
+    const withAll241 = ids241.filter(b => /title:/.test(b) && /note:/.test(b) && /sig:/.test(b));
+    assert(
+      ids241.length >= 3 && withAll241.length === ids241.length,
+      `241.8: every GAME_DEFS identity block declares a schematic{title,note,sig} — including the design-only entry, so the N-game abstraction stays proven (found ${ids241.length}, complete ${withAll241.length})`
+    );
+  }
+
+  // ── 241.9  [behavioral] an unauthored game falls back GENERIC ────────────
+  // Protocol UI-10's rule: never another game's borrowed fiction.
+  {
+    let framing241 = null;
+    let err241c = null;
+    try {
+      const vm241c = require('vm');
+      const framingSrc241 =
+        (core241.match(/const SCHEMATIC_FALLBACK = \{[\s\S]*?\n\};/) || [''])[0] +
+        '\n' +
+        (core241.match(/function _schematicFraming\(\)[\s\S]*?\n\}/) || [''])[0];
+      const sb241c = {
+        // a game that authored no schematic block at all
+        getIdentity: () => ({ machine: 'unauthored-machine' }),
+        window: {},
+      };
+      vm241c.createContext(sb241c);
+      vm241c.runInContext(framingSrc241 + '\n;globalThis.__f = _schematicFraming();', sb241c);
+      framing241 = sb241c.__f;
+    } catch (e) {
+      err241c = e;
+    }
+    assert(
+      !err241c &&
+        framing241 &&
+        framing241.title === 'SCHEMATIC VIEW' &&
+        !/VAULT-TEC|PIP-BOY|ROBCO IND/.test(framing241.sig),
+      "241.9: [behavioral] a game with no authored schematic block gets the literal generic framing — never another machine's borrowed fiction (Protocol UI-10)" +
+        (err241c ? ' — ' + err241c.message : ` — got ${JSON.stringify(framing241)}`)
+    );
+  }
+
+  // ── 241.10  Protocol 17 — the flat view's own tap targets ───────────────
+  // The row list is now materially longer (14 chips + SLOT 05 + SVC TRAY), so
+  // these are controls a technician really drives, not a token fallback.
+  assert(
+    /\.schem-row-control input\[type='checkbox'\] \{[\s\S]{0,200}(width|height|min-width):\s*28px/.test(
+      css241
+    ) && /\.schem-row-control button \{[\s\S]{0,120}min-height:\s*28px/.test(css241),
+    "241.10: the Schematic View's own checkboxes and buttons meet the >=28px tap-target floor (Protocol 17)"
+  );
+
+  // 241.10a / 241.10b — both found by RENDERING this view (Protocol 42), not by
+  // reading CSS: the range input measured a 4px-tall hit box (the UA default
+  // track height; a height had never been declared for it here, so PRINT-RATE
+  // TRIM has been a 4px drag target on touch for as long as the row existed),
+  // and the text/password inputs measured 27px — one pixel under the floor.
+  assert(
+    /\.schem-row-control input\[type='range'\] \{[\s\S]{0,200}min-height:\s*28px/.test(css241),
+    '241.10a: the Schematic View range input declares a >=28px height — regression guard for the 4px-tall PRINT-RATE TRIM drag target found by rendering (Protocol 42)'
+  );
+  assert(
+    /\.schem-row-control input\[type='password'\],?[\s\S]{0,260}min-height:\s*28px/.test(css241) &&
+      /\.schem-row-control input\[type='password'\],?[\s\S]{0,320}font-size:\s*16px/.test(css241),
+    '241.10b: the Schematic View text/password inputs meet the 28px tap floor AND the 16px font floor (Protocol 17 — >=16px prevents mobile focus auto-zoom)'
+  );
+
+  // ── 241.11  per-game presentation is a [data-game] selector, not JS ──────
+  assert(
+    /\[data-game='FO3'\] \.bay-schematic/.test(css241),
+    '241.11: per-game schematic presentation rides a [data-game] attribute selector in CSS (Protocol UI-7), never a JS colour/fiction branch'
+  );
+
+  // ── 241.12  the framing is applied on EVERY render, incl. the boot restore ─
+  assert(
+    /_applySchematicFraming\(\)/.test(schemFn241) &&
+      /baySchematicTitle/.test(html241) &&
+      /baySchematicNote/.test(html241) &&
+      /baySchematicSig/.test(html241),
+    "241.12: renderBaySchematic() paints the per-game framing on every render, and index.html carries the three ids it writes — so a game switch (which reloads) always shows its own machine's heading"
+  );
+
+  // ── 241.13  Protocol UI-6 — the view choice actually survives a reload ───
+  // Found by RENDERING (Protocol 42), and it was a LIVE defect, not a harness
+  // artifact: robco_bay_view was written correctly on every toggle and then
+  // never read on the boot path. The panel-restore branch called
+  // renderModuleBay() — which repaints the bay but has no idea a view choice
+  // exists — so a returning user whose Settings panel was remembered OPEN got
+  // the hardware bay back regardless of what they last chose. Only a manual
+  // open of the panel in that same session ran initModuleBay(), the one place
+  // the restore lived. Reproduced at 360px in both games; fixed by routing the
+  // restore branch through the SAME _applyBayView() the user action uses —
+  // the one-shared-apply-function shape UI-6 mandates.
+  {
+    const restoreBranch241 = (core241.match(
+      /if \(d\.id === 'securityConfigPanel' && d\.open\) \{[\s\S]*?\n {6}\}/
+    ) || [''])[0];
+    assert(
+      /_restoringPanels/.test(restoreBranch241) &&
+        /_applyBayView/.test(restoreBranch241) &&
+        /robco_bay_view/.test(restoreBranch241),
+      '241.13: the boot panel-restore branch routes the Module Bay through the shared _applyBayView() and reads robco_bay_view — so a persisted Schematic View choice survives a reload instead of silently reverting to the bay (Protocol UI-6, found by rendering)'
     );
   }
 }

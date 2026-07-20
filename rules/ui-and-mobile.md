@@ -117,6 +117,17 @@ Any new user-facing **view, mode, or display-choice control** — not just setti
 
 **How to apply:** register the key in `META_MANIFEST` with a sensible default (Protocol 4), read it once at boot to restore the choice, and write it at the exact moment the user changes it — mirroring the pattern already established for `robco_active_tab` and, as of B2b, `robco_bay_view`. Never let two equivalent DOM states (e.g. two projections of the same underlying prefs) drift out of sync with each other or with the stored choice — route both the boot-restore path and the user-action path through one shared apply function (Protocol 22) so they can't diverge.
 
+> **The cited precedent was itself broken until 2.8.5 item 6 (2026-07-20) — worth knowing, because
+> it shows how this rule fails in practice.** `robco_bay_view` looked like a correct UI-6
+> implementation: a registered pref, written on every toggle, with a shared `_applyBayView()` apply
+> function. But one caller — the boot panel-restore branch in `ui-core.js` — bypassed that shared
+> function and called `renderModuleBay()` instead, which repaints the bay and never reads the pref.
+> The choice was therefore recorded faithfully and discarded on every reload. **The lesson: "a
+> shared apply function exists" is not the invariant — "every path that can set the view calls it"
+> is.** When applying this rule, enumerate the callers, including the boot path, and check each one
+> actually routes through the shared function. A static guard on the pref's existence will not
+> catch this; only rendering a real reload does (it was found by exactly that).
+
 **Why:** A control the user deliberately picked — including which VIEW they were looking at, not just which OPTION they chose within it — silently resetting on every reload is a rough edge users will report every time; treating "remembers on reload" as a default expectation for new UI, rather than an opt-in nicety, keeps that class of report from recurring.
 
 ---

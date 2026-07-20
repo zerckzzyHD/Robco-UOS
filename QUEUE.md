@@ -218,7 +218,41 @@ This strand ran in full as a numbered twelve-unit round. What it delivered, in p
 
 **Done means:** none of the three flows can report success (or an innocent empty state) when the operation actually failed. Met. Source: `planning/2.8.5/audits/WARNING_SURFACE_INVENTORY.md`.
 
-## 6. ⬜ Legacy / schematic per-game layout
+## 6. ✅ Legacy / schematic per-game layout — SHIPPED (2026-07-20)
+
+**Shipped.** The drift this entry asserted was **real, and slightly larger than described** — verified
+against the code before any change (Protocol 27). The flat layout is exactly one thing today: the
+Module Bay's Schematic View (`renderBaySchematic()`), and it was a **hardcoded literal array of
+rows**, which is why it drifted — nothing about adding a board to the bay made the flat list follow.
+Four confirmed defects, all fixed: the 14 channel chips were one inert row with a hand-typed count
+(already wrong by one) that told the reader to go back to the bay; SLOT 05's key/engine/handshake
+and the entire SVC TRAY had **no representation at all** (and since the view choice persists, a
+technician could be stuck with no route to their own API key); the bay's PRINT-RATE slider went
+stale after a schematic edit because the re-sync map covered booleans only; and per-game adaptation
+was **zero** — no `GAME_DEFS`/`getIdentity()`/`[data-game]` read anywhere in the renderer or its CSS.
+
+The chips are now derived live from `#chipGrid`, the missing boards are proxy rows that drive the
+real bay controls, and the framing reads `identity.schematic` per machine with a generic fallback
+(FO4's design-only entry kept valid). **Suite 241** adds the guard that was actually missing — a
+**parity check** asserting every interactive control in `#bayContent` is reachable from the flat
+view, with intentional omissions named and justified. Prior tests only ever asserted that named
+setters were _present_, which is exactly how whole boards went missing with nothing going red.
+
+**Two further defects were found by rendering it (Protocol 42) and fixed in the same commit.** The
+schematic's range input had a **4px-tall** hit box and its text input 27px — both under the Protocol
+17 floor. And, more seriously: **the persisted view choice never actually restored on reload.**
+`robco_bay_view` was written faithfully on every toggle and then ignored at boot — the panel-restore
+branch called `renderModuleBay()`, which knows nothing about a view choice, while `initModuleBay()`
+(the one place the restore lived) ran only on a genuine user toggle. So a returning user got the
+hardware bay back every time. `ARCHITECTURE.md`, the MetaStore table and **Protocol UI-6's own
+worked example** all claimed this worked; all three are corrected, and Suite 172.1 was amended
+because its final clause had been asserting the defect. Verified by rendering both games at
+360/412/desktop: no overflow, all controls ≥28px, 14 chip rows, view restored.
+
+**Scope held:** this made the existing flat layout correct and per-game. The general "schematic mode
+on every tab" formalization remains 2.9.0's, and now builds on a correct base — which was the point.
+
+<details><summary>Original entry</summary>
 
 **What it is.** The plain, flat, chrome-less "schematic" fallback layout — the dense engineering-diagram view — brought current and made correct and dynamic for every game. As the fancy hardware boards were built, this fallback layout drifted; this fixes it so it reflects the current feature set and adapts per game like the immersive panels do.
 
@@ -228,7 +262,9 @@ This strand ran in full as a numbered twelve-unit round. What it delivered, in p
 
 **Done means:** each game has a working, current schematic-mode layout alongside its full machine.
 
-**⚠ Scheduling note (2026-07-18 placement pass).** This is cosmetic/clarity UI work. The near-term data-safety item **A1 (LIVE-SAVE DURABILITY)** in the tail below should be scheduled **ahead** of it — data-safety outranks cosmetics (the precedent that let the save-integrity pass jump ahead of the Fallout 3 cosmetic queue). The two are independent, so this is a priority note, not a dependency: do A1 first, this whenever.
+**⚠ Scheduling note (2026-07-18 placement pass).** This is cosmetic/clarity UI work. The near-term data-safety item **A1 (LIVE-SAVE DURABILITY)** in the tail below should be scheduled **ahead** of it — data-safety outranks cosmetics (the precedent that let the save-integrity pass jump ahead of the Fallout 3 cosmetic queue). The two are independent, so this is a priority note, not a dependency: do A1 first, this whenever. _(Honoured: A1 shipped 2026-07-19, this on 2026-07-20.)_
+
+</details>
 
 ---
 

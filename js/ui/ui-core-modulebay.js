@@ -364,6 +364,24 @@ const BAY_CHECKBOX_SYNC_MAP = {
   hapticToggle: 'robco_haptic_enabled',
   geminiKeySyncToggle: 'robco_gemini_key_sync',
 };
+// Protocol 42 fix (2.8.5 item 6) — the NON-checkbox half of the same drift the
+// BAY_CHECKBOX_SYNC_MAP above was written to close. BAY_CHECKBOX_SYNC_MAP only
+// ever re-synced booleans, so the bay's PRINT-RATE TRIM slider and its numeric
+// readout were restored at BOOT only (ui-core.js): dragging the trim in the
+// Schematic View wrote the pref correctly, but switching back to the bay showed
+// the old slider position and a stale "1.00×" until the next reload. Re-syncing
+// value controls from the stored pref on every renderModuleBay() — which
+// already fires after every bay AND schematic change — closes it in both
+// directions, exactly as the checkbox map does.
+function _syncBayValueControls() {
+  const speed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
+  const slider = document.getElementById('typerSpeedSlider');
+  if (slider) slider.value = String(speed);
+  const label = document.getElementById('typerSpeedVal');
+  if (label) label.textContent = speed.toFixed(2) + '×';
+}
+window._syncBayValueControls = _syncBayValueControls;
+
 function renderModuleBay() {
   Object.keys(BAY_CHECKBOX_SYNC_MAP).forEach(id => {
     const el = document.getElementById(id);
@@ -376,6 +394,7 @@ function renderModuleBay() {
   // robco_hardwaresfx_muted boolean the mute toggle always wrote.
   const hwSfxToggle = document.getElementById('hardwareSfxToggle');
   if (hwSfxToggle) hwSfxToggle.checked = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
+  _syncBayValueControls();
   if (typeof _updateOpticsBoardStatus === 'function') _updateOpticsBoardStatus();
   if (typeof _updateSonicBoardStatus === 'function') _updateSonicBoardStatus();
   if (typeof _updateUplinkBoardStatus === 'function') _updateUplinkBoardStatus();
@@ -480,6 +499,61 @@ function _schemSetHardwareSfx(checked) {
 }
 window._schemSetHardwareSfx = _schemSetHardwareSfx;
 
+// ── 2.8.5 item 6 — SCHEMATIC PROXY FORWARDERS ─────────────────────────────
+// The rows added in this unit (the audio channel chips, the SLOT 05 uplink
+// controls, the SVC TRAY actions) are PROXIES: they drive the REAL bay control
+// and let its own already-wired handler run, rather than re-declaring which
+// setter/pref each one owns.
+//
+// WHY forwarding rather than the direct-setter shape the original 11 rows use
+// (both shapes are Protocol 22 — one truth; they differ in WHERE that truth
+// lives):
+//   1. It is the only CORRECT shape for the uplink controls. saveApiKeySilent()
+//      (api.js) reads document.getElementById('apiKeyInput').value and
+//      'apiModelInput'.value directly — a schematic input that called it
+//      without first writing the bay's own node would persist the BAY's stale
+//      value and silently discard what the user just typed.
+//   2. It is what makes the chip list undriftable. The chips are derived from
+//      #chipGrid at render time, so a 15th chip appears in the schematic with
+//      no change here — which is the exact defect this unit fixes (the old
+//      hardcoded chip-count label was already wrong by one when it was found).
+// The bay stays in the DOM while hidden ([hidden] only hides it), so the real
+// nodes are always reachable.
+function _schemProxy(id, apply) {
+  const el = document.getElementById(id);
+  if (!el) return; // bay markup absent (test harness / partial DOM) — fail soft
+  if (typeof apply === 'function') apply(el);
+  return el;
+}
+
+// Mirrors a bay checkbox: set the real node, then fire its own change handler
+// so whatever setter that chip declares in index.html is the one that runs.
+function _schemForwardCheckbox(id, checked) {
+  _schemProxy(id, el => {
+    el.checked = !!checked;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  renderModuleBay();
+}
+window._schemForwardCheckbox = _schemForwardCheckbox;
+
+// Mirrors a bay text/select control the same way (input vs change chosen to
+// match the handler the bay node actually declares).
+function _schemForwardValue(id, value, evtName) {
+  _schemProxy(id, el => {
+    el.value = value;
+    el.dispatchEvent(new Event(evtName || 'change', { bubbles: true }));
+  });
+  renderModuleBay();
+}
+window._schemForwardValue = _schemForwardValue;
+
+// Mirrors a bay action button — clicks the real one (its own onclick runs).
+function _schemForwardClick(id) {
+  _schemProxy(id, el => el.click());
+}
+window._schemForwardClick = _schemForwardClick;
+
 // Regenerated from the SAME stored prefs the bay reads — every row calls the
 // SAME setter its bay counterpart calls, then re-syncs via renderModuleBay()
 // (which re-renders this very list while it's open, so it can never drift).
@@ -496,6 +570,18 @@ function renderBaySchematic() {
   const keySync = MetaStore.get('robco_gemini_key_sync') === 'true';
   const typerSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
   const hwSfxOn = MetaStore.get('robco_hardwaresfx_muted') !== 'true';
+  // SLOT 05 / SVC TRAY (2.8.5 item 6): mirror the bay's own nodes so the two
+  // views can never disagree about the current value. The <select> option lists
+  // are cloned from the real controls rather than re-declared — the model list
+  // is populated at runtime by fetchAuthorizedModels(), so it has no static
+  // list to copy.
+  const apiKey = MetaStore.get('robco_gemini_key') || '';
+  const modelOptions = _schemCloneOptions('apiModelInput');
+  const holotapeOptions = _schemCloneOptions('holotapeFormatSelect');
+  const pwaBtn = document.getElementById('btnInstallPwa');
+  const pwaInstallable = !!pwaBtn && pwaBtn.style.display !== 'none';
+
+  _applySchematicFraming();
 
   // FIX 2 (owner report): name/loc stacked ABOVE a full-width control row —
   // the control can never be squeezed narrower than its own content (which
@@ -527,12 +613,8 @@ function renderBaySchematic() {
     ),
     checkboxRow('toggleHighLumen', highLumen, 'HIGH-LUMEN COIL', 'SLOT 01'),
     checkboxRow('toggleMasterMute', masterMuted, 'SONIC PROCESSOR BOARD (MASTER MUTE)', 'SLOT 02'),
-    row(
-      '<span style="opacity:.6">13 rows</span>',
-      '13 CHANNEL CHIPS — manage individually in SLOT 02 above',
-      'SLOT 02'
-    ),
     checkboxRow('_schemSetHardwareSfx', hwSfxOn, 'SERVO CLICK RELAY', 'SLOT 02'),
+    _schemChipRows(),
     checkboxRow('toggleRadio', radioOn, 'RADIO RECEIVER MODULE', 'SLOT 02'),
     row(
       `<input type="range" min="0.25" max="3" step="0.25" value="${typerSpeed}" style="flex:1 1 90px;min-width:0" oninput="MetaStore.set('robco_typer_speed', this.value); renderModuleBay();" aria-label="Print-rate trim" />`,
@@ -550,10 +632,149 @@ function renderBaySchematic() {
       'ATMOSPHERIC REGULATOR',
       'SLOT 04'
     ),
+    // SLOT 05 (UPLINK) — added at 2.8.5 item 6. Before this the schematic had
+    // NO representation of the uplink board's actual payload, so a technician
+    // who left the view on `schematic` (it persists — Protocol UI-6) could not
+    // reach their own API key or model without switching back to the bay.
+    row(
+      `<input type="password" maxlength="200" value="${escapeHtml(apiKey)}" placeholder="PASTE GEMINI KEY HERE…" aria-label="Gemini API key" oninput="_schemForwardValue('apiKeyInput', this.value, 'input')" />`,
+      'CIPHER KEY — AUTHORIZATION KEY',
+      'SLOT 05'
+    ),
+    row(
+      `<select onchange="_schemForwardValue('apiModelInput', this.value)" aria-label="AI model selection">${modelOptions}</select>`,
+      'ENGINE SELECT — AI MODEL',
+      'SLOT 05'
+    ),
+    row(
+      `<button type="button" class="btn-sm" onclick="_schemForwardClick('btnFetchModels')">HANDSHAKE</button>`,
+      'HANDSHAKE — VALIDATE KEY &amp; FETCH ENGINES',
+      'SLOT 05'
+    ),
     checkboxRow('_schemSetGeminiSync', keySync, 'KEY-SYNC JUMPER', 'SLOT 05'),
+    // SVC TRAY — added at 2.8.5 item 6, same gap as SLOT 05 above.
+    row(
+      `<select onchange="_schemForwardValue('holotapeFormatSelect', this.value)" aria-label="Holotape export format">${holotapeOptions}</select>`,
+      'HOLOTAPE FORMAT',
+      'SVC TRAY'
+    ),
+    row(
+      `<button type="button" class="btn-sm" onclick="_schemForwardClick('ejectHolotapeBtn')">&#9654; EJECT HOLOTAPE</button>`,
+      'EJECT HOLOTAPE — EXPORT CAMPAIGN LOG',
+      'SVC TRAY'
+    ),
+    // The bay hides this button until the browser fires beforeinstallprompt —
+    // mirror that visibility rather than offering an install that cannot run.
+    pwaInstallable
+      ? row(
+          `<button type="button" class="btn-sm" onclick="_schemForwardClick('btnInstallPwa')">&#9660; INSTALL SYSTEM (APP)</button>`,
+          'SYSTEM INSTALLER',
+          'SVC TRAY'
+        )
+      : '',
   ].join('');
 }
 window.renderBaySchematic = renderBaySchematic;
+
+// Clones a bay <select>'s options, preserving the CURRENT selection.
+// Deliberately not a raw .innerHTML copy: a selection made through the DOM
+// (el.value = …, which is how fetchAuthorizedModels() and the boot restore both
+// set the model) never appears as a `selected` attribute in the serialized
+// markup, so an innerHTML clone would silently render the schematic's copy
+// showing the FIRST option while the real control held something else.
+function _schemCloneOptions(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  return Array.from(el.options)
+    .map(
+      o =>
+        '<option value="' +
+        escapeHtml(o.value) +
+        '"' +
+        (o.value === el.value ? ' selected' : '') +
+        '>' +
+        escapeHtml(o.textContent) +
+        '</option>'
+    )
+    .join('');
+}
+window._schemCloneOptions = _schemCloneOptions;
+
+// The audio channel chips, derived LIVE from the bay's own #chipGrid.
+//
+// This replaces a single hardcoded, inert row that named a chip COUNT in its
+// label and caption. Two defects in one line: the count was written as a
+// string, so it was already wrong for the real number of chips the moment one
+// was added (muteReactorHumToggle) — and the row was not a control at all, it
+// told the reader to go back to the bay, contradicting the view's own promise
+// of "EVERY MODULE AS A FLAT LIST, SAME CONTROLS".
+// Deriving from the DOM means the count can never drift again and a future
+// chip needs no change here (Protocol 38 / Protocol 22).
+function _schemChipRows() {
+  const grid = document.getElementById('chipGrid');
+  if (!grid) return '';
+  return Array.from(grid.querySelectorAll('input.chip-input'))
+    .map(input => {
+      const label = grid.querySelector('label[for="' + input.id + '"]');
+      const pinEl = label && label.querySelector('.pin-id');
+      const pin = pinEl ? pinEl.textContent.trim() : '';
+      // The pin id is nested inside the label, so it rides along in textContent.
+      const name = label ? label.textContent.replace(pin, '').trim() : input.id;
+      const escName = escapeHtml(name + ' (CHANNEL CHIP — MUTE)');
+      return (
+        '<div class="schem-row"><div class="schem-row-head">' +
+        '<span class="sr-name">' +
+        escName +
+        '</span><span class="sr-loc">' +
+        escapeHtml(pin ? 'SLOT 02 · ' + pin : 'SLOT 02') +
+        '</span></div><div class="schem-row-control">' +
+        '<input type="checkbox" ' +
+        (input.checked ? 'checked' : '') +
+        ' onchange="_schemForwardCheckbox(\'' +
+        escapeHtml(input.id) +
+        '\', this.checked)" aria-label="' +
+        escName +
+        '" /></div></div>'
+      );
+    })
+    .join('');
+}
+window._schemChipRows = _schemChipRows;
+
+// Generic framing for a game that has authored no identity.schematic block.
+// Protocol UI-10's rule: a literal generic fallback, never another game's
+// borrowed fiction.
+const SCHEMATIC_FALLBACK = {
+  title: 'SCHEMATIC VIEW',
+  note: 'EVERY MODULE AS A FLAT LIST — SAME CONTROLS, SAME SETTINGS, NO HARDWARE FICTION.',
+  sig: 'SERVICE SCHEMATIC',
+};
+
+// Per-game framing, read from GAME_DEFS via getIdentity() — data, never a
+// per-game `ctx === '<game>' ? … : …` branch (Protocol 38 / Protocol UI-7).
+function _schematicFraming() {
+  const id = typeof getIdentity === 'function' ? getIdentity() : null;
+  const s = (id && id.schematic) || {};
+  return {
+    title: s.title || SCHEMATIC_FALLBACK.title,
+    note: s.note || SCHEMATIC_FALLBACK.note,
+    sig: s.sig || SCHEMATIC_FALLBACK.sig,
+  };
+}
+window._schematicFraming = _schematicFraming;
+
+// Paints the per-game heading/subtitle/signature strip. Separate from the row
+// list so the framing is applied on every render (including the boot restore).
+function _applySchematicFraming() {
+  const f = _schematicFraming();
+  const t = document.getElementById('baySchematicTitle');
+  if (t) t.textContent = '⌕ ' + f.title;
+  const n = document.getElementById('baySchematicNote');
+  if (n) n.textContent = f.note;
+  const g = document.getElementById('baySchematicSig');
+  if (g) g.textContent = f.sig;
+}
+window._applySchematicFraming = _applySchematicFraming;
 
 // ── SVC TRAY EXPORT/UTILITY ACTIONS ─────────────────────────────────────────
 // SVC Tray onclick wrappers — kept as tiny named functions (not inline multi-

@@ -1124,7 +1124,23 @@ function _wirePanelPersistence() {
         if (_restoringPanels) {
           if (MetaStore.get('robco_bay_opened') !== 'true')
             MetaStore.set('robco_bay_opened', 'true');
-          if (typeof renderModuleBay === 'function') renderModuleBay();
+          // PROTOCOL UI-6 fix (2.8.5 item 6, found by rendering — Protocol 42):
+          // this branch used to call renderModuleBay(), which repaints the bay
+          // but never reads robco_bay_view — so a returning user whose panel was
+          // restored already-open ALWAYS got the hardware bay back, no matter
+          // which view they last chose. The pref was written correctly and then
+          // ignored, which is precisely the divergence UI-6 exists to prevent
+          // ("route BOTH the boot-restore path and the user-action path through
+          // one shared apply function"). _applyBayView() is that function, and
+          // it calls renderModuleBay() itself on the 'bay' branch — so the
+          // previous behaviour is preserved exactly when 'bay' is the choice.
+          // It deliberately does NOT go through initModuleBay(), which also
+          // touches the hatch overlay this restore path must leave alone.
+          if (typeof _applyBayView === 'function') {
+            _applyBayView(MetaStore.get('robco_bay_view') === 'schematic' ? 'schematic' : 'bay');
+          } else if (typeof renderModuleBay === 'function') {
+            renderModuleBay();
+          }
         } else if (typeof initModuleBay === 'function') {
           initModuleBay();
         }
@@ -1320,11 +1336,12 @@ function _restoreDevicePrefs() {
 
   // #34 Typewriter Speed — restore slider + label on load
   {
-    const savedSpeed = parseFloat(MetaStore.get('robco_typer_speed') || '1');
-    const slider = document.getElementById('typerSpeedSlider');
-    const label = document.getElementById('typerSpeedVal');
-    if (slider) slider.value = savedSpeed;
-    if (label) label.textContent = savedSpeed.toFixed(2) + '\u00d7';
+    // Routed through the shared _syncBayValueControls() (ui-core-modulebay.js)
+    // at 2.8.5 item 6 so the boot-restore path and the post-change re-sync path
+    // are ONE function (Protocol 22 / Protocol UI-6's one-apply-function rule)
+    // \u2014 the same readout was previously formatted in two places, and only this
+    // copy ever re-ran, so a Schematic View edit left the bay's slider stale.
+    if (typeof _syncBayValueControls === 'function') _syncBayValueControls();
   }
 
   // Command-Line MODE (Step 2 Phase 2 B1): restore the pill/placeholder from

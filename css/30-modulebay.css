@@ -2128,3 +2128,62 @@ button.dial:focus-visible {
   width: 100%;
   min-width: 0;
 }
+/* 2.8.5 item 6: the schematic's own controls must clear the Protocol 17 tap
+   floor in their own right — the row list is now materially longer (the 14
+   channel chips, SLOT 05 and the SVC TRAY all render here), so these are the
+   controls a technician actually drives in this view rather than a short
+   fallback list. */
+.schem-row-control input[type='checkbox'] {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  /* Protocol 42 (found by screenshotting this view): at the UA default size
+     these read as small neutral boxes, but raised to the 28px tap floor an
+     unstyled checkbox becomes a glaring white/blue block against the phosphor
+     glass. accent-color is the same one-property treatment the bay's own
+     typer-speed slider already uses. */
+  accent-color: var(--robco-green);
+}
+.schem-row-control input[type='range'] {
+  accent-color: var(--robco-green);
+}
+.schem-row-control button {
+  min-height: 28px;
+}
+/* Protocol 42 — both of these were found by actually rendering this view, not
+   by reading the CSS. The range input reported a 4px-tall hit box (the UA
+   default track height, with no height ever declared for it here), which is a
+   pre-existing defect in this row: the PRINT-RATE TRIM slider has been a 4px
+   drag target on a touch screen since it was added. The text/password inputs
+   measured 27px — one pixel under the floor. Both are fixed at the floor. */
+.schem-row-control input[type='range'] {
+  height: 28px;
+  min-height: 28px;
+}
+.schem-row-control input[type='text'],
+.schem-row-control input[type='password'],
+.schem-row-control select {
+  min-height: 28px;
+  font-size: 16px; /* Protocol 17: >=16px or mobile focus auto-zooms */
+}
+/* Per-machine signature strip (2.8.5 item 6). The TEXT is per-game data read
+   from GAME_DEFS[ctx].identity.schematic; only the presentation is here. */
+.schem-sig {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dotted rgba(var(--robco-green-rgb), 0.35);
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+}
+/* Per-game framing via [data-game] attribute selectors (Protocol UI-7 / 38) —
+   never a JS colour or fiction branch. FO3's diagram reads as a moulded
+   Vault-Tec document rather than a salvaged steel service sheet. A game with
+   no rule here simply keeps the default treatment above. */
+[data-game='FO3'] .bay-schematic {
+  border-style: double;
+  border-width: 4px;
+}
+[data-game='FO3'] .schem-sig {
+  letter-spacing: 2px;
+}

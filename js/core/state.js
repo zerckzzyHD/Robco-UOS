@@ -1083,6 +1083,19 @@ const GAME_DEFS = {
       machine: 'salvaged-terminal',
       material: 'scavenged-steel',
       structuralMode: 'bay',
+      // 2.8.5 item 6 — the Module Bay's flat SCHEMATIC VIEW framing, per machine.
+      // Per-game design DATA (Protocol 38 + Protocol UI-7's flavor-text clause):
+      // only the FRAMING varies (heading, subtitle, signature strip). The row
+      // labels and the SLOT tokens deliberately do NOT vary — they name the real
+      // bay boards, whose markup is shared across games, so renaming them per
+      // game would break the schematic↔bay correspondence the view exists to
+      // provide. A game with no block of its own gets SCHEMATIC_FALLBACK
+      // (ui-core-modulebay.js), never another game's borrowed fiction.
+      schematic: {
+        title: 'SCHEMATIC VIEW',
+        note: 'EVERY MODULE AS A FLAT LIST — SAME CONTROLS, SAME SETTINGS, NO HARDWARE FICTION.',
+        sig: 'ROBCO IND. — FIELD SERVICE SCHEMATIC · SALVAGED UNIT',
+      },
       // AI_OVERSEER Finding 4: the player's in-fiction title, read by the AI
       // system directive (api-directive.js) and the Director-removal confirm copy
       // (api-import.js) so the AI never calls an FO3 player "Courier". Per-game
@@ -1296,6 +1309,13 @@ Update state.magazines when the Courier reads a skill magazine. Include only nam
       machine: 'pipboy-3000',
       material: 'vaulttec-molded',
       structuralMode: 'bay',
+      // 2.8.5 item 6 — see the FNV schematic note above. A Pip-Boy technician
+      // reads a Vault-Tec maintenance diagram, not a salvage service schematic.
+      schematic: {
+        title: 'MAINTENANCE DIAGRAM',
+        note: 'EVERY MODULE AS A FLAT LIST — SAME CONTROLS, SAME SETTINGS, NO DEVICE FICTION.',
+        sig: 'VAULT-TEC — PIP-BOY 3000 FIELD MAINTENANCE DIAGRAM',
+      },
       // AI_OVERSEER Finding 4: FO3's player is the Lone Wanderer — never "Courier"
       // (New Vegas). See the FNV playerNoun note above.
       playerNoun: 'Lone Wanderer',
@@ -2011,6 +2031,13 @@ Update state.lincolnItems when the Lone Wanderer acquires or sells any Lincoln a
       machine: 'pipboy-3000-mk4',
       material: 'vaulttec-mk4',
       structuralMode: 'bay',
+      // 2.8.5 item 6 — design-only stub (unreachable at runtime, designOnly:
+      // true); present so the N-game schematic abstraction stays proven.
+      schematic: {
+        title: 'SERVICE DIAGRAM',
+        note: 'EVERY MODULE AS A FLAT LIST — SAME CONTROLS, SAME SETTINGS, NO DEVICE FICTION.',
+        sig: 'VAULT-TEC — PIP-BOY 3000 MARK IV SERVICE DIAGRAM',
+      },
       // AI_OVERSEER Finding 4: FO4's player is the Sole Survivor. Design-only entry
       // (unreachable at runtime) — present so the N-game abstraction stays proven.
       playerNoun: 'Sole Survivor',

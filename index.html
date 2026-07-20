@@ -3832,12 +3832,20 @@
 
                   <!-- Schematic View — permanent light-touch fallback (regenerated from state, never a parallel wired set) -->
                   <div id="baySchematic" class="bay-schematic" hidden>
-                    <h3>&#8981; SCHEMATIC VIEW</h3>
-                    <div class="schem-note">
+                    <!-- Heading/subtitle/signature are painted per game from
+                         GAME_DEFS[ctx].identity.schematic by _applySchematicFraming()
+                         (2.8.5 item 6). The literals below are the New Vegas
+                         values, kept in the markup so the panel reads correctly
+                         before the first render. -->
+                    <h3 id="baySchematicTitle">&#8981; SCHEMATIC VIEW</h3>
+                    <div class="schem-note" id="baySchematicNote">
                       EVERY MODULE AS A FLAT LIST &mdash; SAME CONTROLS, SAME SETTINGS, NO HARDWARE
                       FICTION.
                     </div>
                     <div id="baySchematicList"></div>
+                    <div class="schem-sig" id="baySchematicSig">
+                      ROBCO IND. &mdash; FIELD SERVICE SCHEMATIC &middot; SALVAGED UNIT
+                    </div>
                     <button
                       type="button"
                       class="action-btn"
