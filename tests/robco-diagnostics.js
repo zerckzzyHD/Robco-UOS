@@ -17056,77 +17056,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '293578576d7ac6bb402d84547ed74231635844d8e6e31ec3c966913cd07cbf4b',
+        sha256: '579fec156902828b3ae1885074b7ddd26b709ec909a6b695fde022d10f181f69',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: 'd096891983140ec6e375ae85e1d3fb2c87d7a48a422853320db731e719a9ad15',
+        sha256: 'f9cfa49627d760d7ceeff9f7886eb40e3205b8fc98e2c51c295e77ad28b7fbe8',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '04496ccd2cadd219f3915ac9b4d5ccc57ffe7024cdd76628684d0250ae010646',
+        sha256: '6a1a563e0904156090fa12b74ed0adca7f65c4814f10ebfa77676401afed98b1',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: '9b7043dc71a62cd97eb89081bd6057ec1ec7d4c3743d193b4d7bd432573fe7ef',
+        sha256: '94afc6bf9e606088a13e1457926fea2c923f4ab5bfaf4a8a67ffcd2ea89359c8',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '73e0e58cca5bd69d21302f0ed1915c60a2b568ae53dcb90d7999aa3ce4dae3eb',
+        sha256: 'cf4e3c646958eb18fb46b3212dc3f6dd8702842379c226e0a3470a474db69470',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: '11bd0f54a3eaa4faef8ecdc895d8a4f31d028ef128c22bba4fe3e118f5227412',
+        sha256: 'fd31d3b3bff71fd91d496623e62c3a16f21896c8ef6f4f012526884f39766efe',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '436932f3cdfc95556b97dc2a3deed1faa425024f31cc1fc7c150d8e5b5de5901',
+        sha256: '0d45bde6c1763266c8edaf05d6a64d20604726f36e8f99521e372e689f2ef3f1',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '3dc4ebcd962fe17e189366cd65e970253df72990a6f2e31c0d9202862502af09',
+        sha256: '4e07cd40d19d664dbcdd479b2aeb31623d61fd2b819291c3ea4da5d8e9cfdb54',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '93fc9e309ba4b9d0ed7131f54ad7acabd2f6248b0f062b644850ae89864c1aba',
+        sha256: '41b89e6cbe1610aed255182a154b83c0f5df9adeae290446d0e87d4baeb9f394',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'c4aa6bb684ed40744eaaeaa1a67fc6d6f70a993a090e0821debbc54013a84dc9',
+        sha256: 'f193f2d1cc29d959806c53f7e8eeb48478201550f98a03711188c51c999cf42e',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'c6e6ac56cab846e02d43dd358f88ed2b21273158672ffb0281f8bdc9069488a0',
+        sha256: '1226c7a77e1876f38a1cf2608b8124756eaac9989f532190b44c5b77cb08bd48',
       },
     ];
 
@@ -35858,7 +35858,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let err202c = null;
     try {
       const declared202c =
-        'function expandPanelForCategory(categoryKey)' +
+        // AI_OVERSEER Finding 6: the real signature gained an `opts` parameter
+        // (the {navigate:false} the post-sync AI import path passes). Declared here
+        // so this harness keeps exercising the REAL body, not a stale signature.
+        'function expandPanelForCategory(categoryKey, opts)' +
         extractFunctionBody(uiCoreSrc202, 'expandPanelForCategory');
       function makeDetails202c(initialOpen) {
         const details = {
@@ -36070,6 +36073,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const cssStripped204 = css204.replace(/\/\*[\s\S]*?\*\//g, '');
   const onLocChangeBody204 = extractFunctionBody(coreSrc204, 'onLocationChange');
   const showBody204 = extractFunctionBody(coreSrc204, '_locationCardShow');
+  // AI_OVERSEER Finding 6: the card is now fed by a bounded FIFO queue so a post-sync
+  // burst of change cards plays in sequence through the SAME element instead of each
+  // clobbering the last. _locationCardShow() is now the enqueue call site; _cardPump()
+  // owns the render/escape/dismiss lifecycle these tests exercise.
+  const enqueueBody204 = extractFunctionBody(coreSrc204, '_cardEnqueue');
+  const pumpBody204 = extractFunctionBody(coreSrc204, '_cardPump');
   const wireLocBody204 = extractFunctionBody(coreSrc204, '_wireLocationCardSubscriber');
   const wireEchoBody204 = extractFunctionBody(coreSrc204, '_wireFeedbackEchoSubscribers');
 
@@ -36165,8 +36174,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        escapeHtml() helper used app-wide before writing it into the DOM
   //        (XSS-safe).
   assert(
-    /escapeHtml\(String\(loc\)\)/.test(showBody204) && /labelEl\.innerHTML =/.test(showBody204),
-    '204.4: _locationCardShow() escapes the location name via escapeHtml() before writing it into .loc-card-label'
+    /escapeHtml\(next\.text\)/.test(pumpBody204) && /labelEl\.innerHTML =/.test(pumpBody204),
+    '204.4: the card render path (_cardPump) escapes the card text via escapeHtml() before writing it into .loc-card-label — every card, arrival or post-sync change, goes through this one escape'
   );
 
   // 204.5  BEHAVIORAL (vm sandbox) — _locationCardShow() shows the card
@@ -36180,7 +36189,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let err204b = null;
     try {
       const declared204b =
-        'let _locCardTimer = null; let _locCardHideTimer = null;\nfunction _locationCardShow(loc)' +
+        'let _locCardTimer = null; let _locCardHideTimer = null;\n' +
+        'let _cardQueue = []; let _cardBusy = false;\n' +
+        'const CARD_QUEUE_MAX = 5; const CARD_DWELL_MS = 2200; const CARD_DWELL_CHANGE_MS = 1700;\n' +
+        'function _cardEnqueue(text, dwellMs)' +
+        enqueueBody204 +
+        '\nfunction _cardPump()' +
+        pumpBody204 +
+        '\nfunction _locationCardShow(loc)' +
         showBody204;
       const timers204b = [];
       const classes204b = new Set();
@@ -39225,7 +39241,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 166 &&
+        tools212.length === 167 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -39234,7 +39250,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 166 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 167 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -39263,6 +39279,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           t.id !== 'inspect-observers' &&
           t.id !== 'replay-hatch' &&
           !t.id.startsWith('inspect-') && // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
+          t.id !== 'fire-sync-change-cards' && // AI_OVERSEER Finding 6's Protocol 44 trigger — a later addition, not one of U3's 45
           t.group !== 'SAVE INTEGRITY' // SAVE_LAYER3's 6 tools landed after U3 (own suite covers them)
       );
       const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
@@ -40279,7 +40296,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
         // more after this unit shipped, so the registry now totals 166
         // (61 at this unit's own ship time + 80 U4b + 18 U5 + 1 P8 eviction-recovery trigger).
-        tools214.length === 166 &&
+        tools214.length === 167 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -40292,7 +40309,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (166 tools, after U4b+U5+SAVE_LAYER3) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (167 tools, after U4b+U5+SAVE_LAYER3+the AI_OVERSEER change-card trigger) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -40677,7 +40694,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 166 &&
+        tools215.length === 167 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -40685,7 +40702,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 166 (after this unit + U5 + SAVE_LAYER3) with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 (after this unit + U5 + SAVE_LAYER3 + the AI_OVERSEER change-card trigger) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -41691,7 +41708,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok216 =
         newIds216.length === 18 &&
-        tools216.length === 166 &&
+        tools216.length === 167 &&
         newIds216.every(id => ids216.includes(id)) &&
         new Set(ids216).size === ids216.length;
     } catch (e) {
@@ -41699,7 +41716,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 166 with no duplicate id' +
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 with no duplicate id' +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -41892,7 +41909,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const stagingTools216 = tools216.filter(t => t.tier === 'staging');
       const prodTools216 = tools216.filter(t => t.tier === 'prod');
       ok216 =
-        tools216.length === 166 &&
+        tools216.length === 167 &&
         stagingTools216.length > 0 &&
         prodTools216.length > 0 &&
         stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
@@ -41907,7 +41924,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 166-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
+      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 167-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -42359,7 +42376,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     try {
       const tools216 = _evalRealTools216();
       ok216 =
-        tools216.length === 166 &&
+        tools216.length === 167 &&
         tools216.every(t => !t.destructive || t.tier === 'staging') &&
         tools216.every(
           t =>
@@ -42371,7 +42388,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.18: static leak-proof invariant re-derived against the FULL, final 166-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
+      "216.18: static leak-proof invariant re-derived against the FULL, final 167-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -49506,6 +49523,466 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       );
     })()
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 240 — AI / OVERSEER AUDIT, BATCH 2 (behaviour half).
+//  Batch 1 (3b3331d) fixed how the Director LOOKS and SPEAKS; this batch fixes
+//  how the machinery around it BEHAVES. Four findings:
+//    • Finding 6 (owner directive) — an AI state change no longer yanks the view
+//      off the terminal to the changed panel. The panel still EXPANDS; the tab
+//      no longer switches; each change surfaces in place as a card on the same
+//      toast the location-change card already uses (Protocol 22).
+//    • Finding 5 — the downloaded log was narrative-only, silently dropping the
+//      Director's modal nodes and every confirmation dialog. That produced a
+//      real false conclusion during the audit. Exports are now assembled from a
+//      merged record so a popup, and the player's ANSWER, appear in the log.
+//    • Finding 8 — the directive authority sweep: four instructions that claimed
+//      authority over now-native systems were removed, and the example schema's
+//      all-eleven-factions block (which contradicted the delta-only rule it sat
+//      beside) was cut to one changed faction.
+//    • Finding 4 leftover — the standby wake line said "COURIER RETURNED" in
+//      every game; it now reads the per-game identity source (Protocol 38).
+//  24 tests. Protocols 13/14/20/22/24/38.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 240 — AI/Overseer batch 2: cards, truthful export, directive sweep');
+
+  const uiCoreSrc240 = readGroup('ui-core');
+  const savesSrc240 = readGroup('ui-saves');
+  const stateSrc240 = readGroup('state');
+  const importSrc240 = readGroup('api');
+  const directiveSrc240 = readFile('js/services/api-directive.js');
+  const autoImportBody240 = extractFunctionBody(importSrc240, 'autoImportState');
+  const expandBody240 = extractFunctionBody(uiCoreSrc240, 'expandPanelForCategory');
+  const exitStandbyBody240 = extractFunctionBody(uiCoreSrc240, 'exitStandby');
+  const holotapeBody240 = extractFunctionBody(savesSrc240, '_buildHolotapeText');
+  const recordsBody240 = extractFunctionBody(savesSrc240, '_transcriptRecords');
+  const evtLinesBody240 = extractFunctionBody(savesSrc240, '_transcriptEventLines');
+  const confirmBody240 = extractFunctionBody(uiCoreSrc240, 'confirmAction');
+  // These suites assert about what the CODE does and what the DIRECTIVE TEXT says.
+  // Both files carry long explanatory comments that quote the very strings being
+  // asserted absent (e.g. the sweep's own "removed Consumable Purge" note), so every
+  // scan below runs on comment-stripped source — otherwise a test could pass or fail
+  // purely on prose, which is exactly the kind of dishonest guard Protocol 42 warns
+  // against.
+  const _strip240 = src =>
+    String(src)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+  const directiveCode240 = _strip240(directiveSrc240);
+  const autoImportCode240 = _strip240(autoImportBody240);
+
+  // ── FINDING 6 — cards instead of tab-jumps ─────────────────────────────────
+
+  // 240.1  the post-sync auto-expand pass no longer navigates. This is the exact
+  //        line the owner complained about: it used to call
+  //        expandPanelForCategory(cat) with default routing, so every AI state
+  //        change switched tabs away from the conversation.
+  assert(
+    /expandPanelForCategory\(cat,\s*\{\s*navigate:\s*false\s*\}\)/.test(autoImportBody240) &&
+      !/expandPanelForCategory\(cat\)\s*;/.test(autoImportBody240),
+    '240.1: [RED→GREEN, Finding 6] the post-sync auto-expand pass calls expandPanelForCategory(cat, {navigate:false}) — never the bare expandPanelForCategory(cat) that switched tabs away from the terminal mid-conversation'
+  );
+
+  // 240.2  the tab jump is gated by the flag, and the flag DEFAULTS ON so every
+  //        other caller (#go= deep links, the native router, LOOT/ammo hand-offs)
+  //        is byte-for-byte unchanged. A default of `false` would silently break
+  //        all of them — that is what this test exists to catch.
+  assert(
+    /const _navigate = !\(opts && opts\.navigate === false\)/.test(expandBody240) &&
+      /if \(_navigate && tabMap\[categoryKey\]\) switchTab/.test(expandBody240),
+    '240.2: expandPanelForCategory() gates ONLY the switchTab() call on opts.navigate, which defaults TRUE — every existing caller keeps its "take me there" behaviour and only the AI-import path opts out'
+  );
+
+  // 240.3  the panel is STILL expanded on the no-navigate path — the owner asked
+  //        to stop the tab jump, not to stop the panel opening for a user who
+  //        walks over there manually.
+  assert(
+    /expandPanelForCategory\(cat, \{ navigate: false \}\)/.test(autoImportCode240) &&
+      !/switchTab\s*\(/.test(autoImportCode240),
+    '240.3: the AI-import path still EXPANDS the changed panel (only the navigation is dropped) and never calls switchTab() itself — a user who navigates there manually still finds the board open'
+  );
+
+  // 240.4  the cards are fed from the SAME diff that builds the [DELTA] line —
+  //        an upgrade of the existing primitive, not a second change-detector
+  //        (Protocol 22, and the owner said so explicitly).
+  assert(
+    /_cardLines\.push/.test(autoImportBody240) &&
+      /_syncChangeCardsShow\(_cardLines\)/.test(autoImportBody240) &&
+      /changes\.forEach\(c => _cardLines\.push/.test(autoImportBody240),
+    '240.4: the change cards are built from the SAME `changes` diff that produces the [DELTA] chat line (one change-detector, two surfaces) and flushed once via _syncChangeCardsShow — never a parallel change-detection system'
+  );
+
+  // 240.5  the [DELTA] chat line SURVIVES. The cards are transient; the chat line
+  //        is the durable record that the log export (Finding 5) depends on.
+  assert(
+    /appendToChat\('> \[DELTA\] ' \+ changes\.join\(' \| '\)/.test(autoImportBody240),
+    '240.5: the durable [DELTA] chat line is kept alongside the transient cards — the cards are an addition, not a replacement (the log export depends on the line)'
+  );
+
+  // 240.6  _syncChangeCardsShow routes through the SHARED card queue, never its
+  //        own toast element (Protocol 22 — the owner named the existing
+  //        location-change card as the thing to reuse).
+  {
+    const syncBody240 = extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+    assert(
+      /_cardEnqueue\(line, CARD_DWELL_CHANGE_MS\)/.test(syncBody240) &&
+        !/createElement|document\.body\.append/.test(syncBody240),
+      '240.6: _syncChangeCardsShow() enqueues onto the SHARED card queue (the same #locationCard toast the arrival card uses) and never creates a second toast element of its own (Protocol 22)'
+    );
+  }
+
+  // 240.7  the queue is BOUNDED — a pathological sync can never monopolise the
+  //        corner of the screen with an unbounded backlog of cards.
+  {
+    const enqBody240 = extractFunctionBody(uiCoreSrc240, '_cardEnqueue');
+    assert(
+      /_cardQueue\.length >= CARD_QUEUE_MAX/.test(enqBody240) &&
+        /CARD_QUEUE_MAX = \d+/.test(uiCoreSrc240),
+      '240.7: the card queue is bounded by CARD_QUEUE_MAX and drops overflow — a sync that changes everything at once can never produce an unbounded backlog of toasts'
+    );
+  }
+
+  // 240.8  [behavioral] the queue actually SEQUENCES: three enqueued cards play
+  //        one at a time through the single element, each fully exiting before
+  //        the next enters — the old single-slot behaviour would have shown only
+  //        the last one.
+  {
+    const vm240 = require('vm');
+    let out240 = null;
+    let err240 = null;
+    try {
+      const decl240 =
+        'let _locCardTimer = null; let _locCardHideTimer = null;\n' +
+        'let _cardQueue = []; let _cardBusy = false;\n' +
+        'const CARD_QUEUE_MAX = 5; const CARD_DWELL_MS = 2200; const CARD_DWELL_CHANGE_MS = 1700;\n' +
+        'function _cardEnqueue(text, dwellMs)' +
+        extractFunctionBody(uiCoreSrc240, '_cardEnqueue') +
+        '\nfunction _cardPump()' +
+        extractFunctionBody(uiCoreSrc240, '_cardPump') +
+        '\nfunction _syncChangeCardsShow(lines)' +
+        extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+      const shown240 = [];
+      const timers240 = [];
+      const classes240 = new Set();
+      const labelStub240 = { innerHTML: '' };
+      const elStub240 = {
+        querySelector: () => labelStub240,
+        classList: { add: c => classes240.add(c), remove: c => classes240.delete(c) },
+        setAttribute: () => {},
+        get offsetWidth() {
+          return 0;
+        },
+      };
+      const sb240 = {
+        document: { getElementById: id => (id === 'locationCard' ? elStub240 : null) },
+        escapeHtml: s => String(s),
+        _echoShouldShow: () => true,
+        clearTimeout: () => {},
+        setTimeout: (fn, ms) => {
+          timers240.push({ fn, ms });
+          return timers240.length;
+        },
+      };
+      vm240.createContext(sb240);
+      vm240.runInContext(decl240, sb240);
+      vm240.runInContext(
+        "_syncChangeCardsShow(['CAPS 0\\u219245', 'INVENTORY 0\\u21921 items', 'PERKS UPDATED']);",
+        sb240
+      );
+      // Drain: after each card's display timer + exit timer, the next must render.
+      for (let i = 0; i < 3; i++) {
+        shown240.push(labelStub240.innerHTML);
+        const disp = timers240.find(t => t.ms === 1700 && !t.done);
+        if (!disp) break;
+        disp.done = true;
+        disp.fn();
+        const exit = timers240.find(t => t.ms === 240 && !t.done);
+        if (!exit) break;
+        exit.done = true;
+        exit.fn();
+      }
+      out240 = shown240;
+    } catch (e) {
+      err240 = e;
+    }
+    assert(
+      !err240 &&
+        out240.length === 3 &&
+        out240[0] === 'CAPS 0→45' &&
+        out240[1] === 'INVENTORY 0→1 items' &&
+        out240[2] === 'PERKS UPDATED',
+      '240.8: [behavioral, Finding 6] three change cards enqueued at once play in SEQUENCE through the one card element (CAPS, then INVENTORY, then PERKS) — the old single-slot toast would have clobbered the first two and shown only the last' +
+        (err240 ? ' — ' + err240.message : ` — got ${JSON.stringify(out240)}`)
+    );
+  }
+
+  // 240.9  the card path stays presentational — zero campaign-state write, the
+  //        same invariant Suite 204.8 locks for the arrival card.
+  {
+    const cardCode240 =
+      extractFunctionBody(uiCoreSrc240, '_cardEnqueue') +
+      extractFunctionBody(uiCoreSrc240, '_cardPump') +
+      extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+    assert(
+      !/saveState\(|robco_v8|state\.[a-z]+\s*=/.test(cardCode240),
+      '240.9: the whole card path (_cardEnqueue/_cardPump/_syncChangeCardsShow) never calls saveState(), touches robco_v8, or assigns state.* — transient DOM only'
+    );
+  }
+
+  // ── FINDING 5 — truthful log export ────────────────────────────────────────
+
+  // 240.10  the txt transcript is built from the MERGED record, not chatHistory
+  //         alone. This is the precise defect: chatHistory holds no modal node,
+  //         so iterating it could never show the confirmation popup.
+  assert(
+    /_transcriptRecords\(\)\.forEach/.test(holotapeBody240) &&
+      !/chatHistory\.forEach/.test(holotapeBody240),
+    '240.10: [RED→GREEN, Finding 5] _buildHolotapeText() iterates the merged _transcriptRecords(), never chatHistory alone — chatHistory holds no modal/confirm node, which is exactly why the old export could not show them'
+  );
+
+  // 240.11  ALL THREE export formats share the one assembly point, so they can
+  //         never disagree about what happened (Protocol 22).
+  {
+    const exportBody240 = extractFunctionBody(savesSrc240, 'exportCampaignLog');
+    const uses240 = (exportBody240.match(/_transcriptRecords\(\)/g) || []).length;
+    assert(
+      uses240 >= 2 && /_transcriptRecords\(\)/.test(holotapeBody240),
+      `240.11: every export format (txt via _buildHolotapeText, plus md and html in exportCampaignLog) assembles from the SAME _transcriptRecords() merge — the three exports can never disagree about what was on screen (found ${uses240} in-export uses)`
+    );
+  }
+
+  // 240.12  a confirmation's ANSWER is recorded. Recording that the terminal
+  //         ASKED but not what the player CHOSE would still leave the log
+  //         ambiguous — and ambiguity is what produced the false conclusion.
+  assert(
+    /_tEntry\.choice = answered \? confirmLabel : cancelLabel/.test(confirmBody240) &&
+      /_recordChoice\(val\)/.test(confirmBody240),
+    "240.12: confirmAction() writes the player's ACTUAL ANSWER back into the transcript record on settle — the log shows both that the terminal asked and what was chosen, not just that a dialog existed"
+  );
+
+  // 240.13  the AI modal node is recorded at the point it is rendered.
+  assert(
+    /recordTranscriptEvent\('modal', parsedNode\.modal\.title, _modalLines\)/.test(importSrc240),
+    '240.13: an AI modal node is recorded into the transcript ledger at the moment it is rendered into #sysModal — the node that used to vanish from the log entirely'
+  );
+
+  // 240.14  the ledger anchors are REBASED when chatHistory is capped. Anchors
+  //         are indices; dropping the oldest N lines without shifting them would
+  //         silently move every recorded popup to the wrong place in the export.
+  {
+    const appendBody240 = extractFunctionBody(uiCoreSrc240, 'appendToChat');
+    assert(
+      /const _dropped = chatHistory\.length - CHAT_MAX/.test(appendBody240) &&
+        /at: \(e\.at \|\| 0\) - _dropped/.test(appendBody240) &&
+        /filter\(e => e\.at >= 0\)/.test(appendBody240),
+      '240.14: capping chatHistory rebases every transcript-event anchor by the same count and drops anchors that fall off the front — otherwise recorded popups would silently drift to the wrong position in the export'
+    );
+  }
+
+  // 240.15  [behavioral] the merge actually interleaves correctly: an event
+  //         recorded at index 1 lands BETWEEN chat lines 0 and 1, and a confirm
+  //         renders its answer.
+  {
+    const vm240b = require('vm');
+    let out240b = null;
+    let err240b = null;
+    try {
+      const decl240b =
+        'function _transcriptRecords()' +
+        recordsBody240 +
+        '\nfunction _transcriptEventLines(evt)' +
+        evtLinesBody240;
+      const sb240b = {
+        chatHistory: [
+          { text: 'level me up to 15', sender: 'user' },
+          { text: 'Confirm the jump?', sender: 'ai' },
+        ],
+        transcriptEvents: [
+          {
+            at: 1,
+            kind: 'confirm',
+            title: '> DIRECTOR PROGRESSION REQUEST',
+            lines: ['Raise level 5 → 15?'],
+            choice: 'KEEP',
+          },
+        ],
+      };
+      vm240b.createContext(sb240b);
+      vm240b.runInContext(decl240b, sb240b);
+      const recs = vm240b.runInContext('_transcriptRecords()', sb240b);
+      const lines = vm240b.runInContext(
+        '_transcriptEventLines(transcriptEvents[0]).join("\\n")',
+        sb240b
+      );
+      out240b = {
+        order: recs.map(r => (r.kind === 'event' ? 'EVENT' : r.msg.sender)),
+        lines,
+      };
+    } catch (e) {
+      err240b = e;
+    }
+    assert(
+      !err240b &&
+        JSON.stringify(out240b.order) === JSON.stringify(['user', 'EVENT', 'ai']) &&
+        /CONFIRMATION REQUESTED/.test(out240b.lines) &&
+        /Raise level 5 → 15\?/.test(out240b.lines) &&
+        /ANSWER: KEEP/.test(out240b.lines),
+      '240.15: [behavioral, Finding 5] the merged transcript places a confirmation recorded at chat index 1 BETWEEN the user line and the reply, and renders it with its prompt and the answer ("ANSWER: KEEP") — the exact record whose absence made a correctly-confirmed request read as silent compliance' +
+        (err240b ? ' — ' + err240b.message : ` — got ${JSON.stringify(out240b)}`)
+    );
+  }
+
+  // 240.16  the ledger is persisted + restored, so an export taken after a
+  //         reload is as truthful as one taken in-session.
+  assert(
+    /localStorage\.setItem\('robco_transcript_events'/.test(stateSrc240) &&
+      /localStorage\.getItem\('robco_transcript_events'\)/.test(uiCoreSrc240),
+    '240.16: the transcript-event ledger is persisted alongside robco_chat and restored at boot — a log downloaded after a reload still contains the popups'
+  );
+
+  // 240.17  purging the chat purges the ledger with it. Orphaned popups anchored
+  //         to lines that no longer exist would be a NEW way to mislead a reader.
+  {
+    const clearBody240 = extractFunctionBody(uiCoreSrc240, 'clearChat');
+    assert(
+      /transcriptEvents = \[\]/.test(clearBody240) &&
+        /removeItem\('robco_transcript_events'\)/.test(clearBody240),
+      '240.17: purging the Comm-Link clears the transcript-event ledger too — the log can never keep popups anchored to chat lines that no longer exist'
+    );
+  }
+
+  // 240.18  recording can never break the dialog it records (the recorder is a
+  //         diagnostic, and a diagnostic that can break the app is worse than none).
+  {
+    const recBody240 = extractFunctionBody(stateSrc240, 'recordTranscriptEvent');
+    assert(
+      /try \{/.test(recBody240) && /catch \(_\) \{/.test(recBody240),
+      '240.18: recordTranscriptEvent() is fully try/caught and returns null on failure — a recording failure can never break the modal or confirmation it was recording'
+    );
+  }
+
+  // ── FINDING 8 — directive authority sweep (Protocol 14) ────────────────────
+
+  // 240.19  the four now-native authority claims are GONE. Each was verified
+  //         against the native implementation before removal (Protocol 27).
+  assert(
+    !/Consumable Purge/.test(directiveCode240) &&
+      !/Financial Metrics/.test(directiveCode240) &&
+      !/Skill Point Math/.test(directiveCode240) &&
+      !/Quadratic XP Scaling/.test(directiveCode240),
+    '240.19: [Finding 8] the four directive lines claiming authority over now-native systems are removed — Consumable Purge (native nativeUseItem), Financial Metrics/Vendor Base_Cap (native barter pricing + liquidity), Skill Point Math (duplicate of the LEVEL UP deferral) and the Quadratic XP formula (which also DISAGREED with the native curve)'
+  );
+
+  // 240.20  the WRONG XP formula is replaced by a deferral, not merely deleted.
+  //         The directive taught a curve that diverges from the native one past
+  //         level 2 — a correctness hazard, not just a token cost.
+  assert(
+    !/25 \* \(Target_Level\^2\)/.test(directiveCode240) &&
+      /XP thresholds \/ level progression: native deterministic LEVEL UP terminal/.test(
+        directiveSrc240
+      ) &&
+      /Do NOT compute a level from XP/.test(directiveCode240),
+    '240.20: [Finding 8] the wrong quadratic-XP formula is replaced by an explicit deferral to the native LEVEL UP terminal — the AI is told not to compute a level from XP at all, closing the "AI returns state a native path owns" hazard'
+  );
+
+  // 240.21  the example schema no longer contradicts the delta-only rule beside
+  //         it. Demonstrating a full faction resend is the same shape that caused
+  //         the Finding 1 data loss.
+  assert(
+    !/"legion":\{"fame":0,"infamy":0\}/.test(directiveCode240) &&
+      /"factions": \{"ncr":\{"fame":5,"infamy":0\}\}/.test(directiveCode240) &&
+      /Report ONLY the factions whose standing CHANGED/.test(directiveCode240),
+    '240.21: [Finding 8] the example schema shows ONE changed faction instead of all eleven at zero — the example no longer demonstrates the whole-collection resend that the Faction Standing rule beside it forbids (and that caused the Finding 1 class of loss)'
+  );
+
+  // 240.22  the sweep did NOT over-strip. These are the instructions verified as
+  //         still genuinely AI-owned (no native implementation exists); a later
+  //         pass removing them would be a real regression, so they are pinned.
+  assert(
+    /state\.stats tracks cumulative session stats/.test(directiveCode240) &&
+      /COMPLETE RNG MODE ACTIVE/.test(directiveCode240) &&
+      /Faction Standing System/.test(directiveCode240) &&
+      /Visual Upload Fallback/.test(directiveCode240) &&
+      /Return ONLY the inventory items that CHANGED this turn/.test(directiveCode240),
+    '240.22: [Finding 8 guard-rail] the instructions verified as STILL AI-owned are pinned in place — session stats (no native writer exists), COMPLETE RNG build randomisation (no native randomiser exists), faction standing, the OCR fallback, and the batch-1 delta-only inventory rule. The sweep removes stale authority, never live authority'
+  );
+
+  // ── FINDING 4 leftover — the standby wake line ─────────────────────────────
+
+  // 240.23  the wake line reads the per-game identity source. Batch 1 fixed the
+  //         directive and the confirm copy but left this line saying "COURIER"
+  //         in every game.
+  assert(
+    /_wakeId && _wakeId\.playerNoun/.test(exitStandbyBody240) &&
+      /_wakeNoun \+ ' RETURNED/.test(exitStandbyBody240) &&
+      !/'> COURIER RETURNED/.test(exitStandbyBody240),
+    '240.23: [RED→GREEN, Finding 4 leftover] the standby wake line builds its player title from GAME_DEFS[ctx].identity.playerNoun via getIdentity() — no hardcoded "COURIER RETURNED" literal remains (Protocol 38)'
+  );
+
+  // 240.24  [behavioral] the wake line actually says the right thing per game —
+  //         the point of the fix, proven at runtime rather than by source shape.
+  {
+    const vm240c = require('vm');
+    const runWake240 = playerNoun => {
+      const decl =
+        'let _standbyActive = true;\nlet _wakeTimer = null;\n' +
+        'function _isShuttingDown()' +
+        extractFunctionBody(uiCoreSrc240, '_isShuttingDown') +
+        '\nfunction exitStandby()' +
+        exitStandbyBody240;
+      const chat = [];
+      const pending = [];
+      const sb = {
+        console: { warn() {} },
+        AmbientRuntime: { getState: () => 'ACTIVE' },
+        document: {
+          body: { classList: { add() {}, remove() {}, contains: () => false } },
+          getElementById: () => ({ value: '0' }),
+        },
+        crtHumGain: null,
+        audioCtx: null,
+        playWakeTone() {},
+        appendToChat(t) {
+          chat.push(t);
+        },
+        setGeigerRate() {},
+        updateMath() {},
+        getIdentity: () => (playerNoun ? { playerNoun } : null),
+        setTimeout: fn => {
+          pending.push(fn);
+          return pending.length;
+        },
+        clearTimeout: () => {},
+      };
+      vm240c.createContext(sb);
+      vm240c.runInContext(decl, sb);
+      sb.exitStandby();
+      pending.forEach(fn => fn());
+      return chat.join('\n');
+    };
+    let err240c = null;
+    let fnv240 = '';
+    let fo3240 = '';
+    let none240 = '';
+    try {
+      fnv240 = runWake240('Courier');
+      fo3240 = runWake240('Lone Wanderer');
+      none240 = runWake240(null);
+    } catch (e) {
+      err240c = e;
+    }
+    assert(
+      !err240c &&
+        /COURIER RETURNED/.test(fnv240) &&
+        /LONE WANDERER RETURNED/.test(fo3240) &&
+        !/COURIER/.test(fo3240) &&
+        /COURIER RETURNED/.test(none240),
+      '240.24: [behavioral, Finding 4 leftover] the wake line prints the ACTIVE game\'s player title — "COURIER RETURNED" for one game, "LONE WANDERER RETURNED" for another (and never "Courier" there), with the absence-guarded fallback still printing a sane line when no identity is available' +
+        (err240c ? ' — ' + err240c.message : ` — got FO3: ${fo3240}`)
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

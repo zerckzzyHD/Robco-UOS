@@ -65,6 +65,17 @@ function _directiveConstraints(nounUpper) {
 // FICTIONAL CONTEXT OVERRIDE + persona/constraints + Tri-Node API sync protocol
 // + the example schema block. First section — no leading blank line.
 // `noun` is the per-game player title (AI_OVERSEER Finding 4).
+//
+// AI_OVERSEER Finding 8 (sweep): the example schema's "factions" node used to show
+// ALL ELEVEN FNV factions at zero, which directly CONTRADICTED the Faction Standing
+// rule below ("Report ONLY the factions whose standing CHANGED this turn — never
+// resend the whole object"). An example that demonstrates the exact behaviour the
+// rules forbid is worse than no example: it is the same "AI resends a whole
+// collection" shape that caused the Finding 1 data loss, and it also billed the
+// owner for ~600 characters of zeroes on every single call. It now shows ONE
+// changed faction, matching the rule. state.skills is deliberately still shown in
+// full — the Skill System section genuinely asks for the whole object when skills
+// change, so there the full example is correct, not a contradiction.
 function _directivePersonaAndContract(ctx, noun) {
   const { constraintStr, campaignModeStr } = _directiveConstraints(noun.toUpperCase());
   return `### **FICTIONAL CONTEXT OVERRIDE**
@@ -98,7 +109,7 @@ Example Schema:
     "caps": 0, "loc": "Mojave", "rads": 0, "karma": 0, "ticks": 1,
     "la": "OK", "ra": "OK", "ll": "OK", "rl": "OK", "hd": "OK",
     "skills": {"barter":15,"energy_weapons":15,"explosives":15,"guns":15,"lockpick":15,"medicine":15,"melee_weapons":15,"repair":15,"science":15,"sneak":15,"speech":15,"survival":15,"unarmed":15},
-    "factions": {"ncr":{"fame":0,"infamy":0},"legion":{"fame":0,"infamy":0},"house":{"fame":0,"infamy":0},"bos":{"fame":0,"infamy":0},"boomers":{"fame":0,"infamy":0},"khans":{"fame":0,"infamy":0},"followers":{"fame":0,"infamy":0},"powder":{"fame":0,"infamy":0},"kings":{"fame":0,"infamy":0},"strip":{"fame":0,"infamy":0},"freeside":{"fame":0,"infamy":0}},
+    "factions": {"ncr":{"fame":5,"infamy":0}},
     "status": [],
     "inventory": [{"name": "Stimpak", "qty": 3, "wgt": 0.5, "val": 20, "type": "aid"}],
     "squad": [{"name": "Boone", "hp": 100, "hpMax": 100, "weapon": "Hunting Rifle", "ammo": 50, "condition": "OK", "dt": 15, "affinity": 75}],
@@ -120,6 +131,50 @@ Example Schema:
 
 // Core state/formatting rules + operational matrix + dev-manual math.
 // `noun` is the per-game player title (AI_OVERSEER Finding 4).
+//
+// AI_OVERSEER Finding 8 — DIRECTIVE AUTHORITY SWEEP (2.8.5, batch 2). Every
+// instruction in this builder was re-checked against the code that actually
+// implements the system (Protocol 27 — traced, not assumed). Four lines were
+// REMOVED because a native, deterministic, offline path now owns the job, so the
+// instruction was pure paid-for waste and, worse, an invitation for the AI to
+// return state a native path owns (the Finding 1 mechanism):
+//   • "Consumable Purge: … -1 deduction from the backpack memory array" — item use
+//     is native (nativeUseItem, ui-render-inventory.js) and effect resolution +
+//     the qty decrement happen there. For free-text consumption during narration
+//     the general Inventory Persistence rule above already says exactly how to
+//     report a reduced qty, so this line was ALSO a duplicate of a live rule.
+//   • "Financial Metrics: Run Economy Sync using live Barter skills. Strictly
+//     enforce Vendor Base_Cap liquidity limits." — barter is entirely native
+//     (_tradeBuyPrice/_tradeSellPrice + the vendor-purse liquidity check in
+//     doSell, ui-render-economy.js). The API Sync Protocol section above already
+//     forbids a TRADE modal, so nothing is lost by deleting the claim.
+//   • "Skill Point Math: Base points = 10 + (INT / 2)." — a duplicate: the Skill
+//     System section below ALREADY tells the AI the LEVEL UP terminal awards and
+//     the player allocates, and not to do it itself. Handing it the formula twice
+//     only made it likelier to try.
+//   • "Quadratic XP Scaling: Boundaries = 25*(T^2) + 125*T - 150." — this was not
+//     merely stale, it was WRONG: the native curve (ui-core-cmd.js) is
+//     75*(L+1)^2 - 25*(L+1) - 50, which agrees with the directive only at level 2
+//     and diverges after (at T=4: directive 750 vs native 1050). An AI computing a
+//     level from XP on the wrong curve is a correctness hazard, not just cost.
+//     Replaced with a deferral to the native LEVEL UP terminal.
+//
+// DELIBERATELY KEPT (verified still AI-owned — do not strip these on a later pass
+// without re-tracing): state.stats (kills/capsEarned/damageDealt — NO native
+// writer exists), the status-effect tick-down (the ONLY decrement lives in
+// autoImportState), COMPLETE RNG build randomisation (no native randomiser exists
+// for SPECIAL/trait/tag-skill/perk selection), the faction-standing section (both
+// native and AI write it — the AI genuinely narrates consequences during play),
+// state.ammo (the AI must be able to report rounds spent in combat), the tracker
+// directives (AI writes are add-only + registry-validated on import), and the OCR
+// "Visual Upload Fallback" line (accurate as written — Tesseract is primary and
+// the AI vision path is a real fallback).
+//
+// FLAGGED, NOT CHANGED (left in deliberately, per the sweep's conservative rule):
+// the directive still lets the AI return `lvl`, even though nativeLevelUp() is the
+// level authority and levelling is not XP-gated natively. Making level AI-read-only
+// is defensible but would change a workflow the owner may rely on ("level me up"),
+// so it is recorded here for an owner decision rather than decided unilaterally.
 function _directiveCoreTracking(noun) {
   return `
 
@@ -131,16 +186,13 @@ Telemetry Lock: FORBIDDEN from inventing narrative outcomes, combat damage, or i
 
 ### **Operational Matrix**
 [A] Bio-Dynamics & Combat Systems
-Consumable Purge: Upon consumption of ANY item, execute a -1 deduction from the backpack memory array.
 Trauma Systems: Apply RAD thresholds and crippled-limb effects in the state node during play. The [BIO-SCAN] advisory (limb / HP / radiation / addiction medical readout) is handled by the native deterministic BIO-SCAN terminal (state + CHEMS.CSV, computed offline) — do NOT produce a BIO-SCAN modal or medical advisory; defer to the local calculator.
 
 [B] Economy, Logistics & Progression
 Visual Upload Fallback: On-device optical scan (Tesseract OCR) is the PRIMARY parser for screenshots and handles it offline, unseen by you. You only receive an image here because that scan was unavailable/failed or the ${noun} explicitly requested Director vision instead. Infer the pictured category yourself from the image and update ONLY that category. You are STRICTLY FORBIDDEN from deleting un-pictured items from other categories (e.g., if the screenshot shows Weapons, do NOT delete Armor or Junk).
-Financial Metrics: Run Economy Sync using live Barter skills. Strictly enforce Vendor Base_Cap liquidity limits.
 
 ### **ROBCO_DEV_MANUAL.TXT (System Math & Logic Base)**
-- Skill Point Math: Base points = 10 + (INT / 2).
-- Quadratic XP Scaling: Boundaries = 25 * (Target_Level^2) + 125 * (Target_Level) - 150.
+- XP thresholds / level progression: native deterministic LEVEL UP terminal (offline, own curve + level cap). Do NOT compute a level from XP — report XP earned only.
 - Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
 - LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play returns ONLY the newly-looted item(s) per the persistence rule above — never the whole array.
 - V.A.T.S. accuracy / AP-strike simulation: the [VATS SIM] / [VS] terminal is a native deterministic offline calculator (equipped weapon + SPECIAL + skills + GAME_DEFS V.A.T.S. coefficients, computed offline). Do NOT compute or narrate a V.A.T.S. hit-chance, AP-strike plan, or modal — defer to the local calculator.`;

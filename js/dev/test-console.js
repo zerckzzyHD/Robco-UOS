@@ -972,6 +972,31 @@
       action: () => _firePendingExhibitLight(),
     },
     {
+      // AI_OVERSEER Finding 6 (Protocol 44): the post-sync change cards only ever
+      // appear after a REAL Director sync — which needs an API key, a live network
+      // call, and a response that happens to change something. That makes them
+      // exactly the class of feature that silently rots between test passes, so they
+      // get a guaranteed on-demand trigger. tier 'prod' + non-destructive: the card
+      // path is purely presentational (zero campaign-state write, guarded by Suite
+      // 240.9), so firing it cannot touch a save.
+      id: 'fire-sync-change-cards',
+      label: 'FIRE: SYNC CHANGE CARDS',
+      subLabel: '_syncChangeCardsShow() — the in-place post-sync card queue',
+      icon: '⧉',
+      category: 'triggers',
+      group: 'FIRE ANIMATION (PENDING)',
+      tier: 'prod',
+      destructive: false,
+      tooltip:
+        'Fires three post-sync change cards through the shared card queue, exactly as a Director state change would — they play in sequence in the top-right without switching tabs.',
+      triggers: [],
+      action: () => {
+        if (typeof _syncChangeCardsShow === 'function') {
+          _syncChangeCardsShow(['CAPS 0→450', 'INVENTORY 1→2 items', 'QUESTS UPDATED']);
+        }
+      },
+    },
+    {
       id: 'fire-pending-survey-ping',
       label: 'FIRE: SURVEY PING',
       subLabel: '_pendingSurveyPing + renderWorldMap() (forces the WORLD GRID view)',

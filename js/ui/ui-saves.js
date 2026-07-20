@@ -24,6 +24,63 @@
 // confirm-gated (confirmOverwriteSlot/confirmDeleteSlot) and a rolling backup
 // is snapped before any state-replacing load — never add a new destructive
 // path that skips the confirm step or the pre-load snapshot.
+// ── TRUTHFUL TRANSCRIPT ASSEMBLY (AI_OVERSEER Finding 5) ─────────────────────
+// Every export format used to iterate chatHistory alone, which silently dropped the
+// Director's `modal` nodes and every confirmation dialog — so a log could show the
+// AI apparently obeying a dangerous request when it had in fact asked first and the
+// popup was edited out of the record. This is the ONE assembly point all three
+// formats (txt/md/html) now share (Protocol 22): it merges chatHistory with the
+// transcript-event ledger (state.js) back into the order they appeared on screen.
+// An event's `at` is the chatHistory index it was recorded in FRONT of, so events
+// are flushed before the message at that index.
+function _transcriptRecords() {
+  const msgs = Array.isArray(chatHistory) ? chatHistory : [];
+  const evts =
+    typeof transcriptEvents !== 'undefined' && Array.isArray(transcriptEvents)
+      ? transcriptEvents.slice().sort((a, b) => (a.at || 0) - (b.at || 0))
+      : [];
+  const out = [];
+  let ei = 0;
+  for (let i = 0; i <= msgs.length; i++) {
+    while (ei < evts.length && (evts[ei].at || 0) <= i) {
+      out.push({ kind: 'event', evt: evts[ei] });
+      ei++;
+    }
+    if (i < msgs.length) out.push({ kind: 'msg', msg: msgs[i] });
+  }
+  return out;
+}
+
+// Renders one transcript event as plain lines (no markup) — the shared wording every
+// format uses, so the three exports can never disagree about what happened.
+function _transcriptEventLines(evt) {
+  const label = evt.kind === 'confirm' ? 'CONFIRMATION REQUESTED' : 'DIRECTOR MODAL';
+  const lines = [`[${label}] ${String(evt.title || '').replace(/^>\s*/, '')}`];
+  (evt.lines || []).forEach(l => {
+    if (String(l).trim()) lines.push('    ' + l);
+  });
+  if (evt.kind === 'confirm') {
+    lines.push('    ANSWER: ' + (evt.choice ? evt.choice : 'NO RESPONSE RECORDED'));
+  }
+  return lines;
+}
+
+// The chat-line label used across formats. Finding 4: the player side is named by the
+// active game's own title, never a hardcoded "COURIER" (Protocol 38).
+function _transcriptSpeaker(sender) {
+  if (sender === 'sys') return 'SYSTEM';
+  if (sender !== 'user') return 'DATABANK';
+  const id = typeof getIdentity === 'function' ? getIdentity() : null;
+  return ((id && id.playerNoun) || 'Courier').toUpperCase();
+}
+
+function _transcriptCleanText(text) {
+  return String(text)
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/\x60{3}[a-z]*\n?/gi, '')
+    .replace(/\x60{3}/g, '');
+}
+
 function exportCampaignLog(format = 'txt') {
   if (!chatHistory || chatHistory.length === 0) {
     if (typeof openModal === 'function')
@@ -38,20 +95,23 @@ function exportCampaignLog(format = 'txt') {
     // the on-screen optic in either game. Falls back to the canon RobCo green.
     const optics = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
     const fg = ((typeof THEMES !== 'undefined' && THEMES[optics]) || { hex: '#14fdce' }).hex;
-    let rows = chatHistory
-      .map(msg => {
-        let clean = msg.text
-          .replace(/<[^>]*>?/gm, '')
-          .replace(/```[a-z]*\n?/gi, '')
-          .replace(/```/g, '');
-        const label =
-          msg.sender === 'user' ? 'COURIER' : msg.sender === 'sys' ? 'SYSTEM' : 'DATABANK';
+    const _esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let rows = _transcriptRecords()
+      .map(rec => {
+        // Finding 5: a recorded popup renders as its own block, visually distinct from
+        // the chat so a reader can see the terminal ASKED and what the answer was.
+        if (rec.kind === 'event') {
+          const lines = _transcriptEventLines(rec.evt);
+          return `<div style="margin-bottom:10px;border:1px dashed ${fg};padding:6px 10px;opacity:0.92;"><span style="color:${fg};white-space:pre-wrap;">${_esc(lines.join('\n'))}</span></div>`;
+        }
+        const msg = rec.msg;
+        const clean = _transcriptCleanText(msg.text);
+        const label = _transcriptSpeaker(msg.sender);
         const color = msg.sender === 'user' ? '#fff' : msg.sender === 'sys' ? '#f39c12' : fg;
-        const safe = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return `<div style="margin-bottom:10px;"><span style="color:${color};opacity:0.6;font-size:11px;">[${label}]</span><br><span style="color:${color};white-space:pre-wrap;">${safe}</span></div>`;
+        return `<div style="margin-bottom:10px;"><span style="color:${color};opacity:0.6;font-size:11px;">[${_esc(label)}]</span><br><span style="color:${color};white-space:pre-wrap;">${_esc(clean)}</span></div>`;
       })
       .join('');
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>Courier: ${escapeHtml(state.loc || '?')} | ${formatGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>${_esc(_transcriptSpeaker('user'))}: ${escapeHtml(state.loc || '?')} | ${formatGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
     _downloadBlob(html, 'text/html', 'robco_campaign_log.html');
     return;
   }
@@ -60,16 +120,22 @@ function exportCampaignLog(format = 'txt') {
     // #27 Export as Markdown
     let md = `# RobCo U.O.S. — Campaign Log\n\n`;
     md += `**Location:** ${state.loc || '?'} | **Time:** ${formatGameTime(state.ticks || 0)} | **Level:** ${state.lvl || 1}\n\n---\n\n`;
-    chatHistory.forEach(msg => {
-      let clean = msg.text
-        .replace(/<[^>]*>?/gm, '')
-        .replace(/```[a-z]*\n?/gi, '')
-        .replace(/```/g, '')
-        .trim();
+    _transcriptRecords().forEach(rec => {
+      if (rec.kind === 'event') {
+        // Finding 5: popups are part of the record, blockquoted so they read as an
+        // out-of-band system event rather than another chat line.
+        md += _transcriptEventLines(rec.evt)
+          .map(l => `> ${l}`)
+          .join('\n');
+        md += '\n\n';
+        return;
+      }
+      const msg = rec.msg;
+      const clean = _transcriptCleanText(msg.text).trim();
       if (!clean) return;
       const prefix =
         msg.sender === 'user'
-          ? '**[COURIER]**'
+          ? `**[${_transcriptSpeaker(msg.sender)}]**`
           : msg.sender === 'sys'
             ? '*[SYSTEM]*'
             : '> [DATABANK]';
@@ -90,14 +156,16 @@ function _buildHolotapeText() {
   logStr += '         ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM\n';
   logStr += '                 AFTER-ACTION CAMPAIGN LOG\n';
   logStr += '=========================================================\n\n';
-  chatHistory.forEach(msg => {
-    let cleanText = msg.text
-      .replace(/<[^>]*>?/gm, '')
-      .replace(/\x60{3}[a-z]*\n/gi, '')
-      .replace(/\x60{3}/g, '');
-    if (msg.sender === 'user') logStr += `[COURIER]: ${cleanText}\n\n`;
-    else if (msg.sender === 'sys') logStr += `[SYSTEM]: ${cleanText}\n\n`;
-    else logStr += `[DATABANK]: ${cleanText}\n\n`;
+  // Finding 5: iterate the MERGED record, not chatHistory alone — the popups the old
+  // transcript silently dropped are what made it possible to read this log wrongly.
+  _transcriptRecords().forEach(rec => {
+    if (rec.kind === 'event') {
+      logStr += _transcriptEventLines(rec.evt).join('\n') + '\n\n';
+      return;
+    }
+    const msg = rec.msg;
+    const cleanText = _transcriptCleanText(msg.text);
+    logStr += `[${_transcriptSpeaker(msg.sender)}]: ${cleanText}\n\n`;
   });
   return logStr;
 }

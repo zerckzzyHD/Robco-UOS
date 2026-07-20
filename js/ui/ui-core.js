@@ -259,7 +259,16 @@ function exitStandby() {
       crtHumGain.gain.cancelScheduledValues(audioCtx.currentTime);
       crtHumGain.gain.linearRampToValueAtTime(0.007, audioCtx.currentTime + 0.5);
     }
-    appendToChat('> COURIER RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
+    // AI_OVERSEER Finding 4 (batch-2 leftover): this wake line hardcoded one game's
+    // protagonist title and printed it in every campaign. Batch 1 moved the AI
+    // directive and the Director-removal confirm copy onto
+    // GAME_DEFS[ctx].identity.playerNoun but deliberately left this line out of scope;
+    // it is the same class of bug, so it now reads that same per-game source
+    // (Protocol 38). Absence-guarded fallback only, never a per-game ternary — and
+    // deliberately no game literal in this function, which Suite 150.9 enforces.
+    const _wakeId = typeof getIdentity === 'function' ? getIdentity() : null;
+    const _wakeNoun = ((_wakeId && _wakeId.playerNoun) || 'Courier').toUpperCase();
+    appendToChat('> ' + _wakeNoun + ' RETURNED. SYNCHRONIZING TELEMETRY...', 'sys', true);
     let _rads = parseInt(document.getElementById('stat_rads').value) || 0;
     setGeigerRate(_rads >= 1000 ? 25 : _rads >= 600 ? 12 : _rads >= 200 ? 0.33 : 0);
     // The uptime + memory-cycle observers resume automatically on the ACTIVE re-entry
@@ -824,6 +833,17 @@ function _restoreApiKeyAndChatHistory() {
     chatHistory = [];
     localStorage.removeItem('robco_chat');
     appendToChat('> SYSTEM INITIALIZED. DIAGNOSTIC CORE ACTIVE...', 'sys', true);
+  }
+  // AI_OVERSEER Finding 5: restore the transcript-event ledger alongside the chat it
+  // annotates, so a log downloaded after a reload still shows the popups. Failure is
+  // silent and non-fatal — a missing ledger degrades to the old chat-only export,
+  // never a broken boot.
+  try {
+    const _teRaw = localStorage.getItem('robco_transcript_events');
+    const _te = _teRaw ? JSON.parse(_teRaw) : null;
+    transcriptEvents = Array.isArray(_te) ? _te : [];
+  } catch (_) {
+    transcriptEvents = [];
   }
 }
 
@@ -1670,7 +1690,16 @@ function _updatePanelBadges() {
 // ── AUTO-EXPAND PANEL (#31) ──────────────────────────────────────────
 // Called by autoImportState() after a state delta with the changed category key.
 // Opens the relevant panel so the Courier can immediately see what changed.
-function expandPanelForCategory(categoryKey) {
+// AI_OVERSEER Finding 6 (owner directive): `opts.navigate` gates ONLY the tab jump.
+// Default TRUE, so every existing caller — the `#go=` deep links, the native command
+// router's panel navigation, the LOOT/ammo hand-offs, the typed panel aliases — keeps
+// its current "take me there" behaviour byte-for-byte. The post-sync AI import path is
+// the ONE caller that passes {navigate:false}: it still OPENS the panel that changed
+// (so a user who navigates there manually finds it already expanded), but no longer
+// drags the view off the terminal mid-conversation. The change is surfaced in place as
+// a card instead (_syncChangeCardsShow).
+function expandPanelForCategory(categoryKey, opts) {
+  const _navigate = !(opts && opts.navigate === false);
   // Tab routing: switch to the correct tab before expanding the panel
   const tabMap = {
     squad: 'inv',
@@ -1697,7 +1726,7 @@ function expandPanelForCategory(categoryKey) {
     databank: 'data',
     config: 'settings',
   };
-  if (tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
+  if (_navigate && tabMap[categoryKey]) switchTab(tabMap[categoryKey]);
 
   const map = {
     squad: '> SQUAD ROSTER',
@@ -2115,6 +2144,7 @@ function confirmAction(opts) {
     const settle = val => {
       if (resolved) return;
       resolved = true;
+      _recordChoice(val); // Finding 5 — write the player's answer into the record
       resolve(val);
     };
     const warningHtml = String(opts.warning || 'Are you sure?')
@@ -2123,6 +2153,25 @@ function confirmAction(opts) {
       .join('');
     const confirmLabel = opts.confirmLabel || 'CONFIRM';
     const cancelLabel = opts.cancelLabel || 'CANCEL';
+    // AI_OVERSEER Finding 5: every confirmation dialog is recorded in the transcript
+    // ledger, anchored where it appeared, and its ANSWER is written back on
+    // resolution — so the downloaded log shows both that the terminal asked and what
+    // the player chose. This is the one choke point every confirm flows through
+    // (Protocol 22), so recording here covers the Director state-removal gates and
+    // every native destructive confirm alike.
+    const _tEntry =
+      typeof recordTranscriptEvent === 'function'
+        ? recordTranscriptEvent(
+            'confirm',
+            opts.title || '> CONFIRM ACTION',
+            String(opts.warning || 'Are you sure?').split('\n')
+          )
+        : null;
+    const _recordChoice = answered => {
+      if (!_tEntry) return;
+      _tEntry.choice = answered ? confirmLabel : cancelLabel;
+      if (typeof _persistTranscriptEvents === 'function') _persistTranscriptEvents();
+    };
     const body =
       '<div class="modal-confirm-body">' +
       warningHtml +
@@ -2902,7 +2951,20 @@ function appendToChat(text, sender, isHistoryLoad = false) {
   if (!isHistoryLoad) {
     chatHistory.push({ text, sender });
     // Cap in-memory history and debounce the localStorage write
-    if (chatHistory.length > CHAT_MAX) chatHistory = chatHistory.slice(-CHAT_MAX);
+    if (chatHistory.length > CHAT_MAX) {
+      // AI_OVERSEER Finding 5: transcript-event anchors are chatHistory INDICES, so
+      // dropping the oldest N chat lines must shift every anchor by the same N or the
+      // recorded popups drift to the wrong place in the export. An event whose anchor
+      // falls off the front is dropped with the lines it annotated.
+      const _dropped = chatHistory.length - CHAT_MAX;
+      chatHistory = chatHistory.slice(-CHAT_MAX);
+      if (typeof transcriptEvents !== 'undefined' && Array.isArray(transcriptEvents)) {
+        transcriptEvents = transcriptEvents
+          .map(e => Object.assign({}, e, { at: (e.at || 0) - _dropped }))
+          .filter(e => e.at >= 0);
+        if (typeof _persistTranscriptEvents === 'function') _persistTranscriptEvents();
+      }
+    }
     clearTimeout(_chatSaveTimer);
     _chatSaveTimer = setTimeout(() => {
       // Debounce eliminates jitter — no need to further truncate here.
@@ -2922,6 +2984,10 @@ async function clearChat() {
   if (ok) {
     chatHistory = [];
     localStorage.removeItem('robco_chat');
+    // Finding 5: the event ledger annotates the chat — purging one without the other
+    // would leave orphaned popups anchored to lines that no longer exist.
+    transcriptEvents = [];
+    localStorage.removeItem('robco_transcript_events');
     document.getElementById('chatDisplay').innerHTML = '';
     appendToChat('> SYSTEM LOGS PURGED. AWAITING COURIER INPUT...', 'sys', true);
   }
@@ -2971,9 +3037,11 @@ async function wipeTerminal() {
 
   Object.assign(state, freshState);
 
-  // Clear chat history
+  // Clear chat history (+ the Finding 5 transcript-event ledger that annotates it)
   chatHistory = [];
   localStorage.removeItem('robco_chat');
+  transcriptEvents = [];
+  localStorage.removeItem('robco_transcript_events');
   localStorage.removeItem('robco_v7'); // force fresh state on next save
 
   // Re-present game context selection

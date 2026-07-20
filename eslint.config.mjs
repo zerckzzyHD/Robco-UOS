@@ -128,6 +128,14 @@ export default [
         generateSyncPayload: 'readonly',
         restoreChatHistory: 'readonly',
         chatHistory: 'writable',
+        // AI_OVERSEER Finding 5 — the transcript-event ledger. Declared in state.js
+        // (beside chatHistory, which it annotates) and read/written across the
+        // ui-core / ui-saves / api families exactly like chatHistory itself.
+        transcriptEvents: 'writable',
+        recordTranscriptEvent: 'readonly', // state.js -> api.js, ui-core.js
+        _persistTranscriptEvents: 'readonly', // state.js -> ui-core.js
+        // AI_OVERSEER Finding 6 — post-sync in-place change cards.
+        _syncChangeCardsShow: 'readonly', // ui-core-cmd.js -> api-import.js
         transmitMessage: 'readonly',
         _wireApiEventBusSubscribers: 'readonly', // U7 OS event bus (api-import.js)
         fetchAuthorizedModels: 'readonly',

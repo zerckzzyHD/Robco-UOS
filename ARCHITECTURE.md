@@ -106,7 +106,7 @@
 ├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.js    3470-test Node runner (the single canonical gate audit)
+│   ├── robco-diagnostics.js    3494-test Node runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
@@ -517,7 +517,7 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 239 suites / 3470 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
+**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, all 240 suites / 3494 tests still pass unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
 
 **Diagnostic Shell U1 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
@@ -2560,9 +2560,39 @@ JSON string → parse
   → Faction change auto-logging to campaign_notes
   → loadUI()
   → playSyncTone()
-  → Auto-expand changed panels (#31)
+  → Auto-expand changed panels (#31) — EXPAND ONLY, no tab switch (AI_OVERSEER F6)
+  → Flush in-place change cards (_syncChangeCardsShow — AI_OVERSEER F6)
   → Show undo button
 ```
+
+**Post-sync surface — cards, not tab-jumps (AI_OVERSEER Finding 6, owner directive, 2026-07-19).**
+The #31 auto-expand pass used to call `expandPanelForCategory(cat)` with its default tab
+routing, so ANY AI state change yanked the view off the terminal to whichever panel changed —
+interrupting the conversation the player was reading. It now passes `{ navigate: false }`: the
+changed panel is still EXPANDED (a player who walks over there manually still finds it open),
+but the tab does not switch. Each change is instead surfaced in place as a card in the top-right,
+through the SAME `#locationCard` toast the location-arrival card already uses (Protocol 22) —
+now fed by a bounded FIFO queue (`_cardEnqueue`/`_cardPump`, `ui-core-cmd.js`) so a burst of
+changes plays in sequence rather than each clobbering the last. The card text comes from the SAME
+diff that builds the `[DELTA]` chat line — one change-detector, two surfaces (a durable line for
+the record, a transient card so the change is visible as it happens). `expandPanelForCategory()`'s
+new `opts.navigate` DEFAULTS TRUE, so `#go=` deep links, the native command router, the LOOT/ammo
+hand-offs and every typed panel alias keep their existing "take me there" behaviour unchanged.
+Guarded by Suite 240.
+
+**Truthful log export (AI_OVERSEER Finding 5, 2026-07-19).** `chatHistory` holds only chat lines,
+so the downloaded campaign log silently dropped every AI `modal` node (rendered into `#sysModal`,
+never appended to `chatHistory`) and every `confirmAction()` dialog. That is not merely incomplete —
+it is misleading, and it produced a real false conclusion during the audit itself: a log appeared
+to show the Director silently obeying "level me up to 15" when it had in fact raised a confirmation
+that the player declined, with the popup edited out of the record. A parallel ledger
+(`transcriptEvents` + `recordTranscriptEvent()`, `js/core/state.js`, declared beside `chatHistory`)
+now records those events, anchored to the `chatHistory` index they appeared at, with the player's
+ANSWER written back on resolution. `appendToChat()` rebases every anchor when the history is capped
+so recorded popups cannot drift. `_transcriptRecords()` (`js/ui/ui-saves.js`) is the ONE assembly
+point all three export formats (txt/md/html) share, merging chat and events back into on-screen
+order. The ledger is persisted to `localStorage['robco_transcript_events']`, restored at boot, and
+cleared with the chat. Guarded by Suite 240.
 
 **Registry-trust guard (Protocol 42 defense-in-depth, added alongside the cross-game
 save-load fix — `planning/2.8.5/audits/AUDIT_registry_leak.md`):** before mapping the five
@@ -3333,7 +3363,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3470-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 3494-test persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable

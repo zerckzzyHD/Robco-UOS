@@ -1973,19 +1973,53 @@ function _wireFeedbackEchoSubscribers() {
 let _locCardTimer = null;
 let _locCardHideTimer = null;
 
-function _locationCardShow(loc) {
+// AI_OVERSEER Finding 6 — CARD QUEUE. The card used to be a single clobbering slot:
+// a second trigger overwrote the first mid-display, so a burst of signals lost all
+// but the last. Finding 6 makes post-sync state CHANGES ride this same card instead
+// of stealing the tab, and a sync routinely produces several at once — so the one
+// card element is now fed by a bounded FIFO queue and plays them in sequence
+// (Protocol 22: ONE toast component, never a second parallel stack). The queue is
+// capped so a pathological sync can never monopolise the corner of the screen;
+// overflow is dropped, because the [DELTA] chat line below is the durable record.
+const CARD_QUEUE_MAX = 5;
+const CARD_DWELL_MS = 2200; // location arrival — unchanged
+const CARD_DWELL_CHANGE_MS = 1700; // post-sync change cards — slightly brisker
+let _cardQueue = [];
+let _cardBusy = false;
+
+// Enqueue one card. `text` is raw (escaped at render); `dwellMs` is its display time.
+function _cardEnqueue(text, dwellMs) {
   if (!_echoShouldShow()) return; // same hidden-tab/powered-down suppression as the annunciator
+  if (!document.getElementById('locationCard')) return;
+  if (_cardQueue.length >= CARD_QUEUE_MAX) return; // bounded — never an unbounded backlog
+  _cardQueue.push({ text: String(text), dwell: dwellMs || CARD_DWELL_MS });
+  if (!_cardBusy) _cardPump();
+}
+
+// Render the head of the queue, then chain to the next once it has fully exited.
+function _cardPump() {
+  const next = _cardQueue.shift();
+  if (!next) {
+    _cardBusy = false;
+    return;
+  }
+  _cardBusy = true;
   const el = document.getElementById('locationCard');
-  if (!el) return;
+  if (!el) {
+    _cardQueue = [];
+    _cardBusy = false;
+    return;
+  }
   const labelEl = el.querySelector('.loc-card-label');
   if (labelEl) {
-    labelEl.innerHTML = typeof escapeHtml === 'function' ? escapeHtml(String(loc)) : String(loc);
+    labelEl.innerHTML =
+      typeof escapeHtml === 'function' ? escapeHtml(next.text) : String(next.text);
   }
   clearTimeout(_locCardTimer);
   clearTimeout(_locCardHideTimer);
   el.setAttribute('aria-hidden', 'false');
   el.classList.remove('hide');
-  void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly on a rapid re-trigger
+  void el.offsetWidth; // reflow — a re-trigger restarts the entrance cleanly
   el.classList.add('show');
   _locCardTimer = setTimeout(() => {
     el.classList.remove('show');
@@ -1993,10 +2027,26 @@ function _locationCardShow(loc) {
     _locCardHideTimer = setTimeout(() => {
       el.classList.remove('hide');
       el.setAttribute('aria-hidden', 'true');
+      _cardPump(); // next card (or idle) — never overlaps the exit animation
     }, 240); // matches the location-card-out keyframe duration
-  }, 2200);
+  }, next.dwell);
+}
+
+function _locationCardShow(loc) {
+  _cardEnqueue(loc, CARD_DWELL_MS);
 }
 window._locationCardShow = _locationCardShow;
+
+// AI_OVERSEER Finding 6 — the post-sync CHANGE CARDS. Called by autoImportState()
+// with the already-computed change descriptions (an UPGRADE of the existing [DELTA]
+// mechanism, not a second change-detector — the strings come from the same diff).
+// Each change rides the SAME card element as a location arrival, so a Director sync
+// announces itself in place on the terminal instead of yanking the view to a panel.
+function _syncChangeCardsShow(lines) {
+  if (!Array.isArray(lines) || !lines.length) return;
+  lines.forEach(line => _cardEnqueue(line, CARD_DWELL_CHANGE_MS));
+}
+window._syncChangeCardsShow = _syncChangeCardsShow;
 
 // Wiring is deferred to a function called from window.onload (the U7
 // boot-order lesson), never a bare top-level RobcoEvents.on() call.

@@ -2242,6 +2242,67 @@ window._defaultState = JSON.parse(JSON.stringify(state));
 
 let chatHistory = [];
 
+// ── TRANSCRIPT EVENT LEDGER (AI_OVERSEER Finding 5) ──────────────────────────
+// chatHistory holds only the CHAT lines. Everything else that appeared on screen —
+// an AI `modal` node (rendered into #sysModal, never appended to chatHistory) and
+// any confirmAction() dialog plus the answer the player gave it — used to be absent
+// from the downloaded campaign log entirely. That produced a real false conclusion
+// during the AI/Overseer audit: a log appeared to show the Director silently obeying
+// "level me up to 15" when it had in fact raised a confirmation popup, because the
+// popup was edited out of the record. An export that misrepresents what happened is
+// worse than no export, so the popups are now recorded here and interleaved into
+// every export format by _transcriptRecords() (ui-saves.js).
+//
+// Each entry: { at, kind, title, lines[], choice }
+//   at     — chatHistory.length at record time; the anchor that puts the event back
+//            in the right place between two chat lines. Rebased when chatHistory is
+//            capped (see appendToChat) so the anchors never drift.
+//   kind   — 'modal' (a Director modal node) | 'confirm' (a confirmation dialog)
+//   choice — for 'confirm': what the player actually chose. null until they answer.
+// Purely a RECORD of on-screen events: never read back into state, never replayed
+// into the UI, and capped alongside the chat it annotates.
+let transcriptEvents = [];
+const TRANSCRIPT_EVENTS_MAX = 100;
+
+// Records one non-chat on-screen event. Absence-guarded and never throws — a failure
+// to record must never break the dialog it is recording. Returns the entry so a
+// caller with a deferred outcome (confirmAction) can fill in `choice` on resolution.
+function recordTranscriptEvent(kind, title, lines) {
+  try {
+    const entry = {
+      at: Array.isArray(chatHistory) ? chatHistory.length : 0,
+      kind: String(kind || 'modal'),
+      title: String(title || ''),
+      lines: (Array.isArray(lines) ? lines : [lines]).filter(l => l != null).map(String),
+      choice: null,
+    };
+    transcriptEvents.push(entry);
+    if (transcriptEvents.length > TRANSCRIPT_EVENTS_MAX) {
+      transcriptEvents = transcriptEvents.slice(-TRANSCRIPT_EVENTS_MAX);
+    }
+    if (typeof _persistTranscriptEvents === 'function') _persistTranscriptEvents();
+    return entry;
+  } catch (_) {
+    return null;
+  }
+}
+window.recordTranscriptEvent = recordTranscriptEvent;
+
+// Debounced mirror of the ledger alongside robco_chat, so an export taken AFTER a
+// reload is just as truthful as one taken in-session (the log is the whole point).
+let _transcriptSaveTimer = null;
+function _persistTranscriptEvents() {
+  clearTimeout(_transcriptSaveTimer);
+  _transcriptSaveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem('robco_transcript_events', JSON.stringify(transcriptEvents));
+    } catch (_) {
+      /* quota/private-mode — the in-memory ledger still serves this session */
+    }
+  }, 200);
+}
+window._persistTranscriptEvents = _persistTranscriptEvents;
+
 // ── STATE PERSISTENCE ───────────────────────────────────────────
 // Decoupled into two steps:
 //   syncStateFromDom() — immediate DOM → state sync (no I/O)

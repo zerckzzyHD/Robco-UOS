@@ -333,6 +333,14 @@ function autoImportState(jsonString) {
     // Snapshot current state for undo before applying changes
     window._lastStateBeforeSync = JSON.stringify(state);
 
+    // AI_OVERSEER Finding 6 — collected in-place change-card lines for this sync.
+    // Filled from the SAME diff that builds the [DELTA] chat line below (scalars) and
+    // from the changed-category pass at the end of this function (arrays/objects), then
+    // flushed once to _syncChangeCardsShow(). This is the upgrade of the existing DELTA
+    // primitive the owner asked for — one change-detector, two surfaces (a durable chat
+    // line for the record, a transient card so the change is visible AS IT HAPPENS).
+    const _cardLines = [];
+
     let parsed = JSON.parse(jsonString);
 
     // ── DIRECT FIELD MAPPING (no flatten — avoids key collision risk) ─────────────
@@ -846,6 +854,10 @@ function autoImportState(jsonString) {
           changes.push(`ammo: ${oldAmmoRounds}→${newAmmoRounds} rounds`);
         if (changes.length > 0) {
           appendToChat('> [DELTA] ' + changes.join(' | '), 'sys', true);
+          // Finding 6: the same scalar changes, one card each. "caps: 0→45" reads as
+          // "CAPS 0→45" on the card (the colon is chat-line grammar, not card grammar);
+          // the card element uppercases via CSS.
+          changes.forEach(c => _cardLines.push(c.replace(': ', ' ')));
         }
       } catch (e) {
         /* silent */
@@ -1158,23 +1170,39 @@ function autoImportState(jsonString) {
     // #33 Sync tone — subtle two-note confirmation after state loads
     if (typeof playSyncTone === 'function') playSyncTone();
 
-    // #31 Auto-expand panels that received updates this sync
+    // #31 Auto-expand panels that received updates this sync.
+    // AI_OVERSEER Finding 6 (OWNER DIRECTIVE): this pass used to call
+    // expandPanelForCategory(cat) with its default tab routing, so any AI state change
+    // yanked the view off the terminal to the affected panel — interrupting the
+    // conversation the player was actually having. It now passes {navigate:false}: the
+    // panel is still EXPANDED (so a player who walks over there manually finds it open,
+    // exactly as before), but the tab no longer switches. Each change instead surfaces
+    // in place as a card on the terminal, via the same toast the location-change card
+    // already uses. Nothing here touches switchTab(), `#go=` deep links, or the bezel
+    // nav's own routing — those all still call expandPanelForCategory() with navigation
+    // on by default.
     if (typeof expandPanelForCategory === 'function') {
-      [
-        'squad',
-        'status',
-        'inventory',
-        'ammo',
-        'campaign_notes',
-        'perks',
-        'factions',
-        'quests',
-        'equipped',
-        'collectibles', // v2.0
-        'lincolnItems', // Phase 6 Task 4
-        'traits', // Phase 6 Task 5
-        'skillBooks', // Phase 6 Task 6
-      ].forEach(cat => {
+      // Card labels for the array/object categories. Deliberately NOT the panel <h2>
+      // titles from expandPanelForCategory()'s own map — that map answers "which board
+      // do I open", this answers "what should the player be told just changed", and the
+      // two drift independently (a board can be renamed without the announcement
+      // changing). Kept here beside the categories it labels.
+      const _CARD_LABELS = {
+        squad: 'SQUAD UPDATED',
+        status: 'STATUS EFFECTS UPDATED',
+        inventory: 'INVENTORY UPDATED',
+        ammo: 'AMMO UPDATED',
+        campaign_notes: 'FIELD NOTES UPDATED',
+        perks: 'PERKS UPDATED',
+        factions: 'FACTION STANDING UPDATED',
+        quests: 'QUESTS UPDATED',
+        equipped: 'LOADOUT UPDATED',
+        collectibles: 'CURIO ARCHIVE UPDATED',
+        lincolnItems: 'LINCOLN ARCHIVE UPDATED',
+        traits: 'TRAITS UPDATED',
+        skillBooks: 'SKILL BOOKS UPDATED',
+      };
+      Object.keys(_CARD_LABELS).forEach(cat => {
         const before = JSON.parse(window._lastStateBeforeSync || '{}');
         const bArr = Array.isArray(before[cat])
           ? JSON.stringify(before[cat])
@@ -1182,8 +1210,18 @@ function autoImportState(jsonString) {
         const nArr = Array.isArray(state[cat])
           ? JSON.stringify(state[cat])
           : JSON.stringify(state[cat] || {});
-        if (bArr !== nArr) expandPanelForCategory(cat);
+        if (bArr === nArr) return;
+        expandPanelForCategory(cat, { navigate: false });
+        // Skip a category card the scalar DELTA cards already announced with real
+        // numbers — "INVENTORY 0→1 ITEMS" is strictly better than "INVENTORY UPDATED".
+        const _already = _cardLines.some(l => l.toLowerCase().startsWith(cat.toLowerCase()));
+        if (!_already) _cardLines.push(_CARD_LABELS[cat]);
       });
+    }
+
+    // Flush every change this sync produced onto the in-place card queue.
+    if (_cardLines.length && typeof _syncChangeCardsShow === 'function') {
+      _syncChangeCardsShow(_cardLines);
     }
 
     // Show undo button after every AI sync

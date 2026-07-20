@@ -484,10 +484,19 @@ async function transmitMessage(overrideText) {
             // the AI->native survey Part C.1 retired the AI GPS modal (cartography is a
             // native offline view, Suite 202) — every remaining AI modal renders as plain
             // TEXT; the directive (above) forbids the AI from ever emitting anything else.
-            mContent.innerText = Array.isArray(parsedNode.modal.content)
-              ? parsedNode.modal.content.join('\n')
-              : parsedNode.modal.content;
+            const _modalLines = Array.isArray(parsedNode.modal.content)
+              ? parsedNode.modal.content
+              : [parsedNode.modal.content];
+            mContent.innerText = _modalLines.join('\n');
             document.getElementById('sysModal').style.display = 'flex';
+            // AI_OVERSEER Finding 5: a modal node is rendered to #sysModal and NEVER
+            // appended to chatHistory, so it used to vanish from the downloaded log —
+            // the exact omission that made a correctly-confirmed "level me up to 15"
+            // read as silent compliance. Record it so the export shows what was on
+            // screen. Purely a record; the modal itself is unchanged.
+            if (typeof recordTranscriptEvent === 'function') {
+              recordTranscriptEvent('modal', parsedNode.modal.title, _modalLines);
+            }
           }
 
           let narrativeContent =
