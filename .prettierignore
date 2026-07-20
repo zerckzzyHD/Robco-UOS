@@ -19,7 +19,6 @@ js/vendor/
 # not Prettier-managed. They were formerly skipped via .gitignore; keep them skipped
 # here now that they are un-ignored so Prettier does not churn their tables.
 CLAUDE.md
-RULES.md
 
 # Claude-facing local reference library (gitignored; belt-and-suspenders so Prettier
 # never churns the hand-authored brain dump even if the .gitignore default changes).

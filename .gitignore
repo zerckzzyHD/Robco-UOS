@@ -1,5 +1,5 @@
 # Private / AI-agent files — keep off GitHub
-# NOTE: CLAUDE.md and RULES.md are intentionally tracked — the test gate reads them
+# NOTE: CLAUDE.md and rules/ are intentionally tracked — the test gate reads them
 # (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
 

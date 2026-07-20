@@ -45,7 +45,7 @@ jobs:
 
       - name: Stage app files
         # Copy only the files that belong on the public site.
-        # Private files (CLAUDE.md, RULES.md, ARCHITECTURE.md, tests/, scripts/,
+        # Private files (CLAUDE.md, rules/, ARCHITECTURE.md, tests/, scripts/,
         # .github/, node_modules, package files) are intentionally excluded.
         # assets/ covers icon.png + all shortcut icons (comm-link, inventory, stats, new-campaign).
         run: |

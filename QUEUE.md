@@ -383,11 +383,12 @@ test enforced any retired item — they were prose only — so nothing was remov
 
 </details>
 
-**Noted for a future stage, deliberately NOT acted on at R3** (scope discipline — the owner must
-be able to judge whether this cut mattered before the next one is proposed):
+**Noted at R3 for a follow-up pass — ✅ BOTH CLOSED 2026-07-20.** Neither was a new trim
+decision; both were _consequences_ of decisions already landed (R2's rulebook split, R1's
+Protocol 2a retirement), so they ran immediately rather than waiting on the stage-2 evidence gate.
 
-- **`RULES.md`** is now a 32-line pointer file whose entire content is "read `CLAUDE.md`". It duplicates the R2 explanation a third time (after `CLAUDE.md`'s own preamble and `library/CODE_MAP.md`'s). It cannot simply be deleted — Suite 89.12 asserts it contains "Protocol 38" and Suite 220.9 scans it — so retiring it is a real Protocol 49 job with enforcement to remove, not a delete.
-- **The per-suite `// N tests` comments** in `tests/robco-diagnostics.js` are explicitly unmaintained as of the Protocol 2a retirement, and the rulebook says not to trust them. Dead narration that a session can still mistake for fact.
+- ✅ **`RULES.md` — DELETED.** It had become a 32-line pointer file whose entire content was "read `CLAUDE.md`", duplicating the R2 explanation a third time (after `CLAUDE.md`'s own preamble and `library/CODE_MAP.md`'s). It was a real Protocol 49 job, not a delete: every assertion naming it was retargeted at the invariant it actually protected — Protocol 38 and Protocol 40 now read the rulebook (`CLAUDE.md` + `rules/*.md`) instead of the pointer; the repomix private-file exclusion now asserts `CLAUDE.md` + `rules/**`. Suite 28 gained a stays-deleted guard, the same inversion used when the PowerShell runner mirror was removed. No test was deleted merely for being in the way.
+- ✅ **The per-suite `// N tests` comments — STRIPPED.** The 2a retirement removed the obligation to keep them accurate but left the numbers in place, so they still read as fact — the tax cured, the lie kept. All 152 standalone comments plus every inline `(N tests)` / trailing `N tests.` fragment are gone from `tests/robco-diagnostics.js`, and the same sweep cleaned `library/TEST_CATALOG.md`, `library/CODE_MAP.md`, and `library/BRAIN_DUMP.md`. Suite 28 guards the convention against returning. `tests/test.html`'s `Suites: N` marker (a self-consistency check, Protocol 40) and the frozen `Tests: N/N` headers on **released** CHANGELOG blocks (history, not obligation) were deliberately kept.
 
 ### R4. ⬜ THE RE-PIN PASS — stamp the local-only artifacts to one commit
 

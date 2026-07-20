@@ -1193,7 +1193,6 @@ try {
 // ══════════════════════════════════════════════════════════════
 //  SUITE 14 — Render Contracts (Protocol 20)
 //  Static source checks that render*() markup/class contracts are intact.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Render Contracts (Protocol 20)');
 let renderFactionRepBody = '';
@@ -1277,7 +1276,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 15 — CSS Invariants (Protocol 20)
 //  Verifies critical CSS rules that guard mobile layout and faction button sizing.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
 const cssSource = readCss();
@@ -1353,7 +1351,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 16 — Service Worker Invariants (Protocol 20)
 //  Static source guards for SW install/activate/message behavior.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Service Worker Invariants (Protocol 20)');
 const swSource = readFile('sw.js');
@@ -1405,7 +1402,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 17 — Structural Integrity (Protocol 20)
 //  Verifies key render functions exist, are called, and their DOM targets exist.
-//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Structural Integrity (Protocol 20)');
 guards(uiSource, [
@@ -1436,7 +1432,6 @@ guards(indexHtml, [
 // ══════════════════════════════════════════════════════════════
 //  SUITE 18 — Detail-Current Dedup Guard (Protocol 27)
 //  Verifies scoreZoneForLoc correctly rejects substring-only matches (<50).
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Detail-Current Dedup Guard');
 try {
@@ -1470,7 +1465,6 @@ try {
 // ══════════════════════════════════════════════════════════════
 //  SUITE 19 — FO3 Database structural integrity
 //  Mirrors Suite 9 for js/db_fo3.js: CSV tables, purity contract.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('FO3 Database structural integrity');
 const dbFo3Source = readGroup('db_fo3');
@@ -1534,7 +1528,6 @@ guards(dbFo3Code, [
 //  SUITE 20 — CSV column-count integrity
 //  Every WEAPONS.CSV data row in db_nv and db_fo3 must have the
 //  same number of fields as the header row.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('CSV column-count integrity');
 
@@ -1577,7 +1570,6 @@ checkWeaponsCsvColumnCount(dbFo3Source, 'db_fo3.js');
 //  strings (localStorage, Firestore, Gemini API) are escaped before
 //  innerHTML, and no served JS inlines a localStorage read into a
 //  template literal.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Security regression guards');
 
@@ -1722,7 +1714,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 22 — Critical Feature Presence (Group 1)
 //  Asserts every key control exists in index.html and is wired.
-//  30 tests
 // ══════════════════════════════════════════════════════════════
 header('Critical Feature Presence');
 // DO-N: the tab-bar's plain buttons were replaced by illuminated bezel keycaps that
@@ -1804,7 +1795,6 @@ guards(htmlSource, [
 // ══════════════════════════════════════════════════════════════
 //  SUITE 23 — Prohibited Patterns (Group 2)
 //  Static checks that banned patterns haven't crept back in.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Prohibited Patterns');
 // 23.1 No innerHTML += in ui.js (render functions must use map().join('') bulk assignment)
@@ -1901,7 +1891,6 @@ assert(
 //  SUITE 24 — Protocol Completeness (Group 3)
 //  P5: every render*() is called from loadUI(); P6: wireInput IDs
 //  exist; P7: every audio function has the double-guard pattern.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Protocol Completeness — P5 render wiring');
 {
@@ -1976,7 +1965,6 @@ header('Protocol Completeness — P7 audio double-guard');
 //  SUITE 25 — AI Contract Lock (Group 4)
 //  Verifies responseMimeType is locked and getSystemDirective()
 //  references the tri-node schema shape.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('AI Contract Lock');
 assert(
@@ -2015,7 +2003,6 @@ assert(
 //  SUITE 26 — Architectural Boundaries (Group 5)
 //  reg_fo3.js must be pure read-only reference data: no state
 //  writes, no localStorage, no chatHistory references.
-//  3 tests
 // ══════════════════════════════════════════════════════════════
 header('Architectural Boundaries — reg_fo3.js purity');
 {
@@ -2032,7 +2019,6 @@ header('Architectural Boundaries — reg_fo3.js purity');
 //  SUITE 27 — Assets Completeness (Group 6)
 //  Every local <script src> / <link href> in index.html must
 //  appear in sw.js ASSETS so the PWA caches the full app.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Assets Completeness');
 {
@@ -2121,13 +2107,39 @@ header('Meta / Single-Runner Guard');
     !/Tests:\s*\d+/.test(unreleasedHeader),
     'CHANGELOG.md [Unreleased] header carries no live test count (Protocol 2a retired — released blocks keep their frozen historical counts)'
   );
+
+  // R3 follow-up (2026-07-20, Protocol 49): RULES.md was DELETED. It had become
+  // a 32-line pointer whose entire job was "go read CLAUDE.md" — redundant once
+  // R2 split the rulebook into CLAUDE.md (universal contract) + rules/*.md
+  // (path-scoped notes). Every assertion that named it was retargeted at the
+  // invariant it actually protected (Protocol 38 → the rulebook, Protocol 40 →
+  // the rulebook, the repomix private-file exclusion → CLAUDE.md + rules/**).
+  // Same inversion as the PS-mirror guard above: assert it stays gone, so a
+  // future session cannot silently reintroduce a second rulebook to drift from.
+  assert(
+    !fs.existsSync(path.join(ROOT, 'RULES.md')),
+    'RULES.md stays deleted (R3 — the rulebook is CLAUDE.md + rules/*.md, one source of truth)'
+  );
+
+  // R3 follow-up: the per-suite "// N tests" narration comments were STRIPPED
+  // from this runner. Protocol 2a's retirement removed the obligation to keep
+  // those numbers accurate but left the numbers sitting there reading as fact —
+  // curing the tax while keeping the lie. Assert the convention does not return.
+  {
+    const selfSrc28 = readFile('tests/robco-diagnostics.js');
+    const countComments28 = (selfSrc28.match(/^\s*\/\/\s*\(?\d+ tests?\)?\s*$/gm) || []).length;
+    assert(
+      countComments28 === 0,
+      'tests/robco-diagnostics.js carries no per-suite "// N tests" count comments (Protocol 2a retired — unmaintained counts must not read as fact)' +
+        (countComments28 ? ` — found ${countComments28}` : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 29 — SW Update Banner (Protocol 13/20)
 //  Regression guards: alert() replaced by in-page banner;
 //  banner element + tap→SKIP_WAITING wiring; reload guard intact.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 header('SW Update Banner');
 
@@ -2172,7 +2184,6 @@ assert(
 //  Input maxlength caps, enforcing CSP (Stage 2), the branch-agnostic
 //  cache-bump guard (exercised behaviourally in a throwaway git repo),
 //  proactive localStorage quota warning.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 1b Guards');
 
@@ -2330,7 +2341,6 @@ assert(
 //  hook-install and boot-smoke scripts exist;
 //  the cache-bump gate is delegated to the Node guard (served-file gate);
 //  gate.js messages describe the single Node runner.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CI/CD Automation Guards');
 
@@ -2392,10 +2402,7 @@ assert(
 // 31.7 ci.yml does not contain stale "(386 tests)" label
 {
   const ciSource = readFile('.github/workflows/ci.yml');
-  assert(
-    !/\(386 tests\)/.test(ciSource),
-    'ci.yml does not contain stale "(386 tests)" label (updated to 519)'
-  );
+  assert(!/\(386 tests\)/.test(ciSource), 'ci.yml does not contain stale "(386 tests)" label');
 }
 
 // 31.8 deploy.yml trigger is release-gated (workflow_call — invoked only by release.yml)
@@ -2504,7 +2511,6 @@ assert(
 //  Data-driven COMMAND_REGISTRY; no box-drawing glyphs; removed commands
 //  absent from both ui.js and api.js; .skill-row markup in index.html;
 //  _applyChemHighlights targets .skill-row selector.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2a Guards');
 
@@ -2584,7 +2590,6 @@ assert(
 // Suite 33 -- Phase 2b Guards (Optics RGB, Empty-State, Utility Classes)
 // --robco-green-rgb CSS var chain; emptyState() helper; utility classes;
 // config-summary toggle; no residual rgba(20,253,206) literals.
-// 10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2b Guards');
 
@@ -2682,7 +2687,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 34 — Phase 2c Guards (CSS Hygiene, List-Row, Btn-Sm, Empty-State Vocab)
 //  Deleted dead CSS, unified delete-btn flex pattern, .btn-sm utility, vocab fix.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2c Guards');
 
@@ -2776,7 +2780,6 @@ header('Phase 2c Guards');
 //  SUITE 35 — Phase 3a Performance Guards (P7 optimizations)
 //  campaign_notes cap, saveState dirty-check, standby interval/animation
 //  pause, beforeunload v8 key, registrySearch cache.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 3a Performance Guards');
 const apiSrc35 = readGroup('api');
@@ -2843,7 +2846,6 @@ assert(
 //  SUITE 36 — Keyboard Shortcuts Group ([?] menu discoverability)
 //  COMMAND_REGISTRY has KEYBOARD SHORTCUTS group with ≥6 entries;
 //  global keydown handler closes modal on Escape; closeModal() exists.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 header('Keyboard Shortcuts Group');
 {
@@ -2898,7 +2900,6 @@ header('Keyboard Shortcuts Group');
 //  Every list-mutator calls its targeted render* + updateMath()
 //  instead of loadUI(). updateMath() tail must still hold saveState()
 //  and _updatePanelBadges(). toggleCollectible latent-bug fix verified.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('Render Fan-out (P7-1)');
 {
@@ -3048,7 +3049,6 @@ header('Render Fan-out (P7-1)');
 //  match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
 //  registry entry. Guards against future drift in either direction.
 //  Plus WU-D6 O'cta Brain canon-removal regression guard.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('DB↔Registry Weapon Parity');
 {
@@ -3149,7 +3149,6 @@ header('DB↔Registry Weapon Parity');
 //  SUITE 39 — Ammo Token Split (Energy Cell / MFC / ECP)
 //  AMMO.CSV must carry three distinct caliber names; no bare EC
 //  token may remain as a caliber or as a weapon Ammo_Type.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Ammo Token Split (EC→3)');
 {
@@ -3225,7 +3224,6 @@ header('Ammo Token Split (EC→3)');
 //  SUITE 40 — Inventory Category Filter + Mod Type (Phase 4d-i)
 //  'mod' is accepted in schema + autoImportState; filter bar exists;
 //  renderInventory() honours the active filter; mod in type select.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Inventory Category Filter + Mod Type');
 
@@ -3282,7 +3280,6 @@ guards(htmlSource, [
 //  [WEAPON_MODS.CSV] structural guard: section exists, correct
 //  column header, all rows 5 cols; parity between db_nv.js CSV
 //  and reg_nv.js 'mod' entries in both directions.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Weapon Mods CSV + Registry Parity');
 {
@@ -3385,7 +3382,6 @@ header('Weapon Mods CSV + Registry Parity');
 //  the +80/hours×10 tick math, the HP/limb restore, and the real
 //  loadUI→saveState call order + sleep.completed emit — the mutation
 //  math the static asserts above never run.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('Native Command Router (Phase 5a)');
 {
@@ -3593,7 +3589,6 @@ header('Native Command Router (Phase 5a)');
 //  SUITE 43 — GAME_DEFS Structural Integrity (Phase 5b)
 //  Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
 //  Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
-//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('GAME_DEFS Structural Integrity (Phase 5b)');
 {
@@ -3673,7 +3668,6 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
 //  SUITE 44 — Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 //  Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 //  and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-i: Auth + Rules + XSS Fix');
 
@@ -3850,7 +3844,6 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
 //  Durable identity: Google auth link, collision recovery,
 //  sign-out → re-anon, popup-only flow, ACCOUNT UI panel, boot guard.
 //  Plus Gap 5 (warning-surface): real sign-in failures surface a modal.
-//  18 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-ii: Google Sign-In + Account Panel');
 
@@ -4069,7 +4062,6 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 //  cleanly with no pre-2.8.0 data loss (Protocol 4/16/34, data-safety-critical).
 //  Plus Gap 3/4 (warning-surface): listCloudSaves rethrows on fetch failure and
 //  the sync summary never falsely reports "SYNC COMPLETE".
-//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 
@@ -4646,7 +4638,6 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 //  SUITE 47 — Gemini Key Sync + AI Studio Link (Phase 5c-iv)
 //  Security: key never leaves device for anon or sync-OFF.
 //  Picker: NAME button, date rendered once.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 
@@ -4778,7 +4769,6 @@ header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 //  Session-scoped auto-disable on repeated failures (FAIL_THRESHOLD=3).
 //  Plus WU-B6 behavioral coverage: isFeatureEnabled fail-open reads +
 //  loadRemoteConfig leaves flags enabled when the config fetch fails.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 {
@@ -4959,7 +4949,6 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 //  SUITE 49 — CI / Repo Hardening Guards (Q-series)
 //  Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating,
 //  deploy.yml shortcut-icon staging guard (Protocol 36 escape-ratchet).
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 49 — CI / Repo Hardening Guards');
 {
@@ -5028,7 +5017,6 @@ header('Suite 49 — CI / Repo Hardening Guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 50 — Gate Parity Guards (Protocol 36)
 //  Verify that the local gate == CI gate and the escape-ratchet is wired.
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 50 — Gate Parity Guards (Protocol 36)');
 {
@@ -5138,7 +5126,6 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 //  Verify checksum stamping, forward-compat guard, and rolling backup
 //  ring are wired consistently across all load/save paths. Plus WU-B6
 //  TS-GAP-2: an end-to-end behavioral restoreRollingBackup proof.
-//  57 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
@@ -5828,7 +5815,6 @@ header('Suite 51 — Save Integrity + Rolling Backups');
 //  Suite 52 — Repo / Site Enrichment Guards (Protocol 37)
 //  Verifies static site files, repomix config tuning, manifest
 //  enrichment, and README CI badge are present and correct.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 {
@@ -5865,10 +5851,16 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
     'repomix.config.json customPatterns excludes package-lock.json (lockfile)'
   );
 
-  // 52.6  customPatterns excludes RULES.md (private agent file)
+  // 52.6  customPatterns excludes the private agent rulebook.
+  //        R3: was `includes('RULES.md')`. That file is deleted; the invariant
+  //        it protected — the private agent files never enter the repomix AI
+  //        context pack — is retargeted at the files that actually hold the
+  //        rulebook now (CLAUDE.md + the rules/ notes).
   assert(
-    Array.isArray(patterns52) && patterns52.includes('RULES.md'),
-    'repomix.config.json customPatterns excludes RULES.md (private agent file)'
+    Array.isArray(patterns52) &&
+      patterns52.includes('CLAUDE.md') &&
+      patterns52.some(p => p.startsWith('rules/')),
+    'repomix.config.json customPatterns excludes the private agent rulebook (CLAUDE.md + rules/**)'
   );
 
   // 52.7  .nojekyll exists at root (stops GitHub Pages running Jekyll)
@@ -5922,7 +5914,6 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 //  Suite 53 — AI + Gemini-Key Resilience Guards
 //  Key validation hardening, bounded exponential backoff,
 //  error classification, Tri-Node schema validation.
-//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 53 — AI + Gemini-Key Resilience Guards');
 {
@@ -6146,7 +6137,6 @@ header('Suite 53 — AI + Gemini-Key Resilience Guards');
 //  Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning
 //  Injection-resistance directive, player-input wrapper,
 //  HTML + JS length caps, saveState quota handling.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 {
@@ -6257,7 +6247,6 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 //  Protocol-20 origin guard (load-bearing CSP origins),
 //  unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard,
 //  'wasm-unsafe-eval' guard (Visual Upload OCR Unit 1).
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
@@ -6374,7 +6363,6 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
 //  Also guards the document.write → createElement migration.
-//  35 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
@@ -6626,7 +6614,6 @@ header('Suite 56 — UI Module Split Guards');
 //  SHORTCUT_ROUTES / routeLaunchShortcut implementation.
 //  Also checks custom per-shortcut icon files exist and are
 //  listed in sw.js ASSETS.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 57 — PWA App Shortcuts Guards');
 {
@@ -6773,7 +6760,6 @@ header('Suite 57 — PWA App Shortcuts Guards');
 //  Suite 58 — Client Error Ring-Buffer Guards (Item C)
 //  Verifies ERROR_LOG_KEY/CAP, _recordError, both handlers wired,
 //  showErrorLog + escapeHtml + [LOGS] in router, no-exfil.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 58 — Client Error Ring-Buffer Guards');
 {
@@ -6833,7 +6819,6 @@ header('Suite 58 — Client Error Ring-Buffer Guards');
 //  Suite 59 — Inline Handler Integrity (Item D-proxy)
 //  Scans index.html for on*="..." inline handlers, extracts
 //  standalone function names, asserts all resolve in js/*.js.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 59 — Inline Handler Integrity');
 {
@@ -6973,7 +6958,6 @@ header('Suite 59 — Inline Handler Integrity');
 //  Suite 60 — A11y Gate Guards
 //  Verifies @axe-core/playwright devDep, a11y-check.mjs + baseline
 //  exist, gate.js invokes a11y step, package.json has a11y script.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 60 — A11y Gate Guards');
 {
@@ -7018,7 +7002,6 @@ header('Suite 60 — A11y Gate Guards');
 //  Regression guards for r75 mobile layout stretch fix.
 //  Ensures minmax(0,1fr) grid track, overflow-wrap on panels/rows,
 //  inventory-span wrap rule, and mobile column clip are in place.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 61 — Mobile Layout Overflow Guards');
 {
@@ -7094,7 +7077,6 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
@@ -7421,7 +7403,6 @@ header('Suite 62 — Changelog viewer guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 63 — Save/Cloud UI consolidation guards (Phase 6 Task 7)
 //  saveCurrentToCloud additive, renderSavesList unified, new HTML elements
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 63 — Save/Cloud UI consolidation guards');
 {
@@ -7505,7 +7486,6 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 64 — SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1+follow-up)
 //  commitStat replaces clampStat; capStatMax upper cap on input; syncStateFromDom clamp
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
@@ -7766,7 +7746,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  #updateModal replaces #updateBanner; full-screen blocking dialog;
 //  focus trap, Esc blocked, fail-safe, robust _isGenuineUpdate() gate.
 //  Case C already-installing fix + idempotency + WU-SW2 focus/visibility re-check.
-//  18 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
@@ -7926,7 +7905,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  legacy-'other' coercion — the last satisfiable by a comment) were
 //  CONVERTED to behavioral tests that execute the real function against the
 //  real reg_fo3.js — now Suite 76's 76.12–76.14.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 Lincoln Memorabilia Tracker');
@@ -8089,7 +8067,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
 //  renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList,
 //  #traitFilter input + renderTraits substring-filter guard.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Traits Tracker');
@@ -8283,7 +8260,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  SUITE 68 — FNV Location Database Expansion (Phase 6 Task 6)
 //  Adds 22 verified minor/notable NV locations sourced from fallout.wiki.
 //  Floor guard, type validity, dedup, seed examples, zone↔registry parity.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Location Database Expansion');
@@ -8396,7 +8372,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Root cause: onGameContextChange never updated state.gameContext,
 //  so beforeunload/saveState re-derived activeContext='FNV' and
 //  clobbered the deliberate 'FO3' localStorage write.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 game-switch regression guard');
@@ -8561,7 +8536,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  apparel, Vault 13 Canteen in MISC + registry,
 //  seedNewCampaignInventory definition + guards,
 //  WU-D2 Mysterious Stranger Outfit DT + WU-D6 1st Recon DT regressions.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
@@ -8784,7 +8758,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  no-dup-header guard, Lincoln data-lname onclick safety,
 //  setLincolnDisposition re-render guard, Lincoln no-inline-flex guard,
 //  Traits no-inline-flex guard (compact rows matching collectibles density).
-//  23 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 71 — Phase 6 UI Consistency');
@@ -9000,7 +8973,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 72 — Fix A: location datalist per-game bleed + Fix B: update-modal whitespace
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 72 — Location datalist bleed fix + update-modal whitespace');
@@ -9066,7 +9038,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)');
@@ -9180,7 +9151,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  regression: no name-based badge logic, lincoln check present,
 //  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix,
 //  bobblehead location-canon guard (Explosives→WKML, Unarmed→Rockopolis).
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
@@ -9415,7 +9385,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Suite 75 — Registry items[] no-duplicate-names guard
 //  behavioral: extract items section, build name set, assert no name appears twice.
 //  Also regression-guards the Rebound weapon typo fix.
-//  3 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 75 — Registry items[] No-Duplicate-Names Guard');
@@ -9542,7 +9511,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  merge behavior, the perk rank-reduction confirm gate (76.43 async), and 76.42
 //  is the ⭐ STATIC RATCHET that fails the build if any durable field is ever again
 //  assigned wholesale from AI-parsed data (state.<field> = parsed.<field> / .map).
-//  44 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
@@ -10365,7 +10333,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment');
@@ -10485,7 +10452,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 78 — VENDORS.CSV structural integrity
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 78 — VENDORS.CSV structural integrity');
@@ -10517,7 +10483,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 79 — FO3 location database expansion (57 → 90)
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 79 — FO3 location database expansion (57 → 90)');
@@ -10576,7 +10541,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)');
@@ -10635,7 +10599,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 removed NV bleed)
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)');
@@ -10702,7 +10665,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 82 — FO3 quests (64, WU-D1 canon fix + WU-D5 Anchorage completeness) + quest items (15→25)
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 82 — FO3 quests (64) + quest items (15→25)');
@@ -10831,7 +10793,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 83 — Crafting recipe + breakdown registry (NV + FO3)
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 83 — Crafting recipe + breakdown registry (NV + FO3)');
@@ -10961,7 +10922,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)
-//  24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)');
@@ -11322,7 +11282,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  guards (BUS-05a — top-level board, single-flowing shelf, no more
 //  READ/UNREAD sub-panel split), WU-B8 shared _renderReadTracker
 //  consolidation guards.
-//  27 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
@@ -11654,7 +11613,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-// Suite 86 — Maskable shortcut icons + OPTICS label wrap (6 tests)
+// Suite 86 — Maskable shortcut icons + OPTICS label wrap
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 86 — Maskable shortcut icons + OPTICS label wrap');
@@ -11697,7 +11656,6 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)
 // Phase 3 OPERATOR batch 3: periodical-rack reskin guards (BUS-05b — top-
 // level board, no more READ/UNREAD sub-panel split).
-// 24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
@@ -11947,7 +11905,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 88 — GATE-UI: UI consistency structural guards (8 tests)
+//  Suite 88 — GATE-UI: UI consistency structural guards
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 88 — GATE-UI: UI consistency structural guards');
@@ -12058,7 +12016,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (16 tests)
+//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards');
@@ -12066,7 +12024,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   const uiCore89 = readGroup('ui-core');
   const stateSrc89 = readGroup('state');
   const htmlSrc89 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const rulesSrc89 = fs.readFileSync(path.join(__dirname, '../RULES.md'), 'utf8');
+  const rulesSrc89 = readRulebook();
 
   // 89.1  api.js: no two-game coercion pattern (=== 'FO3' ? 'FO3' : 'FNV')
   assert(
@@ -12170,10 +12128,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-AGNOSTIC-11: GAME_DEFS.FO3 has seedInventory array — GA-6 seed data in state.js'
   );
 
-  // 89.12  RULES.md contains Protocol 38 (game-agnostic codification)
+  // 89.12  the rulebook codifies Protocol 38 (game-agnostic feature code).
+  //        R3: was a RULES.md grep. RULES.md is deleted; the real invariant is
+  //        that Protocol 38 is written down somewhere a session will retrieve
+  //        it — since R2 that is rules/game-data.md, inside the rulebook.
   assert(
     /Protocol 38/.test(rulesSrc89),
-    'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
+    'GATE-AGNOSTIC-12: the rulebook (CLAUDE.md + rules/*.md) codifies Protocol 38 (game-agnostic feature code)'
   );
 
   // 89.13  index.html: boot data-file selection is the sanctioned GAME_FILES manifest
@@ -12260,7 +12221,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
+//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS');
@@ -12325,7 +12286,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (7 tests)
+//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS');
@@ -12391,7 +12352,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 93 — FO3 AUTOCOMPLETE GUARD (8 tests)
+//  Suite 93 — FO3 AUTOCOMPLETE GUARD
 //  Protocol 13 + 36b: registrySearch lives in always-loaded
 //  registry-core.js so FO3 campaigns have working autocomplete.
 //  WU-B11 root cause: fn was only in reg_nv.js; boot loads only
@@ -12469,7 +12430,7 @@ header('Suite 93 — FO3 Autocomplete Guard');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 94 — ACCESSIBILITY GUARDS (10 tests)
+//  Suite 94 — ACCESSIBILITY GUARDS
 //  WCAG 2.1 AA: focus-visible indicators, prefers-reduced-motion
 //  (seizure-hazard flicker freeze), aria-live chat region, and
 //  sysModal dialog ARIA semantics. A-1/A-S4/A-7/A-S1 spec items.
@@ -12546,7 +12507,7 @@ header('Suite 94 — Accessibility Guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression) (9 tests)
+//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression)
 //  Regression for the d0f0429 beforeunload bug: a load path writes the new
 //  robco_v8 then calls location.reload(); the beforeunload flush fired during
 //  teardown and re-serialized the STALE in-memory state over robco_v8, so
@@ -12716,7 +12677,7 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 96 — test.html RUNTIME MIRROR PARITY (8 tests)
+//  Suite 96 — test.html RUNTIME MIRROR PARITY
 //  Protocol 40: the browser-side runtime audit (tests/test.html) must stay in
 //  sync with the live import contract and the canonical runners. These guards
 //  fail if test.html drifts — wrong boot chain, stale dead stubs, a suite-count
@@ -12791,19 +12752,19 @@ header('Suite 96 — test.html Runtime Mirror Parity');
     '96.7: tests/test-html-check.mjs exists and scripts/gate.js runs it (test.html executed in gate)'
   );
 
-  // 96.8  Protocol 40 is codified in RULES.md and the rulebook (CLAUDE.md + rules/*.md)
+  // 96.8  Protocol 40 is codified in the rulebook (CLAUDE.md + rules/*.md).
+  //        R3: the RULES.md half of this assertion is dropped with the file.
   {
-    const rules96 = readFile('RULES.md');
     const claude96 = readRulebook();
     assert(
-      /Protocol 40/.test(rules96) && /Protocol 40/.test(claude96),
-      '96.8: Protocol 40 (test.html sync) present in RULES.md and the rulebook (CLAUDE.md + rules/*.md)'
+      /Protocol 40/.test(claude96),
+      '96.8: Protocol 40 (test.html sync) present in the rulebook (CLAUDE.md + rules/*.md)'
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 97 — CHANGELOG category-heading integrity (Protocol 21) (2 tests)
+//  Suite 97 — CHANGELOG category-heading integrity (Protocol 21)
 //  Keep a Changelog convention: under one `## [version]` block there must be
 //  exactly ONE heading per category (a single ### Added / ### Fixed / etc.).
 //  This guards against the recurrence of a duplicate-heading split (e.g. two
@@ -12821,7 +12782,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
     'Fixed',
     'Security',
     'Improved',
-    'Hotfix', // post-release fix folded into a shipped version's block (RULES.md hotfix model)
+    'Hotfix', // post-release fix folded into a shipped version's block (Protocol 2 hotfix model)
     'Under the Hood',
   ];
   // Split into version blocks on top-level `## [` headers.
@@ -12867,7 +12828,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 98 — Project-root cleanliness (Protocol 41) (2 tests)
+//  Suite 98 — Project-root cleanliness (Protocol 41)
 //  Flags leftover/junk that reappears at the project root so the end-of-task
 //  cleanup sweep can't silently regress. The gate only FLAGS (fails) — it never
 //  auto-deletes. Tracked files and the gitignored planning/ folder are untouched.
@@ -12900,7 +12861,7 @@ header('Suite 98 — Project-root cleanliness (Protocol 41)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 99 — WU-B7 dead-code purge + duplication consolidation (16 tests)
+//  Suite 99 — WU-B7 dead-code purge + duplication consolidation
 //  Locks the removals so a refactor can't silently re-introduce the dead
 //  code, and proves the consolidated helpers stayed consolidated. Each
 //  removed symbol had zero call sites at purge time (grep-verified); each
@@ -12997,7 +12958,7 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 100 — Staging build output guards (Cloudflare Pages) (6 tests)
+//  Suite 100 — Staging build output guards (Cloudflare Pages)
 //  The staging PWA registers a service worker at root scope. A service-worker
 //  script fetch that returns a 3xx redirect cannot be registered/updated —
 //  browsers reject it ("The script resource is behind a redirect, which is
@@ -13063,7 +13024,7 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 101 — WU-B9 cloud.js → state.js boundary fix (8 tests)
+//  Suite 101 — WU-B9 cloud.js → state.js boundary fix
 //  Protocol 23 module boundary: cloud.js (the cloud-sync module) must never reach
 //  into the global `state` object directly — it reads the active game context and
 //  snapshots state ONLY through the sanctioned state.js accessors. These guards lock
@@ -13126,7 +13087,7 @@ header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 102 — WU-B10 boot-drone autoplay timing (6 tests)
+//  Suite 102 — WU-B10 boot-drone autoplay timing
 //  The browser autoplay policy blocks audio before the first user gesture, so
 //  the boot drone is armed to the first click/key. The bug: it fired on the
 //  user's first interaction WHENEVER it happened — including a mid-session menu
@@ -13215,7 +13176,7 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 103 — WU-C13 SAVE MENU "?" help affordance (8 tests)
+//  Suite 103 — WU-C13 SAVE MENU "?" help affordance
 //  A diegetic "?" button in the save panel header opens a help modal explaining
 //  each save action. Reuses the shared sysModal entry point (_openSysModal,
 //  WU-C4) so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic
@@ -13316,7 +13277,7 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified) (19 tests)
+//  Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified)
 //  Locks the canon coefficients that feed the Phase-N native calculators
 //  (WU-N1 VATS / WU-N2 TRADE / WU-N3 THREAT). Sources (Protocol 3, fallout.wiki):
 //    • Barter buy/sell — "Barter (Fallout: New Vegas)" / "Barter (Fallout 3)":
@@ -13460,7 +13421,7 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 105 — WU-N1 VATS native calculator (34 tests)
+//  Suite 105 — WU-N1 VATS native calculator
 //  105.22–105.33 (U3 slice 4 / B2) EXECUTE the shipped _vatsCompute in a vm — the
 //  hit-%/AP-cost/damage math was extracted out of the DOM-entangled recomputeVATS()
 //  into a pure helper (Protocol 22/23; behavior-identical), so a sign flip / wrong
@@ -13847,7 +13808,7 @@ header('Suite 105 — WU-N1 VATS native calculator');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 106 — WU-N2 TRADE native barter terminal (25 tests)
+//  Suite 106 — WU-N2 TRADE native barter terminal
 //  106.23–106.25 (U3 slice 3 / B3) execute the shipped _tradeBuyPrice/
 //  _tradeSellPrice in a vm — exact prices across barter 0/50/100 + the
 //  floor(1)/clamp(0)/margin — the arithmetic 106.4/106.5 only re-implement.
@@ -14152,7 +14113,7 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 107 — WU-N3 THREAT native bestiary + TTK (17 tests)
+//  Suite 107 — WU-N3 THREAT native bestiary + TTK
 //  Deterministic offline THREAT assessment: BESTIARY.CSV lookup → enemy card +
 //  TTK = ceil(HP / max(1, weaponDPS − DT)) + ammo-burn (WU-D4c coefficient) +
 //  weakness highlight. Routed natively (the AI TTK directive is retired). The math
@@ -14282,7 +14243,7 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 108 — WU-N4 CONSULT native databank lookup (18 tests)
+//  Suite 108 — WU-N4 CONSULT native databank lookup
 //  `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 //  deterministic, offline, read-only registry+DB lookup. Locks: the router wiring, the
 //  registry/DB cross-reference, the NO-ENTRY path (Protocol 3 — never invents), XSS-safe
@@ -14492,7 +14453,7 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 109 — WU-N5 BIO-SCAN native medical advisory (13 tests)
+//  Suite 109 — WU-N5 BIO-SCAN native medical advisory
 //  `> [BIO-SCAN]` (+ [BIO]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
 //  offline, read-only limb/HP/radiation/addiction advisory computed from state +
 //  CHEMS. Locks: router wiring, the pure compute core (behavioral), the AI-path
@@ -14658,7 +14619,7 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 110 — WU-N6 LOOT native add/value terminal (13 tests)
+//  Suite 110 — WU-N6 LOOT native add/value terminal
 //  `> [LOOT]` (+ [LT]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
 //  offline salvage terminal: pick a DB-catalog item, ADD it additively to
 //  state.inventory[] at its DB value, confirm-gated. Locks: router wiring, the
@@ -14820,7 +14781,7 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 111 — WU-E1 diegetic terminology / voice standards (11 tests)
+//  Suite 111 — WU-E1 diegetic terminology / voice standards
 //  Locks the HOUSE_STANDARD terminology pass: ALL-CAPS content
 //  placeholders + empty-states, game-agnostic out-of-frame manifest
 //  copy, DIRECTOR (not "AI"/"Gemini") narrative-error voice, and the
@@ -14930,7 +14891,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  reusable <template> banners — NEVER deleted. Guards they still EXIST
 //  and are disabled-by-default (wrapped in <template>, so the browser
 //  parses but never renders/activates them on their own).
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('WU-E2 reusable disabled banner templates');
@@ -14997,7 +14957,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Locks COMMAND_REGISTRY (ui-core.js) ↔ NATIVE_COMMAND_ROUTER (api.js) ↔ the
 //  [FEATURES] help modal so the in-app command reference can't drift from reality:
 //  every native terminal is advertised, retired AI macros stay gone.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 113 — WU-E3 FEATURES / command-reference consistency');
@@ -15098,7 +15057,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  locationHistory for CURRENT / VISITED / UNKNOWN status. (Protocol 42 map fix)
 //  114.2/2b/2c behavioral (Health-U3 slice 2): recordLocationVisit() executed
 //  in a vm sandbox — dedup, case-folding, no-truncation, null/whitespace no-op.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 114 — Map location discovery persistence');
@@ -15269,7 +15227,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Keep-display-lit toggle: feature-detected, graceful fallback when unsupported,
 //  re-acquire on visibilitychange, release on toggle-off, persisted as a localStorage
 //  device preference. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 115 — WU-F1 Sustained Power Cell (Wake Lock)');
@@ -15376,7 +15333,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Brief chassis buzz on key events: feature-detected, opt-in localStorage device
 //  preference (default OFF), graceful no-op when navigator.vibrate is unavailable,
 //  and SUPPRESSED under prefers-reduced-motion. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 116 — WU-F2 Haptic Solenoid (Vibration)');
@@ -15477,7 +15433,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Ejects the comm-link log as a holotape transcript via navigator.share, with a
 //  three-tier graceful fallback (share → clipboard → download). Feature-detected,
 //  reuses _buildHolotapeText() formatting. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 117 — WU-F3 Eject Holotape (Web Share)');
@@ -15560,7 +15515,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Posts the active-quest count on the installed icon while backgrounded, clears
 //  it when the terminal is open. Feature-detected, graceful no-op when unsupported,
 //  reuses the QUEST LOG count. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 118 — WU-F4 Pending-Directives Tally (Badge)');
@@ -15638,7 +15592,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  uptime) surfaced as a DATA-tab read-out. Persisted as a localStorage device
 //  stat (NOT campaign state — no Protocol-4 path), reuses the session clock, no
 //  web API, no AI, no network, game-agnostic. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header("Suite 119 — WU-F7 Overseer's Maintenance Log");
@@ -15774,7 +15727,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  pref) AND the OS prefers-contrast: more media query — both applying the same
 //  pure-CSS boosts (pure-black bg, glow removed, dimmed surfaces lifted, scanline
 //  veil dropped). Game-agnostic (layers over any optics colour), no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 120 — WU-F8 High-Lumen Optics (high-contrast)');
@@ -15894,7 +15846,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  A procedural station bed (static + carrier + tonal motifs), fully generated
 //  via WebAudio (no audio files). Opt-in player, respects masterMute, autoplay-
 //  safe. Game-agnostic, offline, no AI. (Phase F, Protocol 7)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 121 — WU-F5 Pip-Boy Radio (synthesized)');
@@ -15998,7 +15949,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  gated once by robco_booted_before), or a RARE degraded "cold tube" variant
 //  that rolls on ANY boot (NOT first-boot-gated — owner pref). Honors reduced-
 //  motion, leaves the normal boot unchanged. Game-agnostic, offline, no AI.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 122 — WU-F6 Cold-Start / Degraded-Tube Boot');
@@ -16102,7 +16052,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  DATABANK panel, "consult <topic>" still runs the native lookup). Formerly bundled
 //  with the WU-F9 TERMLINK Command Console tests; TERMLINK was fully retired — see
 //  Suite 168 — and its tests removed rather than renumbered in place.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 123 — WU-HF2/HF3 precise-pointer refocus + native panel navigation');
@@ -16266,7 +16215,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  changeOpticsColor (ui-audio) and the duplicated fgMap (ui-saves); each GAME_DEFS entry
 //  declares theme.defaultOptics resolved via _activeDef() (no game literal); a real WCAG
 //  relative-luminance computation enforces AA ≥4.5:1 for every contrastSafe default.
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 124 — WU-T1 per-game theming + AA contrast');
@@ -16454,7 +16402,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  unit): the device-telemetry half moved again, from #systemStatusPanel into
 //  its own BUS-22 #unitPowerPlantPanel board (#systemStatusPanel is now BUS-23
 //  IDENTITY PLATE & BREAKERS — see Suite 192).
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 125 — WU-F10 session stats merged into OVERSEER LOG');
@@ -16551,7 +16498,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  A per-row LOG VISIT button on the WORLD GRID flags a location discovered directly,
 //  add-only (no un-mark), routed through the single-source recordLocationVisit() helper
 //  with NO AI. Accessible (<button>, aria-label, ≥28px tap target), game-agnostic.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 126 — WU-F11 native mark-visited map control');
@@ -16637,7 +16583,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  The boot sequence shows the active game's Pip-Boy model + wasteland uplink, and the
 //  save manager shows its saveLabel — all sourced from GAME_DEFS[ctx].theme (Protocol 38).
 //  The identity line is injected flavor-independently so WU-F6 cold/degraded boot is intact.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 127 — WU-T3 per-game identity strings + save header');
@@ -16737,7 +16682,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (The forbidden literal is assembled at runtime so this guard file never self-matches.)
 //  2.8.5 U-B3: the PowerShell mirror (.ps1) was deleted; these guards now cover
 //  the single Node runner only, and 128.5 asserts the gate is single-runner.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 128 — WU-REN runner-rename escape-ratchet');
@@ -16783,7 +16727,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'README.md',
     'ARCHITECTURE.md',
     'CHANGELOG.md',
-    'RULES.md',
     'CLAUDE.md',
   ];
   const offenders = scanList.filter(f => _readIf(f).includes(_legacy));
@@ -16818,7 +16761,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  hover so a touch phone can NEVER boot into the PC layout, even if a first-paint
 //  layout-viewport race momentarily reports ≥1000px. The JS panel-open default must use
 //  the same matchMedia gate, not a raw window.innerWidth read.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 129 — first-load desktop-layout pointer/hover gate');
@@ -16865,7 +16807,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Item 5: the chosen optic persists PER GAME (robco_optic_<ctx>), resolved per-game pick →
 //  game default → green. Both are game-agnostic / N-game scalable (keyed by gameContext) —
 //  adding a game needs ZERO theming-code change.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 130 — per-game optics + dynamic (Default) label');
@@ -16960,7 +16901,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  11-point state matrix (both games x every playstyle/playthroughType/
 //  campaignMode branch) and the SHA-256 of each assembled directive is asserted
 //  against the pre-refactor golden hash — proving byte-identical output.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 131 — U1 directive decomposition + GA-5 retirement (golden-master)');
@@ -17206,7 +17146,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  that made _startAmbientTimers() able to reach _startUptimeClock/
 //  _startMemCycle in the first place), and window.onload itself stays a
 //  slim composition instead of drifting back into a monolith.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 132 — U2 window.onload boot decomposition');
@@ -17371,7 +17310,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  malformed AI response (e.g. `{"s":"abc"}`) silently corrupted player state
 //  with NaN (discovered by actually running the function under this harness,
 //  not by inspection). Fixed by matching the established `|| 0` idiom.
-//  27 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 133 — U3 autoImportState() VM-sandbox behavioral test');
@@ -17710,7 +17648,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  a registered device key directly (the only sanctioned exception — the
 //  index.html pre-paint scripts that run before state.js loads — is proven
 //  to sit strictly before the first js/*.js <script> tag).
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 134 — U6 MetaStore boundary gate');
@@ -17941,7 +17878,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  wrapped in a named _wire*EventBusSubscribers() function called from
 //  window.onload, since a bare top-level call in a static <script> file could
 //  execute before state.js (dynamically, context-conditionally loaded) had run.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 135 — U7/U8 OS event bus + faction-agnostic fix + auto-log');
@@ -18292,7 +18228,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (reverse Protocol-38 leak — FO3 has no weapon-mod data at all); and closes
 //  the one live player-authority violation the U10 audit found — squad
 //  affinity was AI-write-only, now has native [+]/[-] buttons.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 136 — Step 2 Phase 0 U9/U10 connector sweep + affinity fix');
@@ -18481,7 +18416,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  synchronous *Apply mutation core so the gate and the mutation can each be
 //  tested independently. A real Promise-resolution behavioral proof (137.6)
 //  runs confirmAction() against a minimal synthetic DOM in a Node vm sandbox.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
@@ -18853,7 +18787,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  slow/corrupt the shadow no-ops and the app is byte-identical (migration-
 //  safety). These are structural guards; the REAL IndexedDB behavioral proof
 //  (round-trip + fail-safe) runs in tests/test.html (Protocol 40 — the browser
-//  is the only runner with a native IndexedDB). 12 tests
+//  is the only runner with a native IndexedDB).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 138 — P1 IndexedDB durability shadow + write-through');
@@ -18984,7 +18918,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  boot; if IdbStore is absent it resolves immediately (byte-identical boot).
 //  Only the 'meta' store is touched (two-store boundary). Structural guards
 //  here; the REAL IndexedDB recovery/backfill/no-flip/corrupt-skip behavioral
-//  proof runs in tests/test.html (Protocol 40). 12 tests
+//  proof runs in tests/test.html (Protocol 40).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 139 — P2 device-pref boot hydration + reconciliation');
@@ -19130,7 +19064,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  strictly newer; NEVER removes a localStorage copy). Two-store boundary: cold
 //  store uses ONLY the 'campaign' object store; device prefs stay in 'meta'.
 //  Structural guards here; the REAL IndexedDB migration/round-trip/fallback
-//  behavioral proof runs in tests/test.html (Protocol 40). 12 tests
+//  behavioral proof runs in tests/test.html (Protocol 40).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 140 — P3 cold-store IDB-primary (save slots + rolling backups)');
@@ -19254,7 +19188,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  campaign_notes route into eventLog (deduped 'log' events), and it can NEVER
 //  author eventLog directly. Crossroads + a new Incident view are cheap filters
 //  over the Record. eventLog rides the campaign container (robco_v8) →
-//  cloud/export/backup via the serialized-whole path (Protocol 34). 12 tests
+//  cloud/export/backup via the serialized-whole path (Protocol 34).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 141 — P4 Terminal Record (structured eventLog + [T#] migration)');
@@ -19373,7 +19307,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  _applySlotEnvelope core loadFromSlot uses (Protocol 22). Fail-safe: no IDB →
 //  no version history offered, save/load byte-identical to pre-P5. Structural
 //  guards here; the real-IndexedDB behavioral proof lives in tests/test.html
-//  (Suite 14 — the Node runner has no IndexedDB). 12 tests
+//  (Suite 14 — the Node runner has no IndexedDB).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 142 — P5 save version history (per-slot revision ring)');
@@ -19502,7 +19436,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  carries campaign/save data ONLY — device prefs ('meta' store) are excluded, so
 //  the two-store boundary holds (Protocol 23). Data-layer fns (buildFullBundle /
 //  verify / applyBundleData) live in state.js so the real-IndexedDB round-trip is
-//  proven in tests/test.html (Suite 15). 13 tests
+//  proven in tests/test.html (Suite 15).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 143 — P6 full backup bundle (export/import whole history)');
@@ -19653,7 +19587,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (_uploadSaveDoc; Protocol 22/34), gated by the offlineQueue kill-switch flag
 //  (Protocol 32/33) and every auth guard the manual button uses. The storage layer
 //  round-trip is proven live in tests/test.html (Suite 16); this suite guards the
-//  wiring + the never-auto-push invariant. 12 tests
+//  wiring + the never-auto-push invariant.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 144 — P7 offline cloud-push queue (manual-push resilience)');
@@ -19808,7 +19742,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Phase 2 — those consumers do NOT exist yet. Default 'full' preserves today's
 //  behavior. The ONE existing ambient behavior wired as a proof-of-seam is the
 //  periodic memory-cycle flash (_startMemCycle). The pref round-trip + thresholds
-//  are proven live in tests/test.html (Suite 17). 10 tests
+//  are proven live in tests/test.html (Suite 17).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 145 — P8 global immersion dial (Full/Balanced/Minimal)');
@@ -19911,7 +19845,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (15 tests)
+//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core
 // ──────────────────────────────────────────────────────────────
 //  The one heartbeat + observer registry + central dial enforcement, ADDITIVE:
 //  A1 tracks the canonical terminal state (OFF→COLD_BOOT→READY→ACTIVE→IDLE→
@@ -20085,7 +20019,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 147 — Step 2 (v2.8.0) Phase 2 A2.1: Standby machine → runtime observer (7 tests)
+//  Suite 147 — Step 2 (v2.8.0) Phase 2 A2.1: Standby machine → runtime observer
 // ──────────────────────────────────────────────────────────────
 //  The tab-standby dim + audio ducking is migrated off its own blur/focus/
 //  visibilitychange listeners onto the Ambient Runtime's STANDBY state: _wireStandby
@@ -20166,7 +20100,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 148 — Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers → runtime observers (7 tests)
+//  Suite 148 — Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers → runtime observers
 // ──────────────────────────────────────────────────────────────
 //  The three fixed-cadence loops — uptime clock (1s), memory-cycle flash (15min), and
 //  overseer-log flush (30s) — are migrated off their own setIntervals onto the Ambient
@@ -20250,7 +20184,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Developer Console: the ONE canonical dev/debug console (19 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console
 // ──────────────────────────────────────────────────────────────
 //  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
 //  This IS the canonical developer/debug console the roadmap's hacking
@@ -20596,7 +20530,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 150 — Step 2 (v2.8.0) Phase 2 A3: IDLE/STANDBY/SHUTDOWN ambient
-//  experiences (9 tests)
+//  experiences
 // ──────────────────────────────────────────────────────────────
 //  The showcase consumers of the runtime states: _wireAmbientExperiences()
 //  (ui-core.js) registers three dial-gated observers — idle-phosphor (tier
@@ -20887,7 +20821,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  mirror + clamp, trimmed onLocationChange, fame/infamy faction adjust
 //  with the unknown-key fall-through — the mutations 151.9-11 (static)
 //  and 153.3 (spy-router) never run.
-//  22 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 151 — Step 2 Phase 2 B1: Command-Line MODE system');
@@ -21328,7 +21261,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  ONLY during SHUTDOWN/OFF via the SAME body classes the observer already
 //  toggles, recovers using legal transition() edges only (never forceState,
 //  the documented TEST-ONLY escape hatch — Suite 146.15 still guards that).
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)');
@@ -21486,7 +21418,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  SUITE 153 — Command-Line MODE upgrades: inline `@` ping, comma
 //  multi-action quick-log, content-aware autocomplete
 //  (Step 2 Phase 2 B1 follow-up)
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -21779,7 +21710,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 37 tests (154.24-154.33 add the
+//  this unit — B2b converts them to DIP chips. (154.24-154.33 add the
 //  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage; 154.34-
 //  154.37 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes,
 //  including the (DEFAULT) marker's own matching corner-chip treatment).
@@ -22326,7 +22257,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  labels, Schematic View text clipping, SVC-tray centering, and a new
 //  reload-persistence pref for the Bay/Schematic view choice. One-truth model
 //  preserved throughout — every reskinned control still calls the exact
-//  setter it always called; zero forked persistence paths. 16 tests.
+//  setter it always called; zero forked persistence paths.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 155 — Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes');
@@ -22335,7 +22266,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const state155 = readGroup('state');
   const css155 = readCss();
   const claude155 = readRulebook();
-  const rules155 = readFile('RULES.md');
 
   // 155.1  the chassis subheader from the mockup's bay-head row is present
   assert(
@@ -22532,19 +22462,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 155.16  the reload-persistence standing rule + the Protocol 2a wording fix
-  //         are both recorded in the docs this unit touches
+  //         are both recorded in the docs this unit touches.
+  //         R3: the RULES.md half of the stale-sentence check is dropped —
+  //         the file is deleted, so the sentence cannot live there any more.
   assert(
     /everything remembers on reload/i.test(claude155) &&
-      !/the files are kept identical for protocol sections/.test(claude155) &&
-      !/the files are kept identical for protocol sections/.test(rules155),
-    '155.16: the rulebook records the new reload-persistence standing rule, and the stale "RULES.md and CLAUDE.md are kept identical" sentence is corrected'
+      !/the files are kept identical for protocol sections/.test(claude155),
+    '155.16: the rulebook records the new reload-persistence standing rule, and the stale "kept identical" twin-rulebook sentence is gone'
   );
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 156 — Step 2 (v2.8.0) Phase 2 B2c: Module Bay refinements —
 //  master-mute shows all chips pulled, draggable Immersion dial, install/
-//  eject SFX. Two owner bug/request fixes + the Module Bay's SFX unit. 16 tests.
+//  eject SFX. Two owner bug/request fixes + the Module Bay's SFX unit.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 156 — Step 2 Phase 2 B2c: Module Bay refinements + hardware SFX');
@@ -22757,7 +22688,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  onGameContextChange()), the designOnly guards in onGameContextChange() and
 //  wipeTerminal()'s context-list loop, and the save-boundary (no
 //  saveState()/robco_v8 write anywhere in the DO-K additions — pure data + one
-//  attribute set, Protocol 26). 24 tests.
+//  attribute set, Protocol 26).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 157 — DO-K: identity keystone (GAME_DEFS.identity + data-game)');
@@ -23010,7 +22941,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  158.33-158.34 (all 7 keycaps share one fixed width via --navkey-w,
 //  with the label font shrunk to fit the longest labels at that width;
 //  desktop scales both up inside the existing hover+fine gate).
-//  39 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
@@ -23378,7 +23308,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  phosphor rack both move to the reusable flex+wrap+justify-content:center pattern
 //  this app already established for .bay-tools, and the SAVE/cloud-sync button row
 //  gets the same treatment.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 159 — Owner bug-fix batch: eventLog live-render + centering rule');
@@ -23431,7 +23360,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  actual (responsive) width evenly, leaving a stray thin partial pin at
 //  the end — background-repeat:round rescales the tile so a whole number
 //  of pins always fits.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 160 — Owner audit: bezel bottom placement + stray-pin cleanup');
@@ -23507,7 +23435,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  SAVE_HELP gains it plus an OVERWRITE entry; (4) the Module Bay's view-once
 //  hatch ceremony had no way to replay for testing — a REPLAY HATCH button in the
 //  (still gated/inert) Test Console resets the exact same robco_bay_opened
-//  MetaStore key releaseBayHatch() sets. 10 tests
+//  MetaStore key releaseBayHatch() sets.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 161 — Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay');
@@ -23710,7 +23638,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  textarea auto-grows from a small placeholder-fit size up to a cap instead
 //  of a fixed-height box, resets to small after every send, and the mode
 //  pill's touch-sticky hover fill is neutralized (gated back in for real
-//  hover-capable pointers only) with a blur() second line of defense. 31 tests.
+//  hover-capable pointers only) with a blur() second line of defense.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
@@ -24293,7 +24221,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  buttons wrap onto their own line instead of overflowing. 15 static tests +
 //  3 behavioral (163.16–163.18, U3 slice 6): the cloud OVERWRITE/DELETE
 //  destructive-op ORDER proven at runtime (archive-before-overwrite that
-//  captures the prior contents; purge-versions-before-parent-delete). 18 tests
+//  captures the prior contents; purge-versions-before-parent-delete).
 
 // ══════════════════════════════════════════════════════════════
 {
@@ -25135,7 +25063,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  system (Protocol 22): AmbientRuntime.shutdown(), selectSubsystem(),
 //  showErrorLog(), and the Overseer's own _overseerRestState/
 //  _overseerRestSignals connection signal.
-//  30 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 165 — Functional casing lamps + Overseer routing + VITALS strip');
@@ -25384,7 +25311,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 166 — Casing/layout polish batch (owner-reported): the big purple
 //  frame outline removed, per-subsystem scroll-position memory added, and
 //  the Module Bay's BACKPLANE BUS header centered.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 166 — Casing/layout polish batch (outline, scroll memory, header centering)');
@@ -25803,7 +25729,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  display-only OVERSEER tag on AI-sourced transcript lines, mirroring the
 //  existing [TERM] quick-log text tag, so a shared transcript still shows at
 //  a glance which side produced each line.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 167 — [CROSSROADS] command retirement + OVERSEER transcript tag');
@@ -25898,7 +25823,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  TERMLINK is removed ENTIRELY: the router entries, the console (manifest + launcher
 //  + renderer), the COMMAND_REGISTRY entry, and the console CSS. BIO-SCAN and the Tool
 //  Deck are independent of TERMLINK and are proven untouched by this batch.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 168 — TERMLINK Command Console fully retired');
@@ -26004,7 +25928,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  same _scopeShouldAnimate() reduced-motion/dial/hidden/standby check every
 //  other scope motion already obeys, never a bespoke carve-out — and never
 //  writes any campaign state.
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 169 — transcript cleanup + composer autocomplete drop-up + scope pulse');
@@ -26386,7 +26309,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // (renderModuleBay()) instead of popping the ceremony. A genuine post-boot
 // user click (flag already false) still runs initModuleBay() normally.
 //
-// 2 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 172 — Boot-restore must never re-trigger the Module Bay hatch');
@@ -26599,7 +26521,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // "[Sunday, 10.19.81, 12:00 AM]" instead of "[T0]". The underlying ev.t data
 // is untouched; only the display changed.
 //
-// 8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 173 — Owner batch: native LEVEL UP control + readable event-log timestamps');
@@ -27000,7 +26921,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // call exportCampaignLog(fmt) (download-only, unchanged). FIRMWARE REVISION
 // LOG and INSTALL SYSTEM are untouched.
 //
-// 8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 174 — SVC tray EJECT HOLOTAPE export consolidation');
@@ -27112,7 +27032,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  was not allowed to start" warnings — each is now deferred to the first
 //  click/keydown via a shared _armAmbientAudio() arm, mirroring playBootDrone's
 //  (H4) own established pattern. The opening boot drone itself is untouched.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -27239,7 +27158,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  firmware/carrier/feature-flag readout); the campaign-stats half of the
 //  former Overseer's Log becomes its own CAMPAIGN LOG panel on DATABANK.
 //  Functional relocation only (Protocol 22) — every id/handler preserved.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 176 — SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)');
@@ -27417,7 +27335,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  STATUS carrier line, so none of them can disagree. A Node vm sandbox
 //  actually EXECUTES the real renderAccount() body (not a static grep) across
 //  all four conditions and asserts the resulting DOM text.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 177 — SU-4: dynamic ACCOUNT (REG PORT) status words');
@@ -27620,7 +27537,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Immersion Dial technique, Protocol 17) and the new visible cartridge/
 //  rocker/detent/breaker widgets, which drive the SAME setters. New in this
 //  unit: a confirm gate in front of a game-cartridge swap (owner decision).
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 178 — SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)');
@@ -27890,7 +27806,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Removing the override lets the label fall back to var(--robco-dark) — the
 //  SAME theme-matched dark partner the base button rule already reuses
 //  everywhere else (Protocol 22), verified by real WCAG contrast math below.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
@@ -28251,7 +28166,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the needle (the knob's own rotation) always points at the active one.
 //  Owner directive: the knob performs NO action on tap — only a drag, a
 //  direct position tap, or the arrow keys change #playthroughTypeSelect.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
@@ -28864,7 +28778,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 182 — PHASE 3 OPERATOR follow-up: draggable HP/XP/SPECIAL,
 //  behavioral zone-click proof, and the RAD EXPOSURE max-rads clamp
-//  (owner interactivity fold-in). 12 tests.
+//  (owner interactivity fold-in).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 182 — OPERATOR follow-up: drag controls + RAD max clamp');
@@ -29273,7 +29187,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  fixes bundled into the same push (Protocol 19): the BOTTLE CAPS readback
 //  value and the OPERATIONAL TEMPO dial's overlapping detent hit areas.
 //  Owner scope correction: the limb-label / RAD-row-centering content
-//  changes from the prior push were reverted — frames only. 7 tests.
+//  changes from the prior push were reverted — frames only.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 183 — OPERATOR frames + readback centering + tempo dial hit-areas');
@@ -29395,7 +29309,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 184 — Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
 //  caps, full scroll+panel-state restore ordering, SETTINGS collapsed
 //  summary lines, plus the RAD-bar touch-action/transition-lag follow-up.
-//  21 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -29835,7 +29748,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  summary lines, id-preservation contract. 185.10/11 converted to
 //  behavioral (Health-U3 slice 2): adjItemQty + toggleEquipItem
 //  executed in a vm sandbox (clamp/remove/target-row, equip/toggle/
-//  replace/no-op). 34 tests.
+//  replace/no-op).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
@@ -30397,7 +30310,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (SKILL MATRIX → VU array, STATUS EFFECTS → compound lamps, FACTION
 //  STANDING → reputation console). id/handler-preservation + game-agnostic
 //  + no-new-campaign-state + centering + reduced-motion guards, plus the
-//  owner follow-up restoring the MAJOR/MINOR faction grouping. 20 tests.
+//  owner follow-up restoring the MAJOR/MINOR faction grouping.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
@@ -30621,7 +30534,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  scroll+search + FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma
 //  gauge (now a universal board with a nested FO3-only KARMA CENTER
 //  appendix). id/handler-preservation + game-agnostic + no-new-campaign-
-//  state + centering + reduced-motion guards. 23 tests.
+//  state + centering + reduced-motion guards.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
@@ -31141,7 +31054,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  owner-locked Q3), the status-drawer + search filters, identity.databank
 //  per-game flavor, and the full id-preservation contract across all six
 //  boards (Protocol 22 — every original id/handler survives the reskin).
-//  20 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 189 — Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)');
@@ -31456,7 +31368,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
 //  FACTIONS collapsible, faction pin-strip uniform width, RAD-drag
 //  transition-lag follow-up (dragging-class transition suppression).
-//  17 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -31821,7 +31732,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  sizes to its own content (no more mid-glyph clipping) with native
 //  form-control chrome stripped via appearance:none so the box stays
 //  compact and consistent across devices (Protocol 17 floors preserved).
-//  25 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
@@ -32176,7 +32086,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  into its own dedicated readout window in the always-visible casing-top
 //  header (#chassisScreenMini), since it read poorly squeezed next to the
 //  Overseer waveform.
-//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 192 — Design Overhaul CHASSIS unit: THE LIVING CORE');
@@ -32917,7 +32826,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the Lincoln cell to a fixed compact width (min-width:0 to escape the
 //  flexbox min-width:auto trap) so the select now sizes to its CELL
 //  instead, with ellipsis for any label too long for that compact width.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 193 — Owner polish batch: tap-highlight kill + Lincoln side-by-side grid');
@@ -33057,7 +32965,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the small casing-top mini core (33-54px, already sharing its circle
 //  with 3 rings + the heart) without hurting the design; guarded here by
 //  a negative check that no half-shipped readout markup exists.
-//  21 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 194 — CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)');
@@ -33449,7 +33356,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  actually too large, especially in the mini) — and the core "?" button
 //  sat close enough to the shape's corner that the r1 ring crossed
 //  through it.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 195 — LIVING CORE ring visual-parity fix (owner audit)');
@@ -33672,7 +33578,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  map scrolling away when backing out of a zoomed node (196.31), and the
 //  survey-ping route line drawing itself already-complete instead of being
 //  watchable (196.32/196.33).
-//  50 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
@@ -34295,7 +34200,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  get an annunciator echo push in _wireFeedbackEchoSubscribers() — INK
 //  STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
 //  owner decision and deliberately carry no echo.
-//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 197 — FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations');
@@ -34754,7 +34658,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  [home + echo] items also get an annunciator push in
 //  _wireFeedbackEchoSubscribers() — the remaining 7 are home-only by the
 //  build plan's routing table and deliberately carry no echo.
-//  31 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 199 — FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations');
@@ -35111,7 +35014,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (ui-core.js) + the extracted _applyStatusEffect() (Protocol 22),
 //  decrementing qty by exactly 1 only when at least one effect was
 //  genuinely applied.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 200 — Native USE (deterministic item consumption, no AI)');
@@ -35527,7 +35429,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  _resolveStatToken() (universal scalar/SPECIAL alias maps + getSkillKeys()
 //  for the per-game skill set, Protocol 38) and applied through the SAME A.2
 //  native setters Native USE uses (Protocol 22). Zero AI on every path.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 201 — TERMINAL stat edits (deterministic, no AI)');
@@ -36316,7 +36217,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the SURVEYED annunciator reaction (location.visited, new-discovery-only)
 //  are both untouched. Plain @keyframes (Protocol UI-9), zero campaign-state
 //  write, mobile-safe fixed positioning (Protocol 17).
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 204 — LOCATION CONFIRMATION CARD (top-right arrival toast)');
@@ -36586,7 +36486,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  runtime-best-effort only), and a raw-text-dump proof wired into the
 //  staging-only Dev Console. NO parser, NO state write, NO change to the
 //  existing AI-vision Visual Upload path anywhere in this unit (Unit 2/3).
-//  20 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 {
@@ -36856,7 +36755,6 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 //  No hybrid/kill-switch routing here (Unit 3 scope) — the pipeline is
 //  reached via the staging-only Dev Console SCAN & PARSE board, same
 //  visibility gate as Unit 1.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)');
 {
@@ -37375,7 +37273,6 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
 //  pre-existing AI-vision transmitMessage() inlineData branch is reused
 //  verbatim as the fallback (Protocol 22) — this unit retires the AI-ONLY
 //  default without deleting or forking that code path.
-//  17 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 {
@@ -37862,7 +37759,6 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 //  SEAT (the Protocol UI-9 pending motion verb, adopted at 4 install call
 //  sites). Every moment is transient/MetaStore-only (Protocol 4 not
 //  triggered) and game-agnostic (Protocol 38).
-//  29 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 {
@@ -38439,7 +38335,6 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 //  .bay-part-no subtitle is never hidden (Protocol 25). The whole block is
 //  deliberately placed at the END of terminal.css so it always wins the
 //  cascade over each selector's earlier, unconditional base rule.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
@@ -38592,7 +38487,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate
-//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage) (14 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  The Developer Console (Suite 149) is re-founded on a data-driven
 //  DIAGNOSTIC_SHELL_TOOLS registry that auto-filters by a two-signal
@@ -39001,7 +38896,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons
-//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage) (13 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  U1's document-flow <details class="panel"> (which shoved the whole
 //  machine down on mobile whenever the console mounted) is replaced by a
@@ -39365,7 +39260,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 //  Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44
 //  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
-//  (16 tests)
 // ──────────────────────────────────────────────────────────────
 //  ~45 new registry entries under category:'triggers' — fire any of the 33
 //  feedback animations (bus-emit + pending-var), force each Living Core
@@ -40065,7 +39959,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 213 — Diagnostic Shell mobile chrome fixes (owner report) (8 tests)
+//  Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)
 // ──────────────────────────────────────────────────────────────
 //  Five presentation fixes on top of U1-U3, MOBILE ONLY (the exact inverse
 //  of the (min-width:1000px)... Suite 129 desktop gate) — desktop stays
@@ -40259,7 +40153,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 //  Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out
 //  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
-//  (16 tests)
 // ──────────────────────────────────────────────────────────────
 //  Two U4a deliverables: (1) EVERY registry `group` (not just the top-level
 //  CATEGORY) is now its own collapsible details.sub-panel, nested inside its
@@ -40811,7 +40704,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 //  Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES +
 //  submenu visual hierarchy (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
-//  Protocol 8 Sonnet stage) (16 tests — 14 initial + 2 Protocol 42
+//  Protocol 8 Sonnet stage) (plus 2 Protocol 42
 //  regressions found by this unit's own live Playwright verification: the
 //  DOM-sync revert bug in the fixture/FRESH START preset, and the shell's
 //  own confirm dialog rendering unreachable behind itself)
@@ -41884,7 +41777,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 //  Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock
 //  ceremony + FINAL leak-proof audit (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md
-//  §4/§7/§11 U5, Protocol 8 Sonnet stage) (22 tests)
+//  §4/§7/§11 U5, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  18 new registry entries: 8 tier:'staging' feature-flag override toggles
 //  (control:'toggle', a new synthesis path in _renderShell()) routing
@@ -42720,7 +42613,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  class sneaks in outside the known, already-reviewed set. SAVE_INTEGRITY_PASS
 //  added .storage-warning-banner to that reviewed set (217.7b) alongside its
 //  own inert-template guard, same as .update-banner/.fo3-warning-banner.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 217 — Mobile UX polish: cloud-save prominence + toast audit');
@@ -42871,7 +42763,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  inactive-subsystem panel — no override was actually winning — so MF-1's
 //  fix here is an explicit, un-overridable hardening of the existing
 //  invariant rather than a repair of a reproduced break. MF-3 are real fixes.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
@@ -42982,7 +42873,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  falling back to a literal array (_SYSTEM_STATUS_FLAGS_FALLBACK) only
 //  when that accessor isn't available (a reduced test harness). Also fixes
 //  a Protocol 42 gate defect this hotfix's own net test-count change exposed
-//  (Suite 28's canonical-count reader picked a stale, frozen count). 7 tests.
+//  (Suite 28's canonical-count reader picked a stale, frozen count).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 219 — v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced');
@@ -43170,7 +43061,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  220.11 (r-review Defect-4) guards that the ARCHITECTURE.md File Map
 //  carries no hardcoded byte/KB sizes. 220.12 (r-review) guards that
 //  CLAUDE.md's gate block pushes to dev, not main (Protocol 43).
-//  12 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
@@ -43431,7 +43321,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // model before its heading exists. Remove that entry when the heading lands.
   {
     // Scan set: the load-bearing docs + all js + all tests (mirrors the file
-    // set Suite 220 reads, widened to RULES.md / QUEUE.md and tests/ per the
+    // set Suite 220 reads, widened to QUEUE.md and tests/ per the
     // finding). Full-file text, not just comments — proven zero-FP because the
     // token only appears in prose/comments/descriptions across these files.
     const REF_DOCS_220 = [
@@ -43439,7 +43329,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ...ruleNoteFiles(), // U-R2: the subsystem notes are rulebook text too
       'ARCHITECTURE.md',
       'README.md',
-      'RULES.md',
       'QUEUE.md',
     ];
     const refCorpusFiles220 = [
@@ -43669,7 +43558,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  missed removal path, and that a plain reload of an existing save did
 //  NOT actually self-heal a stale reference as the original commit claimed
 //  (the v8 fast-path skipped migrateState, where the heal lived).
-//  16 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)');
@@ -44139,7 +44027,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  CHASSIS boards · the 4 SETTINGS boards) is EXHAUSTIVE — derived directly
 //  from index.html, not hand-copied, so a future un-allowlisted board can't
 //  silently fall through the cracks of both lists.
-//  62 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 222 — FO3 PIP-BOY BUILD U0 (board ids + rails data)');
@@ -44344,7 +44231,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  restores on a fresh "reload" (a fresh _applyRails() call with no live
 //  in-memory state), and switchTab() calls _applyRails() from the ONE choke
 //  point every entry path (including boot) funnels through.
-//  21 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 223 — FO3 PIP-BOY BUILD U1 (second nav axis, inert)');
@@ -44692,7 +44578,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  real DOM position sitting BEFORE the glass. 224.13 (U8) locks the
 //  render-integrity.mjs allowlist tightening from a bare-tag-name match to
 //  a precise `.closest('.bezel')` dock-membership check.
-//  28 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 224 — FO3 PIP-BOY BUILD U2 (landscape casing shell, the spine)');
@@ -45223,7 +45108,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  38/41). Every assertion is static-analysis-only, matching Suite 223/224's
 //  house style; NV-untouched is proven by requiring every new/changed
 //  selector to carry the [data-game='FO3'] prefix.
-//  13 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 225 — FO3 PIP-BOY landscape feedback pass round 2 (room reclaim + Vault Boy)');
@@ -46110,7 +45994,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  object surviving in memory, which is exactly how this bug shipped past
 //  every prior test in this file. The full real-browser, real-registry proof (actual
 //  reg_nv.js/reg_fo3.js, actual reload) lives in tests/render-check.mjs.
-//  6 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 228 — cross-game local-slot switch stale-registry regression');
@@ -46301,7 +46184,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  a source-text grep cannot see a stale FALLOUT_REGISTRY global surviving
 //  in memory, which is exactly how the original leak escaped every prior
 //  test in this file (Suite 133 precedent).
-//  8 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 229 — autoImportState() registry/game-context trust guard');
@@ -47141,7 +47023,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Weapons" master table (explosives' blast pulled per-page), THEN cited
 //  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
 //  a citation label proves nothing about a value; the pin does.
-//  24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 232 — FO3 + NV Weapon Data: Protocol 3 golden-master + plausibility guard');
@@ -48345,7 +48226,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  corrupt / valid / helper-throw / eviction fixtures. Browser-level
 //  proof (real banners, real IndexedDB, real chat lines) lives in
 //  tests/save-survival.mjs (full push gate).
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 233 — SAVE_LAYER3: read-side fail-loud');
@@ -48970,7 +48850,7 @@ header('Suite 234 — Accessibility: form controls carry an accessible name (U9)
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4) (17 tests)
+//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4)
 //  Protocol 20 static source-invariant guard. U4 made a red CI run
 //  diagnosable from the run itself (screenshots + console dumps + per-step
 //  gate logs uploaded as artifacts). This suite locks that wiring so a future
@@ -49107,7 +48987,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 //  Zero false positives is the bar (Protocol 45): the scanner strips comments
 //  and string literals before matching, so a token in prose/a string is never
 //  counted. The scan + diff logic lives in tests/arch-conformance-check.js
-//  (also runnable standalone for the red-then-green proof). 6 tests.
+//  (also runnable standalone for the red-then-green proof).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 236 — Static Architectural Conformance (Protocol 23 enforcement)');
@@ -49198,7 +49078,6 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 //  cannot fail a push. Both the static contract (no non-zero exit, a top-level
 //  catch, a non-blocking hook invocation that keeps the full gate) and the real
 //  behavior (bogus path → exit 0; default resolution → exit 0) are asserted.
-//  8 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 237 — Local-artifact backup nudge (Protocol 48)');
@@ -49545,9 +49424,9 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 //  Suite 239 — LIVE CONTAINER DURABILITY MIRROR (Step 2 · Phase 1 · P8).
 //  The live campaign container (localStorage 'robco_v8') now shadows into the
 //  IDB 'campaign'/'live' key so an Android localStorage eviction that spares
-//  IndexedDB recovers the campaign instead of booting empty. 16 tests: 10 static
+//  IndexedDB recovers the campaign instead of booting empty. Covered by static
 //  guards (mirror hooked on the debounced save, recovery-only restore, bounded
-//  fail-safe boot phase, visibilitychange flush, Diagnostic Shell trigger) + 6
+//  fail-safe boot phase, visibilitychange flush, Diagnostic Shell trigger) plus
 //  behavioral (RED→GREEN eviction recovery, localStorage-wins-never-clobbered,
 //  shape + integrity gates, mirror write, deep round-trip). Protocols 22/33/34.
 // ══════════════════════════════════════════════════════════════
@@ -49852,7 +49731,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 //      beside) was cut to one changed faction.
 //    • Finding 4 leftover — the standby wake line said "COURIER RETURNED" in
 //      every game; it now reads the per-game identity source (Protocol 38).
-//  24 tests. Protocols 13/14/20/22/24/38.
+//  Protocols 13/14/20/22/24/38.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 240 — AI/Overseer batch 2: cards, truthful export, directive sweep');

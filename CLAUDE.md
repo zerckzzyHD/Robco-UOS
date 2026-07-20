@@ -382,7 +382,11 @@ Per the Protocol 15 precedent, the number is **retired, not reused, and not renu
 
 **What was removed with it** (retirement means removing the enforcement, not just the prose — Protocol 49): Suite 28's cross-file count assertions and its end-of-run count reconciliation, which compared the runtime test total against the hand-synced `CHANGELOG.md` header. That reconciliation also incidentally caught a *silently dropped suite* — real value, now gone with it. It is recorded honestly rather than quietly replaced: the drop-detection was entirely parasitic on the hand-synced number, and a **generated** count could not have preserved it (a self-updating baseline regenerates to match whatever ran, so it can never notice that less ran). If suite-drop detection is wanted back, it needs a mechanism that does not route through a count. `tests/test.html`'s `Suites: N` marker (Protocol 40) is deliberately **kept** — see that protocol for the reasoning.
 
-**No count is maintained anywhere.** Where a doc needs to describe the suite, describe it qualitatively. The per-suite `// N tests` comments still present in `tests/robco-diagnostics.js` are unmaintained historical narration as of this retirement — do not sync them, and do not trust them.
+**No count is maintained anywhere.** Where a doc needs to describe the suite, describe it qualitatively.
+
+**R3 follow-up (2026-07-20) — the counts are now GONE, not merely unmaintained.** The retirement above originally left the per-suite `// N tests` comments sitting in `tests/robco-diagnostics.js` and told sessions not to trust them. That was half a fix: it cured the sync tax but kept the lie, because an unmaintained number still reads as fact to the next session. All 152 standalone `// N tests` comments and every inline `(N tests)` / trailing `N tests.` narration fragment have been **stripped** from the runner, and the same strip was applied to `library/TEST_CATALOG.md`, `library/CODE_MAP.md`, and `library/BRAIN_DUMP.md`. Suite 28 now guards the convention against returning.
+
+**Deliberately kept:** `tests/test.html`'s `Suites: N` marker (Protocol 40) — that is a *self-consistency* check that the file declares what it actually runs, not a hand-synced cross-file count; and the frozen `Tests: N/N` headers on **released** `CHANGELOG.md` version blocks, which are release-day history, not an obligation (Protocol 49).
 
 ---
 
