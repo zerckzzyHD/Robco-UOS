@@ -540,7 +540,7 @@ Exactly four `.map-*` classes survive repo-wide, and **all four have live consum
 
 ### P. ⬜ THE MUSEUM — a generated, browsable history of the project (build BEFORE the 2.8.5 release)
 
-**What it is.** Turn the private archive repo (Protocol 48's `robco-uos-local-archive`) into a browsable **museum** of the project's history — an index, a timeline, per-version "rooms," file lists, counts, and mockup galleries. Owner-approved concept and mechanism:
+**What it is.** Turn the private archive repo (Protocol 48's `_RobCo-Archive`) into a browsable **museum** of the project's history — an index, a timeline, per-version "rooms," file lists, counts, and mockup galleries. Owner-approved concept and mechanism:
 
 - **Generated, never hand-curated.** Every view is derived from the archive's folder structure by a script. A hand-maintained museum would rot exactly like the architecture doc's file-size numbers did — the whole point is generation over maintenance (same DNA as the Atlas, item I, and the TEST_CATALOG generator, item D).
 - **The ONE hand-written part** is a short account of what each release was actually about, written **at release time** when it's freshest, then frozen. It describes something finished, so it can't go stale.
@@ -652,7 +652,7 @@ This is deliberate planning, not busywork — the round touches gameplay and the
 
 **Enforcement — done.** App Check has been enforced since 2026-07-01 (owner-confirmed). The long-parked MONITORING→ENFORCE reminder was stale — it had been telling sessions to perform work completed weeks earlier — and has been retired from memory. There was no flip to perform.
 
-**The debug token — revoked.** A security scan (2026-07-20) found an App Check debug token committed in the private local-archive repo (Protocol 48's `robco-uos-local-archive`); a debug token bypasses App Check verification entirely, so it is a real credential, not a config value. **The owner deleted all three debug tokens in the Firebase console on 2026-07-20** — that deletion IS the revocation, so the strings are now dead. No replacement was registered, deliberately: one gets created on demand the next time local debug work needs it. The dead string was removed from the archive in the same pass (it was harmless but read like a live credential).
+**The debug token — revoked.** A security scan (2026-07-20) found an App Check debug token committed in the private local-archive repo (Protocol 48's `_RobCo-Archive`); a debug token bypasses App Check verification entirely, so it is a real credential, not a config value. **The owner deleted all three debug tokens in the Firebase console on 2026-07-20** — that deletion IS the revocation, so the strings are now dead. No replacement was registered, deliberately: one gets created on demand the next time local debug work needs it. The dead string was removed from the archive in the same pass (it was harmless but read like a live credential).
 
 **★ The Museum-publication blocker is CLEARED.** Item P no longer waits on anything from this entry.
 

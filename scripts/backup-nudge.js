@@ -32,7 +32,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // The private archive working copy — sibling of the public repo by default.
 // Overridable for tests via ROBCO_BACKUP_REPO.
 const BACKUP_REPO =
-  process.env.ROBCO_BACKUP_REPO || path.resolve(REPO_ROOT, '..', '_robco-local-backup');
+  process.env.ROBCO_BACKUP_REPO || path.resolve(REPO_ROOT, '..', '_RobCo-Archive');
 
 // Where the orchestrator's session store lives. Memory discovery is best-effort:
 // if the base is absent or invisible (e.g. a sandboxed shell can't see AppData),
