@@ -24,9 +24,13 @@ signal.
 
 ---
 
-## Protocol 20 — Static Source-Invariant Guards
+## Protocol 20 — Static Source-Invariant Guards (LAST RESORT — narrowed 2026-07-20)
 
-Critical CSS rules, render-function class/markup contracts, and service-worker invariants must each be covered by a static test that fails if the safeguard is removed in a refactor. Lost-safeguard regressions (a dropped class, an overridden CSS rule, `skipWaiting` in install) must surface as a gate failure, not reach production.
+**A behavioural test is the default; a static source assertion is the exception.** Critical CSS rules, render-function class/markup contracts, and service-worker invariants must each be covered by a test that fails if the safeguard is removed in a refactor — and wherever a behavioural test can reach the invariant at all, that test must assert the app **behaves** correctly (render it, run it, exercise the path), not that the source reads a certain way.
+
+**A static source assertion is permitted only where a behavioural test genuinely cannot reach the invariant, and the test must state why** — one line at the assertion naming what blocks the behavioural route. Real cases exist and stay: the UTF-8 source-integrity scan (Protocol 39), the deleted-runner and deleted-file guards, load-order/boot-chain declarations, and anything whose subject genuinely _is_ the source text rather than a runtime behaviour.
+
+**Why it was narrowed.** As originally written this protocol **mandated** static guards for render contracts, and sessions correctly followed it — so the gate filled with tests asserting that code _said_ it did the right thing rather than that it _did_. That is not doc drift; the protocol caused the blindness. The failure is not hypothetical: a guard was found asserting that a render path _claimed_ to escape dangerous input, which would have passed unchanged had the escaping actually been broken. A test that reads the source can only ever prove the source reads a certain way. Lost-safeguard regressions (a dropped class, an overridden CSS rule, `skipWaiting` in install) must still fail the gate — this narrows **how** they are caught, not **whether**.
 
 ---
 
