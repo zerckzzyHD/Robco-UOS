@@ -8,7 +8,8 @@
 // before cloud.js (see index.html load order).
 // EXPOSES: autoImportState(), sanitizeImportedContainer(),
 // _wireApiEventBusSubscribers(), _confirmDirectorRemovals(),
-// _confirmInventoryRemovals(), _confirmPerkRemovals().
+// _confirmInventoryRemovals(), _confirmPerkRemovals(),
+// _announceDirectorLevelUp().
 // GOTCHA: never use recursive key transformation on AI JSON here (Protocol
 // 24 / Prohibited Patterns) — every field below is an explicit, named
 // mapping (parsed.<key> → state.<key>) with its own type coercion/clamp.
@@ -217,7 +218,11 @@ function _wireApiEventBusSubscribers() {
 // fork per field). This is Protocol 34's DNA — "cloud writes are additive;
 // destructive ops are confirm-gated" — applied to the AI-import path: a
 // destructive write to the Courier's durable data is NEVER silent. Reuses
-// confirmAction() (the same diegetic confirm the level-up / WIPE flows use).
+// confirmAction() (the same diegetic confirm the WIPE TERMINAL flow uses).
+// (Corrected 2026-07-20: this comment also used to cite "the level-up flow".
+// nativeLevelUp() has never called confirmAction() — the player's own LEVEL UP
+// button commits immediately, by design. The only level-related popup that ever
+// existed was an AI-emitted display-only modal node that gated nothing.)
 //
 // `opts`:
 //   • noun   — what is being reduced, for the prose ('items', 'perks', …)
@@ -324,6 +329,61 @@ function _confirmPerkRemovals(removals) {
   });
 }
 
+// LEVEL announcement — NOT a removal gate, and deliberately not a permission
+// request either. Level is player-owned (owner directive 2026-07-20): the
+// Director may announce that a level has been EARNED, but the advance itself is
+// a build decision (perks, skill points) that belongs to the player.
+//
+// So this is the inverse of the gates above. Those ask "may I take this away?"
+// and apply the AI's change on approval. This one says "you've earned it — go
+// level up", and on approval calls nativeLevelUp(): the exact function the
+// player's own GRADE ADVANCE / LEVEL UP button calls. Nothing here ever writes
+// state.lvl, so the native curve and MAX_PLAYER_LEVEL stay the sole authority
+// and the AI's claimed number is never the value committed — it advances one
+// level, exactly as pressing the button would.
+//
+// SAFETY DEFAULT (mirrors _confirmDirectorRemovals): with no confirm surface, or
+// with no native level path available, the announcement is simply DROPPED. The
+// player keeps their current level and can always level up manually. Silence is
+// the safe failure here, because nothing was owed to the player automatically.
+function _announceDirectorLevelUp(opts) {
+  if (!opts || typeof confirmAction !== 'function') return;
+  if (typeof nativeLevelUp !== 'function') return; // no native authority → drop
+  const _id = typeof getIdentity === 'function' ? getIdentity() : null;
+  const _playerNoun = (_id && _id.playerNoun) || 'Courier';
+  const cap = typeof MAX_PLAYER_LEVEL === 'number' ? MAX_PLAYER_LEVEL : Infinity;
+  if (opts.from >= cap) return; // already at the cap — nothing to offer
+  confirmAction({
+    title: '> DIRECTOR FIELD ASSESSMENT',
+    warning:
+      'The Director assesses that the ' +
+      _playerNoun +
+      ' has earned a promotion:\n• Level ' +
+      opts.from +
+      ' → ' +
+      opts.to +
+      '\n\nAdvancing is yours to do — it spends perk and skill-point choices the ' +
+      'Director does not make for you. Open the GRADE ADVANCE terminal now, or ' +
+      'later at your own pace. Your level is unchanged until you do.',
+    confirmLabel: 'LEVEL UP NOW',
+    cancelLabel: 'LATER',
+  }).then(ok => {
+    if (!ok) {
+      if (typeof appendToChat === 'function')
+        appendToChat(
+          '> [PROGRESSION] Promotion noted. Advance via GRADE ADVANCE when ready.',
+          'sys',
+          true
+        );
+      return;
+    }
+    // The player chose to advance — route through the NATIVE path so the curve,
+    // the cap, the skill-point award, the level.up bus event, saveState() and the
+    // repaint all happen exactly once, in the one place that owns them.
+    nativeLevelUp();
+  });
+}
+
 // ── AI JSON → STATE FIELD MAPPING ─────────────────────────────────────────────
 // Called from transmitMessage() (api.js) with the raw JSON string of the AI's
 // "state" node, and from cloud-pull / file-import paths. Every field is mapped
@@ -351,14 +411,34 @@ function autoImportState(jsonString) {
         : obj[k.toUpperCase()] !== undefined
           ? obj[k.toUpperCase()]
           : undefined;
+    // LEVEL IS PLAYER-OWNED (owner directive 2026-07-20). The Director may DETECT
+    // and ANNOUNCE that a level has been earned; it may NEVER write state.lvl.
+    // Levelling spends real build choices — perks and skill points — and those are
+    // the player's to make. Same shape as the inventory/perk gates above, one layer
+    // up: the AI proposes, the player disposes (Protocol 22 — reuses the existing
+    // confirm machinery, no new surface).
+    //
+    // This replaces the previous unconditional `state.lvl = parseInt(lvlV) || 0`,
+    // which also had no floor and no MAX_PLAYER_LEVEL clamp (the clamp lives in the
+    // native paths only) — so the AI could write level 0, a negative, or 9999. It
+    // could silently LOWER the level too: an ungated destructive progression loss,
+    // structurally the same defect class as the inventory F1 finding. Refusing the
+    // write closes all of it at once, because there is no longer a write to guard.
+    //
+    // The announcement is advisory ONLY. Declining changes nothing, and the real
+    // advance always goes through nativeLevelUp() — the same function the player's
+    // own GRADE ADVANCE / LEVEL UP button calls — so the native curve, the level
+    // cap, and the skill-point award stay the single authority (Protocol 24: the
+    // AI is never the source of truth for durable state).
     const lvlV = _g(parsed, 'lvl');
-    const _prevLvl = state.lvl; // H3: capture before update
-    if (lvlV !== undefined) state.lvl = parseInt(lvlV) || 0;
-    // H3/U7: level-up is a state crossing — emit through the bus. The jingle,
-    // haptic, and (U8) campaign-note subscribers each decide independently
-    // whether to react; the detector here only detects.
-    if (lvlV !== undefined && state.lvl > _prevLvl) {
-      RobcoEvents.emit('level.up', { oldLvl: _prevLvl, newLvl: state.lvl });
+    if (lvlV !== undefined) {
+      const _claimedLvl = parseInt(lvlV);
+      if (Number.isFinite(_claimedLvl) && _claimedLvl > state.lvl) {
+        _announceDirectorLevelUp({ from: state.lvl, to: _claimedLvl });
+      }
+      // A claim at or below the current level is ignored outright — the Director
+      // cannot demote the player, and re-announcing the level they already hold
+      // would be noise.
     }
     const xpV = _g(parsed, 'xp');
     if (xpV !== undefined) state.xp = parseInt(xpV) || 0;

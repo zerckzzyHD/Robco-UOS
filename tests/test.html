@@ -320,10 +320,13 @@
         // ══════════════════════════════════════════════════════════════
         section('Suite 1 — Scalar field import');
 
+        // NOTE (2026-07-20): `lvl` is deliberately NOT in this payload. Level is
+        // player-owned — the AI may announce an earned promotion but can never
+        // write state.lvl (nativeLevelUp() is the sole writer). The dedicated
+        // read-only assertion for it follows this block.
         resetState();
         autoImportState(
           JSON.stringify({
-            lvl: 15,
             xp: 7500,
             hpCur: 63,
             hpMax: 130,
@@ -347,7 +350,6 @@
           })
         );
         const scalarExpect = {
-          lvl: 15,
           xp: 7500,
           hpCur: 63,
           hpMax: 130,
@@ -376,6 +378,28 @@
             `Got ${state[k]}`
           );
         });
+
+        // LEVEL IS READ-ONLY TO THE AI (owner directive 2026-07-20). The live
+        // runtime analogue of Suite 173.14 in the Node runner: an AI payload
+        // cannot move the level in EITHER direction — not up, not down, not to
+        // zero — while a sibling field in the same payload still imports.
+        {
+          resetState();
+          const lvlBefore = state.lvl;
+          autoImportState(JSON.stringify({ lvl: lvlBefore + 10, caps: 777 }));
+          assert(
+            state.lvl === lvlBefore && state.caps === 777,
+            'AI cannot RAISE state.lvl (announcement only) while caps still imports',
+            `Got lvl ${state.lvl} (expected ${lvlBefore}), caps ${state.caps}`
+          );
+          autoImportState(JSON.stringify({ lvl: 1 }));
+          autoImportState(JSON.stringify({ lvl: 0 }));
+          assert(
+            state.lvl === lvlBefore,
+            'AI cannot LOWER or zero state.lvl — no ungated progression loss',
+            `Got ${state.lvl} (expected ${lvlBefore})`
+          );
+        }
 
         // ══════════════════════════════════════════════════════════════
         //  Suite 2 — Factions (game-agnostic via getFactionRegistry)

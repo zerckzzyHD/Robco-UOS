@@ -17007,6 +17007,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
+    // LEVEL OWNERSHIP → THE PLAYER (2026-07-20, owner directive): ALL 11 rows'
+    // hashes moved. A new line in the ROBCO_DEV_MANUAL progression block tells the
+    // AI that level is player-owned and READ-ONLY to it — "lvl" may now only
+    // ANNOUNCE an earned promotion (and only upward), never store a value. That
+    // text rides in every directive, so every ctx/playstyle/playthrough/campaign
+    // combination's hash changed. An intentional content change, not a regression
+    // (Protocol 14 — the contract change is guarded by Suite 173.13/173.14, and the
+    // code-side enforcement by 173.10/173.11/173.12). Regenerated via the same
+    // in-sandbox getSystemDirective() the matrix below hashes.
+    //
     // AI_OVERSEER Finding 4 (persona game-agnostic, 2026-07-19): ONLY the two FO3
     // rows' hashes moved this pass. The player noun is now per-game DATA
     // (GAME_DEFS[ctx].identity.playerNoun — api-directive.js/state.js): FNV resolves
@@ -17035,77 +17045,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '579fec156902828b3ae1885074b7ddd26b709ec909a6b695fde022d10f181f69',
+        sha256: '09979e404e096857b3c2d758460a6ff94bdf046138da8539d41ee0e6502c97e0',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: 'f9cfa49627d760d7ceeff9f7886eb40e3205b8fc98e2c51c295e77ad28b7fbe8',
+        sha256: '44e186d5374ab02e15e4385a290a5f394d133e3aaeb48bc6050fb8a0df5de540',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '6a1a563e0904156090fa12b74ed0adca7f65c4814f10ebfa77676401afed98b1',
+        sha256: '0d03364b522a999dc91c07cfd9eaf0015467014c3dfb73911e5fb480f059b620',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: '94afc6bf9e606088a13e1457926fea2c923f4ab5bfaf4a8a67ffcd2ea89359c8',
+        sha256: 'a6f83197a03a7f47a32dff6669abee37b21b55f5bbe0fa385ed04bac73fa0c1e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: 'cf4e3c646958eb18fb46b3212dc3f6dd8702842379c226e0a3470a474db69470',
+        sha256: '265c78463e80a608c91c5ab2fbfed68269aebb1ba155f95ecf0b6318e5800f05',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'fd31d3b3bff71fd91d496623e62c3a16f21896c8ef6f4f012526884f39766efe',
+        sha256: '9df11080498c7967bad74460abe09fc153732f0082589b6f81ea39dc606bc4da',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '0d45bde6c1763266c8edaf05d6a64d20604726f36e8f99521e372e689f2ef3f1',
+        sha256: 'e59fbf7d417c9fc110f5cd80eb69da13b0b13720452017ecd0a40bf6cddae725',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '4e07cd40d19d664dbcdd479b2aeb31623d61fd2b819291c3ea4da5d8e9cfdb54',
+        sha256: 'a61620d349e3b4aa2813852cebd588262bc513bf5d1a42123f73846b2938d0c3',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '41b89e6cbe1610aed255182a154b83c0f5df9adeae290446d0e87d4baeb9f394',
+        sha256: '3026ab20ceefe9e65b1351ee3c3f083185630a926d938894c8b9e398eaa2dc04',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: 'f193f2d1cc29d959806c53f7e8eeb48478201550f98a03711188c51c999cf42e',
+        sha256: '7d9775b50b5a0d878f7d32e3947f30700481cb511923b8466fa3d419eadaef02',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '1226c7a77e1876f38a1cf2608b8124756eaac9989f532190b44c5b77cb08bd48',
+        sha256: 'ecc9c05dea238a3f7968bf5a30ad128922726bb5fbee3adcd2b67d77f0b87aad',
       },
     ];
 
@@ -17451,9 +17461,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   });
 
   // ── C. Hostile / injection-shaped payloads ────────────────────────────
+  // Carrier field changed lvl → xp (2026-07-20): level is now player-owned and
+  // the AI cannot write it, so `lvl` no longer proves the payload was processed.
+  // `xp` is a field the AI legitimately still writes, so it demonstrates the same
+  // thing — the payload imported normally while the pollution attempt failed.
   behavior133('__proto__ pollution attempt does not pollute Object.prototype', undefined, () => {
-    callThrows133(JSON.stringify({ __proto__: { polluted133: 'yes' }, lvl: 7 }));
-    return Object.prototype.polluted133 === undefined && liveState133().lvl === 7;
+    callThrows133(JSON.stringify({ __proto__: { polluted133: 'yes' }, xp: 7 }));
+    return Object.prototype.polluted133 === undefined && liveState133().xp === 7;
   });
   behavior133(
     'constructor.prototype pollution attempt does not pollute Object.prototype',
@@ -17589,14 +17603,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // ── G. Valid / partial payloads (positive path through the hardening) ──
+  // Carrier field changed lvl → xp (2026-07-20), same reason as the __proto__
+  // case above: the AI can no longer write lvl, so it cannot demonstrate a
+  // successful partial import. lvl is asserted UNCHANGED here instead, which
+  // makes this case cover both halves of the contract at once.
   behavior133('well-formed partial payload updates only the included field', undefined, () => {
-    callThrows133(JSON.stringify({ lvl: 5 }));
+    const lvlBefore133 = liveState133().lvl;
+    callThrows133(JSON.stringify({ xp: 5 }));
     const st = liveState133();
-    return (
-      st.lvl === 5 &&
-      st.xp === harness133.defaultState133.xp &&
-      st.caps === harness133.defaultState133.caps
-    );
+    return st.xp === 5 && st.lvl === lvlBefore133 && st.caps === harness133.defaultState133.caps;
   });
   behavior133(
     'well-formed payload updates SPECIAL + factions + inventory correctly',
@@ -18071,11 +18086,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // ── U7 detector migration (static) ────────────────────────────────────────
 
-  // 135.10  level-up and faction-threshold detectors in api.js emit through the bus
+  // 135.10  the faction-threshold detector in api.js emits through the bus.
+  //         UPDATED 2026-07-20: the level-up half was removed with the AI's
+  //         ability to write the level. The import path no longer emits
+  //         'level.up' because it no longer changes the level — nativeLevelUp()
+  //         is the sole emitter now (Suite 173.4/173.10).
   assert(
-    /RobcoEvents\.emit\(\s*'level\.up'/.test(apiSource) &&
-      /RobcoEvents\.emit\(\s*'faction\.threshold'/.test(apiSource),
-    "135.10: autoImportState()'s level-up and faction-threshold detectors emit 'level.up' / 'faction.threshold' through RobcoEvents"
+    /RobcoEvents\.emit\(\s*'faction\.threshold'/.test(apiSource),
+    "135.10: autoImportState()'s faction-threshold detector emits 'faction.threshold' through RobcoEvents"
   );
 
   // 135.11  HP-critical detector in ui-core.js emits through the bus
@@ -26591,20 +26609,26 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press,
-  //        clamped at MAX_PLAYER_LEVEL, and emits the SAME 'level.up'
-  //        RobcoEvents the AI-driven autoImportState() path uses (api.js) —
-  //        reused, not forked.
+  // 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press, clamped
+  //        at MAX_PLAYER_LEVEL, and emits 'level.up'.
+  //
+  //        UPDATED 2026-07-20 (level ownership → the player): this test used to
+  //        ALSO require autoImportState()'s body to emit 'level.up', on the
+  //        Protocol 22 "same event, not forked" reasoning. That coupling is now
+  //        inverted — the import path must NOT emit it, because it no longer
+  //        changes the level, and emitting a level.up the player never earned
+  //        would fire the jingle, the haptic and the campaign-note subscriber on
+  //        a state crossing that did not happen. nativeLevelUp() is now the SOLE
+  //        emitter, which is a stronger single-source guarantee than the old
+  //        two-emitter parity. The import side is guarded by 173.10 below.
   {
     const nativeLevelUpBody173c = extractFunctionBody(uiCore173, 'nativeLevelUp');
-    const autoImportBody173 = extractFunctionBody(apiSource, 'autoImportState');
     assert(
       /if \(lvl >= MAX_PLAYER_LEVEL\) return;/.test(nativeLevelUpBody173c) &&
         /const newLvl = Math\.min\(MAX_PLAYER_LEVEL, lvl \+ 1\);/.test(nativeLevelUpBody173c) &&
         /state\.lvl = newLvl;/.test(nativeLevelUpBody173c) &&
-        /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c) &&
-        /RobcoEvents\.emit\('level\.up',/.test(autoImportBody173),
-      "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up' — the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+        /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c),
+      "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up'"
     );
   }
 
@@ -26789,6 +26813,142 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         outcome173b.boundary.emitCount === 1,
       '173.9: [behavioral] nativeLevelUp() always increments by exactly +1 per press and fires level.up every time (5 presses from level 1 → level 6, 5 events, correct oldLvl/newLvl sequence, XP never read) — and no-ops with zero events at MAX_PLAYER_LEVEL while a press from MAX_PLAYER_LEVEL-1 lands exactly on the cap' +
         (err173b ? ' — ' + err173b.message : '')
+    );
+  }
+
+  // ── LEVEL OWNERSHIP → THE PLAYER (owner directive 2026-07-20) ──────────────
+  // The AI could previously write state.lvl directly from its response, with no
+  // floor, no MAX_PLAYER_LEVEL clamp, and no gate in EITHER direction — so it
+  // could set level 0, a negative, 9999, or silently DEMOTE the player. Levelling
+  // spends perk and skill-point choices that belong to the player. The AI may now
+  // only ANNOUNCE an earned promotion; nativeLevelUp() is the sole writer.
+  //
+  // Protocol 13 (regression test for the fix) + Protocol 14 (the AI contract
+  // changed, so the schema and the import round-trip are both re-guarded).
+
+  // 173.10  STATIC — autoImportState() contains no write to state.lvl at all,
+  //         and no longer emits 'level.up' (see 173.4's updated reasoning).
+  //         Written as a broad "no assignment to state.lvl in any form" probe so
+  //         a reintroduced write cannot slip back in a differently-spelled shape.
+  {
+    // Strip comments first — the explanatory comment in the import path quotes
+    // the REMOVED `state.lvl = parseInt(lvlV) || 0` line verbatim, and a probe
+    // that counted that would be reporting on prose, not on code.
+    const autoImportBody173d = extractFunctionBody(apiSource, 'autoImportState')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+    const lvlWrites173 =
+      autoImportBody173d.match(/state\.lvl\s*(?:=[^=]|[+\-*/]{1,2}=|\+\+|--)/g) || [];
+    assert(
+      lvlWrites173.length === 0 && !/RobcoEvents\.emit\('level\.up'/.test(autoImportBody173d),
+      "173.10: autoImportState() never writes state.lvl and never emits level.up — the AI cannot set, raise, or lower the player's level (found " +
+        lvlWrites173.length +
+        ' write(s))'
+    );
+  }
+
+  // 173.11  STATIC — the import path routes an earned level through the
+  //         announcement, which itself defers to nativeLevelUp() rather than
+  //         applying the AI's number (Protocol 22 — reuses the confirm machinery
+  //         and the native authority, forks neither).
+  {
+    const announceBody173 = extractFunctionBody(apiSource, '_announceDirectorLevelUp');
+    const autoImportBody173e = extractFunctionBody(apiSource, 'autoImportState');
+    assert(
+      /_announceDirectorLevelUp\(/.test(autoImportBody173e) &&
+        /confirmAction\(/.test(announceBody173) &&
+        /nativeLevelUp\(\)/.test(announceBody173) &&
+        !/state\.lvl\s*=/.test(announceBody173),
+      "173.11: autoImportState() hands an earned level to _announceDirectorLevelUp(), which confirms with the player and then calls nativeLevelUp() — it never writes state.lvl with the AI's claimed value"
+    );
+  }
+
+  // 173.12  STATIC — the announcement inherits the safety default of the
+  //         inventory/perk gates: with no confirm surface, or no native level
+  //         authority present, it drops silently rather than acting.
+  {
+    const announceBody173b = extractFunctionBody(apiSource, '_announceDirectorLevelUp');
+    assert(
+      /typeof confirmAction !== 'function'\) return/.test(announceBody173b) &&
+        /typeof nativeLevelUp !== 'function'\) return/.test(announceBody173b),
+      '173.12: _announceDirectorLevelUp() drops the announcement when either confirmAction() or nativeLevelUp() is unavailable — never acts without both'
+    );
+  }
+
+  // 173.13  PROTOCOL 14 — the AI contract states the rule the code enforces.
+  //         A directive that still invited the AI to set a level, while the
+  //         import path silently discarded it, would make the AI narrate a
+  //         promotion it did not actually apply — the exact confusion the
+  //         AI_OVERSEER Finding 5 log incident came from.
+  {
+    const directiveSrc173 = readFile('js/services/api-directive.js');
+    assert(
+      /Level is \$\{noun\}-OWNED and READ-ONLY to you/.test(directiveSrc173) &&
+        /only ever HIGHER than the current level/.test(directiveSrc173) &&
+        /never as a value to store/.test(directiveSrc173),
+      '173.13: PROTOCOL 14 — getSystemDirective() tells the AI that level is player-owned and read-only, that "lvl" is an announcement only, and that it may never be used to store a value'
+    );
+  }
+
+  // 173.14  PROTOCOL 14 (round-trip, BEHAVIORAL) — the real autoImportState()
+  //         body, executed in a vm sandbox with a confirm surface that is never
+  //         allowed to resolve, is fed AI payloads that try to raise, lower, and
+  //         zero the level. state.lvl must survive all three untouched, while a
+  //         sibling field in the same payload still imports normally (proving the
+  //         payload really was processed, not rejected wholesale).
+  {
+    const vm173c = require('vm');
+    let lvlAfter173 = null;
+    let xpAfter173 = null;
+    let announced173 = 0;
+    let err173c = null;
+    try {
+      // Same harness footing as Suite 133 — the REAL state.js + reg_nv.js loaded
+      // into the context, so autoImportState() runs against real state defaults
+      // and a real registry rather than a hand-stubbed object.
+      const sandbox173 = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error: () => {}, log: () => {}, warn: () => {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+        confirmAction: () => new Promise(() => {}), // never resolves — nothing applied
+        nativeLevelUp: () => {},
+        getIdentity: () => ({ playerNoun: 'Courier' }),
+        MAX_PLAYER_LEVEL: 50,
+        saveState: () => {},
+        reconcileEquipped: () => {},
+        _announceCount: 0,
+      };
+      vm173c.createContext(sandbox173);
+      vm173c.runInContext(stateSource, sandbox173);
+      vm173c.runInContext(readGroup('reg_nv'), sandbox173);
+      vm173c.runInContext(
+        'function _announceDirectorLevelUp(o){ _announceCount++; }\n' +
+          'function autoImportState(jsonString)' +
+          extractFunctionBody(apiSource, 'autoImportState') +
+          '\nthis.autoImportState = autoImportState;',
+        sandbox173
+      );
+      vm173c.runInContext('state.lvl = 5; state.xp = 0;', sandbox173);
+      // raise, demote, zero, negative — none may move state.lvl
+      sandbox173.autoImportState(JSON.stringify({ lvl: 12, xp: 700 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: 1 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: 0 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: -3 }));
+      lvlAfter173 = vm173c.runInContext('state.lvl', sandbox173);
+      xpAfter173 = vm173c.runInContext('state.xp', sandbox173);
+      announced173 = vm173c.runInContext('_announceCount', sandbox173);
+    } catch (e) {
+      err173c = e;
+    }
+    assert(
+      !err173c && lvlAfter173 === 5 && xpAfter173 === 700 && announced173 === 1,
+      '173.14: PROTOCOL 14 [behavioral] — a real AI payload cannot write the level in ANY direction: raise (12), demote (1), zero (0) and negative (-3) all leave lvl at 5, while xp in the same payload imports normally (700), and only the single upward claim raises an announcement' +
+        (err173c
+          ? ' — ' + err173c.message
+          : ' — got lvl=' + lvlAfter173 + ' xp=' + xpAfter173 + ' announcements=' + announced173)
     );
   }
 }

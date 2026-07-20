@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.0-r53 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.0-r54 -->
 
 ### Added
 
@@ -85,6 +85,7 @@
 ### Changed
 
 - The AI no longer throws you out of the conversation when it changes something. Previously, any stat or inventory change the AI made would switch you away to whichever panel had changed — interrupting you mid-exchange and losing your place. Now you stay on the terminal, and each change announces itself right there as a small card in the corner, the same way arriving at a new location already does. The panel that changed is still opened for you in the background, so it's ready whenever you go and look. Several changes at once queue up and show one after another rather than overwriting each other.
+- Levelling up is now entirely yours. The Director can still notice when you have earned a level and will tell you so, but it can no longer set your level itself — in either direction. Levelling spends real choices (a perk, your skill points), and those belong to you, not to the AI. When the Director says you have earned a promotion, you now get a note offering to open the LEVEL UP terminal right then or leave it for later; either way your level does not move until you choose it, and the advance goes through the same LEVEL UP button you have always used, with the same level cap and skill-point award. Asking the Director to "level me up" still works exactly as a request — it just prompts you instead of doing it for you. This also closes a real hole: the Director could previously set your level to anything at all, including lowering it, with nothing asking you first.
 
 ### Improved
 

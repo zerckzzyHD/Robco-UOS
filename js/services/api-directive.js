@@ -170,11 +170,14 @@ Example Schema:
 // "Visual Upload Fallback" line (accurate as written — Tesseract is primary and
 // the AI vision path is a real fallback).
 //
-// FLAGGED, NOT CHANGED (left in deliberately, per the sweep's conservative rule):
-// the directive still lets the AI return `lvl`, even though nativeLevelUp() is the
-// level authority and levelling is not XP-gated natively. Making level AI-read-only
-// is defensible but would change a workflow the owner may rely on ("level me up"),
-// so it is recorded here for an owner decision rather than decided unilaterally.
+// RESOLVED 2026-07-20 (owner directive) — the flag here asked for an owner call on
+// whether the AI may return `lvl`. The answer is NO: level is player-owned. The AI
+// may DETECT and ANNOUNCE an earned level, but the advance spends perk and
+// skill-point choices that belong to the player, so nativeLevelUp() is the sole
+// writer. The "level me up" workflow is preserved, not removed — it now surfaces an
+// announcement whose LEVEL UP NOW action calls nativeLevelUp() for the player.
+// Enforced in api-import.js (_announceDirectorLevelUp): the import path no longer
+// writes state.lvl at all.
 function _directiveCoreTracking(noun) {
   return `
 
@@ -193,6 +196,7 @@ Visual Upload Fallback: On-device optical scan (Tesseract OCR) is the PRIMARY pa
 
 ### **ROBCO_DEV_MANUAL.TXT (System Math & Logic Base)**
 - XP thresholds / level progression: native deterministic LEVEL UP terminal (offline, own curve + level cap). Do NOT compute a level from XP — report XP earned only.
+- Level is ${noun}-OWNED and READ-ONLY to you. You may return "lvl" ONLY to ANNOUNCE that a promotion has been earned, and only ever HIGHER than the current level — the terminal treats it as an announcement, never as a value to store, and will invite the ${noun} to advance at their own pace. You can NEVER set, raise, or lower the ${noun}'s level yourself, because levelling spends perk and skill-point choices that are theirs to make. A "lvl" equal to or below the current level is discarded. If the ${noun} asks you to level them up, announce the promotion — do not claim you have applied it.
 - Tactical TTK / THREAT: handled by the native deterministic THREAT terminal (BESTIARY.CSV lookup + TTK/ammo-burn math, computed offline). Do NOT compute or narrate time-to-kill or a THREAT modal — defer to the local calculator.
 - LOOT add/value: the [LOOT] terminal (add a DB item to inventory at its Database Value) is a native deterministic offline tool — do NOT emit a LOOT picker/modal or compute item values; defer to the local calculator. Free-text looting during play returns ONLY the newly-looted item(s) per the persistence rule above — never the whole array.
 - V.A.T.S. accuracy / AP-strike simulation: the [VATS SIM] / [VS] terminal is a native deterministic offline calculator (equipped weapon + SPECIAL + skills + GAME_DEFS V.A.T.S. coefficients, computed offline). Do NOT compute or narrate a V.A.T.S. hit-chance, AP-strike plan, or modal — defer to the local calculator.`;

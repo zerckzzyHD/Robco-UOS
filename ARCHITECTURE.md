@@ -350,7 +350,9 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 27. js/services/api-directive.js → defines: getSystemDirective + its 8 _directive* section
                        builders (Suite 131 golden-master SHA-256 guarded; Protocol 14) (2.8.5 U-A3 split)
 28. js/services/api-import.js → defines: autoImportState, sanitizeImportedContainer,
-                       _wireApiEventBusSubscribers — the AI-JSON-response → state field-mapping
+                       _wireApiEventBusSubscribers, _confirmDirectorRemovals (+ its
+                       _confirmInventoryRemovals / _confirmPerkRemovals wrappers),
+                       _announceDirectorLevelUp — the AI-JSON-response → state field-mapping
                        path (Protocol 24) (2.8.5 U-A3 split)
 29. js/services/api-router.js → defines: NATIVE_COMMAND_ROUTER, _routeNativeCommand,
                        QUICK_LOG_PATTERNS, transmitTerminal — deterministic offline command
@@ -1754,6 +1756,42 @@ that a pre-existing stale save "self-heals on load" was only true for cloud-pull
 calls `reconcileEquipped(state)` directly, right beside the `_migrateEventLog` targeted-migration call it
 already runs for the same reason, so the claim is true for every load path, including a plain reload.
 Protocol 13-regression-tested (Suite 221, expanded 11→16 tests to cover both follow-ups; Suite 12).
+
+**Level is player-owned; the AI announces, it never writes (owner directive, 2026-07-20):** the standing
+player-control principle — _the player has full control; the AI decides only when invoked_ — applied to
+`state.lvl`. `autoImportState()` previously did an unconditional `state.lvl = parseInt(lvlV) || 0`: no
+floor, no `MAX_PLAYER_LEVEL` clamp (that clamp lives only in the native paths), and **no gate in either
+direction**, so an AI response could set level 0, a negative, 9999, or silently _demote_ the player — an
+ungated destructive progression loss, structurally the same defect class as the AI_OVERSEER Finding 1
+inventory bug one layer up.
+
+The import path now **never writes `state.lvl` at all**. A returned `lvl` strictly greater than the
+current level is handed to `_announceDirectorLevelUp({from, to})` (`js/services/api-import.js`), which
+sits beside `_confirmInventoryRemovals` / `_confirmPerkRemovals` and reuses the same `confirmAction()`
+machinery (Protocol 22 — no new surface). A claim at or below the current level is discarded outright.
+It is the **inverse** of those gates: they ask "may I take this away?" and apply the AI's change on
+approval, whereas this one says "you've earned it — go level up" and on approval calls **`nativeLevelUp()`**,
+the exact function the player's own GRADE ADVANCE / LEVEL UP button calls. So the AI's claimed number is
+never the value committed — the native curve, the level cap, and the skill-point award remain the single
+authority (Protocol 24), and levelling keeps spending the perk and skill-point choices that belong to the
+player. Declining changes nothing. Safety default mirrors the removal gates: with no `confirmAction()`
+surface **or** no `nativeLevelUp()` available, the announcement is dropped silently.
+
+Because the import path no longer changes the level, it also **no longer emits `level.up`** —
+`nativeLevelUp()` is now the sole emitter, a stronger single-source guarantee than the previous
+two-emitter parity (emitting a `level.up` the player never earned would fire the jingle, haptic and
+campaign-note subscribers on a state crossing that did not happen). The directive states the rule the
+code enforces (Protocol 14): level is player-owned and read-only to the AI, `lvl` is an announcement
+only and only ever upward. All 11 Suite 131 golden-master directive hashes moved accordingly. Guarded by
+Suite 173.10–173.14; Suite 133's two `lvl`-carrier behavioral cases were re-pointed at `xp`, and 135.10
+dropped its level-up half.
+
+**A note on the "level confirmation popup":** there has never been a native one. `nativeLevelUp()` commits
+immediately by design, and the popup previously seen for an AI level-up was an **AI-emitted display-only
+`modal` node** that gated nothing — `autoImportState()` had already written `state.lvl` before it rendered
+(this is the same conflation recorded in AI_OVERSEER Finding 5, where an export dropped the modal node).
+Two stale comments claiming `confirmAction()` was "the same diegetic confirm the level-up flow uses" were
+corrected in the same commit.
 
 **FO3 Karma Engine (Protocol 8 Stage 2, 2.8.5 unreleased work — supersedes an earlier, narrower `karmaCompanions` fix):**
 a deterministic, offline, zero-AI rebuild of `renderKarmaCenter()` (`js/ui/ui-render-factions.js`),
