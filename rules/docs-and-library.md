@@ -96,4 +96,18 @@ Every doc under `library/` and `planning/` falls into exactly one of three class
 
 - Where the rulebook's own structure is defined: `CLAUDE.md` (the contract + retrieval map)
 - Backing up `library/`, `planning/` and agent memory: **Protocol 48** — in `CLAUDE.md`.
+
+**Where a standing tool lives — and the backup consequence (R4, 2026-07-20).** `library/PROMPT_LIBRARY/`
+(the reusable prompt set + the engineering playbook) moved out of `planning/_standing/`. The reason is the
+3-class model above: those two files are **standing tools that get re-aimed**, not frozen point-in-time
+snapshots, so they were mis-filed under ARCHIVE-class `planning/`.
+
+**Know what the move costs, because it is a real downgrade in backup guarantee.** Protocol 48's sync
+mirrors `planning/` **additively** — once captured, a planning file is never removed from the archive even
+if it disappears locally. `library/` is a **plain mirror**: a local deletion now propagates to the archive
+working tree on the next sync. The content stays recoverable from the archive's git history, but the
+"deleted locally is still sitting in the archive working copy" safety net no longer applies to these two
+files. That is the accepted trade for filing them by what they actually are — recorded here rather than
+discovered later.
+
 - File moves that oblige a code-map update: `rules/file-layout.md`

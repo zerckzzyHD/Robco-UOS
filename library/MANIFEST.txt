@@ -1,11 +1,17 @@
 # library/MANIFEST.txt — committed exception to the library/ gitignore (Protocol 46).
-# Lists every filename `library/` is expected to hold. library/ itself is gitignored
+# Lists every file `library/` is expected to hold. library/ itself is gitignored
 # (local-only Claude reference docs), so on a clean CI checkout none of these files
 # exist on disk — this manifest is what lets Suite 220 still verify that every
-# `library/…` pointer path named in CLAUDE.md resolves to a real, known filename,
+# `library/…` pointer path named in CLAUDE.md resolves to a real, known file,
 # even where the file itself can't be read. Hand-maintained: add/remove a line in the
 # same commit a file is added to or removed from library/ (Protocol 46).
+#
+# Paths are relative to library/ and may be nested (forward slashes). Suite 220.8
+# walks library/ recursively, so a file inside a subdirectory must be listed here
+# too — a nested file left unlisted fails the gate rather than passing unnoticed.
 BRAIN_DUMP.md
 CODE_MAP.md
+PROMPT_LIBRARY/RobCo_Engineering_Playbook.md
+PROMPT_LIBRARY/RobCo_Prompt_Library.md
 PROMPT_MULTI_AI_REMAKE.md
 TEST_CATALOG.md

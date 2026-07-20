@@ -43244,7 +43244,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // ── 220.7  every library/<file> pointer in the docs resolves against the
   //           committed manifest — the guard that is REAL on CI ──
   {
-    const libRe220 = /(?<![.\w/])library\/([A-Za-z0-9_-]+\.(?:md|txt))\b/g;
+    // Accepts a nested path (library/PROMPT_LIBRARY/Foo.md) as well as a flat
+    // one — library/ gained a subdirectory at R4, and a regex that only matched
+    // flat names would let every nested pointer skip the guard silently.
+    const libRe220 = /(?<![.\w/])library\/((?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:md|txt))\b/g;
     const missingLib220 = new Set();
     let m;
     while ((m = libRe220.exec(docBlob220))) {
@@ -43272,8 +43275,21 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // (a file added to/removed from library/ without updating MANIFEST.txt);
   // 220.7 treats the manifest as ground truth and cannot.
   {
+    // Recursive walk (R4): library/ now holds a subdirectory (PROMPT_LIBRARY/).
+    // A flat readdirSync would have listed the DIRECTORY entry, then dropped it
+    // on the .md/.txt extension filter below — so every file inside it would
+    // have escaped the manifest guard entirely while 220.8 still reported PASS.
+    // Paths are relative to library/ and forward-slashed to match the manifest.
+    const walkLib220 = (dir, prefix = '') =>
+      fs
+        .readdirSync(dir, { withFileTypes: true })
+        .flatMap(e =>
+          e.isDirectory()
+            ? walkLib220(path.join(dir, e.name), prefix + e.name + '/')
+            : [prefix + e.name]
+        );
     const nonManifestFiles220 = fs.existsSync(libDir220)
-      ? fs.readdirSync(libDir220).filter(f => f !== 'MANIFEST.txt')
+      ? walkLib220(libDir220).filter(f => f !== 'MANIFEST.txt')
       : [];
     if (nonManifestFiles220.length > 0) {
       const actual220 = new Set(nonManifestFiles220.filter(f => /\.(?:md|txt)$/.test(f)));
@@ -43295,6 +43311,26 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         "220.8 (local-only): skipped — no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
       );
     }
+  }
+
+  // ── 220.8b  STATIC (real on CI): 220.8's library/ scan stays RECURSIVE ──
+  // Protocol 42 lock. Found during the R4 re-pin: 220.8 used a flat
+  // readdirSync + an .md/.txt extension filter, so when library/ gained a
+  // subdirectory the directory entry was filtered out and every file inside it
+  // escaped the manifest guard — while 220.8 still reported PASS. That is the
+  // worst shape a guard can take (silently covering less than it claims), so
+  // the recursion is pinned here rather than left to be reverted by the next
+  // person who finds walkLib220 more verbose than readdirSync.
+  {
+    const selfSrc220 = fs.readFileSync(path.join(__dirname, 'robco-diagnostics.js'), 'utf8');
+    const walkDecl220 =
+      /const walkLib220 = \(dir, prefix = ''\) =>[\s\S]{0,400}?walkLib220\(path\.join\(dir, e\.name\)/.test(
+        selfSrc220
+      );
+    assert(
+      walkDecl220 && /walkLib220\(libDir220\)/.test(selfSrc220),
+      '220.8b: 220.8 scans library/ with a RECURSIVE walk (walkLib220 recurses into subdirectories and is what feeds nonManifestFiles220) — a flat readdirSync would let files inside a library/ subdirectory skip the manifest guard while still reporting PASS'
+    );
   }
 
   // ── 220.9  every "Protocol N" reference resolves to a real protocol heading ──
@@ -49028,8 +49064,11 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       );
 
   // ── The three enforced rules — one aggregate assert each. The assert COUNT is
-  // fixed (independent of how many violations exist) so the Suite 28 end-of-run
-  // count reconciliation stays stable as the 2.9.0 debt burns down. ──
+  // fixed (independent of how many violations exist) so the suite's output stays
+  // stable as the 2.9.0 debt burns down. (This originally read "so the Suite 28
+  // end-of-run count reconciliation stays stable" — that reconciliation was
+  // deleted with Protocol 2a's retirement, R1 2026-07-20; the fixed-count shape
+  // is kept on its own merits, not for a mechanism that no longer exists.) ──
   const nvFor = key => nv236.filter(v => v.rule === key);
   assert(
     nvFor('renderWritesState').length === 0,
