@@ -196,6 +196,102 @@ function extractManifest() {
   return { stubs, edges, status };
 }
 
+// Shared by every `·`-segment path-bearing extractor (routes_to today;
+// claims_scope_over reuses this exact helper — the independence load-bearing
+// idea is about which SOURCE TEXT feeds it, not about having two classifiers).
+function edgesFromSegments(segments, type, note) {
+  const edges = [];
+  for (const seg of segments) {
+    const tokens = extractBacktickTokens(seg);
+    if (tokens.length === 0) {
+      edges.push({
+        type,
+        note,
+        kind: 'selector',
+        raw: seg,
+        target: `selector:${slugSelector(seg)}`,
+      });
+    } else {
+      for (const tok of tokens) {
+        edges.push({ type, note, kind: classifyToken(tok), raw: tok, target: tok });
+      }
+    }
+  }
+  return edges;
+}
+
+function isTableSeparatorRow(line) {
+  return /^\|?[\s:-]+\|[\s:|-]*$/.test(line.trim());
+}
+
+// GFM row splitter. Adequate for this project's tables — none of the rows
+// scanned by this script contain an escaped `\|` inside a cell (verified
+// against the real files); a row that doesn't split into >=2 cells is
+// reported as unparsed rather than silently dropped.
+function splitTableRow(line) {
+  const inner = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return inner.split('|').map(c => c.trim());
+}
+
+// ---------------------------------------------------------------------------
+// `routes_to` — CLAUDE.md's retrieval-map table (plan §2a, lines 27-38)
+// ---------------------------------------------------------------------------
+
+function extractRoutesTo(claudeMdText) {
+  const status = {
+    source: 'CLAUDE.md#retrieval-map',
+    records_seen: 0,
+    records_emitted: 0,
+    records_unparsed: 0,
+    parser_status: 'ok',
+  };
+  if (claudeMdText == null) {
+    status.parser_status = 'source_missing';
+    return { edges: [], status, unparsedRaw: [] };
+  }
+  const lines = claudeMdText.split('\n');
+  // Anchor on the column-header text, NOT the "Retrieval map" heading above it
+  // (that heading carries a non-ASCII ellipsis — a fragile anchor per plan §2a).
+  const headerIdx = lines.findIndex(
+    l => l.includes('If you are touching') && l.includes('Also read')
+  );
+  if (headerIdx === -1) {
+    status.parser_status = 'empty_parse';
+    return { edges: [], status, unparsedRaw: [] };
+  }
+  let i = headerIdx + 1;
+  if (lines[i] && isTableSeparatorRow(lines[i])) i++;
+  const rows = [];
+  while (i < lines.length && lines[i].trim().startsWith('|')) {
+    rows.push(lines[i]);
+    i++;
+  }
+  status.records_seen = rows.length;
+
+  const edges = [];
+  const unparsedRaw = [];
+  for (const row of rows) {
+    const cells = splitTableRow(row);
+    if (cells.length < 2) {
+      unparsedRaw.push(row);
+      continue;
+    }
+    const [leftCell, rightCell] = cells;
+    const noteMatch = rightCell.match(/`rules\/([a-z0-9-]+)\.md`/);
+    if (!noteMatch) {
+      unparsedRaw.push(row);
+      continue;
+    }
+    const note = noteMatch[1];
+    edges.push(...edgesFromSegments(splitSegments(leftCell), 'routes_to', note));
+  }
+  status.records_emitted = edges.length;
+  status.records_unparsed = unparsedRaw.length;
+  if (rows.length === 0) status.parser_status = 'empty_parse';
+  else if (unparsedRaw.length > 0) status.parser_status = 'degraded';
+  return { edges, status, unparsedRaw };
+}
+
 module.exports = {
   REPO_ROOT,
   OUTPUT_PATH,
@@ -209,10 +305,15 @@ module.exports = {
   slugSelector,
   buildNodeRegistry,
   extractManifest,
+  edgesFromSegments,
+  isTableSeparatorRow,
+  splitTableRow,
+  extractRoutesTo,
 };
 
-// Step-1 self-check: run directly (not required-as-module) to prove the
-// classifier and the node/manifest parse before any further extractor is built.
+// Step-1/2 self-check: run directly (not required-as-module) to prove the
+// classifier, the node/manifest parse, and the routes_to extractor before any
+// further extractor is built.
 if (require.main === module) {
   const { stubs, edges, status } = extractManifest();
   const nodes = buildNodeRegistry(stubs);
@@ -226,5 +327,23 @@ if (require.main === module) {
       t,
       classifyToken(t),
     ])
+  );
+
+  const claudeMd = readRepoFile('CLAUDE.md');
+  const routesTo = extractRoutesTo(claudeMd);
+  console.log('\nrouts_to status:', routesTo.status);
+  const byNote = {};
+  for (const e of routesTo.edges) {
+    (byNote[e.note] = byNote[e.note] || []).push(`${e.kind}:${e.raw}`);
+  }
+  console.log('routes_to edges by note:', JSON.stringify(byNote, null, 2));
+
+  // Protocol 42 red->green self-test: a renamed table header must yield
+  // empty_parse, NEVER an empty-but-ok edge set (load-bearing idea b).
+  const renamed = claudeMd.replace('If you are touching', 'If you touch');
+  const brokenRoutesTo = extractRoutesTo(renamed);
+  console.log(
+    '\n[self-test] renamed-header probe parser_status (expect empty_parse):',
+    brokenRoutesTo.status.parser_status
   );
 }
