@@ -404,6 +404,26 @@ not guaranteed to exist on every machine that pushes here — so this check must
 by construction, the same constraint Protocol 48's discovery already solved, and reuses its shape
 (and its `ROBCO_MEMORY_BASE` override) rather than inventing a second discovery mechanism.
 
+**(c) The gap the backstop does NOT close — named honestly, not papered over.** Protocol 50 shipped
+on 2026-07-20, and **within hours a decision reached purely in conversation (the DeepSeek third-witness
+roster) existed nowhere — not in memory, not in the queue — until the owner happened to ask.** That is
+not a bug in (b); it is a class (b) *cannot* cover, and pretending otherwise would be worse than saying
+so. The backstop compares **memory ↔ queue**. A decision that lived only in a conversation and never
+became a memory is invisible to it — and, worse, the highest-risk case is a **purely conversational
+planning session that never touches the repo at all**, so it never reaches the pre-push hook, the one
+place any nudge fires. **A script cannot read a conversation, and the sessions most likely to drop a
+decision never push.** So the conversation ↔ queue gap is **behavioural, with no reliable automated
+backstop** — recorded as such rather than given a guard that pretends.
+
+What actually closes it is a **session-end ritual, owned by the orchestrator, not a script**: before any
+planning/decision session ends, reconcile every decision it reached into `QUEUE.md` **that session** (rule
+(a) above), and — when the decision is durable — write it as a `type: project` memory too, because *that*
+is what hands the mechanical backstop (b) something to catch next time. The practical instruction is
+therefore "decision → queue **and** memory, same session": the queue entry is the record, the memory is
+the handle (b) needs. The one genuinely mechanisable improvement here is indirect and already built —
+keep routing durable decisions through memory so (b) can see them; there is deliberately **no**
+conversation-scraping script, because it could only ever fire where the risk mostly isn't.
+
 ---
 
 # RETIRED PROTOCOLS

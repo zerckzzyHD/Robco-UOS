@@ -50687,6 +50687,223 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 243 — robco-uos SKILL source integrity + staleness nudge
+//
+//  The `robco-uos` skill is one of the four ways a session acquires its
+//  context (alongside CLAUDE.md+rules, QUEUE.md, and the memory store), and it
+//  was the only one with NO tracked source and NO guard — so it drifted: two
+//  separate sessions independently found the installed skill pointing at a dead
+//  repo path, citing a deleted second test runner, and referencing a retired
+//  protocol. The fix is (1) a committed source at skill/SKILL.md and (2) THIS
+//  suite, which fails the build if that source names a path/protocol that no
+//  longer exists or reintroduces a known-stale claim — the same "hand-written
+//  prose, mechanically fact-checked" model Suite 220 already applies to the
+//  docs. The installed cache is read-only (only the owner can re-install), so a
+//  fail-safe nudge (scripts/skill-drift-check.js) covers the one axis the gate
+//  can't: an installed copy that has gone stale relative to the source.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 243 — robco-uos SKILL source integrity + staleness nudge');
+
+  const skillRel243 = 'skill/SKILL.md';
+  const skillPath243 = path.join(ROOT, skillRel243);
+  const skillExists243 = fs.existsSync(skillPath243);
+  assert(
+    skillExists243,
+    '243.1: skill/SKILL.md exists (the committed source of the robco-uos skill)'
+  );
+
+  const skillSrc243 = skillExists243 ? fs.readFileSync(skillPath243, 'utf8') : '';
+
+  // ── 243.2  the skill names the CURRENT repo path, never the stale one ──
+  assert(
+    skillSrc243.includes('C:\\Dev\\!RobCo\\!RobCo-UOS') &&
+      !skillSrc243.includes('!GEM') &&
+      !/Website version/.test(skillSrc243),
+    '243.2: skill names the current repo path (C:\\Dev\\!RobCo\\!RobCo-UOS) and none of the stale !GEM / "Website version" path'
+  );
+
+  // ── 243.3  every explicit js/ css/ tests/ scripts/ file path exists ──
+  // Same shape and allowlist rationale as Suite 220.2, applied to the skill.
+  {
+    const pathRe243 =
+      /(?<![.\w/])(?:js|css|tests|scripts|rules)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html|md)\b/g;
+    const missing243 = new Set();
+    let m;
+    while ((m = pathRe243.exec(skillSrc243))) {
+      const p = m[0];
+      if (!fs.existsSync(path.join(ROOT, p))) missing243.add(p);
+    }
+    assert(
+      missing243.size === 0,
+      '243.3: every explicit js/ css/ tests/ scripts/ rules/ file path in the skill exists on disk' +
+        (missing243.size ? ' — DRIFT: ' + [...missing243].join(', ') : '')
+    );
+  }
+
+  // ── 243.4  every "Protocol N" reference resolves to a real heading ──
+  // Reuses Suite 220.9's rulebook heading parse (compound headings define each
+  // number; sub-parts like 2a/36b resolve by base).
+  {
+    const definedNum243 = new Set();
+    const definedUi243 = new Set();
+    for (const rel of rulebookFiles()) {
+      for (const line of readFile(rel).split(/\r?\n/)) {
+        const h = /^#{2,4}\s+Protocols?\s+([^—]*?)\s*—/.exec(line);
+        if (!h) continue;
+        for (const id of h[1].match(/(?:UI-)?\d+[a-z]?/gi) || []) {
+          if (/^UI-/i.test(id)) definedUi243.add('UI-' + id.replace(/^UI-/i, ''));
+          else definedNum243.add(id.match(/^\d+/)[0]);
+        }
+      }
+    }
+    const parseOk243 =
+      definedNum243.size >= 40 && definedNum243.has('1') && definedNum243.has('43');
+    const protoRe243 = /\bProtocols?\s+((?:UI-)?\d+[a-z]?(?:\s*\/\s*(?:UI-)?\d+[a-z]?)*)/gi;
+    const dangling243 = new Set();
+    let m;
+    while ((m = protoRe243.exec(skillSrc243))) {
+      for (const raw of m[1].split('/')) {
+        const tok = raw.trim();
+        if (!tok) continue;
+        let resolves;
+        if (/^UI-\d+$/i.test(tok)) {
+          resolves = definedUi243.has('UI-' + tok.replace(/^UI-/i, ''));
+        } else {
+          const base = (tok.match(/^\d+/) || [])[0];
+          resolves = !!base && definedNum243.has(base);
+        }
+        if (!resolves) dangling243.add(tok);
+      }
+    }
+    assert(
+      parseOk243 && dangling243.size === 0,
+      '243.4: every "Protocol N" reference in the skill resolves to a real heading in the rulebook' +
+        (dangling243.size ? ' — DANGLING: ' + [...dangling243].join(', ') : '') +
+        (!parseOk243 ? ' — DEFINED-set parse looks empty/wrong (self-integrity failed)' : '')
+    );
+  }
+
+  // ── 243.5  the skill reintroduces no known-stale claim ──
+  // RULES.md was deleted (R3); the PowerShell test runner was deleted (Protocol
+  // 15 retired) — the skill must not name either as a live thing.
+  assert(
+    !skillSrc243.includes('RULES.md') &&
+      !skillSrc243.includes('robco-diagnostics.ps1') &&
+      !/both (?:test )?runners/i.test(skillSrc243),
+    '243.5: skill names no deleted artifact as live (RULES.md, tests/robco-diagnostics.ps1, "both runners")'
+  );
+
+  // ── 243.6  the skill's live URL matches README's ──
+  {
+    const urlRe243 = /https?:\/\/[A-Za-z0-9.]+\.github\.io\/[A-Za-z0-9._-]+/gi;
+    const norm243 = u => u.toLowerCase().replace(/\/+$/, '');
+    const readmeUrls243 = new Set((readFile('README.md').match(urlRe243) || []).map(norm243));
+    const skillUrls243 = [...new Set((skillSrc243.match(urlRe243) || []).map(norm243))];
+    const mismatch243 = skillUrls243.filter(u => !readmeUrls243.has(u));
+    assert(
+      skillUrls243.length > 0 && mismatch243.length === 0,
+      '243.6: every github.io live URL in the skill matches one in README.md (case/trailing-slash-insensitive)' +
+        (mismatch243.length ? ' — DRIFT: ' + mismatch243.join(', ') : '') +
+        (skillUrls243.length === 0 ? ' — skill names no live URL at all' : '')
+    );
+  }
+
+  // ── 243.7  RED-THEN-GREEN: the source checks are not vacuous ──
+  // Prove the path detector actually flags a fabricated missing path and the
+  // stale-path detector actually flags the old !GEM string — otherwise 243.2/3
+  // could be passing only because they never test anything.
+  {
+    const fakeSkill243 =
+      'See rules/this-note-does-not-exist-243.md at C:\\Dev\\!GEM\\Website version.';
+    const pathRe243b =
+      /(?<![.\w/])(?:js|css|tests|scripts|rules)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html|md)\b/g;
+    const flaggedPath243 = [...fakeSkill243.matchAll(pathRe243b)].some(
+      mm => !fs.existsSync(path.join(ROOT, mm[0]))
+    );
+    const flaggedStale243 = fakeSkill243.includes('!GEM');
+    assert(
+      flaggedPath243 && flaggedStale243,
+      '243.7: RED-THEN-GREEN — the path-existence and stale-path detectors both fire on a fabricated bad skill (the guards are non-vacuous)'
+    );
+  }
+
+  // ── 243.8  the staleness nudge exists and is fail-safe, and is wired in ──
+  const nudgePath243 = path.join(ROOT, 'scripts', 'skill-drift-check.js');
+  const nudgeExists243 = fs.existsSync(nudgePath243);
+  const nudgeSrc243 = nudgeExists243 ? fs.readFileSync(nudgePath243, 'utf8') : '';
+  assert(
+    nudgeExists243,
+    '243.8: scripts/skill-drift-check.js exists (the installed-skill staleness nudge)'
+  );
+  assert(
+    nudgeExists243 && !/process\.exit\(\s*[1-9]/.test(nudgeSrc243) && /\bcatch\b/.test(nudgeSrc243),
+    '243.9: the nudge is fail-safe — no non-zero exit and a top-level catch, so it can never block a push'
+  );
+  {
+    const prePush243 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+      ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+      : '';
+    assert(
+      /node\s+scripts\/skill-drift-check\.js\s*\|\|\s*true/.test(prePush243) &&
+        /npm run gate\b/.test(prePush243) &&
+        /node\s+scripts\/queue-drift-check\.js/.test(prePush243),
+      '243.10: the pre-push hook invokes the skill nudge non-blockingly (`|| true`) and still runs the full gate + the other nudges (added, not swapped in)'
+    );
+  }
+
+  // ── 243.11  RED-THEN-GREEN: the nudge catches a stale installed cache ──
+  // Built against a throwaway fixture so this never touches the owner's real
+  // installed skill. A cache carrying a removed phrase must be flagged; a clean
+  // cache must not; and the nudge must exit 0 either way.
+  {
+    const { spawnSync: spawn243 } = require('child_process');
+    const fixtureBase243 = path.join(
+      require('os').tmpdir(),
+      'robco-skill-drift-fixture-' + process.pid
+    );
+    const staleDir243 = path.join(fixtureBase243, 'guidA', 'guidB', 'skills', 'robco-uos');
+    try {
+      fs.mkdirSync(staleDir243, { recursive: true });
+      // A stale cache: still points at the old !GEM path the corrected source removed.
+      fs.writeFileSync(
+        path.join(staleDir243, 'SKILL.md'),
+        '---\nname: robco-uos\n---\nOld skill at C:\\Dev\\!GEM\\Website version, runs both runners.\n'
+      );
+      const staleRun243 = spawn243('node', ['scripts/skill-drift-check.js'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 20000,
+        env: { ...process.env, ROBCO_SKILL_CACHE_BASE: fixtureBase243 },
+      });
+      assert(
+        staleRun243.status === 0,
+        '243.12: the skill nudge exits 0 even while flagging a stale cache (never blocks a push)'
+      );
+      assert(
+        /!GEM/.test(staleRun243.stdout || '') &&
+          /Settings > Capabilities/.test(staleRun243.stdout || ''),
+        '243.13: RED-THEN-GREEN — a stale installed cache IS flagged with the re-install instruction (the nudge can catch the thing it exists to catch)'
+      );
+      // A clean cache (a verbatim copy of the corrected source) must NOT flag.
+      fs.writeFileSync(path.join(staleDir243, 'SKILL.md'), skillSrc243);
+      const cleanRun243 = spawn243('node', ['scripts/skill-drift-check.js'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 20000,
+        env: { ...process.env, ROBCO_SKILL_CACHE_BASE: fixtureBase243 },
+      });
+      assert(
+        cleanRun243.status === 0 && !/stale/.test(cleanRun243.stdout || ''),
+        '243.14: a cache matching the corrected source is NOT flagged (self-clearing — the nudge falls silent once re-installed)'
+      );
+    } finally {
+      fs.rmSync(fixtureBase243, { recursive: true, force: true });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
