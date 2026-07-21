@@ -413,6 +413,354 @@ function diffRoutesAndClaims(routesToEdges, claimsEdges) {
   return { claimedButNotRouted, routedButNotClaimed, multiClaim };
 }
 
+// ---------------------------------------------------------------------------
+// `references` — CLAUDE.md's two reference tables (plan §2a). Closed-world:
+// a backtick token only becomes an edge if it resolves to an ALREADY-DECLARED
+// node key (§1's fixed node set) — an arbitrary identifier in prose never
+// manufactures a node or a dangling edge.
+//
+// Correction to plan §2a (recorded per the brief): the plan describes both
+// source tables as having the target path in the RIGHT cell. That holds for
+// the Reference Pointer Index (lines 49-72), but the Protocol 2 "Documentation
+// Updates" table (CLAUDE.md lines ~226-230) actually carries the path in the
+// LEFT cell (`File` | `What to update`). Rather than hardcode a cell side
+// per table, this extractor scans every cell of a matched row for backtick
+// tokens — robust to either layout, and to a future column reorder.
+// ---------------------------------------------------------------------------
+
+function findTableRows(lines, headerMatches) {
+  const headerIdx = lines.findIndex(headerMatches);
+  if (headerIdx === -1) return null;
+  let i = headerIdx + 1;
+  if (lines[i] && isTableSeparatorRow(lines[i])) i++;
+  const rows = [];
+  while (i < lines.length && lines[i].trim().startsWith('|')) {
+    rows.push(lines[i]);
+    i++;
+  }
+  return rows;
+}
+
+// Resolves a raw file-classified token to a node key ONLY if it names one of
+// the §1 fixed nodes — the closed-world guard against inventing phantom nodes
+// from arbitrary prose (e.g. `js/services/api-directive.js` is a real file
+// but has no node in this minimum graph, so it resolves to null, not an edge).
+function resolveDeclaredNode(token, manifestStubs) {
+  if (token === 'CLAUDE.md') return 'doc:CLAUDE.md';
+  if (token === 'ARCHITECTURE.md') return 'doc:ARCHITECTURE.md';
+  if (token === 'QUEUE.md') return 'doc:QUEUE.md';
+  if (token === 'QUEUE_LOG.md') return 'doc:QUEUE_LOG.md';
+  if (token === 'skill/SKILL.md') return 'skill:SKILL.md';
+  if (token === 'library/MANIFEST.txt') return 'doc:library/MANIFEST.txt';
+  const ruleMatch = token.match(/^rules\/([a-z0-9-]+)\.md$/);
+  if (ruleMatch && RULE_NOTES.includes(ruleMatch[1])) return `rule:${ruleMatch[1]}`;
+  if (token.startsWith('library/')) {
+    const rel = token.slice('library/'.length);
+    if (manifestStubs.includes(rel)) return `lib:${rel}`;
+  } else if (manifestStubs.includes(token)) {
+    return `lib:${token}`;
+  } else {
+    // A nested stub (e.g. `PROMPT_LIBRARY/RobCo_Engineering_Playbook.md`) is
+    // often named by bare basename in prose (row 68's "the engineering
+    // playbook … (`RobCo_Engineering_Playbook.md`)") — found via testing
+    // (Protocol 42): without this, the reference silently resolves to
+    // nothing instead of the real nested stub.
+    const basenameMatch = manifestStubs.find(s => s.split('/').pop() === token);
+    if (basenameMatch) return `lib:${basenameMatch}`;
+  }
+  return null;
+}
+
+function extractReferences(claudeMdText, manifestStubs) {
+  const status = {
+    source: 'CLAUDE.md#reference-tables',
+    records_seen: 0,
+    records_emitted: 0,
+    records_unparsed: 0,
+    parser_status: 'ok',
+  };
+  if (claudeMdText == null) {
+    status.parser_status = 'source_missing';
+    return { edges: [], status };
+  }
+  const lines = claudeMdText.split('\n');
+  const pointerRows = findTableRows(lines, l => l.includes('Need') && l.includes('Where to look'));
+  const docsRows = findTableRows(lines, l => l.includes('| File') && l.includes('What to update'));
+
+  if (pointerRows === null && docsRows === null) {
+    status.parser_status = 'empty_parse';
+    return { edges: [], status };
+  }
+
+  const allRows = [...(pointerRows || []), ...(docsRows || [])];
+  status.records_seen = allRows.length;
+
+  const edges = [];
+  const unparsed = [];
+  for (const row of allRows) {
+    const cells = splitTableRow(row);
+    if (cells.length < 2) {
+      unparsed.push(row);
+      continue;
+    }
+    const tokens = extractBacktickTokens(cells.join(' '));
+    for (const tok of tokens) {
+      if (classifyToken(tok) !== 'file') continue;
+      const nodeKey = resolveDeclaredNode(tok, manifestStubs);
+      if (!nodeKey) continue; // closed-world: not a declared node, not an edge
+      edges.push({ type: 'references', source: 'doc:CLAUDE.md', target: nodeKey, raw: tok });
+    }
+  }
+  status.records_emitted = edges.length;
+  status.records_unparsed = unparsed.length;
+  if (allRows.length === 0) status.parser_status = 'empty_parse';
+  else if (unparsed.length > 0) status.parser_status = 'degraded';
+  return { edges, status };
+}
+
+// ---------------------------------------------------------------------------
+// Dangling-reference diagnostic (plan §3) — checked across every file/
+// directory token any extractor emitted, not just `references`. A file token
+// is FINE if it's a real tracked file, or a manifested-but-gitignored library
+// stub; otherwise it is `unavailable` — a genuine dangling target. A
+// directory token is FINE if at least one tracked file lives under it.
+// ---------------------------------------------------------------------------
+
+// Many header segments name a file by BARE BASENAME with no directory (e.g.
+// audio.md's "the `AudioSettings` cache in `ui-core.js`" for the real
+// js/ui/ui-core.js, or game-data.md's parenthesized `db_nv.js` for the real
+// js/data/db_nv.js) — the surrounding prose supplies the location, the
+// backtick token doesn't repeat it. A tracked-tree membership test on the
+// literal token alone would falsely flag every one of these as dangling
+// (found via testing — Protocol 42), so a basename-only token additionally
+// resolves against every tracked file's basename before being flagged.
+function checkDanglingFiles(fileTokens, trackedFiles, manifestStubs) {
+  const dangling = [];
+  const manifestFine = [];
+  const seen = new Set();
+  let basenameIndex = null;
+  const buildBasenameIndex = () => {
+    if (basenameIndex) return basenameIndex;
+    basenameIndex = new Set();
+    if (trackedFiles) for (const f of trackedFiles) basenameIndex.add(path.posix.basename(f));
+    return basenameIndex;
+  };
+  for (const tok of fileTokens) {
+    if (seen.has(tok)) continue;
+    seen.add(tok);
+    if (trackedFiles && trackedFiles.has(tok)) continue;
+    if (!tok.includes('/') && trackedFiles && buildBasenameIndex().has(tok)) continue;
+    const rel = tok.startsWith('library/') ? tok.slice('library/'.length) : tok;
+    const nestedStubMatch = manifestStubs.find(s => s === rel || s.split('/').pop() === rel);
+    if (nestedStubMatch) {
+      manifestFine.push(tok);
+      continue;
+    }
+    if (!trackedFiles) continue; // git unavailable — can't determine, don't false-flag
+    dangling.push(tok);
+  }
+  return { dangling, manifestFine };
+}
+
+// A directory prefix that is ENTIRELY gitignored (e.g. `planning/`, which has
+// no MANIFEST.txt-style committed exception) will always show zero tracked
+// files under it, regardless of whether it exists and holds content locally
+// — the exact same "expected absence" shape library/'s stubs get via the
+// manifest, just with no manifest to consult. Found via testing (Protocol
+// 42): without this check, `planning/` false-flags as dangling on every run,
+// on every machine, forever. A directory ignored only in PART (i.e. it holds
+// no tracked files today but isn't itself an ignore rule) still counts as a
+// genuine gap.
+function isDirectoryFullyIgnored(dir) {
+  const res = spawnSync('git', ['check-ignore', '-q', dir], { cwd: REPO_ROOT });
+  return res.status === 0;
+}
+
+function checkDanglingDirectories(dirTokens, trackedFiles) {
+  const dangling = [];
+  const ignoredFine = [];
+  if (!trackedFiles) return { dangling, ignoredFine };
+  for (const dir of new Set(dirTokens)) {
+    const hasAny = [...trackedFiles].some(f => f.startsWith(dir));
+    if (hasAny) continue;
+    if (isDirectoryFullyIgnored(dir)) {
+      ignoredFine.push(dir);
+    } else {
+      dangling.push(dir);
+    }
+  }
+  return { dangling, ignoredFine };
+}
+
+// ---------------------------------------------------------------------------
+// Orphan check (plan §3 `unrouted_graph_bearing_artifact`) — a node has NO
+// inbound edge of ANY kind. Keys on "no inbound edge", not "no route", so a
+// references-reached node (QUEUE_LOG.md, ARCHITECTURE.md) is never a false
+// orphan. `ext`/`selector`/`group` kinds are structural/deferred and exempt —
+// they are reserved keys for a later graph layer, not artifacts this minimum
+// extractor's source text is expected to point at.
+// ---------------------------------------------------------------------------
+
+function findOrphans(
+  nodes,
+  routesToEdges,
+  claimsScopeEdges,
+  referenceEdges,
+  manifestEdges,
+  manifestStubs
+) {
+  const targeted = new Set();
+  for (const e of routesToEdges) targeted.add(`rule:${e.note}`);
+  for (const e of claimsScopeEdges) {
+    if (e.kind !== 'file') continue;
+    const key = resolveDeclaredNode(e.target, manifestStubs);
+    if (key) targeted.add(key);
+  }
+  for (const e of referenceEdges) targeted.add(e.target);
+  for (const e of manifestEdges) targeted.add(e.target);
+
+  const orphans = [];
+  for (const node of nodes.values()) {
+    if (!['skill', 'doc', 'rule', 'lib'].includes(node.kind)) continue;
+    if (!targeted.has(node.key)) orphans.push(node.key);
+  }
+  return orphans;
+}
+
+// ---------------------------------------------------------------------------
+// Full graph assembly — ties every extractor together, computes graph_status,
+// and renders the three-band diagnostics report (DEFECTS / EXPECTED / PARSER
+// STATUS — plan §3, a rendering contract, not cosmetic).
+// ---------------------------------------------------------------------------
+
+function buildGraph() {
+  const claudeMd = readRepoFile('CLAUDE.md');
+  const trackedFiles = getTrackedFiles();
+
+  const manifestResult = extractManifest();
+  const nodes = buildNodeRegistry(manifestResult.stubs);
+  const routesTo = extractRoutesTo(claudeMd);
+  const claimsScope = extractAllClaimsScopeOver();
+  const references = extractReferences(claudeMd, manifestResult.stubs);
+  const diff = diffRoutesAndClaims(routesTo.edges, claimsScope.edges);
+
+  const allFileTokens = [
+    ...routesTo.edges.filter(e => e.kind === 'file').map(e => e.raw),
+    ...claimsScope.edges.filter(e => e.kind === 'file').map(e => e.raw),
+    ...references.edges.map(e => e.raw),
+  ];
+  const allDirTokens = [
+    ...routesTo.edges.filter(e => e.kind === 'directory').map(e => e.raw),
+    ...claimsScope.edges.filter(e => e.kind === 'directory').map(e => e.raw),
+  ];
+  const { dangling: danglingFiles, manifestFine } = checkDanglingFiles(
+    allFileTokens,
+    trackedFiles,
+    manifestResult.stubs
+  );
+  const { dangling: danglingDirs, ignoredFine: ignoredDirsFine } = checkDanglingDirectories(
+    allDirTokens,
+    trackedFiles
+  );
+
+  const orphans = findOrphans(
+    nodes,
+    routesTo.edges,
+    claimsScope.edges,
+    references.edges,
+    manifestResult.edges,
+    manifestResult.stubs
+  );
+
+  const extractorStatuses = [
+    manifestResult.status,
+    routesTo.status,
+    ...claimsScope.statuses,
+    references.status,
+  ];
+  const anyFailure = extractorStatuses.some(s => s.parser_status !== 'ok');
+
+  const defects = [
+    ...diff.claimedButNotRouted.map(d => ({
+      diagnostic: 'claimed_but_not_routed',
+      token: d.token,
+      note: d.note,
+    })),
+    ...diff.routedButNotClaimed.map(d => ({
+      diagnostic: 'routed_but_not_claimed',
+      token: d.token,
+      note: d.note,
+    })),
+    ...orphans.map(key => ({ diagnostic: 'unrouted_graph_bearing_artifact', node: key })),
+    ...danglingFiles.map(tok => ({ diagnostic: 'dangling_explicit_reference', token: tok })),
+    ...danglingDirs.map(tok => ({ diagnostic: 'dangling_directory_prefix', token: tok })),
+  ];
+  const expected = [
+    ...diff.multiClaim.map(d => ({ diagnostic: 'multi_claim', token: d.token, notes: d.notes })),
+    ...manifestFine.map(tok => ({ diagnostic: 'manifested', token: tok })),
+    ...ignoredDirsFine.map(tok => ({ diagnostic: 'gitignored_directory', token: tok })),
+  ];
+
+  const edges = [
+    ...manifestResult.edges,
+    ...routesTo.edges.map(e => ({ ...e, source: 'doc:CLAUDE.md', target: `rule:${e.note}` })),
+    ...claimsScope.edges.map(e => ({ ...e, source: `rule:${e.note}` })),
+    ...references.edges,
+  ];
+
+  return {
+    // No generated_at wall-clock timestamp: the output must be byte-identical
+    // across runs against an unchanged tree (verified — determinism is this
+    // project's standard), and a timestamp is the one thing that would break it.
+    graph_status: anyFailure ? 'broken' : 'healthy',
+    nodes: [...nodes.values()],
+    edges,
+    diagnostics: { defects, expected },
+    extractor_status: extractorStatuses,
+  };
+}
+
+function printReport(graph) {
+  const line = '='.repeat(72);
+  const out = [];
+  out.push(line);
+  out.push('RobCo Knowledge Graph — R11 retrieval topology (un-gated, manual run)');
+  out.push(line);
+  out.push(`graph_status: ${graph.graph_status}`);
+  out.push('');
+  out.push('-- PARSER STATUS --');
+  for (const s of graph.extractor_status) {
+    out.push(
+      `  [${s.parser_status.toUpperCase()}] ${s.source} (seen=${s.records_seen} emitted=${s.records_emitted} unparsed=${s.records_unparsed})`
+    );
+  }
+  out.push('');
+  out.push(`-- DEFECTS (${graph.diagnostics.defects.length}) --`);
+  if (graph.diagnostics.defects.length === 0) out.push('  (none)');
+  for (const d of graph.diagnostics.defects) {
+    out.push(`  ${d.diagnostic}: ${JSON.stringify(d)}`);
+  }
+  out.push('');
+  out.push(`-- EXPECTED (${graph.diagnostics.expected.length}) --`);
+  if (graph.diagnostics.expected.length === 0) out.push('  (none)');
+  for (const d of graph.diagnostics.expected) {
+    out.push(`  ${d.diagnostic}: ${JSON.stringify(d)}`);
+  }
+  out.push(line);
+  console.log(out.join('\n'));
+}
+
+function main() {
+  const graph = buildGraph();
+  printReport(graph);
+  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(graph, null, 2) + '\n', 'utf8');
+  console.log(`\nWrote ${OUTPUT_PATH}`);
+  if (graph.graph_status !== 'healthy') {
+    process.exitCode = 1;
+  }
+}
+
 module.exports = {
   REPO_ROOT,
   OUTPUT_PATH,
@@ -434,91 +782,44 @@ module.exports = {
   extractAllClaimsScopeOver,
   isPathKind,
   diffRoutesAndClaims,
+  findTableRows,
+  resolveDeclaredNode,
+  extractReferences,
+  checkDanglingFiles,
+  checkDanglingDirectories,
+  findOrphans,
+  buildGraph,
 };
 
-// Step-1/2/3/4 self-check: run directly (not required-as-module) to prove the
-// classifier, the node/manifest parse, routes_to, claims_scope_over, and the
-// diff step before the references extractor and final assembly are built.
-if (require.main === module) {
-  const { stubs, edges, status } = extractManifest();
-  const nodes = buildNodeRegistry(stubs);
-  console.log('MANIFEST status:', status);
-  console.log('MANIFEST stubs:', stubs);
-  console.log('manifests/contains edges emitted:', edges.length);
-  console.log('node count:', nodes.size);
-  console.log(
-    'classifier probe:',
-    ['api.js', 'css/', 'getSystemDirective()', 'any new sound', '<script>', 'state'].map(t => [
-      t,
-      classifyToken(t),
-    ])
-  );
-
+// Protocol 42 red->green proofs: a source that is present but reworded/
+// renamed must yield parser_status "empty_parse", NEVER a silently-empty-but-
+// ok result (load-bearing idea b). Run via `--self-test`; not part of the
+// normal run so a healthy report stays uncluttered.
+function selfTest() {
   const claudeMd = readRepoFile('CLAUDE.md');
-  const routesTo = extractRoutesTo(claudeMd);
-  console.log('\nrouts_to status:', routesTo.status);
-  const byNote = {};
-  for (const e of routesTo.edges) {
-    (byNote[e.note] = byNote[e.note] || []).push(`${e.kind}:${e.raw}`);
-  }
-  console.log('routes_to edges by note:', JSON.stringify(byNote, null, 2));
-
-  // Protocol 42 red->green self-test: a renamed table header must yield
-  // empty_parse, NEVER an empty-but-ok edge set (load-bearing idea b).
-  const renamed = claudeMd.replace('If you are touching', 'If you touch');
-  const brokenRoutesTo = extractRoutesTo(renamed);
+  const renamedHeader = extractRoutesTo(claudeMd.replace('If you are touching', 'If you touch'));
   console.log(
-    '\n[self-test] renamed-header probe parser_status (expect empty_parse):',
-    brokenRoutesTo.status.parser_status
+    '[self-test] renamed retrieval-map header -> parser_status (expect empty_parse):',
+    renamedHeader.status.parser_status
   );
 
-  const claimsScope = extractAllClaimsScopeOver();
-  console.log('\nclaims_scope_over statuses:', JSON.stringify(claimsScope.statuses, null, 2));
-  const byNoteClaims = {};
-  for (const e of claimsScope.edges) {
-    (byNoteClaims[e.note] = byNoteClaims[e.note] || []).push(`${e.kind}:${e.raw}`);
-  }
-  console.log('claims_scope_over edges by note:', JSON.stringify(byNoteClaims, null, 2));
-
-  // Protocol 42 red->green self-test: a reworded sentinel must yield
-  // empty_parse for that note, never a truncated-but-ok scope claim.
   const gameDataText = readRepoFile('rules/game-data.md');
-  const rewordedSentinel = gameDataText.replace(SENTINEL, 'Universal rules apply too.');
-  const brokenGameData = extractClaimsScopeOver('game-data', rewordedSentinel);
+  const rewordedSentinel = extractClaimsScopeOver(
+    'game-data',
+    gameDataText.replace(SENTINEL, 'Universal rules apply too.')
+  );
   console.log(
-    '\n[self-test] reworded-sentinel probe parser_status (expect empty_parse):',
-    brokenGameData.status.parser_status
+    '[self-test] reworded game-data.md sentinel -> parser_status (expect empty_parse):',
+    rewordedSentinel.status.parser_status
   );
 
-  const diff = diffRoutesAndClaims(routesTo.edges, claimsScope.edges);
-  console.log('\n[golden fixtures] claimed_but_not_routed:', diff.claimedButNotRouted);
-  console.log('[golden fixtures] routed_but_not_claimed:', diff.routedButNotClaimed);
-  console.log('[golden fixtures] multi_claim (informational):', diff.multiClaim);
+  const ok =
+    renamedHeader.status.parser_status === 'empty_parse' &&
+    rewordedSentinel.status.parser_status === 'empty_parse';
+  if (!ok) process.exitCode = 1;
+}
 
-  const hasClaimedNotRouted = (token, note) =>
-    diff.claimedButNotRouted.some(d => d.token === token && d.note === note);
-  const hasRoutedNotClaimed = (token, note) =>
-    diff.routedButNotClaimed.some(d => d.token === token && d.note === note);
-  const hasMultiClaim = (token, notesIncl) =>
-    diff.multiClaim.some(d => d.token === token && notesIncl.every(n => d.notes.includes(n)));
-
-  console.log(
-    '\n[golden fixture check 1/6] scripts/cf-staging-build.mjs claimed_but_not_routed:',
-    hasClaimedNotRouted('scripts/cf-staging-build.mjs', 'deploy-and-cache')
-  );
-  console.log(
-    '[golden fixture check 2/6] firebase.json claimed_but_not_routed:',
-    hasClaimedNotRouted('firebase.json', 'auth-and-cloud')
-  );
-  console.log(
-    '[golden fixture check 3/6] QUEUE.md routed_but_not_claimed:',
-    hasRoutedNotClaimed('QUEUE.md', 'docs-and-library')
-  );
-  console.log(
-    '[golden fixture check 5/6] .github/workflows/ multi_claim:',
-    hasMultiClaim('.github/workflows/', ['deploy-and-cache', 'testing-and-gates'])
-  );
-  console.log(
-    '[golden fixture check 4/6 + 6/6] QUEUE_LOG.md / skill/SKILL.md orphans — proven at step 6 (graph assembly), not the routes/claims diff'
-  );
+if (require.main === module) {
+  if (process.argv.includes('--self-test')) selfTest();
+  else main();
 }

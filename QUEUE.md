@@ -640,7 +640,7 @@ audiences) in **P**; and tonight's owner decision on the **bug-record obligation
 governance pass or explicitly owner-decided (L, F); and no future session re-derives these from scratch because
 the reasoning — not just the findings — lives here.
 
-### R11. ⬜ The knowledge-graph / retrieval-topology — DESIGN ADOPTED (GPT-5.6 Sol, 2026-07-21), do not build yet
+### R11. 🔄 The knowledge-graph / retrieval-topology — MINIMUM VERSION BUILT (2026-07-21), un-gated pending proof-of-drift
 
 **What it is.** A generated map of how this project's knowledge layer connects — the skill, `CLAUDE.md`, the
 `rules/*.md` notes, `ARCHITECTURE.md`, the library, the queue and its log, memory, the museum, the Atlas — and
@@ -703,6 +703,16 @@ fail-closed-on-unknown discipline).
 derived independently and their disagreements surface as data; declared-vs-invoked coverage is diffed; every
 extractor reports parser status so a silent empty parse can never masquerade as an empty project; and a session
 can query "what governs this path / is this guarded" and get the map _plus its known defects_.
+
+**Minimum version BUILT (2026-07-21) — [`scripts/knowledge-graph.js`](scripts/knowledge-graph.js).** The
+DIAGNOSTICS-view data layer only (topology view and query answerer remain future consumers, per §10 of the
+plan): `routes_to` and `claims_scope_over` derived independently, diffed, and proven against six real drift
+gaps already present in the shipped files; every extractor reports records-seen/emitted/unparsed/status; a
+missing or reworded source fails loud (`empty_parse`/`broken`), never a silent empty-but-healthy graph. Output
+is generated on demand at `library/knowledge-graph.json` (gitignored, never committed — regenerated fresh
+every run via `node scripts/knowledge-graph.js`). **Deliberately left un-gated** — no Suite, no git hook (owner
+decision, Protocol 50) — until it demonstrably catches real drift over time, per the spec's own stopping rule.
+`claims_checked_by`/`invokes` and the topology/query-answerer consumers remain out of scope, as designed.
 
 ## ⚠️ Blocked on an owner decision
 
