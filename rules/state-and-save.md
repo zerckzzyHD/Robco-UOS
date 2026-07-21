@@ -14,11 +14,11 @@ Requires changes in **4 files minimum.** The pre-commit audit will block if any 
 
 - [ ] Add default value in `let state = { ... }` in `state.js`
 - [ ] Add migration in `migrateState()` in `state.js`
-- [ ] Add import handling in `autoImportState()` in `api.js`
-- [ ] Add a sanitize entry in `sanitizeImportedContainer()` in `api.js` if the field is an array/object/typed value (born-compliant — every new typed state field is coerced on the cloud-pull / file-import path in its own commit)
+- [ ] Add import handling in `autoImportState()` in `api-import.js`
+- [ ] Add a sanitize entry in `sanitizeImportedContainer()` in `api-import.js` if the field is an array/object/typed value (born-compliant — every new typed state field is coerced on the cloud-pull / file-import path in its own commit)
 - [ ] State the field's cloud-sync path in the commit — serialized-whole fields ride the save automatically; a dedicated Firestore doc needs its own additive/merge write (→ Protocol 34 cloud-sync determination)
-- [ ] Update `getSystemDirective()` schema in `api.js` (if AI should return it)
-- [ ] Add `render*()` in `ui-render.js` + call from `loadUI()` in `ui-core.js` (if it needs a UI panel)
+- [ ] Update `getSystemDirective()` schema in `api-directive.js` (if AI should return it)
+- [ ] Add `render*()` in the appropriate `ui-render-*.js` panel file + call from `loadUI()` in `ui-core.js` (if it needs a UI panel)
 - [ ] Add `<details class="panel">` block in `index.html` (if it needs a panel)
 - [ ] Bump `CACHE_NAME` in `sw.js` → Protocol 1
 - [ ] Run `npm run lint` and `npm run format`

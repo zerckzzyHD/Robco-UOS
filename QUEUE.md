@@ -464,6 +464,19 @@ process debt, not shipping debt.** The stated plan: do steps one and two, ship 2
    museum-for-AI extract (P3) is built**, not before anything else. The stable-identifier scheme (item I) is
    needed **before the Atlas and museum link to each other**, which is **after 2.8.5**.
 
+**✅ STEP 1 — the doc trusted-layer fact-corrections DONE (2026-07-21, this pass).** Findings **B** and
+**B-critical** closed against source: every stale `api.js` attribution of the moved symbols corrected to its
+real home (`getSystemDirective`→`api-directive.js`, `autoImportState`/`sanitizeImportedContainer`→`api-import.js`;
+`api.js` keeps `transmitMessage`/`fetchAuthorizedModels`) in `ARCHITECTURE.md` (File Map + the 3 missing split
+files added, Inbound heading, both state checklists, the event-bus table) and in `rules/state-and-save.md`
+Protocol 4 checklist + `rules/ui-and-mobile.md` Protocol 10 — **this closes the "R2 restructure relocated stale
+facts into the new trusted layer" hole (finding B-critical)**; the single-`ui-render.js` render-layer refs
+corrected to the `ui-render-*.js` family in every actionable checklist; the cache-guard description
+(`ARCHITECTURE.md` ~3393) rewritten to match `scripts/cache-bump-guard.js` as it really is (differ-from-HEAD,
+not monotonic; the current `SERVED_RE` set). Defect-2 (`setDoc`→`addDoc`) confirmed still correct. **Still owed
+in step 1 (out of THIS brief's doc-only scope):** the `skill/SKILL.md` overclaim (finding C skill-half) and the
+CLAUDE.md library-fallback sentence (finding E second half).
+
 **✅ FIXED this pass — Defect-1 (shipped `8d14073`): the cache-bump guard's classifier was blind to real precached files.**
 `sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
 `scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing

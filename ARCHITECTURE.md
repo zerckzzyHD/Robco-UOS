@@ -101,7 +101,10 @@
 │   │   ├── ui-saves.js     Save slots, file import/export, rolling backups, registry autocomplete
 │   │   └── ui-account.js   Account panel, cloud save picker, undo-sync
 │   ├── services/               Everything that talks to the outside world
-│   │   ├── api.js          System directive, autoImportState, transmitMessage
+│   │   ├── api.js          Network-layer hub — transmitMessage, fetchAuthorizedModels, comm-config cache
+│   │   ├── api-directive.js getSystemDirective + its section builders (2.8.5 U-A3 split)
+│   │   ├── api-import.js   autoImportState, sanitizeImportedContainer — AI-JSON → state mapping (2.8.5 U-A3 split)
+│   │   ├── api-router.js   NATIVE_COMMAND_ROUTER, quick-log grammar — offline command routing (2.8.5 U-A3 split)
 │   │   ├── cloud.js        Firebase push/pull (ES module)
 │   │   └── ocr.js                Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
 │   ├── dev/                    Dev-only tooling
@@ -720,7 +723,7 @@ cleanly to an empty array rather than assume at least one skill exists. Audited 
 | `renderSkills()` (ui-core.js) — `.map().join('')`                | Renders an empty `#skillsGrid` — no crash. Cosmetic gap: no "NO SKILL SYSTEM" empty-state message (acceptable for now; not a functional break) |
 | `loadUI()` skill-sync loop (ui-core.js) — `.forEach()`           | No-ops cleanly                                                                                                                                 |
 | `syncStateFromDom()` (state.js) — `.forEach()`                   | No-ops cleanly; any stray AI-sent skill data is simply never written                                                                           |
-| `autoImportState()` skill mapping (api.js) — `.forEach()`        | No-ops cleanly; same effect                                                                                                                    |
+| `autoImportState()` skill mapping (api-import.js) — `.forEach()` | No-ops cleanly; same effect                                                                                                                    |
 | Skill-check highlight regex handler (ui-core.js) — `.includes()` | Always `false` — `[SkillName N]` inline markup never highlights, never throws                                                                  |
 | Buff→skill name-matching (ui-render.js) — `.map()`/`.forEach()`  | No-ops cleanly                                                                                                                                 |
 | `expandPanelForCategory`-adjacent guard (ui-core.js)             | Already explicitly defensive: `(typeof getSkillKeys === 'function' && getSkillKeys()) \|\| []`                                                 |
@@ -1571,7 +1574,7 @@ interactive, not display-only readouts beside an editable number field:
   `GAME_DEFS[ctx].maxRads` — never a bare hardcoded 1000 — and is wired into `#stat_rads`'s `oninput`
   alongside `updateMath()`. The same `[0, GAME_DEFS[ctx].maxRads]` clamp is applied at two more
   layers for defense in depth: `syncStateFromDom()` (`js/core/state.js`, mirroring the adjacent SPECIAL-stat
-  clamp) and `autoImportState()` (`js/services/api.js`, so an AI response can't push rads above the per-game max
+  clamp) and `autoImportState()` (`js/services/api-import.js`, so an AI response can't push rads above the per-game max
   either).
 - **RAD EXPOSURE bar is draggable** (`#radDragTrack` on BUS-03 SKELETAL HARNESS, wrapping
   `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui/ui-core.js`) mirrors
@@ -1735,7 +1738,7 @@ indicator** (the app never tracked item condition, so none was added). Two new n
 `adjItemQty(idx, delta)` (a per-row qty ± stepper, clamped ≥0, removing the row entirely at 0 — Protocol
 13 regression-tested) and `toggleEquipItem(idx)` (the first **native EQUIP control**, closing the U10
 audit gap — `state.equipped.weapon`/`.armor` one-per-slot-family, toggle-off on re-tap;
-`autoImportState()`'s own AI-write equip path in `js/services/api.js` is untouched, Protocol 14/24 additive,
+`autoImportState()`'s own AI-write equip path in `js/services/api-import.js` is untouched, Protocol 14/24 additive,
 not a fork). `_updateContextPanels()`'s FO3 no-mods fallback now resets to `'weapon'` instead of the
 retired `'all'`.
 
@@ -1976,7 +1979,7 @@ Protocol UI-6). An in-tray search field (`#questSearch`) narrows the list client
 **⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui/ui-render.js`) is the ONE new native write path this unit
 adds: advances a directive's status ACTIVE→COMPLETE→FAILED→ACTIVE with no AI involved, proven by a
 real Node `vm`-sandbox behavioral test (Node runner) that actually executes the function body across
-three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/services/api.js`)
+three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/services/api-import.js`)
 is completely untouched — this is a second, additive entry point onto the same `state.quests[i].status`
 field (Protocol 14/24), exactly like the existing native affinity/mark-visited setters. `addQuest`/
 `removeQuest`/the add-form ids are unchanged.
@@ -2184,8 +2187,8 @@ persistence audit will block the commit if any step is missed:
 
 1. **state.js** — Add the field to `let state = { ... }` with its default value
 2. **state.js** — Add migration in `migrateState()` for older saves: `if (!s.newField) s.newField = default;`
-3. **api.js** — Add import handling in `autoImportState()` so AI responses update the field
-4. _(If applicable)_ **ui-render.js** — Add rendering in the appropriate `render*()` function
+3. **api-import.js** — Add import handling in `autoImportState()` so AI responses update the field
+4. _(If applicable)_ **ui-render-\*.js** (the per-panel render family) — Add rendering in the appropriate `render*()` function
 
 The pre-commit gate (`tests/robco-diagnostics.js`, the Node runner) auto-discovers all keys
 in `state.js` and verifies that every key appears in `autoImportState()`.
@@ -2278,7 +2281,7 @@ initRegistryAutocomplete()  ← called once in window.onload
 1. Add `<input type="text" id="newXxxName" ...>` in **index.html**
 2. In `initRegistryAutocomplete()` in **ui-saves.js**, add: `wireInput('newXxxName', 'category');`
 3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (**reg_nv.js** / **reg_fo3.js**)
-4. If it has an add action, create `addXxx()` in **ui-render.js** mirroring `addPerk()`
+4. If it has an add action, create `addXxx()` in the appropriate **ui-render-\*.js** panel file mirroring `addPerk()` (which lives in **ui-render-character.js**)
 
 ---
 
@@ -2483,8 +2486,10 @@ addDoc(collection(db, 'users', uid, 'saves'), {
 ```
 
 An existing save is modified in place by id with `updateDoc` (rename/overwrite), and the
-only `setDoc` in cloud.js writes the mutable `settings/preferences` doc with `{ merge: true }`
-so it never clobbers sibling fields. See `rules/auth-and-cloud.md` (Protocol 34) for the rule.
+`setDoc` calls in cloud.js write only fixed-id single-doc targets — the mutable
+`settings/preferences` doc with `{ merge: true }` (so it never clobbers sibling fields) and the
+dedicated `secrets/gemini` key doc — never a campaign save. See `rules/auth-and-cloud.md`
+(Protocol 34) for the rule.
 
 ### Cloud Pull (loadCloudSave in cloud.js)
 
@@ -2591,7 +2596,7 @@ an 11-point state matrix (both games × every playstyle/playthroughType/
 campaignMode branch) and asserts SHA-256 equality against the pre-refactor
 output, proving the decomposition is byte-identical.
 
-### Inbound (autoImportState in api.js)
+### Inbound (autoImportState in api-import.js)
 
 ```
 JSON string → parse
@@ -2670,7 +2675,7 @@ is invalid — so this is additive hardening, not a change to normal-path valida
 field `autoImportState()` can write must also have a NATIVE input/edit path — the player must
 never be stuck depending on the AI to create, correct, or initialize a value.
 
-Audited every `state.X` write inside `autoImportState()` (`js/services/api.js`) against the app's native
+Audited every `state.X` write inside `autoImportState()` (`js/services/api-import.js`) against the app's native
 UI/CRUD surface:
 
 | Field(s)                                                                | Native path                                                                                                                                                                                | Status                                                                                                                                                    |
@@ -3032,11 +3037,11 @@ listener.
 Three previously-inline crossing detectors were migrated to emit through the
 bus (behavior preserved — only the wiring changed):
 
-| Event               | Detected in                  | Subscriber(s)                                               |
-| ------------------- | ---------------------------- | ----------------------------------------------------------- |
-| `level.up`          | `autoImportState()` (api.js) | `ui-audio.js` — jingle + haptic; `state.js` — campaign note |
-| `faction.threshold` | `autoImportState()` (api.js) | `api.js` — chat alert + sound + haptic                      |
-| `hp.critical`       | `updateMath()` (ui-core.js)  | `ui-core.js` — `crit-hp-flash` + haptic                     |
+| Event               | Detected in                         | Subscriber(s)                                               |
+| ------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `level.up`          | `autoImportState()` (api-import.js) | `ui-audio.js` — jingle + haptic; `state.js` — campaign note |
+| `faction.threshold` | `autoImportState()` (api-import.js) | `api-import.js` — chat alert + sound + haptic               |
+| `hp.critical`       | `updateMath()` (ui-core.js)         | `ui-core.js` — `crit-hp-flash` + haptic                     |
 
 Unit 8 added five new emit points for actions that previously went unlogged —
 `collectible.acquired` (`toggleCollectible`), `craft.completed` /
@@ -3390,7 +3395,7 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this conditionally: it first checks whether any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). If matched, it requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. Non-served commits (doc-only, CI, tests) skip the check. When `APP_VERSION` changes, the revision can reset.
+The pre-commit hook (`scripts/cache-bump-guard.js`) enforces this conditionally: it first checks whether any staged file matches the served/precached set (`SERVED_RE` — `index.html`, `sw.js`, `manifest.json`, `CHANGELOG.md`, `assets/`, `css/`, `js/`). If matched, it requires only that the staged `CACHE_NAME` **differ** from this branch's own HEAD value — it does **not** verify a monotonic increase (the old branch-relative arithmetic was dropped because on `dev`, always many revs ahead of release-only `main`, "local N > main N" was unconditionally true and the guard was inert; the branch-agnostic "must differ from HEAD" holds on any branch). Incrementing the `-rN` suffix is the naming convention to follow, but the guard's invariant is difference from HEAD, not ordering. Non-served commits (doc-only, CI, tests) skip the check. If HEAD's `sw.js` is unreachable (fresh repo / sw.js not yet committed), the guard warns and passes, validating format only — a missing baseline never blocks.
 
 ### Historical Note
 
@@ -3417,9 +3422,9 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 
 - [ ] Add field to `let state = { ... }` in **state.js** with default value
 - [ ] Add migration in `migrateState()` in **state.js**: `if (!s.field) s.field = default;`
-- [ ] Add import handling in `autoImportState()` in **api.js**
-- [ ] If the AI should return it: update `getSystemDirective()` schema in **api.js**
-- [ ] If it needs UI: add `render*()` function in **ui-render.js** and call it from `loadUI()` in **ui-core.js**
+- [ ] Add import handling in `autoImportState()` in **api-import.js**
+- [ ] If the AI should return it: update `getSystemDirective()` schema in **api-directive.js**
+- [ ] If it needs UI: add `render*()` function in the appropriate **ui-render-\*.js** panel file and call it from `loadUI()` in **ui-core.js**
 - [ ] If it needs a panel: add `<details class="panel">` in **index.html**
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
@@ -3450,7 +3455,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 ## Adding a New UI Panel (Checklist)
 
 - [ ] Add `<details class="panel">` block in **index.html**
-- [ ] Create `render*()` function in **ui-render.js**
+- [ ] Create `render*()` function in the appropriate **ui-render-\*.js** panel file
 - [ ] Call `render*()` from `loadUI()` in **ui-core.js**
 - [ ] If it shows a count: add to `_updatePanelBadges()` in **ui-core.js**
 - [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui-core.js**

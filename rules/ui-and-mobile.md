@@ -44,7 +44,7 @@ derived from source. A new category must be added to **both** per-game data file
 
 ## Protocol 10 — UI Verification
 
-Any change touching `index.html`, `css/`, or render JS (`ui-render.js` `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
+Any change touching `index.html`, `css/`, or render JS (the `ui-render-*.js` panel family's `render*` functions) must be verified by actually **rendering** the affected UI at **360px, 412px, and ≥1000px (desktop)** before it is considered done — never from headless width measurements alone. Confirm no horizontal page overflow (`document.documentElement.scrollWidth === window.innerWidth`), the component looks correct, and desktop is unchanged.
 
 The definitive verification step is `tests/render-check.mjs` — a Playwright render-check that loads the page at 360px and 412px and asserts no horizontal overflow and no focus-zoom. Run it outside the pre-commit gate whenever map or mobile layout changes land. It is the only check that catches real pixel/overflow regressions.
 
