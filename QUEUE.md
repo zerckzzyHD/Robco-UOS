@@ -19,17 +19,17 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **a six-item placement pass** (recorded per Protocol 50). Emptied the
-"Unversioned" drawer by placing both its items into 2.9.0 (CSS cascade cleanup → attached to the
-UI-consistency audit; manual-inventory event-log wiring → bound to the inventory-panel rebuild + Terminal
-Record), and preserved the rule that made the drawer work as a standing convention (here **and** Protocol
-50); deferred item **H** pending **G**'s results with a written post-G obligation; added three DESIGN-ONLY
-notes to the Atlas (**I**) and an owner-stated visual-ambition goal to the Museum (**P**). No status broadly
-changed, no IDs renumbered, no version bumped. Earlier the same day, **`QUEUE.md` was split from
-`QUEUE_LOG.md`** — a pure structural pass: the running header collapsed to most-recent-pass-plus-pointer,
-~550 lines of shipped post-mortems moved verbatim into the new tracked [`QUEUE_LOG.md`](QUEUE_LOG.md) with a
-one-liner + link left behind for each, and the open 2.8.5 tail regrouped by **readiness** instead of
-discovery-order buckets. The full update history is in
+_Last updated: **2026-07-21** — **the museum's visual identity DECIDED** (recorded per Protocol 50, under
+item **P**): **Direction B, "Records Office"** (owner, verbatim: "okay go with B"). The owner also restated
+a standing ruling that reshaped the design brief itself — the museum drops the terminal bezel entirely and
+gets its own visual identity; it does not have to stay fully in the Fallout theme. Recorded alongside the
+decision: the framing that made it legible (contrast, plus a positive container identity of its own — not
+just "not the terminal"), the two rejected directions (**A** Catalogue, **C** Dark Gallery), where the
+comparison mockups live in the archive, two consequences left open (container animation removed; a dark
+twin of B in flight, no outcome assumed), and a new implementation constraint (phosphor green measured
+unusable as text on light grounds, 1.2:1 — graphic material and the instrument windows only). No status
+changed, no IDs renumbered, no version bumped. Earlier passes — the six-item placement pass that emptied the
+Unversioned drawer, and the `QUEUE.md`/`QUEUE_LOG.md` split — are in the running history chain in
 [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
@@ -567,25 +567,68 @@ galleries. `museum/generate.mjs` in the archive is the generator; `museum/site/`
 - **A correctness pass already ran** (`edfbb05`) — it found and fixed a real defect (a dual-axis growth
   chart whose normalization made an unrelated pair of series look correlated).
 
-**⭐ Visual ambition — an owner-stated GOAL, recorded 2026-07-21 (this is recorded ambition, NOT a
-specification — nobody has designed anything yet).** The owner: _"I really want the museum to look graphically
-insane as well — like really good visual representations."_ Every museum entry above is about **correctness**
-(reproducibility, redirects, provenance) and says nothing about how it LOOKS — and that silence would let a
-future session ship something correct and dull, which the owner would rightly be disappointed by. So the
-ambition is recorded here as a real requirement, with the constraints that already bind it:
+**⭐ Visual ambition — DECIDED 2026-07-21: DIRECTION B, "RECORDS OFFICE"** (owner, verbatim: **"okay go with
+B"**). Recorded the pass before as ambition-not-spec — the owner: _"I really want the museum to look
+graphically insane as well — like really good visual representations."_ It is now a decision, not an
+ambition.
 
-- **The bar is genuinely-good VISUAL REPRESENTATIONS, not decoration** — the growth chart as a real data
-  visualization, the intent-vs-reality mockup comparisons, the bug room pairing each defect with the guard
-  that now prevents it, the "what was happening on this date" view. These ideas are already adopted; their
-  **visual quality** is the new requirement.
+**The ruling that made a fresh design pass necessary, restated by the owner this session (something he'd said
+before).** _"I told you the museum should have it's own feel to it, doesn't have to stay fully in theme ya
+know? Shouldn't have a bezel at all tbh."_ **The museum does NOT use the terminal bezel and does NOT have to
+stay fully in the Fallout theme — it gets its own visual identity.** Recorded honestly: Dispatch's own brief
+for the design pass had asserted the opposite (it listed the CRT terminal aesthetic as a hard constraint),
+which is exactly why an entire design pass came back wrapped in a bezel. The design model followed the brief
+correctly — **the brief was the defect**, not the output.
+
+**The framing behind the decision.** A gallery does not paint its walls to match the paintings. The exhibits —
+screenshots, mockups, captured app states — are already saturated in phosphor green; a terminal-themed
+container makes the artifacts stop reading as artifacts and flattens the whole page into one green surface.
+**Contrast is what makes an exhibit legible as an exhibit.** ⭐ The design model's own refinement, sharper than
+the brief and the half that must survive: **contrast alone is not sufficient — the container needs its own
+POSITIVE identity, or "not the terminal" just collapses into "generic light page."** That distinction is
+precisely what separated the winning direction from its runner-up.
+
+**What Direction B is.** A mid-century technical archive: buff paper, accession cards, rubber stamps
+(including a DE-ACCESSIONED overprint on the graveyard), a ruled ledger margin standing in for the elevator
+shaft, plate numbers, a condition-report form. **The only phosphor on the page lives inside small dark
+instrument windows inset into the paperwork** — a trace of the source material, not the theme worn as a skin.
+
+**The two rejected directions, recorded so they are not re-proposed.** **A — Catalogue** (exhibition-catalogue
+editorial, near-white paper, serif display type): judged elegant but the least striking of the three, and it
+demonstrated the "generic light page" failure the refinement above names. **C — Dark Gallery** (neutral
+charcoal hall, spotlit plates, wall-label type): judged handsome but closest to the old world, risking reading
+as "the same museum minus the bezel."
+
+**Where the mockups live.** The archive repo, `museum/design/2026-07-identity-pass/` (commit `288dd17`) —
+three lobby directions for comparison, plus the other three views carried through in B. The earlier structural
+pass, `museum/design/2026-07-visual-pass/` (commit `932d1f0`), is **not** superseded: its structures (vault-
+directory floors, strip-chart recorder, channel-flip comparison, two-chamber specimen cases) were praised and
+survive unchanged — only the container language was replaced. `museum/design/` sits outside the generator's
+manifest walk, so none of this can leak into the built museum.
+
+**Two consequences, recorded as open — no outcome assumed:**
+
+1. **All container animation was removed** (the hero breathe, the LED pulse, the badge blink were chassis
+   language). Everything is static now except hover/flip states. The design model's position, standing unless
+   the owner objects: if motion is missed, it should return as EXHIBIT behaviour, not container behaviour.
+2. **A dark twin of B is IN FLIGHT right now** in the archive (session `local_acec1822`) — the owner reads
+   almost exclusively at night on a phone, and the winning direction is a light page. That session was told
+   plainly that "the light version is the right answer and here is the proof" is an acceptable outcome, and
+   was asked to weigh a warm-but-dimmer lamplit-archive treatment against a true dark inversion, and to say
+   whether a toggle is even warranted (a toggle is a maintenance surface and must earn its existence).
+
+**A live implementation constraint, new because the old dark design never needed it: phosphor green is
+unusable as text on light grounds — measured at 1.2:1.** It may only appear as graphic material or inside the
+dark instrument windows.
+
 - **⚠ The CLARITY VETO still binds (standing owner ruling): "in theme but not confusing."** Aesthetic never
   wins over legibility.
 - **Mobile-first.** The owner is almost exclusively on mobile; anything designed desktop-first fails the
   actual test surface.
-- **Accessibility: WCAG 2.1 AA is the standing target** — without sacrificing the CRT aesthetic.
-- **The right vehicle is a FABLE design pass** (the project's design/creative model), and it should happen
-  **BEFORE publication (P2)**, not after — a public exhibit is the wrong place to discover the visuals are
-  flat. This is the identified next step, **awaiting the owner's go — not scheduled, not started.**
+- **Accessibility: WCAG 2.1 AA is the standing target** — without sacrificing the identity above.
+- **The right vehicle was a FABLE design pass, already run** for this identity comparison; execution against
+  Direction B should still happen **BEFORE publication (P2)**, not after — a public exhibit is the wrong place
+  to discover the visuals are flat.
 
 **P1. 🔄 Museum reproducibility — a sub-program.** Three sessions have shipped fixes to the archive's `main`;
 a fourth is in flight.

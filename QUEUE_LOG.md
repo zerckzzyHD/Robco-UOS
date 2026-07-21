@@ -16,6 +16,38 @@
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
 
+### 2026-07-21 — the museum's visual identity decided: Direction B, "Records Office"
+
+The owner: **"okay go with B."** Settles the museum's container design (item P) after a Fable identity pass
+compared three directions. It also surfaced and corrected a real defect in how the pass was briefed: Dispatch's
+brief had asserted the CRT terminal bezel as a hard constraint, when the owner had already ruled — restated
+this session — that **the museum gets its own visual identity, no bezel, no obligation to stay in the Fallout
+theme.** The design model followed the (wrong) brief correctly; the brief was the defect. Direction B is a
+mid-century technical archive — buff paper, accession cards, rubber stamps, a ruled ledger margin, a
+condition-report form — with phosphor confined to small dark instrument windows inset into the paperwork,
+rather than worn as a skin. The framing that won it: a gallery doesn't paint its walls to match the paintings,
+so contrast is what keeps an already-phosphor-saturated exhibit legible as an exhibit — refined by the design
+model's own sharper point, that contrast alone isn't enough, the container needs a **positive** identity or
+"not the terminal" just collapses into "generic light page" (exactly what sank the runner-up, Direction A).
+Direction C (dark gallery) was rejected as too close to the old world. Two threads left open: all container
+animation was stripped (motion, if it returns, should be exhibit behaviour, not chassis behaviour), and a dark
+twin of B is being explored in parallel (session `local_acec1822`) because the owner reads mostly at night on a
+phone — with no outcome assumed and "the light version is simply correct" an accepted result. New
+implementation constraint locked in: phosphor green measured at 1.2:1 contrast on light paper — unusable as
+text, graphic/instrument-window use only. Mockups: `museum/design/2026-07-identity-pass/` (`288dd17`); the
+prior structural pass (`museum/design/2026-07-visual-pass/`, `932d1f0`) is not superseded, only its container
+language was replaced.
+
+### 2026-07-21 — a six-item placement pass, emptying the Unversioned drawer
+
+Placed both items sitting in the Unversioned drawer into 2.9.0 (the CSS cascade cleanup attached to the
+UI-consistency audit; manual-inventory event-log wiring bound to the inventory-panel rebuild + Terminal
+Record) and preserved the rule that made the drawer work as a standing convention (both in `QUEUE.md` itself
+and in Protocol 50). Deferred item **H** pending **G**'s results, with a written post-G obligation recorded on
+H's own entry rather than left to memory. Added three DESIGN-ONLY notes to the Atlas (**I**) and an
+owner-stated visual-ambition goal to the Museum (**P**) — the ambition that the entry above went on to
+decide. No status broadly changed, no IDs renumbered, no version bumped.
+
 ### 2026-07-21 — the fourth context source became a pointer, Protocol 50's blind spot got named, and the museum got an AI-facing design
 
 Three related pieces, all under the theme that this project has four sources of truth about itself —
