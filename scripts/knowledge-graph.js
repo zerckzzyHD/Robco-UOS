@@ -292,6 +292,127 @@ function extractRoutesTo(claudeMdText) {
   return { edges, status, unparsedRaw };
 }
 
+// ---------------------------------------------------------------------------
+// `claims_scope_over` — each rules/*.md note's OWN header (plan §2a/§8).
+// Independently derived: this function never reads CLAUDE.md, and
+// extractRoutesTo() above never reads a note file. Neither may consult the
+// other's output — the diff step below is the only place they meet.
+// ---------------------------------------------------------------------------
+
+const SENTINEL = 'Universal rules live in `CLAUDE.md`';
+
+function extractClaimsScopeOver(noteName, overrideText) {
+  const source = `rules/${noteName}.md#header`;
+  const status = {
+    source,
+    records_seen: 0,
+    records_emitted: 0,
+    records_unparsed: 0,
+    parser_status: 'ok',
+  };
+  const text = overrideText !== undefined ? overrideText : readRepoFile(`rules/${noteName}.md`);
+  if (text == null) {
+    status.parser_status = 'source_missing';
+    return { edges: [], status };
+  }
+  const lines = text.split('\n');
+  const startIdx = lines.findIndex(l => l.includes('**Load this when touching:**'));
+  if (startIdx === -1) {
+    status.parser_status = 'empty_parse';
+    return { edges: [], status };
+  }
+  // The scope block is multi-line and variable-length — the sentinel line is
+  // the only reliable terminator (plan §8.1). Search a bounded window so a
+  // missing/reworded sentinel fails loud instead of scanning the whole file.
+  let sentinelIdx = -1;
+  for (let i = startIdx; i < Math.min(lines.length, startIdx + 30); i++) {
+    if (lines[i].includes(SENTINEL)) {
+      sentinelIdx = i;
+      break;
+    }
+  }
+  if (sentinelIdx === -1) {
+    status.parser_status = 'empty_parse';
+    return { edges: [], status };
+  }
+  const joined = lines
+    .slice(startIdx, sentinelIdx)
+    .map(l => l.replace(/^\s*>\s?/, ''))
+    .join(' ')
+    .replace('**Load this when touching:**', '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const segments = splitSegments(joined);
+  status.records_seen = segments.length;
+  const edges = edgesFromSegments(segments, 'claims_scope_over', noteName);
+  status.records_emitted = edges.length;
+  if (edges.length === 0) status.parser_status = 'empty_parse';
+  return { edges, status };
+}
+
+function extractAllClaimsScopeOver() {
+  const edges = [];
+  const statuses = [];
+  for (const name of RULE_NOTES) {
+    const result = extractClaimsScopeOver(name);
+    edges.push(...result.edges);
+    statuses.push(result.status);
+  }
+  return { edges, statuses };
+}
+
+// ---------------------------------------------------------------------------
+// The diff step (plan §2a "the independence is the design") — the ONLY place
+// routes_to and claims_scope_over are compared. Restricted to file/directory
+// kind tokens: symbols and prose are code/scope concepts, not routable paths.
+// ---------------------------------------------------------------------------
+
+function isPathKind(kind) {
+  return kind === 'file' || kind === 'directory';
+}
+
+function diffRoutesAndClaims(routesToEdges, claimsEdges) {
+  const claimants = new Map(); // token -> Set<note>
+  const routers = new Map(); // token -> Set<note>
+
+  for (const e of claimsEdges) {
+    if (!isPathKind(e.kind)) continue;
+    if (!claimants.has(e.target)) claimants.set(e.target, new Set());
+    claimants.get(e.target).add(e.note);
+  }
+  for (const e of routesToEdges) {
+    if (!isPathKind(e.kind)) continue;
+    if (!routers.has(e.target)) routers.set(e.target, new Set());
+    routers.get(e.target).add(e.note);
+  }
+
+  // A path claimed by >=2 notes is a legitimate multi-claim (plan §3), not a
+  // per-note routing defect — so it is reported separately and skipped below.
+  const multiClaim = [];
+  const claimedButNotRouted = [];
+  for (const [token, notes] of claimants) {
+    if (notes.size >= 2) {
+      multiClaim.push({ token, notes: [...notes].sort() });
+      continue;
+    }
+    const [note] = notes;
+    if (!(routers.get(token) || new Set()).has(note)) {
+      claimedButNotRouted.push({ token, note });
+    }
+  }
+
+  const routedButNotClaimed = [];
+  for (const [token, notes] of routers) {
+    for (const note of notes) {
+      if (!(claimants.get(token) || new Set()).has(note)) {
+        routedButNotClaimed.push({ token, note });
+      }
+    }
+  }
+
+  return { claimedButNotRouted, routedButNotClaimed, multiClaim };
+}
+
 module.exports = {
   REPO_ROOT,
   OUTPUT_PATH,
@@ -309,11 +430,15 @@ module.exports = {
   isTableSeparatorRow,
   splitTableRow,
   extractRoutesTo,
+  extractClaimsScopeOver,
+  extractAllClaimsScopeOver,
+  isPathKind,
+  diffRoutesAndClaims,
 };
 
-// Step-1/2 self-check: run directly (not required-as-module) to prove the
-// classifier, the node/manifest parse, and the routes_to extractor before any
-// further extractor is built.
+// Step-1/2/3/4 self-check: run directly (not required-as-module) to prove the
+// classifier, the node/manifest parse, routes_to, claims_scope_over, and the
+// diff step before the references extractor and final assembly are built.
 if (require.main === module) {
   const { stubs, edges, status } = extractManifest();
   const nodes = buildNodeRegistry(stubs);
@@ -345,5 +470,55 @@ if (require.main === module) {
   console.log(
     '\n[self-test] renamed-header probe parser_status (expect empty_parse):',
     brokenRoutesTo.status.parser_status
+  );
+
+  const claimsScope = extractAllClaimsScopeOver();
+  console.log('\nclaims_scope_over statuses:', JSON.stringify(claimsScope.statuses, null, 2));
+  const byNoteClaims = {};
+  for (const e of claimsScope.edges) {
+    (byNoteClaims[e.note] = byNoteClaims[e.note] || []).push(`${e.kind}:${e.raw}`);
+  }
+  console.log('claims_scope_over edges by note:', JSON.stringify(byNoteClaims, null, 2));
+
+  // Protocol 42 red->green self-test: a reworded sentinel must yield
+  // empty_parse for that note, never a truncated-but-ok scope claim.
+  const gameDataText = readRepoFile('rules/game-data.md');
+  const rewordedSentinel = gameDataText.replace(SENTINEL, 'Universal rules apply too.');
+  const brokenGameData = extractClaimsScopeOver('game-data', rewordedSentinel);
+  console.log(
+    '\n[self-test] reworded-sentinel probe parser_status (expect empty_parse):',
+    brokenGameData.status.parser_status
+  );
+
+  const diff = diffRoutesAndClaims(routesTo.edges, claimsScope.edges);
+  console.log('\n[golden fixtures] claimed_but_not_routed:', diff.claimedButNotRouted);
+  console.log('[golden fixtures] routed_but_not_claimed:', diff.routedButNotClaimed);
+  console.log('[golden fixtures] multi_claim (informational):', diff.multiClaim);
+
+  const hasClaimedNotRouted = (token, note) =>
+    diff.claimedButNotRouted.some(d => d.token === token && d.note === note);
+  const hasRoutedNotClaimed = (token, note) =>
+    diff.routedButNotClaimed.some(d => d.token === token && d.note === note);
+  const hasMultiClaim = (token, notesIncl) =>
+    diff.multiClaim.some(d => d.token === token && notesIncl.every(n => d.notes.includes(n)));
+
+  console.log(
+    '\n[golden fixture check 1/6] scripts/cf-staging-build.mjs claimed_but_not_routed:',
+    hasClaimedNotRouted('scripts/cf-staging-build.mjs', 'deploy-and-cache')
+  );
+  console.log(
+    '[golden fixture check 2/6] firebase.json claimed_but_not_routed:',
+    hasClaimedNotRouted('firebase.json', 'auth-and-cloud')
+  );
+  console.log(
+    '[golden fixture check 3/6] QUEUE.md routed_but_not_claimed:',
+    hasRoutedNotClaimed('QUEUE.md', 'docs-and-library')
+  );
+  console.log(
+    '[golden fixture check 5/6] .github/workflows/ multi_claim:',
+    hasMultiClaim('.github/workflows/', ['deploy-and-cache', 'testing-and-gates'])
+  );
+  console.log(
+    '[golden fixture check 4/6 + 6/6] QUEUE_LOG.md / skill/SKILL.md orphans — proven at step 6 (graph assembly), not the routes/claims diff'
   );
 }
