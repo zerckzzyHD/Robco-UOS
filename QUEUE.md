@@ -19,18 +19,17 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **the museum's visual identity DECIDED** (recorded per Protocol 50, under
-item **P**): **Direction B, "Records Office"** (owner, verbatim: "okay go with B"). The owner also restated
-a standing ruling that reshaped the design brief itself — the museum drops the terminal bezel entirely and
-gets its own visual identity; it does not have to stay fully in the Fallout theme. Recorded alongside the
-decision: the framing that made it legible (contrast, plus a positive container identity of its own — not
-just "not the terminal"), the two rejected directions (**A** Catalogue, **C** Dark Gallery), where the
-comparison mockups live in the archive, two consequences left open (container animation removed; a dark
-twin of B in flight, no outcome assumed), and a new implementation constraint (phosphor green measured
-unusable as text on light grounds, 1.2:1 — graphic material and the instrument windows only). No status
-changed, no IDs renumbered, no version bumped. Earlier passes — the six-item placement pass that emptied the
-Unversioned drawer, and the `QUEUE.md`/`QUEUE_LOG.md` split — are in the running history chain in
-[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+_Last updated: **2026-07-21** — **an external knowledge-architecture audit folded in** (GPT-5.6 Sol; recorded
+per Protocol 50 as new item **R10**, with findings folded into **P3**, **I**, **P**, and a new **P4**). Every
+claim was re-verified against the current files before recording. **Two live defects were fixed and guarded in
+the same pass:** the cache-bump guard was blind to the `assets/` icons + best-effort-precached `CHANGELOG.md`
+(fixed `SERVED_RE`; Suites 30.3e behavioral + 30.3f classifier⇄precache-list agreement), and `ARCHITECTURE.md`
+prescribed a save-destroying `setDoc` against Protocol 34 (corrected to the real additive `addDoc`; Suite
+46.26). The sharpest finding is recorded, not fixed: the R2 restructure **copied stale file-ownership facts
+into the new trusted layer** (`rules/state-and-save.md`) — the project's own recurring drift, inside the fix
+for it. No `APP_VERSION`/`CACHE_NAME` bump (no served file changed). Earlier passes — the museum's visual
+identity decision, the six-item placement pass, and the `QUEUE.md`/`QUEUE_LOG.md` split — are in the running
+history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
 
@@ -42,6 +41,12 @@ Unversioned drawer, and the `QUEUE.md`/`QUEUE_LOG.md` split — are in the runni
   the Fallout 3 Pip-Boy skin, the data-provenance re-sourcing, all three save-integrity layers, the
   UI-truthfulness fixes, the schematic-layout fix, and the whole governance restructure (R1-R4, R8, R9)
   have landed. Protocol 23 (layering) is now **enforced** by a static gate.
+- **An external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) has been folded in (item R10).** Two
+  live defects it found are **already FIXED and guarded** — the cache-bump guard was blind to the `assets/`
+  icons + best-effort-precached `CHANGELOG.md`, and `ARCHITECTURE.md` prescribed a save-destroying `setDoc`.
+  Its sharpest finding is recorded but deliberately **not** fixed this pass: the R2 rules restructure
+  **copied stale file-ownership facts into the new trusted layer** (`rules/state-and-save.md`) — the
+  project's own recurring drift, reproduced inside the fix meant to end it.
 - **What's genuinely left before the `dev → main` release:** the near-term data-safety item **A3** (cloud
   round-trip test) plus a short tail of small leftovers. The end-of-round review/synthesis deliverables
   (F done; **G**, H, D, I) and the governance process work (R5-R7) can land around the release, not
@@ -335,6 +340,141 @@ substitution/guard machinery.
 in full. **Done means (public view, later):** a separate generated page shows only opt-in-marked items,
 defaults to omitting anything unmarked, and reuses P2's machinery.
 
+### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
+
+**What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
+project **stores, retrieves and connects what it knows about itself** — the retrieval chain, the scoped
+notes, the doc/gate/skill layers. It read the real files and cited paths/lines. This entry is the Protocol 50
+landing record: **every claim was re-verified against the current files before being written here** (the audit
+read one commit; a claim is only recorded as fact once checked). Two live defects were fixed in the same pass;
+everything else is recorded, ranked by consequence, with each finding's home or earn-condition stated.
+
+**✅ FIXED this pass — Defect-1: the cache-bump guard's classifier was blind to real precached files.**
+`sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
+`scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing
+`assets/icon.png`, `assets/ocr/eng.traineddata.gz`, or `CHANGELOG.md` needed **no cache bump**, and cached
+users silently kept the stale copy **under a fully green gate** — the exact failure class Protocol 1 exists to
+prevent, and one this queue already records happening (the staging-SW stale-`index.html` incident, 2.9.0
+hardening gate). **Proven red on a real path** (staging `assets/icon.png` printed `[SKIP]` and exited 0), then
+fixed: `SERVED_RE` now covers `assets/`, `CHANGELOG.md`, `css/`, `js/`, and the root files. **Guarded two
+ways:** new Suite **30.3e** (behavioral — runs the real guard against a staged `assets/icon.png` and proves it
+now FAILS without a bump, PASSES with one) and Suite **30.3f** (the one the audit specifically asked for — it
+parses `SERVED_RE` straight out of the guard and **every path `sw.js` actually precaches**, and fails if the
+classifier misses any; when run against the old classifier it named all six uncovered paths). A guard that
+tested one hard-coded filename is exactly how this stayed hidden — 30.3f tests **agreement with the real
+precache list**, so it can't drift again.
+
+**✅ FIXED this pass — Defect-2: `ARCHITECTURE.md` prescribed a save-destroying cloud write.** Its Cloud Push
+section showed `setDoc(firestore, { … state: stateObj … })` — a whole-document overwrite — while the real
+`js/services/cloud.js` uses **additive `addDoc`** into a `saves` collection with a `contentHash` dedup, and
+Protocol 34 states plainly that a blind `setDoc` would clobber a campaign with no recovery. A session building
+from the canonical architecture doc would have implemented the clobbering version — a data-loss instruction
+inside a canonical document. Corrected to the real additive shape (matched against `cloud.js` line-by-line),
+and guarded by Suite **46.26** (asserts the Cloud Push section prescribes `addDoc` and carries neither the
+`setDoc(firestore,…)` call nor the `state: stateObj` field; proven red against the old text). **Factual
+correction only — the file was not restructured.**
+
+**⬜ RECORDED, ranked by consequence — the knowledge-architecture defects (high-priority doc-currency + one
+enforcement gap; none gate the `dev → main` release, all belong to the next governance pass / R5 conversion
+thread).**
+
+- **⭐ Finding B-critical — the retrieval redesign relocated STALE knowledge into the new trusted layer. This
+  is the sharpest evidence yet for the project's own recurring failure class, and it happened inside the fix
+  for it.** `rules/state-and-save.md` — the note R2 created so sessions load _only_ the relevant, current
+  rules — carries stale file-ownership facts in its Protocol 4 checklist: **line 17** puts `autoImportState()`
+  in `api.js`, **line 18** puts `sanitizeImportedContainer()` in `api.js` (both live in **`api-import.js`**),
+  **line 20** puts `getSystemDirective()` in `api.js` (lives in **`api-directive.js`**), and **line 21** names a
+  single **`ui-render.js`** (split into the `ui-render-*.js` family at U-A4). Verified directly against source
+  and `git log`: all four lines were authored by the restructure commit **`eac54ba`**. CLAUDE.md's own pointer
+  index is _correct_ — so the restructure copied the drift into the subsystem note while the index it sat beside
+  was right, violating "each fact in exactly one place" and Protocol 3. **Why it survived the gate → finding C.**
+- **Finding B — `ARCHITECTURE.md` is doing two jobs and carries current-looking errors** (beyond the Defect-2
+  `setDoc`, which is fixed). Its header says rules live elsewhere, yet it holds the cache protocol, the rollback
+  runbook, and the state/audio/UI change checklists. Stale specifics confirmed: the **File Map (line 104)**, the
+  **`### Inbound (autoImportState in api.js)` heading (line ~2594)**, and the **state checklist (lines
+  2183-2191)** all still credit `api.js` with the directive + import (the doc is internally inconsistent —
+  lines 354-356 attribute them correctly); the **cache section (line ~3393)** claims a _strict monotonic-rev_
+  guard that the real guard **deliberately dropped** in favour of "differ from HEAD"; the state checklist names
+  the single `ui-render.js`. Direction (record, don't build): Architecture owns stable rationale/invariants;
+  rules own obligations; the code map + source own current locations — remove the operational checklists in
+  favour of links.
+- **Finding A — the blanket-retrieval problem MOVED rather than being solved.** CLAUDE.md (**501 lines /
+  ~57 KB**) tells every session to then read `ARCHITECTURE.md` (**3,462 lines / ~348 KB**), loaded **wholesale**
+  — it has an internal TOC but nothing routes a session to a _section_. So >400 KB of universal material still
+  loads before task code; the scoped-notes win is real but the retrieval chain partly defeats it. Direction:
+  make Architecture **task-retrieved by section** — route surfaces to Architecture anchors from the existing
+  retrieval map / scoped notes; **explicitly NOT another summary document**; a Suite 220-style check can verify
+  the named anchors exist.
+- **Finding C — Suite 220 does far less than Protocol 45 advertises, which is why B/B-critical passed a green
+  gate.** Suite **220.2**'s regex matches **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
+  it cannot see bare filenames (`api.js`), nested paths (`js/services/api-import.js`), function ownership, or
+  prose — so the stale `api.js` ownership claims are invisible to it. And `skill/SKILL.md` **overclaims** the
+  canonical files are "canonical and current by construction (the gate guards them)" (line 20). Direction:
+  correct the SKILL claim first (say _partially_ mechanically checked, source wins); extend 220.2 only for
+  unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT** attempt a prose-truth checker.
+- **Finding D — the retrieval map has concrete gaps against the notes' own declared scopes.**
+  `.github/workflows/` routes only to the deploy note though the testing note also governs it;
+  `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sends it to testing;
+  `firebase.json` is in the auth note's load header but missing from its map row; `QUEUE_LOG.md` is absent from
+  the documentation row despite that note defining its append-only contract; `skill/SKILL.md` routes nowhere.
+  Suite **220.14** only proves every note is _named_ in the map, not that every relevant path _reaches_ the note
+  claiming it. Direction: make the map the **sole** scope authority, fix the rows, add a narrow parity check
+  (each note's "load this when" header ⇄ its map row). No second routing document.
+- **Finding E — `skill/SKILL.md` is not a pure pointer and contains a FALSE statement.** It restates ~7
+  operational rules, and **line 38 is wrong**: "the full gate must pass on every commit/push" — the real design
+  is **fast gate at commit, full gate at push** (`scripts/pre-commit` → `gate:fast`; `scripts/pre-push` →
+  `gate`). **Verified the working-tree modification does NOT fix it** — the pending `skill/SKILL.md` diff only
+  adds a "Sister repo" bullet, leaving line 38 untouched. Because the skill is installed read-only, the tracked
+  source needs correcting **and** the owner must re-install for it to take (the owner did re-install after
+  `0b72bd1`, which the audit couldn't see — but that predates this correction, so a re-install is owed _after_
+  the fix lands). Second half of E: CLAUDE.md tells sessions to read gitignored `library/` files, but a clean
+  checkout has only `library/MANIFEST.txt` — add a one-sentence fallback: **if a local-only library target is
+  absent, do not infer its contents — fall back to source and report the missing context.**
+- **Finding F — the rollback path contradicts the branch model.** `scripts/rollback.sh` (and
+  `ARCHITECTURE.md`'s rollback runbook, line ~3408) both instruct `git push origin main`, while Protocol 43
+  says all work goes through `dev` and `main` receives only release merges — a contradiction that surfaces
+  during an outage, when ambiguity costs most. **Honest nuance (from verification):** a live-site hotfix is
+  arguably the one legitimate case where `main` IS the target, since production deploys from `main` and
+  Protocol 16 is restore-first — so this may be an intentional emergency exception the docs simply never
+  reconcile. Direction (owner call): explicitly choose an emergency-direct-`main` exception **or** a dev-first
+  rollback, and make script + protocol + runbook agree.
+- **Finding G — LOW, one redundancy.** App Check is closed in **two** places in this file (the 2.9.0-round
+  section, line ~872, and the "Closed / off the board" list, line ~1253). **Verification correction to the
+  audit:** they are **paraphrases, not identical text**, both linking `QUEUE_LOG.md#appcheck` — redundant, not a
+  copy-paste. Cleanup only; earns its slot on the next queue-touch pass. **Recorded clean:** the audit's other
+  G claim checked out in the good direction — **all `QUEUE_LOG.md#…` anchor links resolve, no orphans** (the
+  queue/log split verified clean, spot-checked across `#v280`, `#u1`, `#r2`, `#appcheck`, `#f`, and the
+  heading-derived `#update-history--the-running-last-updated-chain`).
+
+**⚠ RECORDED as an OPEN owner-decision — Finding L: the missing category (verified external control-plane
+state).** Facts essential to the project but derivable from **neither repo**: which skill version is actually
+installed, branch-protection state, which commit is _actually_ deployed to prod/staging, Cloudflare project +
+secret presence (not values), App Check enforcement state, GitHub Pages source config, the live service-worker
+cache version. These currently **leak into queue prose and historical logs** (the App Check and skill-install
+entries are the evidence). The auditor proposes a hand-maintained section in a library doc with a
+`last_verified` field. **Dispatch objects, and records the disagreement rather than resolving it:** that is a
+hand-maintained ledger of facts about a _moving_ world — the exact pattern this project keeps getting burned by
+(test counts, architecture file sizes, the growth chart, the inert cache guard). Dispatch's position: **derive
+what can be derived, mark honestly-unknown what cannot, and do not build a table someone must remember to
+update.** This is left for the owner to settle — not a settled design. Earn-condition: a decision from the
+owner on derive-vs-ledger before any implementation.
+
+**✅ RECORDED — what the audit found CLEAN (evidence the restructure landed).** All ten scoped rule files exist
+and are referenced; protocol headings are defined exactly once; the **tiered gate is genuinely real**
+(`scripts/pre-commit` = cache-guard + secret-scan + `gate:fast`; `scripts/pre-push` = full `gate` + the
+non-blocking nudges; CI runs full `gate`); Protocol 34's additive-cloud-write assertions, Protocol 40's browser
+test, Protocol 44's diagnostic-trigger checks, and the Protocol 48/50 pre-push nudges are all wired and passing;
+the queue/log split preserved every anchor; no meaningful orphaned system document exists.
+
+**Cross-references (findings folded into the items they belong to, per Protocol 50 "write plans where they
+live"):** Finding **H** (the P3 supersession logic defect) is recorded in **P3**; Finding **I** (the durable
+stable-identifier scheme) in **item I, design note (b)**; Findings **J/K** (museum as front door; three
+audiences) in **P**; and tonight's owner decision on the **bug-record obligation** in **P4**.
+
+**Done means:** the two fixes are shipped and guarded (done); each recorded finding is either fixed in a later
+governance pass or explicitly owner-decided (L, F); and no future session re-derives these from scratch because
+the reasoning — not just the findings — lives here.
+
 ## ⚠️ Blocked on an owner decision
 
 ### R5. ⏭️ STAGE 2 — Convert prose into enforcement (waits on the owner formally calling it)
@@ -529,6 +669,21 @@ numbers, and queue items have stable IDs the restructure just protected. (The AI
 spec — the raw archive / internal manifest, never the ~190MB generated HTML nor the name-substituted public
 tree; not restated here.)
 
+**⭐ Sharpened by the knowledge-architecture audit (R10, finding I, 2026-07-21) — the ruling stands, but the
+naive version of it breaks: file paths are LOCATORS, not IDENTITIES.** This project already has the evidence —
+its own archive-rename work measured git's content-similarity rename detection **undercounting by ~22%, and
+failing silently** (recorded under P1). So a durable link scheme needs, concretely: **namespaced immutable IDs**
+(`incident:0042`, `protocol:1`, `guard:cache-bump`, `queue:R9`) kept **separate from an evidence locator**
+(repo + commit + path); IDs that **survive** label / path / display-name changes; **no reuse after retirement**;
+**retirement tombstones** carrying status and an optional `superseded_by` (deleting the _enforcement_ must never
+delete the _identity_ — the Protocol 49 discipline, made structural); **baseline-aware relations** ("prevented
+this at release X" ≠ "active now"); **one owner per relation** with inverses generated, not hand-written; and
+**validation that lives in the Atlas / museum / extract generators, NOT in the app's release gate** (linking
+metadata must never be able to block a release). **What breaks it, recorded so it isn't re-invented:** deriving
+IDs from paths / headings / slugs; reusing retired numbers; deleting IDs on retirement; treating a _moving_
+branch URL as historical evidence; public sanitisation changing IDs instead of only display labels; and
+treating a missing reference as "retired" or "current" instead of **"unknown."**
+
 **⬜ Design note (c) — share the museum's renderer, keep publication separate (owner: "part of the museum on
 the user end", 2026-07-21).** Yes to sharing the museum's generator plumbing — renderer, navigation, search,
 styling, pinning discipline — rather than building a second browsable site. BUT the Atlas maps where the
@@ -629,6 +784,29 @@ dark instrument windows.
 - **The right vehicle was a FABLE design pass, already run** for this identity comparison; execution against
   Direction B should still happen **BEFORE publication (P2)**, not after — a public exhibit is the wrong place
   to discover the visuals are flat.
+
+**⬜ Design note (d) — the museum as FRONT DOOR: endorsed with hard limits, and THREE audiences not two
+(knowledge-architecture audit R10, findings J + K, 2026-07-21).** The museum **can** be the human front door to
+history, releases, bugs, visual evolution and _why_, and a navigation shell pointing at current surfaces. It
+**cannot** be the _sole_ front door to current operations. The sound model the audit endorses: **museum =
+historical, release-pinned; the private queue view (L) = what's next, continuously current; the Atlas (I) =
+what exists and what's assured, current-baseline and degraded when stale; rules + library = AI implementation
+context.** Two hard constraints: **every museum detail page and every search result must expose its
+release/commit baseline** — otherwise search extracts a past statement without its historical frame (the same
+provenance rule P3 enforces for the AI extract, applied to the human view); and the release dependency stays
+**strictly one-way** — a completed release may _trigger_ regeneration, but a failed museum build may leave the
+museum visibly stale and must **never** block, undo, or delay a release. **What the museum must NOT swallow:**
+the live queue, the current rules or code map, orchestrator memory, private external-control state (L), the
+Atlas's uncovered/attack-map view, or the AI-facing extract (P3). **The three audiences, because publication
+creates a third:** disposable AI sessions (need compact, deterministic, status-bearing, fail-closed facts —
+the P3 extract), the owner (needs visual navigation + current decisions, on a phone), and public readers (need
+sanitised, release-pinned history — P2). The recorded conflicts: **museum HTML is valuable to humans and
+actively harmful as AI context** (why P3 reads the manifest, never the ~190 MB HTML), and **the owner may see
+private plans and attack surfaces that public output must never carry**. The audit's own scorecard, recorded
+honestly: this project is **not** fooling itself where it plans one source with separate generated views (L,
+P3) — but it **is** fooling itself in two places worth fixing: calling a ~1,300-line `QUEUE.md` "phone-readable"
+(L is the answer, not the label), and treating a ~348 KB `ARCHITECTURE.md` as an appropriate universal entry
+point for _either_ audience (finding A).
 
 **P1. 🔄 Museum reproducibility — a sub-program.** Three sessions have shipped fixes to the archive's `main`;
 a fourth is in flight.
@@ -735,6 +913,18 @@ reach must carry its status, and it must be structurally impossible to serve an 
   past-state," never to "current."
 - **Every non-current entry MUST carry a `why`, enforced at build (fail the build if missing).**
 
+**⚠ CORRECTION — a real logic defect in the model above, from the knowledge-architecture audit (R10, finding
+H, 2026-07-21). Fix this before P3 is built.** "_current_ iff nothing supersedes it" and "fail CLOSED on
+unknown" **contradict each other**: in an incomplete link graph, "no supersession edge recorded" is
+indistinguishable from "genuinely current" — so the rule as written is **current-by-absence wearing a
+fail-closed label**, the precise trap fail-closed is supposed to prevent. The corrected four-state model to
+build: an entry is **`superseded`** when a supersession link points at it; **`rejected`/`closed`** when
+explicitly marked so at creation (with its reason); **`current-at-baseline` ONLY when positively affirmed by a
+current-state authority** (a present-tense source vouches for it) — never merely because no edge was found;
+otherwise **`unverified history`**. The auditor's stronger, simpler option, recorded so it isn't lost: if the
+agent-facing extract never actually needs to call a museum fact _current_, **treat the entire museum as
+historical** — then "current" is not a state the museum can claim at all, and the ambiguity cannot arise.
+
 **Where it sits.** It **depends on P1** (stable document identity). It is **independent of P2** and should
 NOT wait on it: the agent value is immediate and reads the private source. So: **after P1, alongside/
 independent of P2.** It touches the archive's `museum/generate.mjs` — **a separate session; this is design
@@ -782,6 +972,44 @@ path that's still being actively changed.
 **Done means:** a fresh-clone regeneration runs in CI on every push to the archive, fails loudly on any byte
 difference from the committed `museum/site/`, and the coverage gaps above are stated in the workflow's own
 comments.
+
+### P4. ⬜ The bug-record obligation — DESIGN DECIDED (owner, 2026-07-21), do not build yet
+
+**What it is.** The rule that a fixed defect leaves a durable **record** — the raw material the museum's bug
+room (P) and the AI-facing extract (P3) are built from. Its shape was decided in conversation tonight, over
+three rounds of the owner sharpening it, and is recorded here per Protocol 50 because it lived only in that
+conversation.
+
+- **Purpose is KNOWLEDGE CAPTURE FOR SESSIONS, not filling an exhibit.** The consequence is the whole point:
+  **record a defect that TAUGHT something even if it is visually dull** — an exhibit-first framing would skip
+  exactly the unglamorous, high-lesson bugs a future session most needs.
+- **Record always. Curate ruthlessly.** `exhibited` is demoted to a **display concern only**; every record
+  reaches the AI extract regardless of whether it's ever shown to a human.
+- **Enforcement: ONE line folded into the EXISTING pre-push nudge** — it names commits that look like defect
+  fixes but carry no record. **Net new mechanisms: ZERO.** This overrode Dispatch's instinct to build a
+  separate check, on the owner's reasoning: reuse existing enforcement rather than add surface (the same call
+  that deleted Suite 243 in favour of Suite 220). The earlier idea of a separate release-time mechanism is
+  **dropped**.
+- **Cadence — one source, two speeds.** **Records are live the moment they are written**, and sessions read
+  the **records**, not the generated museum. The **museum regenerates only at release, strictly AFTER the
+  release tag exists** — which converts "the museum must never block a release" from a written rule into an
+  **ordering fact** (it structurally cannot run before the tag it pins to). So nothing needs maintaining
+  between releases, yet the knowledge is available immediately.
+- **⭐ Notify on SUCCESS as well as failure (owner overruled Dispatch).** The owner's reasoning is better than
+  Dispatch's silence-only-on-failure default: **a success notice IS the liveness signal**, so the separate
+  "proof it ran" stamp Dispatch was going to add becomes unnecessary — one mechanism, not two.
+  Silence-only-on-failure was rejected because **a check that only ever speaks on failure is
+  indistinguishable from one that has silently stopped running** — the exact failure mode of the growth chart
+  and the inert cache guard this project has already been burned by.
+
+**Where it sits.** It is the input side of P (bug room) and P3 (extract), and its enforcement rides the
+Protocol 48/50 pre-push nudge that already exists — so it depends on nothing new and is buildable whenever the
+museum records get their first-class schema. **Design only for now; do not build.**
+
+**Done means (when built):** a fixed-defect commit that carries no record is named by the existing pre-push
+nudge; every record — dull or not — reaches the AI extract; `exhibited` controls only display; museum
+regeneration runs after the release tag and never blocks a release; and the nudge speaks on success as well as
+failure.
 
 ---
 

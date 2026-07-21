@@ -2325,6 +2325,118 @@ guards(htmlSource, [
   );
 }
 
+// 30.3e  BEHAVIORAL real-path proof of the classifier fix (knowledge-arch audit,
+//   Defect-1). Before the fix, scripts/cache-bump-guard.js's SERVED_RE matched a
+//   ROOT-anchored `icon[^/]*\.png` and therefore matched NO real precached asset, so
+//   staging a change to ./assets/icon.png (a genuine sw.js ASSETS entry) SKIPPED the
+//   guard and required no cache bump — cached users silently kept the stale asset under
+//   a fully green gate. This runs the ACTUAL production guard against a staged assets/
+//   change and proves it now FAILS without a bump and PASSES with one (red-then-green).
+{
+  const os30e = require('os');
+  const cp30e = require('child_process');
+  const guard30e = path.join(ROOT, 'scripts', 'cache-bump-guard.js');
+  const env30e = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/.test(k)) env30e[k] = process.env[k];
+  const SWe = v =>
+    "const CACHE_NAME = 'robco-terminal-v9.9.9-r" +
+    v +
+    "';\nconst ASSETS = ['./assets/icon.png'];\n";
+  const ge = (repo, args) =>
+    cp30e.spawnSync('git', args, { cwd: repo, env: env30e, encoding: 'utf8' });
+  const commite = repo =>
+    ge(repo, [
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=test',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'x',
+    ]);
+  const runGuarde = repo =>
+    cp30e.spawnSync('node', [guard30e], { cwd: repo, env: env30e, encoding: 'utf8' }).status;
+  let assetRed = null;
+  let assetGreen = null;
+  let setupErrE = null;
+  const rootsE = [];
+  try {
+    const a = fs.mkdtempSync(path.join(os30e.tmpdir(), 'robco-cacheguard-asset-'));
+    rootsE.push(a);
+    ge(a, ['init', '-q']);
+    fs.mkdirSync(path.join(a, 'assets'));
+    fs.writeFileSync(path.join(a, 'sw.js'), SWe('1'), 'utf8');
+    fs.writeFileSync(path.join(a, 'assets', 'icon.png'), 'a', 'utf8');
+    ge(a, ['add', '-A']);
+    commite(a);
+    // RED: change the precached asset, stage it, leave CACHE_NAME at HEAD.
+    fs.writeFileSync(path.join(a, 'assets', 'icon.png'), 'b', 'utf8');
+    ge(a, ['add', 'assets/icon.png']);
+    assetRed = runGuarde(a); // pre-fix bug: this was 0 (SKIP). Post-fix: non-zero.
+    // GREEN: bump CACHE_NAME alongside the same asset change.
+    ge(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SWe('2'), 'utf8');
+    ge(a, ['add', 'sw.js', 'assets/icon.png']);
+    assetGreen = runGuarde(a); // expect 0
+  } catch (e) {
+    setupErrE = (e && e.message) || String(e);
+  } finally {
+    for (const r of rootsE) {
+      try {
+        fs.rmSync(r, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
+  assert(
+    setupErrE === null && assetRed !== 0,
+    '30.3e: [behavioral] cache-bump guard FAILS when a precached assets/ file (assets/icon.png) is staged without a CACHE_NAME bump — the classifier now covers assets/ (knowledge-arch audit Defect-1)' +
+      (setupErrE ? ' — setup error: ' + setupErrE : ' — guard exited ' + assetRed)
+  );
+  assert(
+    setupErrE === null && assetGreen === 0,
+    '30.3e: [behavioral] cache-bump guard PASSES once CACHE_NAME is bumped alongside the assets/ change (red-then-green)' +
+      (setupErrE ? ' — setup error: ' + setupErrE : '')
+  );
+}
+
+// 30.3f  The classifier must AGREE WITH THE REAL PRECACHE LIST, not a hardcoded example.
+//   A guard that tests one filename is exactly how the assets/ gap stayed hidden. This
+//   parses SERVED_RE straight out of scripts/cache-bump-guard.js and every path sw.js
+//   actually precaches — the install-time ASSETS array PLUS the best-effort
+//   cache.add('./CHANGELOG.md') — and asserts SERVED_RE classifies every one as served.
+//   If a future sw.js precaches a new path type the classifier doesn't cover, this fails.
+{
+  const guardSrc30f = readFile('scripts/cache-bump-guard.js');
+  const reM30f = /const SERVED_RE\s*=\s*(\/.*\/)\s*;/m.exec(guardSrc30f);
+  let served30f = null;
+  if (reM30f) {
+    const lit = reM30f[1];
+    served30f = new RegExp(lit.slice(1, lit.lastIndexOf('/')));
+  }
+  // Real precache corpus, parsed from sw.js (the single source of truth): the ASSETS
+  // array + every best-effort cache.add('...') outside it (addAll(ASSETS) is excluded —
+  // `add\(` does not match `addAll\(`).
+  const assetsM30f = swSource.match(/const ASSETS\s*=\s*\[([\s\S]*?)\];/);
+  const precached30f = assetsM30f ? [...assetsM30f[1].matchAll(/'([^']+)'/g)].map(m => m[1]) : [];
+  for (const m of swSource.matchAll(/cache\.add\(\s*'([^']+)'/g)) precached30f.push(m[1]);
+  // Normalise: strip leading './', drop the bare-root './' placeholder.
+  const normalised30f = precached30f.map(p => p.replace(/^\.\//, '')).filter(p => p.length > 0);
+  const missed30f = served30f ? normalised30f.filter(p => !served30f.test(p)) : normalised30f;
+  assert(
+    served30f !== null && normalised30f.length > 0 && missed30f.length === 0,
+    'cache-bump-guard SERVED_RE classifies EVERY sw.js precache entry as served (classifier ⇄ real precache list agreement — Protocol 1)' +
+      (served30f === null
+        ? ' — could not parse SERVED_RE from the guard source'
+        : missed30f.length
+          ? ' — UNCOVERED precached paths: ' + missed30f.join(', ')
+          : '')
+  );
+}
+
 // 30.4 saveState() contains proactive quota warning
 assert(
   /_quotaWarnShown/.test(stateSource),
@@ -4630,6 +4742,33 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
     assert(
       /throw\s/.test(catchBody) && !/return\s*\[\s*\]/.test(catchBody),
       'listCloudSaves: a fetch failure rethrows (does not swallow to []) so ARCHIVE LINK FAILED is reachable (Gap 3)'
+    );
+  }
+
+  // 46.26  DOC-SAFETY (knowledge-arch audit, Defect-2): ARCHITECTURE.md's Cloud Push
+  //        section must describe the REAL additive write and must NEVER prescribe a
+  //        save-destroying setDoc. The doc formerly showed `setDoc(firestore, { … state:
+  //        stateObj … })` — a whole-document overwrite — while cloud.js uses additive
+  //        addDoc (Protocol 34: a blind setDoc would clobber a campaign with no recovery).
+  //        A session implementing from the canonical architecture doc would have built the
+  //        clobbering version. Assert the Cloud Push block prescribes addDoc and carries
+  //        neither the setDoc(firestore,…) call nor the `state: stateObj` overwrite field.
+  //        (Prose that merely NAMES setDoc — "never a blind setDoc" — is fine; only the
+  //        dangerous call/field patterns are forbidden.)
+  {
+    const archMd46 = readFile('ARCHITECTURE.md');
+    const pushIdx46 = archMd46.indexOf('### Cloud Push');
+    const pullIdx46 = archMd46.indexOf('### Cloud Pull', pushIdx46 + 1);
+    const pushSection46 =
+      pushIdx46 !== -1
+        ? archMd46.slice(pushIdx46, pullIdx46 !== -1 ? pullIdx46 : pushIdx46 + 1400)
+        : '';
+    assert(
+      pushSection46.length > 0 &&
+        /\baddDoc\b/.test(pushSection46) &&
+        !/setDoc\s*\(\s*firestore/.test(pushSection46) &&
+        !/state:\s*stateObj/.test(pushSection46),
+      'ARCHITECTURE.md Cloud Push section prescribes additive addDoc, not a save-destroying setDoc(firestore,{…state}) (Protocol 34 — the canonical doc must not describe the clobbering write)'
     );
   }
 }

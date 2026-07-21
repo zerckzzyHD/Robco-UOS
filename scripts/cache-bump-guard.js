@@ -33,9 +33,16 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 
-// Served/precached set (mirrors sw.js ASSETS + Protocol 1). EXTEND if a new
-// served-file type is added (fonts/, extra icon dirs, .webmanifest, …).
-const SERVED_RE = /^(index\.html|sw\.js|manifest\.json|icon[^/]*\.png|css\/|js\/)/;
+// Served/precached set. This MUST cover every path sw.js precaches — the install-time
+// ASSETS array (index.html, manifest.json, assets/* icons, css/*, js/*) AND the
+// best-effort runtime precaches (CHANGELOG.md, assets/ocr/*). The old classifier only
+// matched a ROOT-anchored `icon[^/]*\.png`, so it silently missed every real icon
+// (`assets/icon.png` …), `assets/ocr/eng.traineddata.gz`, and `CHANGELOG.md` — changing
+// any of those needed no cache bump and cached users kept the stale copy under a green
+// gate (the exact class of failure Protocol 1 exists to prevent). Suite 30.3f now
+// asserts this regex classifies EVERY real sw.js precache entry as served, so it can
+// never again drift out of agreement with the actual precache list.
+const SERVED_RE = /^(index\.html|sw\.js|manifest\.json|CHANGELOG\.md|assets\/|css\/|js\/)/;
 const VALID_FMT = /^robco-terminal-v[0-9]\S*-r[0-9]+$/;
 
 function git(cmd) {

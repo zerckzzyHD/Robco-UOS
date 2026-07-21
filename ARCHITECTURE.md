@@ -2459,17 +2459,32 @@ helper-throw-on-valid-save lock) and the `LAYER3` sections of
 the eviction false-positive family, both degraded modes); six `SAVE
 INTEGRITY` Diagnostic Shell tools (Protocol 44).
 
-### Cloud Push (saveCurrentToCloud in cloud.js)
+### Cloud Push (saveCurrentToCloud → \_uploadSaveDoc in cloud.js)
+
+Cloud saves are **additive** — never a blind `setDoc` that would overwrite (Protocol 34: a
+whole-document `setDoc` would clobber a user's campaign with no recovery). The single
+uploader `_uploadSaveDoc()` (reused by both the manual push and the offline-queue flush,
+Protocol 22) `addDoc`s a NEW document into the user's `saves` **collection**, after
+deduplicating against existing saves by `contentHash`:
 
 ```
-setDoc(firestore, {
+addDoc(collection(db, 'users', uid, 'saves'), {
+  schema: 2,
   version: APP_VERSION,
-  savedAt: Date.now(),
-  state: stateObj,
+  savedAt: now,
+  updatedAt: now,
+  label,                  // save label
+  gameContext,            // fnv | fo3
+  contentHash,            // identical content is skipped ('duplicate'), never re-added
+  robco_v8,               // the full campaign container (NOT a bare `state` object)
   chat: JSON.parse(localStorage.getItem('robco_chat')),
-  playstyle: localStorage.getItem('robco_playstyle')
+  playstyle: localStorage.getItem('robco_playstyle'),
 })
 ```
+
+An existing save is modified in place by id with `updateDoc` (rename/overwrite), and the
+only `setDoc` in cloud.js writes the mutable `settings/preferences` doc with `{ merge: true }`
+so it never clobbers sibling fields. See `rules/auth-and-cloud.md` (Protocol 34) for the rule.
 
 ### Cloud Pull (loadCloudSave in cloud.js)
 

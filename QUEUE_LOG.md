@@ -16,6 +16,30 @@
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
 
+### 2026-07-21 — an external knowledge-architecture audit folded in (new item R10)
+
+An external audit (GPT-5.6 Sol, read access to `dev` at `2798271`) reviewed how the project stores, retrieves
+and connects what it knows about itself. Folded into `QUEUE.md` per Protocol 50 as new item **R10**, with every
+claim re-verified against the current files first — the audit read one commit and the repo had one uncommitted
+change, so a finding was recorded as fact only after checking, and imprecise claims were corrected in place
+(e.g. the two "duplicate" App Check entries are paraphrases not a copy-paste; the anchor links all resolve
+clean; several design labels were the auditor's own coinage, not existing items). **Two live defects were
+fixed and guarded in the same pass, both proven red-then-green on real cases.** _Defect-1:_ the Protocol 1
+cache-bump guard's `SERVED_RE` classifier matched only a root-anchored `icon*.png`, so changing the
+`assets/*` icons, `assets/ocr/eng.traineddata.gz`, or the best-effort-precached `CHANGELOG.md` needed no cache
+bump — cached users kept stale copies under a green gate. Fixed the classifier and added Suite **30.3e**
+(behavioral, runs the real guard against a staged `assets/icon.png`) + **30.3f** (parses `SERVED_RE` and
+asserts it classifies **every** path `sw.js` actually precaches — agreement with the real list, not a
+hard-coded filename). _Defect-2:_ `ARCHITECTURE.md`'s Cloud Push section prescribed `setDoc(firestore, {…state})`
+— a whole-document overwrite — while `cloud.js` uses additive `addDoc` and Protocol 34 forbids the blind
+`setDoc`; corrected to the real shape and guarded by Suite **46.26**. **The rest was recorded, not fixed**
+(this was a recording pass): ranked by consequence, headlined by the finding that the R2 rules restructure
+copied stale `api.js`/`getSystemDirective`/single-`ui-render.js` file-ownership facts into
+`rules/state-and-save.md` (commit `eac54ba`) — stale knowledge relocated into the layer built to hold current
+knowledge, and invisible to Suite 220's single-segment path guard. Findings **H/I/J/K** were folded into
+**P3**, **item I**, **P**, and a new **P4** (the bug-record obligation, owner-decided this session). No
+`APP_VERSION`/`CACHE_NAME` bump — no served file changed.
+
 ### 2026-07-21 — the museum's visual identity decided: Direction B, "Records Office"
 
 The owner: **"okay go with B."** Settles the museum's container design (item P) after a Fable identity pass
