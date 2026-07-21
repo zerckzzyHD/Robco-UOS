@@ -24,6 +24,9 @@ skill is not a substitute for reading them.
 - **Repo:** `C:\Dev\!RobCo\!RobCo-UOS`. Live (production): https://zerckzzyHD.github.io/Robco-UOS/
   (GitHub Pages from `main`). A private staging site builds from `dev` (Cloudflare Pages).
   Vanilla HTML/CSS/JS PWA, no build step. The details are in `README.md` / `ARCHITECTURE.md`.
+- **Sister repo:** the private archive at `C:\Dev\!RobCo\_RobCo-Archive` (library, planning, graveyard, memory, museum).
+  It has its **own `CLAUDE.md`** — read that one when working there, not this repo's rules.
+  Nothing in the archive is ever pushed anywhere public.
 
 ## The few things that bite before you've read the rules (each points at the real rule)
 
@@ -31,7 +34,7 @@ These are pointers, not the rules themselves — read the cited protocol in `CLA
 (or its `rules/*.md` note) for the actual, current text.
 
 - **Branch:** work on `dev`; `main` is release-only. → Protocol 43.
-- **Gate:** the full gate must pass on every commit/push; never `--no-verify`. → Protocol 36.
+- **Gate:** the FAST gate runs at commit, the FULL gate (browser checks too) at push — both must pass; never `--no-verify`. → Protocol 36.
 - **Cache:** bump `CACHE_NAME` in `sw.js` only when a served/precached file changes. → Protocol 1.
 - **AI-contract & saves:** validate + field-map, never blind-persist; saves are sacred. → Protocols 34, 24.
 - **Auth changes** need real-device mobile verification before "done." → Protocols 29 / 30 / 31.
