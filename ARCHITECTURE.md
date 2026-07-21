@@ -1,7 +1,7 @@
 ﻿# RobCo U.O.S. — System Architecture
 
 > **Version:** 2.8.0
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-21
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
@@ -123,6 +123,7 @@
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
+│   ├── knowledge-graph.js      R11 knowledge-graph / retrieval-topology extractor (Node, manual run) — emits library/knowledge-graph.json (gitignored, generated on demand); un-gated, no Suite/hook, per Protocol 50
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        Full version history
 ├── assets/              PWA icon + app-shortcut icons
