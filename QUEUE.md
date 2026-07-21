@@ -19,21 +19,26 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **a Protocol 50 recording pass: six conversational decisions written where they
-live** (built nothing; each status claim re-verified against the real files and the sibling archive first).
-**(1)** Dispatch **sequenced R10's remediation** at the owner's instruction — trusted layer → under-checking
-guards → route Architecture by section; none of it gates the release. **(2)** Adopted GPT-5.6 Sol's
-**knowledge-graph / retrieval-topology** spec as new item **R11** (infrastructure; one derivation → topology
-picture + plain diagnostics + a machine-readable answer for sessions), full spec in
-`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md`. **(3)** The **museum audit plan** (Claude-first, external-second,
-Gemini-not) + its external-access blocker — P design note (e). **(4)** A homeless workflow finding (concurrent
-sessions failing each other's lint gate through the shared dir; the junk-sweep concurrency caveat) → the
-workflow-review prompt §7. **(5)** Status: the **skill was re-installed** (R9 closed) and the **museum's
-"Records Office Dark" identity landed** in the archive. **(6)** R10's two defects carry their `8d14073` ship
-ref; skill finding E is ✅ fixed at `21c78f7`, finding C's overclaim still open. No `APP_VERSION`/`CACHE_NAME`
-bump (no served file changed). The pass before — **the external knowledge-architecture audit (R10)** — and
-earlier passes are in the running history chain in
-[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+_Last updated: **2026-07-21** — **a Protocol 50 recording pass: seven conversational decisions written where they
+live** (built nothing; every status claim re-verified against the real files and the sibling archive before
+being recorded — the bug-record count, the archive commit hashes, and the achievements-line date were all
+checked on disk, and the circulating "11 records" was corrected to the verified **10**). **(1)** A new standing
+rule — **dates, and DERIVED ones**: every recorded decision carries its date, a later reinforcement carries its
+OWN date rather than being merged into the original, and dates come from git / the changelog / the event, never
+a session's felt time (added as **Protocol 50 (a-date)**, mirrored in this file's conventions; it exists because
+a continuously-running Dispatch session's clock-sense is decoupled from wall-time). **(2)** The **master-key
+rule-out is now DOUBLE** — the original blast-radius reason plus a dated reinforcement: a master key forces
+read-modify-write and would *introduce* a lost-update race that independent keys cannot have (category-grouping
+doesn't help). **(3)** The **achievements rule-out's REASON recovered** — it fights the fiction (a scoreboard
+*about* the player); analysed by Dispatch, decided by the owner; the flagship case for rule (1). **(4)** A new
+OPEN question in the Unversioned drawer — **New Vegas Challenges** (brother-raised, max-priority audience); NOT
+the same as achievements, owes a `fallout.wiki` write-up before any owner in/out call. **(5)** The **museum's
+Claude-first audit has RUN** — five defects fixed (still **unpushed** on the archive), gallery-mats design
+regression back to Fable, a real "couldn't check pixels" gap; external review still warranted (P design note e).
+**(6)** New museum item **P5** — contextual return (breadcrumb + in-page back control). **(7)** No
+`APP_VERSION`/`CACHE_NAME` bump (no served file changed). The pass before — six conversational decisions
+(R10 sequencing, the R11 knowledge-graph spec, the museum audit plan) — and earlier passes are in the running
+history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
 
@@ -62,11 +67,14 @@ earlier passes are in the running history chain in
   system" round. Its hardening gate (which burns down the baselined architecture debt) sits BEFORE the OS
   services that would otherwise multiply it.
 - **Then 3.0** — Fallout 4 as a real playable third game, bundled with the native ES-modules migration.
-- **The Museum is BUILT, and its "Records Office Dark" visual identity has now LANDED in the archive**
-  (bezel removed, vault-directory lobby, strip-chart growth, intent-vs-reality exhibit, bug room wired to
-  `bugs/*/record.md`; it fixed a real self-referential bug on the way in). Its reproducibility sub-program
-  (P1), an **audit plan** (Claude-first, external-second — design note e), and publication (P2, post-release)
-  are the remaining museum work.
+- **The Museum is BUILT, its "Records Office Dark" visual identity has LANDED, and the Claude-first AUDIT has
+  now RUN.** (Bezel removed, vault-directory lobby, strip-chart growth, intent-vs-reality exhibit, bug room
+  wired to `bugs/*/record.md` — **10 records, not 11**; it fixed a real self-referential bug on the way in.)
+  The audit fixed **five self-audit defects** (operators stat, unclassified, redirect ledger, growth prose, a
+  stale comment) — **committed to the archive but still UNPUSHED** — and left a design regression for Fable
+  (gallery mats) plus a real "couldn't check actual pixels" gap. The **external-second** review (design note
+  e), reproducibility (P1), **contextual-return nav (P5)**, and publication (P2, post-release) are the
+  remaining museum work.
 
 _Everything shipped is summarized below with a link to its full account in
 [`QUEUE_LOG.md`](QUEUE_LOG.md); everything still ahead is expanded in full._
@@ -948,6 +956,53 @@ it isn't re-litigated:
   (item G's rejected-proposal specimen). Two proven lineages (Claude + one external) is enough; a third mostly
   costs owner copy-paste.
 
+**✅ THE CLAUDE-FIRST PASS HAS NOW RUN (2026-07-21) — results recorded here per Protocol 50.** An independent
+Claude session audited the museum; its report is at that session's scratchpad `AUDIT_REPORT.md`. **Placement
+note:** the report could be filed in the archive under `museum/` — that subtree is **excluded from the manifest
+walk**, so it would be preserved without becoming an exhibit; decide when the report is in hand.
+
+**✅ FIXED and committed to the archive — three commits, verified STILL UNPUSHED on archive `main` as of this
+recording** (`e1fa0ab` five self-audit fixes → `a5bfe4d` regenerate → `cef158f` drop a dangling § anchor;
+`origin/main` is behind by all three — the fix session's work has not reached the private remote yet, worth a
+push so a machine loss can't take it):
+
+- **The lobby's "Operators 3" stat** counted author _emails_, so it split the owner across two GitHub addresses
+  and counted dependabot as a person — while sitting beside a masthead reading "one operator." Fixed to count
+  distinct author _names_ filtering GitHub's `[bot]` suffix convention (**self-updating, NOT a maintained
+  list**), and the masthead now reads the _same computed value_ so the two structurally cannot disagree again.
+- **The condition report's "UNCLASSIFIED 3"** about the museum's own repo (`.claude/launch.json` leaking as
+  tooling; `memory-audit/` unrecognised by the classifier) → now **zero**.
+- **A malformed `redirect-ledger.json` silently dropping all 363 redirects while reporting "done."** Now
+  distinguishes _missing_ from _malformed_, AND compares against the count the previous build actually wrote to
+  disk (catching a valid-but-emptied ledger too) — surfaced as a visible lobby warning while still exiting 0.
+- **Growth-page prose** that contradicted itself about whether its numbers were measured or read from the
+  changelog.
+- **A stale code comment** citing a drift example that no longer exists at the pin.
+
+**⬜ STILL OPEN from the audit — recorded, each with its disposition:**
+
+- **⭐ Gallery mats lost the design → back to FABLE (a design value, deliberately NOT code-fixed).**
+  `.mz-galcell` is a dark card with a dark border (~1.05:1 against the room) while every other exhibit surface
+  kept the cream lamplit mat (8.6:1) — the exact "invisible as a shape" failure the adjacency finding was
+  written to prevent, on the pages with the most dark screenshots.
+- **v2.8.0 shows two ship dates a day apart** (changelog vs tag commit) — a timezone artifact. **Low.**
+- **⚠ The audit could NOT check actual pixels** — screenshots timed out, so every visual conclusion is a
+  _computed-style measurement_, not eyeballed. Recorded as a **real gap for a phone-first owner**: nothing has
+  confirmed how the museum actually _looks_.
+- **The `file://` auto-redirect is still unverified** (already queued as P1's `file://` click-test; the audit
+  **confirms it remains open**).
+- **The committed museum is STALE against the current archive** — a regeneration would change ~307 pages. **By
+  design** (release-cadence regeneration), but recorded: what you open today does not show current content.
+- **⚠ The audit's own caveat, which MUST survive:** a Claude session auditing Claude sessions **shares their
+  blind spots**, so its clean findings are **WEAK evidence** — exactly why (e)'s plan puts external review
+  second. The planned external pass is still warranted.
+
+**Two self-reported process behaviours from the fix session — recorded because self-reporting is the behaviour
+worth reinforcing:** it ran a **global git-config change** while debugging (violating the standing
+never-touch-git-config rule), **reverted it immediately** and confirmed it was never needed; and it **caught
+itself writing a `§` comment tag referencing a bug record that does not exist** (`cef158f`) and **removed it
+rather than fabricating a record** to justify the reference.
+
 **⚠ The BLOCKER on external access — an open owner-decision.** GPT's connector returned **404 on the private
 archive** because the GitHub App's repo allow-list excludes it. Granting access is a one-time reversible
 settings change — **but the archive contains `memory/`**, which is precisely why museum publication (P2) was
@@ -1166,6 +1221,41 @@ nudge; every record — dull or not — reaches the AI extract; `exhibited` cont
 regeneration runs after the release tag and never blocks a release; and the nudge speaks on success as well as
 failure.
 
+**⚠ Record-count correction (2026-07-21): the bug room holds 10 records, NOT 11.** Verified directly on disk —
+`bugs/*/record.md` = **10** (`ai-inventory-overwrite`, `crlf-page-rename`, `cross-game-registry-leak`,
+`premature-pin`, `restless-thumbnails`, `search-box-weight`, `silent-flatline`, `two-units-one-axis`,
+`untracked-stowaway`, `vanishing-addresses`). The "11" that has circulated traces to a **`BACKFILL_REPORT.md`
+in the archive that contradicts itself** — its line 146 asserts "11 records" while the directory it describes
+holds 10. This is a clean specimen of this project's own rule **"a session's account is a claim, not
+evidence"**: a session's own report, not the disk, was the source of the wrong number. Do not re-derive "11"
+from that report; count `bugs/*/record.md` if in doubt.
+
+### P5. ⬜ Museum CONTEXTUAL RETURN — a breadcrumb + an in-page back control (verified, not assumed, 2026-07-21)
+
+**What it is — and what it is NOT (inspected directly, not assumed).** Dispatch inspected the generated pages.
+**Every document page, including deeply nested ones, DOES carry the full nav bar** with correct relative paths
+back to the lobby, rooms, bug museum, intent-vs-reality, graveyard and search — so **nobody is stranded.** What
+is missing is **contextual return**: click from (say) the 2.8.0 room into a document and there is no way back
+to _that room_ — only to the lobby, from which you re-navigate. On a phone that is real friction. Owner: _"it
+should be fully interactable without having to click the back arrow in the browser."_
+
+**The wrinkle that shapes the fix.** A document is reachable from a **room**, a **gallery**, OR a **search
+result** — so "where you came from" is **not a fixed property of the page**. Therefore the fix is **both
+halves, not one**:
+
+- **(a) A structural breadcrumb** — the document's own place in the archive (deterministic, generated). Answers
+  "where does this live," independent of how you arrived.
+- **(b) A plain in-page back control using browser history** — which is what the owner actually asked for, and
+  which works fine from a local `file://` location. Answers "take me back where I came from."
+
+**Where it sits.** Museum-generator work (`museum/generate.mjs` in the archive); does **NOT** gate the
+`dev → main` release. Independent of P1's reproducibility work but touches the same generator, so sequence it
+so it does not collide with P1's in-flight path-URL change.
+
+**Done means:** every generated document page carries a generated structural breadcrumb AND an in-page
+browser-history back control that works from `file://`; a reader reaching a doc from a room, gallery, or search
+can return to their origin without the browser's own back button.
+
 ---
 
 # ⬜ 2.9.0 — Gameplay + The OS Round
@@ -1357,8 +1447,15 @@ that it **unlocks the Diagnostic Shell** — already built and shipped; the mini
 front of it, the one piece not yet built.
 
 **Deliberately NOT in this set:** the **holotape archive / audio logs** is dropped (too many, a feature few
-would use). A **survival / hardcore tracker** is set aside as a possible standalone future. An achievements
-tracker, an NPC codex, and an encounter/loot generator were removed at the owner's direction.
+would use). A **survival / hardcore tracker** is set aside as a possible standalone future. An **achievements
+tracker, an NPC codex, and an encounter/loot generator** were cut — **analysed by Dispatch, decided by the
+owner** (the removal was recorded 2026-07-11 in the full-depth QUEUE rewrite; the removal decision itself was
+made during the Round-3 gameplay-set curation on or before that date). **The reason, recovered 2026-07-21
+because only the bare outcome had survived (this is Protocol 50 (a-date)'s flagship cautionary case — a
+well-made decision whose reasoning evaporated): an achievements tracker FIGHTS THE FICTION.** It is a
+scoreboard _about_ the player, sitting outside the world, whereas RobCo is trying to _be_ the terminal. Keep
+this reasoning attached to the decision — it is exactly what distinguishes achievements from the New Vegas
+Challenges open question below, which the same reasoning argues _for_ rather than against.
 
 ### The OS round proper — "it's an operating system, not a character sheet"
 
@@ -1599,9 +1696,9 @@ including the release. Analysis only.
 
 ---
 
-# Unversioned — the standing rule (drawer currently EMPTY)
+# Unversioned — the standing rule (drawer holds ONE item)
 
-_This section is the home of a standing queue convention, kept even though it now holds zero items._
+_This section is the home of a standing queue convention, and currently of one genuinely-unversioned item._
 
 **THE RULE — nothing gets recorded without either a home or an explicit stated condition that would earn it
 one.** A version/section IS a home; so is being bound to a named item. When an entry has neither yet, it MUST
@@ -1610,9 +1707,31 @@ carry an explicit reason it has no version AND the concrete condition that would
 exists to forbid. The rule is mirrored into **Protocol 50** (which governs what gets written to the queue) so
 it survives any future restructure of this file.
 
-**The drawer is currently empty — and that is the rule working, not a gap.** The two items that used to live
-here both carried explicit earn-conditions, which is exactly why they could be placed in minutes on
-2026-07-21:
+### ⬜ OPEN QUESTION — New Vegas CHALLENGES (raised 2026-07-21; do NOT resolve without a wiki write-up)
+
+**Who raised it and why it's weighted.** The owner's **brother** — the project's second real user and, per
+standing note, a **maximum-priority audience**. That alone earns it a recorded slot.
+
+**Explicitly NOT covered by the achievements rule-out above — they are different proposals wearing the same
+coat.** Achievements are **platform-level, meta, outside the fiction** (a scoreboard _about_ the player). New
+Vegas **Challenges** are an **in-game system that lives inside the Pip-Boy itself, with in-game rewards** — a
+system _inside the machine_. The recorded reason for cutting achievements ("a scoreboard about the player
+fights the fiction") therefore **argues FOR Challenges, not against them**: a system inside the machine _is_
+the fiction rather than commentary on it.
+
+**⚠ Do NOT assert what Challenges actually track or reward.** The brother believes they reward perks; that is
+**unverified**. Protocol 3 governs — Fallout data comes from **`fallout.wiki` only**, the AI is a typist not
+an authority. **A wiki-sourced write-up of what Challenges genuinely track and reward is owed BEFORE the owner
+decides**, so he decides against real detail rather than a summary of a recollection.
+
+**Earn-condition (why it sits in the drawer, not a version).** It has no version because the owner has made no
+in/out call yet. It earns a slot when: **(1)** a `fallout.wiki`-sourced write-up of the real Challenges
+mechanics exists, then **(2)** the owner decides in or out. **If IN → it joins the 2.9.0 gameplay set. If OUT
+→ it moves to "Closed / off the board" with its reason.** Until then it stays here, correctly unversioned.
+
+**The rule working, as a worked example.** The drawer was empty on 2026-07-21 because the two items that used
+to live here both carried explicit earn-conditions, which is exactly why they could be placed in minutes — and
+why this new item, carrying its own earn-condition, is the drawer being _used correctly_, not a gap:
 
 - **CSS cascade cleanup** (`@layer` refactor) → **2.9.0**, attached to the UI-consistency audit — its stated
   condition ("a pass already opening the cascade") was met there.
@@ -1644,8 +1763,24 @@ _Finished or ruled out — listed briefly so they don't resurface as pending._
 - **Transactional comma-separated commands** — ruled out (owner, 2026-07-18). The current partial-success
   behavior is **correct**: if one of four comma-separated commands has a typo, the other three should still
   apply.
-- **Consolidating the ~50 device-preference keys into one master key** — ruled out (owner, 2026-07-18). One
-  master key **increases blast radius on a bad write**; the spread-out keys are the safer design.
+- **Consolidating the ~50 device-preference keys into one master key** — ruled out, now **double** (owner,
+  verbatim: _"double ruled out now"_).
+  - **Reason 1 — blast radius (owner, 2026-07-18).** One master key **increases blast radius on a bad write**;
+    the spread-out keys are the safer design.
+  - **Reason 2 — the write race (reinforcement on review, 2026-07-21).** A master key forces
+    **read-modify-write**: to change one setting you read the whole blob, modify it, and write the whole blob
+    back. If two things do that concurrently — two tabs, an async handler, a cloud sync completing mid-edit —
+    the second write silently erases the first one's change. **That race does not exist today**, because
+    independent keys write independently; consolidating would **introduce** a lost-update bug into something
+    that currently cannot have one. This is a distinct, dated reinforcement, not part of the original ruling —
+    and it is stronger: blast radius is a risk trade someone can argue is acceptable; the race is a
+    correctness bug.
+  - **The middle option (grouping into CATEGORIES) does NOT help — recorded so it isn't re-proposed.** It
+    reintroduces the write race at category granularity, makes blast radius "all your audio settings" instead
+    of one key, and adds a mapping layer where every new setting needs a category decision that can be got
+    wrong and can drift. And the main _benefit_ of consolidation is **already had without it**: the
+    `AudioSettings` cache object gives the read-once win in memory, and export/enumerate needs only a list of
+    known keys in code — not merged storage.
 - **Precaching the OCR engine** — ruled out (owner, 2026-07-18). The **lazy first-use fetch stays** —
   precaching Tesseract would bloat every install for a feature most sessions never touch.
 
@@ -1659,4 +1794,8 @@ Whenever the roadmap actually moves, both files are updated in the same commit (
 this file phone-first — structured, scannable, real depth per open item, but no walls of text and no code. Item
 IDs are stable tags: never renumber, never re-letter, never reuse (Protocol 49 discipline). Every recorded item
 carries either a version/home or an explicit stated condition that would earn one — no vaguely-parked entries
-(the Unversioned section states this rule in full; Protocol 50 mirrors it so it survives a restructure)._
+(the Unversioned section states this rule in full; Protocol 50 mirrors it so it survives a restructure).
+**Every recorded decision also carries its date, and a later reinforcement carries its OWN date rather than
+being merged into the original** (Protocol 50 (a-date)) — dates are derived from git / the changelog / the
+actual event, never from a session's felt sense of time, because a continuously-running Dispatch session's
+conversation position is fully decoupled from wall-clock._

@@ -383,6 +383,22 @@ home and no earn-condition is the vague drawer this rule forbids. This is what l
 would place them, so placing them was mechanical. The rule is mirrored in `QUEUE.md`'s own Unversioned
 section (its point of use), but lives here too so it survives any future restructure of that file.
 
+**(a-date) Every recorded decision carries its date, and every date is DERIVED, not remembered.** A
+decision or plan written to the queue records the date it was made. A later reinforcement or revision
+of it carries **its own** date — it is **not** folded silently into the original. That distinction is
+load-bearing: "decided once" and "decided, then re-examined and it held" are different strengths of
+evidence, and merging the two timestamps destroys the second (a rule-out with two independently dated
+reasons is much harder to re-litigate than one). "Accurate" is the operative word: dates come from
+**git, the changelog, or the actual event** — never from a session's sense of elapsed time. This
+clause exists because the orchestrator's felt-time is unreliable **by construction** — a Dispatch
+session is left running continuously on the owner's machine for days, so conversation position and
+wall-clock are fully decoupled (a one-message gap can be eight hours), and it has repeatedly
+mis-stated timescales to the owner (most recently calling it late at night when it was 1:40 pm). When
+a date genuinely cannot be derived, write "date not derivable" rather than inventing one. The
+flagship cautionary case is the achievements rule-out (QUEUE.md, 2.9.0 gameplay set): a well-made
+decision whose *reasoning evaporated* while the bare outcome survived — exactly what dated,
+reason-bearing records prevent.
+
 **(b) The automated backstop — a fail-safe queue-drift NUDGE.** `scripts/queue-drift-check.js`,
 wired into the pre-push hook exactly like Protocol 48's backup nudge (`|| true`, never blocking),
 lists every `type: project` memory in the orchestrator's memory store and flags the ones that
