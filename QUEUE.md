@@ -19,29 +19,22 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **a Protocol 50 recording pass: the cross-cutting EXECUTION SEQUENCE the owner
-approved ("go with recs"), plus one standing filing convention** (built nothing; every item ID, status and
-dependency was re-verified against the real file before being recorded). **(1)** A new **"The execution
-SEQUENCE"** section sits beside the 5-second version and is carried in it. **The order, after a same-day owner
-revision:** R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas built in. It is an
-OVERLAY on the readiness groups, not a re-filing — nothing moved between groups. **The same-day change,
-recorded so the two orders don't both survive:** it was first recorded as R10 → A3/ship → R11 → 2.9.0 ("go
-with recs"); the owner then moved **R11 before the ship**, exercising the option the brief had pre-approved as
-his — he judges the knowledge graph's session-help worth more than a faster release. R11 stays BELOW the R10
-trusted-layer fixes (the graph detects drift in exactly those files). The recorded cost: the museum's
-release-pin benefit is deferred slightly — a cost of the choice, not a lost benefit. Its load-bearing
-correction, unchanged: most "museum stuff" helps HUMANS, not sessions; what genuinely helps sessions is the
-smaller set R10 / R11 / P3 / the Atlas assurance view (I), and the order is built on that distinction. The **Atlas [I] was the
-one place the owner's "push it up" instinct was explicitly OVERRULED** (with his agreement): built now it maps a
-system 2.9.0 is about to change, so it stays IN 2.9.0. **Verified consistent with R10's own recorded plan**
-("do steps one and two, ship 2.8.5, then step three", R10 §THE SEQUENCE) — the overlay references it, it is not
-a competing order. **(2)** A standing convention recorded near museum item P: audits OF the archive are filed in
-an archive-side `audits/` tree, never in `planning/` (a 1:1 app-repo mirror); the museum audit is filed there
-and renders under the museum's STANDING section (the full archive path is recorded in item P). **(3)** No
-`APP_VERSION` / `CACHE_NAME` bump (no served file changed). The pass before — seven conversational decisions
-(the dates-are-derived rule, the doubled master-key rule-out, the recovered achievements reason, the New Vegas
-Challenges open question, the museum Claude-first audit results, museum item P5) — and earlier passes are in the
-running history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+**Last updated: 2026-07-21** — a Protocol 50 recording pass, one decision: the QUEUE.md header-mangle
+hazard (self-caught, commits `8dc9d5f` → `89bc6a5`) — root cause verified by reproduction, not assumed
+(Protocol 27): `prettier --write` left both the correct and the mangled header **byte-identical to their
+input**, so this was never a Prettier reformat side effect — it was a hand-authoring slip inside one
+dense, heavily-nested paragraph that stayed syntactically valid markdown while being factually wrong, so
+the gate's format check had nothing to catch. Full decision record (no guard / fix the structural class /
+revisit condition) lives in **R10**, filed under step 1 (the trusted-layer doc fixes), since that step
+was already scheduled to touch this file. **The structural fix rides in this same pass:** this header no
+longer wraps in one giant single-underscore `_..._` italic span — the construct that let an underscored
+identifier collide with the italic markers in the first place; verified clean against Prettier
+(`--check` passes, `--write` makes no change) with `APP_VERSION` and `CACHE_NAME` rendering correctly
+below. No `APP_VERSION` / `CACHE_NAME` bump otherwise (no served file changed). The pass before — the
+cross-cutting **EXECUTION SEQUENCE** (R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with
+the Atlas built in, revised same-day by the owner) plus the archive-audit filing convention — and earlier
+passes are in the running history chain in
+[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
 
 ---
 
@@ -453,7 +446,9 @@ process debt, not shipping debt.** The stated plan: do steps one and two, ship 2
    restructure copied into `rules/state-and-save.md` (finding B-critical), plus the remaining false/overclaimed
    statements in the skill (findings C skill-overclaim + E library-fallback). **Why first:** these bleed
    _continuously_ — every session that runs before they're fixed inherits wrong facts and generates work.
-   Nothing else in R10 costs anything per-session. This goes first purely on **bleed rate**.
+   Nothing else in R10 costs anything per-session. This goes first purely on **bleed rate**. **Also riding
+   here (landed 2026-07-21, self-caught, not from the audit):** the QUEUE.md header-mangle structural fix —
+   full record below, in the ranked findings list.
 2. **SECOND — fix the guards that overstate their coverage.** Suite 220 checking less than Protocol 45
    advertises (finding C), and the retrieval map's routing gaps (finding D). **Why second:** these are _why_
    step one's problem stayed invisible — stale references sat under a passing check. Fixing them second means
@@ -567,6 +562,31 @@ thread).**
   G claim checked out in the good direction — **all `QUEUE_LOG.md#…` anchor links resolve, no orphans** (the
   queue/log split verified clean, spot-checked across `#v280`, `#u1`, `#r2`, `#appcheck`, `#f`, and the
   heading-derived `#update-history--the-running-last-updated-chain`).
+- **Self-caught, NOT from the audit — the QUEUE.md header-mangle hazard (found and fixed 2026-07-21,
+  commits `8dc9d5f` → `89bc6a5`).** A recording pass hand-authoring a new paragraph into the giant
+  single-underscore-italic `_Last updated: …_` header mistyped `` `APP_VERSION` `` as `` `APP*VERSION` ``
+  and broke the italic close; caught by eye and fixed the same day. **Root cause verified by reproduction
+  (Protocol 27), and it is NOT what the fix commit's own message claimed:** `npx prettier --write` run
+  against both the correct and the mangled header text left each byte-for-byte **unchanged**, and
+  `--check` passed both — Prettier never reformatted this content, so "Prettier's reformat corrupted it"
+  is wrong. The real mechanism: Prettier is a formatter, not a fact-checker, and it did its job — the
+  actual hazard is structural. The header is one dense paragraph mixing bold, code spans, and links, all
+  wrapped in a single outer `_..._` italic span; a human or AI hand-composing a new entry into that block
+  can mistype a markup character (an underscore as an asterisk, a stray backslash-escape) and the result
+  stays syntactically valid markdown, so nothing in the gate catches it. **Owner decision (2026-07-21),
+  three parts, all approved together:** **(1) no guard** — a hand-maintained "known identifiers survive
+  intact" checker is the exact Protocol 2a anti-pattern the project already retired, and this project's
+  standing bar requires a real _recurring_ consequential failure before a guard earns its existence; one
+  self-caught occurrence in a non-served planning file does not clear it. **(2) fix the structural
+  trigger, not the instance** — the hazard is the giant single-italic construct, not any specific
+  identifier, so removing the outer `_..._` wrapper makes the whole fragility class disappear with no
+  list to maintain and no guard to rot; **done in this same pass** (rides with step 1 above, since step 1
+  was already scheduled to touch this file) — the header no longer wraps the "Last updated" note in one
+  italic span, verified clean against Prettier and rendering `APP_VERSION`/`CACHE_NAME` correctly. **(3)
+  the not-to-guard choice is recorded on purpose, with its revisit condition** — "consciously chose not to
+  guard, here's when we'd revisit" is a different, stronger claim than silently doing nothing: if a giant
+  single-italic block mangles a second time anywhere in this repo's docs, that is a recurrence and it
+  earns a guard then.
 
 **⚠ RECORDED as an OPEN owner-decision — Finding L: the missing category (verified external control-plane
 state).** Facts essential to the project but derivable from **neither repo**: which skill version is actually
