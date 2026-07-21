@@ -16,6 +16,29 @@
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
 
+### 2026-07-21 — a Protocol 50 recording pass: six conversational decisions written where they live
+
+A pure recording pass (built nothing) folding six decisions that existed only in conversation into `QUEUE.md`,
+each status claim re-verified against the real files and the sibling archive first. **(1)** Dispatch **sequenced
+R10's remediation** at the owner's instruction (_"you need to sequence everything not me"_) — fix the trusted
+layer first (it bleeds per-session), then the guards that under-check (they hid the first problem), then route
+`ARCHITECTURE.md` by section (step one shrinks it first); rollback/App-Check cleanups ride along; the P3 and
+item-I fixes are gated on downstream work; **none of it gates the release** (only A3 does) — recorded inside
+R10. **(2)** Adopted GPT-5.6 Sol's **knowledge-graph / retrieval-topology** spec as new item **R11** (placed as
+_infrastructure_ per the owner's "helps the AI too" correction — one derivation, three renderings: topology
+picture, plain diagnostics, and a machine-readable answer for sessions), with the full spec in
+`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md` and the queue referencing it. **(3)** The **museum audit plan**
+(Claude-first because it can execute, external-second for genuine independence, Gemini-not) plus the
+external-access blocker as an open three-option owner decision — recorded as P design note (e). **(4)** A
+workflow finding with no home — concurrent sessions failing each other's `npx eslint .` gate through the shared
+working directory, and the junk-sweep deleting a live session's scratch files — added to
+`planning/_standing/WORKFLOW_REVIEW_PROMPT.md` §7 (it complicates the worktree-isolation claim there). **(5)**
+Status: the **skill was re-installed** (R9's manual step closed; the `21c78f7` gate-claim fix took), and the
+**museum's "Records Office Dark" identity landed** in the archive (six commits, verified). **(6)** Corrected
+stale status: R10's two defects carry their `8d14073` ship reference; skill finding E's line-38 falsehood is
+✅ fixed at `21c78f7` while finding C's separate skill-overclaim (line 19) remains open. No
+`APP_VERSION`/`CACHE_NAME` bump — no served file changed.
+
 ### 2026-07-21 — an external knowledge-architecture audit folded in (new item R10)
 
 An external audit (GPT-5.6 Sol, read access to `dev` at `2798271`) reviewed how the project stores, retrieves

@@ -19,17 +19,21 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **an external knowledge-architecture audit folded in** (GPT-5.6 Sol; recorded
-per Protocol 50 as new item **R10**, with findings folded into **P3**, **I**, **P**, and a new **P4**). Every
-claim was re-verified against the current files before recording. **Two live defects were fixed and guarded in
-the same pass:** the cache-bump guard was blind to the `assets/` icons + best-effort-precached `CHANGELOG.md`
-(fixed `SERVED_RE`; Suites 30.3e behavioral + 30.3f classifier⇄precache-list agreement), and `ARCHITECTURE.md`
-prescribed a save-destroying `setDoc` against Protocol 34 (corrected to the real additive `addDoc`; Suite
-46.26). The sharpest finding is recorded, not fixed: the R2 restructure **copied stale file-ownership facts
-into the new trusted layer** (`rules/state-and-save.md`) — the project's own recurring drift, inside the fix
-for it. No `APP_VERSION`/`CACHE_NAME` bump (no served file changed). Earlier passes — the museum's visual
-identity decision, the six-item placement pass, and the `QUEUE.md`/`QUEUE_LOG.md` split — are in the running
-history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+_Last updated: **2026-07-21** — **a Protocol 50 recording pass: six conversational decisions written where they
+live** (built nothing; each status claim re-verified against the real files and the sibling archive first).
+**(1)** Dispatch **sequenced R10's remediation** at the owner's instruction — trusted layer → under-checking
+guards → route Architecture by section; none of it gates the release. **(2)** Adopted GPT-5.6 Sol's
+**knowledge-graph / retrieval-topology** spec as new item **R11** (infrastructure; one derivation → topology
+picture + plain diagnostics + a machine-readable answer for sessions), full spec in
+`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md`. **(3)** The **museum audit plan** (Claude-first, external-second,
+Gemini-not) + its external-access blocker — P design note (e). **(4)** A homeless workflow finding (concurrent
+sessions failing each other's lint gate through the shared dir; the junk-sweep concurrency caveat) → the
+workflow-review prompt §7. **(5)** Status: the **skill was re-installed** (R9 closed) and the **museum's
+"Records Office Dark" identity landed** in the archive. **(6)** R10's two defects carry their `8d14073` ship
+ref; skill finding E is ✅ fixed at `21c78f7`, finding C's overclaim still open. No `APP_VERSION`/`CACHE_NAME`
+bump (no served file changed). The pass before — **the external knowledge-architecture audit (R10)** — and
+earlier passes are in the running history chain in
+[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
 
@@ -46,7 +50,10 @@ history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-
   icons + best-effort-precached `CHANGELOG.md`, and `ARCHITECTURE.md` prescribed a save-destroying `setDoc`.
   Its sharpest finding is recorded but deliberately **not** fixed this pass: the R2 rules restructure
   **copied stale file-ownership facts into the new trusted layer** (`rules/state-and-save.md`) — the
-  project's own recurring drift, reproduced inside the fix meant to end it.
+  project's own recurring drift, reproduced inside the fix meant to end it. **Dispatch has now SEQUENCED
+  R10's remediation** (fix the trusted layer → fix the guards that under-check → route Architecture by
+  section; none of it gates the release) and **adopted a knowledge-graph / retrieval-topology spec (new item
+  R11)** off the same audit.
 - **What's genuinely left before the `dev → main` release:** the near-term data-safety item **A3** (cloud
   round-trip test) plus a short tail of small leftovers. The end-of-round review/synthesis deliverables
   (F done; **G**, H, D, I) and the governance process work (R5-R7) can land around the release, not
@@ -55,8 +62,11 @@ history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-
   system" round. Its hardening gate (which burns down the baselined architecture debt) sits BEFORE the OS
   services that would otherwise multiply it.
 - **Then 3.0** — Fallout 4 as a real playable third game, bundled with the native ES-modules migration.
-- **The Museum is BUILT** (a browsable history of the project in the private archive); its reproducibility
-  sub-program (P1) and publication (P2, post-release) are the remaining museum work.
+- **The Museum is BUILT, and its "Records Office Dark" visual identity has now LANDED in the archive**
+  (bezel removed, vault-directory lobby, strip-chart growth, intent-vs-reality exhibit, bug room wired to
+  `bugs/*/record.md`; it fixed a real self-referential bug on the way in). Its reproducibility sub-program
+  (P1), an **audit plan** (Claude-first, external-second — design note e), and publication (P2, post-release)
+  are the remaining museum work.
 
 _Everything shipped is summarized below with a link to its full account in
 [`QUEUE_LOG.md`](QUEUE_LOG.md); everything still ahead is expanded in full._
@@ -127,7 +137,8 @@ _Governance restructure:_
 - **R8** ✅ Queue-drift reconciliation — Protocol 50 + `scripts/queue-drift-check.js` pre-push nudge (Suite
   242). → [account](QUEUE_LOG.md#r8)
 - **R9** ✅ The skill made a POINTER, not a copy — the fourth context source stops being a second source of
-  truth (owner must re-install via Settings › Capabilities). → [account](QUEUE_LOG.md#r9)
+  truth. **The owner has re-installed the skill (confirmed 2026-07-21), so R9's outstanding manual step is now
+  closed** — and it also carries the `21c78f7` gate-claim correction (R10 finding E). → [account](QUEUE_LOG.md#r9)
 
 _Small residual fixes:_
 
@@ -269,6 +280,13 @@ or waste.
 
 **What it depends on.** The four refreshes (F, now ✅) — that's the whole reason F sits in front of it.
 
+**New evidence for this review (2026-07-21).** A concrete session-management failure nothing in the documented
+process anticipated: **concurrent sessions can fail each other's gates through the shared working directory**
+(the full pre-push gate runs `npx eslint .` over the whole tree, so a concurrent session's untracked scratch
+file failed another session's push while its commit had passed), and a Protocol 41 junk sweep **deleted a live
+concurrent session's scratch files**. It **complicates the worktree-isolation claim** the workflow prompt
+asserts. Recorded in `planning/_standing/WORKFLOW_REVIEW_PROMPT.md` §7 for the review to attack.
+
 **The model roster — decided 2026-07-20, recorded here per Protocol 50 because it had lived only in
 conversation.** The review still goes blind to **GPT-5.6 Sol** and **Gemini 3.1 Pro Extended**
 independently, then Dispatch synthesizes. Added for this ONE review: **DeepSeek as a third WITNESS, not a
@@ -349,7 +367,32 @@ landing record: **every claim was re-verified against the current files before b
 read one commit; a claim is only recorded as fact once checked). Two live defects were fixed in the same pass;
 everything else is recorded, ranked by consequence, with each finding's home or earn-condition stated.
 
-**✅ FIXED this pass — Defect-1: the cache-bump guard's classifier was blind to real precached files.**
+**⭐ THE SEQUENCE for working R10's findings — Dispatch sequenced it, owner's instruction (2026-07-21):
+_"you need to sequence everything not me."_** The ordering reasoning is the valuable part, so it is recorded,
+not just the order. **NONE of this blocks the release — 2.8.5 is blocked only by A3; everything in R10 is
+process debt, not shipping debt.** The stated plan: do steps one and two, ship 2.8.5, then do step three.
+
+1. **FIRST — fix the trusted layer.** The stale facts in `ARCHITECTURE.md` (finding B) and the ones the R2
+   restructure copied into `rules/state-and-save.md` (finding B-critical), plus the remaining false/overclaimed
+   statements in the skill (findings C skill-overclaim + E library-fallback). **Why first:** these bleed
+   _continuously_ — every session that runs before they're fixed inherits wrong facts and generates work.
+   Nothing else in R10 costs anything per-session. This goes first purely on **bleed rate**.
+2. **SECOND — fix the guards that overstate their coverage.** Suite 220 checking less than Protocol 45
+   advertises (finding C), and the retrieval map's routing gaps (finding D). **Why second:** these are _why_
+   step one's problem stayed invisible — stale references sat under a passing check. Fixing them second means
+   step one's fix stays fixed instead of silently rotting again.
+3. **THIRD — route `ARCHITECTURE.md` by section instead of universally** (finding A). **Why third, not first
+   (load-bearing):** step one REMOVES the operational checklists and runbooks from that file, which shrinks the
+   problem before it is solved. Routing-by-section first would mean building section routing for content about
+   to be deleted.
+4. **RIDING ALONG wherever convenient:** the rollback script contradicting Protocol 43's branch model
+   (finding F) and the duplicate App Check entry (finding G) — both small and independent. Note: F only bites
+   during an outage, which is exactly when ambiguity is most expensive, so it should not sit indefinitely.
+5. **GATED on other work, not on effort:** the P3 supersession-logic fix (finding H) must land **before the
+   museum-for-AI extract (P3) is built**, not before anything else. The stable-identifier scheme (item I) is
+   needed **before the Atlas and museum link to each other**, which is **after 2.8.5**.
+
+**✅ FIXED this pass — Defect-1 (shipped `8d14073`): the cache-bump guard's classifier was blind to real precached files.**
 `sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
 `scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing
 `assets/icon.png`, `assets/ocr/eng.traineddata.gz`, or `CHANGELOG.md` needed **no cache bump**, and cached
@@ -364,7 +407,7 @@ classifier misses any; when run against the old classifier it named all six unco
 tested one hard-coded filename is exactly how this stayed hidden — 30.3f tests **agreement with the real
 precache list**, so it can't drift again.
 
-**✅ FIXED this pass — Defect-2: `ARCHITECTURE.md` prescribed a save-destroying cloud write.** Its Cloud Push
+**✅ FIXED this pass — Defect-2 (shipped `8d14073`): `ARCHITECTURE.md` prescribed a save-destroying cloud write.** Its Cloud Push
 section showed `setDoc(firestore, { … state: stateObj … })` — a whole-document overwrite — while the real
 `js/services/cloud.js` uses **additive `addDoc`** into a `saves` collection with a `contentHash` dedup, and
 Protocol 34 states plainly that a blind `setDoc` would clobber a campaign with no recovery. A session building
@@ -409,9 +452,11 @@ thread).**
   gate.** Suite **220.2**'s regex matches **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
   it cannot see bare filenames (`api.js`), nested paths (`js/services/api-import.js`), function ownership, or
   prose — so the stale `api.js` ownership claims are invisible to it. And `skill/SKILL.md` **overclaims** the
-  canonical files are "canonical and current by construction (the gate guards them)" (line 20). Direction:
-  correct the SKILL claim first (say _partially_ mechanically checked, source wins); extend 220.2 only for
-  unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT** attempt a prose-truth checker.
+  canonical files are "canonical and current by construction (the gate guards them)" — **still present at
+  line 19 (verified 2026-07-21); NOT fixed by `21c78f7`, which only corrected the separate gate falsehood
+  (finding E).** Direction: correct the SKILL claim first (say _partially_ mechanically checked, source wins);
+  extend 220.2 only for unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT**
+  attempt a prose-truth checker. Belongs to steps one (skill claim) and two (Suite 220) of the sequence above.
 - **Finding D — the retrieval map has concrete gaps against the notes' own declared scopes.**
   `.github/workflows/` routes only to the deploy note though the testing note also governs it;
   `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sends it to testing;
@@ -420,16 +465,16 @@ thread).**
   Suite **220.14** only proves every note is _named_ in the map, not that every relevant path _reaches_ the note
   claiming it. Direction: make the map the **sole** scope authority, fix the rows, add a narrow parity check
   (each note's "load this when" header ⇄ its map row). No second routing document.
-- **Finding E — `skill/SKILL.md` is not a pure pointer and contains a FALSE statement.** It restates ~7
-  operational rules, and **line 38 is wrong**: "the full gate must pass on every commit/push" — the real design
-  is **fast gate at commit, full gate at push** (`scripts/pre-commit` → `gate:fast`; `scripts/pre-push` →
-  `gate`). **Verified the working-tree modification does NOT fix it** — the pending `skill/SKILL.md` diff only
-  adds a "Sister repo" bullet, leaving line 38 untouched. Because the skill is installed read-only, the tracked
-  source needs correcting **and** the owner must re-install for it to take (the owner did re-install after
-  `0b72bd1`, which the audit couldn't see — but that predates this correction, so a re-install is owed _after_
-  the fix lands). Second half of E: CLAUDE.md tells sessions to read gitignored `library/` files, but a clean
-  checkout has only `library/MANIFEST.txt` — add a one-sentence fallback: **if a local-only library target is
-  absent, do not infer its contents — fall back to source and report the missing context.**
+- **Finding E — `skill/SKILL.md` FALSE statement is now ✅ FIXED (`21c78f7`); its library-fallback half is
+  still open.** The false gate claim ("the full gate must pass on every commit/push") was **corrected at
+  `21c78f7`** — the skill now reads _"the FAST gate runs at commit, the FULL gate (browser checks too) at
+  push"_ (verified against the tracked source), matching `scripts/pre-commit` → `gate:fast` / `scripts/pre-push`
+  → `gate`. Because the skill is installed read-only, a re-install was owed after the fix landed — **and the
+  owner has re-installed and confirmed it (2026-07-21)**, so this is closed (owner-confirmed control-plane
+  state, not repo-verifiable — the finding-L category). **Still open — the second half of E:** CLAUDE.md tells
+  sessions to read gitignored `library/` files, but a clean checkout has only `library/MANIFEST.txt`. Add a
+  one-sentence fallback: **if a local-only library target is absent, do not infer its contents — fall back to
+  source and report the missing context.** Belongs to step one of the sequence above.
 - **Finding F — the rollback path contradicts the branch model.** `scripts/rollback.sh` (and
   `ARCHITECTURE.md`'s rollback runbook, line ~3408) both instruct `git push origin main`, while Protocol 43
   says all work goes through `dev` and `main` receives only release merges — a contradiction that surfaces
@@ -474,6 +519,70 @@ audiences) in **P**; and tonight's owner decision on the **bug-record obligation
 **Done means:** the two fixes are shipped and guarded (done); each recorded finding is either fixed in a later
 governance pass or explicitly owner-decided (L, F); and no future session re-derives these from scratch because
 the reasoning — not just the findings — lives here.
+
+### R11. ⬜ The knowledge-graph / retrieval-topology — DESIGN ADOPTED (GPT-5.6 Sol, 2026-07-21), do not build yet
+
+**What it is.** A generated map of how this project's knowledge layer connects — the skill, `CLAUDE.md`, the
+`rules/*.md` notes, `ARCHITECTURE.md`, the library, the queue and its log, memory, the museum, the Atlas — and
+how each routes to / claims scope over / is checked by the others. **It grew directly out of R10:** the owner
+asked for a visual map of how everything connects, GPT-5.6 Sol (second pass, repo-aware) specified the data
+model, and Dispatch amended it. **The full specification lives in
+[`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md`](planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md)** (recorded per
+Protocol 50, referenced here rather than pasted).
+
+**The core ruling — build a RETRIEVAL TOPOLOGY first, not a universal graph of every project fact.** Protocols,
+suites, guards, queue items, museum history and Atlas assurance can join the same schema later, but their
+derivation is less uniform and including them prematurely risks _"a polished graph that lies."_
+
+**The three load-bearing ideas (must survive verbatim in substance — full text in the spec):**
+
+- **`routes_to` and `claims_scope_over` are two INDEPENDENTLY DERIVED edges** — one from `CLAUDE.md`'s
+  retrieval-map rows, one from each note's "load this when touching" header. The gap **emerges when the two
+  derivations disagree**, which is far harder to fool than a checker written to look for a known problem. (This
+  is R10 finding D, found mechanically.)
+- **`claims_checked_by` and `invokes` are SEPARATE edges** — a protocol _naming_ Suite 30 and something
+  _running_ Suite 30 are different facts. **The cache-guard defect is the proof:** protocol, script, hook and
+  suite all named each other and the classifier still missed every icon path. **Naming is not running.**
+- **Every extractor reports records seen / emitted / unparsed / parser status.** If the retrieval-map heading is
+  renamed and the parser returns zero routes, the graph must say **"route extraction failed"**, NOT render ten
+  orphaned notes as if the project collapsed — the silent-empty-parse failure of this whole week, designed out
+  at the data layer.
+
+**Also adopted:** node states `observed / declared / manifested / unavailable`; baseline-local keys for most
+nodes with cross-release identity ONLY for protocol + queue IDs (which already have no-reuse contracts); a file
+rename shown as remove+add, never inferred by git similarity (this project measured that heuristic undercounting
+by 22%); and the public projection built FROM PUBLIC SOURCES PLUS GENERIC PLACEHOLDERS, fail-closed by
+construction rather than by redaction.
+
+**⭐ Dispatch's amendment, owner-endorsed — ONE derivation, THREE renderings.** GPT designed a diagnostic
+instrument; the owner asked for a picture; the owner then corrected that there is a **third** consumer that may
+matter most. Same "one source, N views" ruling already made for `QUEUE.md`/L and the museum/P3, extended to
+three: **(1) a TOPOLOGY view** (human, visual — a **Fable design job**), **(2) a DIAGNOSTICS view** (human,
+plain — selectors, dangling edges, parser status; stays plain), and **(3) ⭐⭐ a machine-readable answer for
+SESSIONS** — a session touching `.github/workflows/` asks _"what governs this path?"_ and gets the note the map
+routes it to AND the note that claims it AND the fact that they disagree; a session asking _"is this guarded?"_
+gets _"named, invoked, and here's what its classifier actually reaches"_ rather than protocol prose; and the
+node-states let a session know `library/CODE_MAP.md` is declared-but-unreadable on a clean checkout so it does
+not infer the contents. **The owner's correction (_"we don't just need visuals, whatever helps the AI too ya
+know?"_) is why this is placed as infrastructure, the R2-restructure category — not post-2.8.5 visualisation
+decoration.**
+
+**Its own stopping rule.** Build the retrieval topology first; extend to protocols / guards / museum / Atlas
+**ONLY if the first map is actually used** to find or prevent drift. If it becomes wallpaper, stop.
+
+**Honest cost.** Even GPT's "minimum" version needs a real parser — AST detection for suite definitions, glob
+expansion against the tracked tree, boundary-accurate block parsing. **A session or two, not an afternoon.**
+
+**Where it sits.** Infrastructure, near-term — **does NOT gate the `dev → main` release** (process debt like the
+rest of R10), but placed as infrastructure rather than decoration per the owner's third-consumer correction. It
+**shares the schema with the Atlas (item I)** — link, don't fuse; item I's stable-identifier scheme (design note
+b) is the identity contract this graph's cross-release keys obey — and with **P3** (same provenance /
+fail-closed-on-unknown discipline).
+
+**Done means (when eventually built):** one derivation feeds the three views above; the two retrieval edges are
+derived independently and their disagreements surface as data; declared-vs-invoked coverage is diffed; every
+extractor reports parser status so a silent empty parse can never masquerade as an empty project; and a session
+can query "what governs this path / is this guarded" and get the map _plus its known defects_.
 
 ## ⚠️ Blocked on an owner decision
 
@@ -766,8 +875,21 @@ manifest walk, so none of this can leak into the built museum.
 1. **All container animation was removed** (the hero breathe, the LED pulse, the badge blink were chassis
    language). Everything is static now except hover/flip states. The design model's position, standing unless
    the owner objects: if motion is missed, it should return as EXHIBIT behaviour, not container behaviour.
-2. **A dark twin of B is IN FLIGHT right now** in the archive (session `local_acec1822`) — the owner reads
-   almost exclusively at night on a phone, and the winning direction is a light page. That session was told
+2. **✅ The dark twin LANDED — "Records Office Dark" is the shipped identity (archive, 2026-07-21).** The
+   owner reads almost exclusively at night on a phone; the light "Records Office" won the design pass but the
+   implementation resolved to its **dark** treatment. **Verified in the sibling archive** (`C:\Dev\!RobCo\_RobCo-Archive`,
+   six museum commits `ab4ca16`→`4d0cac3`, synced to public HEAD `8d14073`): identity implementation with the
+   **bezel removed entirely**, the **lobby rebuilt as the vault-directory ledger**, the growth page as a
+   strip-chart recorder, a new **intent-vs-reality** exhibit, and the **bug room wired to `bugs/*/record.md`**.
+   Design-verified at 360/412px, contrast recomputed, regenerated twice byte-identical, and a
+   bare-clone-to-fresh-clone regeneration matched exactly. **Two things to record from the landing:**
+   - **It found and fixed a real bug on the way in:** `bugs/` records were falling into "unclassified" and
+     tripping the lobby's own integrity report — the museum was about to raise a **false alarm about itself**.
+   - **One item is deliberately unfinished, and the page says so on its face:** the intent-vs-reality "reality"
+     captures are still **working-tree screenshots, not release-pinned** — the page states this rather than
+     pretending otherwise.
+
+   _(Prior design-exploration context, now resolved:)_ that session was told
    plainly that "the light version is the right answer and here is the proof" is an acceptable outcome, and
    was asked to weigh a warm-but-dimmer lamplit-archive treatment against a true dark inversion, and to say
    whether a toggle is even warranted (a toggle is a maintenance surface and must earn its existence).
@@ -807,6 +929,39 @@ honestly: this project is **not** fooling itself where it plans one source with 
 P3) — but it **is** fooling itself in two places worth fixing: calling a ~1,300-line `QUEUE.md` "phone-readable"
 (L is the answer, not the label), and treating a ~348 KB `ARCHITECTURE.md` as an appropriate universal entry
 point for _either_ audience (finding A).
+
+**⬜ Design note (e) — the museum AUDIT plan: Claude first, external second, Gemini not (owner, 2026-07-21).**
+The owner asked _"maybe claude model audits instead of gpt? maybe gpt and gemini ? and claude ?"_ **Decision:
+a Claude session audits FIRST, external review SECOND, Gemini not at all for now.** The reasoning, recorded so
+it isn't re-litigated:
+
+- **Claude first, because it can EXECUTE.** A Claude session can audit the archive immediately — no access
+  negotiation, no privacy decision, no memory exposure — and unlike GPT it can _run_ the generator, do the
+  fresh-clone and bare-clone reproducibility checks, and render the site and look at it. **Given that every bug
+  found this week only surfaced when something was actually run, that matters.**
+- **The catch, recorded honestly:** a Claude session auditing work done by Claude sessions has **correlated
+  blind spots** — strong on _"is this correct"_, weak on _"what did we all collectively fail to consider."_ A
+  clean result from it is therefore **weak evidence**, which is exactly why external review comes second.
+- **External review is worth buying only AFTER the internal pass** — at that point it purchases genuine
+  independence rather than a second opinion on execution.
+- **Gemini is excluded for now:** on the DeepSeek question it answered a workflow the project does not have
+  (item G's rejected-proposal specimen). Two proven lineages (Claude + one external) is enough; a third mostly
+  costs owner copy-paste.
+
+**⚠ The BLOCKER on external access — an open owner-decision.** GPT's connector returned **404 on the private
+archive** because the GitHub App's repo allow-list excludes it. Granting access is a one-time reversible
+settings change — **but the archive contains `memory/`**, which is precisely why museum publication (P2) was
+gated on a memory audit-and-split. Three options were put to the owner:
+
+1. Grant access to the **whole archive** — best audit, but **memory is exposed**.
+2. **★ Do the memory split FIRST, then grant access (Dispatch's recommendation)** — it is _already_ a queued
+   publication prerequisite (P2), so it is work needed anyway, pulled forward; it unblocks the audit **and**
+   publication together.
+3. A **scoped throwaway repo** with just `museum/`, `bugs/` and the generator — fastest, no exposure, **but**
+   GPT then cannot check how the museum relates to the archive it is built from, and _that relationship is
+   where the bugs have been_.
+
+**Awaiting the owner's call between these three; do not proceed with external access until then.**
 
 **P1. 🔄 Museum reproducibility — a sub-program.** Three sessions have shipped fixes to the archive's `main`;
 a fourth is in flight.
