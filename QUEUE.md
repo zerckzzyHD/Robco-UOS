@@ -22,21 +22,26 @@ Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/co
 _Last updated: **2026-07-21** — **a Protocol 50 recording pass: the cross-cutting EXECUTION SEQUENCE the owner
 approved ("go with recs"), plus one standing filing convention** (built nothing; every item ID, status and
 dependency was re-verified against the real file before being recorded). **(1)** A new **"The execution
-SEQUENCE"** section sits beside the 5-second version and is carried in it: **R10 doc-fixes → A3 → ship 2.8.5 →
-R11 knowledge graph → 2.9.0 with the Atlas built in.** It is an **OVERLAY** on the readiness groups, not a
-re-filing — nothing moved between groups. Its load-bearing correction, recorded so it is not re-litigated:
-**most "museum stuff" helps HUMANS, not sessions**; what genuinely helps sessions is the smaller set **R10 /
-R11 / P3 / the Atlas assurance view (I)**, and the order is built on that distinction. The **Atlas [I] was the
+SEQUENCE"** section sits beside the 5-second version and is carried in it. **The order, after a same-day owner
+revision:** R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas built in. It is an
+OVERLAY on the readiness groups, not a re-filing — nothing moved between groups. **The same-day change,
+recorded so the two orders don't both survive:** it was first recorded as R10 → A3/ship → R11 → 2.9.0 ("go
+with recs"); the owner then moved **R11 before the ship**, exercising the option the brief had pre-approved as
+his — he judges the knowledge graph's session-help worth more than a faster release. R11 stays BELOW the R10
+trusted-layer fixes (the graph detects drift in exactly those files). The recorded cost: the museum's
+release-pin benefit is deferred slightly — a cost of the choice, not a lost benefit. Its load-bearing
+correction, unchanged: most "museum stuff" helps HUMANS, not sessions; what genuinely helps sessions is the
+smaller set R10 / R11 / P3 / the Atlas assurance view (I), and the order is built on that distinction. The **Atlas [I] was the
 one place the owner's "push it up" instinct was explicitly OVERRULED** (with his agreement): built now it maps a
 system 2.9.0 is about to change, so it stays IN 2.9.0. **Verified consistent with R10's own recorded plan**
 ("do steps one and two, ship 2.8.5, then step three", R10 §THE SEQUENCE) — the overlay references it, it is not
-a competing order. **(2)** A standing convention recorded (near museum item P): \*\*audits OF the archive are
-filed in `\_RobCo-Archive/audits/<target>/<date>_<slug>.md`, never in `planning/`** (a 1:1 app-repo mirror); the
-museum audit is filed there and renders under the museum's STANDING section. **(3)** No `APP*VERSION`/`CACHE_NAME`
-bump (no served file changed). The pass before — seven conversational decisions (the dates-are-derived rule, the
-doubled master-key rule-out, the recovered achievements reason, the New Vegas Challenges open question, the
-museum Claude-first audit results, museum item P5) — and earlier passes are in the running history chain in
-[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).*
+a competing order. **(2)** A standing convention recorded near museum item P: audits OF the archive are filed in
+an archive-side `audits/` tree, never in `planning/` (a 1:1 app-repo mirror); the museum audit is filed there
+and renders under the museum's STANDING section (the full archive path is recorded in item P). **(3)** No
+`APP_VERSION` / `CACHE_NAME` bump (no served file changed). The pass before — seven conversational decisions
+(the dates-are-derived rule, the doubled master-key rule-out, the recovered achievements reason, the New Vegas
+Challenges open question, the museum Claude-first audit results, museum item P5) — and earlier passes are in the
+running history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
 
@@ -73,13 +78,13 @@ museum Claude-first audit results, museum item P5) — and earlier passes are in
   (gallery mats) plus a real "couldn't check actual pixels" gap. The **external-second** review (design note
   e), reproducibility (P1), **contextual-return nav (P5)**, and publication (P2, post-release) are the
   remaining museum work.
-- **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21, owner: "go with recs"):**
-  **R10 doc-fixes → A3 → ship 2.8.5 → R11 knowledge graph → 2.9.0 with the Atlas built in.** The one-line
-  why: fix the docs every session is forced to read FIRST, ship so the backward-looking tools pin to a real
-  baseline, then build the graph that actually helps sessions — and keep the Atlas IN 2.9.0 so it maps a
-  system that isn't about to change under it. It is an **overlay** on the readiness groups below, not a
-  re-filing. Full reasoning in **"The execution SEQUENCE"** just below. The correction it is built on: **most
-  "museum stuff" helps HUMANS, not sessions.**
+- **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21; R11 moved before the ship the
+  SAME day, owner's call):** **R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas
+  built in.** The one-line why: fix the docs every session is forced to read FIRST, then build the graph that
+  actually helps sessions (the owner judges its session-help worth more than a faster release), then A3 and
+  ship — and keep the Atlas IN 2.9.0 so it maps a system that isn't about to change under it. It is an
+  **overlay** on the readiness groups below, not a re-filing. Full reasoning in **"The execution SEQUENCE"**
+  just below. The correction it is built on: **most "museum stuff" helps HUMANS, not sessions.**
 
 _Everything shipped is summarized below with a link to its full account in
 [`QUEUE_LOG.md`](QUEUE_LOG.md); everything still ahead is expanded in full._
@@ -111,20 +116,25 @@ the Atlas's assurance view (I).** The order below is built on that distinction.
    its step-one trusted-layer fixes and its step-two guard-fixes land before the ship, and its step-three
    Architecture-by-section routing lands after it.
 
-2. **Then A3, then SHIP 2.8.5 → [A3].** A3 (the cloud round-trip test) is the near-term data-safety blocker on
-   the release. **Why ship before the graph:** shipping gives the museum a real released version to PIN to
-   (unblocking publication P2), and it means R11 and the Atlas get built against a stable released baseline
-   instead of a moving `dev`. Shipping is what makes the backward-looking tools honest. A3 is small and unlocks
-   three downstream things (the museum pin, R11's baseline, the Atlas's baseline).
+2. **Then the knowledge graph → [R11]. ⭐ MOVED before the ship (owner's call, 2026-07-21 — same day, revising
+   the order first recorded above).** It derives from files that already exist and are stable, so — unlike the
+   Atlas — it can be built now without lying. It is the thing that lets a session ask "what governs this file,
+   and is it actually guarded" and get a true answer (recorded already as infrastructure, not decoration).
+   **Why it moved up — the owner's reasoning, recorded so it isn't re-litigated:** he judges the graph's
+   session-help worth **more than a faster release**. The order first recorded here had the graph after the
+   ship purely because it does NOT go stale while it waits — so nothing forced it earlier; but "nothing forces
+   it earlier" is not "nothing is gained by it earlier," and the owner made exactly the call the brief had
+   pre-approved as his (the graph's session-help over release speed). **It still must NOT move above step 1:**
+   the graph is built to detect drift in exactly the trusted-layer files R10 fixes, so those fixes stay first.
 
-3. **Then the knowledge graph → [R11].** It derives from files that already exist and are stable, so — unlike
-   the Atlas — it can be built now without lying. It is the thing that lets a session ask "what governs this
-   file, and is it actually guarded" and get a true answer (recorded already as infrastructure, not
-   decoration). It does NOT go stale while it waits for the ship, so it loses nothing by coming after A3 —
-   which is the only reason it sits after rather than before. **Owner option, pre-approved as his call:** if he
-   later decides the graph's session-help outweighs a fast release, moving it before A3 is legitimate. But the
-   Atlas and the museum's human-facing polish do NOT move up on a session-help rationale, because that
-   rationale is not true for them.
+3. **Then A3, then SHIP 2.8.5 → [A3].** A3 (the cloud round-trip test) remains the near-term data-safety
+   blocker on the release — it is still the only thing gating the ship. **The reasoning that still stands:**
+   shipping gives the museum a real released version to PIN to (unblocking publication P2), and it lets the
+   Atlas get built against a stable released baseline instead of a moving `dev`. **The recorded COST of moving
+   R11 up:** that museum-pin benefit is now **deferred slightly** — it is a cost of the owner's choice, not a
+   lost benefit, and it is small (the museum is release-pinned history; nothing depends on its pin advancing
+   sooner). R11 itself does not need the ship — it derives from already-stable files — which is exactly why
+   putting it before the ship costs the graph nothing.
 
 4. **Then 2.9.0, with the Atlas built INTO it once the round settles → [I].** The Atlas's assurance view is the
    single most session-useful artifact in the plan — AND it must NOT be pushed up. It maps the CURRENT system;
