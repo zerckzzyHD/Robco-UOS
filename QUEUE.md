@@ -19,26 +19,24 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **a Protocol 50 recording pass: seven conversational decisions written where they
-live** (built nothing; every status claim re-verified against the real files and the sibling archive before
-being recorded — the bug-record count, the archive commit hashes, and the achievements-line date were all
-checked on disk, and the circulating "11 records" was corrected to the verified **10**). **(1)** A new standing
-rule — **dates, and DERIVED ones**: every recorded decision carries its date, a later reinforcement carries its
-OWN date rather than being merged into the original, and dates come from git / the changelog / the event, never
-a session's felt time (added as **Protocol 50 (a-date)**, mirrored in this file's conventions; it exists because
-a continuously-running Dispatch session's clock-sense is decoupled from wall-time). **(2)** The **master-key
-rule-out is now DOUBLE** — the original blast-radius reason plus a dated reinforcement: a master key forces
-read-modify-write and would *introduce* a lost-update race that independent keys cannot have (category-grouping
-doesn't help). **(3)** The **achievements rule-out's REASON recovered** — it fights the fiction (a scoreboard
-*about* the player); analysed by Dispatch, decided by the owner; the flagship case for rule (1). **(4)** A new
-OPEN question in the Unversioned drawer — **New Vegas Challenges** (brother-raised, max-priority audience); NOT
-the same as achievements, owes a `fallout.wiki` write-up before any owner in/out call. **(5)** The **museum's
-Claude-first audit has RUN** — five defects fixed (still **unpushed** on the archive), gallery-mats design
-regression back to Fable, a real "couldn't check pixels" gap; external review still warranted (P design note e).
-**(6)** New museum item **P5** — contextual return (breadcrumb + in-page back control). **(7)** No
-`APP_VERSION`/`CACHE_NAME` bump (no served file changed). The pass before — six conversational decisions
-(R10 sequencing, the R11 knowledge-graph spec, the museum audit plan) — and earlier passes are in the running
-history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+_Last updated: **2026-07-21** — **a Protocol 50 recording pass: the cross-cutting EXECUTION SEQUENCE the owner
+approved ("go with recs"), plus one standing filing convention** (built nothing; every item ID, status and
+dependency was re-verified against the real file before being recorded). **(1)** A new **"The execution
+SEQUENCE"** section sits beside the 5-second version and is carried in it: **R10 doc-fixes → A3 → ship 2.8.5 →
+R11 knowledge graph → 2.9.0 with the Atlas built in.** It is an **OVERLAY** on the readiness groups, not a
+re-filing — nothing moved between groups. Its load-bearing correction, recorded so it is not re-litigated:
+**most "museum stuff" helps HUMANS, not sessions**; what genuinely helps sessions is the smaller set **R10 /
+R11 / P3 / the Atlas assurance view (I)**, and the order is built on that distinction. The **Atlas [I] was the
+one place the owner's "push it up" instinct was explicitly OVERRULED** (with his agreement): built now it maps a
+system 2.9.0 is about to change, so it stays IN 2.9.0. **Verified consistent with R10's own recorded plan**
+("do steps one and two, ship 2.8.5, then step three", R10 §THE SEQUENCE) — the overlay references it, it is not
+a competing order. **(2)** A standing convention recorded (near museum item P): \*\*audits OF the archive are
+filed in `\_RobCo-Archive/audits/<target>/<date>_<slug>.md`, never in `planning/`** (a 1:1 app-repo mirror); the
+museum audit is filed there and renders under the museum's STANDING section. **(3)** No `APP*VERSION`/`CACHE_NAME`
+bump (no served file changed). The pass before — seven conversational decisions (the dates-are-derived rule, the
+doubled master-key rule-out, the recovered achievements reason, the New Vegas Challenges open question, the
+museum Claude-first audit results, museum item P5) — and earlier passes are in the running history chain in
+[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).*
 
 ---
 
@@ -75,9 +73,70 @@ history chain in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-
   (gallery mats) plus a real "couldn't check actual pixels" gap. The **external-second** review (design note
   e), reproducibility (P1), **contextual-return nav (P5)**, and publication (P2, post-release) are the
   remaining museum work.
+- **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21, owner: "go with recs"):**
+  **R10 doc-fixes → A3 → ship 2.8.5 → R11 knowledge graph → 2.9.0 with the Atlas built in.** The one-line
+  why: fix the docs every session is forced to read FIRST, ship so the backward-looking tools pin to a real
+  baseline, then build the graph that actually helps sessions — and keep the Atlas IN 2.9.0 so it maps a
+  system that isn't about to change under it. It is an **overlay** on the readiness groups below, not a
+  re-filing. Full reasoning in **"The execution SEQUENCE"** just below. The correction it is built on: **most
+  "museum stuff" helps HUMANS, not sessions.**
 
 _Everything shipped is summarized below with a link to its full account in
 [`QUEUE_LOG.md`](QUEUE_LOG.md); everything still ahead is expanded in full._
+
+---
+
+## ⭐ The execution SEQUENCE (decided 2026-07-21 — the owner asked Dispatch to sequence, then approved: "go with recs")
+
+**This is a cross-cutting ORDER laid over the readiness groups below — it does NOT re-file anything.** Each
+step points at its existing item; the readiness grouping (Ready now / Blocked on owner / Blocked on another
+item / the Museum cluster) stays exactly as it is. The sequence is the overlay; the groups are the filing.
+
+**The load-bearing correction this sequence is built on — recorded so nobody re-asks "why isn't the Atlas
+earlier, it helps sessions" in three weeks: most of "the museum stuff" helps HUMANS, not sessions.** The
+museum itself — its visuals, bug room, publication (P2), contextual return (P5) — is release-pinned history
+for the owner, his brother, and the public; a session building the app never reads it. So "push the museum up
+to help sessions" is the **wrong rationale**. Legitimate reasons to push the museum up exist (showing his
+brother, going public) — session-help is not one of them. **What genuinely helps sessions is a different,
+smaller set: the R10 trusted-layer fixes, the knowledge graph (R11), the AI-facing museum extract (P3), and
+the Atlas's assurance view (I).** The order below is built on that distinction.
+
+1. **The R10 trusted-layer fixes FIRST → [R10].** Already #1, cannot go higher. The stale facts in
+   `ARCHITECTURE.md` and the ones the R2 restructure copied into `rules/state-and-save.md`, plus any remaining
+   false statement in the skill. **Why nothing goes before it:** these bleed every session — one of them (the
+   `setDoc` vs additive `addDoc` cloud-write) would lead a session to write saves in a way Protocol 34 says
+   destroys a campaign. Nothing helps a session more than the documents it is forced to read not lying to it —
+   and this helps every later step, including step 2. **This is a reference to R10's own recorded plan, not a
+   competing order:** R10 §THE SEQUENCE already states "do steps one and two, ship 2.8.5, then step three" — so
+   its step-one trusted-layer fixes and its step-two guard-fixes land before the ship, and its step-three
+   Architecture-by-section routing lands after it.
+
+2. **Then A3, then SHIP 2.8.5 → [A3].** A3 (the cloud round-trip test) is the near-term data-safety blocker on
+   the release. **Why ship before the graph:** shipping gives the museum a real released version to PIN to
+   (unblocking publication P2), and it means R11 and the Atlas get built against a stable released baseline
+   instead of a moving `dev`. Shipping is what makes the backward-looking tools honest. A3 is small and unlocks
+   three downstream things (the museum pin, R11's baseline, the Atlas's baseline).
+
+3. **Then the knowledge graph → [R11].** It derives from files that already exist and are stable, so — unlike
+   the Atlas — it can be built now without lying. It is the thing that lets a session ask "what governs this
+   file, and is it actually guarded" and get a true answer (recorded already as infrastructure, not
+   decoration). It does NOT go stale while it waits for the ship, so it loses nothing by coming after A3 —
+   which is the only reason it sits after rather than before. **Owner option, pre-approved as his call:** if he
+   later decides the graph's session-help outweighs a fast release, moving it before A3 is legitimate. But the
+   Atlas and the museum's human-facing polish do NOT move up on a session-help rationale, because that
+   rationale is not true for them.
+
+4. **Then 2.9.0, with the Atlas built INTO it once the round settles → [I].** The Atlas's assurance view is the
+   single most session-useful artifact in the plan — AND it must NOT be pushed up. It maps the CURRENT system;
+   2.9.0 will change most of what it maps; built now it is stale the day 2.9.0 lands. Its own entry already
+   wants the round finished so it represents something real. Rushing it does not deliver the benefit early — it
+   delivers a WRONG MAP early. **This is the one place the owner's "push it up" instinct was explicitly
+   overruled, with his agreement.**
+
+**Gated items that ride their dependency, NOT this order:** **P3** (AI-facing museum extract) helps sessions
+and can move up, but is gated on the "current-by-absence" supersession-logic fix (recorded under P3 / R10
+finding H) — it lands after that fix, not before. **The Atlas [I] depends on D** (the TEST_CATALOG generator),
+unchanged.
 
 ---
 
@@ -957,9 +1016,14 @@ it isn't re-litigated:
   costs owner copy-paste.
 
 **✅ THE CLAUDE-FIRST PASS HAS NOW RUN (2026-07-21) — results recorded here per Protocol 50.** An independent
-Claude session audited the museum; its report is at that session's scratchpad `AUDIT_REPORT.md`. **Placement
-note:** the report could be filed in the archive under `museum/` — that subtree is **excluded from the manifest
-walk**, so it would be preserved without becoming an exhibit; decide when the report is in hand.
+Claude session audited the museum; its report is at that session's scratchpad `AUDIT_REPORT.md`.
+
+**✅ Filing convention established (2026-07-21) — resolves the earlier "file it under `museum/`?" placement
+question.** Audits **OF the archive itself** are filed in the archive at
+**`_RobCo-Archive/audits/<target>/<date>_<slug>.md`** — NOT in `planning/`, which is a **1:1 mirror of the app
+repo's planning folder** and would wrongly duplicate archive-only audits there. The museum audit is filed under
+that path and now **renders inside the museum under STANDING** (the classifier was taught to recognise
+`audits/`). Recorded here so the convention is discoverable from the app repo's queue, not only in the archive.
 
 **✅ FIXED and committed to the archive — three commits, verified STILL UNPUSHED on archive `main` as of this
 recording** (`e1fa0ab` five self-audit fixes → `a5bfe4d` regenerate → `cef158f` drop a dangling § anchor;
