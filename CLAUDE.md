@@ -373,6 +373,16 @@ identified, a scope change, a re-ordering, an item closed or reopened — is wri
 about. This applies whether or not the session's task otherwise touches any file in the repo — a
 purely conversational planning session still owes a `QUEUE.md` update before it ends.
 
+**(a-form) Every recorded entry needs a home or a stated earn-condition.** It is not enough that a
+decision *reaches* `QUEUE.md` — the entry must land somewhere honest. Every recorded item carries
+**either** a version/section that owns it (or a binding to a named item) **or**, when it has neither
+yet, an explicit reason it is unversioned AND the concrete condition that would earn it a slot.
+"Parked", "someday", or "revisit later" with no stated condition is not acceptable — an entry with no
+home and no earn-condition is the vague drawer this rule forbids. This is what let `QUEUE.md`'s
+"Unversioned" drawer be emptied in minutes on 2026-07-21: both items already named the condition that
+would place them, so placing them was mechanical. The rule is mirrored in `QUEUE.md`'s own Unversioned
+section (its point of use), but lives here too so it survives any future restructure of that file.
+
 **(b) The automated backstop — a fail-safe queue-drift NUDGE.** `scripts/queue-drift-check.js`,
 wired into the pre-push hook exactly like Protocol 48's backup nudge (`|| true`, never blocking),
 lists every `type: project` memory in the orchestrator's memory store and flags the ones that

@@ -19,13 +19,18 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-_Last updated: **2026-07-21** — **`QUEUE.md` was split from `QUEUE_LOG.md`.** This was a pure structural
-pass: the running header (a single multi-thousand-word paragraph) was collapsed to the most-recent pass
-plus a pointer; ~550 lines of shipped post-mortems moved verbatim into the new tracked
-[`QUEUE_LOG.md`](QUEUE_LOG.md) with a one-liner + link left behind for each; and the open 2.8.5 tail was
-regrouped by **readiness** (ready-now / blocked-on-owner / blocked-on-another-item / the museum
-sub-program) instead of discovery-order buckets. No item's status or content changed. The full update
-history is in [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
+_Last updated: **2026-07-21** — **a six-item placement pass** (recorded per Protocol 50). Emptied the
+"Unversioned" drawer by placing both its items into 2.9.0 (CSS cascade cleanup → attached to the
+UI-consistency audit; manual-inventory event-log wiring → bound to the inventory-panel rebuild + Terminal
+Record), and preserved the rule that made the drawer work as a standing convention (here **and** Protocol
+50); deferred item **H** pending **G**'s results with a written post-G obligation; added three DESIGN-ONLY
+notes to the Atlas (**I**) and an owner-stated visual-ambition goal to the Museum (**P**). No status broadly
+changed, no IDs renumbered, no version bumped. Earlier the same day, **`QUEUE.md` was split from
+`QUEUE_LOG.md`** — a pure structural pass: the running header collapsed to most-recent-pass-plus-pointer,
+~550 lines of shipped post-mortems moved verbatim into the new tracked [`QUEUE_LOG.md`](QUEUE_LOG.md) with a
+one-liner + link left behind for each, and the open 2.8.5 tail regrouped by **readiness** instead of
+discovery-order buckets. The full update history is in
+[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain)._
 
 ---
 
@@ -383,21 +388,36 @@ predicting which failures recur, and this project's own incident record is full 
 predicted would recur until they did. Not marked ready to plan; each bullet needs the owner's explicit
 call, not a session's judgment substituting for it.
 
-### H. ⬜ Optional: the system-model review (owner-gated)
+### H. ⬜ DEFERRED pending G's results — the optional system-model review (owner-gated)
 
-**What it is.** An OPTIONAL external review of the project's system MODEL (its representation of itself),
-run only if you want it. Per the ecosystem synthesis, it must be kept **small and question-scoped** (a
-large-context review degrades and tends to adopt your own errors rather than catch them).
+**Status (decided 2026-07-21): DEFERRED PENDING G'S RESULTS — not dropped.** When H was written, the
+workflow-review prompt had no sections auditing the orchestrator, the multi-model hand-off, or the context
+sources; item **F** added exactly those. H asked "is your model of yourself accurate"; **G now asks that
+directly — with more evidence and three reviewers.** So Dispatch's assessment, which the owner accepted, is
+that H is now **largely redundant with G**.
 
-**What it depends on.** A **portable brief generated fresh from the now-pinned brain dump** (the §20 spec in
-the brain dump). That foundation is available now — so this is unblocked whenever you want it. It is **not**
+**The counter-argument, recorded so it isn't lost — they are NOT identical.** G reviews the **PROCESS** (is
+the three-model workflow pulling its weight, are the hand-offs clean, where does it leak). H reviews the
+**REPRESENTATION** — the brain dump, the library, the docs a session actually reads to build its model of the
+project. That is a real distinction, and it is why H is deferred rather than closed.
+
+**The standing obligation (written here, not remembered).** After **G completes**, Dispatch owes the owner an
+explicit **yes/no on whether H is still worth running, with reasons** — did G's process review leave the
+representation genuinely unexamined, or cover enough of it that a separate H would be ceremony? This
+obligation lives in H's own entry rather than in the orchestrator's memory on purpose: promises kept only in
+memory are exactly the failure this project spent all night (Protocol 50) fixing.
+
+**What it is (unchanged).** An OPTIONAL external review of the project's system MODEL (its representation of
+itself), kept **small and question-scoped** (a large-context review degrades and tends to adopt your own
+errors rather than catch them).
+
+**What it depends on.** G's results first (the deferral above), then a **portable brief generated fresh from
+the now-pinned brain dump** (the §20 spec in the brain dump) — that foundation is available now. It is **not**
 a standing doc: generated fresh each time so it's always accurate because it's always new.
 
-**Why it's optional.** Only worth running if you actually want an outside eye on the model; the synthesis
-was explicit that a ceremonial review isn't worth its cost.
-
 **Done means (if run):** a small, question-scoped external pass returns findings in the required claim →
-provenance → falsification format, or it isn't run at all.
+provenance → falsification format — OR Dispatch's post-G recommendation is that it isn't worth running, with
+reasons recorded.
 
 ## ⬜ Blocked on another item
 
@@ -487,6 +507,38 @@ just before this.
 **Why it's last.** It's the capstone that represents the finished round, and it wants the round finished and
 pinned to represent it honestly.
 
+**⬜ Design note (a) — enumerate the eight views NOW; that's cheap scoping, not implementation
+(2026-07-21).** This entry says "8 views over one graph" but only ever NAMES two (assurance, dependency) — the
+other six are a number standing in for a specification. Enumerating the eight — each view plus the one
+question it answers — is a cheap scoping step worth doing NOW, independent of everything else. **Explicitly
+NOT the implementation:** do not spec how they're built. The round is unfinished, 2.9.0 will change much of
+what the Atlas maps, and this entry's own "why it's last" wants the round finished so the Atlas represents
+something real. Scope it, don't spec it.
+
+**⬜ Design note (b) — LINK the Atlas, library and museum; do NOT fuse them (owner: "link not fuse",
+2026-07-21).** All three share one principle — generate what a script can compute, hand-maintain only the
+un-derivable WHY — but cover different corpora and time axes: **library = current-state prose, Atlas =
+current-state structure, museum = history.** The valuable connection: **the Atlas's assurance view and the
+museum's bug room are the same relationship from opposite ends** — the Atlas answers "what guards this?", the
+museum answers "why does this guard exist?" (always some specific bug that escaped). Walking it both ways
+answers "why is this here", otherwise unanswerable without having been present. **RULING: link via a stable
+identifier scheme** (files, protocols, suites, queue items) so each references the others WITHOUT any owning
+the others — do NOT merge into one shared graph. Three things that reference each other can each fail alone;
+one merged thing fails everywhere. The scheme is already half-present: the skill and rules cite protocol
+numbers, and queue items have stable IDs the restructure just protected. (The AI-facing read side is P3's
+spec — the raw archive / internal manifest, never the ~190MB generated HTML nor the name-substituted public
+tree; not restated here.)
+
+**⬜ Design note (c) — share the museum's renderer, keep publication separate (owner: "part of the museum on
+the user end", 2026-07-21).** Yes to sharing the museum's generator plumbing — renderer, navigation, search,
+styling, pinning discipline — rather than building a second browsable site. BUT the Atlas maps where the
+architecture is violated and what isn't covered by tests: a fair description of an **attack map** for a live
+app with cloud sync and auth. So the Atlas lives on the **PRIVATE side by default**, using the same
+private-source-vs-published-output split P2 already designs. The one genuine difference to record: the museum
+is pinned to **RELEASES** (history, deliberately frozen); the Atlas is pinned to a **CURRENT BASELINE** and
+marks itself **degraded** when the repo moves off it. Same pinning idea, opposite intent — **share a renderer,
+never share a cadence.** (Design only — build nothing here.)
+
 **Done means:** one generated Atlas, pinned to a baseline, with 8 views (assurance among them) computed from
 source rather than hand-authored.
 
@@ -514,6 +566,26 @@ galleries. `museum/generate.mjs` in the archive is the generator; `museum/site/`
 - **RITUAL, NOT A GATE (hard rule).** It must never block, fail, or delay a release.
 - **A correctness pass already ran** (`edfbb05`) — it found and fixed a real defect (a dual-axis growth
   chart whose normalization made an unrelated pair of series look correlated).
+
+**⭐ Visual ambition — an owner-stated GOAL, recorded 2026-07-21 (this is recorded ambition, NOT a
+specification — nobody has designed anything yet).** The owner: _"I really want the museum to look graphically
+insane as well — like really good visual representations."_ Every museum entry above is about **correctness**
+(reproducibility, redirects, provenance) and says nothing about how it LOOKS — and that silence would let a
+future session ship something correct and dull, which the owner would rightly be disappointed by. So the
+ambition is recorded here as a real requirement, with the constraints that already bind it:
+
+- **The bar is genuinely-good VISUAL REPRESENTATIONS, not decoration** — the growth chart as a real data
+  visualization, the intent-vs-reality mockup comparisons, the bug room pairing each defect with the guard
+  that now prevents it, the "what was happening on this date" view. These ideas are already adopted; their
+  **visual quality** is the new requirement.
+- **⚠ The CLARITY VETO still binds (standing owner ruling): "in theme but not confusing."** Aesthetic never
+  wins over legibility.
+- **Mobile-first.** The owner is almost exclusively on mobile; anything designed desktop-first fails the
+  actual test surface.
+- **Accessibility: WCAG 2.1 AA is the standing target** — without sacrificing the CRT aesthetic.
+- **The right vehicle is a FABLE design pass** (the project's design/creative model), and it should happen
+  **BEFORE publication (P2)**, not after — a public exhibit is the wrong place to discover the visuals are
+  flat. This is the identified next step, **awaiting the owner's go — not scheduled, not started.**
 
 **P1. 🔄 Museum reproducibility — a sub-program.** Three sessions have shipped fixes to the archive's `main`;
 a fourth is in flight.
@@ -705,6 +777,12 @@ it up front prevents four workstreams building four inconsistent things.
    font, script, module, stylesheet, or asset from silently entering the offline-critical path. **Done
    means:** a finite decision recorded for every boundary crossing, and a guard for any one worth making
    permanent.
+   **Attached to the UI-consistency audit — the CSS cascade cleanup (was unversioned; placed 2026-07-21):**
+   replace the stylesheets' ancestor-selector specificity bumps with native CSS `@layer`, which expresses
+   the same precedence declaratively. It rides ALONG with this audit rather than standing alone because the
+   real risk in the work is opening the whole cascade at once (high blast radius for a pure refactor) — so it
+   belongs on a pass already opening the stylesheets, not as its own high-blast-radius refactor. Attached
+   here, not floating in the round.
 3. Then ideation: **a capability ideation pass** (original RobCo-native ideas derived from real
    device/browser capabilities) and **an AI-feature evaluation pass** (which AI features can be made native,
    each scored on offline behavior, grounding, cost, injection-resistance, and fit).
@@ -826,6 +904,15 @@ inventory data stays untouched; everything is derived at display time. **⚠ Ord
 deferred U8 "virtualize long lists" perf win (C2) lands HERE, not as a near-term standalone** — this rebuild
 replaces the list-rendering path anyway, so virtualizing today's flat list first would be thrown away
 (Protocol 22 double-build).
+
+**Bound in here — wire manual inventory changes into the event log (was unversioned; placed 2026-07-21).**
+Manual inventory changes don't reach the Terminal Record (`state.eventLog`). **Verified against
+`js/ui/ui-render-inventory.js` (2026-07-18):** adding an item, the quantity ± stepper (`adjItemQty`, which
+emits nothing), and equip all fire animation/echo handlers only — while craft, scrap, trade, sleep,
+level-up, kills and caps DO log. The fix is three `_logEvent` calls at the existing `addItem` / `adjItemQty`
+/ `toggleEquipItem` write points. It binds here because this rebuild **and** the Terminal Record
+consolidation (in "The OS round proper" below) both already establish native, manual, no-AI logging — so it
+folds into that work rather than earning a standalone unit.
 
 **One combined ENCOUNTER flow.** V.A.T.S., threat assessment, the combat log, and looting are one guided loop
 reachable from a single ENCOUNTER entry point. The pieces stay independently reachable for edge cases.
@@ -1086,35 +1173,28 @@ including the release. Analysis only.
 
 ---
 
-# ⬜ Unversioned — recorded, not yet scheduled (with the reason each has no version)
+# Unversioned — the standing rule (drawer currently EMPTY)
 
-_This is NOT the "parked drawer." The standing rule is that nothing sits vaguely parked — so each item here
-carries an explicit reason it has no version yet AND what would earn it one. Both arrived in the 2026-07-18
-placement pass from the two external reviews._
+_This section is the home of a standing queue convention, kept even though it now holds zero items._
 
-## ⬜ CSS cascade cleanup — replace specificity-bump ancestor selectors with native `@layer`
+**THE RULE — nothing gets recorded without either a home or an explicit stated condition that would earn it
+one.** A version/section IS a home; so is being bound to a named item. When an entry has neither yet, it MUST
+carry an explicit reason it has no version AND the concrete condition that would earn it a slot. "Parked",
+"someday", or "revisit later" with no stated condition is NOT acceptable — that is the vague drawer this rule
+exists to forbid. The rule is mirrored into **Protocol 50** (which governs what gets written to the queue) so
+it survives any future restructure of this file.
 
-**What it is.** The stylesheets lean on ancestor-selector specificity bumps to win the cascade; native CSS
-`@layer` would express the same precedence declaratively.
+**The drawer is currently empty — and that is the rule working, not a gap.** The two items that used to live
+here both carried explicit earn-conditions, which is exactly why they could be placed in minutes on
+2026-07-21:
 
-**Why it's unversioned.** It's **legitimate but expensive, and nothing is forcing it** — no feature is blocked,
-no bug traces to it, and it touches the whole cascade at once (high blast radius for a pure refactor).
+- **CSS cascade cleanup** (`@layer` refactor) → **2.9.0**, attached to the UI-consistency audit — its stated
+  condition ("a pass already opening the cascade") was met there.
+- **Wire manual inventory changes into the event log** → **2.9.0**, bound to the inventory-panel rebuild +
+  Terminal Record consolidation — its stated condition ("a pass that establishes native no-AI logging") was
+  met there.
 
-**What would earn it a slot.** A UI/CSS pass that's already opening the cascade — the natural host is the 2.9.0
-UI-consistency audit or the Round-2 deep-polish program.
-
-## ⬜ Wire manual inventory quantity / equip changes into the event log
-
-**What it is.** Manual inventory changes don't reach the Terminal Record (`state.eventLog`). **Verified against
-`js/ui/ui-render-inventory.js` (2026-07-18):** adding an item, the quantity ± stepper (`adjItemQty`, which
-emits nothing), and equip all fire animation/echo handlers only — no `_logEvent` call. By contrast craft,
-scrap, trade, sleep, level-up, kills and caps DO log.
-
-**Why it's unversioned.** It earned its slot but there's no version pressure and it's small.
-
-**What would earn it a slot — and the natural home.** The 2.9.0 Terminal Record consolidation plus the
-inventory-panel rebuild both already establish native, manual, no-AI logging — a clean fold-in there (add three
-`_logEvent` calls at the existing `addItem` / `adjItemQty` / `toggleEquipItem` write points).
+Future unversioned items land here under the same rule, or they don't get recorded at all.
 
 ---
 
@@ -1151,4 +1231,6 @@ single place the roadmap lives where a work session can actually find it. Its co
 item ships, its body moves there under a stable `<a id>` anchor and this file keeps the one-liner + link.
 Whenever the roadmap actually moves, both files are updated in the same commit (Protocol 2 / Protocol 50). Keep
 this file phone-first — structured, scannable, real depth per open item, but no walls of text and no code. Item
-IDs are stable tags: never renumber, never re-letter, never reuse (Protocol 49 discipline)._
+IDs are stable tags: never renumber, never re-letter, never reuse (Protocol 49 discipline). Every recorded item
+carries either a version/home or an explicit stated condition that would earn one — no vaguely-parked entries
+(the Unversioned section states this rule in full; Protocol 50 mirrors it so it survives a restructure)._
