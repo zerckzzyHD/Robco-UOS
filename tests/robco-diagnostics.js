@@ -43381,6 +43381,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       'ARCHITECTURE.md',
       'README.md',
       'QUEUE.md',
+      'QUEUE_LOG.md', // the shipped-work archive cites protocol numbers — validate they resolve
       'skill/SKILL.md', // the pointer-skill cites protocol numbers — validate they resolve
     ];
     const refCorpusFiles220 = [

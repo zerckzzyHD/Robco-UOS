@@ -4,9 +4,14 @@
  *
  * A pre-push REMINDER (never a gate): the orchestrator's memory store holds
  * `type: project` memories — by definition ongoing work or goals, exactly the
- * class that should have a QUEUE.md entry. This lists every project memory
- * and flags the ones QUEUE.md doesn't appear to mention, so a plan that only
- * ever lived in memory becomes visible instead of silently staying there.
+ * class that should have a queue entry. This lists every project memory and
+ * flags the ones the queue record doesn't appear to mention, so a plan that
+ * only ever lived in memory becomes visible instead of silently staying there.
+ *
+ * The "queue record" is TWO files since the 2026-07-21 split: QUEUE.md (open
+ * work) + QUEUE_LOG.md (the append-only archive of shipped accounts). A memory
+ * counts as referenced if it appears in EITHER — otherwise every shipped item's
+ * memory would flag the moment its reasoning moved from the queue into the log.
  *
  * Fail-safe by construction, same shape as scripts/backup-nudge.js:
  *
@@ -43,6 +48,12 @@ const MEMORY_BASE =
   );
 
 const QUEUE_PATH = process.env.ROBCO_QUEUE_PATH || path.join(REPO_ROOT, 'QUEUE.md');
+// The "queue record" is TWO files since the 2026-07-21 restructure: QUEUE.md is
+// the lean queue of open work, QUEUE_LOG.md the append-only archive of shipped
+// accounts. A plan is "recorded" if it appears in EITHER — so a shipped item's
+// memory must not start flagging merely because its reasoning moved to the log.
+// QUEUE_LOG.md is optional: a machine without it still gets the QUEUE.md scan.
+const QUEUE_LOG_PATH = process.env.ROBCO_QUEUE_LOG_PATH || path.join(REPO_ROOT, 'QUEUE_LOG.md');
 
 function safeExists(p) {
   try {
@@ -186,7 +197,14 @@ function main() {
   const memDirs = discoverMemoryDirs(MEMORY_BASE);
   if (memDirs.length === 0) return; // no memory store visible — stay silent
 
-  const queueTextLower = fs.readFileSync(QUEUE_PATH, 'utf8').toLowerCase();
+  let queueTextLower = fs.readFileSync(QUEUE_PATH, 'utf8').toLowerCase();
+  if (safeExists(QUEUE_LOG_PATH)) {
+    try {
+      queueTextLower += '\n' + fs.readFileSync(QUEUE_LOG_PATH, 'utf8').toLowerCase();
+    } catch {
+      /* log optional — QUEUE.md scan alone still runs */
+    }
+  }
   const flagged = [];
 
   for (const dir of memDirs) {

@@ -49,7 +49,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | Need | Where to look |
 | ---- | ------------- |
 | **Full project reconstruction** — what the app IS, the architecture, the state shape, every subsystem, the protocols and WHY each exists, the recurring gotchas, the owner's hard rules, the workflow, the roadmap | `library/BRAIN_DUMP.md` (gitignored, local-only, Claude-facing — read it from disk) |
-| **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) |
+| **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) — the QUEUE only; full accounts of shipped/ruled-out work live in `QUEUE_LOG.md` (repo root, append-only archive) |
 | **Canonical protocol & gate rules** | this file (the universal contract) + `rules/*.md` (the subsystem notes) |
 | **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
 | **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/services/api-directive.js` builds the directive and owns `getSystemDirective()`; `js/services/api-import.js` owns `autoImportState()`; `js/services/api.js` is the network-layer hub only) — rules in `rules/ai-contract.md`, design rationale in `ARCHITECTURE.md` |
