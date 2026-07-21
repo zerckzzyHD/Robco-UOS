@@ -3405,16 +3405,25 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 
 ## Hotfix Rollback (Protocol 16)
 
-If a push breaks the live site, restore users **first** — then diagnose. The rollback script handles the revert + cache bump in one step:
+If a push breaks the live site, restore users **first** — then diagnose. The rollback is **dev-first** per Protocol 43: `main` is release-only and is never pushed directly, so the revert lands on `dev`, clears the full gate, and reaches production by the same verified `dev → main` path every release uses.
 
 ```bash
-# From repo root in Git Bash:
+# From repo root in Git Bash, ON THE `dev` BRANCH (the script refuses to run elsewhere):
 sh scripts/rollback.sh           # reverts HEAD
 sh scripts/rollback.sh <hash>    # reverts a specific commit
-git push origin main
+
+# Then promote it to prod the verified way:
+git push origin dev              # 1. full gate + CI + refreshes staging (proves the revert)
+# 2. merge dev → main  — the same gated release path every release uses
+# 3. publish: cut it as a patch APP_VERSION release (automated deploy), OR run
+#    deploy.yml's manual `workflow_dispatch` from the Actions tab (emergency
+#    redeploy of the now-reverted `main`). Production is release-gated, so a
+#    plain merge to `main` alone does NOT redeploy — step 3 is what publishes.
 ```
 
-The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev (so all cached clients receive the update prompt), and commits through the pre-commit gate. After pushing, diagnose the root cause, add a regression test (Protocol 13), and record it in CHANGELOG.md before re-attempting the fix.
+The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev (so all cached clients receive the update prompt), and commits through the pre-commit gate **on `dev`**. After the rollback reaches prod, diagnose the root cause, add a regression test (Protocol 13), and record it in CHANGELOG.md before re-attempting the fix.
+
+**Accepted tradeoff (owner decision, 2026-07-21 — recorded so it is not re-litigated as an oversight).** Routing an emergency rollback through `dev`'s gate adds a little latency exactly when prod is broken and speed matters most. The owner judged `main`-integrity worth that cost: `main` gets pushed only when the build is known good. The cost is bounded by the fact that a rollback reverts to a commit that was **already gated and already lived in `main`'s history** — the target is known-good code, not new code being rushed onto prod — so this is inherently safer than pushing a fresh fix straight to `main`. (For a break contained to a flaggable networked feature, the remote kill-switch is faster still and needs no deploy — Protocols 32/33/35.)
 
 ---
 

@@ -16,8 +16,12 @@ When you are in the repo, **read `CLAUDE.md` first** (the universal contract, ch
 in). Follow **its retrieval map** to load the one `rules/*.md` subsystem note for the
 surface you are touching — that is the whole point of the map, and it is the only
 current list of which note covers what. Then `ARCHITECTURE.md` for design rationale.
-Those files are canonical and current by construction (the gate guards them); this
-skill is not a substitute for reading them.
+Those files are the canonical **source of truth** — but they are only **partially**
+mechanically checked (the gate validates a narrow set of doc cross-references, not
+bare filenames, nested paths, symbol ownership, or prose), so a canonical doc can
+still be stale. Extend this skill's "the repo wins" rule to the docs themselves:
+**where any doc and the actual code disagree, the code wins** — verify against source
+when it matters. This skill is not a substitute for reading them.
 
 ## What's useful before the repo is even open
 

@@ -477,6 +477,16 @@ not monotonic; the current `SERVED_RE` set). Defect-2 (`setDoc`→`addDoc`) conf
 in step 1 (out of THIS brief's doc-only scope):** the `skill/SKILL.md` overclaim (finding C skill-half) and the
 CLAUDE.md library-fallback sentence (finding E second half).
 
+**✅ STEP 1 NOW FULLY CLOSED (2026-07-21, a later pass).** The two owed pieces above landed: `skill/SKILL.md`'s
+"canonical and current by construction" overclaim (finding C skill-half) rewritten to "canonical source of truth
+but only partially mechanically checked — where a doc and the code disagree, the code wins"; the CLAUDE.md
+library-fallback sentence added (finding E second half — absent `library/` targets: fall back to source, don't
+infer). **Finding F (rollback ↔ branch model) rode along in the same pass:** reconciled dev-first (owner's call,
+NO direct-`main` exception) across `scripts/rollback.sh`, the `ARCHITECTURE.md` runbook, and Protocol 16 — the
+accepted latency-vs-integrity tradeoff recorded in-place. **⚠ Skill re-install owed:** `skill/SKILL.md` is a
+read-only installed artifact, so the owner must RE-INSTALL it (Settings › Capabilities) for the fix to reach his
+sessions — his second re-install today.
+
 **✅ FIXED this pass — Defect-1 (shipped `8d14073`): the cache-bump guard's classifier was blind to real precached files.**
 `sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
 `scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing

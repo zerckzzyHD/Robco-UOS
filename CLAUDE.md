@@ -72,6 +72,8 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Plain-English release history** | `CHANGELOG.md` |
 
 > Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `library/CODE_MAP.md` is derived directly from source (Protocol 46) and is a snapshot too — a session that finds it disagreeing with the code trusts the code and should flag the drift.
+>
+> **`library/` is gitignored** — a clean checkout contains only `library/MANIFEST.txt`, so any `library/` target named above is often absent. **If a `library/` target is absent, do not infer its contents** — fall back to reading the actual source it points at, and report the missing local-only context rather than guessing.
 
 ---
 
@@ -191,7 +193,9 @@ _(Protocol 47 is reserved for the future GENERATED test-catalog generator; 48 is
 
 ## Protocol 16 — Hotfix / Rollback
 
-If a push breaks the live site (e.g. black screen / failed boot), restore users **first** — `git revert` the offending commit, bump `CACHE_NAME`, push — **then** diagnose the root cause. Restore first, debug second. After a rollback, document the root cause, add a regression test (Protocol 13), and record it in the CHANGELOG before re-attempting the fix.
+If a push breaks the live site (e.g. black screen / failed boot), restore users **first** — `git revert` the offending commit, bump `CACHE_NAME` — **then** diagnose the root cause. Restore first, debug second. After a rollback, document the root cause, add a regression test (Protocol 13), and record it in the CHANGELOG before re-attempting the fix.
+
+**The rollback is DEV-FIRST (owner decision, 2026-07-21) — there is NO emergency direct-`main` exception.** `main` stays release-only (Protocol 43): the revert lands on `dev`, clears the full gate, and reaches production by the same verified `dev → main` release path every release uses (`scripts/rollback.sh` refuses to run off `dev` and never pushes to `main`; runbook in `ARCHITECTURE.md` § "Hotfix Rollback"). **Accepted tradeoff:** this adds a little latency during an active incident, when speed matters most — the owner judged `main`-integrity worth that cost ("main would only get pushed when we know the build is good"). It is bounded because a rollback reverts to a commit that was **already gated and already lived in `main`'s history** — known-good code, not new code rushed onto prod.
 
 When the break is contained to a flaggable networked feature, prefer the remote kill-switch over `git revert` — it is instant and needs no deploy or cache bump (Protocol 35, in `rules/auth-and-cloud.md`).
 
