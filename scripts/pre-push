@@ -14,3 +14,12 @@ npm run gate || exit 1
 # push. On a machine without the private backup it stays completely silent.
 node scripts/backup-nudge.js || true
 # ── End backup nudge ──────────────────────────────────────────────────────────
+
+# ── Queue-drift NUDGE (Protocol 50) — NEVER a blocker ─────────────────────────
+# A fail-safe reminder listing `type: project` memories that don't appear
+# referenced in QUEUE.md, so a plan that only ever lived in memory becomes
+# visible. Same fail-safe shape as the backup nudge above: always exits 0,
+# and `|| true` is a second guarantee. Silent on a machine with no memory
+# store, or when nothing looks unqueued.
+node scripts/queue-drift-check.js || true
+# ── End queue-drift nudge ─────────────────────────────────────────────────────

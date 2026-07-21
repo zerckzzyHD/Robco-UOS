@@ -35,7 +35,7 @@ Read this file, then read **only** the notes whose surface you are touching.
 | `js/services/api.js` · `js/services/api-directive.js` · `js/services/api-import.js` · `js/services/api-router.js` · the Tri-Node schema | `rules/ai-contract.md` |
 | any `<script>` tag or boot-order change · any file split/add/move/rename/delete · `repomix.config.json` · any file with non-ASCII characters | `rules/file-layout.md` |
 | `tests/` · `scripts/` · `js/dev/test-console.js` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
-| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · the in-app changelog viewer | `rules/docs-and-library.md` |
+| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · `QUEUE.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
 
 Touching several surfaces means reading several notes. When in doubt, read the note — they are
 short by construction.
@@ -355,6 +355,54 @@ A private GitHub repo (`zerckzzyHD/_RobCo-Archive`, confirmed PRIVATE) is the on
 **Why:** these three artifact classes are load-bearing for every future session (the brain dump, the code map, the planning queue, the orchestrator's own memory) yet exist on exactly one disk. The earlier version of `sync.ps1` hardcoded a session-GUID path that could silently back up **nothing** when the GUID changed — a backup that quietly protects nothing is worse than none, because it removes the pressure to notice. The rewrite fails loudly instead; making the sync an agent obligation (with a nudge trigger and an upward-report fallback) means the backup happens on its own instead of depending on a phone-first owner remembering a terminal command he never sees.
 
 **`planning/` is ARCHIVE-class → additive-only in the backup.** Because `planning/` is frozen point-in-time snapshots (the 3-class library model), the sync mirrors it **additively for `planning/` only** — once a planning file is captured it is **never removed** from the archive, even if it later disappears locally. So the owner can safely **clear `planning/` locally** after a document has served its purpose: the archive (and its git history) keeps it forever, and future sessions recover it from there. One consequence to remember: a **rename or reorg** of `planning/` reads to an additive mirror as *delete-old + add-new*, so the archive would otherwise accumulate both the old and new paths indefinitely. Reconcile a reorg **once, deliberately**: run the sync, then prune the stale old-path copies from the archive working tree and commit that — a working-tree tidy, not a loss of record (git history still holds the old paths).
+
+---
+
+## Protocol 50 — Queue Currency: Write Plans Where They Live
+
+A plan that lives only in the orchestrator's memory is not planned, it is remembered — and it
+decays or gets lost the moment a session ends. The owner's own words: *"everything planned should
+live in queue, not just remembered by you."* Two parts, deliberately paired — the first is the
+Stage-2-style "prose an agent must remember" (see the governance-trim R5 candidate list, which
+argues rules like this should eventually become mechanised enforcement instead); the second is
+that mechanised backstop, built now rather than left as an aspiration.
+
+**(a) The standing rule.** Any decision or plan actually reached in a conversation — new work
+identified, a scope change, a re-ordering, an item closed or reopened — is written into `QUEUE.md`
+**in the same session it is decided**, not batched for a later pass or left for the owner to ask
+about. This applies whether or not the session's task otherwise touches any file in the repo — a
+purely conversational planning session still owes a `QUEUE.md` update before it ends.
+
+**(b) The automated backstop — a fail-safe queue-drift NUDGE.** `scripts/queue-drift-check.js`,
+wired into the pre-push hook exactly like Protocol 48's backup nudge (`|| true`, never blocking),
+lists every `type: project` memory in the orchestrator's memory store and flags the ones that
+don't appear referenced in `QUEUE.md`. Memories of type `project` are, by definition, ongoing work
+or goals — exactly the class that should have a queue entry, so a memory that doesn't read like
+`QUEUE.md` has ever heard of it is exactly the drift (a) exists to prevent. Same fail-safe DNA as
+Protocol 48 throughout (Protocol 33): it can **never** fail or block a push, and on any machine
+where the memory store is absent, invisible to the shell, or unparsable, it stays **silent** and
+lets the push proceed — a machine with no memory store sees no difference at all.
+
+**The match is a heuristic, not a hand-maintained count.** Nothing here is synced by hand (the
+exact failure Protocol 2a was retired for) — every run re-reads the live memory files and the live
+`QUEUE.md` text fresh, computing distinctive words from each memory's description and requiring a
+plurality of them to appear in `QUEUE.md` before treating it as referenced (a single generic word
+match — e.g. "project" itself — was measured to false-clear an unrelated memory by coincidence in
+a document this size, so the bar is 3 hits, or all of a memory's tokens when it has fewer than 3).
+It is deliberately biased toward flagging: a missed real gap defeats the whole point, while a
+noisy false flag just costs a skim.
+
+**The explicit exception, recorded rather than assumed.** A memory that genuinely isn't
+queue-worthy is marked so on purpose — `queue_status: not-applicable` (or `na` / `skip`) in its
+frontmatter `metadata` block — so the exception is a decision on file, not silent non-coverage.
+Guarded by Suite 242, including a red-then-green proof that a fabricated unreferenced memory is
+actually flagged (not just that the script never crashes) and that an exempt one is not.
+
+**Why the memory store, not something inside this repo.** The memory store lives outside both the
+public and the private-archive repos (`AppData\Roaming\Claude\local-agent-mode-sessions\…`) and is
+not guaranteed to exist on every machine that pushes here — so this check must degrade gracefully
+by construction, the same constraint Protocol 48's discovery already solved, and reuses its shape
+(and its `ROBCO_MEMORY_BASE` override) rather than inventing a second discovery mechanism.
 
 ---
 

@@ -50540,6 +50540,153 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 242 — Queue-drift nudge (Protocol 50)
+//
+//  Protocol 50 adds a pre-push REMINDER that lists `type: project` memories
+//  which don't appear referenced in QUEUE.md, so a plan that only ever lived
+//  in the orchestrator's memory becomes visible instead of staying invisible.
+//  Same fail-safe shape as Protocol 48's backup nudge (Suite 237): it can
+//  never fail or block a push, and on any machine where the memory store is
+//  absent or unreadable it stays silent (Protocol 33 DNA).
+//
+//  This suite locks the never-fails invariant AND proves the matcher
+//  actually works — a fabricated unreferenced memory must be flagged, and
+//  an explicitly exempt one (`queue_status: not-applicable`) must not be.
+//  A nudge that only ever proves it can't crash, and never proves it can
+//  catch the thing it exists to catch, is exactly the false-confidence
+//  shape Protocol 13/42 exist to rule out.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 242 — Queue-drift nudge (Protocol 50)');
+
+  const nudgePath242 = path.join(ROOT, 'scripts', 'queue-drift-check.js');
+  const nudgeExists242 = fs.existsSync(nudgePath242);
+  assert(nudgeExists242, '242.1: scripts/queue-drift-check.js exists (Protocol 50 nudge script)');
+
+  const nudgeSrc242 = nudgeExists242 ? fs.readFileSync(nudgePath242, 'utf8') : '';
+  assert(
+    nudgeExists242 && !/process\.exit\(\s*[1-9]/.test(nudgeSrc242),
+    '242.2: the nudge never exits non-zero — no process.exit() with a non-zero code (fail-safe: it can never fail a push)'
+  );
+  assert(
+    nudgeExists242 && /\bcatch\b/.test(nudgeSrc242),
+    '242.3: the nudge wraps its logic in a top-level catch so an unexpected error can never escape to the shell'
+  );
+
+  const prePush242 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+  assert(
+    /node\s+scripts\/queue-drift-check\.js\s*\|\|\s*true/.test(prePush242),
+    '242.4: the pre-push hook invokes node scripts/queue-drift-check.js in a non-blocking way (`|| true`)'
+  );
+  assert(
+    /npm run gate\b/.test(prePush242) && /node\s+scripts\/backup-nudge\.js/.test(prePush242),
+    '242.5: the pre-push hook still runs the full gate and the backup nudge — this nudge was ADDED, not swapped in for either'
+  );
+
+  const { spawnSync: spawn242 } = require('child_process');
+
+  // ── 242.6-7: fail-safe behavior — must exit 0 no matter what. ───────────
+  const bogus242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+    env: { ...process.env, ROBCO_MEMORY_BASE: path.join(ROOT, 'no', 'such', 'memory', 'xyz') },
+  });
+  assert(
+    bogus242.status === 0,
+    '242.6: with the memory base pointed at a non-existent path the nudge exits 0 (cannot determine state, stays silent, push proceeds)'
+  );
+  const dflt242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert(
+    dflt242.status === 0,
+    '242.7: with default resolution the nudge exits 0 whether or not a memory store is present — it never blocks a push'
+  );
+
+  // ── 242.8-10: the matcher actually catches an unreferenced memory, and ──
+  // respects the explicit exemption — built against a throwaway fixture
+  // tree so this suite never depends on the owner's real memory contents.
+  const fixtureBase242 = path.join(
+    require('os').tmpdir(),
+    'robco-queue-drift-fixture-' + process.pid
+  );
+  const fixtureMemDir242 = path.join(fixtureBase242, 'guidA', 'guidB', 'agent', 'memory');
+  try {
+    fs.mkdirSync(fixtureMemDir242, { recursive: true });
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'unqueued.md'),
+      [
+        '---',
+        'name: fake-unqueued-plan-242',
+        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, discussed but never written down anywhere else.',
+        'metadata:',
+        '  type: project',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'exempt.md'),
+      [
+        '---',
+        'name: fake-exempt-plan-242',
+        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, deliberately marked not queue-worthy.',
+        'metadata:',
+        '  type: project',
+        '  queue_status: not-applicable',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'not-a-project.md'),
+      [
+        '---',
+        'name: fake-reference-242',
+        'description: Some reference-type memory that should never be evaluated at all.',
+        'metadata:',
+        '  type: reference',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+
+    const fixtureRun242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      timeout: 20000,
+      env: { ...process.env, ROBCO_MEMORY_BASE: fixtureBase242 },
+    });
+    assert(
+      fixtureRun242.status === 0,
+      '242.8: the fixture run still exits 0 (never blocks a push, even while flagging something)'
+    );
+    assert(
+      /fake-unqueued-plan-242/.test(fixtureRun242.stdout || ''),
+      '242.9: RED-THEN-GREEN — an unreferenced project-type memory IS flagged in the nudge output (proves the matcher can actually catch the thing it exists to catch)'
+    );
+    assert(
+      !/fake-exempt-plan-242/.test(fixtureRun242.stdout || '') &&
+        !/fake-reference-242/.test(fixtureRun242.stdout || ''),
+      '242.10: an explicitly-exempt memory (`queue_status: not-applicable`) and a non-`project`-type memory are both left out of the flag list'
+    );
+  } finally {
+    fs.rmSync(fixtureBase242, { recursive: true, force: true });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
