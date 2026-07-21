@@ -23,12 +23,3 @@ node scripts/backup-nudge.js || true
 # store, or when nothing looks unqueued.
 node scripts/queue-drift-check.js || true
 # ── End queue-drift nudge ─────────────────────────────────────────────────────
-
-# ── Skill-drift NUDGE (Suite 243) — NEVER a blocker ───────────────────────────
-# A fail-safe reminder that the INSTALLED robco-uos skill (a read-only cache the
-# owner refreshes via Settings > Capabilities) has gone stale relative to the
-# committed source skill/SKILL.md. Same fail-safe shape as the nudges above:
-# always exits 0, `|| true` is a second guarantee, and it stays silent on any
-# machine where the installed skill isn't present.
-node scripts/skill-drift-check.js || true
-# ── End skill-drift nudge ─────────────────────────────────────────────────────
