@@ -19,10 +19,13 @@
  */
 
 import { acquireBrowser } from './browser-shared.mjs';
+import { installFailureCapture, trackBrowser, saveFailureArtifacts } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
+
+installFailureCapture('test-html');
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TEST_HTML = path.join(ROOT, 'tests', 'test.html');
@@ -79,6 +82,7 @@ const fail = m => {
 };
 
 const browser = await acquireBrowser();
+trackBrowser(browser, 'test-html');
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 
@@ -108,6 +112,7 @@ try {
   });
 } catch {
   fail('test.html audit did not complete within 10 s (summary never populated)');
+  await saveFailureArtifacts('test-html', page);
 }
 
 if (result) {

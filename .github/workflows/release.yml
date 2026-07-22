@@ -36,7 +36,7 @@ jobs:
       - name: Extract version from state.js
         id: version
         run: |
-          VERSION=$(grep -oP "const APP_VERSION\s*=\s*'\K[^']+" js/state.js)
+          VERSION=$(grep -oP "const APP_VERSION\s*=\s*'\K[^']+" js/core/state.js)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"

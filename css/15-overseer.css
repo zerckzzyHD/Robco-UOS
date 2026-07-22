@@ -1,0 +1,571 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/15-overseer.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 1288-1821. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: DO-O Living Overseer / Director Uplink presence (Protocol UI-10)
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   15-overseer.css — cascade slot 15: the DO-O Director Uplink /
+   Living Overseer chat presence (header, oscilloscope, transcript
+   recolor, composer, mobile carrier strip) — plus a grab-bag of
+   generic modal/tab-visibility/sub-panel/changelog-viewer/
+   Diagnostic-Shell-env-banner rules that share this stretch of the
+   original monolith but are not Overseer-specific.
+   WHY HERE: loads after 10-chrome (reads its --bezel-wire tokens).
+   At least one rule here has a CONFIRMED equal-specificity cascade
+   dependency on 05-base.css: `.panel h2` is declared once in
+   05-base.css (margin-top:0, padding-bottom:4px) and declared AGAIN
+   here (margin:-10px -10px 10px -10px, padding:10px) — same
+   specificity (0,1,1), so this file's version wins ONLY because it
+   loads later in source order. The rest of this file's position is
+   otherwise the original monolith's chronological build order — the
+   split cut the file top-to-bottom, it did not re-sequence by
+   dependency, so beyond the confirmed case above no further
+   deliberate ordering rationale is claimed.
+   ══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   DO-O: THE LIVING OVERSEER — DIRECTOR UPLINK presence (Protocol UI-10).
+   A reskin OVER the existing Comm-Link (Protocol 22 — appendToChat()/
+   transmitMessage() are hooked, never forked). Amber/--bezel-wire is "the
+   wire" — the remote Director presence, distinct from the local phosphor
+   green (Protocol UI-7). Per-game flavor text is JS-filled from
+   getIdentity().overseer (Protocol 38); nothing here is game-literal.
+   ════════════════════════════════════════════════════════════════════ */
+.ovs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  color: var(--bezel-wire);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+.ovs-lamp {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  animation: rad-pulse 2.6s infinite;
+  flex-shrink: 0;
+}
+.ovs-carrier {
+  margin-left: auto;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+.ovs-purge-btn {
+  border-color: var(--bezel-wire) !important;
+  color: var(--bezel-wire) !important;
+}
+
+.scope-wrap {
+  position: relative;
+  padding: 8px 0 6px;
+}
+#overseerScope {
+  display: block;
+  width: 100%;
+  height: 120px;
+  background:
+    linear-gradient(rgba(var(--bezel-wire-rgb), 0.02), rgba(0, 0, 0, 0.35)),
+    var(--robco-screen-bg, #010a07);
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.45);
+}
+.scope-tag {
+  position: absolute;
+  top: 14px;
+  right: 10px;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--bezel-wire);
+  text-shadow: 0 0 6px rgba(var(--bezel-wire-rgb), 0.6);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 6px;
+  border: 1px solid rgba(var(--bezel-wire-rgb), 0.4);
+  /* FIX 4a (owner report): now a real <button> (Protocol UI-5) — undo the
+     global button reset (width:100%/margin-top/font-weight) so it keeps its
+     original absolute-positioned overlay look at every state. */
+  width: auto;
+  margin: 0;
+  font-weight: normal;
+  font-family: inherit;
+  cursor: default;
+}
+.scope-tag:not(:disabled) {
+  cursor: pointer;
+}
+.scope-tag:disabled {
+  /* A status readout even while inert — never dimmed just because it's disabled. */
+  opacity: 1;
+  color: var(--bezel-wire);
+}
+.scope-tag.thinking {
+  animation: ovs-tag-blink 0.7s steps(2) infinite;
+}
+@keyframes ovs-tag-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.scope-meta {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+  color: var(--bezel-wire);
+  padding: 5px 1px 0;
+  overflow-wrap: break-word;
+}
+
+/* Owner-report fix (real-terminal-screen batch): the outer amber content-area
+   frame that boxed the WHOLE Director Uplink column (header + oscilloscope +
+   transcript + composer together) is removed — border AND the base .panel
+   background tint both go, so no rectangle of any kind demarcates the column
+   — so the view reads as a real terminal screen rather than a panel-in-a-
+   panel. Only .panel.chat-panel loses its box here; every other .panel keeps
+   the base green frame. */
+.panel.chat-panel {
+  border: none;
+  background: none;
+}
+
+/* Transcript restyle — the `> ` prefix on user lines already exists in
+   appendToChat(); this only recolors the AI/sys lines to read as the
+   remote Director presence (amber/--bezel-wire) vs local phosphor. Style A
+   cleanup dropped the side border entirely (see the shared .msg-ai rule). */
+.chat-panel .msg-ai {
+  color: var(--bezel-wire);
+}
+.chat-panel .msg-sys {
+  color: rgba(var(--bezel-wire-rgb), 0.6);
+}
+
+/* DO-O follow-up — the modern rounded composer (owner-supplied Claude-style
+   reference layout): a bottom toolbar of [+ upload] [mode pill] [? help] …
+   [↑ send]. Every control is the SAME pre-existing element/handler
+   (Protocol 22) — only the container/position/styling changed. Amber/
+   --bezel-wire throughout (Protocol 38 — token only, no game literal).
+   Owner-report fix (real-terminal-screen batch): .composer now carries its
+   OWN border/radius/background (transplanted from the retired
+   .transcript-card box below) — it's the one thing in the Director Uplink
+   column meant to still read as a bordered "pill," now that the transcript
+   above it and the outer content frame around the whole column are both
+   borderless. */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--bezel-wire);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.composer-image-preview {
+  position: relative;
+  width: 100%;
+  text-align: center;
+}
+.composer-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--bezel-wire);
+  margin-top: 0;
+  padding: 4px 2px;
+  /* Owner fix (small-UI-polish batch): the box starts as small as possible
+     (sized to fit its own placeholder — _autoGrowComposer() in ui-core.js —
+     not a big fixed-height box with dead space below the text) and grows
+     with typed content up to this cap, then scrolls internally. */
+  min-height: 40px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.composer-input:focus {
+  outline: none;
+}
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* .icon-btn-round (small-UI-polish batch) — the shared modern round "?"
+   shape, reused outside the composer too (e.g. the ALL SAVES help button)
+   via the --icon-btn-color custom property; a caller that doesn't set it
+   falls back to --bezel-wire, matching the composer buttons unchanged. */
+.composer-icon-btn,
+.composer-send-btn,
+.icon-btn-round {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--icon-btn-color, var(--bezel-wire));
+  color: var(--icon-btn-color, var(--bezel-wire));
+  font-size: 15px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.composer-icon-btn:hover,
+.composer-send-btn:hover,
+.icon-btn-round:hover {
+  background: var(--icon-btn-color, var(--bezel-wire));
+  color: #000;
+}
+.composer-send-btn {
+  margin-left: auto;
+  font-size: 16px;
+  font-weight: bold;
+}
+.composer-send-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.composer-token-budget {
+  font-size: 9px;
+  opacity: 0.5;
+  color: var(--bezel-wire);
+  text-align: right;
+}
+.chat-panel .mode-pill--overseer {
+  border-color: var(--bezel-wire);
+  color: var(--bezel-wire);
+}
+
+/* mobile carrier strip — the Overseer never fully leaves the screen.
+   Hidden by default; the mobile media query below reveals it whenever
+   the UPLINK subsystem is NOT the active one. Not position:fixed (the
+   DO-N Suite 160 containing-block caveat doesn't apply — it sits in the
+   normal flow at the top of the scrollable glass). */
+.carrier-strip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: none;
+  border-bottom: 1px dashed rgba(var(--bezel-wire-rgb), 0.4);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--bezel-wire);
+  text-shadow: 0 0 6px rgba(var(--bezel-wire-rgb), 0.5);
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  text-transform: none;
+  min-height: 32px;
+}
+.carrier-strip .cs-state {
+  margin-left: auto;
+  opacity: 0.7;
+  font-size: 8.5px;
+}
+.mini-wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.mini-wave i {
+  width: 3px;
+  background: var(--bezel-wire);
+  box-shadow: 0 0 4px rgba(var(--bezel-wire-rgb), 0.7);
+  animation: ovs-mini-wave 1.6s ease-in-out infinite;
+}
+.mini-wave i:nth-child(1) {
+  height: 5px;
+  animation-delay: 0s;
+}
+.mini-wave i:nth-child(2) {
+  height: 10px;
+  animation-delay: 0.18s;
+}
+.mini-wave i:nth-child(3) {
+  height: 14px;
+  animation-delay: 0.36s;
+}
+.mini-wave i:nth-child(4) {
+  height: 8px;
+  animation-delay: 0.54s;
+}
+.mini-wave i:nth-child(5) {
+  height: 4px;
+  animation-delay: 0.72s;
+}
+@keyframes ovs-mini-wave {
+  50% {
+    transform: scaleY(0.35);
+  }
+}
+
+/* MOBILE (<1000px): UPLINK becomes a self-contained view (Protocol 10 —
+   fixes the "infinite scroll" problem: .col-right previously had no
+   data-tab, so it rendered permanently at full length below every other
+   subsystem). Every other subsystem hides .col-right and shows the
+   carrier strip instead — the Overseer never fully disappears. */
+@media (max-width: 999.98px) {
+  body[data-subsystem='uplink'] .container.machine {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .glass-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .main-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-subsystem='uplink'] .col-left {
+    display: none;
+  }
+  body[data-subsystem='uplink'] .col-right {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  body[data-subsystem='uplink'] .panel.chat-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  body[data-subsystem='uplink'] .transcript-card {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  body[data-subsystem='uplink'] #chatDisplay {
+    flex: 1 1 auto;
+    min-height: 90px;
+    overflow-y: auto;
+  }
+  /* DO-O follow-up (owner mobile-density fix): trim the oscilloscope to a
+     tidy banner (was a fixed 120px, plus head/meta chrome, on every
+     viewport) so the transcript above reclaims the freed space and leads
+     the view. Neither rule touches wiring — layout only. #chatInput's own
+     fixed height was superseded by the small-UI-polish batch's auto-grow
+     (.composer-input's min/max-height + _autoGrowComposer(), ui-core.js) —
+     flex-shrink:0 still guards it from being crushed by flex siblings. */
+  body[data-subsystem='uplink'] .scope-wrap {
+    padding: 5px 0 4px;
+  }
+  body[data-subsystem='uplink'] #overseerScope {
+    height: 64px;
+  }
+  body[data-subsystem='uplink'] .scope-meta {
+    font-size: 8px;
+  }
+  body[data-subsystem='uplink'] #chatInput {
+    flex-shrink: 0;
+  }
+  body:not([data-subsystem='uplink']) .col-right {
+    display: none;
+  }
+  body:not([data-subsystem='uplink']) .carrier-strip {
+    display: flex;
+  }
+}
+/* Desktop needs no explicit override: .carrier-strip's base rule above is
+   display:none, and only the mobile query (max-width:999.98px) ever flips
+   it to display:flex — a desktop viewport never matches that query, so the
+   Director column there stays the only "always visible" presence. */
+
+/* Hidden panels (not in active tab) */
+.panel[data-tab] {
+  display: none;
+}
+.panel[data-tab].tab-visible {
+  display: block;
+}
+/* Panels with no data-tab (e.g. the chat panel) always show */
+.panel:not([data-tab]) {
+  display: block;
+}
+/* NV_OVERHAUL_DESIGN_AUDIT MF-1 hardening: an explicit, !important, mobile-scoped
+   restatement of the gate above. Live verification (local static build + the
+   deployed Cloudflare staging site) found the base gate already correctly hides
+   every inactive-subsystem panel at <=999.98px — no override was actually
+   winning — but this makes the invariant explicit and un-overridable at the
+   exact breakpoint the bezel subsystem nav (DO-N) targets, so a future rule
+   added at higher specificity/later source order can never silently re-widen
+   mobile back into the stacked/interleaved 6-subsystems-at-once layout. */
+@media (max-width: 999.98px) {
+  .panel[data-tab]:not(.tab-visible) {
+    display: none !important;
+  }
+}
+
+/* C3: FO3 warning banner — shown when gameContext = FO3 */
+.fo3-warning-banner {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+  color: var(--robco-alert);
+  border: 1px dashed var(--robco-alert);
+  background: rgba(231, 204, 60, 0.06);
+  opacity: 0.85;
+}
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 2000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+/* U4b (Protocol 42 fix, found via this unit's own live Playwright
+   verification): #sysModal normally sits at z-index:2000, BELOW the
+   Diagnostic Shell's .dsh-scrim/.dsh-drawer/.dsh-fab (20000-20002) — a
+   deliberate U1/U2 choice so the shell stays reachable over whatever app
+   modal was already open (e.g. the first-visit PATCH NOTES popup). That
+   same ordering silently made every one of U4b's 77 destructive:true tools
+   unusable: _invoke()'s auto-confirm-gate opens THIS SAME #sysModal for its
+   CONFIRM/ABORT dialog, which rendered behind the shell's own scrim and was
+   genuinely unclickable (confirmed via document.elementFromPoint() landing
+   on #dshScrim, not the button) — not a test artifact, a real dead end for
+   a real user. A blanket z-index swap was tried first and reverted: it
+   fixed the shell's own confirm dialog but broke the ORIGINAL case this
+   ordering protected (a genuinely common one — the patch-notes popup then
+   blocked the FAB). The fix is instead scoped and temporary: _invoke()
+   (js/test-console.js) adds this class to <body> for the exact duration of
+   its own confirmAction() call (removed as soon as the promise settles,
+   confirmed or cancelled), so ONLY a confirm dialog the shell itself
+   triggered is ever elevated — every other #sysModal use (patch notes, save
+   help, etc.) keeps the original z-index:2000, unaffected. */
+body.dsh-modal-elevate #sysModal {
+  z-index: 20010;
+}
+.panel h2 {
+  margin: -10px -10px 10px -10px;
+  padding: 10px;
+  background: rgba(var(--robco-green-rgb), 0.2);
+  border-bottom: 1px solid var(--robco-green);
+  font-size: 14px;
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+details.panel summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+details.panel summary::-webkit-details-marker {
+  display: none;
+}
+details.panel summary h2::after {
+  content: ' [+]';
+  float: right;
+  font-family: monospace;
+}
+details.panel[open] summary h2::after {
+  content: ' [-]';
+}
+
+details.panel:not([open]) {
+  padding-bottom: 0;
+}
+details.panel:not([open]) summary h2 {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+/* One-line summary status (e.g. ACCOUNT's live REG PORT state) — visible whether
+   the panel is open or collapsed, so a collapsed panel still shows its state. */
+.panel-substatus {
+  display: block;
+  font-size: 10px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Diagnostic Shell env banner (U1) — STAGING TOOLBENCH vs RESTRICTED DIAGNOSTIC
+   ACCESS, driven off _shellTier(). Opacity raised above the base .panel-substatus
+   so the environment read stays legible, not just a dim footnote. */
+#dshEnvBanner {
+  opacity: 0.9;
+  font-weight: bold;
+  white-space: normal;
+}
+#dshEnvBanner.dsh-banner-staging {
+  color: rgb(var(--amber-rgb, 255, 182, 66));
+}
+#dshEnvBanner.dsh-banner-prod {
+  color: var(--robco-green);
+}
+
+/* U5: the MINIGAME UNLOCK CEREMONY banner flash (_fireUnlockCeremony(),
+   js/test-console.js) — a plain `animation:` (Protocol UI-9), so the
+   existing global prefers-reduced-motion block above neutralizes it to an
+   instant, fully-lit static frame with no bespoke carve-out. */
+#dshEnvBanner.dsh-unlock-ceremony {
+  color: var(--bezel-wire, var(--robco-green));
+  animation: dshUnlockGlow 1.2s ease-in-out 2;
+}
+@keyframes dshUnlockGlow {
+  0%,
+  100% {
+    opacity: 0.6;
+    text-shadow: none;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 8px var(--bezel-wire, var(--robco-green));
+  }
+}
+
+/* U5: the RESILIENCE & INFRA feature-flag toggle row's live state readout
+   (control:'toggle', _renderShell()) — a compact "OVERRIDE: ON (ENABLED)"
+   style line sitting between the label and its ON/OFF/DEFAULT buttons. */
+.dsh-toggle-state {
+  font-size: 9px;
+  opacity: 0.75;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}

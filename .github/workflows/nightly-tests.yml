@@ -1,9 +1,11 @@
 name: Nightly Tests
 
-# Nightly both-runner test sweep on dev. COMPLEMENTS the pre-push gate - this
-# workflow is TESTS ONLY and never deploys or releases anything (no Pages deploy,
-# no GitHub release, no tag). It re-runs both persistence runners on a schedule so
-# any drift or environment-specific failure surfaces even between pushes.
+# Nightly Node test sweep on dev. COMPLEMENTS the pre-push gate - this workflow
+# is TESTS ONLY and never deploys or releases anything (no Pages deploy, no
+# GitHub release, no tag). It re-runs the canonical Node persistence runner on a
+# schedule so any drift or environment-specific failure surfaces even between
+# pushes. (2.8.5 U-B3: the PowerShell mirror was deleted and Protocol 15 retired;
+# this workflow used to run both runners and now runs the single Node runner.)
 on:
   schedule:
     # 07:15 UTC daily (~00:15 US Pacific). Off-the-hour to avoid GitHub's
@@ -17,7 +19,7 @@ permissions:
 
 jobs:
   nightly-tests:
-    name: Nightly both-runner test (dev)
+    name: Nightly Node test (dev)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dev
@@ -28,38 +30,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          # Single source of truth for the Node version (see .nvmrc / ci.yml).
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Node runner (tests/robco-diagnostics.js)
-        id: node_runner
-        continue-on-error: true
         run: node tests/robco-diagnostics.js
-
-      - name: PowerShell runner (tests/robco-diagnostics.ps1)
-        id: ps_runner
-        continue-on-error: true
-        # pwsh (PowerShell Core) is preinstalled on ubuntu-latest - the same
-        # invocation the local gate uses (scripts/gate.js).
-        run: pwsh -File tests/robco-diagnostics.ps1
-
-      - name: Report results + fail if either runner failed
-        run: |
-          NODE='${{ steps.node_runner.outcome }}'
-          PS='${{ steps.ps_runner.outcome }}'
-          {
-            echo "## Nightly test results (dev)"
-            echo ""
-            echo "| Runner | Result |"
-            echo "| ------ | ------ |"
-            echo "| Node - tests/robco-diagnostics.js | $NODE |"
-            echo "| PowerShell - tests/robco-diagnostics.ps1 | $PS |"
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$NODE" != 'success' ] || [ "$PS" != 'success' ]; then
-            echo "::error::Nightly tests FAILED - Node: $NODE, PowerShell: $PS"
-            exit 1
-          fi
-          echo "Both runners passed."

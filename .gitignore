@@ -1,7 +1,16 @@
 # Private / AI-agent files — keep off GitHub
-# NOTE: CLAUDE.md and RULES.md are intentionally tracked — the test gate reads them
+# NOTE: CLAUDE.md and rules/ are intentionally tracked — the test gate reads them
 # (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
+
+# Claude-facing local reference library (BRAIN_DUMP.md et al.) — local-only, never
+# committed. It reconstructs a session's understanding from disk on the owner's PC;
+# it is NOT for the phone (that is QUEUE.md, which IS committed). See CLAUDE.md's
+# pointer index. library/MANIFEST.txt is the one committed exception — a filename-only
+# manifest (Protocol 46 / Suite 220) so the doc-reference-integrity gate can check
+# pointer paths against it even on a clean CI checkout where library/ doesn't exist.
+library/*
+!library/MANIFEST.txt
 
 # Dependencies
 node_modules/
@@ -24,6 +33,11 @@ desktop.ini
 
 # Repomix output (generated artifact — never committed)
 repomix-output.*
+
+# CI failure-evidence (Health-batch U4) — screenshots + console/gate logs written
+# ONLY when a check fails, uploaded by the CI workflow, then swept (Protocol 41).
+# Never committed.
+test-artifacts/
 
 # Logs
 *.log

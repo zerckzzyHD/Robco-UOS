@@ -99,10 +99,23 @@ writeFileSync(join(OUT, 'index.html'), html, 'utf8');
 //     shell. This edits only the staged copy — the repo's CACHE_NAME (Protocol 1) is
 //     untouched, and production keeps the bare rev.
 const swPath = join(OUT, 'sw.js');
-const swSrc = readFileSync(swPath, 'utf8').replace(
+let swSrc = readFileSync(swPath, 'utf8').replace(
   /const CACHE_NAME = '([^']+)';/,
   (m, name) => `const CACHE_NAME = '${name.includes('-dev') ? name : name + '-dev'}';`
 );
+
+// 5c. Drop './index.html' from the STAGED precache list (staging-only).
+//     Cloudflare Pages 308-canonicalizes '/index.html' -> '/', and the Cache API
+//     REJECTS a redirected response inside cache.addAll() (it throws when
+//     response.redirected is true). Because the SW install precache is
+//     all-or-nothing, that single redirected entry fails the ENTIRE install ->
+//     the new service worker never activates -> the staging PWA freezes on the
+//     old build and "REBOOT TERMINAL" does nothing (the exact r15-dev freeze).
+//     './' already precaches the identical shell — Cloudflare serves '/' at a
+//     direct 200 — so dropping the redundant './index.html' entry loses no
+//     offline coverage. This edits only the staged copy; GitHub Pages (prod)
+//     serves '/index.html' at 200, so the repo sw.js legitimately keeps it.
+swSrc = swSrc.replace(/^\s*'\.\/index\.html',[ \t]*\r?\n/m, '');
 writeFileSync(swPath, swSrc, 'utf8');
 
 // 6. Cloudflare Pages _redirects — pin the service worker + PWA control files to a
@@ -120,6 +133,11 @@ const REDIRECTS = [
   '# forbid it): "The script resource is behind a redirect, which is disallowed".',
   '/sw.js /sw.js 200',
   '/manifest.json /manifest.json 200',
+  '# Also pin /index.html to a direct 200 so a direct hit serves the page instead',
+  '# of Cloudflare 308-canonicalizing it to /. Defense-in-depth: the staged sw.js',
+  "# no longer precaches './index.html' (see step 5c), so SW install is already",
+  '# safe; this just keeps the deployed artifact serving /index.html cleanly.',
+  '/index.html /index.html 200',
   '',
 ].join('\n');
 writeFileSync(join(OUT, '_redirects'), REDIRECTS, 'utf8');

@@ -1,0 +1,549 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/05-base.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 1-494. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: Base tokens, reset, layout, app-shell
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   05-base.css — cascade slot 05: root CSS custom properties
+   (--robco-*), the html/body reset, and the foundational layout/
+   component primitives (.container, .main-grid, .panel, .panel h2,
+   input/select/button base styles, .special-grid, the chat
+   transcript classes .msg-user/.msg-ai/.msg-sys, .col-left/.col-right).
+   WHY HERE: loads FIRST because every other file in this cascade
+   references the --robco-* custom properties and the base element/
+   class rules (button, input, .panel) defined here. This is the
+   foundation the other 11 files build on or selectively override —
+   nothing here depends on anything loading before it.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --robco-green-rgb: 20, 253, 206;
+  --robco-green: #14fdce;
+  --robco-dark: #021c14;
+  --robco-glow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+  --robco-alert: #f39c12;
+  --robco-danger: #e74c3c;
+  --robco-blue: #3498db;
+  --robco-refresh: rgba(var(--robco-green-rgb), 0.12);
+  /* Mobile Density Standard (planning/MOBILE_DENSITY_PLAN.md §2a) — base/
+     desktop values, matching today's existing hardcoded board-chrome numbers
+     verbatim. Desktop rules stay hardcoded/unchanged (these base tokens are
+     reference-only at this width); the @media(max-width:480px) override
+     below is the only place these values actually drive rendered spacing. */
+  --d-board-pad-block: 10px;
+  --d-board-pad-btm: 12px;
+  --d-board-pad-inline: 10px;
+  --d-board-gap: 12px;
+  --d-section-gap: 10px;
+  --d-subtitle-mb: 8px;
+}
+html {
+  overflow-x: hidden;
+  /* Owner report: the browser's own default tap/active highlight box flashed
+     on the real interactive element underneath every dressed control (worst
+     on the CHASSIS living core, where it washed out the tap-to-poke pulse) —
+     "breaks immersion." -webkit-tap-highlight-color is NOT inherited by every
+     engine the same way a normal CSS property is, so it is set both here
+     (broad, catches most WebKit/Blink builds) and directly on the interactive
+     elements below (belt-and-suspenders for engines that look at the element
+     itself). This only suppresses the tap/mouse-active highlight OVERLAY —
+     :focus-visible (Protocol 17) is untouched and stays fully visible for
+     keyboard navigation. */
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  background-color: #010a07;
+  color: var(--robco-green);
+  font-family: 'Courier New', Courier, monospace;
+  margin: 0;
+  padding: 10px;
+  font-size: 14px;
+  text-shadow: var(--robco-glow);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Authentic CRT Scanlines & Screen Curvature.
+   Owner report: this used to be position:fixed against the viewport, so the
+   scanline/vignette bled out over the casing-top and bezel chrome instead of
+   staying inside the terminal's own screen. It now lives inside .glass-frame
+   (index.html) — the device chrome's "screen" layer, already
+   position:relative + overflow:hidden — as position:absolute, so it's
+   clipped to exactly the glass area (including its rounded corners) and
+   never covers the casing/bezel outside it. */
+.crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 9999;
+  pointer-events: none;
+  /* Repeating linear gradient for more authentic Fallout New Vegas scanlines */
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.25),
+    rgba(0, 0, 0, 0.25) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  /* Darkened corners of an analog monitor */
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.9);
+  animation: flicker 0.15s infinite;
+}
+
+/* The Slow CRT Refresh Bar */
+.crt-overlay::after {
+  content: ' ';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(transparent 0%, var(--robco-refresh) 10%, transparent 100%);
+  opacity: 0.8;
+  animation: refresh-bar 7s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes refresh-bar {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes flicker {
+  0% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes rad-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+  /* Owner-report fix (casing/layout polish batch): this pre-DO-N flat CRT-edge
+     border predates the device-chrome bezel (.casing-top + .glass-frame +
+     .bezel) that now frames the whole machine — left in place, it draws a
+     second, redundant rectangle around the ENTIRE app (casing, bezel, and
+     glass together), reading as a stray outline whose color always matches
+     whatever optic the user has selected (e.g. NEON VIOLET reads as a big
+     purple frame). The device chrome supplies the real framing now. */
+  padding: 12px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+}
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.panel {
+  border: 1px solid var(--robco-green);
+  padding: 10px;
+  background: rgba(2, 28, 20, 0.5);
+  overflow-wrap: anywhere;
+}
+.panel h2 {
+  margin-top: 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--robco-green);
+  padding-bottom: 4px;
+}
+.input-group {
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.optics-label {
+  white-space: nowrap;
+}
+/* WU-C7: config labels (GAME:, PLAYSTYLE:, etc.) must not wrap in narrow flex rows */
+.cfg-label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* WU-C14: the COMPLETE RNG toggle + its warning banner must STACK (label on its
+   own full-width row above the warning) at every width — desktop matches mobile.
+   The base .input-group is a space-between ROW, so on desktop the banner sat
+   beside the label and crushed the label column to ~0 width, wrapping
+   "COMPLETE RNG" one character per line. Forcing column + stretch (overriding
+   align-items:center) gives the label a full-width row; nowrap + a min-width
+   floor are the same squeeze-proof treatment as WU-C7/C9/C10/C12 so the label
+   can never wrap per-character again. */
+.rng-mode-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+.rng-mode-group > label {
+  white-space: nowrap;
+  min-width: 0;
+}
+/* WU-C9/C10: shared inline-nowrap class for inventory type-tags and map [?] badges */
+.tag {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 9px;
+  opacity: 0.7;
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+.badge {
+  display: inline-block;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+/* WU-C10: inventory item name — fills remaining flex space so USE/tag/X stay compact */
+.inv-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.special-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.special-grid div {
+  display: flex;
+  flex-direction: column;
+}
+input[type='number'],
+input[type='text'],
+input[type='password'],
+select {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--robco-green);
+  color: var(--robco-green);
+  font-family: inherit;
+  padding: 5px;
+  width: 65px;
+  text-shadow: var(--robco-glow);
+  outline: none;
+  box-sizing: border-box;
+}
+input[type='text'],
+input[type='password'] {
+  width: 130px;
+}
+select {
+  width: 95px;
+}
+.special-grid input {
+  width: 100%;
+  text-align: center;
+  padding: 4px 0;
+}
+button,
+a,
+summary,
+select,
+[role='button'],
+[role='tab'] {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  background: var(--robco-green);
+  color: var(--robco-dark);
+  border: none;
+  padding: 12px;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 5px;
+  transition:
+    filter 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+button:hover {
+  filter: brightness(1.35);
+}
+button.alert-btn {
+  background: var(--robco-alert);
+  color: #000;
+}
+button.action-btn {
+  background: transparent;
+  border: 1px solid var(--robco-green);
+  color: var(--robco-green);
+}
+button.action-btn:hover {
+  background: var(--robco-green);
+  color: var(--robco-dark);
+  filter: brightness(1.1);
+}
+
+/* AI_OVERSEER item 1 — modal/action button vocabulary.
+   This class was formerly a solid bright-blue rectangle (background:var(--robco-blue),
+   the only blue control in an otherwise phosphor-green/amber interface) — the owner
+   called it "completely outdated." It now REUSES the existing modern pill vocabulary
+   the OVERSEER control, the circular composer +/?/send buttons (.icon-btn-round), the
+   [ PURGE ] control, and the bezel nav keycaps already share (Protocol 22): a
+   transparent fill with a thin "over-the-wire" outline (--bezel-wire — amber on FNV,
+   phosphor green by default, amber on FO3) and rounded pill edges, filling on hover.
+   The class name is kept (a rename would churn 6 call sites across index.html + 3 JS
+   files for no user-visible gain); it is no longer "blue" in any sense. Every current
+   consumer — the confirm dialogs (confirmAction: level-up / WIPE / AI removal gates),
+   the visual-parse (loot) modal, the modal CLOSE button, REBOOT TERMINAL, and the
+   bezel directory items — inherits this one shared style, so there is no second button
+   look to keep in sync. Guarded by Suite 238 (static: can't silently revert to the
+   solid-blue fill or fall back to unstyled defaults). */
+button.blue-btn {
+  background: transparent;
+  border: 1px solid var(--bezel-wire);
+  color: var(--bezel-wire);
+  border-radius: 999px;
+}
+button.blue-btn:hover {
+  background: var(--bezel-wire);
+  color: #000;
+  filter: none;
+}
+/* Protocol 17: a focus ring that does not rely on colour alone — an outward
+   glow + offset outline visible in both the resting and hover states. */
+button.blue-btn:focus-visible {
+  outline: 2px solid var(--bezel-wire);
+  outline-offset: 2px;
+}
+
+button.limb-ok {
+  background: transparent;
+  border: 1px solid var(--robco-green);
+  color: var(--robco-green);
+  padding: 4px;
+  width: 80px;
+  font-size: 11px;
+  margin: 0;
+}
+button.limb-crip {
+  background: transparent;
+  border: 1px dashed var(--robco-danger);
+  color: var(--robco-danger);
+  padding: 4px;
+  width: 80px;
+  font-size: 11px;
+  margin: 0;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  background: transparent;
+  width: 100px;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(var(--robco-green-rgb), 0.3);
+  border: 1px solid var(--robco-green);
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 8px;
+  background: var(--robco-green);
+  margin-top: -6px;
+  cursor: pointer;
+}
+
+.inventory-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.inventory-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding: 5px 0;
+}
+.inventory-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.delete-btn {
+  width: auto;
+  margin: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--robco-danger);
+  border: 1px solid var(--robco-danger);
+  min-height: 28px;
+  min-width: 28px;
+  box-sizing: border-box;
+}
+textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--robco-green);
+  border: 1px solid var(--robco-green);
+  margin-top: 5px;
+  padding: 8px;
+  font-family: inherit;
+  resize: none;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+/* Owner-report fix (real-terminal-screen batch): .transcript-card no longer
+   owns a visible border/radius/background — the transcript now flows
+   directly on the screen with no box around it, like a real terminal. The
+   bordered "pill" look moves to .composer alone (below) so the input stays
+   visually contained while the transcript above it doesn't. Purely a layout
+   shell now: #chatDisplay keeps its OWN overflow-y:auto, so the transcript
+   still scrolls exactly as before — only the box around it is gone. */
+.transcript-card {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  overflow: hidden;
+}
+#chatDisplay {
+  height: 250px;
+  overflow-y: auto;
+  background: transparent;
+  padding: 15px;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+/* Style A transcript cleanup (owner-approved mockup,
+   planning/mockups/chat-overhaul.html): every line left-anchored + full-width
+   — no more right-aligned/centered voices or side borders eating mobile
+   width — with a 14px hanging indent so wrapped rows tuck under the first
+   row's text start. Voice is carried by color/weight/size only. */
+.msg-user {
+  color: var(--robco-green);
+  text-align: left;
+  padding-left: 14px;
+  text-indent: -14px;
+  /* Match .msg-ai: a long unbroken token in a restored user message must wrap,
+     not set a wide min-content that blows out the single 1fr main-grid track. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.msg-ai {
+  color: var(--robco-blue);
+  text-align: left;
+  padding-left: 14px;
+  text-indent: -14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.msg-sys {
+  color: var(--robco-alert);
+  text-align: left;
+  padding-left: 14px;
+  text-indent: -14px;
+  font-size: 11px;
+  /* Match .msg-ai: wrap long unbroken tokens instead of widening the track. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.msg-content {
+  /* Keeps the typewriter's textContent/innerHTML writes scoped to the message
+     body only, so an OVERSEER/TERMINAL tag (a sibling element) never gets
+     wiped. */
+  display: inline;
+}
+.msg-tag {
+  display: block;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+  margin-bottom: 2px;
+  text-indent: 0; /* the tag row itself never inherits the hanging indent */
+}
+.msg-tag--overseer {
+  color: var(--bezel-wire);
+}
+.msg-tag--terminal {
+  color: var(--robco-green);
+}
+
+.image-preview {
+  max-height: 80px;
+  max-width: 100%;
+  border: 1px solid var(--bezel-wire);
+  display: none;
+  margin-bottom: 5px;
+}
+
+.col-left {
+  transition: opacity 0.3s;
+  /* Without min-width:0 a grid item defaults to min-width:auto (min-content).
+     On mobile the single 1fr column then expands to hold a wide open panel
+     (e.g. the 6×6 world map) instead of shrinking to the viewport. */
+  min-width: 0;
+}
+
+/* Mirror of .col-left: on mobile both columns share the single 1fr main-grid
+   track, so col-right must also be shrinkable. Without this, a wide chat
+   min-content (e.g. a long unbroken token in a restored user/sys message)
+   blows out the shared track and stretches the STAT-tab column too. The
+   ≥1000px block already sets this; here it covers the mobile single-column. */
+.col-right {
+  min-width: 0;
+}
+
+/* Safety net: keep any map overflow local to the display element
+   rather than letting it stretch the page. */
+#worldMapDisplay {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Clip overflow within each column on mobile without creating a scroll container.
+   position:fixed children (autocomplete panel) are unaffected by clip. */
+@media (max-width: 999px) {
+  .col-left,
+  .col-right {
+    overflow-x: clip;
+  }
+}

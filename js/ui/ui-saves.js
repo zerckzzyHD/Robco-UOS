@@ -1,0 +1,1321 @@
+// ── UI-SAVES — save slots, file import/export, rolling backups, registry
+//    autocomplete ────────────────────────────────────────────────────────
+// Owns every user-initiated way a campaign leaves or enters this device: the
+// 3 local save slots (+ their P5 version rings), file export/import, the full
+// backup bundle (P6), the rolling-backup safety net, campaign-log export
+// (txt/html/md), and the registry-driven autocomplete wiring for free-text
+// inputs (quests/items/perks/locations/companions). Cloud push/pull itself
+// lives in cloud.js — this file only owns the LOCAL (device-file/localStorage/
+// IDB) save surface.
+//
+// LOAD ORDER: static <script> tag, global scope (index.html slot 16 — after
+// js/ui/ui-render-databank.js, before js/ui/ui-account.js). Depends on
+// state.js (state, saveState, snapshotActiveCampaign, the cold-store/backup/
+// bundle accessors), registry-core.js (registrySearch), and the render-*
+// functions it calls to repaint after a load/import.
+// EXPOSES (global scope, no window prefix needed): exportCampaignLog,
+// ejectHolotape, listLocalSaves, saveToSlot/loadFromSlot/confirmOverwriteSlot/
+// confirmDeleteSlot, viewSlotVersions/restoreSlotVersion,
+// viewCloudSaveVersions, addQuest, resetSessionStats, updateTokenBudget,
+// triggerFileInput/handleFileUpload, restoreRollingBackup, restoreChatHistory,
+// exportFullBundle/importBundle, triggerImageUpload/handleImageSelection,
+// initRegistryAutocomplete, initAmmoDatalist, initLocationDatalist.
+// GOTCHA (Protocol 34): every local-slot overwrite/delete/restore here is
+// confirm-gated (confirmOverwriteSlot/confirmDeleteSlot) and a rolling backup
+// is snapped before any state-replacing load — never add a new destructive
+// path that skips the confirm step or the pre-load snapshot.
+// ── TRUTHFUL TRANSCRIPT ASSEMBLY (AI_OVERSEER Finding 5) ─────────────────────
+// Every export format used to iterate chatHistory alone, which silently dropped the
+// Director's `modal` nodes and every confirmation dialog — so a log could show the
+// AI apparently obeying a dangerous request when it had in fact asked first and the
+// popup was edited out of the record. This is the ONE assembly point all three
+// formats (txt/md/html) now share (Protocol 22): it merges chatHistory with the
+// transcript-event ledger (state.js) back into the order they appeared on screen.
+// An event's `at` is the chatHistory index it was recorded in FRONT of, so events
+// are flushed before the message at that index.
+function _transcriptRecords() {
+  const msgs = Array.isArray(chatHistory) ? chatHistory : [];
+  const evts =
+    typeof transcriptEvents !== 'undefined' && Array.isArray(transcriptEvents)
+      ? transcriptEvents.slice().sort((a, b) => (a.at || 0) - (b.at || 0))
+      : [];
+  const out = [];
+  let ei = 0;
+  for (let i = 0; i <= msgs.length; i++) {
+    while (ei < evts.length && (evts[ei].at || 0) <= i) {
+      out.push({ kind: 'event', evt: evts[ei] });
+      ei++;
+    }
+    if (i < msgs.length) out.push({ kind: 'msg', msg: msgs[i] });
+  }
+  return out;
+}
+
+// Renders one transcript event as plain lines (no markup) — the shared wording every
+// format uses, so the three exports can never disagree about what happened.
+function _transcriptEventLines(evt) {
+  const label = evt.kind === 'confirm' ? 'CONFIRMATION REQUESTED' : 'DIRECTOR MODAL';
+  const lines = [`[${label}] ${String(evt.title || '').replace(/^>\s*/, '')}`];
+  (evt.lines || []).forEach(l => {
+    if (String(l).trim()) lines.push('    ' + l);
+  });
+  if (evt.kind === 'confirm') {
+    lines.push('    ANSWER: ' + (evt.choice ? evt.choice : 'NO RESPONSE RECORDED'));
+  }
+  return lines;
+}
+
+// The chat-line label used across formats. Finding 4: the player side is named by the
+// active game's own title, never a hardcoded "COURIER" (Protocol 38).
+function _transcriptSpeaker(sender) {
+  if (sender === 'sys') return 'SYSTEM';
+  if (sender !== 'user') return 'DATABANK';
+  const id = typeof getIdentity === 'function' ? getIdentity() : null;
+  return ((id && id.playerNoun) || 'Courier').toUpperCase();
+}
+
+function _transcriptCleanText(text) {
+  return String(text)
+    .replace(/<[^>]*>?/gm, '')
+    .replace(/\x60{3}[a-z]*\n?/gi, '')
+    .replace(/\x60{3}/g, '');
+}
+
+function exportCampaignLog(format = 'txt') {
+  if (!chatHistory || chatHistory.length === 0) {
+    if (typeof openModal === 'function')
+      openModal({ title: '> EXPORT LOG', body: 'ERROR: COMM-LINK LOGS EMPTY.' });
+    return;
+  }
+
+  if (format === 'html') {
+    // #41 HTML Campaign Log Export — green-on-black styled HTML matching current optics
+    // Read the export foreground from the single-source THEMES table (no duplicate palette),
+    // resolved for the ACTIVE game (per-game pick → game default → green) so the export matches
+    // the on-screen optic in either game. Falls back to the canon RobCo green.
+    const optics = typeof _resolveOptic === 'function' ? _resolveOptic() : 'green';
+    const fg = ((typeof THEMES !== 'undefined' && THEMES[optics]) || { hex: '#14fdce' }).hex;
+    const _esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let rows = _transcriptRecords()
+      .map(rec => {
+        // Finding 5: a recorded popup renders as its own block, visually distinct from
+        // the chat so a reader can see the terminal ASKED and what the answer was.
+        if (rec.kind === 'event') {
+          const lines = _transcriptEventLines(rec.evt);
+          return `<div style="margin-bottom:10px;border:1px dashed ${fg};padding:6px 10px;opacity:0.92;"><span style="color:${fg};white-space:pre-wrap;">${_esc(lines.join('\n'))}</span></div>`;
+        }
+        const msg = rec.msg;
+        const clean = _transcriptCleanText(msg.text);
+        const label = _transcriptSpeaker(msg.sender);
+        const color = msg.sender === 'user' ? '#fff' : msg.sender === 'sys' ? '#f39c12' : fg;
+        return `<div style="margin-bottom:10px;"><span style="color:${color};opacity:0.6;font-size:11px;">[${_esc(label)}]</span><br><span style="color:${color};white-space:pre-wrap;">${_esc(clean)}</span></div>`;
+      })
+      .join('');
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RobCo U.O.S. Campaign Log</title><style>body{background:#010a07;color:${fg};font-family:'Courier New',monospace;padding:20px;font-size:13px;line-height:1.5;}.header{text-align:center;border-bottom:1px dashed ${fg};padding-bottom:10px;margin-bottom:20px;letter-spacing:2px;}</style></head><body><div class="header"><h1>ROBCO INDUSTRIES U.O.S.<br>AFTER-ACTION CAMPAIGN LOG</h1><p>${_esc(_transcriptSpeaker('user'))}: ${escapeHtml(state.loc || '?')} | ${formatGameTime(state.ticks || 0)} | Lv.${state.lvl || 1}</p></div>${rows}</body></html>`;
+    _downloadBlob(html, 'text/html', 'robco_campaign_log.html');
+    return;
+  }
+
+  if (format === 'md') {
+    // #27 Export as Markdown
+    let md = `# RobCo U.O.S. — Campaign Log\n\n`;
+    md += `**Location:** ${state.loc || '?'} | **Time:** ${formatGameTime(state.ticks || 0)} | **Level:** ${state.lvl || 1}\n\n---\n\n`;
+    _transcriptRecords().forEach(rec => {
+      if (rec.kind === 'event') {
+        // Finding 5: popups are part of the record, blockquoted so they read as an
+        // out-of-band system event rather than another chat line.
+        md += _transcriptEventLines(rec.evt)
+          .map(l => `> ${l}`)
+          .join('\n');
+        md += '\n\n';
+        return;
+      }
+      const msg = rec.msg;
+      const clean = _transcriptCleanText(msg.text).trim();
+      if (!clean) return;
+      const prefix =
+        msg.sender === 'user'
+          ? `**[${_transcriptSpeaker(msg.sender)}]**`
+          : msg.sender === 'sys'
+            ? '*[SYSTEM]*'
+            : '> [DATABANK]';
+      md += `${prefix} ${clean}\n\n`;
+    });
+    _downloadBlob(md, 'text/markdown', 'robco_campaign_log.md');
+    return;
+  }
+
+  // Default: plain text (original behavior)
+  _downloadBlob(_buildHolotapeText(), 'text/plain', 'robco_campaign_log.txt');
+}
+
+// Builds the plain-text "holotape transcript" of the comm-link log. Shared by the
+// .txt export (download) path and WU-F3 EJECT HOLOTAPE (Web Share) — Protocol 22.
+function _buildHolotapeText() {
+  let logStr = '=========================================================\n';
+  logStr += '         ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM\n';
+  logStr += '                 AFTER-ACTION CAMPAIGN LOG\n';
+  logStr += '=========================================================\n\n';
+  // Finding 5: iterate the MERGED record, not chatHistory alone — the popups the old
+  // transcript silently dropped are what made it possible to read this log wrongly.
+  _transcriptRecords().forEach(rec => {
+    if (rec.kind === 'event') {
+      logStr += _transcriptEventLines(rec.evt).join('\n') + '\n\n';
+      return;
+    }
+    const msg = rec.msg;
+    const cleanText = _transcriptCleanText(msg.text);
+    logStr += `[${_transcriptSpeaker(msg.sender)}]: ${cleanText}\n\n`;
+  });
+  return logStr;
+}
+
+// ── WU-F3 EJECT HOLOTAPE (Web Share API) ──────────────────────────────────
+// Ejects the comm-link log as a "holotape transcript" to the OS share sheet via
+// the Web Share API. Free, offline, no AI, game-agnostic (Protocol 38) — it only
+// hands plain text to the device's own share UI; carries no game literal. Reuses
+// the existing _buildHolotapeText() formatting (Protocol 22). Three-tier graceful
+// fallback so it always does *something* useful:
+//   1. navigator.share({text}) — native OS share sheet (mobile + some desktops).
+//      A user-dismissed sheet (AbortError) is silent — NOT treated as a failure.
+//   2. navigator.clipboard.writeText — copy the transcript for manual transmit.
+//   3. _downloadBlob — eject the transcript as a local .txt file (the export path).
+// Every tier is wrapped so a missing/blocked API can never break the terminal.
+function _shareSupported() {
+  return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+}
+function _clipboardSupported() {
+  return (
+    typeof navigator !== 'undefined' &&
+    !!navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function'
+  );
+}
+async function ejectHolotape() {
+  if (!chatHistory || chatHistory.length === 0) {
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> EJECT HOLOTAPE',
+        body: 'ERROR: COMM-LINK LOGS EMPTY. NOTHING TO EJECT.',
+      });
+    return;
+  }
+  const text = _buildHolotapeText();
+  // Tier 1 — native share sheet
+  if (_shareSupported()) {
+    try {
+      await navigator.share({ title: 'RobCo U.O.S. — Holotape Transcript', text });
+      return; // shared successfully
+    } catch (err) {
+      // User dismissed the share sheet — honour the cancel, do not fall through.
+      if (err && err.name === 'AbortError') return;
+      // Any other share failure falls through to the clipboard tier.
+    }
+  }
+  // Tier 2 — clipboard copy
+  if (_clipboardSupported()) {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (typeof appendToChat === 'function') {
+        appendToChat('> HOLOTAPE TRANSCRIPT COPIED TO CLIPBOARD — TRANSMIT MANUALLY.', 'sys', true);
+      }
+      return;
+    } catch (_) {
+      // Clipboard blocked (permissions/insecure context) — fall through to download.
+    }
+  }
+  // Tier 3 — eject to a local file (always available)
+  _downloadBlob(text, 'text/plain', 'robco_holotape_transcript.txt');
+  if (typeof appendToChat === 'function') {
+    appendToChat('> HOLOTAPE EJECTED TO LOCAL STORAGE — SHARE SHEET UNAVAILABLE.', 'sys', true);
+  }
+}
+
+function _downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── NOTIFICATION BADGES (#13) ────────────────────────────────────────
+// Shows count badges on panel summaries whenever their contents are non-empty.
+// Called at end of updateMath() so it always reflects current state.
+const SLOT_NAMES = ['A', 'B', 'C'];
+function _slotKey(n) {
+  return `robco_slot_${n}`;
+}
+function _slotLabel(n) {
+  return `SLOT ${SLOT_NAMES[n - 1]}`;
+}
+
+// ── Local save list (synchronous) ────────────────────────────────────────────
+// Returns an array of {id, label, isActive|isSlot, n, gameContext} for the active
+// save + slots 1-3. Co-located with the slot-schema helpers (_slotKey/_slotLabel)
+// so a slot-key or slot-count change touches only this file (DUP-2). Consumed by
+// ui-account.js's renderSavesList() as a global.
+//
+// gameContext is UNFILTERED here — each slot just carries whatever it recorded at
+// save time (or undefined for a pre-WU-F5 slot that never recorded one). The
+// per-game filter itself lives centrally in renderSavesList(), which merges this
+// list with the IDB-only supplement before deciding what to hide, so a slot that
+// exists in BOTH localStorage and IDB is judged exactly once (Protocol 22).
+function listLocalSaves() {
+  const saves = [];
+  const v8raw = localStorage.getItem('robco_v8');
+  if (v8raw) {
+    try {
+      const v8 = JSON.parse(v8raw);
+      const ctx = v8.activeContext || 'FNV';
+      saves.push({ id: 'active', label: 'Active (' + ctx + ')', isActive: true });
+    } catch (_) {}
+  }
+  for (let n = 1; n <= 3; n++) {
+    const slotRaw = localStorage.getItem(_slotKey(n));
+    if (!slotRaw) continue;
+    try {
+      const slot = JSON.parse(slotRaw);
+      const slotName = slot.slotName || 'Slot ' + n;
+      const savedDate = slot.savedAt ? new Date(slot.savedAt).toLocaleDateString() : '';
+      saves.push({
+        id: 'slot_' + n,
+        label: slotName + (savedDate ? ': ' + savedDate : ''),
+        isSlot: true,
+        n,
+        gameContext: slot.gameContext || null,
+      });
+    } catch (_) {}
+  }
+  return saves;
+}
+
+// ── SAVE (local slot) ─────────────────────────────────────────────────────
+// P3: async — the slot is written IDB-PRIMARY (js/state.js _coldWriteObj: IDB
+// 'campaign' store, no ~5MB ceiling) with a best-effort localStorage mirror. A
+// localStorage quota failure is no longer fatal: the save persists to IDB, so a
+// slot too large for localStorage is now saved instead of lost (ceiling relief).
+async function saveToSlot(slotNum) {
+  syncStateFromDom();
+  // P5: capture the slot's CURRENT contents as a retained prior revision BEFORE it
+  // is overwritten (per-slot version ring, IDB-only — rides the P3 IndexedDB
+  // headroom, never the localStorage ceiling). Best-effort + fail-safe: no IDB or
+  // an empty slot → nothing captured and the save below is byte-identical to today.
+  if (window.IdbStore && typeof window.pushSlotVersion === 'function') {
+    try {
+      const _prior =
+        typeof window._coldReadObj === 'function'
+          ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+          : null;
+      if (_prior) await window.pushSlotVersion(slotNum, _prior);
+    } catch (_) {}
+  }
+  const _slotState = JSON.parse(JSON.stringify(state));
+  const _slotChat = chatHistory.slice(-200);
+  const _slotPlaystyle = localStorage.getItem('robco_playstyle') || 'any';
+  const envelope = {
+    version: APP_VERSION,
+    schemaVersion: APP_VERSION,
+    state: _slotState,
+    chat: _slotChat,
+    playstyle: _slotPlaystyle,
+    savedAt: Date.now(),
+    slotName: _slotLabel(slotNum),
+    gameContext: state.gameContext || 'FNV', // F5: store game context in envelope
+  };
+  if (typeof window.computeSaveChecksum === 'function') {
+    envelope.checksum = window.computeSaveChecksum(_slotState, _slotChat, _slotPlaystyle);
+  }
+  // SAVE_LAYER3: _coldWriteObj returns { ok, idbOk, lsOk } (divergence-honest;
+  // an object is ALWAYS truthy so the check below MUST be `.ok`, never the
+  // bare return — gate-guarded contract). The no-_coldWriteObj fallback IIFE
+  // returns the same shape.
+  const res =
+    typeof window._coldWriteObj === 'function'
+      ? await window._coldWriteObj(_slotKey(slotNum), 'slot_' + slotNum, envelope)
+      : (function () {
+          try {
+            localStorage.setItem(_slotKey(slotNum), JSON.stringify(envelope));
+            return { ok: true, idbOk: false, lsOk: true };
+          } catch (_) {
+            return { ok: false, idbOk: false, lsOk: false };
+          }
+        })();
+  if (res && res.ok) {
+    const el = document.getElementById('slotStatus');
+    const ts = new Date(envelope.savedAt).toLocaleTimeString();
+    const ctx = envelope.gameContext;
+    if (el) el.textContent = `${_slotLabel(slotNum)} [${ctx}] saved at ${ts}`;
+    appendToChat(`> [SAVE] ${_slotLabel(slotNum)} [${ctx}] written at ${ts}`, 'sys', true);
+    // Owner report: the SAVES LIST (VER badge + slot row) didn't live-update after a
+    // save — it only refreshed once loadUI() next ran (e.g. on an unrelated LOAD
+    // click). saveToSlot is the one write path for every slot save (quicksave button
+    // AND the OVERWRITE control below), so refreshing here covers both (Protocol 22).
+    if (typeof renderSavesList === 'function') renderSavesList();
+    // CHASSIS LIVING CORE #9 (save/sync write-pulse) — saveToSlot is the one
+    // write path for every local slot save (the quicksave button AND the
+    // OVERWRITE control below), so emitting here covers both (Protocol 22 —
+    // an event, not a direct call into the core, matching the U8 auto-log
+    // emit convention elsewhere in this file).
+    RobcoEvents.emit('data.write', { kind: 'local-save' });
+    // SAVE_LAYER3 degraded-write notice — posted AFTER the success line so
+    // the user's mental model stays "saved, with a caveat".
+    _maybePostDegradedWriteNotice(res);
+  } else {
+    appendToChat('> [ERROR] Save slot write failed — storage unavailable.', 'sys', true);
+  }
+}
+
+// ── SAVE_LAYER3 degraded-write notice (warning-surface gap #6) ───────────────
+// When only ONE of the two stores accepted a slot write, say which — once per
+// session PER MODE (a module-level latch, reset on reload). A transient SYS
+// chat line, deliberately not a banner: the save DID persist, just without
+// its second copy. Full success stays exactly as quiet, and total failure
+// exactly as loud, as before this notice existed.
+const _degradedWriteNoticeShown = { lsOnly: false, idbOnly: false };
+function _maybePostDegradedWriteNotice(res) {
+  try {
+    if (!res || !res.ok || (res.idbOk && res.lsOk)) return; // full success / total failure
+    if (res.lsOk && !res.idbOk && !_degradedWriteNoticeShown.lsOnly) {
+      _degradedWriteNoticeShown.lsOnly = true;
+      appendToChat(
+        '> [SYS] COLD STORAGE UNAVAILABLE — SLOT HELD IN LOCAL MEMORY ONLY.',
+        'sys',
+        true
+      );
+    } else if (res.idbOk && !res.lsOk && !_degradedWriteNoticeShown.idbOnly) {
+      _degradedWriteNoticeShown.idbOnly = true;
+      appendToChat(
+        '> [SYS] LOCAL MIRROR FULL — SLOT HELD IN COLD STORAGE ONLY. EXPORT A SAVE FILE WHEN CONVENIENT.',
+        'sys',
+        true
+      );
+    }
+  } catch (_) {
+    /* a notice must never break a successful save */
+  }
+}
+
+// ── SAVE_LAYER3 quarantined-record affordances (EXPORT / confirm-gated PURGE) ──
+// The durable recovery surface the READ FAULT banner points at. Read priority:
+// the localStorage envelope (the primary, live-condition key) → the in-memory
+// same-session stash (a boot where the localStorage leg failed) → the durable
+// IDB copy (primary 'quarantine' doc, then the newest stamped overflow entry).
+// Never throws; null = nothing on file.
+async function _readQuarantineEnvelope() {
+  try {
+    const raw = localStorage.getItem('robco_v8_quarantine');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  if (window._quarantinedEnvelope) return window._quarantinedEnvelope;
+  try {
+    if (window.IdbStore) {
+      const env = await window.IdbStore.get('campaign', 'quarantine');
+      if (env) return env;
+      const keys = await window.IdbStore.keys('campaign');
+      const stamped = (keys || [])
+        .filter(k => /^quarantine_\d+$/.test(String(k)))
+        .sort((a, b) => Number(String(b).slice(11)) - Number(String(a).slice(11)));
+      if (stamped.length) return await window.IdbStore.get('campaign', stamped[0]);
+    }
+  } catch (_) {}
+  return null;
+}
+window._readQuarantineEnvelope = _readQuarantineEnvelope;
+
+// EXPORT — non-destructive download of the whole quarantine envelope (the
+// exact corrupt bytes ride in `raw`), using the same data-URI download
+// pattern exportSaveFile uses (Protocol 22). Does NOT clear the quarantine
+// or the banner condition — recovery first, cleanup separately.
+window.exportQuarantinedRecord = async function () {
+  const env = await _readQuarantineEnvelope();
+  if (!env) {
+    appendToChat('> [SYS] NO QUARANTINED RECORD ON FILE.', 'sys', true);
+    return;
+  }
+  const dataStr =
+    'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(env, null, 2));
+  const dl = document.createElement('a');
+  dl.setAttribute('href', dataStr);
+  const d = new Date(env.quarantinedAt || Date.now()).toISOString().split('T')[0];
+  dl.setAttribute('download', 'robco_quarantine_' + d + '.json');
+  dl.click();
+};
+
+// PURGE — the destructive half, confirm-gated (Protocol 34): clears the
+// localStorage key, the in-memory stash, and every IDB quarantine* entry.
+// This is what retires the READ FAULT banner's every-boot re-display.
+window.confirmPurgeQuarantine = async function () {
+  const ok = await confirmAction({
+    title: '> PURGE QUARANTINED RECORD',
+    warning:
+      'Permanently erase the quarantined campaign record?\n\nThis is the unreadable data that was set aside when it could not be loaded. If you may ever want it recovered, EXPORT it first. This cannot be undone.',
+    confirmLabel: 'PURGE',
+  });
+  if (!ok) return;
+  await _purgeQuarantineApply();
+};
+
+// The apply core, separated from the confirm gate for direct testability
+// (the _deleteSlotApply / _restoreBackupApply split precedent).
+async function _purgeQuarantineApply() {
+  try {
+    localStorage.removeItem('robco_v8_quarantine');
+  } catch (_) {}
+  window._quarantinedEnvelope = null;
+  try {
+    if (window.IdbStore) {
+      const keys = await window.IdbStore.keys('campaign');
+      for (const k of keys || []) {
+        if (k === 'quarantine' || /^quarantine_\d+$/.test(String(k))) {
+          await window.IdbStore.remove('campaign', k);
+        }
+      }
+    }
+  } catch (_) {}
+  try {
+    const b = document.getElementById('readFaultBanner');
+    if (b) b.remove();
+  } catch (_) {}
+  appendToChat('> [SYS] QUARANTINED RECORD PURGED.', 'sys', true);
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+window._purgeQuarantineApply = _purgeQuarantineApply;
+
+// ── OVERWRITE (local slot) — confirm-gated, keeps the slot's existing name ───
+// The unified SAVES LIST already offers LOAD/VER per slot; OVERWRITE lets the
+// technician deliberately replace a NAMED slot's contents with the current
+// campaign without ever prompting for a rename (the slot name is always the
+// fixed _slotLabel(n), never user-entered — Protocol 34 destructive-op gate).
+// Reuses saveToSlot() verbatim (Protocol 22) — the P5 version ring already
+// retains the slot's prior contents before this overwrite, so it's recoverable.
+async function confirmOverwriteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> OVERWRITE ' + _slotLabel(slotNum),
+    warning: `Overwrite ${_slotLabel(slotNum)} with your current campaign?\n\nThis replaces its contents but keeps its name. The prior contents are preserved in VERSION HISTORY (VER) if you need to recover them.`,
+    confirmLabel: 'OVERWRITE',
+  });
+  if (!ok) return;
+  await saveToSlot(slotNum);
+}
+
+// ── DELETE (local slot) — confirm-gated, permanent ───────────────────────────
+// The unified SAVES LIST previously offered no way to clear a named local slot
+// (LOAD/OVERWRITE/VER only) — the owner asked for parity with cloud rows, which
+// already had DEL. Confirm-gated (Protocol 34 destructive-op gate) via the
+// diegetic confirmAction(), never the blocking confirm(). Clears BOTH the
+// localStorage mirror and the IDB-primary copy (P3) plus that slot's retained
+// version ring (P5) — a deleted slot leaves no orphaned version history behind.
+async function confirmDeleteSlot(slotNum) {
+  const ok = await confirmAction({
+    title: '> DELETE ' + _slotLabel(slotNum),
+    warning: `Permanently delete ${_slotLabel(slotNum)}?\n\nThis cannot be undone. Any saved version history for this slot is erased too.`,
+    confirmLabel: 'DELETE',
+  });
+  if (!ok) return;
+  await _deleteSlotApply(slotNum);
+}
+
+// _deleteSlotApply(slotNum) — the synchronous-flow erase core, separated from the
+// confirm gate so it is directly testable without mocking confirmAction() (mirrors
+// the _restoreBackupApply / _craftPrepare+Apply split — Step 2 Phase 0 U12 pattern).
+async function _deleteSlotApply(slotNum) {
+  try {
+    localStorage.removeItem(_slotKey(slotNum));
+    if (window.IdbStore) {
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum);
+      await window.IdbStore.remove('campaign', 'slot_' + slotNum + '_versions');
+    }
+    appendToChat(`> [DELETE] ${_slotLabel(slotNum)} erased.`, 'sys', true);
+  } catch (_) {
+    appendToChat('> [ERROR] Slot delete failed.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+
+// ── LOAD (local slot) ─────────────────────────────────────────────────────
+async function loadFromSlot(slotNum) {
+  // P3: IDB-PRIMARY read — the newer of {IDB 'campaign' slot, localStorage} wins
+  // (_coldReadObj), so an oversized slot saved only to IDB still loads, and a
+  // partial-write divergence can never surface a stale save.
+  let env =
+    typeof window._coldReadObj === 'function'
+      ? await window._coldReadObj(_slotKey(slotNum), 'slot_' + slotNum)
+      : null;
+  if (!env) {
+    const raw = localStorage.getItem(_slotKey(slotNum));
+    if (raw) {
+      try {
+        env = JSON.parse(raw);
+      } catch (_) {}
+    }
+  }
+  if (!env) {
+    appendToChat(`> [LOAD] ${_slotLabel(slotNum)} is empty.`, 'sys', true);
+    return;
+  }
+  try {
+    await _applySlotEnvelope(env, slotNum);
+  } catch (e) {
+    appendToChat('> [ERROR] Save slot corrupted or unreadable.', 'sys', true);
+  }
+}
+
+// _applySlotEnvelope(env, slotNum, opts) — the SHARED verify → context-check →
+// snap → migrate → apply core for a slot-shaped save envelope. Extracted
+// verbatim from loadFromSlot so that loadFromSlot AND restoreSlotVersion (P5) run
+// the EXACT same state-replacing path (Protocol 22 — one apply implementation, no
+// parallel copy). Returns true when applied, false if the user cancelled at an
+// integrity or context confirm gate (matching loadFromSlot's original early
+// returns — nothing ran after the apply block, so behavior is unchanged). The
+// optional opts.verb customises only the closing status wording.
+// SAME-GAME apply is in-place (loadUI(), no reload). CROSS-GAME apply persists
+// robco_v8 + reloads instead — FALLOUT_REGISTRY/databaseCSVs are boot-time-only
+// per-game globals an in-place loadUI() can never refresh (see the crossGame
+// branch below for the full explanation).
+async function _applySlotEnvelope(env, slotNum, opts) {
+  opts = opts || {};
+  // Integrity + forward-compat check before applying
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const integrity = window.verifySaveEnvelope(env);
+    if (integrity.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This save was made on a newer version of RobCo (v${integrity.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+        confirmLabel: 'FORCE-LOAD',
+      });
+      if (!ok) return false;
+    } else if (integrity.status === 'checksum_mismatch') {
+      const ok = await confirmAction({
+        title: '> SAVE INTEGRITY WARNING',
+        warning:
+          'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+        confirmLabel: 'LOAD ANYWAY',
+      });
+      if (!ok) return false;
+    }
+  }
+  // F5: Warn on gameContext mismatch between slot and current session
+  const slotCtx = env.gameContext || env.state?.gameContext || 'FNV';
+  const curCtx = state.gameContext || 'FNV';
+  const crossGame = slotCtx !== curCtx;
+  if (crossGame) {
+    const ok = await confirmAction({
+      title: '> CONTEXT MISMATCH',
+      warning: `This save is a ${slotCtx} campaign.\nYou are currently in ${curCtx} mode.\n\nLoading will switch to ${slotCtx}. Continue?`,
+      confirmLabel: 'SWITCH & LOAD',
+    });
+    if (!ok) return false;
+  }
+  // Snapshot current state as rolling backup before replacing
+  if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+  if (typeof migrateState === 'function') env.state = migrateState(env.version || '1.0', env.state);
+
+  if (crossGame) {
+    // Cross-game restore: FALLOUT_REGISTRY / databaseCSVs are boot-time-only
+    // per-game globals (index.html's GAME_FILES manifest loads exactly ONE of
+    // reg_nv.js/reg_fo3.js + db_nv.js/db_fo3.js). An in-place loadUI() would
+    // leave every registry-backed surface — item/quest/perk/location
+    // autocomplete, the native LOOT/THREAT/CONSULT lookups, and the AI's own
+    // databaseCSVs system context — silently serving the OLD game's data
+    // (the FO3-shows-NV-locations bug). Route through the SAME
+    // persist-then-reload pattern every other cross-game apply path already
+    // uses (onGameContextChange, loadCloudSave, restoreCloudSaveVersion) —
+    // Protocol 22, no parallel apply path.
+    if (!window.robco_v8) window.robco_v8 = { activeContext: curCtx, campaigns: {} };
+    window.robco_v8.campaigns[curCtx] = JSON.parse(JSON.stringify(state));
+    window.robco_v8.campaigns[slotCtx] = env.state;
+    window.robco_v8.activeContext = slotCtx;
+    localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8));
+    if (env.chat && Array.isArray(env.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(env.chat));
+    if (env.playstyle) localStorage.setItem('robco_playstyle', env.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression —
+    // the same guard onGameContextChange/loadCloudSave/handleFileUpload use).
+    window._loadingSave = true;
+    const verb = opts.verb || 'restored';
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> LOAD',
+        body: `${_slotLabel(slotNum)} [${slotCtx}] ${verb}. REBOOTING SYSTEM...`,
+      });
+    setTimeout(() => window.location.reload(), 2000);
+    return true;
+  }
+
+  state = { ...state, ...env.state };
+  if (env.chat && Array.isArray(env.chat)) restoreChatHistory(env.chat);
+  if (env.playstyle) {
+    localStorage.setItem('robco_playstyle', env.playstyle);
+    if (typeof window._invalidateCommCache === 'function') window._invalidateCommCache();
+    let el = document.getElementById('playstyleInput');
+    if (el) el.value = env.playstyle;
+  }
+  loadUI();
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ctx = slotCtx;
+  const verb = opts.verb || 'restored';
+  appendToChat(`> [LOAD] ${_slotLabel(slotNum)} [${ctx}] ${verb}. Saved: ${ts}`, 'sys', true);
+  const statusEl = document.getElementById('slotStatus');
+  if (statusEl) statusEl.textContent = `${_slotLabel(slotNum)} [${ctx}] loaded (saved: ${ts})`;
+  return true;
+}
+
+// ── SAVE VERSION HISTORY VIEWER + RESTORE (P5) ───────────────────────
+// viewSlotVersions() lists a slot's retained prior revisions in the shared modal;
+// each row RESTORES that revision. IDB-only + fail-safe — never offered when
+// IndexedDB is absent (readSlotVersions returns []). Restoring a prior version is
+// DESTRUCTIVE to the live campaign → confirm-gated (Protocol 34) and routed through
+// the SAME _applySlotEnvelope core as loadFromSlot (verifySaveEnvelope integrity
+// check + snapRollingBackup-before-apply + migrateState). Bounded render (cap
+// SLOT_VERSION_CAP), single innerHTML (no flash), escapeHtml on every dynamic
+// field. Game-agnostic (Protocol 38) — labels come from the envelope, no literals.
+async function viewSlotVersions(slotNum) {
+  if (typeof window.readSlotVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const ts = v && v.savedAt ? new Date(v.savedAt).toLocaleString() : 'unknown';
+      const ctx = String((v && (v.gameContext || (v.state && v.state.gameContext))) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="restoreSlotVersion(' +
+        slotNum +
+        ',' +
+        i +
+        ')" aria-label="Restore this saved version of ' +
+        escapeHtml(_slotLabel(slotNum)) +
+        '">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — ' + _slotLabel(slotNum),
+    body: '<div>' + rows + '</div>',
+  });
+}
+
+async function restoreSlotVersion(slotNum, index) {
+  if (typeof window.readSlotVersions !== 'function') return;
+  const versions = await window.readSlotVersions(slotNum);
+  const env = versions[index];
+  if (!env) {
+    appendToChat('> [LOAD] That version is no longer available.', 'sys', true);
+    return;
+  }
+  const ts = env.savedAt ? new Date(env.savedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> RESTORE VERSION',
+    warning: `Restore ${_slotLabel(slotNum)} to the version saved ${ts}?\n\nThis REPLACES your current campaign state. A rolling backup of the current state is taken first, so this can be undone.`,
+    confirmLabel: 'RESTORE VERSION',
+  });
+  if (!ok) return;
+  try {
+    await _applySlotEnvelope(env, slotNum, { verb: 'version restored' });
+  } catch (_) {
+    appendToChat('> [ERROR] Version restore failed — data unreadable.', 'sys', true);
+  }
+  if (typeof renderSavesList === 'function') renderSavesList();
+}
+
+// ── CLOUD SAVE VERSION HISTORY VIEWER ────────────────────────────────────────
+// viewCloudSaveVersions() mirrors viewSlotVersions() exactly, but lists a cloud
+// save's retained revisions (window.listCloudSaveVersions, cloud.js) instead of a
+// local slot's. Each row restores that revision into the LIVE local campaign via
+// window.restoreCloudSaveVersion — the cloud doc itself is untouched (Protocol 22:
+// same modal shape, same escapeHtml discipline, no parallel viewer implementation).
+async function viewCloudSaveVersions(docId) {
+  if (typeof window.listCloudSaveVersions !== 'function' || typeof openModal !== 'function') return;
+  const versions = await window.listCloudSaveVersions(docId);
+  if (!versions.length) {
+    openModal({
+      title: '> VERSION HISTORY — CLOUD SAVE',
+      body: '<div style="opacity:0.6;font-size:11px;">NO PRIOR VERSIONS ON FILE</div>',
+    });
+    return;
+  }
+  const rows = versions
+    .map((v, i) => {
+      const d = v.data;
+      const ts = d && d.archivedAt ? new Date(d.archivedAt).toLocaleString() : 'unknown';
+      const ctx = String((d && d.gameContext) || '');
+      return (
+        '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' +
+        escapeHtml(i + 1 + '. ' + ts + (ctx ? ' [' + ctx + ']' : '')) +
+        '</span>' +
+        '<span style="flex-shrink:0;"><button class="btn-sm" onclick="window.restoreCloudSaveVersion(\'' +
+        docId +
+        "','" +
+        v.id +
+        '\')" aria-label="Restore this saved cloud version">RESTORE</button></span>' +
+        '</div>'
+      );
+    })
+    .join('');
+  openModal({
+    title: '> VERSION HISTORY — CLOUD SAVE',
+    body: '<div>' + rows + '</div>',
+  });
+}
+
+// ── QUEST LOG HELPERS (#1) ──────────────────────────────────────────
+function addQuest() {
+  const name = ((document.getElementById('newQuestName') || {}).value?.trim() || '').slice(0, 100);
+  if (!name) return;
+  const status = (document.getElementById('newQuestStatus') || {}).value || 'active';
+  const obj = (document.getElementById('newQuestObjective') || {}).value?.trim() || null;
+  if (!state.quests) state.quests = [];
+  state.quests.push({ name, status, objective: obj });
+  // FEEDBACK ANIMATION WAVE 3 (#25 DIRECTIVE FILED) — a transient module var
+  // (never state.*), consumed by renderQuests() the next time it paints.
+  _pendingQuestFiled = name;
+  document.getElementById('newQuestName').value = '';
+  document.getElementById('newQuestObjective').value = '';
+  renderQuests();
+  updateMath();
+}
+
+// ── SESSION STATISTICS HELPERS (#8) ────────────────────────────────
+function resetSessionStats() {
+  state.stats = { kills: 0, capsEarned: 0, damageDealt: 0, sessionStart: Date.now() };
+  saveState();
+  renderSessionStats();
+}
+
+// ── TOKEN BUDGET DISPLAY (#17) ────────────────────────────────────────
+// Rough estimate: 1 token ≈ 4 chars. Updates on textarea input.
+function updateTokenBudget() {
+  const el = document.getElementById('tokenBudgetDisplay');
+  if (!el) return;
+  const model = (document.getElementById('apiModelInput') || {}).value || '';
+  const ctxLimit = model.includes('1.5') ? 1000000 : model.includes('2.0') ? 1000000 : 128000;
+  // Estimate: system directive (~2,875 tokens) + databaseCSVs (~3,200 tokens, now always in systemInstruction) + chat history + state + user input
+  const directiveEst = 6500;
+  const chatEst = Math.round(chatHistory.reduce((a, m) => a + m.text.length, 0) / 4);
+  const stateEst = Math.round(JSON.stringify(state).length / 4);
+  const inputEst = Math.round((document.getElementById('chatInput')?.value?.length || 0) / 4);
+  const total = directiveEst + chatEst + stateEst + inputEst;
+  const pct = Math.round((total / ctxLimit) * 100);
+  el.textContent = `~${total.toLocaleString()} / ${(ctxLimit / 1000).toFixed(0)}K tokens (${pct}%)`;
+  el.style.color =
+    pct > 80 ? 'var(--robco-danger)' : pct > 50 ? 'var(--robco-alert)' : 'var(--robco-blue)';
+}
+
+function triggerFileInput() {
+  document.getElementById('fileInput').click();
+}
+
+// ── RESTORE ROLLING BACKUP ─────────────────────────────────────────
+// Presents the rolling backup ring and lets the user restore one — confirm-gated,
+// routed through sanitizeImportedContainer + migrateState (Protocol 34).
+async function restoreRollingBackup() {
+  if (typeof window.getRollingBackupsAsync !== 'function') return;
+  // IDB-primary union — surfaces a backup that survives in IndexedDB even if the
+  // localStorage ring dropped it under quota (P3 ceiling relief).
+  const backups = await window.getRollingBackupsAsync();
+  if (!backups.length) {
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'NO BACKUP SAVES AVAILABLE' });
+    return;
+  }
+  const listStr = backups.map((b, i) => `${i + 1}. ${b.label}`).join('\n');
+  const choice = prompt(
+    `>> SELECT BACKUP TO RESTORE:\n\n${listStr}\n\nEnter number (1–${backups.length}) or Cancel:`
+  );
+  if (!choice) return;
+  const n = parseInt(choice);
+  if (isNaN(n) || n < 1 || n > backups.length) {
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'INVALID SELECTION' });
+    return;
+  }
+  const backup = backups[n - 1];
+  const ok = await confirmAction({
+    title: '> RESTORE BACKUP',
+    warning: `Restore backup from ${backup.label}?\n\nThis replaces your current campaign state.`,
+    confirmLabel: 'RESTORE',
+  });
+  if (!ok) return;
+  _restoreBackupApply(backup);
+}
+
+// _restoreBackupApply(backup) — the synchronous sanitize → migrate → write core,
+// separated from the confirm gate so it is directly testable without mocking
+// confirmAction() (Step 2 Phase 0 U12 split — mirrors _craftPrepare/_craftApply).
+function _restoreBackupApply(backup) {
+  try {
+    const data = backup.data;
+    const sanitized =
+      typeof sanitizeImportedContainer === 'function'
+        ? sanitizeImportedContainer(data.robco_v8)
+        : data.robco_v8;
+    if (typeof migrateState === 'function' && sanitized && sanitized.campaigns) {
+      Object.keys(sanitized.campaigns).forEach(ctx => {
+        sanitized.campaigns[ctx] = migrateState(data.version || '1.0', sanitized.campaigns[ctx]);
+      });
+    }
+    localStorage.setItem('robco_v8', JSON.stringify(sanitized));
+    if (data.chat && Array.isArray(data.chat))
+      localStorage.setItem('robco_chat', JSON.stringify(data.chat));
+    if (data.playstyle) localStorage.setItem('robco_playstyle', data.playstyle);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
+    if (typeof openModal === 'function')
+      openModal({ title: '> RESTORE BACKUP', body: 'BACKUP RESTORED. REBOOTING SYSTEM...' });
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: BACKUP RESTORE FAILED]', 'sys');
+  }
+}
+function restoreChatHistory(history) {
+  chatHistory = history.slice(-CHAT_MAX);
+  const chatBox = document.getElementById('chatDisplay');
+  if (chatBox) {
+    chatBox.innerHTML = '';
+    chatHistory.forEach(msg => appendToChat(msg.text, msg.sender, true));
+  }
+  clearTimeout(_chatSaveTimer);
+  localStorage.setItem('robco_chat', JSON.stringify(chatHistory));
+}
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function (e) {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (parsed.bundle === true) {
+        // P6 full-backup bundle — its own confirm-gated whole-history restore.
+        await importBundle(parsed);
+        return;
+      }
+      if (parsed.robco_v8) {
+        // v8 Container payload — integrity check + rolling backup before applying
+        if (typeof window.verifySaveEnvelope === 'function') {
+          const _fi = window.verifySaveEnvelope(parsed);
+          if (_fi.status === 'future_version') {
+            const ok = await confirmAction({
+              title: '> VERSION MISMATCH',
+              warning: `This save was made on a newer version of RobCo (v${_fi.version}).\nYour app is on v${APP_VERSION}.\n\nLoading may cause data loss — update the app first.\n\nForce-load anyway?`,
+              confirmLabel: 'FORCE-LOAD',
+            });
+            if (!ok) return;
+          } else if (_fi.status === 'checksum_mismatch') {
+            const ok = await confirmAction({
+              title: '> SAVE INTEGRITY WARNING',
+              warning:
+                'This save may be corrupt or was edited outside the app.\n\nLoad anyway? (Data may be incomplete or incorrect.)',
+              confirmLabel: 'LOAD ANYWAY',
+            });
+            if (!ok) return;
+          }
+        }
+        if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+        // Shared container-write core (state.js) — reused by the P6 bundle import
+        // (Protocol 22 — one container-apply path).
+        window._writeImportedContainer(parsed);
+        // Guard the impending reload's beforeunload flush so stale in-memory state
+        // can't overwrite the robco_v8 we just imported (clobber regression).
+        window._loadingSave = true;
+        if (typeof openModal === 'function')
+          openModal({
+            title: '> IMPORT SAVE',
+            body: 'HARD BACKUP RESTORED SUCCESSFULLY. REBOOTING SYSTEM...',
+          });
+        setTimeout(() => window.location.reload(), 2000);
+      } else if (parsed.version && parsed.state) {
+        // Envelope format (v1.6.3+): contains state, chat, playstyle
+        autoImportState(JSON.stringify(parsed.state));
+        if (parsed.chat && Array.isArray(parsed.chat)) restoreChatHistory(parsed.chat);
+        if (parsed.playstyle) {
+          localStorage.setItem('robco_playstyle', parsed.playstyle);
+          let el = document.getElementById('playstyleInput');
+          if (el) el.value = parsed.playstyle;
+        }
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
+      } else {
+        // Legacy: bare state JSON
+        autoImportState(e.target.result);
+        if (typeof openModal === 'function')
+          openModal({ title: '> IMPORT SAVE', body: 'LEGACY BACKUP RESTORED SUCCESSFULLY' });
+      }
+    } catch (err) {
+      appendToChat('> [SYS-ALERT: SAVE FILE CORRUPTED OR UNREADABLE]', 'sys');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── FULL BACKUP BUNDLE (P6) — UI layer ───────────────────────────────
+// exportFullBundle writes the whole-history bundle (state.js buildFullBundle) to a
+// file on a DELIBERATE button press. importBundle restores it — DESTRUCTIVE, so it
+// is confirm-gated (Protocol 34) and rejects a bad-shape / bad-checksum / (with
+// confirm) future-version bundle with a clear in-terminal error and NO partial
+// apply. The actual storage restore routes through state.js applyBundleData →
+// _writeImportedContainer, the SAME container-apply path handleFileUpload uses
+// (Protocol 22). Bundle metadata shown in the modal is escaped via confirmAction's
+// per-line escapeHtml. Game-agnostic (Protocol 38).
+async function exportFullBundle() {
+  if (typeof window.buildFullBundle !== 'function') return;
+  const bundle = await window.buildFullBundle();
+  _downloadBlob(
+    JSON.stringify(bundle, null, 2),
+    'application/json',
+    'robco_full_backup_' + new Date().toISOString().split('T')[0] + '.json'
+  );
+  appendToChat(
+    '> [BUNDLE] Full backup exported (' +
+      (bundle.slots ? bundle.slots.length : 0) +
+      ' slot(s), ' +
+      (bundle.backups ? bundle.backups.length : 0) +
+      ' backup(s)).',
+    'sys',
+    true
+  );
+}
+
+async function importBundle(parsed) {
+  const _bad = msg => {
+    if (typeof openModal === 'function') openModal({ title: '> IMPORT FULL BACKUP', body: msg });
+  };
+  // 1) SHAPE — reject anything that isn't a well-formed bundle (no partial apply).
+  if (typeof window.isValidBundleShape !== 'function' || !window.isValidBundleShape(parsed)) {
+    _bad('&#9888; NOT A VALID FULL BACKUP FILE. No changes were made.');
+    return;
+  }
+  // 2) FUTURE VERSION — reuse verifySaveEnvelope's version logic (confirm to force).
+  if (typeof window.verifySaveEnvelope === 'function') {
+    const vi = window.verifySaveEnvelope(parsed);
+    if (vi.status === 'future_version') {
+      const ok = await confirmAction({
+        title: '> VERSION MISMATCH',
+        warning: `This backup was made on a newer version of RobCo (v${vi.version}).\nYour app is on v${APP_VERSION}.\n\nRestoring may cause data loss — update the app first.\n\nForce-restore anyway?`,
+        confirmLabel: 'FORCE-RESTORE',
+      });
+      if (!ok) return;
+    }
+  }
+  // 3) CHECKSUM — reject a bundle whose integrity seal doesn't verify (no apply).
+  if (typeof window.verifyBundleChecksum !== 'function' || !window.verifyBundleChecksum(parsed)) {
+    _bad(
+      '&#9888; BACKUP FAILED ITS INTEGRITY CHECK. It may be corrupt or was edited outside the app. No changes were made.'
+    );
+    return;
+  }
+  // 4) CONFIRM — destructive whole-history restore (Protocol 34).
+  const _exp = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString() : 'unknown';
+  const ok = await confirmAction({
+    title: '> IMPORT FULL BACKUP',
+    warning: `Restore your ENTIRE history from this backup?\n\nExported: ${_exp}\nContains ${parsed.slots.length} save slot(s) plus your live campaign.\n\nThis REPLACES your current campaign and overwrites saved slots. A rolling backup of your current state is taken first, so it can be undone.`,
+    confirmLabel: 'RESTORE ALL',
+  });
+  if (!ok) return;
+  // 5) APPLY — snap the current state as the undo point FIRST, then restore all
+  //    storage via the shared data-layer path (state.js applyBundleData).
+  try {
+    if (typeof window.snapRollingBackup === 'function') window.snapRollingBackup();
+    await window.applyBundleData(parsed);
+    // Guard the impending reload's beforeunload flush (clobber regression).
+    window._loadingSave = true;
+    if (typeof openModal === 'function')
+      openModal({
+        title: '> IMPORT FULL BACKUP',
+        body: 'FULL BACKUP RESTORED. REBOOTING SYSTEM...',
+      });
+    setTimeout(() => window.location.reload(), 2000);
+  } catch (_) {
+    appendToChat('> [SYS-ALERT: FULL BACKUP RESTORE FAILED]', 'sys');
+  }
+}
+
+function triggerImageUpload() {
+  document.getElementById('imageInput').click();
+}
+// Visual Upload OCR Unit 3 (planning/VISUAL_UPLOAD_OCR_PLAN.md §4): the stash
+// of attachedImageData/attachedImageMimeType + the #imagePreview thumbnail is
+// UNCHANGED (Protocol 22 — the AI-vision fallback still needs both globals
+// set verbatim). What changes is what happens next — routeVisualUpload(file)
+// (js/ocr.js) now runs the on-device OCR pipeline as the PRIMARY path the
+// instant a screenshot is picked, falling back to the existing AI-vision
+// pipeline only when OCR is unavailable/failing or the player explicitly
+// requests it from the preview modal.
+function handleImageSelection(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  attachedImageMimeType = file.type;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    attachedImageData = e.target.result;
+    const preview = document.getElementById('imagePreview');
+    preview.src = attachedImageData;
+    preview.style.display = 'block';
+    if (typeof routeVisualUpload === 'function') routeVisualUpload(file);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── REGISTRY AUTOCOMPLETE (Phase 3) ──────────────────────────────────────────
+/**
+ * Shared singleton autocomplete panel for registry-backed text inputs.
+ * Wires #newQuestName  → quests  category
+ *       #newItemName   → items   category
+ *
+ * Behaviour:
+ *  - Triggers after 2+ chars, debounced 150 ms.
+ *  - Keyboard: ArrowUp / ArrowDown to navigate, Enter to select, Escape to dismiss.
+ *  - Click item to fill and dismiss.
+ *  - Dismisses automatically on blur (after a 100 ms grace for click events).
+ *  - Does NOT modify state, save, or undo — pure UI read-only helper.
+ */
+function initRegistryAutocomplete() {
+  // Build the singleton panel once
+  var panel = document.getElementById('acPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'acPanel';
+    panel.className = 'autocomplete-panel';
+    panel.setAttribute('role', 'listbox');
+    document.body.appendChild(panel);
+  }
+
+  var _acTimer = null;
+  var _acActiveIdx = -1;
+  var _acResults = [];
+  var _acCurrentInput = null;
+
+  function acHide() {
+    panel.classList.remove('ac-visible');
+    _acActiveIdx = -1;
+    _acResults = [];
+    _acCurrentInput = null;
+  }
+
+  // The composer (#chatInput) has its own toolbar row (+/pill/?/send) docked
+  // directly BELOW the textarea inside the same bordered box — a drop-down
+  // panel there covers the send button. Drop UP instead for that one input
+  // (Protocol 22 — same singleton panel/logic, just flipped vertically for
+  // the composer context); every other registry-backed input keeps dropping
+  // down as before.
+  function acDropsUp(inputEl) {
+    return inputEl && inputEl.id === 'chatInput';
+  }
+
+  function acPosition(inputEl) {
+    var rect = inputEl.getBoundingClientRect();
+    // Clamp to viewport right edge
+    var panelW = Math.min(340, Math.max(220, rect.width));
+    panel.style.width = panelW + 'px';
+    if (acDropsUp(inputEl)) {
+      // panel.offsetHeight only reflects real content once visible — callers
+      // add 'ac-visible' before invoking acPosition() so this measures the
+      // just-rendered result list, not a stale/zero height.
+      var panelH = panel.offsetHeight || 0;
+      panel.style.top = Math.max(4, rect.top - panelH - 2) + 'px';
+    } else {
+      panel.style.top = rect.bottom + 2 + 'px';
+    }
+    panel.style.left = rect.left + 'px';
+  }
+
+  function acRender(results, inputEl) {
+    _acResults = results;
+    _acActiveIdx = -1;
+    panel.innerHTML = '';
+
+    if (!results.length) {
+      var empty = document.createElement('div');
+      empty.className = 'ac-empty';
+      empty.textContent = 'No matches';
+      panel.appendChild(empty);
+    } else {
+      results.forEach(function (entry, i) {
+        var item = document.createElement('div');
+        item.className = 'ac-item';
+        item.setAttribute('role', 'option');
+        item.dataset.idx = i;
+
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'ac-item-name';
+        nameSpan.textContent = entry.name;
+
+        var tagSpan = document.createElement('span');
+        tagSpan.className = 'ac-item-tag';
+        // Show type or dlc as a tag hint
+        var tag = entry.type || '';
+        if (entry.dlc) tag += ' [' + entry.dlc.toUpperCase() + ']';
+        if (entry.level > 0) tag += ' L' + entry.level;
+        tagSpan.textContent = tag;
+
+        item.appendChild(nameSpan);
+        if (tag) item.appendChild(tagSpan);
+
+        item.addEventListener('mousedown', function (e) {
+          // Use mousedown so it fires before blur
+          e.preventDefault();
+          if (_acCurrentInput) {
+            _acCurrentInput.value = entry.name;
+            // Trigger input event so any live listeners see the change
+            _acCurrentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          acHide();
+        });
+
+        panel.appendChild(item);
+      });
+    }
+
+    // Make it visible BEFORE positioning — acPosition() needs a real
+    // offsetHeight to drop-up correctly for the composer, and a panel with
+    // display:none always measures 0.
+    panel.classList.add('ac-visible');
+    acPosition(inputEl);
+  }
+
+  function acSetActive(idx) {
+    var items = panel.querySelectorAll('.ac-item');
+    items.forEach(function (el) {
+      el.classList.remove('ac-active');
+    });
+    if (idx >= 0 && idx < items.length) {
+      items[idx].classList.add('ac-active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+    }
+    _acActiveIdx = idx;
+  }
+
+  // categoryOrFn: a registry category string (existing behavior, unchanged —
+  // results come from registrySearch(category, q)) OR a resolver function
+  // (Step 2 Phase 2 B1 — results come from fn(q) instead; used to wire
+  // #chatInput to _commandSuggestions in api.js without a second singleton).
+  function wireInput(inputId, categoryOrFn) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+    var isFn = typeof categoryOrFn === 'function';
+    if (!isFn && typeof registrySearch !== 'function') return;
+
+    function fetchResults(q) {
+      return isFn ? categoryOrFn(q) || [] : registrySearch(categoryOrFn, q);
+    }
+
+    el.addEventListener('input', function () {
+      clearTimeout(_acTimer);
+      var q = el.value;
+      if (q.length < 2) {
+        acHide();
+        return;
+      }
+      _acCurrentInput = el;
+      _acTimer = setTimeout(function () {
+        acRender(fetchResults(q), el);
+      }, 150);
+    });
+
+    el.addEventListener('keydown', function (e) {
+      if (!panel.classList.contains('ac-visible')) return;
+      var itemCount = _acResults.length;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        acSetActive(Math.min(_acActiveIdx + 1, itemCount - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        acSetActive(Math.max(_acActiveIdx - 1, 0));
+      } else if (e.key === 'Enter') {
+        if (_acActiveIdx >= 0 && _acResults[_acActiveIdx]) {
+          e.preventDefault();
+          el.value = _acResults[_acActiveIdx].name;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          acHide();
+        }
+      } else if (e.key === 'Escape') {
+        acHide();
+      }
+    });
+
+    el.addEventListener('blur', function () {
+      // 100 ms grace: mousedown on an item fires before blur resolves
+      setTimeout(acHide, 120);
+    });
+
+    el.addEventListener('focus', function () {
+      // Reopen if there's already enough text (e.g. user tabbed back)
+      var q = el.value;
+      if (q.length >= 2) {
+        _acCurrentInput = el;
+        var results = fetchResults(q);
+        if (results.length) acRender(results, el);
+      }
+    });
+  }
+
+  // Wire all three registry-backed inputs
+  wireInput('newQuestName', 'quests');
+  wireInput('newItemName', 'items');
+  wireInput('newPerkName', 'perks');
+  // Step 2 Phase 2 B1: TERMINAL-mode command/quick-log suggestions for the
+  // Comm-Link input (suppressed entirely when the message resolves to OVERSEER).
+  if (typeof _commandSuggestions === 'function') {
+    wireInput('chatInput', _commandSuggestions);
+  }
+  // Tool Deck: the shared #deckTarget field (TARGET/ITEM/TOPIC) gets
+  // creature/item/location/topic suggestions (_deckTargetSuggestions, ui-render.js).
+  if (typeof _deckTargetSuggestions === 'function') {
+    wireInput('deckTarget', _deckTargetSuggestions);
+  }
+
+  // Reposition on scroll/resize so the panel doesn't orphan
+  window.addEventListener(
+    'scroll',
+    function () {
+      if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+        acPosition(_acCurrentInput);
+      }
+    },
+    { passive: true }
+  );
+  window.addEventListener('resize', function () {
+    if (_acCurrentInput && panel.classList.contains('ac-visible')) {
+      acPosition(_acCurrentInput);
+    }
+  });
+}
+
+// ── AMMO DATALIST ─────────────────────────────────────────────────────────
+// Populates the #ammoCalibers <datalist> with unique caliber names from
+// AMMO.CSV in database.js. Called once on window.onload.
+function initAmmoDatalist() {
+  const dl = document.getElementById('ammoCalibers');
+  if (!dl) return;
+  if (typeof getAmmoCalibers !== 'function') return;
+  const calibers = getAmmoCalibers();
+  dl.innerHTML = calibers.map(c => `<option value="${c}"></option>`).join('');
+}
+
+// ── LOCATION DATALIST ──────────────────────────────────────────────────────
+// Populates the #locationOptions <datalist> from the active game's registry.
+// Called once on window.onload — game context switch triggers a full reload
+// which re-runs this against the freshly loaded FALLOUT_REGISTRY.
+function initLocationDatalist() {
+  const dl = document.getElementById('locationOptions');
+  if (!dl || typeof FALLOUT_REGISTRY === 'undefined' || !Array.isArray(FALLOUT_REGISTRY.locations))
+    return;
+  dl.innerHTML = FALLOUT_REGISTRY.locations
+    .map(l => `<option value="${escapeHtml(l.name)}"></option>`)
+    .join('');
+}

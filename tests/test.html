@@ -2,8 +2,8 @@
 <!--
     RobCo Persistence Audit — tests/test.html
     ==========================================
-    BROWSER-SIDE RUNTIME MIRROR of the canonical static runners
-    (tests/robco-diagnostics.js + tests/robco-diagnostics.ps1).
+    BROWSER-SIDE RUNTIME MIRROR of the canonical static runner
+    (tests/robco-diagnostics.js).
 
     Where the canonical runners statically analyse the source, this page
     actually EXECUTES the live import contract in a real browser: it loads the
@@ -163,16 +163,21 @@
     </script>
 
     <!-- Boot chain — same files, same order as the live FNV boot in index.html:
-         idb → db → state → reg → registry-core, then api. idb.js loads before
-         state.js so MetaStore's P1 write-through has window.IdbStore. -->
-    <script src="../js/idb.js"></script>
-    <script src="../js/db_nv.js"></script>
-    <script src="../js/state.js"></script>
-    <script src="../js/reg_nv.js"></script>
-    <script src="../js/registry-core.js"></script>
-    <script src="../js/api.js"></script>
-    <script src="../js/runtime.js"></script>
-    <script src="../js/test-console.js"></script>
+         idb → db → state → reg → registry-core, then api-import. idb.js loads
+         before state.js so MetaStore's P1 write-through has window.IdbStore.
+         2.8.5 U-A3: api.js split into a hub + api-directive/api-import/api-router;
+         this page only exercises autoImportState()/sanitizeImportedContainer()
+         (api-import.js) — the hub (transmitMessage/fetchAuthorizedModels) and the
+         directive/router siblings are not referenced anywhere below, so they are
+         deliberately NOT loaded (Protocol 40 — a subset, not full inclusion). -->
+    <script src="../js/core/idb.js"></script>
+    <script src="../js/data/db_nv.js"></script>
+    <script src="../js/core/state.js"></script>
+    <script src="../js/data/reg_nv.js"></script>
+    <script src="../js/data/registry-core.js"></script>
+    <script src="../js/services/api-import.js"></script>
+    <script src="../js/core/runtime.js"></script>
+    <script src="../js/dev/test-console.js"></script>
   </head>
   <body>
     <h1>[ROBCO U.O.S. — PERSISTENCE AUDIT / RUNTIME]</h1>
@@ -185,8 +190,7 @@
     <div id="summary"></div>
 
     <div class="note">
-      For static analysis (no browser needed): run tests/robco-diagnostics.js or
-      tests/robco-diagnostics.ps1.<br />
+      For static analysis (no browser needed): run tests/robco-diagnostics.js.<br />
       This page is run headless in the gate by tests/test-html-check.mjs.
     </div>
 
@@ -316,10 +320,13 @@
         // ══════════════════════════════════════════════════════════════
         section('Suite 1 — Scalar field import');
 
+        // NOTE (2026-07-20): `lvl` is deliberately NOT in this payload. Level is
+        // player-owned — the AI may announce an earned promotion but can never
+        // write state.lvl (nativeLevelUp() is the sole writer). The dedicated
+        // read-only assertion for it follows this block.
         resetState();
         autoImportState(
           JSON.stringify({
-            lvl: 15,
             xp: 7500,
             hpCur: 63,
             hpMax: 130,
@@ -343,7 +350,6 @@
           })
         );
         const scalarExpect = {
-          lvl: 15,
           xp: 7500,
           hpCur: 63,
           hpMax: 130,
@@ -372,6 +378,28 @@
             `Got ${state[k]}`
           );
         });
+
+        // LEVEL IS READ-ONLY TO THE AI (owner directive 2026-07-20). The live
+        // runtime analogue of Suite 173.14 in the Node runner: an AI payload
+        // cannot move the level in EITHER direction — not up, not down, not to
+        // zero — while a sibling field in the same payload still imports.
+        {
+          resetState();
+          const lvlBefore = state.lvl;
+          autoImportState(JSON.stringify({ lvl: lvlBefore + 10, caps: 777 }));
+          assert(
+            state.lvl === lvlBefore && state.caps === 777,
+            'AI cannot RAISE state.lvl (announcement only) while caps still imports',
+            `Got lvl ${state.lvl} (expected ${lvlBefore}), caps ${state.caps}`
+          );
+          autoImportState(JSON.stringify({ lvl: 1 }));
+          autoImportState(JSON.stringify({ lvl: 0 }));
+          assert(
+            state.lvl === lvlBefore,
+            'AI cannot LOWER or zero state.lvl — no ungated progression loss',
+            `Got ${state.lvl} (expected ${lvlBefore})`
+          );
+        }
 
         // ══════════════════════════════════════════════════════════════
         //  Suite 2 — Factions (game-agnostic via getFactionRegistry)
@@ -422,6 +450,10 @@
             inventory: [
               { name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'weapon' },
               { name: 'Stimpak', qty: 8, wgt: 0.5, val: 75, type: 'aid' },
+              // Combat Armor must be present for the equipped.armor assertion below to
+              // survive reconcileEquipped() (js/core/state.js) — it clears any equipped
+              // slot naming an item that isn't actually in inventory (Protocol 13 fix).
+              { name: 'Combat Armor', qty: 1, wgt: 12, val: 500, type: 'armor' },
             ],
             squad: [
               { name: 'Boone', hp: 80, hpMax: 100, ammo: 30, condition: 'Good', weapon: null },
@@ -441,7 +473,7 @@
           })
         );
         assert(
-          state.inventory.length === 2 &&
+          state.inventory.length === 3 &&
             eq(state.inventory[0], {
               name: 'Plasma Rifle',
               qty: 1,
@@ -484,6 +516,82 @@
           eq(state.equipped, { weapon: 'Plasma Rifle', armor: 'Combat Armor', headgear: null }),
           'equipped slots preserved (null headgear via "key in obj")',
           JSON.stringify(state.equipped)
+        );
+
+        // Protocol 13 regression: an equipped slot naming an item that is NOT in the
+        // just-imported inventory is reconciled away (reconcileEquipped(), state.js) —
+        // headgear is left alone (no inventory item type backs it, AI-write-only).
+        resetState();
+        autoImportState(
+          JSON.stringify({
+            inventory: [{ name: 'Plasma Rifle', qty: 1, wgt: 5, val: 3800, type: 'weapon' }],
+            equipped: { weapon: 'Ghost Rifle', armor: 'Ghost Armor', headgear: 'Ghost Hat' },
+          })
+        );
+        assert(
+          eq(state.equipped, { weapon: null, armor: null, headgear: 'Ghost Hat' }),
+          'equipped slots naming an item absent from inventory are reconciled to null; headgear is untouched (Protocol 13)',
+          JSON.stringify(state.equipped)
+        );
+
+        // AI_OVERSEER Finding 1 — the inventory RECONCILE contract, proven in a
+        // real browser: the AI array is a proposal, never a full replace. An empty
+        // (or short) AI array must delete NOTHING the Courier natively holds;
+        // additions still merge in (narrative looting). Removals are confirm-gated
+        // — with no confirm surface on this page they are simply kept.
+        resetState();
+        state.inventory = [
+          { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+          { name: 'Stimpak', qty: 5, wgt: 0.5, val: 75, type: 'aid' },
+        ];
+        autoImportState(JSON.stringify({ inventory: [] }));
+        assert(
+          state.inventory.length === 2 &&
+            state.inventory.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+            state.inventory.some(i => i.name === 'Stimpak' && i.qty === 5),
+          'AI_OVERSEER F1: an empty AI inventory array deletes nothing (reconcile, not full-replace)',
+          JSON.stringify(state.inventory.map(i => i.name + 'x' + i.qty))
+        );
+        autoImportState(
+          JSON.stringify({ inventory: [{ name: 'Combat Knife', qty: 1, type: 'weapon' }] })
+        );
+        assert(
+          state.inventory.length === 3 && state.inventory.some(i => i.name === 'Combat Knife'),
+          'AI_OVERSEER F1: a newly-looted item merges in without dropping existing items',
+          JSON.stringify(state.inventory.map(i => i.name))
+        );
+
+        // AI_OVERSEER Finding 1 — CLASS fix, proven in a real browser: the SAME
+        // reconcile contract now protects every other durable collection. An empty
+        // AI list/object for any of them must delete NOTHING the Courier holds.
+        resetState();
+        state.squad = [
+          { name: 'Boone', hp: 100, hpMax: 100 },
+          { name: 'Veronica', hp: 100, hpMax: 100 },
+        ];
+        state.perks = [{ name: 'Cowboy', rank: 1, level_taken: 6 }];
+        state.quests = [{ name: 'Ghost Town Gunfight', status: 'complete' }];
+        state.ammo = { '5.56mm': 120, '10mm': 45 };
+        autoImportState(JSON.stringify({ squad: [], perks: [], quests: [], status: [], ammo: {} }));
+        assert(
+          state.squad.length === 2 &&
+            state.perks.length === 1 &&
+            state.quests.length === 1 &&
+            state.ammo['5.56mm'] === 120 &&
+            state.ammo['10mm'] === 45,
+          'AI_OVERSEER F1 (class): empty squad/perks/quests/status/ammo from the AI wipe nothing (reconcile, not full-replace)',
+          JSON.stringify({
+            squad: state.squad.length,
+            perks: state.perks.length,
+            quests: state.quests.length,
+            ammo: state.ammo,
+          })
+        );
+        autoImportState(JSON.stringify({ squad: [{ name: 'Cass', hp: 100, hpMax: 100 }] }));
+        assert(
+          state.squad.length === 3 && state.squad.some(m => m.name === 'Cass'),
+          'AI_OVERSEER F1 (class): a new companion merges in without dropping existing ones',
+          JSON.stringify(state.squad.map(m => m.name))
         );
 
         // ══════════════════════════════════════════════════════════════
@@ -707,7 +815,7 @@
       (async function () {
         // ── Suite 10 — P1 IndexedDB durability shadow (REAL IndexedDB) ────────
         // This is the behavioral half of canonical Suite 138: Chromium has a
-        // native IndexedDB (Node/PowerShell do not), so this proves the real
+        // native IndexedDB (the Node runner does not), so this proves the real
         // round-trip, the no-read-flip invariant, the two-store boundary, and
         // fail-safe resolve-soft behavior — not just the source shape.
         try {
@@ -1159,7 +1267,7 @@
         }
 
         // ── Suite 14 — P5 save version history (REAL IndexedDB) ───────────────
-        // Node/PowerShell have no IndexedDB, so the real per-slot revision-ring
+        // The Node runner has no IndexedDB, so the real per-slot revision-ring
         // behavior is proven HERE against the browser's native IndexedDB and the
         // real state.js accessors (readSlotVersions / pushSlotVersion): a push→read
         // round-trip, newest-first ordering, the SLOT_VERSION_CAP bound, the

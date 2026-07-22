@@ -1,0 +1,810 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/45-databank.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 10024-10793. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: Phase 3 Piece 3 Databank / Records Bay (BUS-16..21)
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   45-databank.css — cascade slot 45: Phase 3 Piece 3 "THE RECORDS
+   BAY" (BUS-16..21) — the Phosphor Cartography node-map, the
+   directive-slot rack, and the rest of the DATABANK panel's archival
+   instrumentation.
+   WHY HERE: same pattern as 35/40 — reuses the shared .bay-board/
+   .bay-slot-tag/.bay-part-no/.panel-substatus/.board-led vocabulary
+   from 30-modulebay.css, so it must load after that file. Its
+   position after 40-curio-operations.css is chronological (Piece 3
+   after Piece 2) rather than a required cascade dependency between
+   the two.
+   ══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 · PIECE 3 — DATABANK "THE RECORDS BAY" (BUS-16…21)
+   An archival cartography station: the machine's memory and maps.
+   Green = owned/local/charted records; amber (--bezel-wire) = active
+   query/reference-retrieval (CATALOG QUERY only); red = failed
+   directives/hazards. Every board reuses the shipped .bay-board/
+   .bay-slot-tag/.bay-part-no/.panel-substatus/.board-led machine-language
+   classes (Protocol 22) — only the BUS-16/17 hero instruments (the SVG
+   node map, the directive-slot rack) get substantial new CSS.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── BUS-16 · CARTOGRAPHY TABLE — Phosphor Cartography node map ────────── */
+.map-caption {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 3px;
+  margin-top: 8px;
+  opacity: 0.8;
+}
+.map-caption .mc-sub {
+  display: block;
+  font-size: 7.5px;
+  letter-spacing: 2px;
+  opacity: 0.5;
+  margin-top: 2px;
+}
+.chart-scale {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.chart-scale button {
+  font-size: 9px;
+  padding: 5px 12px;
+  opacity: 0.55;
+  width: auto;
+}
+.chart-scale button.cur {
+  opacity: 1;
+  border-color: var(--bezel-wire);
+  color: var(--bezel-wire);
+}
+/* Owner report fix (original): the app-wide CRT glass overlay (.crt-overlay,
+   a DIRECT child of .glass-frame at z-index:9999 — see terminal.css's
+   crt-overlay rule) spans the FULL scrollable page height on a
+   single-column layout, not just one screen's worth, so its periodic
+   refresh-bar sweep passes over EVERY panel's content — including this
+   board's, whose unusually dark/clean background (#02120c) makes that
+   normally-subtle sweep read as "a bright line crossing the text."
+   .table-frame/.survey-legend/.kbd-hint sit in the SAME stacking context as
+   .crt-overlay (no intermediate ancestor between .glass-frame and
+   #worldMapPanel establishes its own stacking context — the two-column
+   desktop shell's .col-left/.main-grid are both position:static), so a
+   comfortably-higher z-index here is enough to keep this board's own
+   content on top WITHOUT touching the global overlay (which stays exactly
+   as it is everywhere else — Protocol 22, no forked/duplicated CRT effect).
+
+   Owner report re-fix (moving cyan line, real mobile device — a headless
+   desktop repro never reproduced it, but the mechanism was confirmed live):
+   .sweep-radar (below) rotates via `transform` with NO clipping ancestor —
+   its rotated bounding box measurably extends past .table-frame's own
+   edges for most of its 8s rotation (a rotated square's bounding box grows
+   by up to sqrt(2)x). On desktop-engine testing the z-index order above
+   still kept .survey-legend/.kbd-hint painted on top regardless of the
+   geometric overlap, but .sweep-radar's `mix-blend-mode: screen` has no
+   `isolation: isolate` boundary — undefined/inconsistent blend compositing
+   across GPU/mobile rendering paths is a well-documented class of
+   cross-device bug, and is the most likely explanation for a moving bleed
+   that shows on real hardware but never in headless Chromium/WebKit.
+   `overflow: hidden` makes the escape geometrically impossible regardless
+   of engine (the sweep can now never paint outside this box, full stop);
+   `isolation: isolate` gives the blend mode an unambiguous, self-contained
+   compositing boundary. .survey-legend/.kbd-hint already live OUTSIDE this
+   element as later DOM siblings (Protocol 22 — no restructuring needed),
+   so clipping the plot to its own box is sufficient on its own to keep the
+   sweep off the legend row, with the z-index order above kept as
+   defense-in-depth. */
+.table-frame {
+  margin: 12px auto 0;
+  max-width: 560px;
+  position: relative;
+  z-index: 10000;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: #02120c;
+  padding: 22px;
+}
+.compass {
+  position: absolute;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+}
+.compass.n {
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.compass.s {
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.compass.w {
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.compass.e {
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.sweep-radar {
+  position: absolute;
+  inset: 22px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(var(--bezel-wire-rgb), 0.22) 0deg,
+    rgba(var(--bezel-wire-rgb), 0.05) 26deg,
+    transparent 40deg 360deg
+  );
+  animation: dbRadarSpin 8s linear infinite; /* SURVEY-SWEEP */
+  z-index: 3;
+  mix-blend-mode: screen;
+}
+@keyframes dbRadarSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.map-svg-wrap {
+  position: relative;
+  z-index: 2;
+}
+.map-svg-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.rangering {
+  fill: none;
+  stroke: rgba(var(--robco-green-rgb), 0.09);
+  stroke-width: 1;
+}
+.route {
+  stroke: rgba(var(--robco-green-rgb), 0.5);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(var(--robco-green-rgb), 0.5));
+}
+/* Owner report fix (#26 SURVEY PING route-line draw, deferred the same way
+   the ping ring itself is deferred — js/ui-render.js's newRouteSegIdx): the
+   classic stroke-dashoffset "draws itself" reveal needs stroke-dasharray set
+   to the line's own length (one dash spanning it end to end) for the
+   duration of the reveal, which is why this can't just reuse the static "5 4"
+   pattern directly — the keyframe snaps to that pattern only once the line
+   is fully drawn (99%->100%), so the segment settles into the exact same
+   look as every other known-route line. --route-len is a unitless custom
+   property set per-element (its real length varies segment to segment);
+   calc(...*1px) is the standard technique for using it in a length context.
+   A plain @keyframes animation, so the existing global prefers-reduced-motion
+   block collapses it to an instant, correctly-drawn final frame — no bespoke
+   carve-out (Protocol UI-9). */
+@keyframes route-draw-in {
+  0% {
+    stroke-dasharray: calc(var(--route-len) * 1px) calc(var(--route-len) * 1px);
+    stroke-dashoffset: calc(var(--route-len) * 1px);
+  }
+  85% {
+    stroke-dasharray: calc(var(--route-len) * 1px) calc(var(--route-len) * 1px);
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dasharray: 5 4;
+    stroke-dashoffset: 0;
+  }
+}
+.route.route-draw-in {
+  animation: route-draw-in 1.4s ease-out both;
+}
+g.node {
+  cursor: pointer;
+}
+g.node .hit {
+  fill: transparent;
+} /* ≥28px hit disc */
+g.node .dot {
+  fill: var(--robco-green);
+  filter: drop-shadow(0 0 4px rgba(var(--robco-green-rgb), 0.8));
+}
+g.node .halo {
+  fill: rgba(var(--robco-green-rgb), 0.12);
+}
+g.node text.lbl {
+  fill: var(--robco-green);
+  font-family: inherit;
+  font-size: 7.5px;
+  letter-spacing: 0.5px;
+  text-anchor: middle;
+  filter: drop-shadow(0 0 3px rgba(var(--robco-green-rgb), 0.6));
+  text-transform: uppercase;
+}
+g.node.fog .dot {
+  fill: none;
+  stroke: rgba(var(--robco-green-rgb), 0.32);
+  stroke-width: 1.2;
+  stroke-dasharray: 2.5 2.5;
+  filter: none;
+}
+g.node.fog .halo {
+  fill: none;
+}
+g.node .focusring {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 1.6;
+}
+g.node:focus {
+  outline: none;
+}
+g.node:focus-visible .focusring {
+  stroke: var(--robco-green);
+}
+.sig-glyph {
+  fill: var(--bezel-wire);
+  font-family: inherit;
+  font-size: 10px;
+  text-anchor: middle;
+  filter: drop-shadow(0 0 4px rgba(var(--bezel-wire-rgb), 0.8));
+  animation: bayLedPulse 2.2s infinite;
+  pointer-events: none;
+}
+.you {
+  animation: dbYouBlink 1.6s steps(2) infinite; /* PLOT-FIX */
+  pointer-events: none;
+}
+@keyframes dbYouBlink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.you circle {
+  fill: none;
+  stroke: var(--robco-green);
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 5px rgba(var(--robco-green-rgb), 0.9));
+}
+.you line {
+  stroke: var(--robco-green);
+  stroke-width: 1.4;
+}
+.you text {
+  fill: var(--robco-green);
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-anchor: middle;
+  filter: drop-shadow(0 0 3px rgba(var(--robco-green-rgb), 0.7));
+}
+.kbd-hint {
+  /* See the .table-frame comment above — same fix, same reason. */
+  position: relative;
+  z-index: 10000;
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.4;
+  margin-top: 7px;
+  text-transform: none;
+}
+.survey-legend {
+  /* See the .table-frame comment above — same fix, same reason. */
+  position: relative;
+  z-index: 10000;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  text-transform: none;
+}
+.survey-legend .lg-fog {
+  color: rgba(var(--robco-green-rgb), 0.4);
+}
+.survey-legend .lg-sig {
+  color: var(--bezel-wire);
+}
+/* sector sheet (the zoomed detail view) */
+.sheet {
+  margin-top: 12px;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sheet-head button {
+  font-size: 9px;
+  padding: 4px 9px;
+  width: auto;
+}
+.sheet-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.loc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.22);
+  padding: 7px 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+}
+.loc-row b {
+  font-weight: normal;
+  flex: 1 1 150px;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.loc-row .loc-st {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.loc-row .st-cur {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.loc-row .st-vis {
+  color: var(--robco-green);
+  opacity: 0.7;
+}
+.loc-row .st-unk {
+  color: rgba(var(--robco-green-rgb), 0.35);
+  border-style: dashed;
+}
+.loc-row.unknown b {
+  opacity: 0.4;
+}
+.loc-row button.mark {
+  font-size: 8.5px;
+  padding: 4px 8px;
+  min-height: 28px;
+  width: auto;
+}
+
+/* ── BUS-17 · DIRECTIVE REGISTRY — numbered directive slots ────────────── */
+.dir-slot {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  border-left: 4px solid rgba(var(--robco-green-rgb), 0.55);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 10px;
+  margin-bottom: 7px;
+  animation: dbSlotSeat 0.3s ease-out; /* SLOT-SEAT */
+}
+@keyframes dbSlotSeat {
+  from {
+    opacity: 0.3;
+    transform: translateY(-4px);
+  }
+}
+.dir-slot .s-idx {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  opacity: 0.45;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.3);
+  padding: 2px 6px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.dir-lamp {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+  background: #3a3d35;
+}
+.dir-slot.active {
+  border-left-color: var(--bezel-wire);
+}
+.dir-slot.active .dir-lamp {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+  animation: bayLedPulse 2s infinite;
+}
+.dir-slot.complete .dir-lamp {
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+}
+.dir-slot.complete {
+  opacity: 0.75;
+}
+.dir-slot.failed {
+  border-left-color: var(--robco-danger);
+  border-color: rgba(231, 76, 60, 0.45);
+}
+.dir-slot.failed .dir-lamp {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+}
+.dir-slot.failed .d-name {
+  color: var(--robco-danger);
+}
+.dir-main {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.d-name {
+  font-size: 11px;
+  letter-spacing: 1px;
+  overflow-wrap: break-word;
+}
+.d-obj {
+  display: block;
+  font-size: 8.5px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+  text-transform: none;
+}
+.d-st {
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.7;
+}
+.dir-keys {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.dir-keys button {
+  font-size: 8.5px;
+  padding: 3px 7px;
+  min-height: 28px;
+  width: auto;
+}
+.dir-keys .cyc {
+  border-color: var(--bezel-wire);
+  color: var(--bezel-wire);
+  /* U7 (Protocol 42 — found by render-integrity.mjs's New Vegas coverage,
+     a real pre-existing defect): neither .cyc nor .del ever overrode the
+     base button{background:var(--robco-green)} rule (05-base.css), so
+     amber-on-green (.cyc) and red-on-green (.del) sat at ~1.3-2.9:1
+     contrast on the quest board's own accent green — the same class of
+     bug as the STATUS EFFECTS purge button fixed above (35-operator-
+     boards.css). Never caught because nothing tested the quest board's
+     initial-view controls until this unit's matrix broadened to New Vegas. */
+  background: rgba(0, 0, 0, 0.4);
+}
+.dir-keys .del {
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--robco-danger);
+  min-width: 28px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.file-slip {
+  margin-top: 12px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.3);
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.file-slip .fs-name {
+  flex: 1 1 160px;
+  min-width: 130px;
+}
+.file-slip .fs-obj {
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+.file-slip select {
+  flex: 0 1 auto;
+  width: auto;
+}
+.file-slip .keybtn {
+  flex: 0 1 auto;
+  width: auto;
+}
+
+/* ── BUS-18 · CAMPAIGN CHRONICLE — tape-spool record ────────────────────── */
+.stat-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 8px;
+  margin-top: 10px;
+}
+.cs-box {
+  flex: 1 1 96px;
+  max-width: 140px;
+  min-width: 90px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background:
+    linear-gradient(rgba(var(--robco-green-rgb), 0.025), rgba(0, 0, 0, 0.5)), var(--robco-dark);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 7px 8px;
+  text-align: center;
+}
+.cs-box .c-cap {
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  display: block;
+}
+.cs-box .c-val {
+  font-size: 16px;
+  letter-spacing: 1px;
+  display: block;
+  margin-top: 2px;
+}
+.standing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 6px;
+  margin-top: 9px;
+}
+.stch {
+  font-size: 8px;
+  letter-spacing: 1px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  padding: 3px 8px;
+  opacity: 0.85;
+}
+.stch.bad {
+  border-color: rgba(231, 76, 60, 0.5);
+  color: var(--robco-danger);
+}
+.spool-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+}
+.reels {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+.reel {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--robco-green-rgb), 0.55);
+  background:
+    radial-gradient(circle at center, rgba(var(--robco-green-rgb), 0.25) 0 4px, transparent 5px),
+    repeating-conic-gradient(rgba(var(--robco-green-rgb), 0.18) 0deg 14deg, transparent 14deg 60deg);
+  animation: dbReelSpin 9s linear infinite; /* REEL */
+}
+.reel:nth-child(2) {
+  animation-duration: 6s;
+}
+@keyframes dbReelSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spool-list {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rec-line {
+  font-size: 9.5px;
+  letter-spacing: 0.5px;
+  border-left: 2px solid rgba(var(--robco-green-rgb), 0.35);
+  padding: 4px 0 4px 8px;
+  margin-bottom: 3px;
+  opacity: 0.8;
+  text-transform: none;
+  overflow-wrap: break-word;
+}
+.rec-line .rt {
+  opacity: 0.45;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.incident {
+  border: 2px double rgba(var(--robco-green-rgb), 0.5);
+  padding: 6px 10px;
+  margin: 7px 0;
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.incident .in-t {
+  opacity: 0.45;
+  font-size: 8px;
+}
+.incident.milestone-fac.bad {
+  border-color: rgba(231, 76, 60, 0.55);
+  color: var(--robco-danger);
+}
+
+/* ── BUS-19 · CATALOG QUERY (amber) ─────────────────────────────────────── */
+.query-line {
+  position: relative;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.query-line input {
+  width: 100%;
+  border-color: rgba(var(--bezel-wire-rgb), 0.6);
+  color: var(--bezel-wire);
+}
+.query-line::after {
+  /* QUERY-SCAN */
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  background: linear-gradient(90deg, transparent, rgba(var(--bezel-wire-rgb), 0.16), transparent);
+  animation: dbQueryScan 3.2s linear infinite;
+  pointer-events: none;
+}
+@keyframes dbQueryScan {
+  from {
+    left: -40px;
+  }
+  to {
+    left: 100%;
+  }
+}
+/* The shared CONSULT engine's cards reskinned amber, scoped to this board only
+   (Protocol 22 — the CONSULT modal elsewhere keeps its own green treatment). */
+#databankPanel #databankResults .consult-card {
+  color: var(--bezel-wire);
+  text-shadow: 0 0 7px rgba(var(--bezel-wire-rgb), 0.55);
+}
+#databankPanel #databankResults .consult-hit,
+#databankPanel #databankResults .consult-row {
+  border-color: rgba(var(--bezel-wire-rgb), 0.25);
+}
+#databankPanel #databankResults .consult-cat {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.5);
+}
+#databankPanel #databankResults .consult-hit-name {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* ── BUS-20 · FIELD NOTES — courier's field ledger ──────────────────────── */
+.note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-bottom: 1px solid rgba(var(--robco-green-rgb), 0.14);
+  padding: 6px 2px;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-transform: none;
+}
+.note-row .n-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+}
+.note-row.autolog .n-txt {
+  opacity: 0.45;
+  font-size: 9px;
+}
+.note-row .n-x {
+  flex-shrink: 0;
+  font-size: 9px;
+  padding: 2px 6px;
+  min-height: 28px;
+  min-width: 28px;
+  width: auto;
+  border-color: rgba(231, 76, 60, 0.55);
+  color: var(--robco-danger);
+}
+.note-slip {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.note-slip input {
+  flex: 1 1 190px;
+  min-width: 150px;
+  text-align: left;
+}
+.note-slip .keybtn {
+  width: auto;
+}
+
+/* ── BUS-21 · SERVICE TALLY — mechanical odometer bank ──────────────────── */
+.tally-bank {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+  margin-top: 12px;
+}
+.odo-tile {
+  flex: 1 1 128px;
+  max-width: 180px;
+  min-width: 118px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  outline: 1px solid rgba(var(--robco-green-rgb), 0.42);
+  background:
+    linear-gradient(rgba(var(--robco-green-rgb), 0.025), rgba(0, 0, 0, 0.5)), var(--robco-dark);
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+  padding: 8px 8px 9px;
+  text-align: center;
+  position: relative;
+}
+.odo-cap {
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  display: block;
+}
+.odo-digits {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.odo-digits b {
+  font-weight: normal;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+  border-top-color: rgba(255, 255, 255, 0.12);
+  padding: 2px 4px;
+  font-size: 14px;
+  text-shadow: var(--robco-glow);
+}
+.odo-sub {
+  display: block;
+  font-size: 6.5px;
+  letter-spacing: 1px;
+  opacity: 0.32;
+  margin-top: 4px;
+  text-transform: none;
+}
+.tally-actions {
+  display: flex;
+  justify-content: center; /* centering rule */
+  margin-top: 12px;
+}
+.tally-actions button {
+  border-color: rgba(231, 76, 60, 0.6);
+  color: var(--robco-danger);
+  font-size: 9.5px;
+  width: auto;
+}

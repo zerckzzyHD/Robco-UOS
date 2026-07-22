@@ -1,27 +1,41 @@
 /**
- * tests/boot-smoke.mjs — CI boot smoke test
+ * tests/boot-smoke.mjs — boot smoke test (two modes)
  *
  * Serves index.html over HTTP (not file://) so ES modules, fetch, and service
  * worker all work correctly — eliminating false-positive console errors from
- * file:// origin restrictions.
+ * file:// origin restrictions. The static server lives in ./static-server.mjs
+ * (shared, Protocol 22).
  *
- * Asserts:
- *   1. Boot screen is hidden (app reached booted state within 5 s)
+ * FULL mode (default — PUSH gate, `npm run gate` step 6):
+ *   1. Boot screen is hidden (app reached READY within 5 s)
  *   2. Zero unexpected console errors during boot
  *   3. Page body has rendered content (not blank)
  *
- * Run:  node tests/boot-smoke.mjs
- * CI:   called by npm run gate in .github/workflows/ci.yml
+ * FAST mode (`--fast` — COMMIT gate, inside `npm run gate:fast`):
+ *   A deliberately-tiny "the shell boots and paints without throwing" check
+ *   cheap enough to run on every commit. One load; asserts the bezel nav is
+ *   present, a core board actually rendered + is visible (the functional
+ *   readiness signal — reached ~1.3 s, before the cosmetic boot-screen
+ *   animation finishes at ~3.5 s), and NO uncaught pageerror occurred during
+ *   boot. It deliberately skips the full boot-screen-animation wait, the
+ *   300 ms deferred-error buffer, and the full console-error scan — those stay
+ *   in FULL mode at the push gate. Keeps the commit gate to a small bounded
+ *   add (~3–4 s) so it never gets disabled.
  *
+ * Run:  node tests/boot-smoke.mjs          (full)
+ *       node tests/boot-smoke.mjs --fast   (fast commit smoke)
  * Requires: npx playwright install chromium
  */
 
 import { acquireBrowser } from './browser-shared.mjs';
+import { startStaticServer } from './static-server.mjs';
+import { installFailureCapture, trackBrowser, saveFailureArtifacts } from './artifacts.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
-import http from 'http';
 
+const FAST = process.argv.includes('--fast');
+installFailureCapture(FAST ? 'boot-smoke-fast' : 'boot-smoke');
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'index.html');
 
@@ -30,48 +44,7 @@ if (!fs.existsSync(INDEX)) {
   process.exit(1);
 }
 
-// ── Minimal static file server ──────────────────────────────────────────────
-const MIME = {
-  '.html': 'text/html',
-  '.js': 'application/javascript',
-  '.mjs': 'application/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.webmanifest': 'application/manifest+json',
-  '.md': 'text/markdown',
-  '.txt': 'text/plain',
-};
-
-const server = http.createServer((req, res) => {
-  const urlPath = req.url.split('?')[0].split('#')[0];
-  const filePath = path.normalize(path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath));
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
-    res.end();
-    return;
-  }
-  const ext = path.extname(filePath).toLowerCase();
-  const mime = MIME[ext] || 'application/octet-stream';
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    res.writeHead(200, { 'Content-Type': mime });
-    res.end(data);
-  });
-});
-
-const PORT = await new Promise((resolve, reject) => {
-  server.on('error', reject);
-  server.listen(0, '127.0.0.1', () => resolve(server.address().port));
-});
-const BASE_URL = `http://127.0.0.1:${PORT}`;
-
-// ── Test setup ───────────────────────────────────────────────────────────────
+// ── Test harness ─────────────────────────────────────────────────────────────
 let failed = 0;
 function pass(msg) {
   console.log('  [PASS]', msg);
@@ -81,91 +54,115 @@ function fail(msg) {
   failed++;
 }
 
-// Allowlist: known noise that is NOT a bug
+// Allowlist: known noise that is NOT a bug (FULL-mode console scan only).
 function isExpectedNoise(text) {
   // Report-only CSP messages are advisory — the browser logs but never blocks.
-  // Covers: (a) report-only CSP via <meta>, (b) frame-ancestors violations from
-  // Firebase/Google Auth SDK iframes. All are expected in the test environment.
   if (/content.security.policy/i.test(text) && /report.only/i.test(text)) return true;
-  // frame-ancestors is spec-invalid in a <meta> CSP (CSP spec §5.1 — the browser MUST
-  // ignore it when delivered via meta; it can only be enforced via HTTP response headers).
-  // Our own CSP no longer declares it at all (removed rather than left in as a silent
-  // no-op — see index.html + test 55.9). This filter now only catches frame-ancestors
-  // noise from third-party SDK iframes (e.g. Firebase App Check's recaptcha), which are
-  // not ours to fix.
+  // frame-ancestors is spec-invalid in a <meta> CSP; only third-party SDK iframe noise now.
   if (/frame-ancestors/i.test(text) && /ignored/i.test(text)) return true;
   // Service worker noise (edge-case environments)
   if (text.includes('ServiceWorker') || text.includes('service-worker')) return true;
-  // Firebase Auth / Firestore / remote-config calls return network errors in the test
-  // environment (no credentials, no network to real Firebase). The app handles all of
-  // these gracefully (fail-open per Protocol 32/33) — not a genuine app bug.
+  // Firebase Auth / Firestore / remote-config network errors in the test env
+  // (no credentials, no network) — the app fail-opens (Protocol 32/33).
   if (text.includes('Failed to load resource')) return true;
   return false;
 }
 
+const LABEL = FAST ? 'boot-smoke-fast' : 'boot-smoke';
+const srv = await startStaticServer(ROOT);
 const browser = await acquireBrowser();
+trackBrowser(browser, LABEL);
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const page = await ctx.newPage();
 
-const consoleErrors = [];
-page.on('console', msg => {
-  if (msg.type() === 'error') {
-    const text = msg.text();
-    if (!isExpectedNoise(text)) consoleErrors.push(text);
-  }
-});
+// Uncaught page exceptions are a boot failure in BOTH modes.
+const pageErrors = [];
 page.on('pageerror', err => {
-  const text = err.message;
-  if (!isExpectedNoise(text)) consoleErrors.push(`pageerror: ${text}`);
+  if (!isExpectedNoise(err.message)) pageErrors.push(`pageerror: ${err.message}`);
 });
 
-await page.goto(BASE_URL);
-
-// Wait for boot screen to disappear (up to 5 seconds)
-try {
-  await page.waitForFunction(
-    () => {
-      const bs = document.getElementById('bootScreen');
-      return !bs || bs.style.display === 'none' || getComputedStyle(bs).display === 'none';
-    },
-    { timeout: 5000 }
-  );
-  pass('Boot sequence completed — bootScreen hidden within 5 s');
-} catch {
-  fail(
-    'Boot sequence did not complete within 5 s (bootScreen still visible — possible black screen)'
-  );
+// FULL mode also collects console errors.
+const consoleErrors = [];
+if (!FAST) {
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      const text = msg.text();
+      if (!isExpectedNoise(text)) consoleErrors.push(text);
+    }
+  });
 }
 
-// Small buffer for any deferred post-boot errors
-await page.waitForTimeout(300);
+await page.goto(srv.baseUrl);
 
-// Assert no console errors
-if (consoleErrors.length === 0) {
-  pass('Zero console errors during boot');
-} else {
-  for (const e of consoleErrors) {
-    fail(`Console error: ${e}`);
+if (FAST) {
+  // ── FAST commit smoke: the shell boots and paints without throwing ──────────
+  try {
+    // Bezel subsystem nav is up (chrome painted) AND a core board actually
+    // rendered and is visible — the functional "it booted and paints" signal.
+    await page.waitForSelector('.bezel', { state: 'attached', timeout: 10000 });
+    await page.waitForFunction(
+      () => {
+        const board = document.querySelector('.panel[data-tab]');
+        return !!board && board.offsetParent !== null;
+      },
+      { timeout: 10000 }
+    );
+    pass('Shell booted and painted — bezel nav present + a core board rendered and visible');
+  } catch {
+    fail('Shell did not paint a core board within 10 s (possible boot throw / black screen)');
+    await saveFailureArtifacts(LABEL, page);
   }
-}
-
-// Assert page has rendered content
-const hasContent = await page.evaluate(() => document.body && document.body.children.length > 0);
-if (hasContent) {
-  pass('Page has rendered content (not a blank screen)');
+  if (pageErrors.length === 0) {
+    pass('No uncaught pageerror during boot');
+  } else {
+    for (const e of pageErrors) fail(e);
+  }
 } else {
-  fail('Page is blank — document.body has no children');
+  // ── FULL push smoke: READY + clean console + rendered content ────────────────
+  try {
+    await page.waitForFunction(
+      () => {
+        const bs = document.getElementById('bootScreen');
+        return !bs || bs.style.display === 'none' || getComputedStyle(bs).display === 'none';
+      },
+      { timeout: 5000 }
+    );
+    pass('Boot sequence completed — bootScreen hidden within 5 s');
+  } catch {
+    fail(
+      'Boot sequence did not complete within 5 s (bootScreen still visible — possible black screen)'
+    );
+    await saveFailureArtifacts(LABEL, page);
+  }
+
+  // Small buffer for any deferred post-boot errors
+  await page.waitForTimeout(300);
+
+  const allErrors = [...consoleErrors, ...pageErrors];
+  if (allErrors.length === 0) {
+    pass('Zero console errors during boot');
+  } else {
+    for (const e of allErrors) fail(`Console error: ${e}`);
+  }
+
+  const hasContent = await page.evaluate(() => document.body && document.body.children.length > 0);
+  if (hasContent) {
+    pass('Page has rendered content (not a blank screen)');
+  } else {
+    fail('Page is blank — document.body has no children');
+  }
 }
 
 await ctx.close();
 await browser.close();
-server.close();
+srv.close();
 
 console.log('');
+const label = FAST ? 'boot smoke (fast)' : 'boot smoke';
 if (failed === 0) {
-  console.log('  All boot smoke checks passed.\n');
+  console.log(`  All ${label} checks passed.\n`);
   process.exit(0);
 } else {
-  console.error(`  ${failed} boot smoke check(s) FAILED.\n`);
+  console.error(`  ${failed} ${label} check(s) FAILED.\n`);
   process.exit(1);
 }

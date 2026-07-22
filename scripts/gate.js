@@ -7,22 +7,34 @@
  *   npm run gate       — full gate (lint + format + tests + browser checks)
  *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
  *   npm run gate:iter  — OPT-IN iteration pre-check ONLY (lint changed files +
- *                        format + Node runner). Skips the PowerShell mirror,
- *                        parity, and every browser check for fast inner-loop
- *                        feedback. NOT a substitute for the commit gate
- *                        (gate:fast) or the push gate (gate): it is never run by
- *                        a git hook or CI, so it cannot satisfy either boundary.
+ *                        format + Node runner). Skips every browser check for
+ *                        fast inner-loop feedback. NOT a substitute for the
+ *                        commit gate (gate:fast) or the push gate (gate): it is
+ *                        never run by a git hook or CI, so it cannot satisfy
+ *                        either boundary.
  *
- * Steps (full; --fast skips steps 5-9; --iter takes the separate fast path):
+ * 2.8.5 U-B3: the second (mirror) test runner and its per-suite parity check
+ * were REMOVED — the mirror caught nothing the Node runner cannot, at ~13× the
+ * cost. Protocol 15 (runner parity) is retired. The gate now runs the single
+ * canonical Node runner. (This file intentionally carries no reference to the
+ * deleted mirror — Suite 50.6 / 128.5 guard that it stays single-runner.)
+ *
+ * Steps (full; --fast runs 1-4b + the fast boot smoke; --iter takes its own path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
- *   3. Persistence audit — Node runner
- *   4. Persistence audit — PowerShell runner (+ parity check)
+ *   3. Boot-chain preflight (index.html/sw.js/disk/docs/test.html consistency)
+ *   4. Persistence audit — Node runner
+ *   4b. Cloud-serialization guard (QUEUE.md A3 — models Firestore write rules
+ *      against the live state literal; pure Node, so it runs on fast + full)
+ *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
+ *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
- *   6. Boot smoke test (HTTP)                     ← skipped by --fast
+ *   6. Boot smoke test (HTTP, full)               ← skipped by --fast
  *   7. Render check (360px & 412px)               ← skipped by --fast
  *   8. A11y check (axe serious/critical baseline) ← skipped by --fast
  *   9. Runtime audit — test.html headless         ← skipped by --fast
+ *  10. Save-survival (SAVE_INTEGRITY_PASS)         ← skipped by --fast
+ *  11. Offline-first behavioral test (network cut)← skipped by --fast (U1)
  */
 'use strict';
 
@@ -32,8 +44,49 @@ const fs = require('fs');
 const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
-const isCI = !!process.env.CI;
 const fast = process.argv.includes('--fast');
+
+// ── Per-step wall-time profiling (Health-batch U5) ───────────────────────────
+// Measurement only — this records how long each gate step takes and prints a
+// breakdown table at the end. It changes NOTHING about what any step asserts.
+// A step's duration is captured around its child-process spawn (run()) or around
+// the browser launch/warmup helpers, so the table shows exactly where the gate's
+// wall-time actually goes. Always on (cheap), so every gate run leaves a real
+// breakdown behind instead of a guessed one.
+const _timings = [];
+function printTimingTable() {
+  if (!_timings.length) return;
+  const total = _timings.reduce((a, t) => a + t.ms, 0);
+  const w = Math.max(..._timings.map(t => t.label.length), 5);
+  console.log('\n[gate] ── per-step wall-time (U5 profiling) ' + '─'.repeat(Math.max(0, 30)));
+  for (const t of _timings) {
+    const secs = (t.ms / 1000).toFixed(2).padStart(7);
+    const pct = ((t.ms / total) * 100).toFixed(1).padStart(5);
+    console.log(`[gate]   ${t.label.padEnd(w)}  ${secs}s  ${pct}%`);
+  }
+  console.log(`[gate]   ${'TOTAL'.padEnd(w)}  ${(total / 1000).toFixed(2).padStart(7)}s  100.0%`);
+  console.log('[gate] ' + '─'.repeat(72));
+}
+process.on('exit', printTimingTable);
+
+// ── CI failure-evidence packaging (Health-batch U4) ──────────────────────────
+// When CI goes red, the failure should be diagnosable from the run itself — no
+// local re-run. Two pieces:
+//   1. Every gate step's full stdout+stderr is teed to a per-step log file under
+//      test-artifacts/gate-logs/ (so the failing test names + output survive as
+//      an uploadable artifact instead of scrolling past in the Actions console).
+//   2. ROBCO_ARTIFACTS_DIR is propagated to the child browser harnesses so their
+//      screenshots + console dumps land in the SAME directory the workflow
+//      uploads (tests/artifacts.mjs).
+// Capture is on in CI (GitHub Actions sets CI=true) or with --capture. Locally
+// without it, steps keep streaming live to the console exactly as before.
+const CAPTURE = !!process.env.CI || process.argv.includes('--capture');
+const ARTIFACTS_DIR = process.env.ROBCO_ARTIFACTS_DIR
+  ? path.resolve(process.env.ROBCO_ARTIFACTS_DIR)
+  : path.join(ROOT, 'test-artifacts');
+process.env.ROBCO_ARTIFACTS_DIR = ARTIFACTS_DIR; // child harnesses inherit this
+const GATE_LOG_DIR = path.join(ARTIFACTS_DIR, 'gate-logs');
+let _stepSeq = 0;
 // Opt-in iteration pre-check (audit #3). NOT a commit/push gate — see the --iter
 // block below. Never wired into a git hook or CI; it cannot satisfy either gate.
 const iter = process.argv.includes('--iter');
@@ -113,143 +166,82 @@ function stopSharedBrowser() {
 
 function run(label, cmd) {
   console.log(`\n[gate] ${label}`);
-  const result = spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
-  if (result.status !== 0) {
-    console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
-    process.exit(result.status || 1);
-  }
-}
-
-// Per-suite parity (U3/S2-F5, Step 2 Phase 0 Unit 4). The total-only check
-// below this can't catch drift WITHIN a suite (e.g. one runner gains a test
-// and another loses one elsewhere, totals still match by coincidence — the
-// 173-vs-209 gap Protocol 15 exists to prevent). Walks each runner's own
-// captured output (generic header prefix: Node "── Title ─"; PowerShell
-// "-- Title --") into an ordered list of { title, count } sections, where
-// count is the number of PASS/FAIL result lines before the next header.
-//
-// Every suite header in the PowerShell runner is written "Suite N -- Title"
-// (Sep() always numbers). The Node runner only started literally embedding
-// "Suite N" in its header() text from Suite 49 onward — pre-existing suites
-// 1-48 use bare descriptive titles by long-standing historical convention
-// (predates this check; rewriting ~48 legacy header strings across both
-// 14k-line runners is out of scope here and not what drifted). So parity is
-// enforced at TWO tiers:
-//   1. STRICT, per-suite: every suite where Node's header explicitly states
-//      "Suite N" (currently 49+, which covers all Step 2 / Phase 0 work and
-//      everything added from here forward) must have an identical title
-//      (dash/arrow-style normalized — Node uses "—"/"→"/"±", PowerShell
-//      substitutes "--"/"->"/"+-" for the same glyphs by established
-//      convention) and an identical test count in both runners.
-//   2. AGGREGATE, for the legacy zone: suites 1-48 (unnumbered in Node) are
-//      summed on each side and compared as one total — coarser, but still
-//      catches gross drift in the legacy zone without demanding a historical
-//      rewrite unrelated to the current task.
-const ANSI_ESCAPE_RE = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g');
-const HEADER_RE = /^(?:──|--)\s+(.*)$/;
-const NUMBERED_RE = /^Suite\s+(\d+)\s*(?:—|--)\s*(.*)$/;
-
-function normalizeSuiteTitle(title) {
-  return title
-    .replace(/[─-]+\s*$/, '') // trailing decorative dash run
-    .replace(/→/g, '->')
-    .replace(/±/g, '+-')
-    .replace(/—/g, '--')
-    .trim();
-}
-
-// Returns { numbered: Map<num, {title, count}>, legacyTotal: number }
-function parseSections(output, resultLineRe) {
-  const clean = output.replace(ANSI_ESCAPE_RE, '');
-  const numbered = new Map();
-  let legacyTotal = 0;
-  let current = null; // { num: string|null, count: number }
-  const flush = () => {
-    if (!current) return;
-    if (current.num !== null) {
-      if (!numbered.has(current.num)) numbered.set(current.num, { title: current.title, count: 0 });
-      numbered.get(current.num).count += current.count;
-    } else {
-      legacyTotal += current.count;
+  const _t0 = process.hrtime.bigint();
+  const _rec = () => _timings.push({ label, ms: Number(process.hrtime.bigint() - _t0) / 1e6 });
+  if (!CAPTURE) {
+    // Local default: stream live to the console, exactly as before.
+    const result = spawnSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
+    _rec();
+    if (result.status !== 0) {
+      console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
+      process.exit(result.status || 1);
     }
-  };
-  for (const raw of clean.split(/\r?\n/)) {
-    const line = raw.trimEnd();
-    const hm = line.match(HEADER_RE);
-    if (hm) {
-      flush();
-      const rawTitle = hm[1].replace(/[─-]+\s*$/, '').trim();
-      const nm = rawTitle.match(NUMBERED_RE);
-      current = nm
-        ? { num: nm[1], title: normalizeSuiteTitle(nm[2]), count: 0 }
-        : { num: null, title: rawTitle, count: 0 };
-      continue;
-    }
-    if (current && resultLineRe.test(line)) current.count++;
+    return;
   }
-  flush();
-  return { numbered, legacyTotal };
-}
-
-function checkSuiteParity(nodeOut, psOut) {
-  const node = parseSections(nodeOut, /^\s*[✓✗]/);
-  const ps = parseSections(psOut, /^\s*\[(PASS|FAIL)\]/);
-  const problems = [];
-
-  // Tier 1 — strict, per-suite (every suite Node explicitly numbers).
-  const allNums = new Set([...node.numbered.keys(), ...ps.numbered.keys()]);
-  for (const num of [...allNums].sort((a, b) => Number(a) - Number(b))) {
-    const n = node.numbered.get(num);
-    const p = ps.numbered.get(num);
-    if (!n && p) continue; // PS numbers sections Node doesn't (legacy zone) — folded into aggregate below
-    if (n && !p) {
-      problems.push(
-        `Suite ${num}: present in Node runner ("${n.title}") but missing from PowerShell runner`
-      );
-    } else if (n && p && n.title !== p.title) {
-      problems.push(`Suite ${num}: title mismatch — Node "${n.title}" vs PowerShell "${p.title}"`);
-    } else if (n && p && n.count !== p.count) {
-      problems.push(
-        `Suite ${num} "${n.title}": count mismatch — Node ${n.count} vs PowerShell ${p.count}`
-      );
-    }
-  }
-
-  // Tier 2 — aggregate for the legacy (pre-49) unnumbered-in-Node zone. PS
-  // numbers everything, so its "legacy" total is every numbered suite Node
-  // has no entry for, plus its own unnumbered bucket (should be empty).
-  const psLegacyTotal =
-    ps.legacyTotal +
-    [...ps.numbered.entries()]
-      .filter(([num]) => !node.numbered.has(num))
-      .reduce((sum, [, v]) => sum + v.count, 0);
-  if (node.legacyTotal !== psLegacyTotal) {
-    problems.push(
-      `Legacy (pre-Suite-49, unnumbered-in-Node) zone aggregate mismatch: Node ${node.legacyTotal} vs PowerShell ${psLegacyTotal}`
+  // Capture mode (CI / --capture): pipe the step's output, print it, AND tee it
+  // to a per-step log so a red run leaves the failing test names + output behind
+  // as an uploadable artifact. maxBuffer is raised well above the Node runner's
+  // full multi-thousand-test output so nothing is truncated.
+  const result = spawnSync(cmd, {
+    cwd: ROOT,
+    shell: true,
+    encoding: 'utf8',
+    maxBuffer: 128 * 1024 * 1024,
+  });
+  _rec();
+  const out = (result.stdout || '') + (result.stderr || '');
+  process.stdout.write(out);
+  _stepSeq += 1;
+  const slug =
+    String(_stepSeq).padStart(2, '0') +
+    '-' +
+    label
+      .replace(/[^a-z0-9]+/gi, '-')
+      .toLowerCase()
+      .slice(0, 50);
+  try {
+    fs.mkdirSync(GATE_LOG_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(GATE_LOG_DIR, slug + '.log'),
+      `$ ${cmd}\n[exit ${result.status}]\n\n${out}`,
+      'utf8'
     );
+  } catch {
+    /* logging must never break the gate */
   }
-
-  return {
-    ok: problems.length === 0,
-    problems,
-    suiteCount: allNums.size,
-  };
-}
-
-// Like run(), but captures stdout/stderr (while still echoing them) and returns
-// the combined text. Used for the two persistence runners so the parity check
-// can read their "ALL N TESTS" totals from THIS run's output instead of
-// re-executing both runners a second time (audit #4 — kills the double-run).
-function runCapture(label, cmd) {
-  console.log(`\n[gate] ${label}`);
-  const result = spawnSync(cmd, { cwd: ROOT, shell: true, encoding: 'utf8' });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
   if (result.status !== 0) {
-    console.error(`\n[GATE FAIL] ${label} — exit ${result.status}`);
+    console.error(`\n[GATE FAIL] ${label} — exit ${result.status} (log: gate-logs/${slug}.log)`);
     process.exit(result.status || 1);
   }
-  return (result.stdout || '') + (result.stderr || '');
+}
+
+// Verify the Playwright Chromium binary is present before any browser check.
+// Used by BOTH the fast commit gate (the boot smoke, U1) and the full push
+// gate (all browser checks) — a browser check with no browser must fail with a
+// clear, actionable message, never a cryptic crash.
+function ensureChromium(context) {
+  const _t0 = process.hrtime.bigint();
+  console.log(`\n[gate] Playwright Chromium availability${context ? ' (' + context + ')' : ''}`);
+  const chromiumScript =
+    "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
+    "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
+  const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
+    cwd: ROOT,
+    shell: true,
+    stdio: 'pipe',
+    timeout: 10000,
+  });
+  if (pwResult.status !== 0) {
+    const msg = (pwResult.stderr || '').toString().trim();
+    console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
+    console.error('  Run: npx playwright install chromium');
+    process.exit(1);
+  }
+  console.log('  Chromium found.');
+  _timings.push({
+    label: 'Chromium availability' + (context ? ' (' + context + ')' : ''),
+    ms: Number(process.hrtime.bigint() - _t0) / 1e6,
+  });
 }
 
 // Changed .js/.mjs files vs HEAD (staged, unstaged, and untracked) — used only
@@ -284,8 +276,8 @@ function changedLintFiles() {
 if (iter) {
   console.log('\n[gate] ITERATION PRE-CHECK (--iter) — fast inner-loop feedback ONLY.');
   console.log('[gate] Does NOT replace the commit gate (npm run gate:fast) or the');
-  console.log('[gate] push gate (npm run gate). Commit still runs both test runners;');
-  console.log('[gate] push still runs both runners + every browser check.\n');
+  console.log('[gate] push gate (npm run gate). Commit still runs the full Node test');
+  console.log('[gate] runner; push runs the Node runner + every browser check.\n');
 
   const changed = changedLintFiles();
   if (changed.length) {
@@ -299,6 +291,7 @@ if (iter) {
   }
 
   run('Prettier (format check)', 'npx prettier --check .');
+  run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
   run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
   console.log(
@@ -307,93 +300,74 @@ if (iter) {
   process.exit(0);
 }
 
+// ── 0. Clean the failure-evidence dir at the START of every gate run ──────────
+// test-artifacts/ is gitignored failure evidence (Suite 235.14): screenshots,
+// console dumps, and per-step gate logs written by the browser harnesses when a
+// check fails. It was never cleared between runs, so stale artifacts from an
+// earlier failed run were indistinguishable from a fresh failure — "files present
+// ⇒ the last run failed" was NOT a true signal. Clearing it before any step runs
+// makes that signal honest. Fail-safe (mirrors the gate's own DNA): a cleanup
+// error never aborts the gate — the worst case is a stale artifact, exactly the
+// pre-existing behavior. Runs after the --iter early-exit (iter is a dev pre-check,
+// not a real gate) so it covers every actual commit/push gate run (fast + full).
+try {
+  fs.rmSync(ARTIFACTS_DIR, { recursive: true, force: true });
+} catch {
+  /* never let evidence cleanup abort the gate */
+}
+
 // ── 1. ESLint ─────────────────────────────────────────────────────────────────
 run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
 
 // ── 2. Prettier ───────────────────────────────────────────────────────────────
 run('Prettier (format check)', 'npx prettier --check .');
 
-// ── 3. Node persistence audit ─────────────────────────────────────────────────
-const nodeAuditOut = runCapture('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
+// ── 3. Boot-chain preflight ──────────────────────────────────────────────────
+// (U-A0, CODE_HEALTH_PLAN.md §3/§5) index.html/sw.js/disk/docs/test.html
+// consistency — cheap, static, no browser needed, so it runs on both
+// gate:fast (commit) and gate (push), same as lint/prettier.
+run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
 
-// ── 4. PowerShell persistence audit + parity ─────────────────────────────────
-// Probe for pwsh (PowerShell Core) first; fall back to powershell (Windows PS 5.1).
-// Only warn-skip when neither is found (e.g. bare Linux dev box without pwsh installed).
-const pwshProbe = spawnSync('pwsh --version', { shell: true, stdio: 'pipe' });
-const psProbe =
-  pwshProbe.status === 0
-    ? null
-    : spawnSync('powershell -Command "exit 0"', { shell: true, stdio: 'pipe' });
-const psBin =
-  pwshProbe.status === 0 ? 'pwsh' : psProbe && psProbe.status === 0 ? 'powershell' : null;
+// ── 4. Node persistence audit ─────────────────────────────────────────────────
+// The single canonical runner. (2.8.5 U-B3: the second mirror runner + parity
+// check were removed — Protocol 15 retired. See the header comment for why.)
+run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 
-if (psBin) {
-  const psFileCmd =
-    psBin === 'pwsh'
-      ? 'pwsh -File tests/robco-diagnostics.ps1'
-      : 'powershell -ExecutionPolicy Bypass -File tests/robco-diagnostics.ps1';
+// ── 4b. Cloud-serialization guard (QUEUE.md item A3) ──────────────────────────
+// Models Firestore's write constraints against the live `state` literal, so a
+// field defaulted to a Firestore-hostile value (undefined / directly-nested
+// array / oversize) is caught before it can silently fail to sync. Pure Node
+// `vm`, ZERO external dependency (no browser, no emulator, no network) — the
+// same class as the boot-chain preflight above, so it runs on BOTH gate:fast
+// (commit) and gate (push). Self-derives its field set from js/core/state.js
+// and fails LOUDLY on extraction failure (anti-vacuous) and on a broken
+// positive control — so gating it can never weaken it into a green-that-lies.
+run('Cloud-serialization guard (A3, modeled)', 'node scripts/cloud-serialization-check.js');
 
-  const psAuditOut = runCapture('Persistence audit (PowerShell)', psFileCmd);
-
-  console.log('\n[gate] Runner parity check');
-  // Read the totals from the runs we ALREADY did in steps 3 & 4 — no second
-  // execution of either runner (audit #4). ANSI codes wrap lines, not words,
-  // so /ALL N TESTS/ matches even in colored output.
-  const nodeTotal = nodeAuditOut.match(/ALL (\d+) TESTS/)?.[1];
-  const psTotal = psAuditOut.match(/ALL (\d+) TESTS/)?.[1];
-  if (!nodeTotal || !psTotal || nodeTotal !== psTotal) {
-    console.error(
-      `[GATE FAIL] Runner parity broken: Node=${nodeTotal} PS=${psTotal} (Protocol 15)`
-    );
-    process.exit(1);
-  }
-  console.log(`  Both runners agree: ${nodeTotal} tests`);
-
-  // Per-suite parity (U4/S2-F5) — the total above can hide drift within a
-  // suite (a test lost here, a test gained there, coincidentally matching
-  // totals). Compares suite-by-suite composition, not just the grand total.
-  const suiteParity = checkSuiteParity(nodeAuditOut, psAuditOut);
-  if (!suiteParity.ok) {
-    console.error(`\n[GATE FAIL] Per-suite runner parity broken (Protocol 15 / U4):`);
-    for (const p of suiteParity.problems) console.error(`  - ${p}`);
-    process.exit(1);
-  }
-  console.log(`  Per-suite parity holds: ${suiteParity.suiteCount} suites, identical composition`);
-} else if (isCI) {
-  console.error('\n[GATE FAIL] pwsh not available in CI — required for parity check (Protocol 15)');
-  process.exit(1);
-} else {
-  console.warn(
-    '\n[GATE WARN] Neither pwsh nor powershell found — PowerShell & parity checks skipped.'
-  );
-  console.warn('  Install PowerShell Core: https://aka.ms/pscore6');
-  console.warn('  CI will enforce parity; this step is required for a passing push.\n');
+// ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
+// The whole point of U1: before this, gate:fast opened zero browsers, so
+// commit-green meant only "the source greps clean." This adds a minimal,
+// bounded (~2s) headless check so commit-green means "the shell boots and
+// paints without throwing." It cold-launches its own Chromium (no shared server
+// for a single check) and runs boot-smoke.mjs in --fast mode.
+if (fast) {
+  ensureChromium('commit boot smoke');
+  run('Boot smoke (fast, commit gate)', 'node tests/boot-smoke.mjs --fast');
 }
 
 if (!fast) {
   // ── 5. Playwright Chromium check ──────────────────────────────────────────────
-  console.log('\n[gate] Playwright Chromium availability');
-  const chromiumScript =
-    "try{const{chromium}=require('playwright');const p=chromium.executablePath();" +
-    "require('fs').accessSync(p);}catch(e){process.stderr.write(String(e.message||e));process.exit(1);}";
-  const pwResult = spawnSync(`node -e "${chromiumScript}"`, {
-    cwd: ROOT,
-    shell: true,
-    stdio: 'pipe',
-    timeout: 10000,
-  });
-  if (pwResult.status !== 0) {
-    const msg = (pwResult.stderr || '').toString().trim();
-    console.error('\n[GATE FAIL] Playwright Chromium binary not found' + (msg ? ': ' + msg : '.'));
-    console.error('  Run: npx playwright install chromium');
-    process.exit(1);
-  }
-  console.log('  Chromium found.');
+  ensureChromium();
 
-  // Launch ONE shared Chromium for all four browser checks below (audit #8).
+  // Launch ONE shared Chromium for all the browser checks below (audit #8).
   // Each check connects to it via PW_WS_ENDPOINT; if the shared launch fails for
   // any reason, they fall back to launching their own — identical assertions.
+  const _tShared = process.hrtime.bigint();
   const sharedOk = startSharedBrowser();
+  _timings.push({
+    label: 'Shared Chromium launch/warmup',
+    ms: Number(process.hrtime.bigint() - _tShared) / 1e6,
+  });
   console.log(
     sharedOk
       ? '\n[gate] Shared Chromium launched — the four browser checks reuse one browser.'
@@ -413,6 +387,20 @@ if (!fast) {
   // Executes tests/test.html headless and asserts every suite passes + the
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');
+
+  // ── 10. Save-survival (SAVE_INTEGRITY_PASS) ───────────────────────────────────
+  // Boots real fixtures (current/mature/legacy-v7/malformed) through the REAL
+  // boot + import paths and compares the full durable-field inventory — the
+  // sacred-data guard. Too slow for gate:fast; runs on the push gate + CI.
+  run('Save-survival', 'node tests/save-survival.mjs');
+
+  // ── 11. Offline-first behavioral test (U1, HEALTH_BATCH_PLAN.md §4) ────────────
+  // Loads the app, CUTS the network for real (context.setOffline), reloads, and
+  // asserts the app boots to READY and a native tool (CONSULT) works with zero
+  // network — the offline-first promise proven behaviorally, not by grepping
+  // that the source "looks offline-safe." Push gate only (it registers a real
+  // service worker + reloads — heavier than a commit-boundary smoke).
+  run('Offline-first (network cut)', 'node tests/offline-first.mjs');
 
   stopSharedBrowser();
 }

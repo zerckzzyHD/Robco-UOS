@@ -16,8 +16,18 @@ permissions:
 
 jobs:
   gate:
-    name: Full Gate (lint + format + tests + browser)
-    runs-on: ubuntu-latest
+    # OS matrix: the full gate runs identically on Linux AND Windows. Windows is
+    # the platform the app is actually authored on (the owner develops on Windows
+    # and every local pre-push gate runs there), so this job is what finally
+    # validates CI on the real dev platform — it is not an exotic add-on. Both OSes
+    # resolve the SAME Node from .nvmrc (one authoritative declaration). fail-fast
+    # is off so a failure on one OS never hides the other OS's result.
+    name: Full Gate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -26,8 +36,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          # Single source of truth for the Node version — shared with local dev
+          # and every other workflow. Never hardcode a version here (Node 20 went
+          # EOL 2026-04-30 while still pinned in CI — that is the drift this avoids).
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Record runtime versions
+        # Print the actual Node/npm this OS resolved from .nvmrc, so the running
+        # runtime is visible in the log on both platforms.
+        run: |
+          node --version
+          npm --version
 
       - name: Install dependencies
         run: npm ci
@@ -37,3 +57,18 @@ jobs:
 
       - name: Run full gate
         run: npm run gate
+
+      # CI failure-evidence packaging (Health-batch U4): when the gate goes red,
+      # upload the evidence the run left behind — per-step gate logs (failing
+      # test names + output) and any Playwright screenshots + console dumps from
+      # the browser checks — so the failure is diagnosable from the run itself,
+      # with no local re-run. Only fires on failure; a green run uploads nothing.
+      # The name is per-OS so the Linux and Windows matrix legs don't collide.
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-evidence-${{ matrix.os }}
+          path: test-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

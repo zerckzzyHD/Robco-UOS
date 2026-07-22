@@ -26,7 +26,7 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 
 [Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
-**Current version: 2.8.0 — "The Physical Machine"**
+**Current version: 2.8.5 — "Foundations & Fidelity"**
 
 ---
 
@@ -113,8 +113,10 @@ Nine capabilities, each with a graceful fallback when the device/browser doesn't
 ### 💾 Saves & Cloud
 
 - **Auto-save** (debounced localStorage), **A/B/C slots**, **file export/import** with version migration, **rolling backups** with FNV-1a checksums.
+- **Live-campaign durability mirror** — the campaign you're actively playing is continuously shadowed into IndexedDB (the same durable store slots and backups already use), so if a phone reclaims the browser's local storage under memory pressure, your campaign is automatically restored on the next startup instead of starting over. Recovery-only and one-directional (a saved-behind mirror can never overwrite newer progress), and a graceful no-op when IndexedDB is unavailable.
 - **Save version history** — each slot retains up to 5 prior revisions in IndexedDB (riding its headroom, never the localStorage ceiling); view and restore any earlier version from the saves list. Restoring is confirm-gated and takes a rolling backup first; if IndexedDB is unavailable the feature is simply not offered and save/load is unchanged.
 - **Full backup bundle** — a one-file "EXPORT FULL BACKUP" of your entire history (live campaign + all slots with their version rings + rolling backups + chat + playstyle), version-stamped and checksummed. IMPORT SAVE auto-detects a bundle and restores it — confirm-gated, integrity-checked (a bad or edited file is refused with no partial apply), and a rolling backup of your current state is taken first. Campaign/save data only — device preferences are never included (the two-store boundary holds).
+- **Read-side fail-loud save integrity (Layer 3)** — a save that can't be read at boot is **quarantined whole, never deleted**: the exact bytes are preserved (localStorage + a durable IndexedDB copy), a READ FAULT banner announces it every boot until resolved, and a QUARANTINED RECORD row in the saves list offers EXPORT (recover the raw data) and confirm-gated PURGE. A detected storage **eviction** (the browser reclaimed local data while the cold-storage boot marker survived) gets its own banner — gated behind a strict signature so a new visitor never sees a false alarm. Slot saves that only ONE of the two stores accepted post a once-per-session degraded-write notice instead of reporting plain success.
 - **Cloud sync** via Firebase Firestore — additive writes only (never a blind overwrite), confirm-gated destructive actions, Google sign-in (popup-only), anonymous boot, and a Gemini-key sync option.
 - **Offline cloud-push queue** — a manual "Save to Cloud" pressed while offline (or that fails on network) is queued device-locally and flushed automatically on reconnect. Retry-only: it _never_ auto-pushes on a state change — cloud sync stays a manual button. Bounded + contentHash-deduped (no duplicate cloud saves), uid-scoped, kill-switch-gated, and fully fail-safe (no IndexedDB / flag off → the button behaves exactly as before).
 - **Remote kill-switch** — a fail-open feature-flag config that can disable a networked feature remotely, always defaulting to last-known-good / features-enabled so it can never black-screen the app.
@@ -139,18 +141,18 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### Technology Stack
 
-| Layer           | Technology                                       | Purpose                                                                     |
-| --------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
-| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                   |
-| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                   |
-| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                       |
-| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                        |
-| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback) |
-| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                       |
-| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                          |
-| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                             |
-| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                             |
-| **Testing**     | Node + PowerShell + Playwright                   | 2945-test gate at parity + boot-smoke / render / a11y checks                |
+| Layer           | Technology                                       | Purpose                                                                         |
+| --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| **Frontend**    | Vanilla HTML5 / CSS3 / ES2022                    | Zero-framework, browser-native (global-scope script tags)                       |
+| **Styling**     | CSS Custom Properties                            | Dynamic theming via `--robco-*` variables                                       |
+| **Audio**       | Web Audio API                                    | Procedural synthesis — no audio files                                           |
+| **AI**          | Google Gemini API                                | Optional structured-JSON game master                                            |
+| **OCR**         | Tesseract.js (Apache-2.0, self-hosted, lazy)     | On-device Visual Upload text recognition (primary path, AI-vision fallback)     |
+| **Cloud**       | Firebase Auth + Firestore                        | Cross-device save sync, sign-in, remote feature flags                           |
+| **PWA**         | Service Worker + Manifest                        | Installable, offline-capable, reliable auto-update                              |
+| **Hosting**     | GitHub Pages (prod) + Cloudflare Pages (staging) | Release-gated production; auto-deployed staging                                 |
+| **Dev Tooling** | ESLint + Prettier + Vite                         | Linting, formatting, dev server                                                 |
+| **Testing**     | Node + Playwright                                | Node gate (behavioural + static invariants) + boot-smoke / render / a11y checks |
 
 ### Per-game data system
 
@@ -158,37 +160,86 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### File Structure
 
+`css/` is flat with a gapped numeric prefix (not subfoldered like `js/`) because in CSS the file order is load-bearing — equal-specificity ties resolve by source order, so the listing itself has to show what loads after what. `99-mobile.css` sits alone at the end on purpose.
+
 ```
 ├── index.html              DOM, inline handlers, GAME_FILES boot manifest, SW registration
-├── css/terminal.css        All styling, CRT effects, responsive + reduced-motion layers
-├── js/
-│   ├── db_nv.js            FNV game CSV data + lookups
-│   ├── db_fo3.js           FO3 game CSV data + lookups
-│   ├── idb.js              Async IndexedDB durability engine (device-pref write-through shadow)
-│   ├── state.js            State, persistence, migration, GAME_DEFS, THEMES, _activeDef()
-│   ├── reg_nv.js           FNV Fallout Data Registry (read-only)
-│   ├── reg_fo3.js          FO3 Fallout Data Registry (read-only)
-│   ├── registry-core.js    Shared registrySearch() (game-agnostic, both contexts)
-│   ├── ui-audio.js         Audio engine, boot sequence, optics (THEMES table)
-│   ├── ui-render.js        render*() functions, CRUD helpers, map/faction/time utilities
-│   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
-│   ├── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
-│   ├── runtime.js          Ambient Runtime — lifecycle state machine + heartbeat + observer registry
-│   ├── ui-core.js          UI lifecycle, COMMAND_REGISTRY, native command surfaces, badges
-│   ├── api.js              System directive, NATIVE_COMMAND_ROUTER, autoImportState, transmit
-│   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
-│   ├── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
+├── css/                    13 order-prefixed files (2.8.5 U-A2 split + the FO3 Pip-Boy build), source order = cascade order —
+│   ├── 05-base.css            Tokens, reset, layout, app-shell
+│   ├── 10-chrome.css          Device chrome (bezel/casing/glass) + per-game identity
+│   ├── 15-overseer.css        Director Uplink / Overseer presence
+│   ├── 20-diagnostic-shell.css Diagnostic Shell mobile overlay (dev-only)
+│   ├── 25-toolbar.css         Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
+│   ├── 30-modulebay.css       Module Bay (Security & Configuration)
+│   ├── 35-operator-boards.css Phase 3 Operator boards (batches 1-3)
+│   ├── 40-curio-operations.css Curio Archive + Operations console
+│   ├── 45-databank.css        Databank / Records Bay
+│   ├── 50-chassis.css         Chassis diagnostic bay + Living Core
+│   ├── 55-feedback-animations.css Feedback Animation Waves 1-3
+│   ├── 60-fo3-pipboy.css      FO3 landscape Pip-Boy casing/glass skin — [data-game='FO3'] only, NV untouched
+│   └── 99-mobile.css          Mobile Density Standard — MUST stay last (cascade order)
+├── js/                     Reorganized into subfolders by responsibility (2.8.5 U-A2)
+│   ├── data/               Fallout game content: item DBs + registries
+│   │   ├── db_nv.js            FNV game CSV data + lookups
+│   │   ├── db_fo3.js           FO3 game CSV data + lookups
+│   │   ├── reg_nv.js           FNV Fallout Data Registry (read-only)
+│   │   ├── reg_fo3.js          FO3 Fallout Data Registry (read-only)
+│   │   └── registry-core.js    Shared registrySearch() (game-agnostic, both contexts)
+│   ├── core/               The engine: campaign state, ambient runtime, storage layer
+│   │   ├── state.js            State, persistence, migration, GAME_DEFS, THEMES, _activeDef()
+│   │   ├── runtime.js          Ambient Runtime — lifecycle state machine + heartbeat + observer registry
+│   │   └── idb.js              Async IndexedDB durability engine (device-pref write-through shadow)
+│   ├── ui/                 UI lifecycle hub, panels, render/audio/save/account modules
+│   │   ├── ui-core.js          UI lifecycle hub — AudioSettings, loadUI, updateMath, window.onload boot orchestrator
+│   │   ├── ui-core-nav.js      Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES
+│   │   ├── ui-core-overseer.js Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   │   ├── ui-core-chassis.js  THE LIVING CORE + CHASSIS panel — _coreRefresh, System Status, Service & Fault Console
+│   │   ├── ui-core-modulebay.js Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   │   ├── ui-core-cmd.js      Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
+│   │   ├── ui-render.js        Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+│   │   ├── ui-render-inventory.js  Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
+│   │   ├── ui-render-character.js  Character & Field Status — squad, clock/calendar, faction standing, status, perks, quests
+│   │   ├── ui-render-record.js     Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
+│   │   ├── ui-render-ledger.js     Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
+│   │   ├── ui-render-map.js        Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
+│   │   ├── ui-render-factions.js   Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
+│   │   ├── ui-render-economy.js    Resource Economy — Craft panel, native Trade barter terminal
+│   │   ├── ui-render-loot.js       Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
+│   │   ├── ui-render-databank.js   Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
+│   │   ├── ui-audio.js         Audio engine, boot sequence, optics (THEMES table)
+│   │   ├── ui-saves.js         Save slots, file import/export, rolling backups, autocomplete
+│   │   └── ui-account.js       Account/UPLINK panel, cloud save picker, save-manager header
+│   ├── services/           Everything that talks to the outside world
+│   │   ├── api.js              Network-layer hub — transmitMessage lifecycle, comm-config cache, fetchAuthorizedModels
+│   │   ├── api-directive.js    getSystemDirective + its 8 _directive* section builders (Suite 131 golden-master)
+│   │   ├── api-import.js       AI → state import — autoImportState, sanitizeImportedContainer
+│   │   ├── api-router.js       Offline native command routing — NATIVE_COMMAND_ROUTER, quick-log, transmitTerminal
+│   │   ├── cloud.js            Firebase auth + Firestore push/pull + remote config (ES module)
+│   │   └── ocr.js              Visual Upload on-device OCR: lazy Tesseract.js, parser, hybrid routing + kill-switch
+│   ├── dev/                Dev-only tooling
+│   │   └── test-console.js     Diagnostic Shell (gated by _devConsoleUnlocked())
 │   └── vendor/             Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
 ├── sw.js                   Service Worker (cache-first, atomic precache, reliable update)
 ├── manifest.json           PWA manifest (version-less name + app shortcuts)
 ├── tests/
-│   ├── robco-diagnostics.js   Node persistence/structure audit (2945 tests, 220 suites)
-│   ├── robco-diagnostics.ps1  PowerShell mirror (parity-locked)
+│   ├── robco-diagnostics.js   Node persistence/structure audit (the single canonical runner)
 │   ├── test.html              Browser-side runtime import-contract audit
 │   └── *.mjs                  Playwright boot-smoke / render-check / a11y-baseline
-├── scripts/gate.js         The full local gate (lint, format, both runners, browser checks)
+├── scripts/gate.js         The full local gate (lint, format, the Node runner, browser checks)
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
+├── CLAUDE.md               Agent rulebook — the universal contract + the retrieval map
+├── rules/                  Subsystem rule notes, loaded only when that surface is touched
+│   ├── state-and-save.md      State fields, saves, migration, durability
+│   ├── deploy-and-cache.md    Service worker, CACHE_NAME, deploy verification
+│   ├── auth-and-cloud.md      Auth hard rules, cloud write safety, kill-switch
+│   ├── ui-and-mobile.md       Panels, mobile baseline, UX stability, the UI-* protocols
+│   ├── audio.md               Adding an audio source
+│   ├── game-data.md           Provenance + game-agnostic feature code
+│   ├── ai-contract.md         Tri-Node schema safety + AI determinism
+│   ├── file-layout.md         Boot order (machine-checked), repomix, UTF-8 integrity
+│   ├── testing-and-gates.md   Static guards, test.html sync, Diagnostic Shell triggers
+│   └── docs-and-library.md    Changelog style, doc-reference integrity, the library model
 └── assets/                 PWA icon + app-shortcut icons, ocr/ (vendored OCR language data)
 ```
 
@@ -197,19 +248,38 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 Global-scope `<script>` tags load in strict order (per-game db/reg pair is chosen by the boot manifest):
 
 ```
-0. idb.js                →  window.IdbStore (async IndexedDB engine; loaded before the boot manifest)
-1. db_nv.js / db_fo3.js  →  databaseCSVs, lookupItemInDb (active game)
-2. state.js              →  state, APP_VERSION, GAME_DEFS, THEMES, saveState, migrateState
-3. reg_nv.js / reg_fo3.js→  FALLOUT_REGISTRY (active game, read-only)
-4. registry-core.js      →  registrySearch (shared, game-agnostic)
-5. ui-audio.js           →  AudioSettings, audio + boot + optics functions
-6. ui-render.js          →  render*() functions, CRUD helpers, map/faction/time
-7. ui-saves.js           →  save slots, file import/export, autocomplete
-8. ui-account.js         →  renderAccount, renderSavesList, undoLastSync
-9. runtime.js            →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
-10. ui-core.js           →  appendToChat, loadUI, updateMath, COMMAND_REGISTRY
-11. api.js               →  autoImportState, transmitMessage, NATIVE_COMMAND_ROUTER
-12. cloud.js             →  window.pushToCloud / pullFromCloud (ES module)
+0. core/idb.js                →  window.IdbStore (async IndexedDB engine; loaded before the boot manifest)
+1. data/db_nv.js / data/db_fo3.js →  databaseCSVs, lookupItemInDb (active game)
+2. core/state.js              →  state, APP_VERSION, GAME_DEFS, THEMES, saveState, migrateState
+3. data/reg_nv.js / data/reg_fo3.js →  FALLOUT_REGISTRY (active game, read-only)
+4. data/registry-core.js      →  registrySearch (shared, game-agnostic)
+5. ui/ui-audio.js             →  AudioSettings, audio + boot + optics functions
+6. ui/ui-render.js            →  render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+7. ui/ui-render-inventory.js  →  Cargo Manifest & Ammo (2.8.5 U-A4 split)
+8. ui/ui-render-character.js  →  Character & Field Status: squad, clock/calendar, faction standing, status, perks, quests (2.8.5 U-A4 split)
+9. ui/ui-render-record.js     →  Personal Record: session tally, equipped, collectibles, Lincoln, traits (2.8.5 U-A4 split)
+10. ui/ui-render-ledger.js    →  Field Ledger: skill/magazine tracker, campaign notes, chronicle (2.8.5 U-A4 split)
+11. ui/ui-render-map.js       →  Cartography Table: renderWorldMap (2.8.5 U-A4 split)
+12. ui/ui-render-factions.js  →  Faction Reputation & Karma (2.8.5 U-A4 split)
+13. ui/ui-render-economy.js   →  Resource Economy: Craft + Trade (2.8.5 U-A4 split)
+14. ui/ui-render-loot.js      →  Item Acquisition: Loot + Visual Upload OCR apply (2.8.5 U-A4 split)
+15. ui/ui-render-databank.js  →  Native Databank Tools: Threat/Consult/Eligible Perks/Bio-Scan (2.8.5 U-A4 split)
+16. ui/ui-saves.js            →  save slots, file import/export, autocomplete
+17. ui/ui-account.js          →  renderAccount, renderSavesList, undoLastSync
+18. services/ocr.js           →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
+19. core/runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
+20. ui/ui-core.js             →  appendToChat, loadUI, updateMath (the ui-core spine hub)
+21. ui/ui-core-nav.js         →  selectSubsystem, switchTab, SHORTCUT_ROUTES (2.8.5 U-A1 split)
+22. ui/ui-core-overseer.js    →  setOverseerState, the Director Uplink scope canvas (2.8.5 U-A1 split)
+23. ui/ui-core-chassis.js     →  _coreRefresh, initChassisCore, System Status (2.8.5 U-A1 split)
+24. ui/ui-core-modulebay.js   →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
+25. ui/ui-core-cmd.js         →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
+26. dev/test-console.js       →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
+27. services/api.js           →  transmitMessage, fetchAuthorizedModels, comm-config cache (2.8.5 U-A3 split)
+28. services/api-directive.js →  getSystemDirective + its 8 _directive* section builders (2.8.5 U-A3 split)
+29. services/api-import.js    →  autoImportState, sanitizeImportedContainer (2.8.5 U-A3 split)
+30. services/api-router.js    →  NATIVE_COMMAND_ROUTER, transmitTerminal, quick-log routing (2.8.5 U-A3 split)
+31. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
@@ -220,7 +290,7 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18+ (dev tooling only — not required to run the app)
+- [Node.js](https://nodejs.org/) — the version pinned in `.nvmrc` (currently Node 24, the active LTS line). Dev tooling only; not required to run the app. Both the local gate and CI (Linux + Windows) read this same file so every environment runs one Node version.
 - A [Google Gemini API key](https://aistudio.google.com/apikey) — **optional**; the native tools and the whole terminal work without one
 
 ### Installation
@@ -261,23 +331,23 @@ This is a **static site** — no build step to run it.
 npm run lint        # ESLint (zero warnings)
 npm run format      # Prettier
 npm run dev         # Vite dev server
-npm run gate        # FULL gate: lint + format + both runners + boot-smoke + render + a11y + test.html
+npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
 npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
 ```
 
 ### Quality Gate
 
-Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, **both** test runners at parity); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
+Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
 
 ### Commit Workflow (dev-branch model)
 
-All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps docs + the 2945-test count in sync and bumps `CACHE_NAME` when a served file changes.
+All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit keeps the docs current and bumps `CACHE_NAME` when a served file changes.
 
 ```
 npm run lint && npm run format
 git add -A
-git commit          # pre-commit: cache-bump guard, then fast gate (both runners)
+git commit          # pre-commit: cache-bump guard, then fast gate (Node runner)
 git push origin dev # pre-push: full gate (+ Playwright + a11y + test.html)
 ```
 
@@ -310,7 +380,7 @@ The device made physical: the whole UI reframed as a reactive RobCo terminal —
 
 </details>
 
-### Current State (v2.8.0)
+### Current State (v2.8.5)
 
 A **production-quality, two-game browser application** with:
 
@@ -319,6 +389,8 @@ A **production-quality, two-game browser application** with:
 - **Eight device capabilities** (Wake Lock, Vibration, Web Share, Badging, Pip-Boy Radio, cold-start/degraded boot, Overseer's Log, High-Lumen Optics)
 - **Per-game theming** — per-game default optic, dynamic "(Default)" label, per-game colour memory, per-game boot/save identity
 - **Device bezel chrome** — the app renders inside a physical RobCo terminal casing, with the old tab bar replaced by an illuminated subsystem selector (OPERATOR/OPERATIONS/DATABANK/UPLINK/CHASSIS/SETTINGS + a flat DIRECTORY fallback) that routes through the same underlying tab router; CHASSIS hosts device telemetry + firmware/carrier/feature-flag status, and SETTINGS is the one home for Account, the Module Bay, Save Archive, and Campaign Configs
+- **Fallout 3 landscape Pip-Boy** — rotate a Fallout 3 campaign sideways and the same three subsystem keys, the UPLINK/CHASSIS/SETTINGS controls, and a flat directory recast as a real Pip-Boy 3000 casing: three domed lamps reading STATS/ITEMS/DATA (with their real names riding along underneath), a radio knob with a swinging tuner pointer, a status gauge with a needle and chrome ring, and a toggle switch with a real lever, all set in a dark, weathered metal casing that now wraps the glass on both sides with a system-status gauge, an embossed nameplate, and a brand plate above the screen, matching the real device's housing. Each of the six main screens is noticeably denser and closer to the game — S.P.E.C.I.A.L. shows a fill bar per attribute, body-part health boxes are labeled, and your Vault Boy figure now shows a dashed outline and the word CRIPPLED on a damaged limb, exactly like the real damage screen. Each screen's sub-sections get their own dash-separated row of tabs on the glass, scroll inside a bounded display that the casing can never cover, and remember which one you last had open. Portrait keeps today's layout untouched, and New Vegas is unaffected either way; a hand-inked Vault Boy figure (with distressed face and dashed CRIPPLED states) is now drawn in, while indicator sway and a working knob detent are still to come
+- **Schematic View — the flat fallback, per machine** — the Module Bay's hardware boards have a permanent plain-list alternative that now covers every control the bay owns (all 14 sound-channel chips derived live from the bay itself, the AI key/engine/handshake, and the campaign-log export + app installer), sized to the mobile tap-target floor, and framed in each machine's own voice (a RobCo field service schematic on New Vegas, a Vault-Tec maintenance diagram on Fallout 3) while keeping identical control names and slot numbers so the two views can never disagree. Your choice of view is remembered across reloads. A build check enforces bay↔schematic parity, so a new board can't quietly go missing from the flat list
 - **Director Uplink — the living Overseer** — the Comm-Link is reskinned as a phosphor-oscilloscope presence whose waveform reacts to the real AI lifecycle (listening/thinking/speaking/no-carrier/offline), with a per-game status strip and a self-contained mobile view
 - **Tool Deck + Quick-Draw Holster** — a zero-footprint launcher key beside the Comm-Link message box raises a bottom-sheet deck for the six native tools, and the old blind D-Pad shortcuts are redesigned into four gear-vector sockets that show, fire, and let you rebind your quick-draw gear
 - **OPERATIONS — the quartermaster's freight console** — your inventory screen reads as freight-handling hardware: a LOAD-CELL WEIGH BRIDGE bends a physical load beam in live proportion to your carry weight (nominal/amber/SEIZED), a six-drawer CARGO MANIFEST replaces the flat item filter with pull-drawers that scroll in place (every item reachable, nothing capped), items can be equipped or bumped in quantity right from their row, and FIELD FABRICATION/BARTER UPLINK/SQUAD ROSTER/CURIO ARCHIVE match the same hardware language (with SQUAD ROSTER's companion list now correctly reading each game's own roster)
@@ -333,10 +405,10 @@ A **production-quality, two-game browser application** with:
 - **Tighter mobile boards** — on narrow phones, board spacing, faction/status/perk/skill tiles, and the Director Uplink transcript all sit a little closer together, trimming a noticeable amount of scrolling with every tap target still comfortably above the minimum touch size
 - **Diagnostic Shell** _(dev/staging-only)_ — the developer console is re-founded on a data-driven tool registry with a two-signal environment gate, so a future non-destructive sandbox and an owner-only toolbench can share one panel without ever leaking a destructive tool to a live player; every existing dev control still works exactly as before
 - **Optional AI Director** — Tri-Node JSON, validated import, resilient + prompt-injection-hardened
-- **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list
+- **Saves & cloud** — auto-save, A/B/C slots (with confirm-gated overwrite/delete + version history), export/import + migration, rolling checksummed backups, additive Firestore sync (with its own confirm-gated overwrite/delete + version history), Google sign-in, remote kill-switch, per-game filtered saves list, read-side fail-loud integrity (corrupt saves quarantined + recoverable, eviction detection, degraded-write notices)
 - **Accessibility + PWA** — focus rings, reduced-motion, live regions, dialog focus traps, AA contrast; installable, offline, reliable auto-update; touch-first responsive
 - **Wiki-sourced data** — per-game Fallout Data Registries + combat databases (weapons, armor, bestiary, chems, recipes, vendors, quest items), all from the Independent Fallout Wiki
-- **A self-improving gate** — **2945 tests across 220 suites**, mirrored in the Node and PowerShell runners at exact parity (per-suite composition, not just the grand total), plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
+- **A self-improving gate** — a broad behavioural and static-invariant suite in the canonical Node runner, plus Playwright boot-smoke / render-check / a11y baseline and a `test.html` runtime audit; CI + a nightly run back it up
 
 ---
 

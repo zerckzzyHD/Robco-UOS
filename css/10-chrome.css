@@ -1,0 +1,900 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/10-chrome.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 495-1287. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: Device chrome (bezel/casing/glass, Protocol UI-7) + per-game [data-game] identity theming
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   10-chrome.css — cascade slot 10: the device chrome — casing-top
+   header, curved glass frame, the bottom bezel subsystem-selector
+   nav (replaces the old tab bar), the SWEEP motion verb, and the
+   per-[data-game] "wire" accent + custom-cursor theming that most
+   later files' amber accents key off of.
+   WHY HERE: loads right after 05-base because it defines the
+   --bezel-wire/--bezel-wire-rgb tokens that many later files
+   (15-overseer onward) read, and because it is structural scaffolding
+   (the frame everything else renders inside) rather than any one
+   panel's content — it has to exist before panel-specific styling is
+   layered on, but has no reason to load before the base tokens/reset.
+   ══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   DEVICE CHROME — DO-N bezel/casing (Protocol UI-7). The app becomes a
+   physical RobCo terminal: casing-top (brand/lamps) + a curved glass frame
+   (.glass-frame, curvature/vignette on the FRAME only — never the text)
+   + a bottom bezel carrying the illuminated subsystem selector (replaces
+   the old .tab-bar; Protocol 25 owner-approved redesign). Structural rules
+   here apply to every game; per-game FLAVOR (the amber "wire" split, the
+   custom cursor, the casing-top subtitle) is scoped under [data-game="FNV"]
+   with a generic fallback for every other/future game context — never a JS
+   ctx branch (Protocol 38).
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  --bezel-steel-1: #191c17;
+  --bezel-steel-2: #23271f;
+  --bezel-steel-3: #2d3128;
+  --bezel-etch: rgba(214, 224, 200, 0.38);
+  --bezel-etch-dim: rgba(214, 224, 200, 0.2);
+  /* "the wire" — the remote/comm-link accent. Defaults to the local phosphor
+     color (no separate accent) until a game's identity defines one. */
+  --bezel-wire: var(--robco-green);
+  --bezel-wire-rgb: var(--robco-green-rgb);
+}
+[data-game='FNV'] {
+  /* NV's warm bias made structural: everything local stays green, everything
+     that comes over the wire (the Comm-Link / UPLINK) reads amber. */
+  --bezel-wire: #ffb642;
+  --bezel-wire-rgb: 255, 182, 66;
+}
+
+.machine {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, var(--bezel-steel-3), var(--bezel-steel-1) 35%, var(--bezel-steel-2));
+  /* Bezel fidelity pass — subtle hairline at all breakpoints; the full
+     outer drop-shadow frame is desktop-only (see the hover+fine gate). */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.casing-top {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  padding: 6px 4px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--bezel-etch);
+}
+.brand-plate {
+  border: 1px solid var(--bezel-etch-dim);
+  padding: 3px 10px 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
+  letter-spacing: 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.brand-plate .uos {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  display: block;
+  opacity: 0.75;
+}
+/* Per-game casing flavor text — CSS-swapped, never a JS ctx branch. */
+.chassis-flavor--fnv {
+  display: none;
+}
+[data-game='FNV'] .chassis-flavor--generic {
+  display: none;
+}
+[data-game='FNV'] .chassis-flavor--fnv {
+  display: inline;
+}
+/* Serial plate (Gap 4, bezel fidelity pass) — desktop-only decorative
+   unit plate, top-right of the casing-top header. Game-agnostic via the
+   same [data-game]-toggled static-span mechanism as .chassis-flavor
+   above (Protocol 38/UI-7 — never a JS ctx branch). Hidden on mobile. */
+.serial {
+  margin-left: auto;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  text-align: right;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+.serial .scratch {
+  display: block;
+  font-style: italic;
+  color: rgba(230, 215, 175, 0.5);
+  transform: rotate(-0.8deg);
+  letter-spacing: 0.5px;
+}
+.serial-flavor--fnv,
+.serial .scratch--fnv {
+  display: none;
+}
+[data-game='FNV'] .serial-flavor--generic {
+  display: none;
+}
+[data-game='FNV'] .serial-flavor--fnv {
+  display: inline;
+}
+[data-game='FNV'] .serial .scratch--fnv {
+  display: block;
+}
+/* M3 FIRMWARE FLASH (Ceremony Moments Wave 1) — a one-shot amber glint on
+   the serial plate + a REV LOG button pulse acknowledging a completed
+   update (_fireFirmwareFlashFlourish(), ui-audio.js). Plain @keyframes,
+   auto-neutralized by the existing global prefers-reduced-motion block
+   (Protocol UI-9) — no bespoke carve-out. filter/box-shadow only, never
+   transform, so neither collides with any other animation on these
+   elements. */
+.serial.firmware-glint {
+  animation: firmwareGlint 1.6s ease-out;
+}
+@keyframes firmwareGlint {
+  0% {
+    filter: brightness(1);
+  }
+  20% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+#btnViewChangelog.firmware-pulse {
+  animation: firmwarePulse 1.6s ease-out;
+}
+@keyframes firmwarePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  40% {
+    box-shadow: 0 0 12px 3px rgba(var(--bezel-wire-rgb), 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0);
+  }
+}
+.lamp-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+}
+.lamp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Owner-report batch: lamps are now real <button>s (Protocol UI-5) — undo the
+   global button reset (background/color/padding/width/margin/font-weight) so
+   they keep their original inline-badge look, and give each a >=28px tap
+   target (Protocol 17) without growing the visible glyph. */
+button.lamp {
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  margin: 0;
+  width: auto;
+  color: inherit;
+  font: inherit;
+  font-weight: normal;
+  letter-spacing: inherit;
+  min-height: 28px;
+  cursor: pointer;
+}
+.lamp i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  background: #3a3d35;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+.lamp.on i {
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  animation: rad-pulse 3s infinite;
+}
+.lamp.wire.on i {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 8px var(--bezel-wire);
+}
+.lamp.fault i {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+  animation: rad-pulse 1.4s infinite;
+}
+.vents {
+  width: 60px;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 3px, transparent 3px 7px);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.uptime-line {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 11px;
+  opacity: 0.85;
+}
+/* CHASSIS mini-core readout window (owner follow-up) — a small framed
+   "screen" built into the ROBCO INDUSTRIES casing-top header, pushed to the
+   right where the header has clear open space, alongside the PWR/UPLINK/
+   FAULT lamps and the backplane vents. Always visible (the casing-top never
+   hides), machine-language dark recessed glass matching .telemetry's own
+   CRT-window treatment. The mini core itself (#chassisCoreMini) is styled
+   with the shared .chassis-core-shape system further down (Protocol 22).
+   Owner follow-up (prominence pass): enlarged from 44x34 to read clearly —
+   the casing-top row is flex-wrap, so a bigger screen simply wraps onto its
+   own line at narrow widths instead of ever forcing horizontal overflow;
+   three size tiers (this desktop base, the >400-480px tier below, and the
+   <=400px tier further down) keep it appropriately scaled at every width
+   while staying noticeably bigger than before at all of them.
+   Owner follow-up (second bump — the perpendicular ring "can't even be
+   seen" in the mini core): enlarged again, 72x54 -> 88x66, on top of the
+   first bump — more absolute pixels makes the extra diagonal ring easier
+   to pick out from the other overlapping rings/heart sharing the same tiny
+   circle. */
+.chassis-screen-mini {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 66px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  background: #0d0a04;
+  box-shadow:
+    inset 0 1px 4px rgba(0, 0, 0, 0.9),
+    inset 0 0 10px rgba(var(--robco-green-rgb), 0.08);
+}
+/* Base size for the mini core itself (#chassisCoreMini) — a COMPOUND selector
+   (Protocol 42 fix, found live during render-verify): `#chassisCoreMini`
+   carries BOTH `.chassis-core-shape` (the shared 96px base, defined further
+   down the file) and `.chassis-core-mini`. A bare `.chassis-core-mini { ... }`
+   has the SAME specificity as `.chassis-core-shape { ... }`, so whichever one
+   is later in source order wins regardless of which is "supposed to"
+   override the other — this compound form (0,2,0) always beats the shared
+   base (0,1,0) no matter where either rule sits in the file. Second bump:
+   44px -> 54px. */
+.chassis-core-shape.chassis-core-mini {
+  width: 54px;
+  height: 54px;
+}
+
+/* The curved glass — CRT-frame chrome. Curvature/vignette live on THIS
+   frame layer only; nothing inside .main-grid is ever transformed. */
+.glass-frame {
+  border-radius: 14px;
+  padding: 6px;
+  background: linear-gradient(160deg, #131509, #05060a 42%, #0d0f0a);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.92),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.045),
+    inset 0 0 60px rgba(var(--robco-green-rgb), 0.03),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+/* Gap 5 (bezel fidelity pass) — glass sheen + recessed inner vignette.
+   .sweep already owns ::after, so this is a ::before; inset matches the
+   frame's own padding so it sits exactly over the screen. z-index 8 sits
+   above .main-grid content within .glass-frame's own stacking context and
+   below .crt-overlay's z-index:9999 — pointer-events:none, purely inert,
+   never dims/distorts the text underneath (Protocol UI-7). */
+.glass-frame::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  z-index: 8;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 130% 60% at 22% -12%, rgba(255, 255, 255, 0.045), transparent 45%),
+    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.55) 100%);
+  box-shadow: inset 0 0 46px rgba(0, 0, 0, 0.85);
+}
+
+/* SWEEP — the DO-N "re-tune the channel" motion verb on subsystem change
+   (Protocol UI-9). Reduced-motion is handled by the existing global
+   prefers-reduced-motion block below, which zeroes every animation. */
+.glass-frame {
+  position: relative;
+  overflow: hidden;
+  /* z-index establishes its OWN stacking context (needed now that
+     .crt-overlay lives inside it at z-index:9999) — without this, that
+     9999 would be compared directly against sibling .bezel's z-index:60
+     (mobile, position:fixed) in .container's shared stacking context, so
+     the scanline could still paint over the bezel at some scroll depths
+     even though overflow:hidden already clips its box correctly. Trapping
+     it here means nothing inside .glass-frame can ever paint above a
+     sibling like .casing-top/.bezel outside it. */
+  z-index: 1;
+}
+.glass-frame.sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 18%,
+    rgba(var(--robco-green-rgb), 0.16) 42%,
+    rgba(var(--bezel-wire-rgb), 0.1) 50%,
+    transparent 78%
+  );
+  animation: bezel-sweep 0.45s ease-out forwards;
+}
+@keyframes bezel-sweep {
+  from {
+    transform: translateX(-105%);
+  }
+  to {
+    transform: translateX(105%);
+  }
+}
+
+/* M1 CAMPAIGN IGNITION (Ceremony Moments Wave 1) — the glass dips toward
+   near-black then eases back up as the commissioning sequence types on
+   (_runCampaignIgnition(), ui-core.js). Plain @keyframes, auto-neutralized
+   by the existing global prefers-reduced-motion block (Protocol UI-9) — a
+   reduced-motion user sees the correct resting (full-brightness) frame with
+   no bespoke carve-out. Skipping removes the class immediately, snapping
+   back to full brightness instantly (no forwards needed — brightness(1) at
+   100% already matches the unanimated resting state). */
+.glass-frame.ignition-dim {
+  animation: ignitionDim 2.4s ease-out;
+}
+@keyframes ignitionDim {
+  0% {
+    filter: brightness(0.15);
+  }
+  15% {
+    filter: brightness(0.15);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* M5 SEAT — the Protocol UI-9 "component physically installs" motion verb
+   (Ceremony Moments Wave 1), adopted here alongside SWEEP above. Triggered
+   by _motionSeat(el) (ui-core.js, mirrors _bezelSweep()) at every "install"
+   interaction: Module Bay board reseat, phosphor tube pick, program
+   cartridge seat, Tool Deck open. Deliberately filter/box-shadow only —
+   never transform — since several of those targets (.cart's stack-peek
+   offset, .tool-deck's own deckUp slide-in) already own `transform` for
+   their own purposes; a competing transform animation would visibly fight
+   them for the animation's duration. Plain @keyframes, auto-neutralized by
+   the existing global prefers-reduced-motion block (Protocol UI-9) — no
+   bespoke carve-out; not `forwards`, so the element cleanly reverts to
+   whatever its own CSS cascade specifies once the 220ms settle ends (no
+   stuck override, even on an element with its own resting box-shadow).
+   Textured per game via identity.motionTexture.seat (thunk-and-spin NV /
+   mechanical-clunk FO3, state.js) — CSS-only [data-game] variant, never a
+   JS branch (Protocol 38): NV's default below reads brighter/springier,
+   FO3's variant is a single flatter, stiffer flash. */
+.seat {
+  animation: seatSettle 0.22s ease-out;
+}
+@keyframes seatSettle {
+  0% {
+    filter: brightness(1.6);
+    box-shadow: 0 0 0 3px rgba(var(--robco-green-rgb), 0.45);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0);
+  }
+}
+[data-game='FO3'] .seat {
+  animation-name: seatSettleClunk;
+}
+@keyframes seatSettleClunk {
+  0% {
+    filter: brightness(1.3);
+    box-shadow: 0 0 0 2px rgba(var(--bezel-wire-rgb), 0.5);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(var(--bezel-wire-rgb), 0);
+  }
+}
+
+/* ─── BEZEL — illuminated subsystem selector (replaces the tab bar) ──── */
+.bezel {
+  position: relative; /* anchors the desktop-only .bezel-side dial/field-kit */
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.5);
+}
+/* GOVERNOR dial (left) + field-kit flavor line (right) — desktop-only
+   decorative flourishes (Gap 3/7, bezel fidelity pass). Absolutely
+   positioned against the (now position:relative) .bezel; pointer-events
+   none so they never intercept a keycap tap. Hidden on mobile below. */
+.bezel-side {
+  position: absolute;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--bezel-etch-dim);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  pointer-events: none;
+}
+.bezel-side.left {
+  left: 18px;
+}
+.bezel-side.right {
+  right: 18px;
+}
+.bezel-dial {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.7);
+  background: radial-gradient(circle at 35% 30%, #383c30, #15170f 75%);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+.bezel-dial::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 2px;
+  height: 10px;
+  background: var(--bezel-etch);
+  transform: translateX(-50%);
+}
+/* field-kit flavor text (right side) — game-agnostic [data-game] toggle,
+   the same static-span mechanism as .chassis-flavor (never a JS branch). */
+.fieldkit--fnv {
+  display: none;
+}
+[data-game='FNV'] .fieldkit--generic {
+  display: none;
+}
+[data-game='FNV'] .fieldkit--fnv {
+  display: inline;
+}
+/* bezel hazard strip (Gap 6) — low-opacity amber flavor stripe along the
+   bezel's top edge, desktop-only (added in the gated block below). */
+.telemetry {
+  margin: 0 auto 8px;
+  max-width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: #0d0a04;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.9);
+  color: var(--bezel-wire);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  padding: 5px 12px;
+  /* Owner-report batch (Suite 165): the strip grew a live VITALS/RAD/CARRIER
+     suffix on every subsystem, which no longer reliably fits one line at
+     narrow widths — wrap instead of the previous nowrap+ellipsis, so the
+     status text is never silently truncated (Protocol 17). */
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center;
+}
+/* .nav-row groups the role=tablist nav + the sibling DIR button (which is NOT
+   a tab — see index.html) as one visually centered row. */
+.nav-row {
+  display: flex;
+  justify-content: center; /* centering rule — the whole row centers as a unit */
+  align-items: stretch;
+  gap: clamp(4px, 1.4vw, 10px);
+  flex-wrap: wrap;
+  /* Owner-report fix (uniform-keycap-width pass) — a single fixed width
+     shared by every .navkey (the 6 nav-cluster tabs AND the sibling
+     dirkey button both read this custom property, since it inherits down
+     from .nav-row to both). Content-based sizing (the previous ea4aef3
+     fix) rendered 7 UNEVEN keycap widths (OPERATIONS/DATABANK/SETTINGS
+     wide, UPLINK/CHASSIS/DIR narrow) — every keycap now claims the exact
+     same width, and .nk-label's font-size (below) is shrunk to fit the
+     longest labels (OPERATIONS/DATABANK/SETTINGS) inside it instead.
+     Desktop overrides this to a larger value in its own gated block
+     (Suite 129 — never a bare min-width query). */
+  --navkey-w: 42px;
+}
+.nav-cluster {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: center; /* centering rule — the cluster centers as a unit */
+  align-items: stretch;
+  gap: clamp(4px, 1.4vw, 10px);
+  /* nowrap — the 5 tabs always render as ONE strip and shrink together
+     (owner report: independent wrapping here split OPERATOR/OPERATIONS/
+     DATABANK/UPLINK onto a first line while CHASSIS wrapped alone onto a
+     second line, with DIR then reading as floating beside that lone key).
+     .nav-row is still flex-wrap:wrap as a last-resort fallback for
+     genuinely extreme widths. */
+  flex-wrap: nowrap;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+.navkey {
+  position: relative;
+  /* Owner-report fix (uniform-keycap-width pass) — every keycap (the 6
+     nav-cluster tabs AND the sibling dirkey button) now claims the exact
+     same fixed width via the shared --navkey-w custom property (declared
+     on .nav-row above so it inherits identically to both flex contexts,
+     avoiding the proportional-shrink drift a nested flex-grow split would
+     introduce). flex-shrink stays enabled (min-width:0) as a last-resort
+     safety net for genuinely extreme widths, even though --navkey-w is
+     sized to already fit with margin at every tested breakpoint. This
+     replaces the prior content-sized (Fix 1, ea4aef3) behavior, which
+     rendered 7 uneven widths — see the .nk-label font-size comment below
+     for how the longest labels still fit one line at this narrower,
+     uniform width. */
+  width: var(--navkey-w);
+  flex: 0 1 var(--navkey-w);
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 44px;
+  /* Owner-report fix: horizontal padding dropped to 0 (was 1px/side) to
+     free up every spare px of content-box room for the uniform width's
+     smaller footprint — the tap target itself is unaffected, since
+     Protocol 17's 44px floor is a min-height, not width, constraint. */
+  padding: 5px 0 4px;
+  border: 1px solid rgba(0, 0, 0, 0.75);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #363b30, #1d201a 58%, #14170f);
+  box-shadow:
+    0 3px 0 #0c0e0a,
+    0 4px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  color: var(--bezel-etch);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-transform: uppercase;
+}
+.navkey:hover {
+  background: linear-gradient(180deg, #383d31, #22251e 60%, #191c16);
+}
+.navkey:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 #0c0e0a,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.nk-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3a3d35;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+}
+.navkey.active {
+  color: var(--robco-green);
+  border-color: rgba(var(--robco-green-rgb), 0.45);
+  /* Owner-report fix (Fix 2) — the ACTIVE keycap reads as physically
+     PRESSED IN rather than merely lit: raised relief inverted to an inset
+     shadow + a slight downward settle, driven entirely off the existing
+     .active class selectSubsystem() already toggles (Protocol 22 — no nav
+     wiring/hotkey/ARIA touched). Applies to both mobile and the desktop
+     3px-relief variant (below) since neither overrides this base rule. */
+  transform: translateY(1px);
+  background: linear-gradient(180deg, #1a1d17, #14170f 55%, #1d211a);
+  box-shadow:
+    inset 0 2px 3px rgba(0, 0, 0, 0.65),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+.navkey.active .nk-led {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+.navkey.wirekey.active {
+  color: var(--bezel-wire);
+  border-color: rgba(var(--bezel-wire-rgb), 0.5);
+}
+.navkey.wirekey.active .nk-led {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+.nk-num {
+  font-size: 7.5px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+}
+.nk-label {
+  /* Owner-report fix (uniform-keycap-width pass) — the uniform 42px
+     mobile --navkey-w is narrower than OPERATIONS/DATABANK/SETTINGS ever
+     rendered at under the old content-sized (Fix 1, ea4aef3) behavior, so
+     the SAME shared font-size shrinks to fit the longest label
+     (OPERATIONS, 10 chars) one line at that width instead of letting each
+     keycap size itself to its own label. Desktop's much larger
+     --navkey-w (gated block below) restores a bigger, easier-to-read
+     size since desktop has ample room. letter-spacing trimmed further
+     (0.4px->0.2px) for a little extra fit margin at the smaller mobile
+     size. */
+  font-size: 6px;
+  letter-spacing: 0.2px;
+  line-height: 1.15;
+  max-width: 100%;
+  /* white-space:nowrap (Fix 1) is still load-bearing — labels must render
+     on ONE line, never wrapping mid-word ("OPERATO/R"). overflow:hidden +
+     text-overflow:ellipsis remains a defensive fallback (never triggers
+     at any tested breakpoint given the width/font sizing above, but
+     guards against font-metric variance across browsers/OSes). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.nk-sub {
+  font-size: 6.5px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+}
+/* .navkey.dirkey no longer overrides width/flex (uniform-keycap-width
+   pass) — DIR now shares the exact same --navkey-w-driven size as the
+   other 6 keycaps via the base .navkey rule above, per the owner's
+   "all 7 keycaps the same size" directive. */
+/* SETTINGS keycap gets a subtle amber service-stripe so it reads as the
+   config/service cap, distinct from the phosphor-green subsystem keys. */
+.navkey.setkey::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 3px;
+  height: 2px;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(var(--bezel-wire-rgb), 0.5) 0 4px,
+    transparent 4px 8px
+  );
+  opacity: 0.55;
+  border-radius: 1px;
+}
+
+/* MOBILE (<1000px): the bezel keycap nav docks to the true bottom of the
+   viewport as a fixed thumb-zone bar (Protocol UI-7 — matches the
+   approved mockup's "sticky bottom bar" mobile layout). Fixed, not
+   sticky/reordered: on a normal document-flow mobile page the bezel is
+   the LAST element after a very long single-column stack of panels, so
+   a reorder-only or position:sticky fix would still bury the nav below
+   thousands of pixels of scrollable content — reachable only after
+   scrolling all the way down, which is worse than today's bug (nav
+   visible immediately, just at the wrong edge). Only position:fixed
+   keeps it reachable without scrolling. DOM position is deliberately
+   UNCHANGED (still between casing-top and glass-frame) so keyboard/tab
+   order is untouched by this fix.
+   Known trade-off (flagged for owner follow-up, not silently swept):
+   .container receives `filter`/`transform` from three ambient-runtime
+   body states (body.rt-idle, body.time-night, body.rt-shutdown), which
+   per spec makes .container the containing block for ITS fixed
+   descendants. While any of those three states is active, this fixed
+   bezel gracefully degrades to sitting at the true bottom of the page
+   (same as a plain reorder) instead of staying pinned to the viewport —
+   never broken/mispositioned, just temporarily not "always visible."
+   Closing that gap fully requires retargeting those three ambient
+   selectors to an inner wrapper that excludes the bezel — deferred as a
+   separate, wider-reaching change. */
+@media (max-width: 999.98px) {
+  .bezel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    margin-top: 0;
+    /* Mobile immersion pass — the same brushed-steel pinstripe .machine
+       already carries (Gap 1), plus rounded top corners so the fixed dock
+       reads as cut from the same physical casing as the header above. */
+    border-radius: 10px 10px 0 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    background:
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 2px, transparent 2px 5px),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.03),
+        transparent 40%,
+        transparent 60%,
+        rgba(0, 0, 0, 0.15)
+      ),
+      linear-gradient(180deg, var(--bezel-steel-3), var(--bezel-steel-1) 80%, var(--bezel-steel-2));
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.7);
+  }
+  /* Owner report: the fixed bottom dock's real height tracked the live
+     ▸ SUBSYSTEM status strip's own content length (VITALS/RAD/CARRIER +
+     per-subsystem suffix text — _bezelStatusSuffix()/_bezelTelemetryText(),
+     ui-core.js), so the dock visibly grew/shrank switching between a short
+     page (e.g. CHASSIS) and a long one (e.g. OPERATIONS with a manifest
+     count, or a crippled-limb/high-rad state) — reproduced live: 99px vs
+     110px+ at 360px depending on subsystem/campaign state. .telemetry gets
+     a deterministic fixed height here (mobile fixed-dock context only —
+     desktop's document-flow .telemetry, styled by the unchanged base rule
+     above, is untouched) sized for exactly 2 lines at a locked px
+     line-height (never the browser/font-default "normal", which is what
+     made the 2-vs-3-line boundary content-dependent in the first place);
+     any content past 2 lines is clamped with an ellipsis rather than
+     pushing the dock taller. The subsystem name (always first) and most of
+     the live status stay readable; only the rare longest-tail combination
+     ever loses characters off the end. */
+  .telemetry {
+    height: 36px;
+    line-height: 13px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    text-overflow: ellipsis;
+  }
+  /* Reserve space at the end of the scrollable page equal to the fixed
+     bezel's own height so the dock never covers the last panel's
+     content or controls (Protocol 17).
+     Mobile immersion pass (owner follow-up to the desktop bezel fidelity
+     pass) — the casing gets its own scaled-down depth cues: rounded top
+     corners + a soft outer shadow, so it reads as a physical device edge
+     against the page background instead of a flat rectangle. Both
+     box-shadow and border-radius are frame-only (Protocol UI-7) — neither
+     affects layout width/scrollWidth, so this adds zero horizontal-overflow
+     risk and costs zero content area. The blur (16px) and the shadow color
+     are deliberately much smaller than the desktop pass's 60px glow, since
+     body's mobile padding is only 10px (vs desktop's 20px) — enough room
+     for a soft edge, not a dramatic one. The full box-shadow list is
+     restated here (not merged) because .container.machine is more specific
+     than the base .machine rule it otherwise inherits from, exactly like
+     the desktop gated override above. */
+  /* ══ BOTTOM-DOCK OCCLUSION FIX (Option A′, planning/DOCK_OCCLUSION_PLAN.md)
+     The flat mobile view (New Vegas + FO3-portrait) used to be a plain
+     document-scroll page with the 112px fixed .bezel dock glued over the
+     bottom, so any board content whose natural (unscrolled) height ended
+     inside the dock's footprint was painted, then covered by the dock at
+     landing scroll (14 occluded controls across STAT/INV/DATA/CAMPG).
+     The mobile UPLINK view (css/15-overseer.css) and FO3-landscape
+     (css/60-fo3-pipboy.css) already solved this by making the shell a
+     bounded flex column whose ONE internal scroller ends above the dock —
+     which is exactly why neither of them has the bug. This gives the flat
+     view that same app-shell, reusing #fo3BoardScroll (the wrapper that
+     already holds every board, for every game) as the single scroller.
+     The dock itself is UNCHANGED (still position:fixed;bottom:0 above) — it
+     now floats over the padding-bottom reserve band, never over live
+     content, at every scroll position. Property set deliberately mirrors
+     UPLINK's (height + display:flex + flex-direction) so the two
+     higher-specificity regimes keep overriding cleanly with no divergent
+     property leaking into them (plan §3). NO overflow:hidden here (unlike
+     UPLINK/FO3-landscape): the flat view is the one that carries the
+     registry-autocomplete surface, so .container must never be able to
+     become a clipper under an ambient filter/transform state (plan §5.2).
+     The autocomplete panel is a position:fixed document.body child so it is
+     unaffected regardless, but this keeps the invariant belt-and-suspenders.
+     --dock-h is the single source for the reserve (plan §5.3 — no magic
+     number); it covers the real ~112px dock height plus body's 10px bottom
+     padding offset, verified live at 360/412 by tests/render-integrity.mjs. */
+  .container.machine {
+    --dock-h: 122px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    /* Retuned from the old 140px end-of-page reserve to the real dock height
+       (via --dock-h): under the bounded-flex model any excess would show as
+       an empty band between the glass and the dock, so it is matched, not
+       over-reserved (plan §5.3/§5.6). */
+    padding-bottom: var(--dock-h);
+    border-radius: 10px 10px 0 0;
+    box-shadow:
+      0 0 16px rgba(0, 0, 0, 0.6),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+  /* Flex pass-throughs down to the single scroller. Each is min-height:0 so a
+     tall board can't force the column past 100dvh (the classic flexbox
+     min-content floor). .glass-frame keeps its own position:relative/
+     overflow:hidden/z-index base rule; the absolute .crt-overlay, the
+     ::before vignette and the .sweep ::after are out of flow and unaffected. */
+  .glass-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* The DO-O carrier strip is a flow child of .glass-frame above .main-grid;
+     pin it above the scroller so it never scrolls away or doubles up
+     (plan §5.4). Inert when hidden (uplink / FO3-landscape hide it). */
+  .carrier-strip {
+    flex: 0 0 auto;
+  }
+  .main-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .col-left {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* THE bounded scroller — the region that ends at the dock's top edge, so no
+     board content can ever lay out in the dock's footprint. overflow-x:clip
+     (not the default visible) stops overflow-y:auto from promoting the x-axis
+     to auto and adding a stray horizontal scrollbar (Protocol 17); matches
+     FO3-landscape's #fo3BoardScroll. */
+  #fo3BoardScroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: clip;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Bezel fidelity pass — disciplined mobile edge: hide the desktop-only
+     decorative flourishes (governor dial, serial plate, field-kit line)
+     and the keycap sub-label so the bottom dock stays compact at 360/412px
+     (matches nv-machine-mockup.html's own mobile block). */
+  .nk-sub {
+    display: none;
+  }
+  .bezel-side {
+    display: none;
+  }
+  .serial {
+    display: none;
+  }
+}
+
+/* Directory fallback modal body (rendered into #sysModal via openModal()) */
+.bezel-dir-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 7px;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+.bezel-dir-item span {
+  opacity: 0.55;
+  font-size: 9px;
+  flex-shrink: 0;
+}
+
+/* Custom cursor — NV amber block caret (fine pointers only; touch devices
+   keep the system cursor at zero cost). FNV-only until DO-M authors the
+   FO3/FO4 cursor facets from identity.cursor. */
+@media (hover: hover) and (pointer: fine) {
+  [data-game='FNV'] body {
+    cursor:
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="13" height="19"><rect x="1" y="1" width="9" height="15" fill="%23ffb642" fill-opacity="0.9" stroke="%23130d02" stroke-width="1"/></svg>')
+        2 2,
+      auto;
+  }
+  [data-game='FNV'] button,
+  [data-game='FNV'] .navkey {
+    cursor:
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17"><g stroke="%23ffb642" stroke-width="2"><line x1="8.5" y1="0" x2="8.5" y2="6"/><line x1="8.5" y1="11" x2="8.5" y2="17"/><line x1="0" y1="8.5" x2="6" y2="8.5"/><line x1="11" y1="8.5" x2="17" y2="8.5"/></g></svg>')
+        8 8,
+      pointer;
+  }
+}

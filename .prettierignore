@@ -6,6 +6,10 @@ package-lock.json
 scripts/rollback.sh
 scripts/pre-commit
 
+# Single-source Node version pin (read by local dev + every CI OS via
+# node-version-file). A bare version string — Prettier has no parser for it.
+.nvmrc
+
 # Vendored third-party dependency (Visual Upload OCR, Unit 1) — pinned, minified/generated
 # files committed byte-for-byte as downloaded. Never reformatted (Prettier reflowing the
 # emscripten-generated wasm glue bloats it and risks corrupting the pinned build).
@@ -15,4 +19,7 @@ js/vendor/
 # not Prettier-managed. They were formerly skipped via .gitignore; keep them skipped
 # here now that they are un-ignored so Prettier does not churn their tables.
 CLAUDE.md
-RULES.md
+
+# Claude-facing local reference library (gitignored; belt-and-suspenders so Prettier
+# never churns the hand-authored brain dump even if the .gitignore default changes).
+library/

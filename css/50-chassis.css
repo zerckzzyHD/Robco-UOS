@@ -1,0 +1,1049 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/50-chassis.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 10794-11804. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: Chassis [5] diagnostic maintenance bay + Chassis Living Core batch 2
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   50-chassis.css — cascade slot 50: the CHASSIS self-diagnostic
+   maintenance bay (BUS-22 Unit Power Plant + Living Core, BUS-23
+   plate/breakers, BUS-24 Service & Fault console) — the "living
+   core" shell shared between the full instrument and its casing-top
+   mini-mirror.
+   WHY HERE: reuses the same .bay-board/.bay-slot-tag/.bay-part-no/
+   .panel-substatus/.board-led vocabulary from 30-modulebay.css, so
+   it must load after that file. It also defines `.chassis-core-shape`
+   used together with the compound `#chassisCoreMini` selector noted
+   in 10-chrome.css (the CHASSIS mini-core readout window) — that
+   10-chrome.css rule is a COMPOUND selector specifically because a
+   bare `.chassis-core-mini` rule would tie in specificity with
+   `.chassis-core-shape` and the winner would depend on file order;
+   the compound form sidesteps that trap regardless of load order,
+   so this is not itself a hard ordering requirement, but is worth
+   noting as a nearby specificity trap this codebase already had to
+   design around. This file's position after 45-databank.css is
+   otherwise chronological (CHASSIS was Phase 3's last piece).
+   ══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════
+   CHASSIS [5] — self-diagnostic maintenance bay (Design Overhaul,
+   planning/mockups/chassis-diagnostic.html CORE variant). BUS-22/23/24.
+   Every board reuses the existing .bay-board/.bay-slot-tag/.bay-part-no/
+   .panel-substatus/.board-led machine-language classes (Protocol 22) —
+   only the BUS-22 core + BUS-23 plate/breakers + BUS-24 svc/fault
+   instruments below are new. The LIVING CORE (Protocol UI-10) is driven
+   by real machine signals via _coreRefresh() (ui-core.js) — every
+   continuous motion below is a plain `animation:` declaration so the
+   existing global prefers-reduced-motion block neutralises it for free;
+   one-shot flourishes (shutdown collapse, flare/pulse/tap) use `transition:`
+   instead, which the SAME global block also neutralises (transition-
+   duration:0.01ms), so they still settle to the correct frame even while
+   .core-still (the gate) has paused the continuous loops.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── BUS-22 · UNIT POWER PLANT ── */
+.plant-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: center;
+  gap: 14px 24px;
+  margin-top: 10px;
+}
+.meter-bank {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 9px;
+}
+
+/* The living core — a decorative shell shared verbatim (Protocol 22) between
+   the full BUS-22 instrument (#chassisCore, a real <button> — Protocol UI-5)
+   and the mini mirror in its own casing-top readout window (#chassisCoreMini,
+   a decorative aria-hidden <span> inside #chassisScreenMini). Both carry the
+   SAME .chassis-core-shape base class plus state-modifier classes applied by
+   the ONE shared _coreRefresh() (ui-core.js), so they can never drift. */
+.chassis-core-shell {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+/* Behavior #3 SPIN INERTIA (batch 2, further below): registering these two
+   custom properties makes them INTERPOLATABLE, so the `transition:` on the
+   base .chassis-core-shape rule below eases the multiplier itself — which in
+   turn eases the r1/r3 ring's computed animation-duration (calc() re-reads a
+   changing custom property live) — instead of the state classes snapping the
+   duration instantly. Progressive enhancement: a browser without @property
+   support just keeps today's instant snap (no worse than before). */
+@property --core-spin-mul-r1 {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+@property --core-spin-mul-r3 {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+.chassis-core-shape {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  min-height: 0; /* override the global button{min-height:28px} — a decorative
+                    circle sized by width/height, not line-height */
+  --core-spin-mul-r1: 1;
+  --core-spin-mul-r3: 1;
+  transition:
+    --core-spin-mul-r1 1.6s ease,
+    --core-spin-mul-r3 1.6s ease;
+  /* Owner follow-up fix (Protocol 42, found live during render-verify at the
+     new 26px mini size): the ring/heart children are positioned by percentage
+     inset + a border, and at small sizes that combination can round to a
+     couple of stray px past the shape's own box — caught by the gate's
+     populated-save inner-overflow scan. The shape is a self-contained
+     circular cell by design, so clipping its own bleed at its own boundary is
+     correct (never visible — border-radius:50% already reads as circular),
+     and .core-help-btn is a SIBLING of this class inside .chassis-core-shell,
+     never a descendant, so it is unaffected. */
+  overflow: hidden;
+  /* Always-on perpendicular ring (owner follow-up — "perpendicular rings
+     that rotate around in 3d always"): preserve-3d lets the shape's 3D
+     children (this element's own ::before ring below, plus the burst's
+     rotateX/Y/Z rings) compose in one shared 3D space rather than each
+     being flattened independently. */
+  transform-style: preserve-3d;
+}
+button.chassis-core-shape {
+  width: 96px; /* override the global button{width:100%} (Protocol UI-5) */
+  cursor: pointer;
+  /* Owner report: the native tap-highlight box was the worst offender here,
+     washing out the core's own tap-to-poke pulse — belt-and-suspenders on
+     top of the broad html/button rules above. */
+  -webkit-tap-highlight-color: transparent;
+}
+/* Owner report: at -6px/-6px the button sat close enough to the shape's
+   top-right corner that the r1 ring's own outer edge (inset:0 -- radius
+   48px from the shape's own 96x96 center) visibly crossed through the "?"
+   circle as it rotated. A first nudge to -11px/-10px was verified (via the
+   button's own 32px box geometry) to STILL leave its nearest corner only
+   ~37.5px from the shape's center -- inside the 48px ring radius, so the
+   ring still crossed it. Worked out precisely: the button's nearest
+   corner is at (64+right, 32-top) relative to the shape's own (0,0)-(96,96)
+   box, so top/right both need to push that corner's distance from the
+   center (48,48) comfortably past 48px (the ring itself has ~2px of
+   stroke straddling that radius). -24px/-22px puts the nearest corner at
+   ~55px from center -- a clean, verified clearance, not a guess. Still
+   comfortably inside its 32px .icon-btn-round tap target (Protocol 17)
+   and still a sibling of .chassis-core-shape inside .chassis-core-shell,
+   never overlapping the shape's own overflow:hidden clip. */
+.core-help-btn {
+  position: absolute;
+  top: -24px;
+  right: -22px;
+}
+.chassis-core-shape .c-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--robco-green-rgb), 0.68);
+  /* Fluidity pass (owner follow-up): the ring is ALWAYS animating — either
+     the continuous idle chassisCoreSpin or the #14 stat-change burst below —
+     so hinting the compositor to keep it GPU-composited is the correct use
+     of will-change (the anti-pattern is applying it to elements that rarely
+     change, not to one that animates continuously like this). */
+  will-change: transform;
+}
+.chassis-core-shape .c-ring.r1 {
+  inset: 0;
+  border-style: dashed;
+  /* calc() re-reads --core-spin-mul-r1 live (behavior #3 spin inertia) — the
+     multiplier is what eases; 14s is the idle-baseline duration (mul: 1). */
+  animation: chassisCoreSpin calc(14s / var(--core-spin-mul-r1)) linear infinite;
+}
+/* r2 was removed (owner follow-up — the full core had one more ring than
+   the mini core ever did, reading as cluttered and making the two cores
+   visually mismatched). The mini core never carried r2 in its own markup
+   (Protocol 22 — one shared .chassis-core-shape ruleset means removing it
+   from the full core's markup is the only change needed; both cores now
+   render the identical r1/r3/perpendicular-ring set from this same file). */
+.chassis-core-shape .c-ring.r3 {
+  inset: 28%;
+  border-style: dashed;
+  /* calc() re-reads --core-spin-mul-r3 live (behavior #3 spin inertia) — the
+     multiplier is what eases; 9s is the idle-baseline duration (mul: 1). */
+  animation: chassisCoreSpin calc(9s / var(--core-spin-mul-r3)) linear infinite reverse;
+}
+/* Always-on perpendicular ring (owner follow-up, corrected) — a 4th ring,
+   built as a ::before pseudo-element so no HTML markup changes anywhere
+   (both the full BUS-22 core and the casing-top mini core share this rule
+   automatically, since both carry .chassis-core-shape — Protocol 22, one
+   source, no drift). The owner's actual ask: NOT a flat ring spinning
+   around the vertical axis (rotateX(90deg)+rotateY, the first attempt) —
+   a ring that continuously tumbles around a DIAGONAL 3D axis, so its two
+   diagonal corner-pairs swap through depth as it turns (upper-left/
+   bottom-right <-> bottom-left/upper-right), the ring's plane visibly
+   tilting edge-on and back into the screen. `rotate3d(1, 1, 0, deg)`
+   rotates around the diagonal axis running through the shape's other two
+   corners, which is exactly this diagonal-corner-swap tumble (unlike
+   rotateX/rotateY, which only ever spin around the screen's horizontal or
+   vertical axis). `perspective` (already on .chassis-core-shape) gives it
+   real depth; transform-only + linear infinite (matching the existing
+   r1/r3 idle-spin convention — linear is correct for an unbounded loop,
+   never ease-in-out, which would visibly hitch at the seam) + will-change
+   keeps it fluid and GPU-composited. */
+/* Owner correction: "wider" was the wrong read of the earlier ask — the
+   owner means THICKER / genuinely 3D (a torus/sphere-shell BAND with
+   volume), never wider in DIAMETER. The previous inset (6%, an 88%-
+   diameter ellipse) read as oversized, especially cramped inside the tiny
+   mini screen. Shrunk to inset 20% (a ~60%-diameter ring, nesting cleanly
+   between r1 at 100% and r3 at 44%) and given real volume via a much
+   thicker border PLUS an inset/outer box-shadow pair that shades it like a
+   lit, rounded tube rather than a flat hairline outline — a dark inner
+   shadow reads as the far/underside of the band, a faint inner highlight
+   as its near lip, and a soft outer glow as reflected bloom off its
+   surface. box-shadow (not border-image, which fights border-radius on a
+   circle across browsers) is the same glow idiom every other flourish in
+   this file already uses (Protocol 22). Shared by both cores from this ONE
+   rule — only the per-size border-width below is a necessary override
+   (CSS border-width has no percentage form), never a diverging design. */
+.chassis-core-shape::before {
+  content: '';
+  position: absolute;
+  inset: 20%;
+  border-radius: 50%;
+  border: 9px solid rgba(var(--robco-green-rgb), 0.6);
+  box-shadow:
+    inset 0 0 4px rgba(0, 0, 0, 0.6),
+    inset 0 0 1px rgba(255, 255, 255, 0.25),
+    0 0 3px rgba(var(--robco-green-rgb), 0.35);
+  will-change: transform;
+  animation: chassisCoreOrbitPerp 6s linear infinite;
+}
+/* Mini-core border-width overrides (this desktop-tier 54px size; the
+   40px/33px tiers get their own overrides alongside their own width/height
+   media-query blocks further down) — sized to hold roughly the SAME
+   border-to-diameter ratio as the full core (~15-17%) at every size, so the
+   band reads with consistent thickness/volume regardless of which core or
+   viewport tier is showing it (the previous flat 4px mini override, never
+   adjusted per breakpoint, is what let the two cores drift apart visually
+   as the mini shrank). border-color keeps its own higher-contrast opacity —
+   the mini shares the casing-top screen with three other rings + the heart,
+   so a bolder stroke is still what keeps it legible there. */
+.chassis-core-shape.chassis-core-mini::before {
+  border-width: 5px;
+  border-color: rgba(var(--robco-green-rgb), 0.8);
+}
+@keyframes chassisCoreOrbitPerp {
+  0% {
+    transform: rotate3d(1, 1, 0, 0deg);
+  }
+  100% {
+    transform: rotate3d(1, 1, 0, 360deg);
+  }
+}
+@keyframes chassisCoreSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.chassis-core-shape .c-heart {
+  position: absolute;
+  inset: 38%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 42% 38%,
+    rgba(255, 255, 255, 0.25),
+    var(--robco-green) 55%,
+    rgba(var(--robco-green-rgb), 0.4)
+  );
+  box-shadow: 0 0 26px rgba(var(--robco-green-rgb), 0.85);
+  animation: chassisCorePulse 2.6s ease-in-out infinite;
+  /* filter 1.2s eases behavior #1 (thermal glow, batch 2 below) in/out slowly —
+     a "cooling"/"warming" feel distinct from the snappier box-shadow/transform
+     one-shot flourishes. */
+  transition:
+    box-shadow 0.4s,
+    transform 0.4s,
+    filter 1.2s ease;
+}
+@keyframes chassisCorePulse {
+  50% {
+    box-shadow: 0 0 46px rgba(var(--robco-green-rgb), 1);
+    transform: scale(1.16);
+  }
+}
+.chassis-core-shape .c-cap {
+  position: absolute;
+  left: 50%;
+  bottom: -16px;
+  transform: translateX(-50%);
+  font-size: 6.5px;
+  letter-spacing: 1.5px;
+  opacity: 0.5;
+  white-space: nowrap;
+  color: var(--robco-green);
+}
+
+/* Mini mirror — a small reactor glyph sized to actually read well inside its
+   own casing-top screen (owner follow-up: squeezed next to the Overseer
+   waveform it was both hard to see and hard to make look good; a dedicated
+   readout window gives it real room). No r2/cap — kept minimal for the small
+   frame. Same state classes, smaller geometry. The base width/height rule
+   lives up near .chassis-screen-mini (Protocol 42 fix — see that comment for
+   why: it must stay BEFORE its own @media (max-width:480px) shrink override
+   in source order, or the equal-specificity base rule wins regardless of the
+   media query, silently defeating the mobile shrink). */
+.chassis-core-mini .c-ring {
+  border-width: 1px;
+}
+.chassis-core-mini .c-cap {
+  display: none;
+}
+
+/* ── power-state classes (continuous, paused as a group by .core-still) ── */
+/* Behavior #3 SPIN INERTIA (batch 2, below in file) replaces each of these
+   r1/r3 `animation-duration: Xs` snaps with a --core-spin-mul-r1/-r3
+   multiplier instead — the multiplier is what actually eases (see the
+   @property block below), so the target duration below is reproduced
+   exactly (regression-safe) once multiplied against the r1/r3 base
+   durations (14s/9s), just no longer applied as an instant jump. The
+   heart's own animation-duration is untouched (spin inertia is a ROTATION
+   behavior, not a pulse-rate one). */
+.chassis-core-shape.core-boot {
+  --core-spin-mul-r1: 6.3636; /* 14s / 2.2s */
+  --core-spin-mul-r3: 6.4286; /* 9s / 1.4s */
+}
+.chassis-core-shape.core-boot .c-heart {
+  animation-duration: 0.6s;
+}
+.chassis-core-shape.core-standby {
+  opacity: 0.5;
+  --core-spin-mul-r1: 0.35; /* 14s / 40s */
+  --core-spin-mul-r3: 0.3462; /* 9s / 26s */
+}
+.chassis-core-shape.core-standby .c-heart {
+  animation-duration: 6s;
+}
+/* AI revs (#2) — faster spin + a brighter heart while the Director is
+   thinking/speaking (the SAME setOverseerState() lifecycle the Overseer
+   scope already reacts to — Protocol 22, no re-instrumentation). */
+.chassis-core-shape.core-thinking {
+  --core-spin-mul-r1: 4.6667; /* 14s / 3s */
+  --core-spin-mul-r3: 4.5; /* 9s / 2s */
+}
+.chassis-core-shape.core-thinking .c-heart {
+  animation-duration: 0.9s;
+  box-shadow: 0 0 42px rgba(var(--robco-green-rgb), 1);
+}
+/* Connection (#3) — a flicker/dim while disabled/offline (mirrors the
+   Overseer scope's own disabled/offline read, _isUplinkConnected()). */
+@keyframes chassisCoreFlicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 0.55;
+  }
+  45% {
+    opacity: 0.85;
+  }
+  60% {
+    opacity: 0.4;
+  }
+  63% {
+    opacity: 0.9;
+  }
+}
+.chassis-core-shape.core-disconnected {
+  animation: chassisCoreFlicker 3.4s steps(1) infinite;
+}
+.chassis-core-shape.core-disconnected .c-ring {
+  opacity: 0.4;
+}
+.chassis-core-shape.core-disconnected .c-heart {
+  filter: saturate(0.4);
+}
+/* Shutdown collapse (#5) — a plain `transition:` (not an infinite animation),
+   so it still settles to its dark/collapsed resting frame even while
+   .core-still has paused the continuous ring/heart loops above; the global
+   prefers-reduced-motion block's transition-duration override still makes
+   it instant for motion-sensitive users. */
+.chassis-core-shape.core-shutdown {
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+  opacity: 0.1;
+  transform: scale(0.2);
+}
+/* Fault strain (#6) — a subtle red instability overlay, layered on TOP of
+   whatever power-state is active (never replaces the base optic color). */
+@keyframes chassisCoreFault {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(231, 76, 60, 0);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(231, 76, 60, 0.9);
+  }
+}
+.chassis-core-shape.core-fault::after {
+  content: '';
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(231, 76, 60, 0.7);
+  animation: chassisCoreFault 1.3s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Radio-reactive (#10) — a gentle shimmer while the synthesized station is
+   playing (AudioSettings.radio + the real radioNodes signal). */
+@keyframes chassisCoreRadio {
+  50% {
+    filter: brightness(1.45);
+  }
+}
+/* r2 (the shimmer's original target) was removed — see the c-ring.r1/r3
+   comment above. r3 is the closest remaining ring; it already spins
+   (chassisCoreSpin), so the radio shimmer is layered on as a SECOND,
+   comma-separated animation rather than replacing the spin outright. */
+.chassis-core-shape.core-radio .c-ring.r3 {
+  animation:
+    chassisCoreSpin 9s linear infinite reverse,
+    chassisCoreRadio 1.8s ease-in-out infinite;
+}
+/* Overclock strain (#12) — several signals active at once works the core
+   visibly harder: faster spin layered over whichever power-state is active.
+   Multiplier-driven (behavior #3 spin inertia) like boot/standby/thinking
+   above — 14s/1.6s and 9s/1s reproduce the original targets exactly. */
+.chassis-core-shape.core-overclock {
+  --core-spin-mul-r1: 8.75; /* 14s / 1.6s */
+  --core-spin-mul-r3: 9; /* 9s / 1s */
+}
+.chassis-core-shape.core-overclock .c-heart {
+  box-shadow: 0 0 42px rgba(231, 76, 60, 0.75);
+}
+/* One-shot flourishes (#8 level-up flare, #9 save/sync write-pulse, #13
+   tap-to-poke) — transient classes toggled add-then-remove (Suite 135/162
+   reflow-restart pattern); the transition above on .c-heart is what makes
+   these visible as a brighten-then-settle bump rather than an instant snap. */
+.chassis-core-shape.core-flare .c-heart,
+.chassis-core-shape.core-datapulse .c-heart,
+.chassis-core-shape.core-tap .c-heart {
+  box-shadow: 0 0 58px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.3);
+}
+/* #14 3D ring burst on a real stat change (owner follow-up) — a genuine
+   orbital tumble, distinct from the flat 2D chassisCoreSpin the rings idle
+   with. `perspective` on the shell gives the rotateX/rotateY children real
+   depth (harmless when no 3D transform is active, so it's safe on the base
+   rule); the compound `.chassis-core-shape.chassis-core-mini` selector picks
+   a smaller perspective distance so the effect reads proportionally similar
+   at the small casing-top size (Protocol 42 precedent — same reasoning as
+   the mini-core sizing fix below). Each ring gets its own tumble so the
+   three read as independent orbits, same as their existing spin-direction
+   variety; all three start and end at a multiple of 360° so the burst hands
+   off seamlessly back to the continuous flat spin with no visual snap.
+   Prominence pass (owner follow-up): each ring completes a full double
+   rotation (720°) over a 1.4s duration, with the perspective distance
+   tightened (320px->200px full, 90px->55px mini) so the depth is obvious.
+   The heart also flares in step with the tumble (reusing the SAME
+   box-shadow/transform transition every other one-shot flourish already
+   relies on, Protocol 22) so the burst reads as one unmistakable event, not
+   just the rings.
+   Fluidity pass (owner follow-up): the previous 0/40/70/100 keyframes had
+   wildly uneven per-segment rotation deltas, and — combined with a "back"
+   overshoot cubic-bezier — each segment independently bounced past its own
+   endpoint before settling, reading as three chained snaps rather than one
+   continuous tumble. Every keyframe below is now EVENLY spaced (0/25/50/75/
+   100%) with EACH axis value held EXACTLY proportional to its keyframe
+   percent (e.g. r1's rotateX is always 7.2 * percent), so every segment has
+   identical, constant angular velocity per axis — mathematically gap-free.
+   `ease-in-out` (a smooth, non-overshooting curve) is applied to the WHOLE
+   1.4s span rather than per-segment, so the tumble accelerates from rest
+   and decelerates back to rest ONE time, with no bounce or snap anywhere in
+   between. `will-change: transform` on the base .c-ring rule (below, always
+   animating — either this burst or the continuous idle spin) hints the
+   compositor to keep it on the GPU so neither loop stutters; every keyframe
+   here animates `transform` only, never a layout- or paint-triggering
+   property, so the tumble itself never forces a mid-animation reflow. */
+.chassis-core-shape {
+  perspective: 200px;
+}
+/* Owner correction (big/mini visual-mismatch fix): a FLAT 130px mini
+   perspective, applied regardless of which of the mini core's three
+   responsive size tiers (54px here / 40px / 33px, in the media queries
+   further down) was actually showing, meant the perspective-to-size RATIO
+   drifted a lot narrower on phones (130/40 ~= 3.25x, 130/33 ~= 3.94x) than
+   the full core's constant 200/96 ~= 2.08x ratio -- more foreshortening at
+   every tier than the full core ever shows, which is a real, measurable
+   reason the two cores never looked alike. Each tier below now gets its
+   OWN perspective holding that SAME ~2.08x ratio against its own current
+   size (54 * 2.08 ~= 113, matching the media-query overrides further down
+   for the 40px and 33px tiers) -- true parity, not just "big enough to see." */
+.chassis-core-shape.chassis-core-mini {
+  perspective: 113px;
+}
+@keyframes chassisCoreOrbitBurst1 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(180deg) rotateY(180deg) rotateZ(180deg);
+  }
+  50% {
+    transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg);
+  }
+  75% {
+    transform: rotateX(540deg) rotateY(540deg) rotateZ(540deg);
+  }
+  100% {
+    transform: rotateX(720deg) rotateY(720deg) rotateZ(720deg);
+  }
+}
+@keyframes chassisCoreOrbitBurst3 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(180deg) rotateY(-180deg) rotateZ(180deg);
+  }
+  50% {
+    transform: rotateX(360deg) rotateY(-360deg) rotateZ(360deg);
+  }
+  75% {
+    transform: rotateX(540deg) rotateY(-540deg) rotateZ(540deg);
+  }
+  100% {
+    transform: rotateX(720deg) rotateY(-720deg) rotateZ(720deg);
+  }
+}
+.chassis-core-shape.core-stat-burst .c-ring.r1 {
+  /* Owner follow-up: "a bit slower" — 1.4s -> 1.8s (matches the JS
+     _coreOneShot('core-stat-burst', 1800) removal timeout below), same
+     720deg double tumble, just more graceful. */
+  animation: chassisCoreOrbitBurst1 1.8s ease-in-out 1;
+}
+/* r2's own burst tumble (chassisCoreOrbitBurst2) was removed along with the
+   ring itself — see the c-ring.r1/r3 comment above. r1 and r3 still tumble
+   independently (Burst1/Burst3), so the burst keeps two distinct orbits. */
+.chassis-core-shape.core-stat-burst .c-ring.r3 {
+  animation: chassisCoreOrbitBurst3 1.8s ease-in-out 1;
+}
+.chassis-core-shape.core-stat-burst .c-heart {
+  box-shadow: 0 0 58px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.3);
+}
+/* The gate (Protocol UI-10) — reduced-motion OR the Immersion dial below
+   Balanced OR document.hidden OR the Ambient Runtime in STANDBY/SHUTDOWN/
+   OFF each suppress every CONTINUOUS loop above as one group; the state
+   classes themselves (colour/opacity/overlay) still apply instantly, so a
+   state CHANGE always paints one correct static frame — no bespoke
+   per-behaviour carve-out. `.core-still::before` extends the SAME gate to
+   the always-on perpendicular ring above — a continuous 3D loop is caught
+   by this exact mechanism exactly like the existing idle spin, no separate
+   carve-out. */
+.core-still,
+.core-still .c-ring,
+.core-still .c-heart,
+.core-still .c-spark,
+.core-still::before,
+.core-still.core-fault::after {
+  animation-play-state: paused !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CHASSIS LIVING CORE — 10 owner-approved new behaviors (batch 2). Every
+   rule below follows the SAME contract as the block above it: painted on
+   BOTH shells from _coreRefresh()'s one snapshot (ui-core.js), continuous
+   motion gated as a GROUP by .core-still (extended above), one-shot
+   flourishes use `transition:`/a timed class (settle correctly even while
+   .core-still has paused the continuous loops), and zero campaign-state
+   write anywhere — every new signal is transient/in-memory or MetaStore
+   device telemetry, never a state field, saveState(), or robco_v8. Behavior #1
+   (thermal glow, filter added to .c-heart) and #3 (spin inertia, the
+   --core-spin-mul-r1/-r3 @property pair) are threaded into the existing
+   rules above rather than duplicated here (Protocol 22 — one rule per
+   concern). #10 (a center readout glyph) was evaluated and DROPPED — see
+   the commit/CHANGELOG note; it could not be made legible on the small
+   casing-top mini core without hurting the design.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* #1 THERMAL GLOW — the running "temperature" (js: _coreTemp, tracked by
+   _coreThermalTick()) tints .c-heart from green toward amber/red via
+   filter:hue-rotate() rather than a hardcoded amber/red rgb — this rides
+   whatever optics colour (--robco-green) is currently active, so it works
+   correctly under every theme/optic pick (Protocol 38, optic-agnostic).
+   Eased in/out slowly (the "filter 1.2s ease" added to .c-heart's own
+   transition list above) for a genuine warm/cool feel, distinct from the
+   snappier one-shot flourishes. */
+.chassis-core-shape.core-temp-warm .c-heart {
+  filter: hue-rotate(-25deg) saturate(1.3);
+}
+.chassis-core-shape.core-temp-hot .c-heart {
+  filter: hue-rotate(-55deg) saturate(1.6) brightness(1.1);
+}
+
+/* #2 ENERGY SPARKS — small particles orbiting the core. Reuses the classic
+   CSS "orbit around the element's own center" trick (rotate() then
+   translateX() — no wrapper element needed, transforms compose in the
+   coordinate space the previous function established): the dot sits AT the
+   shape's exact center, rotating carries it in a circle of radius
+   var(--spark-r). Density/brightness track real activity (thinking/radio/
+   overclock/hot-thermal show a second, brighter/faster spark) — never a
+   demo loop. --spark-r is scaled down for the small mini core so the orbit
+   stays inside its own (smaller) box instead of being clipped by
+   overflow:hidden. */
+@keyframes chassisCoreOrbitDot {
+  from {
+    transform: rotate(0deg) translateX(var(--spark-r, 40px));
+  }
+  to {
+    transform: rotate(360deg) translateX(var(--spark-r, 40px));
+  }
+}
+.chassis-core-shape .c-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px var(--robco-green);
+  opacity: 0.5;
+  will-change: transform;
+  --spark-r: 40px;
+}
+.chassis-core-mini .c-spark {
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
+  box-shadow: 0 0 3px var(--robco-green);
+  --spark-r: 15px; /* keeps the orbit inside the mini core's much smaller box */
+}
+.chassis-core-shape .c-spark.s1 {
+  animation: chassisCoreOrbitDot 5s linear infinite;
+}
+.chassis-core-shape .c-spark.s2 {
+  animation: chassisCoreOrbitDot 3.4s linear infinite reverse;
+  opacity: 0; /* hidden at rest — busy states below reveal it (sparse when idle) */
+}
+.chassis-core-shape.core-thinking .c-spark.s2,
+.chassis-core-shape.core-overclock .c-spark.s2,
+.chassis-core-shape.core-temp-hot .c-spark.s2 {
+  opacity: 0.9;
+}
+.chassis-core-shape.core-overclock .c-spark.s1 {
+  animation-duration: 1.6s;
+}
+.chassis-core-shape.core-overclock .c-spark.s2 {
+  animation-duration: 1.1s;
+}
+.chassis-core-shape.core-standby .c-spark {
+  opacity: 0.15;
+}
+
+/* #4 POWER-SURGE RIPPLE — a ring ripples outward on the SAME data.write/
+   level.up/connection (reconnect) signals the core already reacts to
+   (Protocol 22, no new triggers). A dedicated child span (not ::after —
+   ::after is already the fault ring's pseudo-element, and a ripple can
+   legitimately overlap a buffered fault) toggled one-shot, add-then-remove
+   (the Suite 135/162 reflow-restart pattern), so a repeated trigger always
+   restarts cleanly. */
+@keyframes chassisCoreRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--robco-green-rgb), 0.55);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 22px rgba(var(--robco-green-rgb), 0);
+    opacity: 0;
+  }
+}
+.chassis-core-shape .c-ripple {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+}
+.chassis-core-shape.core-ripple .c-ripple {
+  animation: chassisCoreRipple 0.9s ease-out 1;
+}
+
+/* #5 IDLE FLARES — occasional faint RANDOM flares during long idle, "the
+   reactor settling" — registered as a dial-gated, non-persisted
+   AmbientRuntime observer (initChassisCore(), ui-core.js), mirroring the
+   DO-O Overseer idle-blip timer exactly (Protocol 22). Deliberately fainter
+   than the flare/datapulse/tap/milestone group below (a settling murmur,
+   not an event flourish). */
+.chassis-core-shape.core-idle-flare .c-heart {
+  box-shadow: 0 0 32px rgba(var(--robco-green-rgb), 0.75);
+  transform: scale(1.08);
+}
+
+/* #7 RECOVERY ANIMATION — when a buffered fault CLEARS (error count -> 0),
+   the core visibly stabilizes back to calm green instead of the red fault
+   ring just vanishing. Safe to reuse ::after here (unlike the ripple above):
+   _coreRefresh() (ui-core.js) applies `core-recovering` in the EXACT same
+   pass that removes `core-fault`, so the two classes are never present on
+   the same element at once — no fight over the shared pseudo-element. */
+@keyframes chassisCoreRecover {
+  0% {
+    box-shadow: 0 0 26px rgba(231, 76, 60, 0.9);
+    border-color: rgba(231, 76, 60, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(231, 76, 60, 0);
+    border-color: rgba(var(--robco-green-rgb), 0);
+  }
+}
+.chassis-core-shape.core-recovering::after {
+  content: '';
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(231, 76, 60, 0.7);
+  animation: chassisCoreRecover 1.2s ease-out 1;
+  pointer-events: none;
+}
+.chassis-core-shape.core-recovering .c-heart {
+  box-shadow: 0 0 40px rgba(var(--robco-green-rgb), 0.9);
+}
+
+/* #8 UPTIME-MILESTONE PULSE — a small celebratory pulse each time the
+   session uptime clock (ui-core.js _tickUptimeClock()) crosses an hour
+   mark. Reuses the SAME brighten-then-settle .c-heart transition the
+   flare/datapulse/tap group already relies on (Protocol 22). */
+.chassis-core-shape.core-milestone .c-heart {
+  box-shadow: 0 0 62px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.32);
+}
+
+/* #9 TAP-AND-HOLD OVERCHARGE — extends tap-to-poke (#13 above) with a
+   press-and-HOLD gesture: core-charging plays while held (ring spin-up via
+   the SAME --core-spin-mul-r1/-r3 inertia mechanism as #3, a nice reuse —
+   Protocol 22), core-charged marks the ready threshold, and releasing AFTER
+   charged fires core-overcharge — the identical 3D tumble keyframes the
+   #14 stat-change burst already uses (chassisCoreOrbitBurst1/3), just a
+   distinct trigger path (a real user hold-release, never a stat change). */
+.chassis-core-shape.core-charging {
+  --core-spin-mul-r1: 3;
+  --core-spin-mul-r3: 3;
+}
+.chassis-core-shape.core-charging .c-heart {
+  box-shadow: 0 0 36px rgba(var(--robco-green-rgb), 0.95);
+  transform: scale(1.1);
+}
+.chassis-core-shape.core-charged .c-heart {
+  box-shadow: 0 0 60px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.22);
+}
+.chassis-core-shape.core-overcharge .c-ring.r1 {
+  animation: chassisCoreOrbitBurst1 1.8s ease-in-out 1;
+}
+.chassis-core-shape.core-overcharge .c-ring.r3 {
+  animation: chassisCoreOrbitBurst3 1.8s ease-in-out 1;
+}
+.chassis-core-shape.core-overcharge .c-heart {
+  box-shadow: 0 0 72px rgba(var(--robco-green-rgb), 1);
+  transform: scale(1.38);
+}
+
+/* The gate (batch 2) — extends the SAME .core-still mechanism above to
+   every new continuous/one-shot element added in this block. The one-shot
+   flourishes (ripple/recovery/milestone/charging/charged/overcharge) all
+   ride `transition:`/timed classes exactly like the flare/datapulse/tap
+   group, so the existing global prefers-reduced-motion block (transition-
+   duration:0.01ms) neutralises them the same way — no bespoke carve-out
+   needed for those. Only the CONTINUOUS spark loop needs pausing here
+   (already added to the .core-still selector list above this block). */
+
+/* ── BUS-23 · IDENTITY PLATE & BREAKERS ── */
+.id-plate {
+  margin: 12px auto 0;
+  max-width: 480px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #33372c, #1d201a 70%, #171a14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 5px rgba(0, 0, 0, 0.6);
+  padding: 12px 16px 13px;
+  position: relative;
+  color: rgba(214, 224, 200, 0.42);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+}
+.id-plate .rivet {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #565b4c, #1a1c15 75%);
+  box-shadow:
+    inset 0 -1px 1px rgba(0, 0, 0, 0.7),
+    0 1px 1px rgba(255, 255, 255, 0.07);
+}
+.id-plate .rivet.tl {
+  top: 5px;
+  left: 5px;
+}
+.id-plate .rivet.tr {
+  top: 5px;
+  right: 5px;
+}
+.id-plate .rivet.bl {
+  bottom: 5px;
+  left: 5px;
+}
+.id-plate .rivet.br {
+  bottom: 5px;
+  right: 5px;
+}
+.id-title {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 3px;
+  border-bottom: 1px solid rgba(214, 224, 200, 0.2);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+.id-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 3px 0;
+  flex-wrap: wrap;
+}
+.id-row b {
+  font-weight: normal;
+  opacity: 0.6;
+}
+.id-row span {
+  text-align: right;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.breaker-rack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 12px;
+  margin-top: 14px;
+}
+.breaker {
+  flex: 0 0 auto;
+  width: 96px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 6px 9px;
+  text-align: center;
+}
+.bk-cap {
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  opacity: 0.6;
+  display: block;
+  margin-bottom: 6px;
+}
+.bk-slot {
+  width: 16px;
+  height: 38px;
+  margin: 0 auto;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-radius: 8px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.6);
+}
+.bk-lever {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 15px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3d4136, #22251e);
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition:
+    top 0.3s,
+    bottom 0.3s;
+}
+.breaker.on .bk-lever {
+  top: -2px;
+}
+.breaker.off .bk-lever {
+  bottom: -2px;
+}
+.bk-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin: 8px auto 0;
+  background: #3a3d35;
+}
+.breaker.on .bk-led {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+.breaker.off .bk-led {
+  background: var(--robco-danger);
+  box-shadow: 0 0 7px var(--robco-danger);
+}
+.breaker.wire.on .bk-led {
+  background: var(--bezel-wire);
+  box-shadow: 0 0 7px var(--bezel-wire);
+}
+.bk-state {
+  display: block;
+  font-size: 7.5px;
+  letter-spacing: 1.5px;
+  margin-top: 5px;
+}
+.breaker.on .bk-state {
+  color: var(--robco-green);
+}
+.breaker.wire.on .bk-state {
+  color: var(--bezel-wire);
+}
+.breaker.off .bk-state {
+  color: var(--robco-danger);
+}
+
+/* ── BUS-24 · SERVICE & FAULT CONSOLE ── */
+.svc-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+.svc-cell {
+  flex: 1 1 230px;
+  max-width: 340px;
+  min-width: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.svc-cell.fault {
+  border-color: rgba(243, 156, 18, 0.55);
+}
+.svc-cell .keybtn {
+  width: auto;
+  margin-top: auto;
+}
+.svc-cap {
+  font-size: 8.5px;
+  letter-spacing: 2px;
+  opacity: 0.6;
+}
+.rev-spool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.rev-spool .reel {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--robco-green-rgb), 0.55);
+  background: repeating-conic-gradient(
+    rgba(var(--robco-green-rgb), 0.18) 0deg 14deg,
+    transparent 14deg 60deg
+  );
+  animation: reelSpin 11s linear infinite;
+}
+@keyframes reelSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.rev-line {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.rev-sub {
+  font-size: 7.5px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+  text-transform: none;
+}
+.fault-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.fault-counter .fc-lamp {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--robco-alert);
+  box-shadow: 0 0 10px var(--robco-alert);
+  animation: rad-pulse 1.1s infinite;
+  flex-shrink: 0;
+}
+.fault-counter.clear .fc-lamp {
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  animation: rad-pulse 3s infinite;
+}
+.fault-counter .fc-num {
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.fault-counter.clear .fc-num {
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+}
+.fault-last {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  border-left: 2px solid rgba(243, 156, 18, 0.5);
+  padding-left: 7px;
+  text-align: left;
+  text-transform: none;
+  overflow-wrap: break-word;
+}
+
+/* ── DATABANK boards: desktop two-up under the glass ────────────────────── */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .table-frame {
+    max-width: 640px;
+  }
+}

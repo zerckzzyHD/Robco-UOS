@@ -1,10 +1,14 @@
 ﻿# RobCo U.O.S. — System Architecture
 
-> **Version:** 2.8.0
-> **Last Updated:** 2026-07-11
+> **Version:** 2.8.5
+> **Last Updated:** 2026-07-22
 > **Purpose:** Living reference for any engineer (human or AI) working on this project.
 > This document maps every system, its dependencies, its persistence contract, and the
 > historical lessons that shaped it.
+>
+> **Rules live elsewhere.** The agent rulebook is `CLAUDE.md` (the universal contract + a
+> retrieval map) plus `rules/*.md` (subsystem notes, loaded per surface touched). This
+> document describes how the system IS built; the rulebook says how it must be changed.
 
 ---
 
@@ -47,43 +51,83 @@
 
 ## File Map
 
+**Why `css/` is flat with numbered names but `js/` got subfolders (2.8.5 U-A2):** different problems, different fixes. In CSS, file ORDER is semantics — equal-specificity ties resolve by source order, which is exactly the hazard this split has to stay safe against. Subfoldering the split (`css/base/`, `css/panels/`, …) would fragment and hide the one property that must stay obvious: what loads after what. A flat directory with a gapped numeric prefix (05, 10, 15, … 99) makes the cascade order visible in the file listing itself, with no config to read — and `99-mobile.css` sitting alone at the end says "always last" without anyone needing to know why. The gaps (multiples of 5) let a future file be inserted between two existing ones without renumbering the set. `js/` has no such constraint — a function defined later still resolves correctly when called — so its files group into subfolders by responsibility instead, which is the more useful axis there.
+
 ```
-├── index.html          ~55KB  DOM structure + all inline event handlers
-├── css/terminal.css    ~16KB  All styling, animations, CRT effects
-├── js/
-│   ├── idb.js          ~4KB   Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
-│   ├── state.js        7.6KB  State definition, persistence, migration
-│   ├── api.js          36.5KB System directive, autoImportState, transmitMessage
-│   ├── ui-audio.js     ~16KB  Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
-│   ├── ui-render.js    ~30KB  All render* functions, CRUD helpers, faction/map/time utilities
-│   ├── ui-saves.js     ~14KB  Save slots, file import/export, rolling backups, registry autocomplete
-│   ├── ui-account.js   ~3KB   Account panel, cloud save picker, undo-sync
-│   ├── runtime.js      ~9KB   Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
-│   ├── ui-core.js      ~43KB  Core UI lifecycle, appendToChat, loadUI, updateMath
-│   ├── test-console.js ~5KB   Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
-│   ├── cloud.js        3.6KB  Firebase push/pull (ES module)
-│   ├── registry-core.js ~3KB  Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
-│   ├── reg_nv.js       ~87KB  FNV registry data (perks/quests/locations/collectibles/traits/magazines)
-│   ├── reg_fo3.js      ~46KB  FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
-│   ├── db_nv.js        ~54KB  FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
-│   └── db_fo3.js       ~34KB  FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
-├── sw.js               2.0KB  Service worker (cache-first for same-origin)
-├── js/ocr.js                  Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
-├── js/vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
+├── index.html          DOM structure + all inline event handlers
+├── css/                       13 order-prefixed files (2.8.5 U-A2 split + the FO3 Pip-Boy build), source order = cascade order
+│   ├── 05-base.css              Tokens, reset, layout, app-shell
+│   ├── 10-chrome.css            Device chrome (bezel/casing/glass) + per-game identity
+│   ├── 15-overseer.css          Director Uplink / Overseer presence
+│   ├── 20-diagnostic-shell.css  Diagnostic Shell mobile overlay (dev-only)
+│   ├── 25-toolbar.css           Tool Deck + Quick-Draw Holster (+ global a11y/reduced-motion)
+│   ├── 30-modulebay.css         Module Bay (Security & Configuration)
+│   ├── 35-operator-boards.css   Phase 3 Operator boards (batches 1-3)
+│   ├── 40-curio-operations.css  Curio Archive + Operations console
+│   ├── 45-databank.css          Databank / Records Bay
+│   ├── 50-chassis.css           Chassis diagnostic bay + Living Core
+│   ├── 55-feedback-animations.css Feedback Animation Waves 1-3
+│   ├── 60-fo3-pipboy.css        FO3 landscape Pip-Boy casing/glass skin — [data-game='FO3'] only, NV untouched
+│   └── 99-mobile.css            Mobile Density Standard — MUST stay last (cascade order)
+├── js/                        Reorganized into subfolders by responsibility (2.8.5 U-A2)
+│   ├── data/                  Fallout game content: item DBs + registries
+│   │   ├── db_nv.js        FNV CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── db_fo3.js       FO3 CSV data (weapons, armor, chems, vendors) + lookupItemInDb()
+│   │   ├── reg_nv.js       FNV registry data (perks/quests/locations/collectibles/traits/magazines)
+│   │   ├── reg_fo3.js      FO3 registry data (perks/quests/locations/bobbleheads/Lincoln memorabilia)
+│   │   └── registry-core.js Read-only registry engine — FALLOUT_REGISTRY + registrySearch()
+│   ├── core/                  The engine: campaign state, ambient runtime, storage layer
+│   │   ├── state.js        State definition, persistence, migration
+│   │   ├── runtime.js      Ambient Runtime — lifecycle state machine + one heartbeat + observer registry (Phase 2 A1)
+│   │   └── idb.js          Async IndexedDB durability engine — window.IdbStore, two object stores (meta/campaign)
+│   ├── ui/                    UI lifecycle hub, panels, render/audio/save/account modules
+│   │   ├── ui-core.js      Core UI lifecycle hub — AudioSettings, appendToChat, loadUI, updateMath, window.onload boot orchestrator (2.8.5 U-A1 split spine)
+│   │   ├── ui-core-nav.js  Bezel subsystem nav — selectSubsystem, switchTab, SHORTCUT_ROUTES, hotkeys, DIRECTORY modal
+│   │   ├── ui-core-overseer.js Director Uplink — setOverseerState, scope canvas, composer wiring, Tool Deck launcher
+│   │   ├── ui-core-chassis.js THE LIVING CORE + CHASSIS panel — _coreRefresh, initChassisCore, System Status, Service & Fault Console
+│   │   ├── ui-core-modulebay.js Module Bay wiring, phosphor-tube/immersion-dial/wake-lock clusters, campaign-config board
+│   │   ├── ui-core-cmd.js  Command layer — native stat setters, COMMAND_REGISTRY, core event-bus subscriber wiring
+│   │   ├── ui-audio.js     Audio engine (geiger, tinnitus, CRT hum, boot/level-up sounds)
+│   │   ├── ui-render.js    Render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
+│   │   ├── ui-render-inventory.js Cargo Manifest & Ammo — addItem/delItem/renderInventory/renderAmmo
+│   │   ├── ui-render-character.js Character & Field Status — squad, clock/calendar, faction standing, status effects, perks, quests
+│   │   ├── ui-render-record.js Personal Record — session tally, equipped gear, collectibles, Lincoln memorabilia, traits
+│   │   ├── ui-render-ledger.js Field Ledger — skill books/magazines tracker, campaign notes, chronicle event log
+│   │   ├── ui-render-map.js   Cartography Table — renderWorldMap SVG, zone zoom/travel, node keyboard nav
+│   │   ├── ui-render-factions.js Faction Reputation & Karma — adjustFaction, renderFactionRep, Karma Center
+│   │   ├── ui-render-economy.js Resource Economy — Craft panel, native Trade barter terminal
+│   │   ├── ui-render-loot.js  Item Acquisition — native Loot terminal, Visual Upload OCR apply flow
+│   │   ├── ui-render-databank.js Native Databank Tools — Threat, Consult, Eligible Perks, Databank panel, Bio-Scan
+│   │   ├── ui-saves.js     Save slots, file import/export, rolling backups, registry autocomplete
+│   │   └── ui-account.js   Account panel, cloud save picker, undo-sync
+│   ├── services/               Everything that talks to the outside world
+│   │   ├── api.js          Network-layer hub — transmitMessage, fetchAuthorizedModels, comm-config cache
+│   │   ├── api-directive.js getSystemDirective + its section builders (2.8.5 U-A3 split)
+│   │   ├── api-import.js   autoImportState, sanitizeImportedContainer — AI-JSON → state mapping (2.8.5 U-A3 split)
+│   │   ├── api-router.js   NATIVE_COMMAND_ROUTER, quick-log grammar — offline command routing (2.8.5 U-A3 split)
+│   │   ├── cloud.js        Firebase push/pull (ES module)
+│   │   └── ocr.js                Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
+│   ├── dev/                    Dev-only tooling
+│   │   └── test-console.js Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
+│   └── vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
+├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
-│   ├── robco-diagnostics.ps1   28KB    2945-test pre-commit audit
-│   ├── robco-diagnostics.js    36KB    2945-test Node runner (parity with .ps1)
+│   ├── robco-diagnostics.js    Node test runner (the single canonical gate audit)
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
-│   └── run-tests.bat           (Batch launcher)
+│   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
+│   ├── save-survival.mjs       SAVE_INTEGRITY_PASS behavioural gate: boots real fixtures (current/mature-dual-campaign/legacy-v7/malformed) through the REAL boot + import paths and compares the full durable-field inventory (sourced from window._defaultState) — push-gate only
+│   └── artifacts.mjs           CI failure-evidence capture (Health-batch U4): shared helper that screenshots + dumps console for any failing browser check into test-artifacts/ (uploaded by CI on failure) — wired into every browser harness
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
+│   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
+│   ├── knowledge-graph.js      R11 knowledge-graph / retrieval-topology extractor (Node, manual run) — emits library/knowledge-graph.json (gitignored, generated on demand); un-gated, no Suite/hook, per Protocol 50
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
-├── CHANGELOG.md        ~74KB  Full version history
-├── assets/              68KB  PWA icon + app-shortcut icons
-├── manifest.json       592B   PWA manifest
+├── CHANGELOG.md        Full version history
+├── assets/              PWA icon + app-shortcut icons
+├── manifest.json       PWA manifest
 └── ARCHITECTURE.md     THIS FILE
 ```
 
@@ -94,8 +138,9 @@
 Scripts are loaded via `<script>` tags in `index.html` in this exact order:
 
 ```
+   ── LOAD-ORDER-GUARD:BEGIN (Suite 220 / Protocol 45 — the numbered `js/….js` items below are machine-checked against index.html; keep them + their order in sync) ──
    ── Static durability engine (index.html, before the boot manifest) ──
-0. js/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
+0. js/core/idb.js        → defines: window.IdbStore (async IndexedDB KV engine; two object stores
                        'meta' + 'campaign' so the two-store boundary is structural in IndexedDB).
                        Step 2 · Phase 1 · P1 durability shadow: MetaStore's set/remove mirror
                        device-pref writes here fire-and-forget; localStorage stays the sole READ
@@ -104,7 +149,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
                        MetaStore's write-through has window.IdbStore. getRaw() returns the full
                        { value, schemaVersion, checksum, mt } envelope for P2's checksum verify.
 
-   P2 (device-pref boot hydration/reconciliation, js/ui-core.js): window.onload is `async` and
+   P2 (device-pref boot hydration/reconciliation, js/ui/ui-core.js): window.onload is `async` and
    `await`s _hydrateMetaFromIdb() BEFORE the rest of boot reads any device preference. It
    reconciles the 'meta' store against localStorage under a strict AUTHORITY RULE — localStorage is
    the source of record: a present localStorage value always wins; the sole exception is RECOVERY
@@ -117,7 +162,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    at page-parse time), and a slow/hung IndexedDB is capped so boot proceeds on localStorage
    exactly as today (fail-safe — never hangs, never black-screens).
 
-   P3 (cold-store IDB-primary, js/state.js accessors): save slots + rolling backups live
+   P3 (cold-store IDB-primary, js/core/state.js accessors): save slots + rolling backups live
    IDB-PRIMARY in the 'campaign' object store (keys slot_<n> / backup_<n>) with localStorage
    (robco_slot_<n> / robco_backup_<n>) kept as a synchronous MIRROR + FALLBACK — this is the ~5MB
    ceiling relief (a save too large for localStorage still persists to IDB; a localStorage quota
@@ -134,7 +179,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    Two-store boundary held: cold store uses ONLY the 'campaign' object store; device prefs (P1/P2)
    stay in 'meta'.
 
-   P5 (save version history, js/state.js accessors + js/ui-saves.js UI): each save slot retains up
+   P5 (save version history, js/core/state.js accessors + js/ui/ui-saves.js UI): each save slot retains up
    to SLOT_VERSION_CAP (5) prior revisions in the 'campaign' object store under key
    slot_<n>_versions (an array, newest-first) — IDB-ONLY (never mirrored to localStorage) so it
    rides the P3 IndexedDB headroom and can never consume the ~5MB localStorage ceiling. saveToSlot
@@ -147,7 +192,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    no IndexedDB → readSlotVersions returns [], no VER affordance, and save/load is byte-identical to
    pre-P5. Two-store boundary held (version data is campaign data → 'campaign' store only).
 
-   P6 (full backup bundle, js/state.js data layer + js/ui-saves.js UI): EXPORT FULL BACKUP writes the
+   P6 (full backup bundle, js/core/state.js data layer + js/ui/ui-saves.js UI): EXPORT FULL BACKUP writes the
    user's ENTIRE local history to one portable file — the live campaign container (robco_v8) + every
    save slot (each with its P5 version ring) + the rolling-backup ring + chat + playstyle. The
    envelope is version-stamped and checksummed with the SAME computeSaveChecksum helper as every other
@@ -169,7 +214,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    the IDB-primary accessors, so with no IndexedDB it simply exports whatever localStorage holds
    (version rings empty), and import degrades to localStorage writes.
 
-   P7 (offline cloud-push queue, js/state.js data layer + js/cloud.js orchestration): resilience for a
+   P7 (offline cloud-push queue, js/core/state.js data layer + js/services/cloud.js orchestration): resilience for a
    USER-INITIATED manual cloud push ONLY — it NEVER auto-pushes on a state/stat change (cloud sync
    stays manual-only; guarded by Suite 23.4/23.5 + Suite 144.11). When the user taps SAVE TO CLOUD
    while offline (navigator.onLine === false) or the push fails with a connectivity error
@@ -191,7 +236,7 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    IndexedDB / kill-switch off → the queue isn't offered and a manual push behaves exactly as today
    (fails/no-ops offline). Airplane-mode operation is unaffected.
 
-   P8 (Global Immersion dial, js/state.js gate helpers + js/ui-core.js UI): ONE device-level control
+   P8 (Global Immersion dial, js/core/state.js gate helpers + js/ui/ui-core.js UI): ONE device-level control
    governing how much of the atmosphere/immersion layer runs — Full / Balanced / Minimal. It is a
    DEVICE PREFERENCE (MetaStore key robco_immersion, registered in META_MANIFEST, default 'full') —
    NOT campaign state, so it never rides the campaign save/cloud (two-store boundary, Protocol 23),
@@ -210,8 +255,8 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    agnostic (Protocol 38). No pre-paint apply is needed (the dial gates ambient behaviors, not the base
    visual palette), so a normal boot restore suffices.
 
-   P9 (SAVES LIST overhaul — local DELETE, cloud VERSION HISTORY, per-game filter, js/ui-saves.js +
-   js/ui-account.js + js/cloud.js): local slots gain a confirm-gated DELETE (confirmDeleteSlot /
+   P9 (SAVES LIST overhaul — local DELETE, cloud VERSION HISTORY, per-game filter, js/ui/ui-saves.js +
+   js/ui/ui-account.js + js/services/cloud.js): local slots gain a confirm-gated DELETE (confirmDeleteSlot /
    _deleteSlotApply, ui-saves.js) that removes the localStorage mirror, the IDB-primary slot_<n> entry
    (P3), and the slot's P5 version ring together, so a deleted slot leaves nothing orphaned. Cloud saves
    gain their OWN version history, mirroring the local P5 ring but translated to Firestore's structural
@@ -238,45 +283,97 @@ Scripts are loaded via `<script>` tags in `index.html` in this exact order:
    growing LOAD/OVERWRITE/VER/DELETE(/NAME) button set wraps instead of clipping at 360/412px.
 
    ── Per-game boot manifest (GAME_FILES in index.html; order preserved via script.async = false) ──
-1. js/db_nv.js / js/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
+1. js/data/db_nv.js / js/data/db_fo3.js → defines: databaseCSVs, lookupItemInDb (game-specific CSV data;
                        the active pair is selected by the GAME_FILES manifest, FNV fail-safe)
-2. js/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
+2. js/core/state.js      → defines: state, chatHistory, APP_VERSION, GAME_DEFS, FACTION_REGISTRY,
                        SKILL_KEYS, saveState, syncStateFromDom, generateSyncPayload,
-                       exportSaveFile, migrateState (game-time helpers live in ui-render.js)
-3. js/reg_nv.js / js/reg_fo3.js + js/registry-core.js → defines: FALLOUT_REGISTRY
+                       exportSaveFile, migrateState (game-time helpers live in ui-render-character.js)
+3. js/data/reg_nv.js / js/data/reg_fo3.js + js/data/registry-core.js → defines: FALLOUT_REGISTRY
                        (read-only game data) + registrySearch() (autocomplete search engine)
-4. js/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
+4. js/ui/ui-audio.js   → defines: audioCtx, all audio functions (geiger/tinnitus/CRT hum,
                        limb/wake/boot/level-up sounds, runBootSequence,
                        triggerPhosphorGhost, changeOpticsColor)
-5. js/ui-render.js  → defines: all render*() functions, CRUD helpers (addItem/delItem,
-                       addAmmo/removeAmmo, addPerk/removePerk, etc.), FACTION_THRESHOLDS,
-                       getFactionStanding, adjustFaction, game-time helpers
-                       (ticksToGameTime/_resolveGameDateTime/formatGameTime/getGameDate),
-                       map helpers (setMapView/zoomMapToZone/renderWorldMap),
-                       _updateContextPanels, _invFilter, setInvFilter
-6. js/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
+5. js/ui/ui-render.js  → the render-pipeline hub after the 2.8.5 U-A4 split: defines only
+                       _updateContextPanels (cross-panel visibility glue not owned by one
+                       sibling) — every render*() panel now lives in a js/ui/ui-render-*.js
+                       sibling below
+6. js/ui/ui-render-inventory.js → CARGO MANIFEST & AMMO: addItem/delItem/adjItemQty/
+                       toggleEquipItem, drawer-filter helpers, nativeUseItem, renderInventory,
+                       renderAmmo/addAmmo/removeAmmo (2.8.5 U-A4 split)
+7. js/ui/ui-render-character.js → CHARACTER & FIELD STATUS: squad roster, the in-game clock/
+                       calendar (ticksToGameTime/_resolveGameDateTime/formatGameTime/
+                       getGameDate), FACTION_THRESHOLDS/getFactionStanding, status effects, the
+                       PERK loadout rack, the quest DIRECTIVE registry (2.8.5 U-A4 split)
+8. js/ui/ui-render-record.js → PERSONAL RECORD: session-stat odometer tally, equipped-gear
+                       readout, CURIO collectibles archive, FO3 Lincoln memorabilia, character
+                       traits (2.8.5 U-A4 split)
+9. js/ui/ui-render-ledger.js → FIELD LEDGER: the shared SHELF/RACK read-tracker renderer
+                       (_renderReadTracker), skill books, skill magazines, campaign field notes,
+                       the campaign status/chronicle event log (2.8.5 U-A4 split)
+10. js/ui/ui-render-map.js → CARTOGRAPHY TABLE: map helpers (setMapView/zoomMapToZone/
+                       renderWorldMap), zone visited-marking, arrow-key node navigation
+                       (2.8.5 U-A4 split)
+11. js/ui/ui-render-factions.js → FACTION REPUTATION & KARMA: adjustFaction, renderFactionRep,
+                       the FO3 Karma Center appendix (2.8.5 U-A4 split)
+12. js/ui/ui-render-economy.js → RESOURCE ECONOMY: the CRAFT panel (crafting + scrapping), the
+                       native TRADE barter terminal (2.8.5 U-A4 split)
+13. js/ui/ui-render-loot.js → ITEM ACQUISITION: the native LOOT add-to-inventory terminal, the
+                       Visual Upload OCR preview/confirm/apply flow (2.8.5 U-A4 split)
+14. js/ui/ui-render-databank.js → NATIVE DATABANK TOOLS: THREAT assessment, CONSULT lookup, the
+                       ELIGIBLE PERKS survey, the DATABANK panel search, the BIO-SCAN medical
+                       advisory (2.8.5 U-A4 split)
+15. js/ui/ui-saves.js   → defines: SLOT_NAMES, saveToSlot, loadFromSlot, handleFileUpload,
                        exportCampaignLog, restoreRollingBackup, restoreChatHistory,
                        initRegistryAutocomplete (wireInput), initAmmoDatalist,
                        addQuest, triggerFileInput, triggerImageUpload
-7. js/ui-account.js → defines: renderAccount, renderCloudSavePicker, undoLastSync
-8. js/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
+16. js/ui/ui-account.js → defines: renderAccount, renderSavesList, undoLastSync
+17. js/services/ocr.js        → defines: window._ensureTesseract, window.runVisualOcrTest, window._parseOcrText,
                        window.runVisualOcr, window.routeVisualUpload (Visual Upload on-device OCR —
                        lazy Tesseract.js load + deterministic parser + hybrid routing/kill-switch,
                        the feature's native-primary/AI-vision-fallback entry point — LAZY, never
                        loads Tesseract.js itself at boot; see Visual Upload OCR below)
-9. js/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
+18. js/core/runtime.js    → defines: window.AmbientRuntime, window.initAmbientRuntime
                        (loaded before ui-core.js; top level defines only — see Ambient Runtime below)
-10. js/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc.
-11. js/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
+19. js/ui/ui-core.js    → defines: AudioSettings, appendToChat, loadUI, updateMath, etc. (the
+                       ui-core spine hub; the ui-core-*.js split below leans on this file)
+20. js/ui/ui-core-nav.js → defines: selectSubsystem, switchTab, _syncBezelNav, SHORTCUT_ROUTES,
+                       #go= routing, hotkeys, the DIRECTORY modal (2.8.5 U-A1 split)
+21. js/ui/ui-core-overseer.js → defines: setOverseerState, the Director Uplink scope canvas,
+                       composer wiring, the Tool Deck launcher (2.8.5 U-A1 split)
+22. js/ui/ui-core-chassis.js → defines: _coreRefresh and every Living Core behavior,
+                       initChassisCore, System Status, the Service & Fault Console
+                       (2.8.5 U-A1 split)
+23. js/ui/ui-core-modulebay.js → defines: renderModuleBay, the phosphor-tube/immersion-dial/
+                       wake-lock clusters, the campaign-config board (2.8.5 U-A1 split)
+24. js/ui/ui-core-cmd.js → defines: native stat/quick-log setters, COMMAND_REGISTRY, the core
+                       event-bus subscriber wiring for stat/quest/faction feedback
+                       (2.8.5 U-A1 split)
+25. js/dev/test-console.js → defines: window.initTestConsole (loaded after ui-core.js — needs
                        _isStagingEnv; gated by _devConsoleUnlocked(), no-ops until unlocked —
                        see Developer Console below)
-12. js/api.js       → defines: autoImportState, transmitMessage, fetchAuthorizedModels
-13. js/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
-                       attaches: window.pushToCloud, window.pullFromCloud
+26. js/services/api.js       → defines: transmitMessage, fetchAuthorizedModels, saveApiKeySilent,
+                       the AI comm-config cache (_commGet), _resetTransmitUI — the network-layer
+                       hub; the directive/import/router responsibilities below were split out
+                       of this file (2.8.5 U-A3)
+27. js/services/api-directive.js → defines: getSystemDirective + its 8 _directive* section
+                       builders (Suite 131 golden-master SHA-256 guarded; Protocol 14) (2.8.5 U-A3 split)
+28. js/services/api-import.js → defines: autoImportState, sanitizeImportedContainer,
+                       _wireApiEventBusSubscribers, _confirmDirectorRemovals (+ its
+                       _confirmInventoryRemovals / _confirmPerkRemovals wrappers),
+                       _announceDirectorLevelUp — the AI-JSON-response → state field-mapping
+                       path (Protocol 24) (2.8.5 U-A3 split)
+29. js/services/api-router.js → defines: NATIVE_COMMAND_ROUTER, _routeNativeCommand,
+                       QUICK_LOG_PATTERNS, transmitTerminal — deterministic offline command
+                       routing, never calls the AI (2.8.5 U-A3 split)
+30. js/services/cloud.js     → loaded as <script type="module"> (ES import from Firebase CDN)
+                       attaches: window.saveCurrentToCloud, window.loadCloudSave (plus the auth /
+                       feature-flag / save-version helpers) — the manual cloud push/pull entry
+                       points; the old pushToCloud/pullFromCloud names were never real, and are retired
+   ── LOAD-ORDER-GUARD:END ──
 ```
 
-**Visual Upload OCR (`js/ocr.js` + `js/ui-render.js` + `js/cloud.js`, complete — Units 1–3,
-`planning/VISUAL_UPLOAD_OCR_PLAN.md`):** self-hosted, lazy-loaded Tesseract.js (Apache-2.0,
+**Visual Upload OCR (`js/services/ocr.js` + `js/ui/ui-render.js` + `js/services/cloud.js`, complete — Units 1–3,
+`planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md`):** self-hosted, lazy-loaded Tesseract.js (Apache-2.0,
 `js/vendor/`) — `_ensureTesseract()` injects `js/vendor/tesseract.min.js` only on first use
 (idempotent via a module-scope promise, never at boot), and the shared `_runOcrPipeline(file)`
 preprocesses the image on a `<canvas>` (grayscale, mean-luminance threshold, invert dark-on-light),
@@ -291,16 +388,16 @@ ASSETS precaches only the small `tesseract.min.js`/`worker.min.js` shims; the he
 total) cache at runtime, best-effort, on first OCR use (`_cacheOcrAssetsBestEffort`, reusing the
 SYSTEM STATUS active-cache-name lookup) — offline works only after that first use.
 
-Unit 2 adds the deterministic, game-agnostic parser `_parseOcrText(text, ctx)` (`js/ocr.js`,
+Unit 2 adds the deterministic, game-agnostic parser `_parseOcrText(text, ctx)` (`js/services/ocr.js`,
 pure — no DOM, no state): each OCR line is tried first as a stat line (`_tryParseStatLine`,
-resolved via the shared `_resolveStatToken()`/`_statTokenLabel()` from `js/api.js` — the same
+resolved via the shared `_resolveStatToken()`/`_statTokenLabel()` from `js/services/api.js` — the same
 resolver Native USE and TERMINAL stat edits already use, Protocol 22), then as an inventory line
 (`_tryParseInventoryLine`, quantity extraction + `lookupItemInDb()` exact/fuzzy cross-reference —
 whichever per-game database the active game loaded, Protocol 38); a line that resolves neither
 and doesn't even look like a plausible item name (`_looksLikeItemName`) is dropped to `unparsed`
 rather than fabricated into a fake row (Protocol 24). `runVisualOcr(file)` chains
 `_runOcrPipeline` → `_parseOcrText` → `renderVisualParsePreview(parsed, file)`
-(`js/ui-render.js`) — a confirm-gated preview modal (the LOOT-modal pattern, `openModal()`/
+(`js/ui/ui-render.js`) — a confirm-gated preview modal (the LOOT-modal pattern, `openModal()`/
 `#sysModal`) listing every detected inventory/stat row with an editable qty/value and a
 keep/discard checkbox. **Nothing writes to state until the player taps CONFIRM & APPLY** —
 `_confirmVisualParse()` reads the live preview DOM and calls `applyVisualParse(parsed)`, the
@@ -312,20 +409,20 @@ OCR misread can never exceed a real limit). No new campaign-state field (Protoco
 triggered) — every write rides `state.inventory` and the existing native setters.
 
 Unit 3 wires this into the real composer `[+]` attach control and completes the feature as a
-**hybrid** (`planning/VISUAL_UPLOAD_OCR_PLAN.md` §4): `handleImageSelection()`
-(`js/ui-saves.js`) stashes `attachedImageData`/`attachedImageMimeType` exactly as before, then
-calls the new `routeVisualUpload(file)` (`js/ocr.js`), which is now the feature's single entry
+**hybrid** (`planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md` §4): `handleImageSelection()`
+(`js/ui/ui-saves.js`) stashes `attachedImageData`/`attachedImageMimeType` exactly as before, then
+calls the new `routeVisualUpload(file)` (`js/services/ocr.js`), which is now the feature's single entry
 point. On-device OCR is the **primary** path — gated on `isFeatureEnabled('visualOcr')`
-(`js/cloud.js` `_featureFlags`, fail-open, Protocol 33). The pre-existing, byte-for-byte
-UNCHANGED `transmitMessage()` `inlineData` AI-vision branch (`js/api.js`) is now the
+(`js/services/cloud.js` `_featureFlags`, fail-open, Protocol 33). The pre-existing, byte-for-byte
+UNCHANGED `transmitMessage()` `inlineData` AI-vision branch (`js/services/api.js`) is now the
 **fallback only** — reused verbatim (Protocol 22), reached via `_tryAiVisionFallback()` when
 `visualOcr` is off, an OCR load/recognize attempt throws, or the player explicitly taps a
 **TRY AI VISION** button that Unit 3 adds to the preview modal's "NOTHING DETECTED" empty
 state (alongside the existing MANUAL ENTRY). The fallback is itself gated on
 `_aiVisionAvailable()` — the `visualAiVision` flag AND the real `_isUplinkConnected()`
-(`js/ui-core.js`, the same key/aiChat-flag/online signal the Director Uplink scope already
+(`js/ui/ui-core.js`, the same key/aiChat-flag/online signal the Director Uplink scope already
 uses, Protocol 22 — no forked check). An OCR failure also calls the real
-`window._recordFeatureFailure('visualOcr', …)` (`js/cloud.js`), auto-disabling OCR into the
+`window._recordFeatureFailure('visualOcr', …)` (`js/services/cloud.js`), auto-disabling OCR into the
 fallback after `FAIL_THRESHOLD` (3) failures for the rest of the session (Protocol 35's client
 analogue) — no reload needed. When neither path is available (both flags off, no key, or
 offline), `_visualUploadDeadEnd()` clears the attach stash and posts a plain-English
@@ -335,11 +432,11 @@ offline), `_visualUploadDeadEnd()` clears the attach stash and posts a plain-Eng
 (tracked by a one-shot `_visualParseRoutingToAiVision` flag the modal's `onClose` callback
 consumes), and `transmitMessage()`'s own existing `_resetTransmitUI()` at the end of an
 AI-vision round trip. The AI directive's old "Visual Upload Override" imperative
-(`_directiveCoreTracking()`, `js/api.js`) is reframed to "Visual Upload Fallback" framing —
+(`_directiveCoreTracking()`, `js/services/api.js`) is reframed to "Visual Upload Fallback" framing —
 native OCR is primary; the AI now only ever sees an image via the fallback — with the
 STRICTLY FORBIDDEN no-clobber rule preserved verbatim (Protocol 14). The staging-only
 Developer Console boards (`_wireOcrTest` for the Unit 1 raw-text dump, `_wireVisualParseTest`
-for the Unit 2 pipeline, both `js/test-console.js`) are unchanged and remain useful for
+for the Unit 2 pipeline, both `js/dev/test-console.js`) are unchanged and remain useful for
 debugging the pipeline independent of the hybrid routing.
 
 **Critical constraint:** Because these are `<script>` tags (not modules), all globals are shared
@@ -353,13 +450,13 @@ its exports to `window.*` for the other scripts to call.
 
 **Auth (Phase 5c-i/ii):** `cloud.js` signs in anonymously on every boot (non-fatal; app stays usable offline). Firebase Auth is tracked via `onAuthStateChanged`; the current `uid` routes all Firestore reads/writes to `users/{uid}/saves/main`. Phase 5c-ii adds Google sign-in: `window.signInWithGoogle()` links the anonymous session to a Google account via popup on all platforms (redirect was removed — iOS/Android storage partitioning blocked the cross-origin iframe used to retrieve the credential, so `getRedirectResult` always returned null on mobile); `window.signOutAccount()` signs out then re-signs in anonymously; `getRedirectResult` is still called at boot to drain any in-flight redirect from a previously cached client before the anon-fallback guard runs; and `auth/credential-already-in-use` collisions fall back to `signInWithCredential`. Boot sequence is a single sequential async IIFE: `await getRedirectResult` → `await authStateReady` → anon fallback if no user. The ACCOUNT panel (`#accountPanel`, `data-tab="settings"` since the Step 2 v2.8.0 Settings-tab unit) shows sign-in status and the sign-in/sign-out button. Push to production is gated on the owner enabling the Google provider in the Firebase console.
 
-**Dynamic ACCOUNT status words (SU-4, Step 2 v2.8.0):** `renderAccount()` (`js/ui-account.js`) paints the REG PORT / Operator Registry board entirely from live state — `window.getAccountState()`, `isFeatureEnabled('googleSignIn')`, and the SAME `_isUplinkConnected()` carrier signal the UPLINK lamp/bezel telemetry/SYSTEM STATUS panel already read (Protocol 22 — no second `navigator.onLine` check) — across four conditions (signed-out×googleSignIn-on/off, signed-in×carrier-connected/disconnected). A collapsed-state summary line (`#acctSummaryStatus`, `.panel-substatus`) sits in the panel's `<summary>` so the state reads even while collapsed. `renderAccount()` is called from `refreshOverseerCarrier()` — the same connection choke point that drives `_updateUplinkLamp()`/`_refreshBezelTelemetry()`/`renderSystemStatus()` — so none of those readouts can disagree; it's also called from `loadUI()` at boot and from the three sign-in/out/collision call sites in `cloud.js`. The summary line is set via `.textContent` (not parsed as HTML), so its name/email separator is the literal Unicode `·` character, never the `&middot;` entity used inside the `.innerHTML`-rendered board.
+**Dynamic ACCOUNT status words (SU-4, Step 2 v2.8.0):** `renderAccount()` (`js/ui/ui-account.js`) paints the REG PORT / Operator Registry board entirely from live state — `window.getAccountState()`, `isFeatureEnabled('googleSignIn')`, and the SAME `_isUplinkConnected()` carrier signal the UPLINK lamp/bezel telemetry/SYSTEM STATUS panel already read (Protocol 22 — no second `navigator.onLine` check) — across four conditions (signed-out×googleSignIn-on/off, signed-in×carrier-connected/disconnected). A collapsed-state summary line (`#acctSummaryStatus`, `.panel-substatus`) sits in the panel's `<summary>` so the state reads even while collapsed. `renderAccount()` is called from `refreshOverseerCarrier()` — the same connection choke point that drives `_updateUplinkLamp()`/`_refreshBezelTelemetry()`/`renderSystemStatus()` — so none of those readouts can disagree; it's also called from `loadUI()` at boot and from the three sign-in/out/collision call sites in `cloud.js`. The summary line is set via `.textContent` (not parsed as HTML), so its name/email separator is the literal Unicode `·` character, never the `&middot;` entity used inside the `.innerHTML`-rendered board.
 
 **Content Security Policy (CSP Stage 2 — enforcing):** The `<meta http-equiv="Content-Security-Policy">` in `index.html` is now in enforcing mode. It was run in report-only mode for Stage 1 and confirmed clean (boot + Firebase + auth + Firestore produced zero violations) before the flip. **`'unsafe-inline'` is intentionally retained** in `script-src` and `style-src`: the app has ~148 inline event handlers, and per CSP Level 2+ a `sha256-` or `nonce-` token in `script-src` silently disables `unsafe-inline`, breaking all of them. Guard 55.10 (tripwire: `'unsafe-inline'` still present) and 55.11 (tripwire: no `sha256-`/`nonce-` token) enforce this invariant. `img-src` includes `blob:` to cover canvas and screenshot-preview images. The suite-55 and suite-30 guards enforce that the enforcing policy is present and report-only is absent.
 
 ---
 
-## Ambient Runtime (`js/runtime.js` — Step 2 · Phase 2 · A1)
+## Ambient Runtime (`js/core/runtime.js` — Step 2 · Phase 2 · A1)
 
 `window.AmbientRuntime` is the OS-level lifecycle substrate for everything atmospheric: it owns **one canonical terminal state**, runs **one heartbeat**, and hosts an **observer registry**. Every ambient consumer (timers, UPLINK, hardware choreography, the attract/standby experiences) subscribes here rather than re-implementing its own tick or its own immersion-dial check.
 
@@ -367,18 +464,18 @@ its exports to `window.*` for the other scripts to call.
 
 **Observer registry.** `register({ id, cadenceMs, states, tier, onTick, onEnter, onExit })` returns an `unregister()` handle. Each heartbeat, an observer's `onTick` runs **iff** `states.includes(getState())` **and** `immersionAllows(tier)` **and** `cadenceMs` has elapsed since its last tick. Every callback is wrapped in `try/catch`, so one bad observer can never break the heartbeat or its siblings (the `RobcoEvents` listener-guard pattern).
 
-**Central dial enforcement (the ONE place).** The runtime is the single point where the Immersion dial (`immersionAllows`, `js/state.js`) is enforced — re-evaluated live every beat, so a dial change takes effect immediately. No ambient feature re-implements the gate. `immersionAllows` is `typeof`-guarded and fails **open** (never suppress on a missing gate).
+**Central dial enforcement (the ONE place).** The runtime is the single point where the Immersion dial (`immersionAllows`, `js/core/state.js`) is enforced — re-evaluated live every beat, so a dial change takes effect immediately. No ambient feature re-implements the gate. `immersionAllows` is `typeof`-guarded and fails **open** (never suppress on a missing gate).
 
 **A1 was purely additive; A2 migrates the timers/standby on (one behavior per commit).** A1 tracked state **in parallel** with the existing standby/timers (only the inert `runtime-selftest` observer). A2 folds them onto the runtime as observers:
 
-- **A2.1 — standby machine.** The tab-standby dim + audio ducking is now a single **STANDBY coordinator observer** (`id:'standby'`, `states:['STANDBY']`, `tier:'minimal'` — essential feedback, never dial-quieted). `_wireStandby()` registers it; the runtime's own blur/focus/visibility listeners (A1) drive `ACTIVE↔STANDBY`, and the coordinator's `onEnter`/`onExit` run the unchanged `enterStandby`/`exitStandby` (which keep their `_standbyActive` idempotency guard). The former direct blur/focus/visibilitychange listeners are retired — the runtime is the single lifecycle driver (no double-wiring). Guarded by Suite 147 (both runners); behavior identical at every tier.
+- **A2.1 — standby machine.** The tab-standby dim + audio ducking is now a single **STANDBY coordinator observer** (`id:'standby'`, `states:['STANDBY']`, `tier:'minimal'` — essential feedback, never dial-quieted). `_wireStandby()` registers it; the runtime's own blur/focus/visibility listeners (A1) drive `ACTIVE↔STANDBY`, and the coordinator's `onEnter`/`onExit` run the unchanged `enterStandby`/`exitStandby` (which keep their `_standbyActive` idempotency guard). The former direct blur/focus/visibilitychange listeners are retired — the runtime is the single lifecycle driver (no double-wiring). Guarded by Suite 147 (Node runner); behavior identical at every tier.
 
 - **A2.2 — fixed-cadence timers.** The three fixed-cadence loops become `onTick` observers registered in `_startAmbientTimers()` / `initOverseerLog()`, retiring their `setInterval`s (ui-core.js now calls `setInterval` **zero** times — the runtime heartbeat is the one scheduler):
   - **uptime-clock** — `states:['ACTIVE','IDLE']`, `tier:'minimal'`, `cadenceMs:1000`. Baseline telemetry; pauses on STANDBY (state-gated), never dial-quieted.
   - **mem-cycle** — `states:['ACTIVE','IDLE']`, `tier:'balanced'`, `cadenceMs:900000`. Ambient flourish; the runtime's tier check is now the single dial gate (fires at Full/Balanced, silent at Minimal — its former `immersionAllows('balanced')` behavior exactly).
   - **overseer-flush** — `states:['READY','ACTIVE','IDLE','STANDBY']`, `tier:'minimal'`, `cadenceMs:30000`. Runs in **all** live states incl. STANDBY, so power-on accounting keeps ticking while blurred (matching the old never-cleared `setInterval`).
 
-  Two runtime refinements make this byte-identical: `register()` seeds `_lastTick` to `now()` (a `cadenceMs>0` observer first fires one full cadence later, like `setInterval`), and `transition()` restarts an observer's cadence clock when it **re-enters** its state set (so a paused-then-resumed observer behaves exactly like a `setInterval` cleared on standby and freshly restarted on wake). Guarded by Suite 148 (both runners) + the `tests/test.html` parity assertion.
+  Two runtime refinements make this byte-identical: `register()` seeds `_lastTick` to `now()` (a `cadenceMs>0` observer first fires one full cadence later, like `setInterval`), and `transition()` restarts an observer's cadence clock when it **re-enters** its state set (so a paused-then-resumed observer behaves exactly like a `setInterval` cleared on standby and freshly restarted on wake). Guarded by Suite 148 (Node runner) + the `tests/test.html` parity assertion.
 
 Behavior is identical at every immersion tier. If the runtime fails to start, the app is byte-identical to today. Still self-scheduling and NOT yet runtime observers: geiger (Poisson, rads-driven), radio + tinnitus (randomized, game-state/user driven), and the audio heartbeat (HP-driven) — these keep their own scheduling; the standby coordinator pauses/resumes the ones that were standby-coupled.
 
@@ -390,7 +487,7 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
 
   A companion fix (found while verifying this unit, then hardened further after review, Protocol 42): the standby "wake" sequence — the tone, the audio ramp, and the `"COURIER RETURNED. SYNCHRONIZING TELEMETRY..."` chat line — is a return-to-active-use behavior and must fire **only** on a genuine wake, never on a power-down. A shutdown can land two different ways relative to that sequence: as a **direct** `STANDBY→SHUTDOWN` edge (reachable via the Test Console today), or **mid-window** — after a normal wake has already started, but before its 650ms delayed half runs. A single check made once, up front, only catches the first case. Instead, the shared `_isShuttingDown()` helper (`AmbientRuntime.getState() === 'SHUTDOWN' || 'OFF'`) is re-checked at **each half's own fire time**: synchronously, right before `playWakeTone()` (that half's fire time is now — since `transition()` flips `_state` before dispatching observer callbacks, this reflects the state the exit is actually happening in), and again as the **first statement inside** the 650ms `setTimeout`, before the class removal / audio ramp / chat line / `updateMath()` (that half's fire time is later — closing the mid-window race a single up-front check would miss). Either half no-oping independently is sufficient; the `shutdown-crt` observer's own `onEnter` already force-clears the `standby` class regardless, so nothing is ever left stuck. A Node `vm`-sandbox behavioral proof (Suite 150.10) executes the real `enterStandby`/`exitStandby`/`_isShuttingDown` bodies against a synthetic DOM with a synchronous-mock `setTimeout`, proving all three scenarios: direct shutdown (no tone, no chat), a normal wake (tone + chat + `updateMath`, byte-identical to before this fix), and the mid-window race (tone already fired, chat/`updateMath` suppressed).
 
-  Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (both runners).
+  Every new `@keyframes` animation (`idle-breathe`, `standby-breathe`, `crt-power-off`, `shutdown-cover`, `shutdown-cover-plain`) is a plain `animation:` declaration, so the existing global `prefers-reduced-motion` block (`animation-duration:0.01ms` + `iteration-count:1` on `*`) neutralises all of them to their static/instant final frame — no bespoke per-class override needed. No durable writes anywhere (body classList toggles only). Guarded by Suite 150 (Node runner).
 
   **Power-on affordance (Protocol 42 fix, Suite 152).** Owner bug: forcing SHUTDOWN/OFF left a
   fully black screen with no visible way back on — the `.rt-shutdown(-plain)::after` cover has
@@ -398,7 +495,7 @@ Behavior is identical at every immersion tier. If the runtime fails to start, th
   drawn to show WHERE to click. `#powerOnBtn` (`index.html`, a real `<button>`, `▶ PRESS TO POWER
 ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.rt-shutdown` /
   `body.rt-shutdown-plain` classes the observer above already toggles (`body.rt-shutdown
-.power-on-btn { display: block; }` in `terminal.css` — Protocol 22, no separate JS visibility
+.power-on-btn { display: block; }` in `css/` — Protocol 22, no separate JS visibility
   bookkeeping that could drift), and sits at `z-index:100002`, above the cover's `100001`, so it is
   always visible over the black overlay. Its click handler, `_powerOnFromShutdown()` (`ui-core.js`,
   defined immediately after the `shutdown-crt` observer), recovers using **only legal**
@@ -415,13 +512,13 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 **Hard atmosphere/save boundary (Phase-2 prime invariant #1).** `runtime.js` writes **nothing durable to the campaign** — it never persists the save, mutates a campaign field, appends to the Terminal Record, or touches raw local storage. State is ephemeral / in-memory; any device pref would go through MetaStore only (A1 stores none). Gate-guarded by Suite 146 (negative grep) + the Suite 18 behavioral no-write assertion in `tests/test.html`.
 
-**Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (both runners); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
+**Boot-order lesson (U7).** `runtime.js`'s top level only **defines** `window.AmbientRuntime` / `window.initAmbientRuntime` (inside an IIFE). Every cross-file read (`immersionAllows`, `RobcoEvents`) happens **inside** `initAmbientRuntime()` — a named `window.onload` boot phase called from `ui-core.js` **after** `_wireStandby()` — never at parse time, because `runtime.js` can be parsed before the shared state module has loaded. Structural guards: Suite 146 (Node runner); behavioral proof (state machine + observer gating + live dial): Suite 18 in `tests/test.html`.
 
 **Read-only observer introspection.** `AmbientRuntime.listObservers()` returns a plain-data snapshot of every registered observer (`{id, states, tier, cadenceMs}` only — never the `onTick`/`onEnter`/`onExit` closures), for tooling that needs to inspect what's wired without touching the registry. Consumed by the Test Console below.
 
 ---
 
-## Developer Console / Diagnostic Shell (`js/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)
+## Developer Console / Diagnostic Shell (`js/dev/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)
 
 **This IS the canonical developer/debug console** — the same one the roadmap's hacking minigame will later unlock in normal builds, not a separate throwaway test panel. A live inspector + trigger panel for the Ambient Runtime, built to keep pace with the accumulating Phase-2 ambient features (UPLINK, Hardware Life, etc. — each future feature adds one more registry entry here).
 
@@ -430,7 +527,9 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 - **Today:** it delegates verbatim to `_isStagingEnv()` (`ui-core.js`, Protocol 43) — the exact same environment signal the changelog viewer (Suite 62 / WU-C11) uses to hide `[Unreleased]` — so a dev/staging build shows the console with no minigame needed ("dev builds skip the hack"). Fail-safe to **HIDDEN**: any uncertainty (the function missing, a throw, an unrecognized host) defaults to production behavior.
 - **MINIGAME-UNLOCK SEAM:** on a production build `_devConsoleUnlocked()` is false today, and stays false until the future hacking minigame is built — at which point its unlock check (e.g. a persisted unlock flag) is added to this exact function, and nowhere else. A comment on the function itself documents this seam so it can't be silently lost in a refactor (locked by Suite 149.14).
 
-**Diagnostic Shell U1 (`planning/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
+**Prod build STRIPS the file entirely (Health-U7).** Because production can never open the console until the minigame ships, the ~204 KB `js/dev/test-console.js` is dead weight for every prod visitor. The production deploy (`.github/workflows/deploy.yml`) therefore runs `scripts/prod-strip-devshell.mjs _site` after staging the served files, removing the file plus its two hard-consistency references (the `index.html` `<script>` tag and the `sw.js` precache entry) from the published `_site/` artifact **only** — never the repo source tree, and never the Cloudflare staging build (`cf-staging-build.mjs` copies the whole `js/` dir, so staging keeps the shell fully working for the owner). The strip removes all three references atomically and an in-build self-consistency assertion fails the deploy if any executable/precache reference survives or any remaining precache entry dangles, so the all-or-nothing SW precache can never be left inconsistent (a half-strip → black screen). The one repo source change is a graceful-absence guard at the single caller — `if (typeof initTestConsole === 'function') initTestConsole();` (`ui-core.js`, `window.onload`) — so the stripped prod build never throws a `ReferenceError` on the missing global (`typeof` on an undeclared identifier is legal JS; Protocol 33 fail-safe). Because the repo keeps the file, the full suite still passes unchanged; the strip mechanism itself is gate-guarded by Suites 149.17–149.19.
+
+**Diagnostic Shell U1 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md`, Protocol 8) — the two-signal gate.** The panel now serves two future audiences (an owner-only staging toolbench and a non-destructive prod-minigame sandbox), so a second signal governs WHICH tools may render, on top of the unchanged existence gate:
 
 - **`_shellVisible()`** — a thin, literally-named alias over `_devConsoleUnlocked()` (existence only, same fail-safe-to-hidden philosophy, not a second re-derived check).
 - **`_shellTier()`** — `'staging'` **only** when `_isStagingEnv()` positively confirms it; otherwise the RESTRICTIVE `'prod'` tier, including on any throw or missing function (same fail-safe direction as the existence gate).
@@ -445,33 +544,33 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 
 **Extension point.** A future hard-to-trigger feature (broadcasts, weather, boot flavors, etc.) adds one more `DIAGNOSTIC_SHELL_TOOLS` entry with an `anchor` selector pointing at a new `.input-group` block placed beside the existing ones in `#testConsoleTemplate` (`index.html`) — never writing campaign state, never bypassing `confirmAction()` for a `destructive:true` tool. Protocol 44 (a future unit) will make this a gate-enforced requirement for every new `RobcoEvents` event / view-once flag.
 
-**Diagnostic Shell U2 (`planning/DIAGNOSTIC_SHELL_PLAN.md` §6, Protocol 8) — mobile overlay + identity + icons.** U1's document-flow `<details class="panel" id="testConsolePanel">` always occupied real vertical space, shoving the whole machine down on mobile whenever the console mounted. U2 replaces it with three body-level `position:fixed` elements — a floating toggle (`#dshFab`, the shared `DEV_MARKER` gear glyph), a scrim (`#dshScrim`), and the drawer itself (`#testConsolePanel`, now a `role="dialog" aria-modal="true"` `<div class="dsh-drawer">` sliding in from the right, `width:min(92vw,420px)`) — all mounted as siblings of `.container.machine`, the same body-level placement `#locationCard` already uses. Since every one of the three is `position:fixed`, `#testConsoleMount` (unchanged location, still a plain empty `<div>` before `.container.machine`) contributes zero layout height whether the drawer is open or closed, and being body-level (never a descendant of `.container`) means the FAB/drawer are immune to the `filter`/`transform` containing-block trade-off the fixed `.bezel` dock documents (idle/night/shutdown apply `filter`/`transform` to `.container` only) — they stay pinned in every ambient-runtime state, mirroring `#locationCard`.
+**Diagnostic Shell U2 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md` §6, Protocol 8) — mobile overlay + identity + icons.** U1's document-flow `<details class="panel" id="testConsolePanel">` always occupied real vertical space, shoving the whole machine down on mobile whenever the console mounted. U2 replaces it with three body-level `position:fixed` elements — a floating toggle (`#dshFab`, the shared `DEV_MARKER` gear glyph), a scrim (`#dshScrim`), and the drawer itself (`#testConsolePanel`, now a `role="dialog" aria-modal="true"` `<div class="dsh-drawer">` sliding in from the right, `width:min(92vw,420px)`) — all mounted as siblings of `.container.machine`, the same body-level placement `#locationCard` already uses. Since every one of the three is `position:fixed`, `#testConsoleMount` (unchanged location, still a plain empty `<div>` before `.container.machine`) contributes zero layout height whether the drawer is open or closed, and being body-level (never a descendant of `.container`) means the FAB/drawer are immune to the `filter`/`transform` containing-block trade-off the fixed `.bezel` dock documents (idle/night/shutdown apply `filter`/`transform` to `.container` only) — they stay pinned in every ambient-runtime state, mirroring `#locationCard`.
 
 - **`_mountConsole()`** now pulls the FAB and scrim out of the same detached template clone and appends them alongside the drawer — the drawer still reaches the document via the exact `mount.appendChild(panel)` call _after_ `_renderShell(panel)`, so the U1 filter-before-DOM-insertion ordering (Suite 210.7) is unchanged by the two new appends.
 - **`_openShell()`/`_closeShell()`/`_shellKeydown()`/`_shellFocusables()`** implement a self-contained Tab focus-trap + Escape-close, mirroring the shape of the existing `#sysModal` trap in `_wireKeyboardShortcuts()` (`ui-core.js`) without forking it — the Diagnostic Shell is its own dialog surface, not a `#sysModal` caller (Protocol 23). Opening sets `aria-expanded="true"` on the FAB and focuses the close button; closing restores focus to whatever triggered the open and resets `aria-expanded="false"`. The slide-in (`@keyframes dsh-slide-in`) is a plain `animation:` declaration (Protocol UI-9) — the existing global `prefers-reduced-motion` block neutralizes it to an instant open automatically.
 - **Icons everywhere.** `_renderShell()` now prepends a per-category glyph (`CATEGORY_META[cat].icon`) to every section `<h3>` and a per-tool glyph (the registry `icon` field) into every migrated control's `.optics-label`, via two new CSS classes (`.dsh-section-icon`/`.dsh-tool-icon`). A single `DEV_MARKER` constant (`⚙`) is the shared glyph — used as the icon fallback and set onto the FAB by `_wireShellToggle()` — reserved for the inline dev-reset buttons a future unit (U4) will add.
 
-Guarded by Suite 149 (both runners: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (both runners: U1 registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action`) + Suite 211 (both runners: the U2 mobile-overlay markup/CSS shape, the float-over-content `position:fixed` invariant, the `#testConsoleMount` zero-height placement, the `_mountConsole()` append ordering extended to the FAB/scrim, the DIAGNOSTIC SHELL identity rebrand, a Node `vm`-sandbox synthetic-DOM behavioral proof that the FAB/scrim/close-button/Escape wiring actually opens and closes the drawer, the reduced-motion-safe slide, the atmosphere/save boundary extended to the new U2 functions, the Protocol 17 mobile tap-target floor, and a regression guard that the U1 document-flow shape can never silently come back) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
+Guarded by Suite 149 (Node runner: staging-gate fail-safe both-sides, no-durable-write boundary, template inert-by-default, reused env signal, minigame-unlock-seam comment presence) + Suite 210 (Node runner: U1 registry completeness, the two-signal gate's fail-safe-to-prod behavior — both structural and a real behavioral eval — the leak-proof `_toolVisible()` filtering proof against the live registry, the filter-before-DOM-insertion ordering, the static destructive/staging-category invariant, a Node `vm`-sandbox proof of `_invoke()`'s auto-confirm-gate, and a Protocol 42 regression test (Suite 210.14) locking that every `destructive:true` tool in the real registry carries a callable `action`) + Suite 211 (Node runner: the U2 mobile-overlay markup/CSS shape, the float-over-content `position:fixed` invariant, the `#testConsoleMount` zero-height placement, the `_mountConsole()` append ordering extended to the FAB/scrim, the DIAGNOSTIC SHELL identity rebrand, a Node `vm`-sandbox synthetic-DOM behavioral proof that the FAB/scrim/close-button/Escape wiring actually opens and closes the drawer, the reduced-motion-safe slide, the atmosphere/save boundary extended to the new U2 functions, the Protocol 17 mobile tap-target floor, and a regression guard that the U1 document-flow shape can never silently come back) + Suite 19 in `tests/test.html` (real-browser fail-safe-to-hidden proof + `listObservers()` behavioral proof).
 
 **Mobile chrome fixes (owner report, on top of U2, MOBILE ONLY except FIX 4).** Five presentation fixes, all gated behind the exact inverse of the `(min-width:1000px)...` Suite 129 desktop signal (`(max-width:999.98px)` in CSS, a new `_dshIsMobile()` matchMedia helper in JS) — desktop's drawer/FAB stay byte-identical to what U2 shipped.
 
-- **FIX 1 — partial-height bottom sheet.** Below the mobile breakpoint, `.dsh-drawer` becomes a bottom-anchored, resizable sheet (`height: var(--dsh-sheet-h, 50vh)`, `box-sizing: border-box` — required, since `left:0;right:0;width:100%` is over-constrained under the default content-box and silently overflows the viewport by its own horizontal padding otherwise) instead of the desktop right-side full-height drawer, so the terminal stays visible **and usable** above it. `_setSheetVh()` (`js/test-console.js`) is the one choke point clamping to `[SHEET_MIN_VH, SHEET_MAX_VH]` and writing both the CSS custom property and `#dshDragHandle`'s `aria-valuenow` — shared by a pointer-drag on the handle (`role="slider"`, `tabindex="0"`), the handle's own ArrowUp/ArrowDown keyboard support, and the `#dshExpandToggle` button (cycling between the 50vh default and an 85vh expanded state). `#dshScrim` goes fully inert on mobile (`background: transparent; pointer-events: none`) — a "tap outside to dismiss" gesture no longer applies once outside is the now-interactive terminal; desktop's scrim keeps dimming + closing on click, unchanged.
+- **FIX 1 — partial-height bottom sheet.** Below the mobile breakpoint, `.dsh-drawer` becomes a bottom-anchored, resizable sheet (`height: var(--dsh-sheet-h, 50vh)`, `box-sizing: border-box` — required, since `left:0;right:0;width:100%` is over-constrained under the default content-box and silently overflows the viewport by its own horizontal padding otherwise) instead of the desktop right-side full-height drawer, so the terminal stays visible **and usable** above it. `_setSheetVh()` (`js/dev/test-console.js`) is the one choke point clamping to `[SHEET_MIN_VH, SHEET_MAX_VH]` and writing both the CSS custom property and `#dshDragHandle`'s `aria-valuenow` — shared by a pointer-drag on the handle (`role="slider"`, `tabindex="0"`), the handle's own ArrowUp/ArrowDown keyboard support, and the `#dshExpandToggle` button (cycling between the 50vh default and an 85vh expanded state). `#dshScrim` goes fully inert on mobile (`background: transparent; pointer-events: none`) — a "tap outside to dismiss" gesture no longer applies once outside is the now-interactive terminal; desktop's scrim keeps dimming + closing on click, unchanged.
 - **FIX 2 — draggable FAB.** `_wireFabDrag()` mirrors the Immersion dial's tap-vs-drag pointer pattern (`ui-core.js` `_dialPointerDown`/`_dialPointerMove`/`_dialPointerEnd`) in two dimensions, gated by `_dshIsMobile()` so desktop's bubble stays click-only. A genuine drag (past a 6px threshold) repositions `#dshFab` via inline `left`/`top`, clamped to the viewport, and persists the final position through a new registered MetaStore device pref (`robco_dsh_fab_pos`, `state.js` `META_MANIFEST`, Protocol 4/UI-6) — `_restoreFabPosition()` re-clamps it to the current viewport on every mount, also mobile-gated.
 - **FIX 3 — highlight keys off an open-state class, not `:hover`.** `_openShell()`/`_closeShell()` toggle a new `.dsh-fab--open` class, and the mobile-only CSS rule for it (never applied outside the mobile block) is what drives the bubble's amber highlight there — replacing the touch-sticky-`:hover`-prone reliance desktop's untouched `[aria-expanded='true']` rule still uses. `.dsh-fab:hover`'s fill is also reset unconditionally then re-gated behind `(hover: hover) and (pointer: fine)` (the same mode-pill fix pattern, Suite 129's signal), so a touch tap can never leave it visually stuck lit.
 - **FIX 4 — glyph centering (all breakpoints).** `.dsh-fab span` gets its own `line-height: 1` plus a small `translateY` nudge, correcting a font-metrics offset present at every screen size — the only one of the five fixes not mobile-gated.
-- **FIX 5 — constant-size bezel dock (`terminal.css` only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
+- **FIX 5 — constant-size bezel dock (CSS only, no JS).** The mobile `.telemetry` rule (the `▸ SUBSYSTEM …` status strip inside the fixed `.bezel` dock) is pinned to a deterministic `height: 36px; line-height: 13px;` with `-webkit-line-clamp: 2`, so the dock can no longer grow or shrink with the live status text's length (which varies by subsystem and campaign state — reproduced live: 99px vs 110px+ at 360px before the fix).
 
-Guarded by Suite 213 (both runners, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
+Guarded by Suite 213 (Node runner, 8 tests): the base/mobile CSS split for the drawer/scrim/FAB-highlight (desktop untouched), the drag-handle/expand-toggle template markup + `_setSheetVh()` choke point, the FAB-drag mobile gate + MetaStore persistence, the glyph-centering rule, the bezel `.telemetry` fixed-height rule, and two Protocol 42 regression guards for the `box-sizing:border-box` overflow fix and the id-vs-class CSS specificity mismatch (an earlier version's `.dsh-drag-handle{display:flex}` show rule — lower specificity than the `#dshDragHandle{display:none}` id-selector hide rule — always lost regardless of source order, silently keeping the handle hidden on mobile until caught live).
 
-**Diagnostic Shell U4a (`planning/DIAGNOSTIC_SHELL_PLAN.md` §3.1/§11 U4, Protocol 8) — collapsible groups + INSPECT build-out.** With the U3 TRIGGERS catalog landed, a 45-tool category made the shell one giant always-expanded scroll: every registry `group` (not just the top-level CATEGORY) is now its own nested collapsible `details.sub-panel`, built by `_buildGroupDetails(cat, headingText, headingIcon)` and wired through the SAME `_wireDynamicSubPanel()` persistence helper the category itself uses (Protocol 22/UI-1/UI-2 — not a second mechanism). `_dshGroupDefaultOpen(headingText)` defaults every group OPEN except any heading starting with `FIRE ANIMATION` (the ~28 buttons across its 3 tier-split groups), which defaults COLLAPSED so the shell opens compact. `_renderShell()`'s per-tool loop now resolves a `groupKey` (`tool.group || tool.label`) per category, builds the wrapper on first encounter, and reuses it for every later tool of that group — whether the tool is anchor-based (an existing `.input-group` moved in) or synthesized (a `.dsh-tool-btn` in a `.dsh-tool-grid`). The retired flat `.dsh-tool-subhead` label div (a non-collapsible group heading) is gone.
+**Diagnostic Shell U4a (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md` §3.1/§11 U4, Protocol 8) — collapsible groups + INSPECT build-out.** With the U3 TRIGGERS catalog landed, a 45-tool category made the shell one giant always-expanded scroll: every registry `group` (not just the top-level CATEGORY) is now its own nested collapsible `details.sub-panel`, built by `_buildGroupDetails(cat, headingText, headingIcon)` and wired through the SAME `_wireDynamicSubPanel()` persistence helper the category itself uses (Protocol 22/UI-1/UI-2 — not a second mechanism). `_dshGroupDefaultOpen(headingText)` defaults every group OPEN except any heading starting with `FIRE ANIMATION` (the ~28 buttons across its 3 tier-split groups), which defaults COLLAPSED so the shell opens compact. `_renderShell()`'s per-tool loop now resolves a `groupKey` (`tool.group || tool.label`) per category, builds the wrapper on first encounter, and reuses it for every later tool of that group — whether the tool is anchor-based (an existing `.input-group` moved in) or synthesized (a `.dsh-tool-btn` in a `.dsh-tool-grid`). The retired flat `.dsh-tool-subhead` label div (a non-collapsible group heading) is gone.
 
 **INSPECT rebuild.** `CATEGORY_ORDER` moves `'inspect'` to the LAST slot, so the readout renders at the bottom of the shell. INSPECT is a read-only "system diagnostics" readout — **never a raw JSON blob**, in staging or production — grouped into **VITALS & CAMPAIGN SUMMARY** (`_inspectVitalsHtml()`: game/level/XP/HP/location/caps/karma/active-directive-count, reading `state`/`GAME_DEFS[getGameContext()].label`), **DEVICE / SYSTEM** (the migrated `RUNTIME STATE`/`REGISTERED OBSERVERS` anchors plus new `DEVICE DETAIL` — app version + active Cache Storage revision via the existing `_readActiveCacheName()`, ui-core.js — and a staging-only `SERVICE WORKER INTERNALS` board), **CONNECTION** (`_inspectConnectionHtml()`: carrier/AI chat/network, reusing `_isUplinkConnected()`), and **FLAGS** (`_inspectFlagsHtml()`: a readable ENABLED/DISABLED line per known flag, plus a staging-only `FEATURE FLAGS — RAW CACHE` presence/count readout). Every field is built from `_chassisIdRow()`/`_chassisBreaker()` — the CHASSIS SYSTEM STATUS board's own labeled-row helpers (Protocol 22, reused verbatim, never a parallel raw-dump renderer). The readable summary (7 of the 9 `inspect-*` tools) is `tier:'prod'` — safe on a minigame-unlocked production build, the same class of telemetry a network tab already reveals; the 2 genuinely dev-only internals stay `tier:'staging'`, still rendered as labeled text, never `JSON.stringify`. A `COPY DIAGNOSTICS` button (`_copyDiagnostics()`) copies the rendered section's own `textContent` — the already-readable DOM — via `navigator.clipboard.writeText`, never a fresh state dump. INSPECT is fully read-only: none of its functions ever call `saveState()`/`MetaStore.set()`/assign `state.*`.
 
-Guarded by Suite 214 (both runners, 16 tests): the group-collapse default-open/collapsed rule (static + a Node `vm`-sandbox behavioral proof against both a synthetic and the real registry), `_buildGroupDetails()`'s shape and its `_wireDynamicSubPanel()` reuse, that every migrated U1 tool now carries an explicit `group`, `CATEGORY_ORDER`'s `'inspect'`-last placement, the 7 new INSPECT tool ids/categories/anchors, the prod/staging tier + all-read-only (`destructive:false`) split across the 9 `inspect-*` tools, a static "never `JSON.stringify`" guard across every INSPECT builder function, a static read-only guard (no `saveState`/`MetaStore.set`/`robco_v8`/state-write), Node `vm`-sandbox behavioral proofs of `_inspectVitalsHtml()`/`_inspectConnectionHtml()`/`_inspectFlagsHtml()` against synthetic globals, and the atmosphere/save boundary + game-agnosticism extended to every new U4a function by name.
+Guarded by Suite 214 (Node runner, 16 tests): the group-collapse default-open/collapsed rule (static + a Node `vm`-sandbox behavioral proof against both a synthetic and the real registry), `_buildGroupDetails()`'s shape and its `_wireDynamicSubPanel()` reuse, that every migrated U1 tool now carries an explicit `group`, `CATEGORY_ORDER`'s `'inspect'`-last placement, the 7 new INSPECT tool ids/categories/anchors, the prod/staging tier + all-read-only (`destructive:false`) split across the 9 `inspect-*` tools, a static "never `JSON.stringify`" guard across every INSPECT builder function, a static read-only guard (no `saveState`/`MetaStore.set`/`robco_v8`/state-write), Node `vm`-sandbox behavioral proofs of `_inspectVitalsHtml()`/`_inspectConnectionHtml()`/`_inspectFlagsHtml()` against synthetic globals, and the atmosphere/save boundary + game-agnosticism extended to every new U4a function by name.
 
-**Diagnostic Shell U4b (`planning/DIAGNOSTIC_SHELL_PLAN.md` §4/§11 U4, Protocol 8) — STATE SETUP + RESETS + FIXTURES + inline dev-resets.** 80 new `tier:'staging'` + `destructive:true` registry entries — the first tools this panel ships that mutate the LIVE campaign, a deliberate, documented exception to the U1 Hard Atmosphere/Save Boundary (Suite 149.9 rescoped to the pre-U4b portion of the file; Suite 215 independently proves the U4b block's own correctness). 63 STATE SETUP cheats (VITALS/PROGRESSION/SPECIAL/SKILLS/KARMA/ECONOMY/INVENTORY/FACTIONS/COLLECTIBLES/PERKS-TRAITS-BOOKS/QUESTS/MAP/CONDITIONS/COMPANIONS/TIME/MEGA-PRESETS groups) and 13 RESETS each route through an EXISTING native setter/mutator (`_nativeSetHp`/`_nativeSetRads`/`_nativeSetSpecial`/`_nativeSetSkill`/`_nativeSetLevel`/`_nativeSetXp`/`_nativeSetKarma`/`_nativeSetCaps`/`toggleLimb`/`adjustAffinity`/`adjustFaction`/`recordLocationVisit`/`onLocationChange` — Protocol 22/24), never a parallel unclamped write path. `_renderShell()` gained a parameterized-tool synthesis path — `control:'input'|'select'|'select-input'` renders a select and/or input plus a GO button instead of a plain button — and `_invoke(tool, arg)` gained an optional `arg` passthrough forwarded unchanged into `tool.action(arg)`. 1 FIXTURE (`fixture-nv-test-campaign`, `_dshLoadNvTestCampaign()`) populates a fully-stocked New Vegas practice campaign, guarded on the active game genuinely being FNV BEFORE its first `state.*` write (`FALLOUT_REGISTRY` is whichever per-game file the boot manifest loaded, not swappable at runtime — populating it during an FO3 session would silently corrupt state under a mislabeled context). 3 `category:'inline'` dev-reset buttons (`_mountInlineResets()`, staging-tier-rechecked by construction) mount tiny DEV-MARKER-glyph buttons directly on the WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels' own static header line, sharing the exact same registry/gate/confirm path as every other tool (Protocol 22 — never a parallel button/confirm mechanism).
+**Diagnostic Shell U4b (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md` §4/§11 U4, Protocol 8) — STATE SETUP + RESETS + FIXTURES + inline dev-resets.** 80 new `tier:'staging'` + `destructive:true` registry entries — the first tools this panel ships that mutate the LIVE campaign, a deliberate, documented exception to the U1 Hard Atmosphere/Save Boundary (Suite 149.9 rescoped to the pre-U4b portion of the file; Suite 215 independently proves the U4b block's own correctness). 63 STATE SETUP cheats (VITALS/PROGRESSION/SPECIAL/SKILLS/KARMA/ECONOMY/INVENTORY/FACTIONS/COLLECTIBLES/PERKS-TRAITS-BOOKS/QUESTS/MAP/CONDITIONS/COMPANIONS/TIME/MEGA-PRESETS groups) and 13 RESETS each route through an EXISTING native setter/mutator (`_nativeSetHp`/`_nativeSetRads`/`_nativeSetSpecial`/`_nativeSetSkill`/`_nativeSetLevel`/`_nativeSetXp`/`_nativeSetKarma`/`_nativeSetCaps`/`toggleLimb`/`adjustAffinity`/`adjustFaction`/`recordLocationVisit`/`onLocationChange` — Protocol 22/24), never a parallel unclamped write path. `_renderShell()` gained a parameterized-tool synthesis path — `control:'input'|'select'|'select-input'` renders a select and/or input plus a GO button instead of a plain button — and `_invoke(tool, arg)` gained an optional `arg` passthrough forwarded unchanged into `tool.action(arg)`. 1 FIXTURE (`fixture-nv-test-campaign`, `_dshLoadNvTestCampaign()`) populates a fully-stocked New Vegas practice campaign, guarded on the active game genuinely being FNV BEFORE its first `state.*` write (`FALLOUT_REGISTRY` is whichever per-game file the boot manifest loaded, not swappable at runtime — populating it during an FO3 session would silently corrupt state under a mislabeled context). 3 `category:'inline'` dev-reset buttons (`_mountInlineResets()`, staging-tier-rechecked by construction) mount tiny DEV-MARKER-glyph buttons directly on the WORLD MAP / DIRECTIVE REGISTRY / CARGO MANIFEST panels' own static header line, sharing the exact same registry/gate/confirm path as every other tool (Protocol 22 — never a parallel button/confirm mechanism).
 
-**Diagnostic Shell U5 (`planning/DIAGNOSTIC_SHELL_PLAN.md` §4/§7/§11 U5, Protocol 8) — RESILIENCE/INFRA + the MINIGAME-UNLOCK SEAM + the final leak-proof audit. This completes the Diagnostic Shell.** 18 new registry entries close out the plan's tool catalog (registry total: 159, up from 141 after U4b):
+**Diagnostic Shell U5 (`planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md` §4/§7/§11 U5, Protocol 8) — RESILIENCE/INFRA + the MINIGAME-UNLOCK SEAM + the final leak-proof audit. This completes the Diagnostic Shell.** 18 new registry entries close out the plan's tool catalog (registry total: 159, up from 141 after U4b):
 
 - **Feature-flag overrides.** 8 `flag-<key>` tools (one per remote kill-switch flag) carry a brand-new `control:'toggle'` synthesis path in `_renderShell()` — a live state readout plus ON/OFF/DEFAULT buttons, each click invoking `_invoke(tool, 'on'|'off'|'clear')` and immediately repainting from the tool's own `read()`/`readOverride()`. They route through a new seam in `cloud.js`: `window._setFeatureFlagOverride(key, valOrNull)` / `window._getFeatureFlagOverride(key)` maintain a staging-only, per-device shadow layer (`_localFlagOverrides`, persisted via the new `robco_dsh_flag_overrides` MetaStore key) that `isFeatureEnabled()` now checks FIRST, ahead of the pre-existing session auto-disable and remote/LKG logic — `valOrNull=null` clears the override and falls straight back through to that unchanged logic. The setter independently re-checks `_isStagingEnv()` itself (defense-in-depth, Protocol 33 fail-safe direction) even though its only caller is already tier-gated.
 - **AI/OCR failure simulation.** Two TRIP tools (`sim-fail-aichat-trip`/`sim-fail-visualocr-trip`, `destructive:true`) drive the REAL `window._recordFeatureFailure()` to `FAIL_THRESHOLD` (3) in one click — the genuine auto-disable machinery (Protocol 35 client analogue), never a synthetic imitation, with no reset short of a reload (matching a real repeated-failure player's own "REBOOT TO RETRY" recovery). A non-destructive `sim-ai-response-preview` select tool posts a clearly dev-labeled chat line describing each of 401/403/429/TIMEOUT/MALFORMED's real fallback behavior, without touching any retry/auto-disable state.
@@ -480,13 +579,13 @@ Guarded by Suite 214 (both runners, 16 tests): the group-collapse default-open/c
 - **The MINIGAME-UNLOCK SEAM itself.** `_devConsoleUnlocked()` now ALSO returns `true` on a production build when the persisted `robco_dsh_minigame_unlocked` flag (new `META_MANIFEST` key, owner `test-console.js`) reads `'true'` — set only by a future in-game hacking minigame once built, or by two new staging-only `env`-category test triggers (`minigame-unlock-test`/`minigame-lock-test`) that flip the exact same flag purely to rehearse the flow. **Critically, `_shellTier()` is completely untouched by this seam** — it stays staging-signal-only, referencing neither `MetaStore` nor the unlock flag — so a minigame-unlocked production build shows the shell but renders ONLY `tier:'prod'` tools. `_fireUnlockCeremony()` is the short in-fiction "RESTRICTED ACCESS GRANTED" flourish: opens the drawer, flashes the env banner via `.dsh-unlock-ceremony`/`@keyframes dshUnlockGlow` (a plain `animation:`, Protocol UI-9, auto-neutralized by the existing global reduced-motion block), then settles back through the existing `_paintEnvBanner()` — writing nothing durable anywhere in its own body. A third, `tier:'prod'` `unlock-ceremony-replay` tool fires it standalone with no flag mutation, mirroring the M1-M5 ceremony-replay convention (planning §4: never clears the real persisted flag).
 - **The FINAL LEAK-PROOF AUDIT.** A from-scratch behavioral re-proof of the Suite 210.6/212.5 invariant against the COMPLETE, final 159-tool registry (not a sampled subset): every `tier:'staging'` tool is invisible under a stubbed `'prod'` tier and visible under `'staging'`; every `tier:'prod'` tool is visible under both. A newly-enforced plan guard (§8.6, previously unimplemented) statically confirms every `tier:'prod'` tool's own inline `action()` source text contains no direct campaign-state write pattern (`saveState(`/`state.<field>`/`robco_v8`/`pushToCloud`) — every prod tool only ever delegates to a named helper.
 
-Guarded by Suite 215 (both runners, 16 tests: the U4b registry/synthesis-path/native-setter/fixture-guard/inline-reset proofs) and Suite 216 (both runners, 22 tests: every new U5 tool id/tier/destructive flag, the `control:'toggle'` synthesis behavioral proof, the minigame-unlock-seam behavioral matrix (staging/non-staging × flag set/unset/throwing), the `_shellTier()`-independence proof, the two-part FINAL LEAK-PROOF AUDIT over the full 159-tool registry, the `_setFeatureFlagOverride`/`isFeatureEnabled` override behavioral proofs, the cache/SW/update-prompt seam proofs, and the Protocol 44 trigger-coverage guard re-derived against the complete registry).
+Guarded by Suite 215 (Node runner, 16 tests: the U4b registry/synthesis-path/native-setter/fixture-guard/inline-reset proofs) and Suite 216 (Node runner, 22 tests: every new U5 tool id/tier/destructive flag, the `control:'toggle'` synthesis behavioral proof, the minigame-unlock-seam behavioral matrix (staging/non-staging × flag set/unset/throwing), the `_shellTier()`-independence proof, the two-part FINAL LEAK-PROOF AUDIT over the full 159-tool registry, the `_setFeatureFlagOverride`/`isFeatureEnabled` override behavioral proofs, the cache/SW/update-prompt seam proofs, and the Protocol 44 trigger-coverage guard re-derived against the complete registry).
 
 ---
 
-## Fallout Data Registry (`js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js`)
+## Fallout Data Registry (`js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js`)
 
-Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/reg_nv.js` (FNV) and `js/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
+Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/data/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/data/reg_nv.js` (FNV) and `js/data/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
 
 ### Key Properties
 
@@ -500,6 +599,10 @@ Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and
 ```js
 const FALLOUT_REGISTRY = {
   version: '2.0.0',
+  game: 'FNV',                                     // 'FNV' | 'FO3' — authoritative per-registry game tag
+                                                     // (added alongside the api-import.js registry-trust guard);
+                                                     // autoImportState() compares this against state.gameContext
+                                                     // before validating any array against the registry.
   quests:     [ { name, type, dlc }, ... ],       // 130 entries. type: main|side|companion|unmarked
   items:      [ { name, type }, ... ],             // ~280 entries. type: weapon|armor|aid|ammo|misc
   perks:      [ { name, type, level }, ... ],      // ~110 entries. type: regular|companion|challenge|special
@@ -534,15 +637,15 @@ const FALLOUT_REGISTRY = {
 
 ### Locked Decisions (see architecture_review.md)
 
-| Decision         | Value                                                    |
-| ---------------- | -------------------------------------------------------- |
-| Global name      | `FALLOUT_REGISTRY`                                       |
-| File name        | `js/registry-core.js` + `js/reg_nv.js` / `js/reg_fo3.js` |
-| Category keys    | `quests`, `items`, `perks`, `locations`, `companions`    |
-| Search function  | `registrySearch(category, query)`                        |
-| Max results      | 7                                                        |
-| Min query length | 2 chars                                                  |
-| Keywords         | Deferred                                                 |
+| Decision         | Value                                                                   |
+| ---------------- | ----------------------------------------------------------------------- |
+| Global name      | `FALLOUT_REGISTRY`                                                      |
+| File name        | `js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js` |
+| Category keys    | `quests`, `items`, `perks`, `locations`, `companions`                   |
+| Search function  | `registrySearch(category, query)`                                       |
+| Max results      | 7                                                                       |
+| Min query length | 2 chars                                                                 |
+| Keywords         | Deferred                                                                |
 
 ---
 
@@ -585,7 +688,7 @@ future audit.
 
 ### Reserved-column register
 
-Every `js/db_nv.js` / `js/db_fo3.js` CSV table carries a matching header comment (same content,
+Every `js/data/db_nv.js` / `js/data/db_fo3.js` CSV table carries a matching header comment (same content,
 kept at parity between the two files). Full per-column detail lives there; summary below.
 Authored-but-unconsumed columns fall into two buckets:
 
@@ -594,34 +697,34 @@ Authored-but-unconsumed columns fall into two buckets:
 - **PARKED-FOR-REMOVAL** — no consumer AND no plausible future one, because a competing data
   source already serves the same purpose (a genuine duplication, not a reserved seam).
 
-| Table                        | Unconsumed column(s)                         | Disposition                                                                                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WEAPONS.CSV`                | `Crit_Damage`, `Crit_Multiplier`             | PARKED — no crit-chance calculator exists yet                                                                                                                                                                                            |
-| `WEAPONS.CSV`                | `Req_Unarmed`, `Req_STR`, `Reach`            | PARKED — target: VATS v2 melee/strength gating                                                                                                                                                                                           |
-| `WEAPONS.CSV`                | `Special_Attack_AP`, `Special_Rules`         | PARKED — target: per-weapon VATS AP-cost variance (same unsourceable-precision gap the WU-D4a-RANGED-GAP note already flags, Suite 104)                                                                                                  |
-| `AMMO.CSV`                   | `DMG_Multiplier`, `DT_Modifier`              | PARKED — target: per-ammo-subtype effect modeling in VATS/THREAT                                                                                                                                                                         |
-| `AMMO.CSV`                   | `Condition_Degradation`                      | PARKED — target: a weapon-condition wear system (unbuilt)                                                                                                                                                                                |
-| `ARMOR.CSV`                  | `Type`, `DT`, `Effects`, `Min_CND_Threshold` | PARKED — no `lookupArmorStats()` sibling to `lookupWeaponStats()`/`lookupBestiaryEntry()` exists; **`DT` is the single highest-priority target** — equipped-armor DT is not looked up anywhere in the app today                          |
-| `CHEMS.CSV`                  | `Duration`                                   | PARKED — target: a BIO-SCAN expiry countdown for active buffs/debuffs                                                                                                                                                                    |
-| `RECIPES.CSV`                | **all 5 columns**, both games                | **PARKED-FOR-REMOVAL** — `doCraft`/`doScrap` read `reg_nv.js`/`reg_fo3.js` `recipes[]`/`breakdowns[]` instead; this CSV table has zero consumers anywhere in the code (a genuine Protocol-22 duplicate data source, not a reserved seam) |
-| `QUEST_ITEMS.CSV`            | `Tradeable`                                  | PARKED — target: a TRADE-panel filter for sellable quest items                                                                                                                                                                           |
-| `VENDORS.CSV`                | `Repair_Skill`                               | PARKED — target: a vendor repair action                                                                                                                                                                                                  |
-| `VENDORS.CSV`                | `Restock_Days`, `Accepted_Currencies`        | Named target: TRADE v2 (per the original audit's own example)                                                                                                                                                                            |
-| `WEAPON_MODS.CSV` (FNV only) | `Effect`                                     | PARKED — target: an equipped-mod effect readout on the weapon detail / CONSULT lookup                                                                                                                                                    |
-| `BESTIARY.CSV`               | `Perception`, `Speed_Factor`                 | Named target: v2.9.0 ENCOUNTER + the BESTIARY BROWSER (FP-GP-4)                                                                                                                                                                          |
+| Table                        | Unconsumed column(s)                         | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEAPONS.CSV`                | `Crit_Damage`, `Crit_Multiplier`             | PARKED — no crit-chance calculator exists yet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `WEAPONS.CSV`                | `Req_Unarmed`, `Req_STR`, `Reach`            | PARKED — target: VATS v2 melee/strength gating                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `WEAPONS.CSV`                | `Special_Attack_AP`, `Special_Rules`         | PARKED — target: per-weapon VATS AP-cost variance (same unsourceable-precision gap the WU-D4a-RANGED-GAP note already flags, Suite 104)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `AMMO.CSV`                   | `DMG_Multiplier`, `DT_Modifier`              | PARKED — target: per-ammo-subtype effect modeling in VATS/THREAT                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `AMMO.CSV`                   | `Condition_Degradation`                      | PARKED — target: a weapon-condition wear system (unbuilt)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ARMOR.CSV`                  | `Type`, `DT`, `Effects`, `Min_CND_Threshold` | PARKED — no `lookupArmorStats()` sibling to `lookupWeaponStats()`/`lookupBestiaryEntry()` exists; **`DT` is the single highest-priority target** — equipped-armor DT is not looked up anywhere in the app today                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CHEMS.CSV`                  | `Duration`                                   | PARKED — target: a BIO-SCAN expiry countdown for active buffs/debuffs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ~~`RECIPES.CSV`~~            | ~~**all 5 columns**, both games~~            | **REMOVED 2026-07-19** (was PARKED-FOR-REMOVAL) — `doCraft`/`doScrap` read `reg_nv.js`/`reg_fo3.js` `recipes[]`/`breakdowns[]`, and no `lookup*()`/`get*()` parser in either `db_*.js` ever named the section, so the table had zero code consumers. It reached only the AI via the `databaseCSVs` system-instruction string — a Protocol-22 duplicate data source competing with the registry the native crafting path actually uses, over a system the AI no longer owns. Deleting it also removed FO3's fabricated "Abraxo Cleaner Bomb" row (output: a non-existent "Tin Grenade"). Suites 9.10/19.10 fail the build if either table returns. |
+| `QUEST_ITEMS.CSV`            | `Tradeable`                                  | PARKED — target: a TRADE-panel filter for sellable quest items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `VENDORS.CSV`                | `Repair_Skill`                               | PARKED — target: a vendor repair action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `VENDORS.CSV`                | `Restock_Days`, `Accepted_Currencies`        | Named target: TRADE v2 (per the original audit's own example)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `WEAPON_MODS.CSV` (FNV only) | `Effect`                                     | PARKED — target: an equipped-mod effect readout on the weapon detail / CONSULT lookup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `BESTIARY.CSV`               | `Perception`, `Speed_Factor`                 | Named target: v2.9.0 ENCOUNTER + the BESTIARY BROWSER (FP-GP-4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ### Skill-less (FO4-class) degradation audit
 
 FO4 has no traditional SPECIAL-skill system, so every `getSkillKeys()` consumer must degrade
 cleanly to an empty array rather than assume at least one skill exists. Audited every call site
-(`js/api.js`, `js/state.js`, `js/ui-core.js`, `js/ui-render.js`) that invokes `getSkillKeys()`:
+(`js/services/api.js`, `js/core/state.js`, `js/ui/ui-core.js`, `js/ui/ui-render.js`) that invokes `getSkillKeys()`:
 
 | Call site                                                        | Behavior on `getSkillKeys() === []`                                                                                                            |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `renderSkills()` (ui-core.js) — `.map().join('')`                | Renders an empty `#skillsGrid` — no crash. Cosmetic gap: no "NO SKILL SYSTEM" empty-state message (acceptable for now; not a functional break) |
 | `loadUI()` skill-sync loop (ui-core.js) — `.forEach()`           | No-ops cleanly                                                                                                                                 |
 | `syncStateFromDom()` (state.js) — `.forEach()`                   | No-ops cleanly; any stray AI-sent skill data is simply never written                                                                           |
-| `autoImportState()` skill mapping (api.js) — `.forEach()`        | No-ops cleanly; same effect                                                                                                                    |
+| `autoImportState()` skill mapping (api-import.js) — `.forEach()` | No-ops cleanly; same effect                                                                                                                    |
 | Skill-check highlight regex handler (ui-core.js) — `.includes()` | Always `false` — `[SkillName N]` inline markup never highlights, never throws                                                                  |
 | Buff→skill name-matching (ui-render.js) — `.map()`/`.forEach()`  | No-ops cleanly                                                                                                                                 |
 | `expandPanelForCategory`-adjacent guard (ui-core.js)             | Already explicitly defensive: `(typeof getSkillKeys === 'function' && getSkillKeys()) \|\| []`                                                 |
@@ -639,7 +742,7 @@ not just planned, by the DO-K unit below** — `GAME_DEFS.FO4` now exists with `
 
 ## Per-Game Identity Block (`GAME_DEFS[ctx].identity` — Design Overhaul DO-K)
 
-The Design Overhaul's keystone unit (`planning/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-K, built first
+The Design Overhaul's keystone unit (`planning/2.8.0/plans/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-K, built first
 per its dependency spine) widens each `GAME_DEFS[ctx].theme` into a full `identity` block — the
 single per-machine design-data table every later overhaul unit (bezel chrome, Overseer presence,
 cartridge-swap ceremony, motion-verb grammar, sonic identity, cursor, empty/loading voice,
@@ -653,6 +756,7 @@ GAME_DEFS[ctx].identity = {
   machine,          // 'salvaged-terminal' | 'pipboy-3000' | 'pipboy-3000-mk4'
   material,         // 'scavenged-steel' | 'vaulttec-molded' | 'vaulttec-mk4' -> future [data-game] CSS
   structuralMode,   // 'bay' — hook kept open; no alternate mode built this cycle
+  playerNoun,       // 'Courier' | 'Lone Wanderer' | 'Sole Survivor' — the AI's per-game player title (AI_OVERSEER F4). getSystemDirective() (api-directive.js) + the Director-removal confirm copy (api-import.js) read it; never a hardcoded literal (Protocol 38)
   theme,            // ALIASED to the game's existing top-level `theme` object (see below) — never a copy
   persona:        { texture, cadence, blipBank: [...] },        // -> future Overseer presence unit
   ceremony:       { coldStart, switchLabel },                    // -> future cartridge-swap unit
@@ -666,7 +770,7 @@ GAME_DEFS[ctx].identity = {
 ```
 
 - **NV** is populated richly and accurately from the owner-approved mockup
-  (`planning/mockups/nv-machine-mockup.html` + `nv-machine-rationale.md`) — the salvaged desk
+  (`planning/2.8.0/mockups/nv-machine-mockup.html` + `nv-machine-rationale.md`) — the salvaged desk
   terminal, the green-local/amber-remote phosphor split, the Mojave-uplink boot handshake, the
   oscilloscope Overseer persona.
 - **FO3** gets a sensible stub (visibly distinct from NV, proving the per-game read works) — its
@@ -689,7 +793,7 @@ every game, so `identity.theme` is the exact same object reference. `changeOptic
 save-header consumer (`ui-account.js`) all keep reading the untouched literal — zero risk of the
 two ever drifting apart.
 
-**Accessor:** `getIdentity(ctx)` (`js/state.js`) mirrors `getFactionRegistry()`/`getSkillKeys()` —
+**Accessor:** `getIdentity(ctx)` (`js/core/state.js`) mirrors `getFactionRegistry()`/`getSkillKeys()` —
 omit `ctx` to resolve the active game via `_activeDef()`, or pass an explicit `ctx` to inspect any
 game's identity (including FO4's design-only entry) without switching context. Fails safe to
 FNV's identity for an unknown/invalid `ctx` — never returns `undefined`.
@@ -709,16 +813,18 @@ attribute, with `identity` read by no feature code yet. DO-N (bezel chrome, `--b
 voice/ambient facets) are still future consumers. No `state.<field>` / `saveState()` / `robco_v8`
 write exists anywhere in the identity block itself. DO-K itself landed under `[Unreleased]` as a
 cache-rev-only change; `APP_VERSION` bumped to 2.8.0 at the v2.8.0 release cut. Guarded end-to-end by
-Suite 157 (both runners at parity) — a Node `vm`-sandbox behavioral test that loads the real
-`js/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
+Suite 157 (Node runner) — a Node `vm`-sandbox behavioral test that loads the real
+`js/core/state.js` and proves the contract, the theme-alias reference equality, the `getIdentity()`
 fail-safe, and the FO4 designOnly guards, plus static structural guards on the three `data-game`
 write sites.
 
+**Extraction-pass finding — the per-game abstraction, measured against two real machines (`planning/2.8.5/audits/SKIN_ARCHITECTURE_EXTRACTION.md`).** Once both machines were built (NV = salvaged desk terminal, FO3 = Pip-Boy 3000), the owed post-FO3 measurement graded the abstraction from the actual code, and it held well: **FO3's entire divergence from NV is a pure CSS override layer** — ~2,100 lines in ONE `[data-game='FO3']`-gated file (`css/60-fo3-pipboy.css`, ~13% of all CSS, ~96% inside a single `@media(orientation:landscape)` block), plus ~5 `identity` data fields and 3 inert-for-NV wrapper divs (`#fo3TopStrip`/`#fo3SubtabRail`/`#fo3BoardScroll`). **The render/state/api/cloud pipeline has zero game-name branches** — per-game behavior flows entirely through `getIdentity()` data (22 call sites) and shared render functions; there is no forked renderer (`renderXxxFO3()` does not exist) and NV is the un-gated default skin. **The one strained seam:** the Pip-Boy shell is keyed to the GAME (`[data-game='FO3']`), not the MACHINE FAMILY — and `identity.machine` / `structuralMode` (and `material`) are **declared but read by zero lines of code today**, the deliberately-anticipated hook for a machine-family root attribute. That seam is the single scoped pre-3.0 "machine-family skin re-key" (re-key the ~278 shell selectors to `[data-machine='pipboy']` and wire the dead fields onto `<html>`), so FO3 and FO4 (Pip-Boy 3000 Mk IV) share one body. The sanctioned N-game rule this establishes: **chrome selectors should key off the machine family (`data-machine`), while flavour keys off `[data-game]`** — the FO3-era `[data-game]` shell gate is a two-game convenience, not the intended N-game pattern. The reskin/data half of a new game remains a clean file-drop (`GAME_FILES` manifest + data files + `designOnly` flip); only the re-body half needs that one re-key, and only if the new game takes the Pip-Boy body.
+
 ---
 
-## Bezel Chrome + Subsystem Nav (`index.html` + `css/terminal.css` + `js/ui-core.js` — Design Overhaul DO-N)
+## Bezel Chrome + Subsystem Nav (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul DO-N)
 
-The vertical slice's first _visible_ unit (`planning/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-N).
+The vertical slice's first _visible_ unit (`planning/2.8.0/plans/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-N).
 Replaces the flat `.tab-bar`/`.tab-btn` webpage nav with a physical-terminal bezel — a
 `.casing-top` (brand plate, status lamps, uptime), a `.glass-frame` (rounded-corner CRT chrome,
 curvature/vignette on the frame only, never the text), and a `.bezel` control strip carrying a
@@ -814,7 +920,7 @@ neutralizes it automatically with no bespoke carve-out.
 `_bezelTelemetryText`, `_bezelSweep`, `openBezelDirectory`, `initBezelSubsystem`,
 `_initBezelChrome`, `_updateFaultLamp`) reads `state`/MetaStore but never writes `saveState()` /
 `robco_v8` / `state.<field> =` anywhere — view choice and device telemetry only. Guarded by
-Suite 158 (both runners at parity, 18 tests).
+Suite 158 (Node runner, 18 tests).
 
 **Mobile bottom-dock follow-up (owner audit, Suite 160):** DO-N originally shipped the desktop
 casing-top/glass-frame/bezel `order:1/2/3` flip (Desk-terminal shell, above) but had no mobile
@@ -838,9 +944,9 @@ it), and (b) fixed the amber connector/vent-pin strips (`details.bay-board::afte
 `.chip-card::after`) from a `repeating-linear-gradient` — whose fixed cycle length rarely divides
 the strip's actual responsive width evenly, leaving a stray thin partial pin at the end — to
 `background-repeat: round`, which rescales the tile so a whole number of pins always fits. Guarded
-by Suite 160 (both runners at parity, 6 tests).
+by Suite 160 (Node runner, 6 tests).
 
-**Bezel fidelity pass (Protocol 8 Sonnet-stage implementation of `planning/BEZEL_FIDELITY_PLAN.md`):**
+**Bezel fidelity pass (Protocol 8 Sonnet-stage implementation of `planning/2.8.0/plans/BEZEL_FIDELITY_PLAN.md`):**
 closes the gap between the shipped chrome and the approved `nv-machine-mockup.html`/
 `campaign-configs.html` reference — a **fidelity** reskin only (Protocol 25), same layout, no
 relocation. `.machine` gains a subtle vertical pinstripe texture + inset hairline at every
@@ -862,7 +968,7 @@ already owns `::after` — delivering the mockup's glass depth with zero DOM res
 `.glass-frame > .glass` wrapper), plus a desktop-only radius/padding bump. A low-opacity
 `.bezel::before` hazard strip is desktop-only. Mobile (360/412px) keeps the disciplined edge exactly
 as before: dial/serial/field-kit/hazard-strip/`.nk-sub` all hidden, zero new horizontal overflow.
-Guarded by Suite 158.21–158.27 (both runners at parity, +7 tests, 2686 total). Cache r118.
+Guarded by Suite 158.21–158.27 (Node runner, +7 tests, 2686 total). Cache r118.
 
 **Mobile immersion pass (owner follow-up — the mobile complement to the bezel fidelity pass
 above):** mobile was intentionally left as a disciplined flat edge by the desktop-only pass;
@@ -881,7 +987,7 @@ An optional compact serial/flavor micro-line was evaluated and deliberately skip
 `nv-machine-412.png` mobile reference shows zero decorative text on mobile, so omitting it keeps
 the disciplined mobile edge faithful to the golden reference rather than forcing a fit. Verified
 live at 360/412/desktop with zero horizontal overflow and the desktop gate completely untouched.
-Guarded by Suite 158.28–158.30 (both runners at parity, +3 tests, 2689 total); this unit also
+Guarded by Suite 158.28–158.30 (Node runner, +3 tests, 2689 total); this unit also
 caught and fixed a stale Suite 158 header-comment test count that had drifted since the bezel
 fidelity pass (Protocol 42 — harness/doc-only, no functional impact). Cache r119.
 
@@ -918,18 +1024,18 @@ horizontal overflow, and the active keycap's pressed-in look (r120) is untouched
 
 ---
 
-## Director Uplink — the Living Overseer (`js/ui-core.js` + `js/api.js` + `css/terminal.css` — Design Overhaul DO-O)
+## Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/` (order-prefixed files) — Design Overhaul DO-O)
 
 Reskins the Comm-Link (`.col-right`) into the mockup's **DIRECTOR UPLINK**: a phosphor
 oscilloscope `<canvas id="overseerScope">` whose waveform reacts to the **real** AI/chat
 lifecycle, a `.ovs-head`/`.scope-meta` status strip, and (on mobile) a self-contained UPLINK
 view that fixes the pre-DO-O "infinite scroll" problem. Protocol UI-10 (Overseer Presence) is
-adopted at this unit — see `CLAUDE.md`.
+adopted at this unit — see `rules/ui-and-mobile.md`.
 
 **A reskin, not a fork (Protocol 22):** `appendToChat()` and `transmitMessage()` are the exact
 same functions as before, hooked at two points each — no parallel chat pipeline exists.
 
-**The state machine (`js/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
+**The state machine (`js/ui/ui-core.js`, the "DO-O" block, co-located with the A3 ambient
 observers rather than a new served file):**
 
 | Function                                        | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -943,14 +1049,14 @@ observers rather than a new served file):**
 
 **Hooked into the real lifecycle, not a demo timer:**
 
-- `js/api.js` `transmitMessage()`: `setOverseerState('thinking')` at the exact point the thermal-load
+- `js/services/api.js` `transmitMessage()`: `setOverseerState('thinking')` at the exact point the thermal-load
   window opens (`document.body.classList.add('thermal-load')`), **after** the native-router/
   feature-flag/no-key early-return gates — so a deterministic command (`[THREAT]`, TERMINAL mode)
   never touches the scope. Its `finally` block resets **only if** `getOverseerState() === 'thinking'`
   — critical, because a successful reply has already called `appendToChat(...,'ai')`, which kicks
   off an **async** typewriter that owns its own reset to `listening`; a blind reset in `finally`
   (which runs synchronously right after) would truncate a `speaking` frame that hasn't finished yet.
-- `js/ui-core.js` `appendToChat(text, sender, isHistoryLoad)`: sets `speaking` at the AI typewriter's
+- `js/ui/ui-core.js` `appendToChat(text, sender, isHistoryLoad)`: sets `speaking` at the AI typewriter's
   **start**, and `listening` at its **completion callback** — both guarded on `sender==='ai' &&
 !isHistoryLoad`, so replayed chat history on reload never touches the scope. The reduced-motion /
   `isHistoryLoad`-false instant branch (no typewriter to wait on) fires `speaking` then immediately
@@ -1020,7 +1126,7 @@ pre-existing focus/scroll behavior) and focuses `#chatInput`.
 **Save boundary clean (Protocol 26):** the entire DO-O block reads `state`/`getIdentity()` but
 never writes `saveState()` / `robco_v8` / `state.<field> =` anywhere — `_scopeState` is a transient
 module variable and the idle-blip observer's `appendToChat(...,true)` call is explicitly excluded
-from persistence. Guarded by Suite 162 (both runners at parity, 31 tests, including a Node
+from persistence. Guarded by Suite 162 (Node runner, 31 tests, including a Node
 `Function`-eval behavioral truth-table proof of `_overseerRestState()`).
 
 **DO-O follow-up — UPLINK mobile density/de-bloat/restyle (owner report):** a live-mobile
@@ -1115,7 +1221,7 @@ value (a plain `.value` write never fires `'input'`, so there is no feedback loo
 `#chatInput`'s `'input'` event via `_wireComposerAutoGrow()` (boot-called from `_restoreDevicePrefs()`
 alongside `_wireModeHint()`), re-invoked by `_renderModePill()` whenever the placeholder itself
 changes (mode toggle), and called again by both `transmitMessage()` and `transmitTerminal()`
-(`js/api.js`) immediately after they clear `#chatInput`'s value, so the box snaps back to its small
+(`js/services/api.js`) immediately after they clear `#chatInput`'s value, so the box snaps back to its small
 size after every send. Second: the mode pill's `:hover` fill (from the general
 `button.action-btn:hover` rule) was "sticking" after a touch tap — mobile browsers apply `:hover` on
 tap with no `pointerleave` event to clear it. `button.mode-pill--terminal:hover` /
@@ -1133,7 +1239,7 @@ custom property that falls back to `--bezel-wire`; the save-menu button sets it 
 
 ---
 
-## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/terminal.css` + `js/ui-core.js` + `js/ui-audio.js` + `js/ui-saves.js` + `js/cloud.js` — Design Overhaul CHASSIS unit)
+## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)
 
 Rebuilds the CHASSIS `[5]` tab from one flat SYSTEM STATUS panel into three real
 `.panel.bay-board` boards, and adds THE LIVING CORE — a decorative reactor glyph driven entirely
@@ -1142,17 +1248,17 @@ Reskin only (Protocol 22/25): every existing id/handler is kept unchanged.
 
 **The three boards:**
 
-| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                                                                                                                                                                                                                                                                                            |
-| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every flag `_systemStatusFlagKeys()` returns) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35). `_systemStatusFlagKeys()` reads `window.getFeatureFlagKeys()` (`js/cloud.js`, `Object.keys(_featureFlags)` — the single source, Protocol 22) first, falling back to a literal `_SYSTEM_STATUS_FLAGS_FALLBACK` array only when that accessor is unavailable — a v2.8.0 hotfix (Suite 219) after the old standalone hardcoded array silently missed `visualOcr`/`visualAiVision`. |
-| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered."                                                                                                                                                                                                                                                                         |
+| Board                            | id                         | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUS-22 UNIT POWER PLANT          | `unitPowerPlantPanel`      | `#overseerLogDisplay`/`renderOverseerLog()` (unchanged reader) reskinned as industrial hour meters via the BUS-21 `_odoTile()` digit-wheel helper (Protocol 22 reuse, no parallel drum-tile implementation) — CURRENT UPTIME / LONGEST SESSION / TOTAL POWER-ON / BOOT COUNT — plus THE LIVING CORE (`#chassisCore`).                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| BUS-23 IDENTITY PLATE & BREAKERS | `systemStatusPanel`        | `#systemStatusDisplay`/`renderSystemStatus()` (unchanged reader) reskinned as a stamped serial plate (MODEL/FIRMWARE/CACHE REV/STORAGE rows) + a breaker-lever rack (CARRIER plus every flag `_systemStatusFlagKeys()` returns) — read-outs only, never user-actionable (the flags are set by the remote kill-switch config, Protocol 32/33/35). `_systemStatusFlagKeys()` reads `window.getFeatureFlagKeys()` (`js/services/cloud.js`, `Object.keys(_featureFlags)` — the single source, Protocol 22) first, falling back to a literal `_SYSTEM_STATUS_FLAGS_FALLBACK` array only when that accessor is unavailable — a v2.8.0 hotfix (Suite 219) after the old standalone hardcoded array silently missed `visualOcr`/`visualAiVision`. |
+| BUS-24 SERVICE & FAULT CONSOLE   | `serviceFaultConsolePanel` | `btnViewChangelog`→`_svcViewChangelog()` and `btnSystemStatusErrorLog`→`showErrorLog()` (unchanged handlers), dressed as a revision-log spool and an amber fault annunciator. `renderServiceFaultConsole()` (new) reads a new shared `_readErrorLog()` helper — the SAME reader `_updateFaultLamp()` and the core's fault-strain signal use — so the casing FAULT lamp, this console, and the core can never disagree on "how many faults are buffered."                                                                                                                                                                                                                                                                                  |
 
 `expandPanelForCategory()`'s `log` category and `_bezelSubsystemLabel('chassis')` were both
 repointed from the old single "SYSTEM STATUS" title to "UNIT POWER PLANT" / "SELF-DIAGNOSTIC BAY"
 to match the split (Suite 176.8/192 both guard this).
 
-**THE LIVING CORE (`js/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
+**THE LIVING CORE (`js/ui/ui-core.js`, the "CHASSIS CORE" block, co-located with the DO-O Overseer
 block it reuses):** a shared visual shell, `.chassis-core-shape` (rings + a pulsing heart, CSS-only
 — no canvas), carried by BOTH `#chassisCore` (a real `<button>`, BUS-22, Protocol UI-5) and
 `#chassisCoreMini` (a decorative `aria-hidden` mirror). **Owner follow-up:** the mini mirror
@@ -1185,12 +1291,12 @@ One choke point paints both from a single snapshot:
   thinking/speaking/disabled/offline transitions the oscilloscope already reacts to.
 - **Fault strain** — the new shared `_readErrorLog()` reader; `_updateFaultLamp()` (existing) calls
   both `renderServiceFaultConsole()` and `_coreRefresh()`.
-- **Radio-reactive** — `_updateRadioUI()` (`js/ui-audio.js`, the one function both `startRadio()`
+- **Radio-reactive** — `_updateRadioUI()` (`js/ui/ui-audio.js`, the one function both `startRadio()`
   and `stopRadio()` already call) gained one line, `_coreRefresh()`. `_radioPlaying()` is exposed
   cross-file for this read.
 - **Save/sync write-pulse** — a NEW `RobcoEvents` bus event, `'data.write'`, emitted from
-  `saveToSlot()` (`js/ui-saves.js`, local slot save) and `saveCurrentToCloud()` /
-  `loadCloudSave()` / `overwriteCloudSave()` (`js/cloud.js`, cloud push ×2 + pull) — an event
+  `saveToSlot()` (`js/ui/ui-saves.js`, local slot save) and `saveCurrentToCloud()` /
+  `loadCloudSave()` / `overwriteCloudSave()` (`js/services/cloud.js`, cloud push ×2 + pull) — an event
   rather than a direct call into the core, matching the DO-O hook convention.
 - **Colour follows optic** — free: the core's CSS reads `var(--robco-green)`/
   `var(--robco-green-rgb)`, the same custom property `changeOpticsColor()` already sets on
@@ -1223,7 +1329,7 @@ entries, one per behaviour) into the shared `#sysModal` via `openModal()`.
 device telemetry; no function in the CHASSIS CORE block ever touches `state.*`, `saveState()`, or
 `robco_v8` (Suite 192.15, a static grep across the whole block).
 
-Guarded by Suite 192 (both runners at parity, 26 tests): the three-board split, the button/mirror
+Guarded by Suite 192 (Node runner, 26 tests): the three-board split, the button/mirror
 contract, the casing-top screen's placement/sizing (192.23), the `.chassis-core-shape` self-clip
 regression guard (192.24 — Protocol 42, see below), the `#chassisScreenMini` aria-prohibited-attr
 regression guard (192.25 — Protocol 42, see below), the compound-selector specificity regression
@@ -1262,18 +1368,18 @@ Ten more real-signal-driven behaviors, all painted on both `#chassisCore` and `#
 from the same `_coreRefresh()` snapshot, gated by the existing `_coreShouldAnimate()`/`.core-still`
 mechanism (no bespoke carve-out), zero campaign-state write:
 
-| #   | Behavior                     | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| --- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Thermal glow                 | `_coreTemp` (0-100, in-memory only) is mutated by `_coreThermalTick()` — an `AmbientRuntime` observer (`id: 'core-thermal'`, states `['ACTIVE','IDLE']`, tier `'balanced'`, `cadenceMs: 4000`) — warming on real activity (thinking/radio/a buffered fault) and cooling otherwise. `_coreRefresh()` only reads it, painting `core-temp-warm`/`core-temp-hot`, which tint `.c-heart` via `filter: hue-rotate()` — optic-agnostic (rides whatever `--robco-green` is active), never a hardcoded amber/red rgb.                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 2   | Energy sparks                | Two `.c-spark` dots (`s1`/`s2`), identical markup on both cores, orbiting via the classic `rotate() translateX(var(--spark-r))` technique (no wrapper element). `--spark-r` is scaled down for the mini core so the orbit stays inside its smaller box. `s2` is hidden at rest, revealed only while `core-thinking`/`core-overclock`/`core-temp-hot` — density tracks real activity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 3   | Spin inertia                 | `--core-spin-mul-r1`/`-r3` are registered via `@property` (`syntax: '<number>'`, `initial-value: 1`) so they are interpolatable; the base `.chassis-core-shape` rule transitions both over 1.6s. The r1/r3 ring `animation-duration` is `calc(14s / var(--core-spin-mul-r1))` / `calc(9s / var(--core-spin-mul-r3))`, so easing the multiplier eases the ring speed instead of snapping. Every per-state multiplier (`core-boot`/`-standby`/`-thinking`/`-overclock`) is calculated to reproduce the EXACT pre-existing target duration — regression-safe, only the ramp between targets is new. Progressive enhancement: a browser without `@property` support just keeps the old instant snap.                                                                                                                                                                                                                                         |
-| 4   | Power-surge ripple           | A dedicated `.c-ripple` child (not `::after` — that pseudo-element is already the fault ring's, and a ripple can legitimately overlap a buffered fault) fires `_coreRipple()` on the SAME `'data.write'`/`'level.up'` RobcoEvents signals already wired, plus a reconnect edge (`_lastCoreDisconnected` transitioning to `!disconnected`) computed inside `_coreRefresh()` itself.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 5   | Idle flares                  | An `AmbientRuntime` observer (`id: 'core-idle-flare'`, states `['IDLE']`, tier `'balanced'`, `cadenceMs: 42000`) mirroring the DO-O Overseer idle-blip timer exactly — roughly half its ticks fire a faint, faded `core-idle-flare` one-shot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 6   | Reactor hum                  | A second synthesized WebAudio channel (`js/ui-audio.js`: `startReactorHum()`/`stopReactorHum()`/`_updateReactorHumLevel()`), tuned to 90Hz — a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental, with its own distinct 0.05Hz LFO drift — so the two tones blend harmonically instead of beating/clashing. Its own Protocol 7 channel: `robco_reactorhum_muted` (`META_MANIFEST`), `AudioSettings.reactorHum`, a 14th SLOT 02 SONIC PROCESSOR chip (`CH-14`), wired through the existing `toggleAudio()`/`toggleMasterMute()` choke points. Its live gain target is computed from the SAME `thinking`/`radioOn`/`faultCount` signals `_coreRefresh()` already derives (no second polling loop), boosted while `document.body.dataset.subsystem === 'chassis'` and quieted elsewhere. Powers down/resumes with the terminal via a `reactor-hum-power` `AmbientRuntime` observer mirroring the existing `crt-hum-power` one. |
-| 7   | Recovery animation           | `_coreRefresh()` tracks `_lastCoreFaultCount`; on the `>0 → 0` edge it fires `core-recovering` (`_coreOneShot`), which safely reuses `::after` because `core-fault` is already removed in the SAME classList pass before `core-recovering` is applied — the two classes can never coexist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 8   | Uptime-milestone pulse       | `_tickUptimeClock()` (the existing session-uptime tick) compares the current whole-hour count against `_lastCoreUptimeMilestone`; crossing a new hour fires `_coreMilestonePulse()` exactly once.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 9   | Tap-and-hold overcharge      | `_coreHoldStart()`/`_coreHoldEnd()` wired to `#chassisCore`'s `pointerdown`/`pointerup`/`pointercancel`/`pointerleave`. Holding `CORE_HOLD_MS` (850ms) ramps `core-charging` (reusing the #3 `--core-spin-mul-r1`/`-r3` inertia mechanism) to `core-charged`; releasing after that threshold fires `core-overcharge` — reusing the #14 stat-change burst's own `chassisCoreOrbitBurst1`/`3` tumble keyframes — plus an optional `playBoardThunk()` kick (Protocol 7, already guarded). `_coreSuppressNextTap` consumes the trailing `click` event a charged release still generates, so it never ALSO fires a plain tap-poke. Gated by `_coreShouldAnimate()` at the top of `_coreHoldStart()` — a closed gate degrades to a plain no-flourish hold, never a broken half-state.                                                                                                                                                          |
-| 10  | Center readout — **dropped** | Evaluated and intentionally not shipped: a live glyph/number could not be made legible on the small casing-top mini core (33-54px across its responsive tiers, already sharing its circle with 3 rings + the heart) without hurting the design — the owner's own stated escape hatch for this item.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| #   | Behavior                     | Mechanism                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Thermal glow                 | `_coreTemp` (0-100, in-memory only) is mutated by `_coreThermalTick()` — an `AmbientRuntime` observer (`id: 'core-thermal'`, states `['ACTIVE','IDLE']`, tier `'balanced'`, `cadenceMs: 4000`) — warming on real activity (thinking/radio/a buffered fault) and cooling otherwise. `_coreRefresh()` only reads it, painting `core-temp-warm`/`core-temp-hot`, which tint `.c-heart` via `filter: hue-rotate()` — optic-agnostic (rides whatever `--robco-green` is active), never a hardcoded amber/red rgb.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2   | Energy sparks                | Two `.c-spark` dots (`s1`/`s2`), identical markup on both cores, orbiting via the classic `rotate() translateX(var(--spark-r))` technique (no wrapper element). `--spark-r` is scaled down for the mini core so the orbit stays inside its smaller box. `s2` is hidden at rest, revealed only while `core-thinking`/`core-overclock`/`core-temp-hot` — density tracks real activity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 3   | Spin inertia                 | `--core-spin-mul-r1`/`-r3` are registered via `@property` (`syntax: '<number>'`, `initial-value: 1`) so they are interpolatable; the base `.chassis-core-shape` rule transitions both over 1.6s. The r1/r3 ring `animation-duration` is `calc(14s / var(--core-spin-mul-r1))` / `calc(9s / var(--core-spin-mul-r3))`, so easing the multiplier eases the ring speed instead of snapping. Every per-state multiplier (`core-boot`/`-standby`/`-thinking`/`-overclock`) is calculated to reproduce the EXACT pre-existing target duration — regression-safe, only the ramp between targets is new. Progressive enhancement: a browser without `@property` support just keeps the old instant snap.                                                                                                                                                                                                                                            |
+| 4   | Power-surge ripple           | A dedicated `.c-ripple` child (not `::after` — that pseudo-element is already the fault ring's, and a ripple can legitimately overlap a buffered fault) fires `_coreRipple()` on the SAME `'data.write'`/`'level.up'` RobcoEvents signals already wired, plus a reconnect edge (`_lastCoreDisconnected` transitioning to `!disconnected`) computed inside `_coreRefresh()` itself.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 5   | Idle flares                  | An `AmbientRuntime` observer (`id: 'core-idle-flare'`, states `['IDLE']`, tier `'balanced'`, `cadenceMs: 42000`) mirroring the DO-O Overseer idle-blip timer exactly — roughly half its ticks fire a faint, faded `core-idle-flare` one-shot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 6   | Reactor hum                  | A second synthesized WebAudio channel (`js/ui/ui-audio.js`: `startReactorHum()`/`stopReactorHum()`/`_updateReactorHumLevel()`), tuned to 90Hz — a perfect fifth (3:2 ratio) above the CRT hum's 60Hz fundamental, with its own distinct 0.05Hz LFO drift — so the two tones blend harmonically instead of beating/clashing. Its own Protocol 7 channel: `robco_reactorhum_muted` (`META_MANIFEST`), `AudioSettings.reactorHum`, a 14th SLOT 02 SONIC PROCESSOR chip (`CH-14`), wired through the existing `toggleAudio()`/`toggleMasterMute()` choke points. Its live gain target is computed from the SAME `thinking`/`radioOn`/`faultCount` signals `_coreRefresh()` already derives (no second polling loop), boosted while `document.body.dataset.subsystem === 'chassis'` and quieted elsewhere. Powers down/resumes with the terminal via a `reactor-hum-power` `AmbientRuntime` observer mirroring the existing `crt-hum-power` one. |
+| 7   | Recovery animation           | `_coreRefresh()` tracks `_lastCoreFaultCount`; on the `>0 → 0` edge it fires `core-recovering` (`_coreOneShot`), which safely reuses `::after` because `core-fault` is already removed in the SAME classList pass before `core-recovering` is applied — the two classes can never coexist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 8   | Uptime-milestone pulse       | `_tickUptimeClock()` (the existing session-uptime tick) compares the current whole-hour count against `_lastCoreUptimeMilestone`; crossing a new hour fires `_coreMilestonePulse()` exactly once.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 9   | Tap-and-hold overcharge      | `_coreHoldStart()`/`_coreHoldEnd()` wired to `#chassisCore`'s `pointerdown`/`pointerup`/`pointercancel`/`pointerleave`. Holding `CORE_HOLD_MS` (850ms) ramps `core-charging` (reusing the #3 `--core-spin-mul-r1`/`-r3` inertia mechanism) to `core-charged`; releasing after that threshold fires `core-overcharge` — reusing the #14 stat-change burst's own `chassisCoreOrbitBurst1`/`3` tumble keyframes — plus an optional `playBoardThunk()` kick (Protocol 7, already guarded). `_coreSuppressNextTap` consumes the trailing `click` event a charged release still generates, so it never ALSO fires a plain tap-poke. Gated by `_coreShouldAnimate()` at the top of `_coreHoldStart()` — a closed gate degrades to a plain no-flourish hold, never a broken half-state.                                                                                                                                                             |
+| 10  | Center readout — **dropped** | Evaluated and intentionally not shipped: a live glyph/number could not be made legible on the small casing-top mini core (33-54px across its responsive tiers, already sharing its circle with 3 rings + the heart) without hurting the design — the owner's own stated escape hatch for this item.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ### LIVING CORE ring visual-parity fix (owner audit, Suite 195)
 
@@ -1313,10 +1419,10 @@ despite reading as "moved further." The final offset was computed precisely
 (not eyeballed) so the button's nearest corner clears the ring radius with
 margin (~55px).
 
-All three fixes are CSS-only (`css/terminal.css`), shared by both cores
+All three fixes are CSS-only (`css/` (order-prefixed files)), shared by both cores
 from the same `.chassis-core-shape`/`.chassis-core-mini` selectors with
-zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui-core.js`
-or `js/ui-audio.js`, write nothing durable to the campaign, and leave the
+zero ID-scoped divergence (Suite 195.6), touch nothing in `js/ui/ui-core.js`
+or `js/ui/ui-audio.js`, write nothing durable to the campaign, and leave the
 existing `.core-still` gate-stacking mechanism untouched.
 
 **A second issue was caught during this same unit's own live render-
@@ -1339,10 +1445,10 @@ future edit reverts to the bare, cascade-dead selector.
 
 ---
 
-## OPERATOR Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-core.js` — Design Overhaul, Phase-3 hero-three)
+## OPERATOR Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)
 
 The STAT tab's panels are reskinned into the same labeled-hardware-board language as the Module
-Bay and Director Uplink, per the owner-approved `planning/mockups/operator-combined.html` mockup.
+Bay and Director Uplink, per the owner-approved `planning/2.8.0/mockups/operator-combined.html` mockup.
 This is a pure Protocol 22/25 reskin: every existing id, handler, and render-function contract is
 preserved exactly (the fixed-id set `loadUI()`/`updateMath()` call `getElementById` on every
 render — SPECIAL `s_s..s_l` + `commitStat`/`capStatMax`, `stat_hp_cur/max`, `stat_lvl`, `stat_xp`,
@@ -1370,7 +1476,7 @@ campaign write was added beyond what the existing handlers already did.
   carrying an `.top` amber accent, plus a `.fd-cap` position marker) with the original input
   (`class="num-sm fader-input"`, `oninput="capStatMax(this); updateMath();"`,
   `onchange="commitStat(this)"` all unchanged) and a new `.fd-steps` pair of `±` buttons calling a
-  new `_bumpSpecialStat(key, delta)` helper (`js/ui-core.js`) that only writes the input's `.value`
+  new `_bumpSpecialStat(key, delta)` helper (`js/ui/ui-core.js`) that only writes the input's `.value`
   and dispatches the same `change`/`input` events `commitStat`/`capStatMax` already listen for —
   never a parallel state-write path.
 - **BUS-03 SKELETAL HARNESS** — an SVG anatomical zone plate (`.zone[data-limb="hd|la|ra|ll|rl"]`,
@@ -1425,7 +1531,7 @@ unrecognized tier is still rendered, never silently dropped. No disclosure/colla
 reintroduced — both sections stay always-visible (zero added taps, Protocol 25); only the mini-pin
 strip (`stripHtml`) stays flat/ungrouped.
 
-**`_syncOperatorTelemetry()`** (`js/ui-core.js`, called from `updateMath()`) is the one new
+**`_syncOperatorTelemetry()`** (`js/ui/ui-core.js`, called from `updateMath()`) is the one new
 central sync function driving every derived OPERATOR readout: the HP condition word
 (`#opCondWord`, NOMINAL/IMPAIRED/CRITICAL) and its critical-state pulse, the RAD trace/bar widths
 and the BUS-03 mirror, each SPECIAL fader's lit-segment count and cap position, the limb-fault LED,
@@ -1433,14 +1539,14 @@ and every board's `.panel-substatus` 0i status line (via a local `setStatus(id, 
 helper) — all read from existing `state`/DOM values, none of it introduces a new write path.
 
 **A real Protocol 42 fix landed in the same commit:** `expandPanelForCategory()`'s `map` lookup
-table (`js/ui-core.js`) still targeted the old `'> BIO-METRICS'`/`'> BIO-SCAN'` heading strings for
+table (`js/ui/ui-core.js`) still targeted the old `'> BIO-METRICS'`/`'> BIO-SCAN'` heading strings for
 the `special`/`bio` categories — since those headings were renamed to `'> VITAL TELEMETRY'`/
 `'> SKELETAL HARNESS'` in this same unit, the Comm-Link's panel-expand-on-mention behavior (driven
-by `PANEL_NAV_ALIASES` in `js/api.js` — e.g. typing "stats" or "bio scan") would have silently
+by `PANEL_NAV_ALIASES` in `js/services/api.js` — e.g. typing "stats" or "bio scan") would have silently
 stopped finding these panels. Fixed alongside the rename, with the pre-existing regression tests
 covering it (123.7, 168.7) updated to the new strings rather than left stale.
 
-Guarded by Suite 181 (both runners, 20 tests): id/handler preservation, the `stat_rads`
+Guarded by Suite 181 (Node runner, 20 tests): id/handler preservation, the `stat_rads`
 single-instance invariant, `>` glyph presence on all nine board headings, `_syncOperatorTelemetry()`
 status-row wiring, the `_bumpSpecialStat`/zone-click/`level.up`-subscriber wiring, the Protocol 38
 part-number fix, and the `expandPanelForCategory()` string-literal fix.
@@ -1448,7 +1554,7 @@ part-number fix, and the `expandPanelForCategory()` string-literal fix.
 **Owner interactivity fold-in (Phase 3 OPERATOR follow-up):** the hero-three controls are genuinely
 interactive, not display-only readouts beside an editable number field:
 
-- **HP/XP bars are draggable.** `setupHpBarInteraction()`/`setupXpBarInteraction()` (`js/ui-core.js`)
+- **HP/XP bars are draggable.** `setupHpBarInteraction()`/`setupXpBarInteraction()` (`js/ui/ui-core.js`)
   already existed (the "C11" mouse+touch drag pattern, pre-dating this reskin) and target the exact
   same `hp_bar_container`/`xp_bar_container` ids the CRT-trace markup reused verbatim — no new code
   was needed here, only live verification that the reskin didn't break the existing drag wiring.
@@ -1465,14 +1571,14 @@ interactive, not display-only readouts beside an editable number field:
 - **RAD EXPOSURE max-rads clamp (pre-existing bug, fixed in this unit):** the RAD field had no upper
   bound. `GAME_DEFS.FNV/FO3/FO4` each gained a `maxRads: 1000` field (fallout.wiki-sourced, Protocol
   3 — 1000 rads is the documented fatal radiation-poisoning threshold in both live games). A new
-  `capRadsMax(el)` (`js/ui-core.js`, mirrors `capStatMax()`'s upper-clamp-on-input pattern) reads
+  `capRadsMax(el)` (`js/ui/ui-core.js`, mirrors `capStatMax()`'s upper-clamp-on-input pattern) reads
   `GAME_DEFS[ctx].maxRads` — never a bare hardcoded 1000 — and is wired into `#stat_rads`'s `oninput`
   alongside `updateMath()`. The same `[0, GAME_DEFS[ctx].maxRads]` clamp is applied at two more
-  layers for defense in depth: `syncStateFromDom()` (`js/state.js`, mirroring the adjacent SPECIAL-stat
-  clamp) and `autoImportState()` (`js/api.js`, so an AI response can't push rads above the per-game max
+  layers for defense in depth: `syncStateFromDom()` (`js/core/state.js`, mirroring the adjacent SPECIAL-stat
+  clamp) and `autoImportState()` (`js/services/api-import.js`, so an AI response can't push rads above the per-game max
   either).
 - **RAD EXPOSURE bar is draggable** (`#radDragTrack` on BUS-03 SKELETAL HARNESS, wrapping
-  `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui-core.js`) mirrors
+  `#opHarnessRadBar`) — `setupRadBarInteraction()` (`js/ui/ui-core.js`) mirrors
   `setupHpBarInteraction()`/`setupXpBarInteraction()` byte-for-byte (mouse+touch, pct-of-width, writes
   `#stat_rads` + `state.rads`, scales to `_resolveMaxRads()` instead of a fixed max). An owner report
   that the drag still didn't work despite this landing (and its own mock-event regression test
@@ -1487,7 +1593,7 @@ interactive, not display-only readouts beside an editable number field:
   real `elementFromPoint` hit-test followed by dispatched `mousedown`/`mousemove`/`mouseup` (never a
   direct-to-element dispatch, which would bypass the hit-test the fix depends on).
 
-Guarded by Suite 182 (both runners, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
+Guarded by Suite 182 (Node runner, 12 tests): behavioral proofs (via a Node `vm` sandbox executing
 the REAL function bodies against a synthetic DOM, mirroring the Suite 137.6/177.4 technique) that
 dragging the HP/XP bars and the SPECIAL faders actually drives `stat_hp_cur`/`stat_xp`/`commitStat`,
 that a zone click/Enter/Space calls `toggleLimb()` (and an unrelated key does not), and that
@@ -1566,7 +1672,7 @@ work, one gate run):
   already shipped for the mode pill), since an ungated `:hover` fill can stick visibly after a tap on
   a touch device.
 
-Guarded by Suite 183 (both runners, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
+Guarded by Suite 183 (Node runner, 8 tests): the `.panel.bay-board` margin-top rule and its scoping
 away from `.sub-panel.bay-board`, the neutralized `h2`/`h2::after` header treatment, a regression
 guard that the reverted `.zc-name`/`.rad-row` content changes stay gone, the `#c_caps` spinner
 suppression, the `.rb-tile input` `max-width: 100%` override (the actual BOTTLE CAPS fix), the
@@ -1576,12 +1682,12 @@ fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
 
 ---
 
-## OPERATIONS Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-core.js` + `js/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
+## OPERATIONS Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
 
 The INV tab's five panels (BACKPACK INVENTORY, COLLECTIBLES, CRAFTING, TRADE, SQUAD STATUS) are
 reskinned into six `bay-board` panels — BUS-10 through BUS-15, continuing the OPERATOR BUS-01…09
 part-number series on the same freight bus — per the owner-approved
-`planning/mockups/operations-console.html` mockup (the BEAM bridge variant + Variant A "CARGO TAG"
+`planning/2.8.0/mockups/operations-console.html` mockup (the BEAM bridge variant + Variant A "CARGO TAG"
 row style). Same Protocol 22/25 reskin discipline as OPERATOR: every shipped id/handler is
 preserved (`invFilterBar`/`invFilterMods`/`invList`, `ammoSubPanel`/`ammoList`, the `newItemName…Type`
 add-item fields, `craftPanel`/`craftRecipeList`/`craftScrapList`, `tradePanel`/`tradeHeader`/
@@ -1593,7 +1699,7 @@ add-item fields, `craftPanel`/`craftRecipeList`/`craftScrapList`, `tradePanel`/`
 
 **BUS-10 LOAD-CELL WEIGH BRIDGE** (new hero board) — a read-only mirror of the exact `curWt`/
 `maxWeight` `updateMath()` already computes, painted by one new function, `_paintWeighBridge(curWt,
-maxWeight)` (`js/ui-core.js`), called from `updateMath()` right after the pre-existing
+maxWeight)` (`js/ui/ui-core.js`), called from `updateMath()` right after the pre-existing
 `weight-heavy`/`weight-critical`/`weight-over` body-class toggle — a read-only second projection,
 never a second computation (Module Bay bay↔schematic precedent). It drives a load-beam SVG
 (`#opsBeamPath`/`#opsBeamBlock`/`#opsBeamPct`) that bends **continuously** in proportion to real
@@ -1608,7 +1714,7 @@ readout can never visually disagree. `#c_caps` and `#display_weight` — previou
 readback strip — **moved verbatim onto this board** (same ids, same `updateMath()`/`doBuy`/`doSell`
 references; `#c_caps` stays the ONE editable caps input in the whole app). A SEIZED bridge also flags
 the board's own `.board-led` red and appends "⚠ CARGO SEIZED" to the bezel telemetry strip
-(`_bezelStatusSuffix()`, `js/ui-core.js`) — reading the same `body.weight-over` class, never a second
+(`_bezelStatusSuffix()`, `js/ui/ui-core.js`) — reading the same `body.weight-over` class, never a second
 weight computation.
 
 **BUS-11 CARGO MANIFEST** (new hero board, ex-BACKPACK INVENTORY) — the flat inventory filter bar
@@ -1633,9 +1739,87 @@ indicator** (the app never tracked item condition, so none was added). Two new n
 `adjItemQty(idx, delta)` (a per-row qty ± stepper, clamped ≥0, removing the row entirely at 0 — Protocol
 13 regression-tested) and `toggleEquipItem(idx)` (the first **native EQUIP control**, closing the U10
 audit gap — `state.equipped.weapon`/`.armor` one-per-slot-family, toggle-off on re-tap;
-`autoImportState()`'s own AI-write equip path in `js/api.js` is untouched, Protocol 14/24 additive,
+`autoImportState()`'s own AI-write equip path in `js/services/api-import.js` is untouched, Protocol 14/24 additive,
 not a fork). `_updateContextPanels()`'s FO3 no-mods fallback now resets to `'weapon'` instead of the
 retired `'all'`.
+
+**Equipped/inventory reconciliation (bug fix):** `state.equipped` stores an item **name** per slot, not a
+reference, so any path that removes an inventory item left a stale `state.equipped` entry pointing at
+gear the Courier no longer carried (confirmed live before the fix — the equipped-gear readout kept
+showing a deleted item). `reconcileEquipped(s)` (`js/core/state.js`) is the one shared reconciler
+(Protocol 22): it clears a `weapon`/`armor` slot whose named item is no longer in `s.inventory`, leaving
+`headgear` untouched (it has no inventory item type backing it — AI-write-only). Every removal path calls
+it — `delItem()`/`adjItemQty()`/`nativeUseItem()` (`js/ui/ui-render-inventory.js`), `_craftConsume()`
+(shared by CRAFT ingredient consumption and SCRAP) and `doSell()` (`js/ui/ui-render-economy.js`), and
+`autoImportState()` (`js/services/api-import.js`, validating the AI's equipped slots against whatever
+inventory it just reconciled — additions merged, removals confirm-gated (AI_OVERSEER Finding 1) — even
+when the AI omits `equipped` that turn) — and `migrateState()`
+also calls it on every load. An independent audit (`planning/2.8.5/audits/AUDIT_U9_bugfixes.md`) found two follow-ups
+after the first pass: `nativeUseItem()` (consuming an aid item to depletion) was a missed removal path
+(closed above — benign in practice, since USE only ever removes `'aid'`-type rows and only `weapon`/`armor`
+types can be equipped, so a stale reference here needs a contrived same-name collision), and the claim
+that a pre-existing stale save "self-heals on load" was only true for cloud-pull/file-import/save-slot-load
+— the normal **v8 boot fast-path** (`_hydrateStateFromStorage()`, `js/ui/ui-core.js`) deliberately skips
+`migrateState()` for performance, so a plain reload never actually ran the reconciler. The fast-path now
+calls `reconcileEquipped(state)` directly, right beside the `_migrateEventLog` targeted-migration call it
+already runs for the same reason, so the claim is true for every load path, including a plain reload.
+Protocol 13-regression-tested (Suite 221, expanded 11→16 tests to cover both follow-ups; Suite 12).
+
+**Level is player-owned; the AI announces, it never writes (owner directive, 2026-07-20):** the standing
+player-control principle — _the player has full control; the AI decides only when invoked_ — applied to
+`state.lvl`. `autoImportState()` previously did an unconditional `state.lvl = parseInt(lvlV) || 0`: no
+floor, no `MAX_PLAYER_LEVEL` clamp (that clamp lives only in the native paths), and **no gate in either
+direction**, so an AI response could set level 0, a negative, 9999, or silently _demote_ the player — an
+ungated destructive progression loss, structurally the same defect class as the AI_OVERSEER Finding 1
+inventory bug one layer up.
+
+The import path now **never writes `state.lvl` at all**. A returned `lvl` strictly greater than the
+current level is handed to `_announceDirectorLevelUp({from, to})` (`js/services/api-import.js`), which
+sits beside `_confirmInventoryRemovals` / `_confirmPerkRemovals` and reuses the same `confirmAction()`
+machinery (Protocol 22 — no new surface). A claim at or below the current level is discarded outright.
+It is the **inverse** of those gates: they ask "may I take this away?" and apply the AI's change on
+approval, whereas this one says "you've earned it — go level up" and on approval calls **`nativeLevelUp()`**,
+the exact function the player's own GRADE ADVANCE / LEVEL UP button calls. So the AI's claimed number is
+never the value committed — the native curve, the level cap, and the skill-point award remain the single
+authority (Protocol 24), and levelling keeps spending the perk and skill-point choices that belong to the
+player. Declining changes nothing. Safety default mirrors the removal gates: with no `confirmAction()`
+surface **or** no `nativeLevelUp()` available, the announcement is dropped silently.
+
+Because the import path no longer changes the level, it also **no longer emits `level.up`** —
+`nativeLevelUp()` is now the sole emitter, a stronger single-source guarantee than the previous
+two-emitter parity (emitting a `level.up` the player never earned would fire the jingle, haptic and
+campaign-note subscribers on a state crossing that did not happen). The directive states the rule the
+code enforces (Protocol 14): level is player-owned and read-only to the AI, `lvl` is an announcement
+only and only ever upward. All 11 Suite 131 golden-master directive hashes moved accordingly. Guarded by
+Suite 173.10–173.14; Suite 133's two `lvl`-carrier behavioral cases were re-pointed at `xp`, and 135.10
+dropped its level-up half.
+
+**A note on the "level confirmation popup":** there has never been a native one. `nativeLevelUp()` commits
+immediately by design, and the popup previously seen for an AI level-up was an **AI-emitted display-only
+`modal` node** that gated nothing — `autoImportState()` had already written `state.lvl` before it rendered
+(this is the same conflation recorded in AI_OVERSEER Finding 5, where an export dropped the modal node).
+Two stale comments claiming `confirmAction()` was "the same diegetic confirm the level-up flow uses" were
+corrected in the same commit.
+
+**FO3 Karma Engine (Protocol 8 Stage 2, 2.8.5 unreleased work — supersedes an earlier, narrower `karmaCompanions` fix):**
+a deterministic, offline, zero-AI rebuild of `renderKarmaCenter()` (`js/ui/ui-render-factions.js`),
+replacing a shipped Protocol 3 violation (a fabricated "ENCLAVE HIT SQUAD" threat, three wrong companion
+gates, and zero of the game's 90 level-scaled karma titles) with the real, cited FO3 karma system. All
+data lives on `GAME_DEFS.FO3.karma` (`js/core/state.js`, inside `KARMA-DATA-GUARD:BEGIN/END` markers) —
+`hitSquads[]` (Regulators at evil karma / Talon Company at good karma, replacing the invented faction),
+`companions[]` (all 8, with the corrected gate classes), `titles`/`titlesSrc`/`titleMaxLevel` (the 90-cell
+level × alignment title table), and `events[]` (the cited karma-delta action list, `null` for
+UNVERIFIED/CONFLICT values, never a guess) — a per-game **definition** entry, not a `state` field
+(Protocol 4 doesn't apply), transcribed from `planning/2.8.5/data/FO3/KARMA_DATA.md`. Five pure engine functions
+(`getKarmaTier`/`getTitleAlignment`/`getKarmaTitle`/`getKarmaHitSquad`/`getKarmaCompanions`) plus
+`applyKarmaEvent()` (the action-picker apply, clamping `state.karma` to ±1000) read this data via
+`_activeDef().karma`. The rebuilt board is action picker → level-scaled title → tier/number → hit-squad
+
+- companion unlocks; the `#stat_karma` slider remains a working manual override, and the tier word now
+  prints exactly once (F9 fix). A new Node-runner suite (Suite 230) is the Protocol 3 citation guard —
+  every karma constant must carry a `src` field citing fallout.wiki, or the build fails; it also
+  anti-regression-locks that no `enclave` hit-squad faction can reappear. Panel still gated behind
+  `usesKarmaCenter` (FO3 only).
 
 **BUS-12 FIELD FABRICATION** (ex-CRAFTING) — `renderCraftCard()` gains a HAVE/NEED **meter-fill bar**
 per ingredient (`.ing`/`.hn-meter`, short = red `.ing.short`) alongside the existing have/need
@@ -1650,7 +1834,7 @@ not a `--bezel-wire` read. `doBuy`/`doSell`/`renderTrade*` unchanged.
 
 **BUS-14 SQUAD ROSTER** (ex-SQUAD STATUS) — a real bug fix: the `#newSquadName` ENLIST `<select>`
 was a hardcoded 8-name FNV companion list shown even in FO3 campaigns (a Protocol 38 violation). A
-new `_populateSquadEnlistOptions()` (`js/ui-render.js`) populates it from `FALLOUT_REGISTRY.companions`
+new `_populateSquadEnlistOptions()` (`js/ui/ui-render.js`) populates it from `FALLOUT_REGISTRY.companions`
 — the active game's registry, already swapped in at boot — filtering out already-enlisted companions,
 mirroring `renderCollectibles()`'s `FALLOUT_REGISTRY.collectibles` read pattern. `renderSquad()` now
 also renders `.sq-card` roster cards (HP bar, HP/AMMO/CND/WPN/DT row, an affinity meter with the
@@ -1659,7 +1843,7 @@ restyled markup.
 
 **BUS-15 CURIO ARCHIVE** (ex-COLLECTIBLES) — originally a wrapper-only dress; superseded by the
 Suite 191 themed-object ground-up redesign (Protocol 25 owner-approved exception, mockup
-`planning/mockups/curio-display-case.html`). Every collectible now renders as its recognizable
+`planning/2.8.0/mockups/curio-display-case.html`). Every collectible now renders as its recognizable
 Fallout object — NV snow globes as a glass dome + skyline scene on a brass-trimmed base, FO3
 bobbleheads as a Vault-Boy figure on a VAULT-TEC base (a plain `@keyframes curioBob` bobble,
 auto-neutralised by the global reduced-motion block), FO3 Lincoln relics as per-item typed
@@ -1719,7 +1903,7 @@ flow OPERATOR already uses (not a `.bay-grid` two-column grid — that pattern i
 Module Bay's SLOT sub-panels, per existing precedent). Zero new campaign-state field: the drawer
 choice is a MetaStore device pref (`robco_cargo_drawer`), not `state.*`.
 
-Guarded by Suite 185 (both runners, 24 tests): the id/handler-preservation contract, the caps/weight
+Guarded by Suite 185 (Node runner, 24 tests): the id/handler-preservation contract, the caps/weight
 relocation (exactly one `#c_caps`/`#display_weight`, both inside `#opsBridgePanel`), the beam
 transition + SEIZED shudder (plain animation/transition, reduced-motion-safe), the 6-drawer-no-"All"
 contract, the bounded in-panel scroll (no render cap), the `robco_cargo_drawer` MetaStore round-trip,
@@ -1729,12 +1913,12 @@ Protocol 17 tap-target floor, and the bezel-telemetry SEIZED flag.
 
 ---
 
-## DATABANK Screen Hardware Dressing (`index.html` + `css/terminal.css` + `js/ui-render.js` + `js/ui-core.js` + `js/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
+## DATABANK Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
 
 The DATA/CAMPG tab's six panels (WORLD MAP, QUEST LOG, DATABANK search, CAMPAIGN NOTES, CAMPAIGN LOG,
 CAMPAIGN RECORD) are reskinned into six `bay-board` panels — BUS-16 through BUS-21, continuing the
 OPERATOR/OPERATIONS BUS-01…15 part-number series — per the owner-approved
-`planning/mockups/databank-records-bay.html` mockup. Same Protocol 22/25 reskin discipline as
+`planning/2.8.0/mockups/databank-records-bay.html` mockup. Same Protocol 22/25 reskin discipline as
 OPERATOR/OPERATIONS: every shipped id/handler is preserved (`worldMapDisplay`/`renderWorldMap`/
 `zoomMapToZone`/`resetMapZoom`/`setMapView`/`markLocationVisited`, `questsList`/`renderQuests`/
 `addQuest`/`removeQuest` + `newQuestName`/`newQuestStatus`/`newQuestObjective`, `databankPanel`/
@@ -1744,7 +1928,7 @@ OPERATOR/OPERATIONS: every shipped id/handler is preserved (`worldMapDisplay`/`r
 `renderCampaignStatus` — all unchanged).
 
 **BUS-16 CARTOGRAPHY TABLE** (new hero board, ex-WORLD MAP) — the "Phosphor Cartography" remake
-(`planning/FEATURE_REMAKES.md`): `renderWorldMap()`'s strategic view was rewritten from a boxed 6×6
+(`planning/2.8.0/slates/FEATURE_REMAKES.md`): `renderWorldMap()`'s strategic view was rewritten from a boxed 6×6
 CSS grid into one inline SVG, built with a single `map().join('')` bulk assignment (never
 `innerHTML +=` in a loop). Nodes plot at each zone's real `gridRow`/`gridCol` (`nx`/`ny` helpers,
 `MARGIN + (z.gridCol - 1) * STEP`) — zero new registry data, the registry stays read-only (Protocol
@@ -1763,14 +1947,14 @@ auto-neutralized by the existing global `prefers-reduced-motion` block. `state.m
 exact meaning (`'full'` = STRATEGIC, else CORE) but now drives an SVG `viewBox` crop over the SAME
 node set, rather than physically excluding off-crop zones from the DOM as the old grid did. Real
 per-node keyboard traversal: every `<g class="node">` is `tabindex="0"` with an `onkeydown` wired to
-a new `_mapNodeKeyNav(event, zoneName)` (`js/ui-render.js`) — arrow keys move focus to the nearest
+a new `_mapNodeKeyNav(event, zoneName)` (`js/ui/ui-render.js`) — arrow keys move focus to the nearest
 node in the pressed direction by real grid coordinate (reading a module-level `_mapLastNodes` cache
 set at render time), Enter/Space pulls the sector sheet. The zoom-detail view is reskinned as a
 "sector sheet" (`.sheet`/`.loc-row`/`.loc-st`) — same `_mapActiveZone`/`zoomMapToZone`/`resetMapZoom`
 logic, only the markup changed; the MARK SURVEYED key (renamed from LOG VISIT, class `.mark`) still
 routes through the unchanged `markLocationVisited()` → `recordLocationVisit()` single source
 (add-only, permanent fog-of-war). A sibling TRAVEL HERE key (same `.mark` class, native, no AI)
-calls a new `travelToLocation(loc)` (`js/ui-render.js`) that delegates to the SAME shared
+calls a new `travelToLocation(loc)` (`js/ui/ui-render.js`) that delegates to the SAME shared
 `onLocationChange(overrideLoc)` setter the `#stat_loc` field already uses (Protocol 22 — never a
 forked setter) to move `[CURRENT]` to the tapped location and record it visited; since
 `onLocationChange()` owns its own single `renderWorldMap()` call, `travelToLocation()` wraps that
@@ -1793,10 +1977,10 @@ physical status lamp (`.dir-lamp`, amber-active/green-complete/red-failed). A st
 verbatim) is a pure display-only filter over `state.quests` — never mutates it — with the last-open
 choice persisted via a new registered `robco_databank_qdrawer` MetaStore device pref (`setQuestDrawer()`,
 Protocol UI-6). An in-tray search field (`#questSearch`) narrows the list client-side. The owner-locked
-**⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui-render.js`) is the ONE new native write path this unit
+**⟳ CYCLE key** (`cycleQuestStatus(idx)`, `js/ui/ui-render.js`) is the ONE new native write path this unit
 adds: advances a directive's status ACTIVE→COMPLETE→FAILED→ACTIVE with no AI involved, proven by a
-real Node `vm`-sandbox behavioral test (both runners) that actually executes the function body across
-three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/api.js`)
+real Node `vm`-sandbox behavioral test (Node runner) that actually executes the function body across
+three calls on the same quest slot. `autoImportState()`'s own AI-write quest-status path (`js/services/api-import.js`)
 is completely untouched — this is a second, additive entry point onto the same `state.quests[i].status`
 field (Protocol 14/24), exactly like the existing native affinity/mark-visited setters. `addQuest`/
 `removeQuest`/the add-form ids are unchanged.
@@ -1832,7 +2016,7 @@ FOUND) — same `state.stats`/`state.ticks`/`state.locationHistory` reads. The r
 ZERO CAMPAIGN COUNTERS but still calls the unchanged `resetSessionStats()`.
 
 A new `identity.databank` facet (`mapCaption`/`mapCaptionSub`/`recordsLabel`) extends the DO-K
-per-game identity keystone (`js/state.js`, Protocol 38) on all three `GAME_DEFS` entries (FNV/FO3/FO4)
+per-game identity keystone (`js/core/state.js`, Protocol 38) on all three `GAME_DEFS` entries (FNV/FO3/FO4)
 — read by BUS-16's map caption via `getIdentity()`. Every board carries a live `.panel-substatus` 0i
 collapsed-summary line (`dbMapStatus`/`dbQuestStatus`/`dbChronStatus`/`dbCatalogStatus`/`dbNotesStatus`/
 `dbTallyStatus`), each painted by its own owning render function. Mobile default-open is the two heroes
@@ -1840,7 +2024,7 @@ only (BUS-16/17); BUS-18–21 default collapsed — the same `<details open>` HT
 `_wirePanelPersistence()` already reads. Zero new campaign-state field: the quest-drawer choice is a
 MetaStore device pref (`robco_databank_qdrawer`), not `state.*`.
 
-Guarded by Suite 189 (both runners, 20 tests): the deleted `_mapAbbrev` table, the SVG node-map's
+Guarded by Suite 189 (Node runner, 20 tests): the deleted `_mapAbbrev` table, the SVG node-map's
 gridRow/gridCol positioning, the fog-of-war label-suppression + CSS styling, the typed signal-glyph
 data-driven logic, the known-route trail, the `_mapNodeKeyNav` keyboard contract, the sector-sheet
 handler preservation, `cycleQuestStatus()`'s real behavioral ACTIVE→COMPLETE→FAILED→ACTIVE proof, the
@@ -1852,9 +2036,9 @@ and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new rend
 
 ---
 
-## Ceremony Moments Wave 1 (`js/ui-core.js` + `js/ui-audio.js` + `js/state.js` + `css/terminal.css` — Suite 208)
+## Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/` (order-prefixed files) — Suite 208)
 
-Five small transition/ceremony beats picked from `planning/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
+Five small transition/ceremony beats picked from `planning/2.8.0/slates/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
 slate — none touch campaign state (Protocol 4 not triggered); every write is a transient module
 var or a registered MetaStore device pref.
 
@@ -1905,13 +2089,13 @@ var or a registered MetaStore device pref.
   `[data-game='FO3']` keyframe override reading `identity.motionTexture.seat` — never a JS branch
   (Protocol 38).
 
-Guarded by Suite 208 (both runners at parity, 30 tests): each moment's trigger, the zero-write
+Guarded by Suite 208 (Node runner, 30 tests): each moment's trigger, the zero-write
 invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavor
 `_bootLinesFor()` call all preserved), and the game-agnostic guard.
 
 ---
 
-## Mobile Density Standard, Tier-1 (`css/terminal.css` — planning/MOBILE_DENSITY_PLAN.md §2/§3)
+## Mobile Density Standard, Tier-1 (`css/` (order-prefixed files) — planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md §2/§3)
 
 Owner-approved Tier-1 mobile spacing tightening. The plan measured every board's spacing (padding,
 inter-board gap, header subtitle, tile padding) as using its base, desktop-shared value on mobile —
@@ -1938,13 +2122,15 @@ controls, the signature fader/karma instruments, default-collapsing boards) are 
 owner-declined and out of scope for this unit.
 
 **Cascade-order placement (Protocol 42):** the whole density block is deliberately placed at the
-true end of `terminal.css`, after every one of its own selectors' earlier, unconditional base rule.
-CSS resolves equal-specificity ties by source order, so an override block placed _before_ its own
-base rule would be silently beaten by it — a real footgun caught before shipping. Living at the end
-of the file guarantees the block always wins the `≤480px` cascade regardless of where a future edit
+true end of the CSS cascade — in `css/99-mobile.css`, the last-loaded stylesheet (2.8.5 U-A2 split
+`terminal.css` into order-prefixed files; `99-mobile.css` must stay last), after every one of its
+own selectors' earlier, unconditional base rule. CSS resolves equal-specificity ties by source
+order, so an override block placed _before_ its own base rule would be silently beaten by it — a real
+footgun caught before shipping. Living at the end of the cascade guarantees the block always wins the
+`≤480px` cascade regardless of where a future edit
 adds a same-selector rule earlier in the file.
 
-Guarded by Suite 209 (both runners at parity, 10 tests): the token scale (base + mobile-tuned
+Guarded by Suite 209 (Node runner, 10 tests): the token scale (base + mobile-tuned
 values), each F1-F8 selector's mobile values, the never-`display:none` subtitle guardrail, the
 untouched floor-bearing children (`.pk-x`, `.vu-track`, `.composer-input`), the block's cascade-order
 placement after every base rule, and the no-desktop-gate-leak guard.
@@ -1953,7 +2139,7 @@ placement after every base rule, and the no-desktop-gate-leak guard.
 
 ## State Architecture
 
-### The `state` Object (js/state.js)
+### The `state` Object (js/core/state.js)
 
 ```javascript
 let state = {
@@ -2002,11 +2188,11 @@ persistence audit will block the commit if any step is missed:
 
 1. **state.js** — Add the field to `let state = { ... }` with its default value
 2. **state.js** — Add migration in `migrateState()` for older saves: `if (!s.newField) s.newField = default;`
-3. **api.js** — Add import handling in `autoImportState()` so AI responses update the field
-4. _(If applicable)_ **ui-render.js** — Add rendering in the appropriate `render*()` function
+3. **api-import.js** — Add import handling in `autoImportState()` so AI responses update the field
+4. _(If applicable)_ **ui-render-\*.js** (the per-panel render family) — Add rendering in the appropriate `render*()` function
 
-The pre-commit hook (`tests/robco-diagnostics.ps1`) auto-discovers all keys in `state.js`
-and verifies that every key appears in `autoImportState()`.
+The pre-commit gate (`tests/robco-diagnostics.js`, the Node runner) auto-discovers all keys
+in `state.js` and verifies that every key appears in `autoImportState()`.
 
 ---
 
@@ -2063,7 +2249,7 @@ The campaign lifecycle **config** controls live in `#campaignConfigPanel`
 
 **Two-board hardware reskin (SU-3, Step 2 v2.8.0) — reuses these exact ids/handlers, no behavior change.** The five controls above are all real, native elements that stay in the DOM — visually hidden via `.bay-visually-hidden-input` (the same technique `#immersionSelect` already used), so a keyboard/AT user can still reach any of them directly — while two new hardware boards provide the visible interaction:
 
-- **CAMPAIGN PROFILE** (`#b-profile`-equivalent sub-panel, green): GAME is two seatable PROGRAM CARTRIDGE buttons (`#cart-fnv`/`#cart-fo3`); PLAYSTYLE is a 2-position ENGAGEMENT DOCTRINE rocker (`#rk-any`/`#rk-melee`); PLAYTHROUGH TYPE is a **centered rotary dial** (`#tempoDialAssembly`/`#tempoKnob`, SU-3 follow-up, owner-approved mockup `planning/mockups/tempo-dial.html`, Suite 180) — the 5 positions (STANDARD/MIN-MAXED/COMPLETIONIST/CASUAL/SPEEDRUN) ring the knob on a `−84°…+84°` gauge arc (`_TEMPO_ARC_MIN`/`_TEMPO_ARC_STEP`, 42° apart, 0°=up), and the knob's own rotation (`_TEMPO_ROT[idx]`) always points the needle at the active position. Only short `.detent2` labels sit on the ring; the active option's full name + description renders on the `.tempo-readout` panel directly under the knob (`#tempoReadoutName`/`#tempoReadoutDesc`) — the mobile-legibility fix the mockup solves. Three input paths converge on `_setTempo()`: dragging the knob (`_tempoPointerDown`/`_tempoPointerMove`/`_tempoPointerUp`/`_tempoPointerCancel` — angle-based, sharing the Immersion dial's drag _pattern_ but not its pixel-step math, since the geometries differ), tapping a `.detent2` position directly, or arrow/Home/End keys (`_tempoKeyDown`; the knob is a real `role="slider"`). **Tapping the knob body itself does nothing** (owner directive) — no `onclick`, no click listener at all, unlike the Immersion dial's tap-to-cycle. New wrapper functions (`_seatGameCartridge`/`_confirmGameContextChange`, `_setDoctrine`, `_setTempo`) sync the hidden real control's `.value` then call the exact unchanged setter — one truth, two/three entry points (Protocol 22). `_syncCampaignProfileUI()` repaints the cartridges/rocker/dial (needle angle + tick/detent lit-state + readout)/summary line from state; called from both `_restoreDevicePrefs()` (boot) and `loadUI()`, and wires `_wireTempoDialDrag()` once at boot.
+- **CAMPAIGN PROFILE** (`#b-profile`-equivalent sub-panel, green): GAME is two seatable PROGRAM CARTRIDGE buttons (`#cart-fnv`/`#cart-fo3`); PLAYSTYLE is a 2-position ENGAGEMENT DOCTRINE rocker (`#rk-any`/`#rk-melee`); PLAYTHROUGH TYPE is a **centered rotary dial** (`#tempoDialAssembly`/`#tempoKnob`, SU-3 follow-up, owner-approved mockup `planning/2.8.0/mockups/tempo-dial.html`, Suite 180) — the 5 positions (STANDARD/MIN-MAXED/COMPLETIONIST/CASUAL/SPEEDRUN) ring the knob on a `−84°…+84°` gauge arc (`_TEMPO_ARC_MIN`/`_TEMPO_ARC_STEP`, 42° apart, 0°=up), and the knob's own rotation (`_TEMPO_ROT[idx]`) always points the needle at the active position. Only short `.detent2` labels sit on the ring; the active option's full name + description renders on the `.tempo-readout` panel directly under the knob (`#tempoReadoutName`/`#tempoReadoutDesc`) — the mobile-legibility fix the mockup solves. Three input paths converge on `_setTempo()`: dragging the knob (`_tempoPointerDown`/`_tempoPointerMove`/`_tempoPointerUp`/`_tempoPointerCancel` — angle-based, sharing the Immersion dial's drag _pattern_ but not its pixel-step math, since the geometries differ), tapping a `.detent2` position directly, or arrow/Home/End keys (`_tempoKeyDown`; the knob is a real `role="slider"`). **Tapping the knob body itself does nothing** (owner directive) — no `onclick`, no click listener at all, unlike the Immersion dial's tap-to-cycle. New wrapper functions (`_seatGameCartridge`/`_confirmGameContextChange`, `_setDoctrine`, `_setTempo`) sync the hidden real control's `.value` then call the exact unchanged setter — one truth, two/three entry points (Protocol 22). `_syncCampaignProfileUI()` repaints the cartridges/rocker/dial (needle angle + tick/detent lit-state + readout)/summary line from state; called from both `_restoreDevicePrefs()` (boot) and `loadUI()`, and wires `_wireTempoDialDrag()` once at boot.
 - **RANDOMIZER INTERLOCK · PURGE** (`#b-interlock`-equivalent sub-panel, red `dangerboard`): COMPLETE RNG is a breaker (`_interlockThrowBreaker()`) under an amber safety cover (`_interlockLiftCover()`) in a hazard-striped well — two deliberate taps to arm from SAFE (lift cover, then throw lever); an always-visible commit-sequence legend (`SAFE ▸ ARMED — reversible ▸ + WIPE ▸ SEALED — permanent`) lights the current step via `[data-rng]` on `#interlockWrap` (`safe`/`armed`/`locked`, derived from `state.campaignMode`). SEALED (`rng-locked`) shows a red wire-seal `✕` + lead disc welded over the lever, gated purely by CSS on `[data-rng='locked']` — the seal literally _is_ the disabled toggle, no separate JS-toggled class. WIPE TERMINAL sits on the same board as its commit point (`.purge-btn`), `wipeTerminal()`'s double-confirm and RNG-armed warning unchanged. `_syncInterlockUI()` is the single repaint function for the WHOLE board — well/cover/seal/title/desc/summary/sequence-legend AND the `#rngModeBanner`/`#rngLockedBanner` banners — called from `_restoreDevicePrefs()`/`loadUI()` **and** from `onCampaignModeChange()` itself, so a direct toggle of the hidden `#completeRngToggle` (bypassing the breaker button) still repaints the whole board, not just the banner (a Protocol 42 fix — the banners used to be toggled redundantly in 3 separate places).
 - **Owner-approved confirm gate:** unlike every other reskinned control, a game-cartridge swap is gated behind `confirmAction()` inside `_confirmGameContextChange()` — confirm proceeds to the unchanged `onGameContextChange()` (still reboots the terminal); cancel reverts the hidden select to the still-active game and re-syncs the profile UI, never touching `onGameContextChange()` — so an accidental cartridge tap can no longer reload unprompted.
 
@@ -2096,7 +2282,7 @@ initRegistryAutocomplete()  ← called once in window.onload
 1. Add `<input type="text" id="newXxxName" ...>` in **index.html**
 2. In `initRegistryAutocomplete()` in **ui-saves.js**, add: `wireInput('newXxxName', 'category');`
 3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (**reg_nv.js** / **reg_fo3.js**)
-4. If it has an add action, create `addXxx()` in **ui-render.js** mirroring `addPerk()`
+4. If it has an add action, create `addXxx()` in the appropriate **ui-render-\*.js** panel file mirroring `addPerk()` (which lives in **ui-render-character.js**)
 
 ---
 
@@ -2107,8 +2293,8 @@ initRegistryAutocomplete()  ← called once in window.onload
 ```
 User interaction / AI sync
   → syncStateFromDom()          // Reads DOM inputs → state object (immediate)
-  → saveState()                 // Debounced (500ms) localStorage.setItem('robco_v7', ...)
-  → beforeunload handler        // Flushes pending save immediately on tab close
+  → saveState()                 // Debounced (500ms) localStorage.setItem('robco_v8', ...) + IDB 'live' mirror (P8)
+  → beforeunload / visibilitychange:hidden  // Flushes pending save + mirrors on tab close / mobile background (_flushUnload)
 ```
 
 ### Load Flow (window.onload in ui-core.js)
@@ -2135,7 +2321,7 @@ shared state (`_standbyActive`/`_uptimeInterval`/`_memCycleInterval`/
 `enterStandby`/`exitStandby`) moved to true module scope so `_wireStandby()`
 (listener wiring) and the later `_startAmbientTimers()` (boot-time timer
 kickoff) share one set of double-start guards, matching the original
-DUP-3/DUP-4 invariant. A static structural suite (Suite 132, both runners)
+DUP-3/DUP-4 invariant. A static structural suite (Suite 132, Node runner)
 guards the function list, the call order, the module-scope promotion, and
 that `window.onload` stays a slim composition; the decomposition was also
 verified live via the full Playwright gate (boot-smoke + 360/412 render-check)
@@ -2159,19 +2345,154 @@ FileReader → JSON.parse
   → Restore playstyle
 ```
 
-### Cloud Push (pushToCloud in cloud.js)
+**v8-container import (current-schema envelopes carrying `.robco_v8`, not the
+legacy `.state` form above)** routes through `_writeImportedContainer()`
+(state.js) — the SAME shared core `applyBundleData()` (full-backup restore)
+reuses (Protocol 22). As of SAVE_INTEGRITY_PASS this now runs the identical
+`sanitizeImportedContainer() → migrateState()` sequence cloud-pull/slot-load/
+backup-restore already ran, per campaign — closing a migrate-parity gap where
+a re-imported old v8 save kept a stale `campaignMode`/`mapView` value and an
+un-archived legacy faction key that every other arrival path already
+normalized (confirmed behaviourally, no field was ever dropped — see
+`tests/save-survival.mjs` PATH2).
+
+### Live Container Durability Mirror (Step 2 · Phase 1 · P8)
+
+The live campaign container (`robco_v8` — the campaign being played _right now_)
+was the one cold-store entry with **no IndexedDB durability shadow**: save slots
+and rolling backups mirror into the `'campaign'` object store (P3), but the live
+container lived only in localStorage, so an Android storage-pressure eviction
+dropped every edit since the last rolling backup (backups snap only on a
+state-_replacing_ load, not per edit). P8 closes that gap by shadowing the live
+container into the **same `'campaign'` store, key `'live'`** (Protocol 22 —
+extends the existing cold store, no second mechanism), IDB-only; localStorage
+`robco_v8` stays the synchronous authority and working store.
+
+- **Write path** — `window.mirrorLiveContainer()` (state.js) is a fire-and-forget
+  IDB-only put, called from `saveState()`'s debounced write (after the
+  dirty-check, so only changed content is mirrored) and from the flush closure
+  wired to **`beforeunload` _and_ `visibilitychange → hidden`** (`_flushUnload`,
+  ui-core.js). The `hidden` trigger is the reliable mobile path: it fires while
+  the page is still alive, so the async put has a real chance to complete before
+  an OS background-kill (unlike `beforeunload`, where an async write typically
+  cannot finish — the known, documented residual).
+- **Restore path** — `window.restoreLiveContainerFromIdb()` (state.js) is an
+  awaited, **bounded** (`Promise.race` vs a timeout) boot phase run from
+  `window.onload` _before_ `_hydrateStateFromStorage()`. It is **recovery-only**
+  and one-directional: it returns immediately _without reading the mirror_
+  whenever localStorage still holds `robco_v8` (localStorage always wins), so a
+  stale mirror can never overwrite a newer local value (Protocol 34). Only when
+  localStorage is empty (the eviction/first-boot signature) does it read the
+  mirror, gate it on container shape **and** a verified checksum (the same idiom
+  as `_reconcileMetaFromIdb`), and write it back into localStorage — after which
+  the unchanged synchronous hydration loads it on its normal v8 path and the
+  campaign boots recovered instead of empty.
+- **Fail-safe (Protocol 33)** — IndexedDB absent / blocked / slow / corrupt ⇒ the
+  mirror write no-ops and the restore yields nothing, so boot is byte-identical
+  to a pure-localStorage build and the eviction banner (below) still fires.
+- **Residual gap** — edits in the final debounce window (< ~500 ms) before a
+  `beforeunload`-only exit that never fired `visibilitychange → hidden` first.
+  The mirror only matters at a _later_ eviction boot, by which time it holds the
+  last debounced-write's content, so realistic loss shrinks from "everything
+  since the last rolling backup" to at most that last sub-second window.
+- **On-demand repro** — the Diagnostic Shell's `SIMULATE EVICTION + RECOVER` tool
+  (staging, destructive) writes the mirror, drops `robco_v8`, and reloads
+  (Protocol 44). Guarded by Suite 239 (RED→GREEN recovery + the anti-clobber
+  "localStorage wins" invariant).
+
+### Storage Durability (Layer 2 — SAVE_INTEGRITY_PASS)
+
+Layer 2 asks the host not to evict this origin in the first place — complementary
+to the P8 mirror above, which recovers the live container _after_ an eviction.
+`_requestPersistentStorage()` (ui-core.js) is a fire-and-forget boot phase,
+called from `window.onload` right after `_hydrateStateFromStorage()`, that
+asks the browser to make this origin's storage persistent
+(`navigator.storage.persist()`), feature-detected and fully wrapped so it can
+never throw into or block boot. The `'granted'|'denied'` result is recorded
+to the `robco_storage_persisted` device pref (MetaStore, never campaign
+state — Protocol 23); on `'denied'` a diegetic "MEMORY CORE UNSTABLE" banner
+is cloned from the inert `#storageWarningBannerTemplate` (index.html, the
+same WU-E2 clone-a-`<template>` pattern as the update/FO3 banners) and shown
+until tapped away for that session. SAVE_LAYER3 tail rider: when persistence
+is denied AND IndexedDB is wholly absent (no durability net at all), the
+recorded value is `'denied-noidb'` and the banner copy compounds to say cold
+storage is offline too.
+
+### Read-Side Fail-Loud (Layer 3 — SAVE_LAYER3)
+
+The read-side sibling of Layer 2 — what happens when the boot READ of the
+campaign goes wrong. Three mechanisms, all in `_hydrateStateFromStorage()`
+(ui-core.js) and its helpers:
+
+- **Quarantine, never delete.** An unreadable `robco_v8`/`robco_v7` (parse or
+  container-shape failure) is captured WHOLE — the exact corrupt bytes — into
+  a `robco_v8_quarantine` localStorage envelope (`{quarantinedAt, sourceKey,
+reason, raw}`) plus a fire-and-forget IndexedDB `'campaign'` copy, via
+  `_quarantineCorruptContainer()` (capture-then-remove ordering; an earlier
+  unresolved quarantine is never overwritten — overflow goes to stamped IDB
+  keys swept to the newest 3). The trigger is deliberately NARROW: the
+  post-load migration helpers (`_migrateEventLog`/`reconcileEquipped`) run
+  OUTSIDE the parse try in their own fail-soft catches, so a helper bug on a
+  VALID save degrades one nicety instead of destroying the campaign (the
+  latent defect the old delete-in-catch carried). Recovery lives in the
+  saves list: a `[FAULT] QUARANTINED RECORD` row with EXPORT (data-URI
+  download) and confirm-gated PURGE (Protocol 34).
+- **Two boot banners, one template** (`#readFaultBannerTemplate`,
+  `_showReadFaultBanner('corrupt'|'evicted')` — the exact Layer-2 idiom).
+  READ FAULT re-shows every boot while the quarantine exists (live
+  condition); EVICTION DETECTED fires only on a strict three-part affirmative
+  signature — the `robco_booted_before` marker was absent from localStorage
+  pre-reconcile AND recovered from IDB this boot (`window._bootMarkerRecovered`,
+  stashed inside `_reconcileMetaFromIdb()`'s recovery loop) AND no campaign
+  container of either vintage exists — so first boots, swipe-away no-save
+  boots, post-quarantine boots, and slow-IDB boots all stay silent
+  (fail-quiet; false negatives are the accepted direction, Protocol 33).
+  Both record telemetry prefs (`robco_read_fault` / `robco_eviction_detected`)
+  and `_recordError()` (FAULT lamp). The valid-save path's total Layer-3 cost
+  is ONE localStorage existence check.
+- **Degraded-write honesty.** `_coldWriteObj()` (state.js) returns
+  `{ ok, idbOk, lsOk }` instead of a divergence-erasing boolean (callers must
+  check `.ok` — an object is always truthy; gate-guarded by Suite 233), and
+  `saveToSlot()` posts a once-per-session-per-mode SYS notice when only one
+  store held the slot ("COLD STORAGE UNAVAILABLE…" / "LOCAL MIRROR FULL…").
+  Full success stays quiet; total failure keeps the loud `[ERROR]` line.
+
+Guards: Suite 233 (static + VM-behavioral, including the red-proven
+helper-throw-on-valid-save lock) and the `LAYER3` sections of
+`tests/save-survival.mjs` (both banner branches, the no-banner valid path,
+the eviction false-positive family, both degraded modes); six `SAVE
+INTEGRITY` Diagnostic Shell tools (Protocol 44).
+
+### Cloud Push (saveCurrentToCloud → \_uploadSaveDoc in cloud.js)
+
+Cloud saves are **additive** — never a blind `setDoc` that would overwrite (Protocol 34: a
+whole-document `setDoc` would clobber a user's campaign with no recovery). The single
+uploader `_uploadSaveDoc()` (reused by both the manual push and the offline-queue flush,
+Protocol 22) `addDoc`s a NEW document into the user's `saves` **collection**, after
+deduplicating against existing saves by `contentHash`:
 
 ```
-setDoc(firestore, {
+addDoc(collection(db, 'users', uid, 'saves'), {
+  schema: 2,
   version: APP_VERSION,
-  savedAt: Date.now(),
-  state: stateObj,
+  savedAt: now,
+  updatedAt: now,
+  label,                  // save label
+  gameContext,            // fnv | fo3
+  contentHash,            // identical content is skipped ('duplicate'), never re-added
+  robco_v8,               // the full campaign container (NOT a bare `state` object)
   chat: JSON.parse(localStorage.getItem('robco_chat')),
-  playstyle: localStorage.getItem('robco_playstyle')
+  playstyle: localStorage.getItem('robco_playstyle'),
 })
 ```
 
-### Cloud Pull (pullFromCloud in cloud.js)
+An existing save is modified in place by id with `updateDoc` (rename/overwrite), and the
+`setDoc` calls in cloud.js write only fixed-id single-doc targets — the mutable
+`settings/preferences` doc with `{ merge: true }` (so it never clobbers sibling fields) and the
+dedicated `secrets/gemini` key doc — never a campaign save. See `rules/auth-and-cloud.md`
+(Protocol 34) for the rule.
+
+### Cloud Pull (loadCloudSave in cloud.js)
 
 ```
 getDoc(firestore)
@@ -2271,12 +2592,12 @@ inline `ctx === 'FO3'/'FNV' ?` ternary — it is data-driven via
 `GAME_DEFS[ctx].ai.trackerDirectives` (`state.js`), read by `_directiveTrackers()`.
 A future game with no trackers supplies `trackerDirectives: ''` (or omits the
 field) — zero code changes to the builders. A Protocol 14 golden-master test
-(Suite 131, both runners) evaluates the real builders + real `GAME_DEFS` across
+(Suite 131, Node runner) evaluates the real builders + real `GAME_DEFS` across
 an 11-point state matrix (both games × every playstyle/playthroughType/
 campaignMode branch) and asserts SHA-256 equality against the pre-refactor
 output, proving the decomposition is byte-identical.
 
-### Inbound (autoImportState in api.js)
+### Inbound (autoImportState in api-import.js)
 
 ```
 JSON string → parse
@@ -2286,15 +2607,15 @@ JSON string → parse
   → Map limbs (validated "OK"/"CRIPPLED")
   → Map factions via FACTION_REGISTRY.forEach
   → Map skills via SKILL_KEYS.forEach
-  → Map status effects (normalize to {name, ticks, type})
-  → Map inventory (direct array replace)
-  → Map squad (direct array replace)
+  → Reconcile status effects (merge by name, keep omitted; transient — reductions/expiry never gated — AI_OVERSEER F1)
+  → Reconcile inventory (additions merged in place; qty reductions/removals confirm-gated — AI_OVERSEER F1, never a full-replace)
+  → Reconcile squad (merge by name, keep omitted; combat-stat updates un-gated — AI_OVERSEER F1)
   → Map campaign_notes (direct replace)
-  → Map perks (normalized {name, rank, level_taken})
-  → Map quests (normalized {name, status, objective, factions})
+  → Reconcile perks (add/rank-increase applied, rank REDUCTION confirm-gated, omitted kept — AI_OVERSEER F1)
+  → Reconcile quests (merge by name, lateral status change applied, omitted kept — AI_OVERSEER F1)
   → Map equipped ({weapon, armor, headgear})
   → Map stats (DELTA accumulation: kills += parsed.kills)
-  → Map ammo (direct object replace + auto-expand if changed)
+  → Reconcile ammo (merge by caliber, keep omitted; consumable — reductions un-gated — AI_OVERSEER F1)
   → State diff display (DELTA log to chat)
   → Status effect tick-down (#7)
   → Faction consequence triggers (#4)
@@ -2302,9 +2623,52 @@ JSON string → parse
   → Faction change auto-logging to campaign_notes
   → loadUI()
   → playSyncTone()
-  → Auto-expand changed panels (#31)
+  → Auto-expand changed panels (#31) — EXPAND ONLY, no tab switch (AI_OVERSEER F6)
+  → Flush in-place change cards (_syncChangeCardsShow — AI_OVERSEER F6)
   → Show undo button
 ```
+
+**Post-sync surface — cards, not tab-jumps (AI_OVERSEER Finding 6, owner directive, 2026-07-19).**
+The #31 auto-expand pass used to call `expandPanelForCategory(cat)` with its default tab
+routing, so ANY AI state change yanked the view off the terminal to whichever panel changed —
+interrupting the conversation the player was reading. It now passes `{ navigate: false }`: the
+changed panel is still EXPANDED (a player who walks over there manually still finds it open),
+but the tab does not switch. Each change is instead surfaced in place as a card in the top-right,
+through the SAME `#locationCard` toast the location-arrival card already uses (Protocol 22) —
+now fed by a bounded FIFO queue (`_cardEnqueue`/`_cardPump`, `ui-core-cmd.js`) so a burst of
+changes plays in sequence rather than each clobbering the last. The card text comes from the SAME
+diff that builds the `[DELTA]` chat line — one change-detector, two surfaces (a durable line for
+the record, a transient card so the change is visible as it happens). `expandPanelForCategory()`'s
+new `opts.navigate` DEFAULTS TRUE, so `#go=` deep links, the native command router, the LOOT/ammo
+hand-offs and every typed panel alias keep their existing "take me there" behaviour unchanged.
+Guarded by Suite 240.
+
+**Truthful log export (AI_OVERSEER Finding 5, 2026-07-19).** `chatHistory` holds only chat lines,
+so the downloaded campaign log silently dropped every AI `modal` node (rendered into `#sysModal`,
+never appended to `chatHistory`) and every `confirmAction()` dialog. That is not merely incomplete —
+it is misleading, and it produced a real false conclusion during the audit itself: a log appeared
+to show the Director silently obeying "level me up to 15" when it had in fact raised a confirmation
+that the player declined, with the popup edited out of the record. A parallel ledger
+(`transcriptEvents` + `recordTranscriptEvent()`, `js/core/state.js`, declared beside `chatHistory`)
+now records those events, anchored to the `chatHistory` index they appeared at, with the player's
+ANSWER written back on resolution. `appendToChat()` rebases every anchor when the history is capped
+so recorded popups cannot drift. `_transcriptRecords()` (`js/ui/ui-saves.js`) is the ONE assembly
+point all three export formats (txt/md/html) share, merging chat and events back into on-screen
+order. The ledger is persisted to `localStorage['robco_transcript_events']`, restored at boot, and
+cleared with the chat. Guarded by Suite 240.
+
+**Registry-trust guard (Protocol 42 defense-in-depth, added alongside the cross-game
+save-load fix — `planning/2.8.5/audits/AUDIT_registry_leak.md`):** before mapping the five
+registry-validated fields (`collectibles`, `lincolnItems`, `traits`, `skillBooks`,
+`magazines`), `autoImportState()` compares the loaded `FALLOUT_REGISTRY.game` tag
+against `state.gameContext`. Every known cross-game load path already reboots before
+this function can run, so the two should never disagree in practice — but if they
+ever did, validating those five arrays against the wrong game's registry would
+recognise none of the campaign's own real names and silently empty them (reproduced
+in the audit). On a detected mismatch, only those five fields are skipped for that
+sync (existing values are left untouched); every other field above still applies
+normally. A mismatch means the registry is untrustworthy, not that the player's data
+is invalid — so this is additive hardening, not a change to normal-path validation.
 
 ### Native-Input-Path Audit (Player Authority — Step 2 Phase 0 U10)
 
@@ -2312,7 +2676,7 @@ JSON string → parse
 field `autoImportState()` can write must also have a NATIVE input/edit path — the player must
 never be stuck depending on the AI to create, correct, or initialize a value.
 
-Audited every `state.X` write inside `autoImportState()` (`js/api.js`) against the app's native
+Audited every `state.X` write inside `autoImportState()` (`js/services/api-import.js`) against the app's native
 UI/CRUD surface:
 
 | Field(s)                                                                | Native path                                                                                                                                                                                | Status                                                                                                                                                    |
@@ -2339,7 +2703,7 @@ UI/CRUD surface:
 | `padBindings` (Quick-Draw Holster)                                      | intentionally **never** read from AI responses (player authority — Protocol 24); native `_nativePadBind()` via the Tool Deck's holster UI or a typed `[BIND: gear, DIR]` only              | OK (by design — the strongest case here, since `autoImportState()` has no read path for it at all)                                                        |
 
 **U10 fix landed:** squad/companion affinity now has native `[+]`/`[-]` buttons on every squad row
-(`adjustAffinity()`, `js/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
+(`adjustAffinity()`, `js/ui/ui-render.js`), clamped 0–100, always visible (defaults an unset member to
 0% instead of hiding the bar). `addSquadMember()` now seeds `affinity: 0` for newly-added members.
 
 **Known gap (documented, not fixed this unit):** `state.equipped` has no native setter — a courier's
@@ -2349,25 +2713,25 @@ action on each inventory row would close it using the same pattern as the other 
 
 **Native USE + TERMINAL stat edits (v2.8.0):** two more entry points joined this audit's "OK" column
 without changing any field's status. (1) The CARGO MANIFEST's USE button, previously a free-text
-`> [USE] <name>` round-trip to the AI, is now the deterministic `nativeUseItem()` (`js/ui-render.js`)
+`> [USE] <name>` round-trip to the AI, is now the deterministic `nativeUseItem()` (`js/ui/ui-render.js`)
 — gated to `cat==='aid'`, it parses the active game's `getChemsTable()` Effect/Duration columns via the
 pure `_computeAidUse()`/`_durationToTicks()` parsers into heal/rad/limb-heal/timed-BUFF/addiction-clear/
 poison-clear, applied through the shared A.2 native setters below and the extracted
 `_applyStatusEffect()` (Protocol 22, reused by `addStatusEffect()` too) — closing the `status`/`hpCur`/
 `rads`/limb fields' AI-narrative dependency for the single most common player action (consuming an
-item). (2) TERMINAL mode (`js/api.js`) now edits every scalar stat, SPECIAL, and skill directly — a
+item). (2) TERMINAL mode (`js/services/api.js`) now edits every scalar stat, SPECIAL, and skill directly — a
 generic `"<stat> <N>"` SET grammar, both delta forms, and a `"level up"`/`"leveled up"` phrase, all
 resolved via `_resolveStatToken()` (static scalar/SPECIAL alias maps — universal Fallout mechanics —
 plus `getSkillKeys()` for the per-game skill set) and applied through the SAME shared setters. Those
 setters — `_nativeSetHp`/`_nativeSetRads`/`_nativeSetXp`/`_nativeSetLevel`/`_nativeSetSpecial`/
-`_nativeSetSkill`/`_nativeSetKarma`/`_nativeSetCaps` (`js/ui-core.js`) — are the ONE clamp/mirror/emit/
+`_nativeSetSkill`/`_nativeSetKarma`/`_nativeSetCaps` (`js/ui/ui-core.js`) — are the ONE clamp/mirror/emit/
 save choke point per stat (Protocol 22): `commitStat()`'s own SPECIAL DOM `onchange` path now delegates
 to `_nativeSetSpecial()` rather than clamping independently, so the DOM path, Native USE, and TERMINAL
 edits can never disagree on a clamp. No new `state` field — Protocol 4's 4-file dance does not apply.
 
 ---
 
-## Command-Line MODE (`js/api.js` + `js/ui-core.js` — Step 2 · Phase 2 · B1)
+## Command-Line MODE (`js/services/api.js` + `js/ui/ui-core.js` — Step 2 · Phase 2 · B1)
 
 A single mode pill (`#modePill`, in the Comm-Link input toolbar) chooses which of two
 paths the Comm-Link input takes on submit — a device preference (`robco_input_mode`,
@@ -2426,7 +2790,7 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
   code change. Falls back to the plain native-token/quick-log-verb suggestions (unchanged) when no
   verb lead-in matches. Every suggestion preserves whatever prefix `_resolveCommandInput` stripped
   (e.g. a `/` override), so picking one never silently drops the user's explicit override.
-  `wireInput()` (`js/ui-saves.js`, the shared `#acPanel` singleton documented under "Registry
+  `wireInput()` (`js/ui/ui-saves.js`, the shared `#acPanel` singleton documented under "Registry
   Autocomplete System" below) accepts this resolver **function** in addition to a registry category
   string; `#chatInput` is wired to `_commandSuggestions()`, which returns `[]` whenever the message
   would resolve to OVERSEER.
@@ -2663,7 +3027,7 @@ registry instead.
 
 ### OS Event Bus (RobcoEvents)
 
-`js/state.js` declares a tiny synchronous pub/sub, `RobcoEvents.on(event, fn)` /
+`js/core/state.js` declares a tiny synchronous pub/sub, `RobcoEvents.on(event, fn)` /
 `RobcoEvents.emit(event, payload)`, added in Step 2 (v2.8.0) Phase 0 Unit 7. It
 decouples STATE CROSSING DETECTION from the code that reacts to it: a detector
 calls `emit()` once when it observes a crossing; any number of independent
@@ -2674,11 +3038,11 @@ listener.
 Three previously-inline crossing detectors were migrated to emit through the
 bus (behavior preserved — only the wiring changed):
 
-| Event               | Detected in                  | Subscriber(s)                                               |
-| ------------------- | ---------------------------- | ----------------------------------------------------------- |
-| `level.up`          | `autoImportState()` (api.js) | `ui-audio.js` — jingle + haptic; `state.js` — campaign note |
-| `faction.threshold` | `autoImportState()` (api.js) | `api.js` — chat alert + sound + haptic                      |
-| `hp.critical`       | `updateMath()` (ui-core.js)  | `ui-core.js` — `crit-hp-flash` + haptic                     |
+| Event               | Detected in                         | Subscriber(s)                                               |
+| ------------------- | ----------------------------------- | ----------------------------------------------------------- |
+| `level.up`          | `autoImportState()` (api-import.js) | `ui-audio.js` — jingle + haptic; `state.js` — campaign note |
+| `faction.threshold` | `autoImportState()` (api-import.js) | `api-import.js` — chat alert + sound + haptic               |
+| `hp.critical`       | `updateMath()` (ui-core.js)         | `ui-core.js` — `crit-hp-flash` + haptic                     |
 
 Unit 8 added five new emit points for actions that previously went unlogged —
 `collectible.acquired` (`toggleCollectible`), `craft.completed` /
@@ -2765,58 +3129,65 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 
 Two separate stores, kept apart on purpose (Protocol 23 boundary, locked structurally by the Suite 134 / U6 boundary gate):
 
-### MetaStore — device preferences (`js/state.js`)
+### MetaStore — device preferences (`js/core/state.js`)
 
-`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (41 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui-audio.js` / `js/ui-render.js` / `js/ui-core.js` / `js/api.js` / `js/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
+`MetaStore.get(key)` / `.set(key, val)` / `.remove(key)` / `.has(key)` / `.keys()` is the single choke point for every `robco_*` key that describes **this device's** preferences — never campaign data. A registered-key `META_MANIFEST` (50 keys) is the boundary: a key is a "device preference" if and only if it is listed there. Every read/write of these keys across `js/ui/ui-audio.js` / `js/ui/ui-render.js` / `js/ui/ui-core.js` / `js/services/api.js` / `js/services/cloud.js` routes through `MetaStore` (never bare `localStorage`). The one sanctioned exception is the two `index.html` `<head>` pre-paint scripts (flash-free optics + high-lumen), which run before `state.js` — and therefore `MetaStore` — has loaded; Suite 134.7 proves they sit strictly before the first `js/*.js` `<script>` tag.
 
-| Key                            | Type   | Owner        | Description                                                                                                                                                                                                                                                                            |
-| ------------------------------ | ------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `robco_gemini_key`             | string | api.js       | Gemini API key                                                                                                                                                                                                                                                                         |
-| `robco_gemini_key_sync`        | bool   | cloud.js     | Whether the Gemini key syncs to the user's Firebase account                                                                                                                                                                                                                            |
-| `robco_gemini_model`           | string | api.js       | Selected model name                                                                                                                                                                                                                                                                    |
-| `robco_gemini_validated_key`   | string | api.js       | The key string that LAST passed a live `fetchAuthorizedModels()` 200 response — lets SLOT 05's uplink status tell "validated" apart from "a key was typed"                                                                                                                             |
-| `robco_sfx_muted`              | bool   | ui-audio.js  | Typing sound mute                                                                                                                                                                                                                                                                      |
-| `robco_hum_muted`              | bool   | ui-audio.js  | CRT hum mute                                                                                                                                                                                                                                                                           |
-| `robco_geiger_muted`           | bool   | ui-audio.js  | Geiger counter mute                                                                                                                                                                                                                                                                    |
-| `robco_tinnitus_muted`         | bool   | ui-audio.js  | Tinnitus mute                                                                                                                                                                                                                                                                          |
-| `robco_ambient_muted`          | bool   | ui-audio.js  | Limb SFX mute                                                                                                                                                                                                                                                                          |
-| `robco_wake_muted`             | bool   | ui-audio.js  | Tab-return wake tone mute                                                                                                                                                                                                                                                              |
-| `robco_panelclick_muted`       | bool   | ui-audio.js  | Rotary-dial panel-click mute                                                                                                                                                                                                                                                           |
-| `robco_bootdrone_muted`        | bool   | ui-audio.js  | Boot drone mute                                                                                                                                                                                                                                                                        |
-| `robco_levelup_muted`          | bool   | ui-audio.js  | Level-up jingle mute                                                                                                                                                                                                                                                                   |
-| `robco_heartbeat_muted`        | bool   | ui-audio.js  | Low-health heartbeat mute                                                                                                                                                                                                                                                              |
-| `robco_questcomplete_muted`    | bool   | ui-audio.js  | Quest-complete chime mute                                                                                                                                                                                                                                                              |
-| `robco_questfail_muted`        | bool   | ui-audio.js  | Quest-fail tone mute                                                                                                                                                                                                                                                                   |
-| `robco_factionthreshold_muted` | bool   | ui-audio.js  | Faction-standing alert mute                                                                                                                                                                                                                                                            |
-| `robco_hardwaresfx_muted`      | bool   | ui-audio.js  | Module Bay hardware SFX mute (B2c — chip click + board thunk on install/eject)                                                                                                                                                                                                         |
-| `robco_master_muted`           | bool   | ui-audio.js  | Global audio kill switch                                                                                                                                                                                                                                                               |
-| `robco_radio_on`               | bool   | ui-audio.js  | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)                                                                                                                                                                                                               |
-| `robco_wakelock_enabled`       | bool   | ui-core.js   | Screen Wake Lock toggle (WU-F1)                                                                                                                                                                                                                                                        |
-| `robco_haptic_enabled`         | bool   | ui-audio.js  | Haptic solenoid toggle (WU-F2, default OFF)                                                                                                                                                                                                                                            |
-| `robco_high_lumen`             | bool   | ui-core.js   | High-Lumen (AA+ contrast) toggle (WU-F8)                                                                                                                                                                                                                                               |
-| `robco_overseer_log`           | JSON   | ui-core.js   | Device telemetry — boot count, total/longest power-on (WU-F7)                                                                                                                                                                                                                          |
-| `robco_error_log`              | JSON   | ui-core.js   | Local-only client error ring buffer                                                                                                                                                                                                                                                    |
-| `robco_panel_state`            | JSON   | ui-core.js   | Panel/sub-panel open-closed memory                                                                                                                                                                                                                                                     |
-| `robco_scroll_positions`       | JSON   | ui-core.js   | Per-subsystem exact scroll offset (`operator`/`operations`/`databank`/`uplink`/`chassis`/`settings`), restored on every switch and full reload                                                                                                                                         |
-| `robco_active_tab`             | string | ui-core.js   | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                                                                                                                                                                                                                  |
-| `robco_typer_speed`            | float  | ui-core.js   | Typewriter speed multiplier                                                                                                                                                                                                                                                            |
-| `robco_version`                | string | ui-core.js   | Last seen version (triggers changelog)                                                                                                                                                                                                                                                 |
-| `robco_optics`                 | string | ui-audio.js  | _(deprecated)_ legacy site-wide color theme; migrated once into `robco_optic_<ctx>`                                                                                                                                                                                                    |
-| `robco_optic_<ctx>`            | string | ui-audio.js  | Per-game optic color pick (dynamic family key, one per game context)                                                                                                                                                                                                                   |
-| `robco_booted_before`          | bool   | ui-audio.js  | First-power-on flag (WU-F6 — gates the one-time cold-start POST)                                                                                                                                                                                                                       |
-| `robco_feature_flags`          | JSON   | cloud.js     | Last-known-good cache of the remote kill-switch config                                                                                                                                                                                                                                 |
-| `robco_sw_installed`           | bool   | index.html   | Records that a service worker has ever controlled the page                                                                                                                                                                                                                             |
-| `robco_input_mode`             | string | state.js     | Command-Line MODE pill selection (`'overseer'`/`'terminal'`, B1)                                                                                                                                                                                                                       |
-| `robco_bay_opened`             | bool   | ui-core.js   | Module Bay hatch first-visit flag (B2a) — once true, the bay opens directly                                                                                                                                                                                                            |
-| `robco_bay_view`               | string | ui-core.js   | Module Bay Bay-vs-Schematic view choice (`'bay'`/`'schematic'`, B2b) — restored on every reload                                                                                                                                                                                        |
-| `robco_bezel_subsystem`        | string | ui-core.js   | Last-focused bezel subsystem (`'operator'`/`'operations'`/`'databank'`/`'uplink'`/`'chassis'`/`'settings'`, DO-N + Step 2 SETTINGS-tab unit) — `chassis`/`settings` are now real tabs restored by `initTabs()`; only the `uplink` highlight still needs the cosmetic boot-time re-sync |
-| `robco_cargo_drawer`           | string | ui-render.js | Last-open CARGO MANIFEST drawer (`'weapon'`/`'armor'`/`'aid'`/`'mod'`/`'misc'`/`'ammo'`, Phase 3 · Piece 2 OPERATIONS reskin) — restored at boot by `_restoreDevicePrefs()`, written by `setInvFilter()`                                                                               |
+| Key                            | Type   | Owner        | Description                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `robco_gemini_key`             | string | api.js       | Gemini API key                                                                                                                                                                                                                                                                                                         |
+| `robco_gemini_key_sync`        | bool   | cloud.js     | Whether the Gemini key syncs to the user's Firebase account                                                                                                                                                                                                                                                            |
+| `robco_gemini_model`           | string | api.js       | Selected model name                                                                                                                                                                                                                                                                                                    |
+| `robco_gemini_validated_key`   | string | api.js       | The key string that LAST passed a live `fetchAuthorizedModels()` 200 response — lets SLOT 05's uplink status tell "validated" apart from "a key was typed"                                                                                                                                                             |
+| `robco_sfx_muted`              | bool   | ui-audio.js  | Typing sound mute                                                                                                                                                                                                                                                                                                      |
+| `robco_hum_muted`              | bool   | ui-audio.js  | CRT hum mute                                                                                                                                                                                                                                                                                                           |
+| `robco_geiger_muted`           | bool   | ui-audio.js  | Geiger counter mute                                                                                                                                                                                                                                                                                                    |
+| `robco_tinnitus_muted`         | bool   | ui-audio.js  | Tinnitus mute                                                                                                                                                                                                                                                                                                          |
+| `robco_ambient_muted`          | bool   | ui-audio.js  | Limb SFX mute                                                                                                                                                                                                                                                                                                          |
+| `robco_wake_muted`             | bool   | ui-audio.js  | Tab-return wake tone mute                                                                                                                                                                                                                                                                                              |
+| `robco_panelclick_muted`       | bool   | ui-audio.js  | Rotary-dial panel-click mute                                                                                                                                                                                                                                                                                           |
+| `robco_bootdrone_muted`        | bool   | ui-audio.js  | Boot drone mute                                                                                                                                                                                                                                                                                                        |
+| `robco_levelup_muted`          | bool   | ui-audio.js  | Level-up jingle mute                                                                                                                                                                                                                                                                                                   |
+| `robco_heartbeat_muted`        | bool   | ui-audio.js  | Low-health heartbeat mute                                                                                                                                                                                                                                                                                              |
+| `robco_questcomplete_muted`    | bool   | ui-audio.js  | Quest-complete chime mute                                                                                                                                                                                                                                                                                              |
+| `robco_questfail_muted`        | bool   | ui-audio.js  | Quest-fail tone mute                                                                                                                                                                                                                                                                                                   |
+| `robco_factionthreshold_muted` | bool   | ui-audio.js  | Faction-standing alert mute                                                                                                                                                                                                                                                                                            |
+| `robco_hardwaresfx_muted`      | bool   | ui-audio.js  | Module Bay hardware SFX mute (B2c — chip click + board thunk on install/eject)                                                                                                                                                                                                                                         |
+| `robco_master_muted`           | bool   | ui-audio.js  | Global audio kill switch                                                                                                                                                                                                                                                                                               |
+| `robco_radio_on`               | bool   | ui-audio.js  | Pip-Boy Radio ON state (WU-F5 — ON-semantics player, not a mute; opt-in)                                                                                                                                                                                                                                               |
+| `robco_wakelock_enabled`       | bool   | ui-core.js   | Screen Wake Lock toggle (WU-F1)                                                                                                                                                                                                                                                                                        |
+| `robco_haptic_enabled`         | bool   | ui-audio.js  | Haptic solenoid toggle (WU-F2, default OFF)                                                                                                                                                                                                                                                                            |
+| `robco_high_lumen`             | bool   | ui-core.js   | High-Lumen (AA+ contrast) toggle (WU-F8)                                                                                                                                                                                                                                                                               |
+| `robco_overseer_log`           | JSON   | ui-core.js   | Device telemetry — boot count, total/longest power-on (WU-F7)                                                                                                                                                                                                                                                          |
+| `robco_error_log`              | JSON   | ui-core.js   | Local-only client error ring buffer                                                                                                                                                                                                                                                                                    |
+| `robco_panel_state`            | JSON   | ui-core.js   | Panel/sub-panel open-closed memory                                                                                                                                                                                                                                                                                     |
+| `robco_scroll_positions`       | JSON   | ui-core.js   | Per-subsystem exact scroll offset (`operator`/`operations`/`databank`/`uplink`/`chassis`/`settings`), restored on every switch and full reload                                                                                                                                                                         |
+| `robco_active_tab`             | string | ui-core.js   | Last active tab (`'stat'`/`'inv'`/`'data'`/`'campg'`)                                                                                                                                                                                                                                                                  |
+| `robco_typer_speed`            | float  | ui-core.js   | Typewriter speed multiplier                                                                                                                                                                                                                                                                                            |
+| `robco_version`                | string | ui-core.js   | Last seen version (triggers changelog)                                                                                                                                                                                                                                                                                 |
+| `robco_optics`                 | string | ui-audio.js  | _(deprecated)_ legacy site-wide color theme; migrated once into `robco_optic_<ctx>`                                                                                                                                                                                                                                    |
+| `robco_optic_<ctx>`            | string | ui-audio.js  | Per-game optic color pick (dynamic family key, one per game context)                                                                                                                                                                                                                                                   |
+| `robco_booted_before`          | bool   | ui-audio.js  | First-power-on flag (WU-F6 — gates the one-time cold-start POST)                                                                                                                                                                                                                                                       |
+| `robco_feature_flags`          | JSON   | cloud.js     | Last-known-good cache of the remote kill-switch config                                                                                                                                                                                                                                                                 |
+| `robco_sw_installed`           | bool   | index.html   | Records that a service worker has ever controlled the page                                                                                                                                                                                                                                                             |
+| `robco_input_mode`             | string | state.js     | Command-Line MODE pill selection (`'overseer'`/`'terminal'`, B1)                                                                                                                                                                                                                                                       |
+| `robco_bay_opened`             | bool   | ui-core.js   | Module Bay hatch first-visit flag (B2a) — once true, the bay opens directly                                                                                                                                                                                                                                            |
+| `robco_bay_view`               | string | ui-core.js   | Module Bay Bay-vs-Schematic view choice (`'bay'`/`'schematic'`, B2b) — genuinely restored on every reload as of 2.8.5 item 6 (the boot path previously ignored it; see the correction note in the Module Bay section)                                                                                                  |
+| `robco_bezel_subsystem`        | string | ui-core.js   | Last-focused bezel subsystem (`'operator'`/`'operations'`/`'databank'`/`'uplink'`/`'chassis'`/`'settings'`, DO-N + Step 2 SETTINGS-tab unit) — `chassis`/`settings` are now real tabs restored by `initTabs()`; only the `uplink` highlight still needs the cosmetic boot-time re-sync                                 |
+| `robco_cargo_drawer`           | string | ui-render.js | Last-open CARGO MANIFEST drawer (`'weapon'`/`'armor'`/`'aid'`/`'mod'`/`'misc'`/`'ammo'`, Phase 3 · Piece 2 OPERATIONS reskin) — restored at boot by `_restoreDevicePrefs()`, written by `setInvFilter()`                                                                                                               |
+| `robco_storage_persisted`      | string | ui-core.js   | `navigator.storage.persist()` result (`'granted'`/`'denied'`/`'denied-noidb'`/`''`, SAVE_INTEGRITY_PASS + SAVE_LAYER3 tail rider) — set once per boot by `_requestPersistentStorage()`; a non-granted result shows the MEMORY CORE UNSTABLE warning banner (`'denied-noidb'` = IndexedDB also absent, compounded copy) |
+| `robco_read_fault`             | string | ui-core.js   | SAVE_LAYER3 telemetry record — timestamp of the last corrupt-container quarantine event (set by `_quarantineCorruptContainer()`). A record, NOT a display gate: the READ FAULT banner keys off the live `robco_v8_quarantine` key's existence                                                                          |
+| `robco_eviction_detected`      | string | ui-core.js   | SAVE_LAYER3 telemetry record — timestamp of the last detected storage eviction (the strict three-part boot signature). A record, NOT a display gate                                                                                                                                                                    |
 
-### Module Bay (`js/ui-core.js`, B2a/B2b) — settings as installable hardware
+### Module Bay (`js/ui/ui-core.js`, B2a/B2b) — settings as installable hardware
 
 The SECURITY & CONFIGURATION panel's _contents_ are reframed as a chassis of hardware boards — an owner-approved redesign (Protocol 25 sanctioned exception). As of the Step 2 (v2.8.0) SETTINGS-tab unit the panel itself also carries `data-tab="settings"` (it moved out of its old always-visible, tab-less placement into the SETTINGS subsystem) — the hatch/schematic/re-sync mechanics below are otherwise unchanged. **One-truth model:** the bay and the permanent Schematic View fallback are both projections of the same MetaStore-backed prefs above; every control still calls the exact setter it always called (`changeOpticsColor`, `toggleHighLumen`, `toggleMasterMute`, `toggleRadio`, `toggleWakeLock`, `toggleHaptic`, `onImmersionChange`, `setGeminiKeySync`, `toggleAudio`) — zero new persistence paths, zero AI involvement. `renderModuleBay()` is the single re-sync point: it re-syncs every boolean control's `.checked` from MetaStore (so a change made via the Schematic View's separate DOM checkboxes always pushes back to the bay's own controls), refreshes the two combined status lines (SLOT 01 optics+high-lumen, SLOT 02 channel-count+radio), and regenerates the Schematic View if it's open — called after every bay/schematic control change and once at boot from `initModuleBay()`. `initModuleBay()` (called from `window.onload`, after `_restoreOpticsPreference()`/`_restoreDevicePrefs()`) decides whether the first-visit hatch ceremony (`#bayHatch`, `releaseBayHatch()`) shows at all, then applies whichever of Bay/Schematic was last viewed. The first-visit hatch now fires from a genuine `selectSubsystem('settings')` visit (which re-opens `#securityConfigPanel`, firing its own once-only toggle listener) rather than the old CHASSIS scroll-to-bay branch, which is retired — `initTabs()`'s boot-time restore never calls `selectSubsystem()`, so a reload landing on SETTINGS never re-triggers the ceremony (Protocol 42). The bay's `.bay-grid` is **single-column unconditionally** — the desktop shell fixes the settings panel's own column at a hard 380px (`grid-template-columns: 380px 1fr` in the ≥1000px shell), so a two-column `@container` breakpoint would never engage in this shell and was removed as dead code after live desktop measurement (confirmed via manual render-check, not just the automated 360/412px gate).
 
 **B2b — visual fidelity + owner-reported fixes.** A follow-up unit rebuilt the bay's visuals to match the owner-approved mockup exactly and fixed four issues found live-rendering it (Protocol 42): the SLOT 02 channel-mute checkboxes now render as a socketed `.chip-grid` of DIP chips (CH-01…CH-13) — the checkbox still writes the exact same `muted` boolean via the unchanged `toggleAudio()` call, but `:checked` (muted) now reads as a PULLED chip and `:not(:checked)` as a seated one, a presentation-only polarity inversion (Protocol 25); SLOT 03 gained a battery-cell graphic (Sustained Power Cell) and a coil graphic (Haptic Solenoid); SLOT 04's plain `<select>` was replaced visually by a rotary `.dial` button that cycles Full/Balanced/Minimal through the same `onImmersionChange()` setter, while `#immersionSelect` itself survives verbatim (Protocol 4) — just visually hidden (`.bay-visually-hidden-input`, kept at 16px font-size so it never triggers iOS focus-zoom) — so a screen-reader/keyboard user retains direct-jump access to any of the 3 values; SLOT 05 gained a "CIPHER KEY SLOT" label and the HANDSHAKE button moved inline beside the key input; the bay header gained the mockup's chassis subheader line. **Fixes:** the phosphor tube-rack labels were rendering as near-invisible dark-on-dark text — `.tube` is a real `<button>` and had overridden `background` but never `color`, so it inherited the global button's `color: var(--robco-dark)` (meant for a bright fill) onto its own dark card; `button.tube` now declares an explicit `color`. The Schematic View's rows were restructured to stack each control's name/location above a full-width control row (`.schem-row-head` + `.schem-row-control`) so a `<select>` can never be squeezed narrower than its own content again (Chrome silently ellipsis-clips a narrow select's rendered text). The maintenance tray (`.bay-tools`) switched from a CSS grid to `display: flex; justify-content: center`, so a partial last row (e.g. when the already-installed PWA hides "INSTALL SYSTEM (APP)") self-centers instead of staying left-pinned with a dangling gap. Finally, the Bay-vs-Schematic view choice is now a registered MetaStore pref (`robco_bay_view`) applied via a shared `_applyBayView(view)` — called by both `initModuleBay()` (boot restore) and `toggleBaySchematic()` (the user's toggle) — so the two can never drift and the choice survives a reload (Protocol UI-6).
+
+**2.8.5 item 6 — the Schematic View made correct, complete and per-machine.** The flat fallback had drifted as the bay's boards grew, and the drift was structural: `renderBaySchematic()` emitted a **hardcoded literal array of rows**, so nothing about adding a board to the bay caused the flat list to follow. Four defects were confirmed against the real code and fixed together. **(1)** The 14 SLOT-02 channel chips were represented by a single inert row whose label carried a hand-typed count — already wrong by one — and which told the reader to go back to the bay, contradicting the view's own "SAME CONTROLS" contract. The chips are now **derived at render time** from `#chipGrid`'s own `input.chip-input` nodes (`_schemChipRows()`), so the count cannot drift and a future chip appears with no code change. **(2)** SLOT 05's real payload (`#apiKeyInput`, `#apiModelInput`, `#btnFetchModels`) and the whole SVC TRAY (`#ejectHolotapeBtn` + `#holotapeFormatSelect`, `#btnInstallPwa`) had **no schematic representation at all** — and because the view choice persists, a technician could be left in a view with no route to their own API key. All are now rows. These new rows are **proxies** (`_schemForwardCheckbox`/`_schemForwardValue`/`_schemForwardClick`) that drive the REAL bay node and let its own handler run, rather than re-declaring which setter each owns — which is not merely tidier but _required_ for the uplink controls, since `saveApiKeySilent()` reads `#apiKeyInput.value`/`#apiModelInput.value` directly and would otherwise persist the bay's stale value. `_schemCloneOptions()` clones a bay `<select>`'s options **preserving the live selection** (a DOM-set `.value` never appears as a `selected` attribute, so a raw `innerHTML` copy would show the first option while the real control held another). **(3)** `renderModuleBay()` re-synced **booleans only** (`BAY_CHECKBOX_SYNC_MAP`), so the bay's PRINT-RATE TRIM slider and its numeric readout were restored at boot only — a trim edit made in the Schematic View left the bay's copy stale until reload. `_syncBayValueControls()` closes the non-checkbox half, and `ui-core.js`'s boot restore now **routes through that same function** instead of formatting the readout a second time (Protocol 22). **(4)** Per-game framing: the view now reads `GAME_DEFS[ctx].identity.schematic` (`{title, note, sig}`) via `getIdentity()`, with a literal generic `SCHEMATIC_FALLBACK` for a game that has authored none — never another machine's borrowed fiction (Protocol UI-10) — plus `[data-game]` CSS for presentation (Protocol UI-7). The row labels and SLOT tokens deliberately do **not** vary per game: they name the real bay boards, whose markup is shared, so per-game renaming would break the schematic↔bay correspondence the view exists to provide. Guarded by Suite 241, whose **241.1 is a parity check** — every interactive control in `#bayContent` must be reachable from the flat view, with intentional omissions named and justified in the test. That guard is the one that was missing: every prior test asserted only that named setters were _present_, which is precisely how whole boards went missing with nothing going red.
+
+> **Correction (2.8.5 item 6).** The B2b paragraph above, the `robco_bay_view` row in the MetaStore table, and Protocol UI-6's own worked example all stated that the Bay/Schematic choice "survives a reload." **It did not.** The pref was written correctly on every toggle and then never read on the boot path: the panel-restore branch in `ui-core.js` called `renderModuleBay()`, which repaints the bay but has no knowledge that a view choice exists, and `initModuleBay()` — the only place the restore lived — ran solely on a _genuine user toggle_ of the panel. A returning user whose SETTINGS panel was remembered open therefore got the hardware bay back every time, regardless of what they had chosen. Found by rendering at 360px in both games (Protocol 42), reproduced deterministically, and fixed by routing the restore branch through the same `_applyBayView()` the user action uses — the one-shared-apply-function shape UI-6 mandates and which this code had only appeared to follow. Locked by Suite 241.13; Suite 172.1 was amended in the same commit because its final clause had been asserting the defect.
 
 **WU-optics-picker — SLOT 01 GREEN FAMILY phosphor-tube redesign.** SLOT 01's flat 7-swatch picker was rebuilt to match the phosphor-tube-rack look established elsewhere in the bay: the 3 green hues (`green`/`green3`/`ghoul`) collapse into one cartridge (`#opticsFamilyTube`, `data-family="green"`) that fans out into a `#opticsFamilyTray` (a `.shell` escape-hatch button + the 3 green variant tubes) on tap, while the 4 single-hue colors stay standalone tubes. The family tag is DATA on the `THEMES` rows (`family: 'green'`, Protocol 38) — `_themeFamilyMembers()` in `ui-audio.js` derives membership by filtering `THEMES[k].family`, never a hardcoded colour-key array, so a future second family only needs the same tag. `_resolveOpticsFamilyRepresentative()`/`_updateOpticsFamilyRepresentative()` compute and repaint which green the cartridge represents (seated optic if it's a family member → the game's default optic if that's a member → the family's first member) — pure derivation, no new persistence. `_expandOpticsFamily()`/`_collapseOpticsFamily(reseat)` drive the open/close, and `_seatOpticsTube()` (unchanged entry point, still the sole caller of `changeOpticsColor()`) detects a family-member pick and additionally repaints the cartridge + collapses with a `tubeSeat` reseat flourish. Every tube (cartridge, fan-tray variant, and standalone alike) carries a `.t-led` seat lamp under its name — a hollow ring when idle, lit + glowing in the tube's own colour when seated — and every rack cell (`.tube`/`.shell`) shares one `--tube-w`/`--tube-h` cell geometry so all render the identical size regardless of content (a fixed `width: var(--tube-w)`, not a percentage, since a percentage width silently resolves against the wrong box once a tube also lives inside the nested, auto-sized `.fan-tray` flex row). `tubeEject`/`shellOpen`/`tubeSeat` are plain CSS `animation:` declarations (Protocol UI-9), so the app's global reduced-motion block neutralizes each to its instant final frame automatically. `_restoreOpticsPreference()` (`ui-core.js`) force-collapses the socket and repaints the representative on every boot/game-switch, so the tray never opens on a fresh load.
 
@@ -2824,17 +3195,18 @@ The SECURITY & CONFIGURATION panel's _contents_ are reframed as a chassis of har
 
 These keys are campaign or cloud-sync data and are deliberately excluded from `META_MANIFEST`; they keep their existing direct-`localStorage` read/write paths in `state.js` / `ui-saves.js` / `ui-core.js` / `cloud.js`:
 
-| Key                     | Type      | Description                                                                      |
-| ----------------------- | --------- | -------------------------------------------------------------------------------- |
-| `robco_v8`              | JSON      | Current save-file-shaped snapshot of `state` (Protocol 4 container)              |
-| `robco_v7`              | JSON      | Legacy full-game-state key, migrated into `robco_v8` on load                     |
-| `robco_chat`            | JSON      | Chat history (up to 200 messages)                                                |
-| `robco_playstyle`       | string    | "any" or "melee" — rides the save envelope                                       |
-| `robco_playstyle_type`  | string    | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load |
-| `robco_slot_1/2/3`      | JSON      | Save slots A/B/C                                                                 |
-| `robco_backup_1/2/3`    | JSON      | Rolling-backup ring (3 slots)                                                    |
-| `robco_backup_ptr`      | int       | Rolling-backup ring pointer                                                      |
-| `robco_last_cloud_push` | timestamp | Cloud-sync conflict detection                                                    |
+| Key                     | Type      | Description                                                                                                                                                                                                                  |
+| ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `robco_v8`              | JSON      | Current save-file-shaped snapshot of `state` (Protocol 4 container)                                                                                                                                                          |
+| `robco_v7`              | JSON      | Legacy full-game-state key, migrated into `robco_v8` on load                                                                                                                                                                 |
+| `robco_chat`            | JSON      | Chat history (up to 200 messages)                                                                                                                                                                                            |
+| `robco_playstyle`       | string    | "any" or "melee" — rides the save envelope                                                                                                                                                                                   |
+| `robco_playstyle_type`  | string    | _(deprecated C5)_ Legacy key migrated into `state.playthroughType` on first load                                                                                                                                             |
+| `robco_slot_1/2/3`      | JSON      | Save slots A/B/C                                                                                                                                                                                                             |
+| `robco_backup_1/2/3`    | JSON      | Rolling-backup ring (3 slots)                                                                                                                                                                                                |
+| `robco_backup_ptr`      | int       | Rolling-backup ring pointer                                                                                                                                                                                                  |
+| `robco_last_cloud_push` | timestamp | Cloud-sync conflict detection                                                                                                                                                                                                |
+| `robco_v8_quarantine`   | JSON      | SAVE_LAYER3 quarantine envelope (`{quarantinedAt, sourceKey, reason, raw}`) — the exact bytes of an unreadable `robco_v8`/`robco_v7`, preserved for EXPORT/PURGE from the saves list; mirrored to the IDB `'campaign'` store |
 
 ---
 
@@ -2859,18 +3231,18 @@ graph TD
     D -->|handleFileUpload| C
     D -->|restoreChatHistory| A
 
-    H[cloud.js] -->|pushToCloud| I[Firebase]
-    H -->|pullFromCloud| C
-    H -->|pullFromCloud| D
+    H[cloud.js] -->|saveCurrentToCloud| I[Firebase]
+    H -->|loadCloudSave| C
+    H -->|loadCloudSave| D
 
     J[sw.js] -->|cache-first| A
 
-    K[tests/robco-diagnostics.ps1] -.-|validates| B
+    K[tests/robco-diagnostics.js] -.-|validates| B
     K -.-|validates| C
     K -.-|validates| D
     K -.-|validates| H
 
-    L[js/registry-core.js] -->|registrySearch| D
+    L[js/data/registry-core.js] -->|registrySearch| D
 ```
 
 ### Critical Paths (modify with extreme care)
@@ -2883,7 +3255,7 @@ graph TD
    faction, inventory item, and audio system flows through here.
 
 3. **Save envelope format** — shared between `exportSaveFile()`, `handleFileUpload()`,
-   `pushToCloud()`, `pullFromCloud()`, `saveToSlot()`, `loadFromSlot()`. Changing the
+   `saveCurrentToCloud()`, `loadCloudSave()`, `saveToSlot()`, `loadFromSlot()`. Changing the
    format requires updating all six.
 
 4. **AudioSettings cache** — 8 audio functions read from this object. `toggleAudio()`
@@ -2922,6 +3294,12 @@ causing a full DOM reparse on every iteration.
 **What happened:** Token triage accidentally dropped the inventory payload during looting.
 **Fix:** Added a critical directive forcing the AI to always return the full inventory array.
 **Lesson:** Token optimization must never silently drop critical state.
+**Superseded (2026-07-18, AI_OVERSEER Finding 1):** that "always return the ENTIRE inventory array"
+directive later became the root cause of a worse bug — a full-replace import meant a short/empty AI array
+from a do-nothing turn silently wiped natively-held items. The directive now instructs the AI to report
+only what CHANGED, and `autoImportState()` reconciles that as a proposal (additions merged, removals
+confirm-gated) instead of assigning it wholesale. The v1.5.6 lesson still holds; the mechanism that
+enforced it moved from "AI resends everything" to "native state is authoritative; AI proposes deltas."
 
 ### 5. The Cloud Sync Spam (v1.6.0)
 
@@ -2990,7 +3368,7 @@ The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has vi
 **Bump `CACHE_NAME` in `sw.js` whenever a commit stages a served/precached file.** Doc-only, config-only, and test-only commits do not require a bump. The following always qualify and must never ship without a bump:
 
 - `index.html` (any UI change, new panel, new button, layout tweak)
-- `css/terminal.css` (any style change)
+- `css/` (order-prefixed files) (any style change)
 - `js/*.js` (any logic change the user will see or interact with)
 - `sw.js` itself
 
@@ -3018,7 +3396,7 @@ Forgetting to bump means cached users **silently run the old UI** until they man
 
 ### Automated Guard
 
-The pre-commit hook enforces this conditionally: it first checks whether any staged file matches the served/precached set (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`). If matched, it requires a strict monotonic increase in the `-rN` revision number when `APP_VERSION` is unchanged — equal or lower revs are blocked. Non-served commits (doc-only, CI, tests) skip the check. When `APP_VERSION` changes, the revision can reset.
+The pre-commit hook (`scripts/cache-bump-guard.js`) enforces this conditionally: it first checks whether any staged file matches the served/precached set (`SERVED_RE` — `index.html`, `sw.js`, `manifest.json`, `CHANGELOG.md`, `assets/`, `css/`, `js/`). If matched, it requires only that the staged `CACHE_NAME` **differ** from this branch's own HEAD value — it does **not** verify a monotonic increase (the old branch-relative arithmetic was dropped because on `dev`, always many revs ahead of release-only `main`, "local N > main N" was unconditionally true and the guard was inert; the branch-agnostic "must differ from HEAD" holds on any branch). Incrementing the `-rN` suffix is the naming convention to follow, but the guard's invariant is difference from HEAD, not ordering. Non-served commits (doc-only, CI, tests) skip the check. If HEAD's `sw.js` is unreachable (fresh repo / sw.js not yet committed), the guard warns and passes, validating format only — a missing baseline never blocks.
 
 ### Historical Note
 
@@ -3028,16 +3406,25 @@ This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#new
 
 ## Hotfix Rollback (Protocol 16)
 
-If a push breaks the live site, restore users **first** — then diagnose. The rollback script handles the revert + cache bump in one step:
+If a push breaks the live site, restore users **first** — then diagnose. The rollback is **dev-first** per Protocol 43: `main` is release-only and is never pushed directly, so the revert lands on `dev`, clears the full gate, and reaches production by the same verified `dev → main` path every release uses.
 
 ```bash
-# From repo root in Git Bash:
+# From repo root in Git Bash, ON THE `dev` BRANCH (the script refuses to run elsewhere):
 sh scripts/rollback.sh           # reverts HEAD
 sh scripts/rollback.sh <hash>    # reverts a specific commit
-git push origin main
+
+# Then promote it to prod the verified way:
+git push origin dev              # 1. full gate + CI + refreshes staging (proves the revert)
+# 2. merge dev → main  — the same gated release path every release uses
+# 3. publish: cut it as a patch APP_VERSION release (automated deploy), OR run
+#    deploy.yml's manual `workflow_dispatch` from the Actions tab (emergency
+#    redeploy of the now-reverted `main`). Production is release-gated, so a
+#    plain merge to `main` alone does NOT redeploy — step 3 is what publishes.
 ```
 
-The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev (so all cached clients receive the update prompt), and commits through the pre-commit gate. After pushing, diagnose the root cause, add a regression test (Protocol 13), and record it in CHANGELOG.md before re-attempting the fix.
+The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev (so all cached clients receive the update prompt), and commits through the pre-commit gate **on `dev`**. After the rollback reaches prod, diagnose the root cause, add a regression test (Protocol 13), and record it in CHANGELOG.md before re-attempting the fix.
+
+**Accepted tradeoff (owner decision, 2026-07-21 — recorded so it is not re-litigated as an oversight).** Routing an emergency rollback through `dev`'s gate adds a little latency exactly when prod is broken and speed matters most. The owner judged `main`-integrity worth that cost: `main` gets pushed only when the build is known good. The cost is bounded by the fact that a rollback reverts to a commit that was **already gated and already lived in `main`'s history** — the target is known-good code, not new code being rushed onto prod — so this is inherently safer than pushing a fresh fix straight to `main`. (For a break contained to a flaggable networked feature, the remote kill-switch is faster still and needs no deploy — Protocols 32/33/35.)
 
 ---
 
@@ -3045,14 +3432,14 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 
 - [ ] Add field to `let state = { ... }` in **state.js** with default value
 - [ ] Add migration in `migrateState()` in **state.js**: `if (!s.field) s.field = default;`
-- [ ] Add import handling in `autoImportState()` in **api.js**
-- [ ] If the AI should return it: update `getSystemDirective()` schema in **api.js**
-- [ ] If it needs UI: add `render*()` function in **ui-render.js** and call it from `loadUI()` in **ui-core.js**
+- [ ] Add import handling in `autoImportState()` in **api-import.js**
+- [ ] If the AI should return it: update `getSystemDirective()` schema in **api-directive.js**
+- [ ] If it needs UI: add `render*()` function in the appropriate **ui-render-\*.js** panel file and call it from `loadUI()` in **ui-core.js**
 - [ ] If it needs a panel: add `<details class="panel">` in **index.html**
 - [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
 - [ ] Run `npm run lint` — no new errors
 - [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the 2945-test persistence audit
+- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the persistence audit
 - [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
 - [ ] **Update CHANGELOG.md** — add entry under the current version block
 - [ ] **Update README.md** — Current State section, feature tables if applicable
@@ -3078,7 +3465,7 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 ## Adding a New UI Panel (Checklist)
 
 - [ ] Add `<details class="panel">` block in **index.html**
-- [ ] Create `render*()` function in **ui-render.js**
+- [ ] Create `render*()` function in the appropriate **ui-render-\*.js** panel file
 - [ ] Call `render*()` from `loadUI()` in **ui-core.js**
 - [ ] If it shows a count: add to `_updatePanelBadges()` in **ui-core.js**
 - [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui-core.js**

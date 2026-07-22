@@ -1,0 +1,2189 @@
+/* === SPLIT-FILE-HEADER-START ===
+   css/30-modulebay.css — one of 12 files split from the original css/terminal.css (2.8.5 U-A2).
+   Original lines 4915-7009. Pure ordered cut: content below is the
+   content of that line range in the pre-split terminal.css, modulo
+   trailing-blank-line normalization at section boundaries.
+
+   NAMING: flat directory, gapped numeric prefix (05, 10, 15, ... 99) — deliberately
+   NOT subfoldered. In CSS the file ORDER is semantics: equal-specificity ties
+   resolve by source order, so scattering these across subfolders (css/base/,
+   css/panels/, ...) would hide the one property that must stay obvious — what
+   loads after what. A flat, numbered listing makes the cascade order visible
+   in the directory listing itself, with no config to read. The numeric gaps
+   (increments of 5) let a future file be inserted between two existing ones
+   without renumbering the whole set. 99-mobile.css is reserved at the very
+   end on purpose and must never load before anything else (see its own header).
+
+   Do NOT reorder this file relative to its siblings in index.html <link> tags.
+   Contents: Module Bay (Security & Configuration, Step 2 Phase 2 B2a)
+=== SPLIT-FILE-HEADER-END === */
+/* ══════════════════════════════════════════════════════════════
+   30-modulebay.css — cascade slot 30: the Module Bay (SECURITY &
+   CONFIGURATION reframed as installable hardware) — the first-visit
+   hatch ceremony, the generic .bay-board/.bay-slot-tag/.bay-module
+   board/module machine-language classes that BOTH this file's own
+   SLOT boards AND every later OPERATOR/Databank/Chassis board reuse,
+   the program-cartridge deck, the doctrine rocker, the tempo dial,
+   the randomizer interlock, and the phosphor-tube rack.
+   WHY HERE: loads after the chrome/overseer/diagnostic-shell
+   infrastructure and before the OPERATOR boards (35) that consume
+   the .bay-board/.bay-slot-tag/.bay-part-no/.board-status classes
+   this file defines first. Beyond "defines the shared board
+   vocabulary before its consumers," no further deliberate ordering
+   rationale versus its immediate neighbors was identified — its
+   exact position reflects when the Module Bay redesign landed in the
+   original monolith's build order.
+   ══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   MODULE BAY (Step 2 · Phase 2 · B2a) — Security & Configuration reframed
+   as installable hardware. Every control below drives the SAME setter it
+   always has (Protocol 22/23) — this section is presentation-only. Namespaced
+   under .module-bay / .bay-* so it can never leak into other panels. The
+   desktop two-column layout is gated on the PANEL'S OWN width via a CSS
+   container query (not the viewport @media), since in-app this panel lives
+   in a narrower shell column than a full-viewport mockup (Protocol 10 risk).
+   ═══════════════════════════════════════════════════════════════════════ */
+.module-bay {
+  container-type: inline-size;
+  container-name: bay;
+  margin-top: 8px;
+}
+.bay-copper {
+  /* local alias so the edge-connector fingers don't hardcode a bespoke hex
+     outside the --robco-* token set */
+  color: #d9a24a;
+}
+
+/* ── Hatch — first-visit-only service-panel ceremony ─────────────────── */
+.bay-hatch {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background:
+    repeating-linear-gradient(
+      115deg,
+      rgba(var(--robco-green-rgb), 0.03) 0 3px,
+      transparent 3px 9px
+    ),
+    linear-gradient(180deg, #05261c, #021b13 55%, #041f16);
+  transition:
+    transform 0.85s cubic-bezier(0.6, -0.02, 0.35, 1),
+    opacity 0.5s 0.4s;
+}
+.bay-hatch[hidden] {
+  display: none;
+}
+.bay-hatch.bay-hatch--open {
+  transform: translateY(-104%);
+  opacity: 0.2;
+  pointer-events: none;
+}
+.hatch-plate {
+  width: min(480px, 100%);
+  border: 2px solid var(--robco-green);
+  box-shadow:
+    0 0 30px rgba(var(--robco-green-rgb), 0.15),
+    inset 0 0 40px rgba(0, 0, 0, 0.6);
+  padding: 24px 18px 20px;
+  position: relative;
+  background: rgba(0, 12, 8, 0.55);
+  text-align: center;
+}
+.hatch-screw {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.7);
+  border-radius: 50%;
+  color: rgba(var(--robco-green-rgb), 0.8);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.5);
+  transition: transform 0.7s ease;
+}
+.hatch-screw::before {
+  content: '\2715';
+}
+.hatch-screw.tl {
+  top: 7px;
+  left: 7px;
+}
+.hatch-screw.tr {
+  top: 7px;
+  right: 7px;
+}
+.hatch-screw.bl {
+  bottom: 7px;
+  left: 7px;
+}
+.hatch-screw.br {
+  bottom: 7px;
+  right: 7px;
+}
+.hatch-brand {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.75;
+}
+.hatch-title {
+  font-size: clamp(17px, 5.4vw, 23px);
+  letter-spacing: 3px;
+  margin: 12px 0 4px;
+  color: var(--robco-green);
+}
+.hatch-sub {
+  font-size: 10px;
+  opacity: 0.6;
+  letter-spacing: 1px;
+}
+.hatch-warn {
+  margin: 14px auto 16px;
+  border: 1px dashed var(--robco-alert);
+  color: var(--robco-alert);
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 7px 10px;
+  max-width: 380px;
+}
+.hatch-latch-btn {
+  font-size: 13px;
+  padding: 12px 20px;
+  border-width: 2px;
+  letter-spacing: 2px;
+  width: auto;
+}
+.hatch-hint {
+  margin-top: 10px;
+  font-size: 9.5px;
+  opacity: 0.45;
+}
+
+/* ── Bay chrome ───────────────────────────────────────────────────────── */
+.bay-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  border: 1px solid var(--robco-green);
+  border-bottom: 2px solid var(--robco-green);
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.bay-head-title {
+  font-size: clamp(13px, 4vw, 16px);
+  letter-spacing: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bay-led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.bay-chassis {
+  width: 100%;
+  font-size: 9px;
+  opacity: 0.55;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.bay-bus-strip {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.5;
+  padding: 5px 2px 10px;
+  /* Decorative flavor text — wraps freely rather than clipping via nowrap +
+     ellipsis, which left the un-rendered tail as full-width scrollable
+     content (scrollWidth > clientWidth) even though nothing was visibly cut
+     off (Protocol 42 — found during gate render-check verification). */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* Owner-report fix (casing/layout polish batch): text-align:center keeps
+     the strip centered as a whole AND centers each individually-wrapped
+     line at narrow widths, instead of the default ragged left edge. */
+  text-align: center;
+}
+.bay-grid {
+  display: grid;
+  /* Single column, unconditionally (Protocol 42 — found during this unit's
+     manual desktop render-check): the app's desktop shell fixes the settings
+     panel's own column at a hard 380px (grid-template-columns: 380px 1fr in
+     the ≥1000px shell), leaving the bay well under 340px of content width at
+     EVERY viewport size, including 4K. A two-column @container breakpoint
+     (the mockup's full-viewport-width vision) can therefore never engage in
+     this shell — it would be dead, misleading code. minmax(0, 1fr), not a
+     bare 1fr — a bare 1fr track's implicit minimum is "auto" (content-based),
+     which let each board's automatic minimum size force the track wider than
+     the container even at this single width, though nothing inside the board
+     actually needed to be that wide. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.bay-board.span2 {
+  grid-column: 1 / -1;
+}
+
+/* ── Generic "board" (a SLOT sub-panel) ──────────────────────────────── */
+details.bay-board {
+  position: relative;
+  margin-top: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-top: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(var(--robco-green-rgb), 0.04) 0 1px,
+      transparent 1px 26px
+    ),
+    rgba(var(--robco-green-rgb), 0.045);
+  padding: 10px 10px 12px;
+}
+details.bay-board::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -6px;
+  height: 6px;
+  /* background-repeat:round rescales the tile so a WHOLE number of pins
+     always fits the strip's width — no truncated stub pin at the end
+     (owner report: a stray thin partial block trailed the last full pin). */
+  background-image: linear-gradient(90deg, #d9a24a 0 7px, transparent 7px 12px);
+  background-size: 12px 100%;
+  background-repeat: round;
+  opacity: 0.75;
+  pointer-events: none;
+}
+.bay-board > summary {
+  padding-right: 62px;
+  position: relative;
+}
+
+/* OPERATOR "hero"/light-frame boards (a top-level <details class="panel
+   bay-board">) stack in a plain block-flow column (.col-left/.col-right —
+   no CSS Grid gap), unlike the Module Bay's SLOT sub-panels (.bay-grid
+   gap:12px). With zero space between them, each board's own connector-strip
+   pseudo-element (details.bay-board::after, above — protrudes 6px below the
+   board) had nowhere to sit and bled straight over the NEXT board's top
+   border (owner report: "connector strips bleed/overflow"). Give top-level
+   bay-board panels the SAME 12px clearance the Module Bay already gets from
+   its grid gap, so the strip renders fully contained again — same machine,
+   same standard (Protocol 22). Specificity (0,2,0) beats the base
+   `details.bay-board` rule's (0,1,1) margin-top:0 above regardless of source
+   order. Sub-panel SLOT boards are untouched — they never match `.panel`. */
+.panel.bay-board {
+  margin-top: 12px;
+}
+
+/* A .panel.bay-board keeps a REAL <h2> (Protocol UI-1 requires it), but the
+   plain `.panel h2` treatment below (full-bleed colored bar + negative
+   margins, meant for an ordinary panel with no corner label) reads as
+   cluttered right against `.bay-slot-tag`'s reserved top-right corner —
+   e.g. "BUS-03" crowding the SKELETAL HARNESS title. Unify it with the
+   Module Bay's clean, plain-text `.sub-panel > summary h3` treatment instead
+   (below) so every bay-board — panel or sub-panel — reads as the SAME
+   machine (Protocol 22). Only the decorative header styling changes; the
+   element is still a real h2 for Protocol UI-1/Suite 88. */
+.panel.bay-board > summary h2 {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-bottom: none;
+  display: inline;
+  font-size: 12px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+.panel.bay-board > summary h2::after {
+  float: none;
+}
+.bay-slot-tag {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  border-top: none;
+  border-right: none;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0.85;
+}
+.bay-part-no {
+  display: block;
+  font-size: 9px;
+  opacity: 0.45;
+  letter-spacing: 1px;
+  margin: 2px 0 8px;
+}
+.board-status {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  border-left: 2px solid var(--robco-green);
+  padding-left: 7px;
+  margin: 10px 0 0;
+  min-height: 13px;
+}
+.board-status.alert {
+  color: var(--robco-alert);
+  border-left-color: var(--robco-alert);
+}
+.board-status.danger {
+  color: var(--robco-danger);
+  border-left-color: var(--robco-danger);
+}
+
+/* Amber AI Uplink board (SLOT 05 — LOCKED identity, kept amber) */
+details.bay-board.uplink {
+  border-color: rgba(243, 156, 18, 0.6);
+}
+details.bay-board.uplink::after {
+  opacity: 0.55;
+}
+details.bay-board.uplink .bay-slot-tag {
+  border-color: rgba(243, 156, 18, 0.6);
+  color: var(--robco-alert);
+}
+
+/* Blue SVC Tray (utility actions — matches the app's existing blue = utility convention) */
+details.bay-board.tray {
+  border-color: rgba(52, 152, 219, 0.55);
+}
+details.bay-board.tray .bay-slot-tag {
+  border-color: rgba(52, 152, 219, 0.55);
+  color: var(--robco-blue);
+}
+
+/* Red danger board (CAMPAIGN CONFIGS' RANDOMIZER INTERLOCK · PURGE, SU-3) */
+details.bay-board.dangerboard {
+  border-color: rgba(231, 76, 60, 0.55);
+}
+details.bay-board.dangerboard .bay-slot-tag {
+  border-color: rgba(231, 76, 60, 0.55);
+  color: var(--robco-danger);
+}
+details.bay-board.dangerboard::after {
+  background-image: linear-gradient(90deg, #b0642f 0 7px, transparent 7px 12px);
+  background-size: 12px 100%;
+  background-repeat: round;
+}
+
+/* LED color modifiers (module bay LEDs default green — amber/red/off states) */
+.bay-led.amber {
+  background: var(--robco-alert);
+  box-shadow: 0 0 8px var(--robco-alert);
+  animation: bayLedPulse 1.6s infinite;
+}
+.bay-led.red {
+  background: var(--robco-danger);
+  box-shadow: 0 0 8px var(--robco-danger);
+}
+.bay-led.off {
+  background: #3a3d35;
+  box-shadow: none;
+}
+@keyframes bayLedPulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Rack labeling — one plain-English real-control label per rack-mounted
+   control (Protocol 25 — the fiction never obscures what a control actually
+   does). .real-label is the dimmer, smaller, literal-name half. */
+.rack-note {
+  font-size: 10px;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  margin-top: 4px;
+}
+.rack-note .real-label {
+  opacity: 0.6;
+  font-size: 8.5px;
+  letter-spacing: 1.5px;
+}
+
+/* ── PROGRAM CARTRIDGE stack (CAMPAIGN PROFILE board — #gameContextSelect) ──
+   A real, native #gameContextSelect stays in the DOM (Protocol 4/17/22 — the
+   exact id/onchange survives, keyboard/AT users can jump straight to either
+   option), visually hidden with the same .bay-visually-hidden-input
+   technique as #immersionSelect. The cartridge buttons are the visible,
+   genuinely-custom control; both entry points route through the SAME
+   confirm-gated setter (Protocol 22 — one truth, two entry points).
+
+   Owner-requested restyle: a genuine physical PILE, not a side-by-side row —
+   every .cart shares the same grid cell (grid-area: 1 / 1) so they overlap;
+   --stack-index (0 = the active/seated cartridge on top, set per-button by
+   renderCartDeck() in ui-core.js) drives both the z-index and a diagonal
+   "peek" offset via transform, so cartridges further back in the pile sit
+   visually behind and below-right of the one in front. Only their bottom-right
+   edge (>=28px, Protocol 17) is left uncovered, which is exactly what stays
+   tappable — clicking that sliver still reaches the real button underneath,
+   no pointer-events trick needed. --cart-stack-depth (set once per render to
+   the seatable-game count) reserves just enough deck padding for however many
+   cartridges are piled beneath the top one, so a future 3rd seatable game
+   reserves more room automatically instead of a CSS rewrite (Protocol 38). */
+.cart-deck {
+  display: grid;
+  justify-items: center; /* centering rule */
+  margin-top: 8px;
+  padding-bottom: calc((var(--cart-stack-depth, 2) - 1) * 30px);
+  padding-right: calc((var(--cart-stack-depth, 2) - 1) * 30px);
+}
+.cart {
+  grid-area: 1 / 1;
+  width: 100%;
+  max-width: 260px;
+  min-height: 74px;
+  position: relative;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: linear-gradient(180deg, rgba(var(--robco-green-rgb), 0.08), rgba(0, 0, 0, 0.45) 70%);
+  padding: 12px 10px 10px;
+  text-align: left;
+  /* Owner report: the global `button { color: var(--robco-dark) }` reset
+     (terminal.css ~line 223) assumes a solid bright button background — this
+     board's background is dark/near-transparent instead, which left every
+     cartridge reading near-black-on-black. Every custom board control below
+     that overrides `background` away from the bright default must also
+     explicitly reset `color` back to the legible phosphor tone. */
+  color: var(--robco-green);
+  /* Diagonal peek offset per stack depth (see block comment above); a plain
+     transition (not a bespoke @keyframes) so the global prefers-reduced-motion
+     block (transition-duration: 0.01ms !important) neutralises the shuffle
+     with no carve-out (Protocol UI-9 convention). */
+  transform: translate(calc(var(--stack-index, 0) * 30px), calc(var(--stack-index, 0) * 30px));
+  z-index: calc(50 - var(--stack-index, 0));
+  transition:
+    transform 0.25s,
+    opacity 0.25s,
+    border-color 0.25s;
+}
+.cart .spools {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.cart .spools i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background: repeating-radial-gradient(
+    circle at center,
+    rgba(var(--robco-green-rgb), 0.35) 0 2px,
+    transparent 2px 4px
+  );
+}
+.cart .c-name {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1px;
+  line-height: 1.3;
+}
+.cart .c-sub {
+  display: block;
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+  text-transform: none;
+}
+/* write-protect notch */
+.cart::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: 14px;
+  width: 14px;
+  height: 6px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  border-top: none;
+  background: #010a07;
+}
+.cart.seated {
+  border-color: var(--robco-green);
+  box-shadow:
+    0 0 14px rgba(var(--robco-green-rgb), 0.3),
+    inset 0 0 14px rgba(0, 0, 0, 0.5);
+}
+.cart.seated .c-name {
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.cart.seated .c-name::after {
+  content: ' \25CF';
+}
+.cart:not(.seated) {
+  border-style: dashed;
+  opacity: 0.6; /* piled beneath — the base .cart rule's transform already sets the peek offset */
+}
+/* Hover/focus lift — a peeking cartridge previews sliding toward the front
+   before you commit to tapping it. Reuses the base transition (no separate
+   carve-out), so reduced-motion still neutralises it to an instant snap. */
+.cart:not(.seated):hover,
+.cart:not(.seated):focus-visible {
+  transform: translate(calc(var(--stack-index, 0) * 16px), calc(var(--stack-index, 0) * 16px));
+  opacity: 0.85;
+}
+
+/* ── DOCTRINE ROCKER — 2-position switch (CAMPAIGN PROFILE — #playstyleInput) ── */
+.rocker {
+  display: flex;
+  margin-top: 8px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  gap: 4px;
+}
+.rocker button {
+  flex: 1 1 0;
+  min-height: 44px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  letter-spacing: 1px;
+  line-height: 1.3;
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--robco-green); /* see .cart's comment above */
+}
+.rocker button .r-sub {
+  display: block;
+  font-size: 8px;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  text-transform: none;
+}
+.rocker button.on {
+  opacity: 1;
+  border-color: var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.12);
+  box-shadow:
+    inset 0 0 10px rgba(var(--robco-green-rgb), 0.15),
+    0 0 8px rgba(var(--robco-green-rgb), 0.25);
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+
+/* ── TEMPO SELECTOR — centered rotary dial (SU-3 rework, owner-approved
+   mockup: planning/mockups/tempo-dial.html). The 5 playthroughType positions
+   ring the knob on a gauge arc (−84°…+84°, 42° apart, 0° = up) and the needle
+   (the knob's own rotation) always points at the active one. Short labels
+   only sit on the ring — the active option's full name + description lives
+   on the .tempo-readout below (this is how mobile legibility is solved,
+   verified at 360px in the mockup screenshots). The 5 .detent2 buttons are
+   the real direct-pick control (1 tap per pick); the knob itself performs NO
+   action on tap (owner decision) — only a drag, a direct .detent2 tap, or
+   arrow keys (knob is role=slider) change #playthroughTypeSelect. ───────── */
+.dial-assembly {
+  --kd: 108px; /* knob diameter */
+  --rt: 62px; /* tick-ring radius */
+  --rl: 82px; /* detent-label radius */
+  --cy: 100px; /* hub center y inside the assembly */
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  height: 168px;
+  margin: 12px auto 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tick-ring {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  width: calc(var(--rt) * 2);
+  height: calc(var(--rt) * 2);
+  margin: calc(var(--rt) * -1) 0 0 calc(var(--rt) * -1);
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.25);
+  -webkit-mask-image: linear-gradient(180deg, #000 0 62%, transparent 78%);
+  mask-image: linear-gradient(180deg, #000 0 62%, transparent 78%);
+  pointer-events: none;
+}
+.tempo-tick {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  width: 2px;
+  height: 9px;
+  margin-left: -1px;
+  margin-top: -4.5px;
+  background: rgba(var(--robco-green-rgb), 0.4);
+  transform: rotate(var(--a)) translateY(calc(var(--rt) * -1));
+  pointer-events: none;
+}
+.tempo-tick.lit {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+/* detent labels ring the knob — short names only, tap to select directly.
+   Owner report: each position's hit area was enormous and overlapped its
+   neighbors (you couldn't reach the left-side positions, and pressing one
+   revealed a huge highlight block over the whole dial). Root cause — .detent2
+   never overrode the global `button { width: 100% }` rule (Protocol UI-5's
+   documented override, missed here), so every position button stretched to
+   the FULL WIDTH of .dial-assembly (its positioned ancestor) instead of
+   shrinking to its own label. `width: auto` restores the real per-label
+   footprint; `max-width` + wrapping (no more nowrap) keeps even the longest
+   label ("COMPLETIONIST") inside a box narrower than the ~60px (mobile) /
+   ~73px (desktop) arc-length between adjacent ticks, so positions can no
+   longer overlap each other or the central knob.
+   Follow-up owner report: that fix made STANDARD/SPEEDRUN (single 8-letter
+   words with no space/hyphen) wrap mid-word ("STANDAR/D") — the inherited
+   `.panel { overflow-wrap: anywhere }` breaks at an arbitrary character once
+   a word can't fit the box. Live-measured in browser: dropping to 7px/0
+   letter-spacing (from 8px/0.5px) gives STANDARD, MIN-MAXED, CASUAL and
+   SPEEDRUN enough single-line room in the SAME 52px box — verified via a
+   real off-DOM text-width measurement, not guessed — so none of those four
+   ever wrap again. COMPLETIONIST (13 letters, no natural break point) is the
+   one label that cannot fit on one line at any legible size within this
+   radius without growing the dial past the owner-approved mockup geometry
+   (would need to re-derive the hit-area math below from scratch) — owner
+   decision: keep it as the sole two-line label, given a real word-break point
+   via <wbr> in the markup (COMPLE/TIONIST) instead of an arbitrary character
+   split, so its own wrap at least reads cleanly. */
+.detent2 {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--rl) * -1))
+    rotate(calc(var(--a) * -1));
+  width: auto;
+  max-width: 52px;
+  border: none;
+  background: transparent;
+  padding: 7px 5px; /* >=28px total tap target */
+  min-height: 28px;
+  min-width: 28px;
+  font-size: 7px;
+  letter-spacing: 0;
+  line-height: 1.2;
+  opacity: 0.5;
+  white-space: normal;
+  text-shadow: none;
+  color: var(--robco-green); /* see .cart's comment above */
+}
+/* Hover fill gated to real mouse/trackpad input (Protocol 22 — the same
+   touch-safety gate already shipped for the mode pill): without it, a tap on
+   a touch device leaves the fill "stuck" on until something else is tapped,
+   which read as the reported hidden/lingering highlight block. */
+@media (hover: hover) and (pointer: fine) {
+  .detent2:hover {
+    background: rgba(var(--robco-green-rgb), 0.08);
+  }
+}
+.detent2 .d-num {
+  display: block;
+  font-size: 7px;
+  opacity: 0.55;
+  margin-bottom: 2px;
+  letter-spacing: 1px;
+}
+.detent2.on {
+  opacity: 1;
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+  font-weight: bold;
+}
+/* the knob — grip ridges + needle; the WHOLE button rotates. Rotation is a
+   plain CSS transition (never a bespoke carve-out needed — the existing
+   global prefers-reduced-motion block already collapses it to an instant
+   snap). touch-action:none is scoped to the knob ONLY so the page still
+   scrolls normally everywhere else. */
+.knob2 {
+  position: absolute;
+  left: 50%;
+  top: var(--cy);
+  width: var(--kd);
+  height: var(--kd);
+  margin: calc(var(--kd) / -2) 0 0 calc(var(--kd) / -2);
+  border-radius: 50%;
+  border: 2px solid var(--robco-green);
+  padding: 0;
+  background:
+    repeating-conic-gradient(rgba(var(--robco-green-rgb), 0.1) 0deg 4deg, transparent 4deg 24deg),
+    radial-gradient(circle at 38% 32%, rgba(var(--robco-green-rgb), 0.16), rgba(0, 0, 0, 0.65) 72%);
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.75),
+    0 0 12px rgba(var(--robco-green-rgb), 0.18);
+  transition: transform 0.35s cubic-bezier(0.3, 1.3, 0.55, 1);
+  touch-action: none;
+  color: var(--robco-green);
+}
+.knob2.dragging {
+  transition: none;
+}
+.knob2:focus-visible {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 4px;
+}
+.knob2::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 30%;
+  background: var(--robco-green);
+  box-shadow: 0 0 8px var(--robco-green);
+  border-radius: 2px;
+}
+.knob2::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.55);
+  background: radial-gradient(circle at 40% 35%, #1d221c, #05080a 75%);
+}
+/* LCD readout — the active option's full name + description (mobile
+   legibility fix: the ring only carries short labels) */
+.tempo-readout {
+  max-width: 320px;
+  margin: 6px auto 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.45);
+  background: linear-gradient(rgba(var(--robco-green-rgb), 0.03), rgba(0, 0, 0, 0.4)), #041009;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.85);
+  padding: 8px 12px 9px;
+  text-align: center;
+}
+.tempo-readout .tr-pos {
+  font-size: 8px;
+  letter-spacing: 2px;
+  opacity: 0.45;
+  display: block;
+}
+.tempo-readout .tr-name {
+  font-size: 13px;
+  letter-spacing: 3px;
+  display: block;
+  margin-top: 2px;
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.tempo-readout .tr-desc {
+  display: block;
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+  opacity: 0.6;
+  margin-top: 3px;
+  line-height: 1.5;
+  text-transform: none;
+  min-height: 15px;
+}
+.dial-hint {
+  text-align: center;
+  font-size: 8px;
+  letter-spacing: 1px;
+  opacity: 0.35;
+  margin-top: 6px;
+  text-transform: none;
+}
+/* Desktop-only size bump — gated on hover/fine-pointer (Suite 129: an ungated
+   min-width query is what let a phone's mis-measured viewport briefly boot
+   into the desktop shell; every desktop-only tweak in this file, not just
+   the shell reflow, carries the same gate). */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .dial-assembly {
+    --kd: 132px;
+    --rt: 76px;
+    --rl: 100px;
+    --cy: 118px;
+    max-width: 360px;
+    height: 198px;
+  }
+  .detent2 {
+    font-size: 9.5px;
+    max-width: 68px; /* wider ring radius (--rl:100px) gives ~73px of arc between
+      adjacent ticks at this breakpoint — stay safely under it (Protocol 17/22) */
+  }
+}
+
+/* ── RANDOMIZER INTERLOCK — arm-then-commit breaker (RANDOMIZER INTERLOCK ·
+   PURGE board — #completeRngToggle → state.campaignMode). SAFE (cover
+   closed) → ARMED (reversible until wipe) → SEALED (rng-locked: permanent,
+   welded shut). data-rng is scoped to #interlockWrap, never document.body,
+   so this stays a self-contained board effect. ─────────────────────────── */
+.interlock {
+  margin-top: 8px;
+  border: 1px solid rgba(243, 156, 18, 0.5);
+  background:
+    linear-gradient(rgba(1, 10, 7, 0.88), rgba(1, 10, 7, 0.88)) padding-box,
+    repeating-linear-gradient(45deg, rgba(243, 156, 18, 0.55) 0 10px, rgba(0, 0, 0, 0.8) 10px 20px)
+      border-box;
+  border: 6px solid transparent;
+  outline: 1px solid rgba(243, 156, 18, 0.45);
+  padding: 12px;
+}
+.interlock[data-rng='locked'] {
+  background:
+    linear-gradient(rgba(1, 10, 7, 0.88), rgba(1, 10, 7, 0.88)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.6) 0 10px, rgba(0, 0, 0, 0.8) 10px 20px)
+      border-box;
+  outline-color: rgba(231, 76, 60, 0.5);
+}
+.ilk-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ilk-well {
+  position: relative;
+  width: 104px;
+  height: 118px;
+  flex-shrink: 0;
+  border: 1px solid rgba(243, 156, 18, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  margin: 0 auto;
+}
+.ilk-breaker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 44px;
+  width: 100%;
+  color: var(--robco-green); /* see .cart's comment above */
+}
+.ilk-slot-line {
+  width: 14px;
+  height: 62px;
+  border: 1px solid rgba(243, 156, 18, 0.6);
+  border-radius: 7px;
+  position: relative;
+  background: rgba(0, 0, 0, 0.6);
+}
+.ilk-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #3a3e33, #22251e);
+  border: 1px solid rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: top 0.25s;
+  top: 34px; /* down = SAFE */
+}
+.interlock[data-rng='armed'] .ilk-handle,
+.interlock[data-rng='locked'] .ilk-handle {
+  top: -2px; /* up = ARMED */
+}
+.ilk-word {
+  font-size: 8px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+}
+.ilk-word.top {
+  color: var(--robco-alert);
+}
+/* safety cover — closed over the lever while SAFE */
+.ilk-cover {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(243, 156, 18, 0.65);
+  background:
+    repeating-linear-gradient(45deg, rgba(243, 156, 18, 0.16) 0 8px, transparent 8px 16px),
+    linear-gradient(180deg, #23261f, #14160f);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-align: center;
+  padding: 6px;
+  transition:
+    transform 0.3s,
+    opacity 0.3s;
+  transform-origin: top center;
+  min-height: 44px;
+  z-index: 2;
+  line-height: 1.5;
+}
+.ilk-cover .cv-screw {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  background: #4a4e41;
+}
+.ilk-cover .cv-screw.tl {
+  top: 3px;
+  left: 3px;
+}
+.ilk-cover .cv-screw.tr {
+  top: 3px;
+  right: 3px;
+}
+.ilk-cover .cv-screw.bl {
+  bottom: 3px;
+  left: 3px;
+}
+.ilk-cover .cv-screw.br {
+  bottom: 3px;
+  right: 3px;
+}
+/* lifted = an opened lid resting just above the well, lever exposed */
+.ilk-well.lifted .ilk-cover {
+  height: 22px;
+  min-height: 0;
+  padding: 2px;
+  font-size: 0;
+  transform: translateY(-115%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.ilk-well.lifted .cv-screw {
+  display: none;
+}
+.interlock[data-rng='locked'] .ilk-cover {
+  display: none;
+}
+/* the seal — locked state only */
+.ilk-seal {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.interlock[data-rng='locked'] .ilk-seal {
+  display: block;
+}
+.ilk-seal::before,
+.ilk-seal::after {
+  content: '';
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 50%;
+  height: 2px;
+  background: var(--robco-danger);
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.8);
+}
+.ilk-seal::before {
+  transform: rotate(24deg);
+}
+.ilk-seal::after {
+  transform: rotate(-24deg);
+}
+.ilk-seal .seal-disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--robco-danger);
+  background: radial-gradient(circle at 40% 35%, #3d1512, #1b0605 75%);
+  color: var(--robco-danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+.ilk-info {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.ilk-title {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.interlock[data-rng='locked'] .ilk-title {
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+.ilk-desc {
+  font-size: 9.5px;
+  opacity: 0.65;
+  margin-top: 5px;
+  line-height: 1.55;
+  letter-spacing: 0.3px;
+}
+.ilk-actions {
+  margin-top: 9px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Owner report: this button's fill is the same theme-accent color the global
+   `button` rule always paints (var(--robco-green) — bright green by default,
+   but whatever hue the active optics theme resolves it to, e.g. bright red
+   under LEGION RED). The fixed amber label text below used to override that
+   fill's own already-correct, theme-matched dark partner (var(--robco-dark)
+   — the same pairing every ordinary solid button already relies on) with a
+   constant amber that doesn't adapt per theme, reading as low-contrast
+   red-on-red under a warm-toned optic. Falling back to var(--robco-dark)
+   (by not overriding color at all) reuses that already-legible pairing
+   instead of re-deriving a new one (Protocol 22). */
+.ilk-actions button {
+  border-color: var(--robco-alert);
+  font-size: 9.5px;
+}
+
+/* the commit-sequence legend — permanence made explicit */
+.seq-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centering rule */
+  align-items: center;
+  gap: 4px 7px;
+  margin-top: 12px;
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+.seq-step {
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 3px 8px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+.seq-arrow {
+  opacity: 0.4;
+}
+.seq-step.now {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--robco-green);
+  text-shadow: 0 0 6px rgba(var(--robco-green-rgb), 0.6);
+}
+.seq-step.armed-step.now {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+  text-shadow: 0 0 7px rgba(243, 156, 18, 0.55);
+}
+.seq-step.locked-step.now {
+  border-color: var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+}
+
+/* armed / locked banners (same information + toggling as before — #rngModeBanner
+   / #rngLockedBanner keep their exact ids + onCampaignModeChange() wiring;
+   only the presentation moved here from inline styles) */
+.rng-banner {
+  margin-top: 10px;
+  padding: 7px 9px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  line-height: 1.6;
+  text-transform: none;
+}
+.rng-banner.armed {
+  color: var(--robco-alert);
+  border: 1px dashed var(--robco-alert);
+  background: rgba(243, 156, 18, 0.05);
+}
+.rng-banner.locked {
+  color: var(--robco-danger);
+  border: 1px dashed var(--robco-danger);
+  background: rgba(231, 76, 60, 0.06);
+}
+
+/* ── TERMINAL PURGE — wipeTerminal() (double-confirm unchanged) ────────── */
+.purge {
+  margin-top: 14px;
+  border-top: 1px dashed rgba(231, 76, 60, 0.4);
+  padding-top: 12px;
+}
+.purge .p-head {
+  font-size: 9.5px;
+  letter-spacing: 2px;
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  margin-bottom: 8px;
+}
+.purge-btn {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--robco-danger);
+  color: var(--robco-danger);
+  text-shadow: 0 0 7px rgba(231, 76, 60, 0.55);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.4) 0 8px, rgba(0, 0, 0, 0.7) 8px 16px)
+      border-box;
+  border: 4px solid transparent;
+  outline: 1px solid var(--robco-danger);
+}
+.purge-btn:hover {
+  background:
+    linear-gradient(rgba(231, 76, 60, 0.1), rgba(231, 76, 60, 0.1)) padding-box,
+    repeating-linear-gradient(45deg, rgba(231, 76, 60, 0.4) 0 8px, rgba(0, 0, 0, 0.7) 8px 16px)
+      border-box;
+}
+.purge .p-note {
+  font-size: 8.5px;
+  opacity: 0.5;
+  letter-spacing: 0.5px;
+  margin-top: 7px;
+  line-height: 1.6;
+  text-transform: none;
+}
+
+/* ── Boolean "module" (installable card) — wraps a REAL checkbox ────────
+   Accessible custom-checkbox pattern: the native input is visually
+   1x1/opacity:0 but stays focusable/keyboard-operable (Protocol 17); the
+   adjacent label is the visible "hardware" card. All state (LED, dashed
+   border, INSTALL/REMOVE text) is driven purely by :checked — the setter
+   functions and their ids/onchange attributes are UNTOUCHED. */
+.bay-module {
+  position: relative;
+  margin-top: 8px;
+}
+.bay-module-input {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.bay-module-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+  cursor: pointer;
+  min-height: 28px;
+}
+.bay-module-input:focus-visible + .bay-module-card {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+}
+.bay-module-input:disabled + .bay-module-card {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.bay-module-input:not(:checked) + .bay-module-card {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.bay-module .m-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.6);
+  background: transparent;
+}
+.bay-module-input:checked + .bay-module-card .m-led {
+  background: var(--robco-green);
+  box-shadow: 0 0 7px var(--robco-green);
+}
+.bay-module .m-name {
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.bay-module .m-sub {
+  display: block;
+  font-size: 9px;
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.bay-module .m-action {
+  font-size: 9px;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--robco-green);
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+}
+.bay-module-input:checked + .bay-module-card .m-action {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+}
+.bay-module .m-action .off-txt {
+  display: inline;
+}
+.bay-module .m-action .on-txt {
+  display: none;
+}
+.bay-module-input:checked + .bay-module-card .m-action .off-txt {
+  display: none;
+}
+.bay-module-input:checked + .bay-module-card .m-action .on-txt {
+  display: inline;
+}
+
+/* Master-eject variant — SAME pattern, inverted emphasis (checked = removed/muted) */
+.bay-module--eject .bay-module-card {
+  border-width: 1px;
+  font-weight: bold;
+}
+.bay-module--eject .bay-module-input:checked + .bay-module-card {
+  border-color: var(--robco-alert);
+  color: var(--robco-alert);
+  background: rgba(243, 156, 18, 0.08);
+}
+
+/* ── SLOT 03 hardware graphics — power cell + solenoid coil ──────────── */
+/* Purely decorative <span>s inside the existing .bay-module-card, in place of
+   the generic .m-led dot for these two specific modules (B2b). No new control
+   — the same real checkbox still drives install/remove. */
+.cell-graphic {
+  width: 86px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 2px solid var(--robco-green);
+  border-radius: 4px;
+  position: relative;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(var(--robco-green-rgb), 0.25) 0 10px,
+    rgba(var(--robco-green-rgb), 0.08) 10px 20px
+  );
+}
+.cell-graphic::after {
+  /* Terminal-lug nub, kept flush with (not overhanging) the box's own edge —
+     an overhang was measurable as inner scrollable overflow (Protocol 17
+     render-check) even though nothing was ever visibly clipped or pushed the
+     page wider; sitting on the border reads the same at this size. */
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 12px;
+  background: #d9a24a;
+  border-radius: 0 3px 3px 0;
+}
+.cell-graphic .cell-tag {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 6.5px;
+  letter-spacing: 0.3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.bay-module-input:not(:checked) + .bay-module-card .cell-graphic {
+  opacity: 0.45;
+}
+.coil-graphic {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 2px solid var(--robco-green);
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at center,
+    rgba(var(--robco-green-rgb), 0.3) 0 3px,
+    transparent 3px 6px
+  );
+}
+.bay-module-input:not(:checked) + .bay-module-card .coil-graphic {
+  opacity: 0.4;
+}
+
+/* ── Phosphor tube rack (SLOT 01 optics) ─────────────────────────────── */
+/* WU-optics-picker: the GREEN FAMILY (ROBCO/PIP-BOY/GHOUL) collapses into one
+   cartridge that fans out into its 3 variants; the 4 single-hue colours stay
+   standalone tubes. --tube-w/--tube-h/--rack-gap/--cell are the shared cell
+   geometry every rack cell (standalone tube, cartridge, shell, fan-tray
+   variant) is measured against, so every cell renders the SAME size (owner
+   directive: "the boxes should all be the same size") regardless of how much
+   content it holds. */
+.tube-rack {
+  display: flex;
+  flex-wrap: wrap;
+  /* FIX 4 (owner report — centering rule): centers a dangling incomplete last row of
+     tubes, same reusable flex+wrap+justify-content:center pattern as .bay-tools. */
+  justify-content: center;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  --tube-w: 62px;
+  /* FIX 3: was 130px, floored by the family tube's multi-tag needing its own flow
+     line (~129px natural height) vs every other tube's ~107px — now that the tag is
+     an absolute corner chip (see .tube.family .multi-tag) all tubes converge on the
+     same natural content height, so the shared floor drops back down with them. */
+  --tube-h: 112px;
+  --rack-gap: 8px;
+  --cell: calc(var(--tube-w) + var(--rack-gap));
+}
+.family-socket {
+  position: relative;
+  flex: 0 0 auto;
+}
+.fan-tray {
+  display: none;
+  gap: var(--rack-gap);
+  align-items: flex-start;
+}
+.family-socket.expanded .fan-tray {
+  display: flex;
+}
+.family-socket.expanded > .tube.family {
+  display: none;
+}
+/* WU-optics-picker: button.tube's width is a fixed var(--tube-w), not the old
+   width:100%/max-width/min-width range — that percentage resolved against the
+   wrong box once .tube also lives inside the nested, auto-sized .fan-tray row
+   (found live-rendering this unit: it collapsed fan-tray tubes to ~37px
+   instead of 62px). */
+button.tube {
+  --tube: var(--robco-green);
+  flex: 0 0 auto;
+  width: var(--tube-w);
+  min-height: var(--tube-h);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  background: rgba(0, 0, 0, 0.4);
+  /* FIX 1 (Protocol 42 — found live-rendering this unit): a plain <button>
+     picks up the global button{color:var(--robco-dark)} rule (dark text meant
+     to sit on the global button's bright fill). .tube overrides background to
+     a dark card but never overrode color, so the tube name rendered as
+     near-black text on a near-black card — unreadable. Every button-based
+     bay control below gets an explicit color for the same reason. */
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+/* the CARTRIDGE OPEN shell — same cell geometry as .tube (uniform size), dashed
+   "empty socket" treatment instead of a seated glass. */
+button.shell {
+  flex: 0 0 auto;
+  width: var(--tube-w);
+  min-height: var(--tube-h);
+  padding: 8px 4px 6px;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+.tube .glass {
+  display: block;
+  width: 20px;
+  height: 38px;
+  margin: 0 auto 5px;
+  border: 1px solid var(--tube);
+  border-radius: 9px 9px 4px 4px;
+  background: linear-gradient(180deg, transparent 12%, var(--tube) 90%);
+  opacity: 0.5;
+  position: relative;
+  flex-shrink: 0;
+  z-index: 1;
+}
+/* FIX 1 (owner audit vs planning/mockups/optics-picker.html + module-bay-mockup.html):
+   the built tube read as a flat-topped battery — the mockup's glass carries a small
+   rounded "anode nib" cap above the border-radius'd top, which is what actually reads
+   as a vacuum-phosphor-tube silhouette rather than a battery cell. Byte-proportional
+   port of the mockup's ::after (6x5px @ tube-w:62/glass:22x44) scaled to this app's
+   smaller 20x38 glass. */
+.tube .glass::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 4px;
+  background: var(--tube);
+  opacity: 0.8;
+  border-radius: 2px 2px 0 0;
+}
+.tube .t-name {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  opacity: 0.95;
+  line-height: 1.25;
+}
+/* seat lamp — every tube (standalone, cartridge, and fan-tray variant alike)
+   carries this same dot directly under its name: hollow ring when idle, lit
+   + glowing in the tube's own colour when seated. Replaces the old bare
+   ".seated .t-name" glow-only cue with a consistent per-tube indicator. */
+.tube .t-led {
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  border: 1px solid var(--tube);
+  background: transparent;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+/* FIX 3 follow-up (owner: "make the default a tag too somehow? or a badge... not
+   tabs badges" — a small chip on the tube itself, not the bezel/tab-bar badges):
+   (DEFAULT) used to sit in normal flow with a reserved min-height so it never grew
+   the box, but it still read as inline text rather than a tag. It's now the same
+   absolute corner-chip treatment as .multi-tag (top-left instead of top-right, so
+   the two info chips never collide if a future tube ever carried both), fully out
+   of flow like multi-tag — so it drops the min-height reservation entirely, not
+   just avoid growing off of it. :empty hides the chip's border/background on every
+   tube that isn't the active game's default (the JS side, _updateOpticsDefaultLabel
+   in ui-audio.js, still just sets/clears textContent — unchanged). */
+.tube .t-default {
+  display: none;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  margin: 0;
+  padding: 1px 3px;
+  font-size: 6.5px;
+  letter-spacing: 0.4px;
+  line-height: 1.3;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--robco-dim);
+  text-shadow: none;
+  opacity: 0.95;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.tube .t-default:not(:empty) {
+  display: inline-block;
+}
+.tube.seated {
+  border-color: var(--tube);
+  box-shadow: 0 0 12px var(--tube);
+}
+.tube.seated .glass {
+  opacity: 1;
+  box-shadow: 0 0 14px var(--tube);
+}
+.tube.seated .t-led {
+  background: var(--tube);
+  box-shadow: 0 0 8px var(--tube);
+  opacity: 1;
+}
+html.high-lumen .tube.seated,
+html.high-lumen .tube.seated .glass {
+  box-shadow: none;
+}
+
+/* --- GREEN FAMILY cartridge: representative glass + 2 ghost tubes behind --- */
+/* FIX 2 (owner audit vs the mockup): the ghosts were sized/offset independently of the
+   glass they hide behind (16x34 ghost vs a 20x38 glass, with margins carried over
+   unscaled) — the smaller ghost footprint landed almost entirely underneath the opaque
+   glass, so the "hint of 3 types" never actually peeked out. Ghosts now share the
+   glass's own 20x38 box (so the peek math is provable against the glass's real edges)
+   with margin-left offsets recalculated so g1 clears the glass's right edge by ~4px and
+   g2 clears its left edge by ~3.5px — the same two-sided fan the mockup shows, scaled
+   to this app's smaller tube. */
+.tube.family .ghost {
+  position: absolute;
+  top: 8px;
+  width: 20px;
+  height: 38px;
+  border: 1px solid var(--g);
+  border-radius: 9px 9px 4px 4px;
+  opacity: 0.28;
+  pointer-events: none;
+}
+.tube.family .ghost.g1 {
+  left: 50%;
+  margin-left: -5px;
+  transform: scale(0.92);
+}
+.tube.family .ghost.g2 {
+  left: 50%;
+  margin-left: -15px;
+  transform: scale(0.85);
+}
+/* FIX 3 (owner report: "make the 3 types a tag ... so the squares can all be the same
+   size without being big af"): the multi-tag used to sit in normal flow as its own
+   line, forcing the family tube's natural content height ~22px taller than every other
+   tube — --tube-h then had to float every cell in the rack up to that inflated height
+   to stay uniform. Lifting it out of flow into a small absolute corner chip removes
+   that height contribution entirely, so --tube-h can shrink back down for every tube
+   in the rack (see the reduced value in .tube-rack below) while every box stays the
+   same size. Text content ("N TYPES") — and the info it conveys — is unchanged; it's
+   redundant with the family button's own aria-label regardless. */
+.tube.family .multi-tag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: inline-block;
+  margin: 0;
+  padding: 1px 3px;
+  font-size: 6.5px;
+  letter-spacing: 0.4px;
+  line-height: 1.3;
+  border: 1px solid rgba(243, 156, 18, 0.6);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--robco-alert);
+  text-shadow: none;
+  opacity: 0.95;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+/* Owner report: the "3 TYPES" / "(DEFAULT)" corner chips read fine on mobile
+   (where the tube is viewed up close) but are too small/low-contrast at the
+   desktop tube size. Desktop-only bump — both chips stay absolutely
+   positioned corner overlays, so growing them never changes the tube's own
+   box (Protocol 17 uniform boxes are untouched); mobile keeps the original
+   6.5px sizing unchanged. */
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .tube .t-default,
+  .tube.family .multi-tag {
+    font-size: 8px;
+    padding: 2px 4px;
+    background: rgba(0, 0, 0, 0.8);
+  }
+  .tube .t-default {
+    border-color: rgba(var(--robco-green-rgb), 0.85);
+  }
+  .tube.family .multi-tag {
+    border-color: rgba(243, 156, 18, 0.9);
+  }
+}
+
+/* --- the opened cartridge shell the variants slide out of --- */
+button.shell {
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.5);
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(var(--robco-green-rgb), 0.7);
+  text-shadow: none;
+  justify-content: center;
+  animation: shellOpen 0.3s ease;
+}
+.shell .slotway {
+  display: block;
+  width: 20px;
+  height: 38px;
+  margin: 0 auto 5px;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.45);
+  border-radius: 9px 9px 4px 4px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(var(--robco-green-rgb), 0.06) 0 3px,
+    transparent 3px 6px
+  );
+  flex-shrink: 0;
+}
+.shell .t-name {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+@keyframes shellOpen {
+  0% {
+    box-shadow: 0 0 16px rgba(var(--robco-green-rgb), 0.55);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* variants ride OUT of the shell on expand: each starts stacked on the
+   shell's own position (negative translateX back to the origin cell) and
+   slides to its own rack cell, staggered via --i/--d — the "cartridge
+   ejects its tubes" moment. Plain animation: declarations only, so the
+   app's global prefers-reduced-motion block (Protocol UI-9) neutralizes
+   this to the instant final frame with no bespoke carve-out. */
+.family-socket.expanded .fan-tray .tube {
+  animation: tubeEject 0.42s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes tubeEject {
+  0% {
+    transform: translateX(calc(-1 * var(--cell) * var(--i, 0))) translateY(4px) scale(0.6);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* seat-back flourish when the family cartridge re-latches after a pick */
+.tube.family.reseat {
+  animation: tubeSeat 0.35s ease both;
+}
+@keyframes tubeSeat {
+  0% {
+    transform: translateY(-6px);
+    box-shadow: 0 0 22px rgba(var(--robco-green-rgb), 0.7);
+  }
+  60% {
+    transform: translateY(1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* hover feedback only for real pointers — never sticky on a touch tap
+   (same (hover:hover) and (pointer:fine) gate the mode-pill fix already
+   established; the mockup verification found a stuck-hover-after-tap
+   issue on the eject animation, since variants animate out from under
+   the pointer). */
+@media (hover: hover) and (pointer: fine) {
+  button.tube:hover {
+    border-color: var(--tube);
+  }
+  button.shell:hover {
+    border-color: rgba(var(--robco-green-rgb), 0.8);
+  }
+}
+
+/* ── Channel chips (SLOT 02 — B2b: the 13 mute checkboxes as socketed DIP
+   chips). Same accessible pattern as .bay-module — a REAL checkbox, visually
+   hidden but focusable, driving an adjacent <label> "hardware" card purely via
+   :checked (Protocol 17 keyboard operability). Polarity is INVERTED in the
+   presentation layer only (Protocol 25 sanctioned-exception guardrail): the
+   checkbox keeps writing the exact same `muted` boolean to the exact same key
+   (toggleAudio() call unchanged) — :not(:checked) (not muted = audible) reads
+   as a SEATED chip, :checked (muted) reads as a PULLED chip. Storage format
+   untouched. Replaces the B2a .bay-channel-list plain checkbox list. */
+/* FIX 4 (owner report — centering rule): a CSS Grid with auto-fill columns can't center
+   an incomplete last row (nth-child needs a FIXED column count, which auto-fill never
+   has at a responsive width) — flex + wrap + justify-content:center is the reusable
+   pattern this app already established for .bay-tools, applied here so the 13-chip
+   grid's dangling last row (1 or 2 chips) centers instead of left-aligning. */
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.chip-wrap {
+  position: relative;
+  flex: 1 1 96px;
+  max-width: 140px;
+}
+.chip-input {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.chip-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid var(--robco-green);
+  background: rgba(var(--robco-green-rgb), 0.1);
+  color: var(--robco-green);
+  text-shadow: var(--robco-glow);
+  padding: 8px 5px 9px;
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  min-height: 44px;
+}
+/* chip notch (top) + copper pins (bottom) */
+.chip-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 5px;
+  border: 1px solid var(--robco-green);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: var(--robco-dark);
+}
+.chip-card::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -4px;
+  height: 4px;
+  /* background-repeat:round — see details.bay-board::after above */
+  background-image: linear-gradient(90deg, #d9a24a 0 3px, transparent 3px 8px);
+  background-size: 8px 100%;
+  background-repeat: round;
+  opacity: 0.7;
+}
+.chip-card .pin-id {
+  display: block;
+  font-size: 8px;
+  opacity: 0.55;
+  margin-top: 3px;
+}
+.chip-input:focus-visible + .chip-card {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 2px;
+}
+/* :checked = muted = the chip has been PULLED (silent channel) */
+.chip-input:checked + .chip-card {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.5;
+  transform: translateY(3px);
+}
+.chip-input:checked + .chip-card::after {
+  opacity: 0.25;
+}
+.chip-input:checked + .chip-card .pin-id::after {
+  content: ' · SOCKET EMPTY';
+}
+/* FIX 1 (owner report, B2c unit): when the Sonic Processor board itself is
+   ejected (master mute), every channel chip must read as pulled — ALL audio
+   is offline, not just the individually-muted channels. .sonic-board--ejected
+   is toggled on #chipGrid by _updateSonicBoardStatus() and is visual-only: it
+   never touches the individual .chip-input checkboxes or their robco_*_muted
+   keys, which stay intact for reseat (Protocol 25 sanctioned-exception rule). */
+.sonic-board--ejected .chip-card {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.5;
+  transform: translateY(3px);
+}
+.sonic-board--ejected .chip-card::after {
+  opacity: 0.25;
+}
+.sonic-board--ejected .chip-card .pin-id::after {
+  content: ' · SOCKET EMPTY';
+}
+.bay-trimmer {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Uplink board (SLOT 05) ──────────────────────────────────────────── */
+.uplink .key-slot-label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--robco-alert);
+  opacity: 0.75;
+  margin-top: 4px;
+}
+.uplink .key-slot {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.uplink .key-slot input {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.uplink .key-slot .hs-btn {
+  flex-shrink: 0;
+  width: auto;
+}
+
+/* ── Atmospheric Regulator legend (SLOT 04 — decorative, mirrors #immersionSelect) ── */
+.immersion-legend span {
+  opacity: 0.4;
+}
+.immersion-legend span.on {
+  opacity: 1;
+}
+.immersion-legend span.on::before {
+  content: '▸ ';
+}
+
+/* ── Rotary dial (SLOT 04 — Atmospheric Regulator, B2b) ───────────────
+   A real, native #immersionSelect stays in the DOM (Protocol 4/17 — every
+   pre-existing id/onchange survives verbatim, and a screen-reader/keyboard
+   user can jump straight to any of the 3 options via the select itself); it
+   is visually hidden with the SAME technique as .bay-module-input. The
+   circular knob below is a genuinely-custom control (a native <select> can't
+   be reshaped into a dial) that CYCLES through the exact same 3 values by
+   calling the exact same onImmersionChange() setter — one truth, two entry
+   points, never a forked persistence path. */
+.dial-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+button.dial {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  border: 2px solid var(--robco-green);
+  border-radius: 50%;
+  position: relative;
+  background: radial-gradient(
+    circle at 38% 34%,
+    rgba(var(--robco-green-rgb), 0.16),
+    rgba(0, 0, 0, 0.6) 70%
+  );
+  color: var(--robco-green);
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.7);
+  /* FIX 2 (owner request, B2c unit): a horizontal drag on the dial must not
+     also scroll the page on touch devices while a pointer drag is in progress. */
+  touch-action: none;
+}
+.dial .knob {
+  position: absolute;
+  inset: 17px;
+  border: 1px solid rgba(var(--robco-green-rgb), 0.7);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  transition: transform 0.35s cubic-bezier(0.3, 1.3, 0.55, 1);
+}
+.dial .knob::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 14px;
+  background: var(--robco-green);
+  box-shadow: 0 0 6px var(--robco-green);
+}
+button.dial:focus-visible {
+  outline: 2px solid var(--robco-green);
+  outline-offset: 4px;
+}
+.dial-info {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.dial-info .dial-pos {
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+.dial-info .dial-desc {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+/* Visually hides a real, still-focusable/operable native control — used for
+   #immersionSelect once the dial becomes its visible counterpart. font-size
+   stays >=16px (Protocol 17) even though the box is 1x1 — iOS triggers its
+   focus auto-zoom off a form control's COMPUTED font-size, not its rendered
+   size, so a keyboard/AT user tabbing to the hidden select must not zoom. */
+.bay-visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  font-size: 16px;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* ── Key-sync jumper — checkbox-driven sliding switch ────────────────── */
+.jumper-wrap {
+  position: relative;
+  margin-top: 10px;
+}
+.jumper-input {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.jumper-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex-wrap: wrap;
+  min-height: 28px;
+}
+.jumper-input:focus-visible + .jumper-card {
+  outline: 2px solid var(--robco-alert);
+  outline-offset: 2px;
+}
+.j-track {
+  width: 38px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid var(--robco-alert);
+  border-radius: 9px;
+  position: relative;
+}
+.j-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--robco-alert);
+  transition: left 0.2s;
+}
+.jumper-input:checked + .jumper-card .j-track {
+  background: rgba(243, 156, 18, 0.25);
+}
+.jumper-input:checked + .jumper-card .j-track::after {
+  left: 23px;
+  box-shadow: 0 0 7px var(--robco-alert);
+}
+.j-label {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--robco-alert);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+/* ── SVC Tray ─────────────────────────────────────────────────────────── */
+/* FIX 3 (owner report): a CSS grid always fills left-to-right, so when the
+   INSTALL SYSTEM (APP) button is hidden (already-installed PWA) the last row
+   stays left-aligned with a dangling empty gap. flex + justify-content:center
+   self-corrects for ANY number of visible buttons — 6 or 5 — with no JS
+   layout bookkeeping needed. */
+.bay-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.bay-tools button {
+  flex: 1 1 140px;
+  max-width: 220px;
+  font-size: 9.5px;
+  padding: 9px 6px;
+  letter-spacing: 1px;
+  background: transparent;
+  border-color: var(--robco-blue);
+  color: var(--robco-blue);
+  text-shadow: 0 0 5px rgba(52, 152, 219, 0.4);
+  width: auto;
+  min-height: 28px;
+}
+.bay-tools button:hover {
+  background: rgba(52, 152, 219, 0.12);
+}
+
+/* Consolidated EJECT HOLOTAPE control (owner report — merges the four
+   former export buttons into one): the button + format <select> sit on one
+   row, with the caption wrapping to its own full-width line underneath.
+   Reuses the generic <select> styling already defined at the top of this
+   file (background/border/color) — no per-select override needed. Takes a
+   full flex row of its own within .bay-tools so it reads as one cohesive
+   unit next to the unrelated FIRMWARE LOG / INSTALL SYSTEM buttons. */
+.bay-holotape-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 100%;
+}
+.bay-holotape-control select {
+  min-height: 28px;
+  width: auto;
+}
+.bay-holotape-caption {
+  flex: 1 1 100%;
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Service log ──────────────────────────────────────────────────────── */
+.bay-svc-log {
+  margin-top: 14px;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.4);
+  padding: 8px 10px;
+  font-size: 10px;
+  opacity: 0.85;
+  max-height: 100px;
+  overflow-y: auto;
+}
+.bay-svc-log .log-title {
+  letter-spacing: 2px;
+  opacity: 0.6;
+  font-size: 9px;
+  margin-bottom: 4px;
+}
+.bay-svc-log div {
+  line-height: 1.6;
+}
+
+/* ── Schematic View (permanent light-touch fallback) ─────────────────── */
+.bay-schematic {
+  margin-top: 10px;
+  border: 2px solid var(--robco-green);
+  background: var(--robco-dark);
+  padding: 12px;
+}
+.bay-schematic[hidden] {
+  display: none;
+}
+.bay-schematic .schem-note {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-bottom: 10px;
+}
+/* FIX 2 (owner report): a control placed inline beside the name/loc text used
+   to be squeezed by the flex row's competing widths, and Chrome's default
+   <select> UA style silently ellipsis-clips its rendered text when the box
+   gets narrow ("ROBCO GR…"). Stacking name+loc ABOVE a full-width control row
+   guarantees the control always gets the row's full width, so it can never be
+   narrower than its content regardless of label length or viewport. */
+.schem-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  padding: 7px 2px;
+  border-bottom: 1px dotted rgba(var(--robco-green-rgb), 0.25);
+}
+.schem-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.schem-row .sr-name {
+  flex: 1 1 170px;
+  min-width: 0;
+}
+.schem-row .sr-loc {
+  font-size: 9px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.schem-row-control {
+  width: 100%;
+}
+.schem-row-control select,
+.schem-row-control input[type='range'] {
+  width: 100%;
+  min-width: 0;
+}
+/* 2.8.5 item 6: the schematic's own controls must clear the Protocol 17 tap
+   floor in their own right — the row list is now materially longer (the 14
+   channel chips, SLOT 05 and the SVC TRAY all render here), so these are the
+   controls a technician actually drives in this view rather than a short
+   fallback list. */
+.schem-row-control input[type='checkbox'] {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  /* Protocol 42 (found by screenshotting this view): at the UA default size
+     these read as small neutral boxes, but raised to the 28px tap floor an
+     unstyled checkbox becomes a glaring white/blue block against the phosphor
+     glass. accent-color is the same one-property treatment the bay's own
+     typer-speed slider already uses. */
+  accent-color: var(--robco-green);
+}
+.schem-row-control input[type='range'] {
+  accent-color: var(--robco-green);
+}
+.schem-row-control button {
+  min-height: 28px;
+}
+/* Protocol 42 — both of these were found by actually rendering this view, not
+   by reading the CSS. The range input reported a 4px-tall hit box (the UA
+   default track height, with no height ever declared for it here), which is a
+   pre-existing defect in this row: the PRINT-RATE TRIM slider has been a 4px
+   drag target on a touch screen since it was added. The text/password inputs
+   measured 27px — one pixel under the floor. Both are fixed at the floor. */
+.schem-row-control input[type='range'] {
+  height: 28px;
+  min-height: 28px;
+}
+.schem-row-control input[type='text'],
+.schem-row-control input[type='password'],
+.schem-row-control select {
+  min-height: 28px;
+  font-size: 16px; /* Protocol 17: >=16px or mobile focus auto-zooms */
+}
+/* Per-machine signature strip (2.8.5 item 6). The TEXT is per-game data read
+   from GAME_DEFS[ctx].identity.schematic; only the presentation is here. */
+.schem-sig {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dotted rgba(var(--robco-green-rgb), 0.35);
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.55;
+}
+/* Per-game framing via [data-game] attribute selectors (Protocol UI-7 / 38) —
+   never a JS colour or fiction branch. FO3's diagram reads as a moulded
+   Vault-Tec document rather than a salvaged steel service sheet. A game with
+   no rule here simply keeps the default treatment above. */
+[data-game='FO3'] .bay-schematic {
+  border-style: double;
+  border-width: 4px;
+}
+[data-game='FO3'] .schem-sig {
+  letter-spacing: 2px;
+}

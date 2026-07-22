@@ -5,8 +5,8 @@
  * AUTO-DISCOVERS every field in state.js and verifies it is handled by:
  *   - autoImportState() in api.js  (AI sync, file import, cloud pull)
  *   - exportSaveFile()  in state.js (export envelope)
- *   - pushToCloud()     in cloud.js (cloud push)
- *   - handleFileUpload() in ui.js   (file import)
+ *   - saveCurrentToCloud() in cloud.js   (cloud push)
+ *   - handleFileUpload()   in ui-saves.js (file import)
  *
  * If a new field is added to `state` but NOT wired into autoImportState(),
  * this script will exit with code 1 and name the missing field.
@@ -65,13 +65,172 @@ function header(title) {
   console.log(`\n── ${title} ${'─'.repeat(Math.max(0, 50 - title.length))}`);
 }
 
+// ── js/ subfolder resolver (2.8.5 U-A2) ─────────────────────────
+// The reorg moved every js/*.js file into one of these subfolders. Rather
+// than rewriting every readFile('js/<name>.js') call site across both
+// runners, readFile() resolves a legacy flat 'js/<name>.js' path against
+// the real on-disk location transparently — same call signature, same
+// return value, same failure behavior for a name that doesn't exist
+// anywhere (e.g. the sanctioned MUST-NOT-EXIST 'js/ui.js' probe still
+// fails exactly as before). This mirrors readGroup's own "keep the call
+// signature, resolve internally" precedent below.
+const JS_SUBFOLDERS = ['data', 'core', 'ui', 'services', 'dev'];
+
+// Recursively lists every js/<subfolder>/*.js file (js/vendor/ deliberately
+// excluded — it's a separate, manually-curated precache allowlist, same
+// scope js/ 's own flat readdirSync had pre-reorg since 'vendor' is a
+// directory name, never a '.js' file). Returns {sub, name, rel} objects,
+// rel being the 'sub/name.js' path used to build './js/'+rel entries.
+// Any full-repo js-file scan (Suites 49, 212, 216, 220, ...) must walk
+// subfolders like this, or it silently scans zero files post-reorg — an
+// empty-corpus guard can vacuously pass OR spuriously fail depending on
+// what it asserts, either way the exact class of regression Protocol 42
+// requires fixing on discovery.
+function allJsFiles(opts = {}) {
+  const exclude = new Set(opts.exclude || []);
+  const out = [];
+  for (const sub of JS_SUBFOLDERS) {
+    const subDir = path.join(ROOT, 'js', sub);
+    if (!fs.existsSync(subDir)) continue;
+    for (const f of fs.readdirSync(subDir)) {
+      if (f.endsWith('.js') && !exclude.has(f)) out.push({ sub, name: f, rel: `${sub}/${f}` });
+    }
+  }
+  return out;
+}
+
+let _jsLocationCache = null;
+function _jsFileLocation(basename) {
+  if (_jsLocationCache === null) {
+    _jsLocationCache = new Map();
+    const jsDir = path.join(ROOT, 'js');
+    for (const sub of JS_SUBFOLDERS) {
+      const subDir = path.join(jsDir, sub);
+      if (!fs.existsSync(subDir)) continue;
+      for (const f of fs.readdirSync(subDir)) {
+        if (f.endsWith('.js')) _jsLocationCache.set(f, `js/${sub}/${f}`);
+      }
+    }
+  }
+  return _jsLocationCache.get(basename);
+}
+
 function readFile(rel) {
-  const abs = path.join(ROOT, rel);
+  let abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) {
+    const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel);
+    const resolved = m && _jsFileLocation(m[1]);
+    if (resolved) abs = path.join(ROOT, resolved);
+  }
   if (!fs.existsSync(abs)) {
     fail(`Source file not found: ${rel}`);
     process.exit(1);
   }
   return fs.readFileSync(abs, 'utf8');
+}
+
+// ── Rulebook read helpers (2.8.5 U-R2, the rules restructure) ────
+// The rulebook is no longer one file. CLAUDE.md carries the universal
+// contract; rules/*.md carry the surface-scoped subsystem notes. Any test
+// asking "is rule X codified?" must look across BOTH, or the restructure
+// would silently break it — the guard follows the content it guards.
+function ruleNoteFiles() {
+  const dir = path.join(ROOT, 'rules');
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter(f => f.endsWith('.md'))
+    .sort()
+    .map(f => `rules/${f}`);
+}
+
+function rulebookFiles() {
+  return ['CLAUDE.md', ...ruleNoteFiles()];
+}
+
+function readRulebook() {
+  return rulebookFiles()
+    .map(f => readFile(f))
+    .join('\n');
+}
+
+// ── Logical-bundle read helper (2.8.5 U-A0) ─────────────────────
+// A content-location test asserts "literal L lives somewhere in the ui-core
+// FAMILY", not "literal L lives in this one exact file". readGroup(stem)
+// concatenates every js/<stem>.js + js/<stem>-*.js file on disk into one
+// string, so a future split (ui-core.js -> ui-core.js + ui-core-nav.js + ...)
+// keeps every existing readGroup('ui-core').includes(L) assertion green
+// without editing a single test — the split file just joins the group glob.
+// For a stem that hasn't split yet, the family is exactly one file, so this
+// returns byte-identical output to the old readFile(`js/${stem}.js`) call
+// (Array.prototype.join never inserts a separator for a single-element
+// array) — this migration is provably coverage-identical today.
+//
+// GROUP_OVERRIDES exists for the one case the plain glob can't handle: a
+// split whose sibling files intentionally don't share a `<stem>-*.js`
+// filename prefix (see planning/2.8.5/plans/CODE_HEALTH_PLAN.md §2.3 — the proposed
+// api.js split into ai-directive.js / ai-import.js / native-router.js does
+// NOT follow the stem-prefix convention §2 states as governing). Empty
+// today because no file has split yet; a future split unit adds one entry
+// here if it ships non-prefixed sibling names instead of renaming them to
+// fit the glob.
+const GROUP_OVERRIDES = {};
+function readGroup(stem) {
+  if (GROUP_OVERRIDES[stem]) {
+    return GROUP_OVERRIDES[stem].map(f => readFile(`js/${f}`)).join('\n');
+  }
+  // 2.8.5 U-A2: the family now lives inside one js/<subfolder>/, not flat
+  // js/ — search every subfolder (a stem's siblings always share one
+  // subfolder, e.g. all six ui-core* files live in js/ui/) and sort file
+  // paths so join order stays deterministic.
+  const jsDir = path.join(ROOT, 'js');
+  const matches = [];
+  for (const sub of JS_SUBFOLDERS) {
+    const subDir = path.join(jsDir, sub);
+    if (!fs.existsSync(subDir)) continue;
+    for (const f of fs.readdirSync(subDir)) {
+      if (f === `${stem}.js` || (f.startsWith(`${stem}-`) && f.endsWith('.js'))) {
+        matches.push(path.join(subDir, f));
+      }
+    }
+  }
+  matches.sort();
+  if (matches.length === 0) {
+    fail(`Source file family not found: js/${stem}.js (or js/${stem}-*.js)`);
+    process.exit(1);
+  }
+  return matches.map(f => fs.readFileSync(f, 'utf8')).join('\n');
+}
+
+// ── CSS split read helper (2.8.5 U-A2) ──────────────────────────
+// terminal.css was split into 12 files as a pure ordered cut (cascade is
+// order-sensitive — see 99-mobile.css's own header comment on why it must
+// load last). CSS_SPLIT_FILES is DERIVED from index.html's own <link> tags
+// (audit N2, 2.8.5 U-A3: a hand-maintained copy here could silently drift
+// from the real cascade order, since nothing cross-checked it against
+// index.html — only scripts/check-boot-chain.js's CANONICAL_CSS_ORDER ever
+// was). Deriving it collapses this runner's copy to zero duplication: readCss()
+// always concatenates in whatever order the browser actually loads, and
+// check-boot-chain.js CHECK I/J/K independently guards that index.html's own
+// order is the CORRECT one (this derivation can't detect a wrong order in
+// index.html itself — only reproduce it faithfully).
+function _deriveCssSplitOrder() {
+  const html = readFile('index.html');
+  const re = /<link[^>]*\srel=["']stylesheet["'][^>]*\shref=["']css\/([A-Za-z0-9_-]+\.css)["']/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(html))) out.push(m[1]);
+  if (out.length === 0) {
+    fail(
+      'index.html has no css/*.css <link rel="stylesheet"> tags — cannot derive CSS split order'
+    );
+    process.exit(1);
+  }
+  return out;
+}
+const CSS_SPLIT_FILES = _deriveCssSplitOrder();
+function readCss() {
+  return CSS_SPLIT_FILES.map(f => readFile(`css/${f}`)).join('\n');
 }
 
 // ── AST-lite helpers ───────────────────────────────────────────
@@ -205,18 +364,18 @@ function extractSkillKeys(source) {
 // ══════════════════════════════════════════════════════════════
 //  LOAD SOURCES
 // ══════════════════════════════════════════════════════════════
-const stateSource = readFile('js/state.js');
-const apiSource = readFile('js/api.js');
-const cloudSource = readFile('js/cloud.js');
-const uiSource = [
-  'js/ui-audio.js',
-  'js/ui-render.js',
-  'js/ui-saves.js',
-  'js/ui-account.js',
-  'js/ui-core.js',
-]
-  .filter(f => fs.existsSync(path.join(ROOT, f)))
+const stateSource = readGroup('state');
+const apiSource = readGroup('api');
+const cloudSource = readGroup('cloud');
+const uiSource = ['js/ui-audio.js', 'js/ui-saves.js', 'js/ui-account.js']
+  .filter(f => {
+    if (fs.existsSync(path.join(ROOT, f))) return true;
+    const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(f);
+    return !!(m && _jsFileLocation(m[1]));
+  })
   .map(f => readFile(f))
+  .concat([readGroup('ui-core'), readGroup('ui-render')]) // 2.8.5 U-A1/U-A4: ui-core.js + its
+  // ui-core-*.js split family, and ui-render.js + its ui-render-*.js split family
   .join('\n');
 
 console.log('\n══ RobCo Persistence Audit ════════════════════════════════════\n');
@@ -574,6 +733,125 @@ guards(fileImportBody, [
   [/autoImportState/, 'calls autoImportState() for game state'],
 ]);
 
+// ── SUITES 4+5 BEHAVIORAL — real export→import round-trip (U3 slice 6) ──────
+// The static guards above prove exportSaveFile()/handleFileUpload() MENTION the
+// right identifiers; they stay green if the export envelope's contract silently
+// drifts from what the import path consumes. The disaster-recovery promise is a
+// user's exported file re-importing LOSSLESSLY — a behavior no in-runner test
+// executed (46.17 proves the cloud CONTAINER round-trip; save-survival.mjs PATH2
+// drives the real handleFileUpload but hand-BUILDS its envelope, so it never
+// runs the real exportSaveFile nor proves export↔import contract compatibility).
+// This runs the REAL exportSaveFile() (state.js) in a vm — capturing the data:
+// URL envelope it emits — then verifies that envelope's integrity seal with the
+// REAL verifySaveEnvelope() and applies it through the REAL shared container
+// core window._writeImportedContainer() (the exact path handleFileUpload uses at
+// ui-saves.js), asserting the campaign + chat + playstyle survive intact. state.js
+// is self-contained in a vm (getGameContext/getFactionRegistry/GAME_DEFS all live
+// there — mirrors Suites 46/133/164); the DOM + localStorage are stubbed. NOTE:
+// sanitizeImportedContainer() lives in api.js and is absent from this state-only
+// sandbox, so _writeImportedContainer falls back to migrate-only apply — the full
+// sanitize+migrate real apply is separately proven by Suite 46.17 and by
+// save-survival.mjs PATH2; the unique thing proven here is the export/import
+// ENVELOPE contract (branch routing + checksum agreement + lossless field round-trip).
+{
+  const vm45 = require('vm');
+  const stateSrc45 = readGroup('state');
+  const appVer45 = (stateSrc45.match(/const APP_VERSION\s*=\s*'([\d.]+)'/) || [])[1];
+  let rt45 = null;
+  let rt45Err = null;
+  try {
+    const ls45 = new Map();
+    const sb45 = {
+      window: {},
+      console: { error() {}, log() {}, warn() {} },
+      localStorage: {
+        getItem: k => (ls45.has(k) ? ls45.get(k) : null),
+        setItem: (k, v) => ls45.set(k, String(v)),
+        removeItem: k => ls45.delete(k),
+      },
+    };
+    sb45.document = {
+      getElementById: () => ({ value: '' }),
+      createElement: () => ({
+        _href: '',
+        setAttribute(k, v) {
+          if (k === 'href') this._href = v;
+        },
+        click() {
+          sb45.window.__capturedHref = this._href;
+        },
+      }),
+    };
+    vm45.createContext(sb45);
+    const driver45 =
+      '\n;(function(){' +
+      'syncStateFromDom = function(){};' + // neutralize the DOM-sync exportSaveFile calls first
+      "state.gameContext = 'FNV';" +
+      'state.caps = 12345;' +
+      'state.lvl = 27;' +
+      "state.inventory = [{ name: 'Round-Trip Rifle', qty: 1, wgt: 4, val: 500, type: 'weapon' }];" +
+      "chatHistory = [{ sender: 'user', text: 'export-import round-trip probe' }];" +
+      'window.robco_v8 = null;' +
+      "localStorage.setItem('robco_playstyle', 'completionist');" +
+      'exportSaveFile();' + // ── REAL export (Suite 4) ──
+      'var envelope = JSON.parse(decodeURIComponent(' +
+      "(window.__capturedHref || '').replace(/^data:text\\/json;charset=utf-8,/, '')));" +
+      'var integrity = window.verifySaveEnvelope(envelope);' + // export/verify checksum agreement
+      "localStorage.removeItem('robco_v8'); localStorage.removeItem('robco_chat');" +
+      'window._writeImportedContainer(envelope);' + // ── REAL shared apply core (Suite 5) ──
+      "var appliedV8 = JSON.parse(localStorage.getItem('robco_v8') || 'null');" +
+      "var appliedChat = JSON.parse(localStorage.getItem('robco_chat') || 'null');" +
+      "var appliedPlaystyle = localStorage.getItem('robco_playstyle');" +
+      'return { envelope: envelope, integrity: integrity, appliedV8: appliedV8,' +
+      ' appliedChat: appliedChat, appliedPlaystyle: appliedPlaystyle };' +
+      '})();';
+    rt45 = vm45.runInContext(stateSrc45 + driver45, sb45);
+  } catch (e) {
+    rt45Err = e;
+  }
+
+  assert(
+    !!rt45 &&
+      !!appVer45 &&
+      rt45.envelope.version === appVer45 &&
+      rt45.envelope.schemaVersion === appVer45,
+    'Suites 4+5 round-trip: exportSaveFile() stamps the running APP_VERSION on both version + schemaVersion' +
+      (rt45Err ? ' — ' + rt45Err.message : '')
+  );
+  assert(
+    !!rt45 &&
+      rt45.envelope.robco_v8.campaigns.FNV.caps === 12345 &&
+      rt45.envelope.robco_v8.campaigns.FNV.inventory[0].name === 'Round-Trip Rifle',
+    'Suites 4+5 round-trip: exportSaveFile() serialises the LIVE campaign (caps + inventory) into the envelope container'
+  );
+  assert(
+    !!rt45 &&
+      rt45.envelope.chat[0].text === 'export-import round-trip probe' &&
+      rt45.envelope.playstyle === 'completionist',
+    'Suites 4+5 round-trip: exportSaveFile() carries the chat history + playstyle verbatim into the envelope'
+  );
+  assert(
+    !!rt45 &&
+      typeof rt45.envelope.checksum === 'string' &&
+      rt45.envelope.checksum.length > 0 &&
+      'robco_v8' in rt45.envelope &&
+      !('state' in rt45.envelope),
+    'Suites 4+5 round-trip: the exported envelope is checksum-sealed AND shaped for the modern robco_v8 import branch (not the legacy parsed.state branch) — export↔import contract holds'
+  );
+  assert(
+    !!rt45 && rt45.integrity.status === 'ok',
+    "Suites 4+5 round-trip: exportSaveFile()'s own checksum verifies against verifySaveEnvelope()'s recompute (status 'ok' — a hash over the wrong fields would read 'checksum_mismatch')"
+  );
+  assert(
+    !!rt45 &&
+      rt45.appliedV8.campaigns.FNV.caps === 12345 &&
+      rt45.appliedV8.campaigns.FNV.inventory[0].name === 'Round-Trip Rifle' &&
+      rt45.appliedChat[0].text === 'export-import round-trip probe' &&
+      rt45.appliedPlaystyle === 'completionist',
+    'Suites 4+5 round-trip: feeding the exported envelope through the REAL _writeImportedContainer() apply core restores the campaign + chat + playstyle LOSSLESSLY (full disaster-recovery round-trip)'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  SUITE 6 — Cloud sync (cloud.js)
 // ══════════════════════════════════════════════════════════════
@@ -608,13 +886,13 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 8 — Fallout Data Registry structural integrity
-//  Validates js/registry.js file structure without requiring
-//  a browser environment. Uses regex against the raw source.
+//  Validates js/reg_nv.js + js/registry-core.js file structure without
+//  requiring a browser environment. Uses regex against the raw source.
 // ══════════════════════════════════════════════════════════════
 header('Registry structural integrity');
 
-const registrySource = readFile('js/reg_nv.js');
-const registryCoreSource = readFile('js/registry-core.js');
+const registrySource = readGroup('reg_nv');
+const registryCoreSource = readGroup('registry-core');
 
 // 8.1 FALLOUT_REGISTRY global declaration must exist
 assert(/const\s+FALLOUT_REGISTRY\s*=/.test(registrySource), 'FALLOUT_REGISTRY global is declared');
@@ -658,7 +936,7 @@ assert(
   'FALLOUT_REGISTRY.version is declared with semver string'
 );
 
-// 8.8 registry.js must NOT reference state, localStorage, or chatHistory
+// 8.8 reg_nv.js must NOT reference state, localStorage, or chatHistory
 //     (enforces the "read-only reference data, not state data" contract)
 // Strip single-line and block comments before checking, handling CRLF on Windows.
 const registryCode = registrySource
@@ -669,12 +947,12 @@ assert(!/localStorage/.test(registryCode), 'reg_nv.js does not reference localSt
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 9 — Database structural integrity
-//  Validates js/database.js: all CSV tables, trigger coverage,
-//  invKeywords, systemInstruction placement, and purity contract.
+//  Validates js/db_nv.js (and js/db_fo3.js): all CSV tables, trigger
+//  coverage, invKeywords, systemInstruction placement, purity contract.
 // ══════════════════════════════════════════════════════════════
 header('Database structural integrity');
 
-const dbSource = readFile('js/db_nv.js');
+const dbSource = readGroup('db_nv');
 
 // 9.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbSource), 'databaseCSVs global is declared');
@@ -690,7 +968,6 @@ const REQUIRED_TABLES = [
   '[BESTIARY.CSV]',
   '[CHEMS.CSV]',
   '[MISC.CSV]',
-  '[RECIPES.CSV]',
   '[QUEST_ITEMS.CSV]',
   '[VENDORS.CSV]',
 ];
@@ -698,7 +975,21 @@ for (const tbl of REQUIRED_TABLES) {
   assert(dbSource.includes(tbl), `db_nv.js contains ${tbl} section`);
 }
 
-// 9.4 lookupItemInDb must be referenced in database.js (item weight/value cache integrity)
+// 9.10  DELETION REGRESSION (2.8.5 tail item E) — the [RECIPES.CSV] table must
+// stay gone. It was PARKED-FOR-REMOVAL with zero code consumers: doCraft/doScrap
+// read reg_nv.js recipes[]/breakdowns[], and no lookup*()/get*() parser in this
+// file ever named the section, so it reached only the AI inside the databaseCSVs
+// system-instruction string — a Protocol 22 duplicate data source competing with
+// the registry the native crafting path actually uses. Inverting the old
+// "REQUIRED_TABLES contains it" assertion into a must-NOT-exist guard is the
+// Protocol 36b escape-ratchet shape used when the PowerShell runner was deleted:
+// a removal is only real if re-adding it fails the build.
+assert(
+  !dbSource.includes('[RECIPES.CSV]'),
+  '9.10: db_nv.js has NO [RECIPES.CSV] table (removed — zero consumers, registry is the source of truth)'
+);
+
+// 9.4 lookupItemInDb must be referenced in db_nv.js (item weight/value cache integrity)
 assert(/lookupItemInDb/.test(dbSource), "'lookupItemInDb' function exists in db_nv.js");
 
 // 9.5 BESTIARY must have ≥ 30 data rows (guards against data regression)
@@ -723,7 +1014,7 @@ assert(
   'databaseCSVs is injected via systemInstruction in api.js'
 );
 
-// 9.8 database.js must NOT reference state, localStorage, or chatHistory
+// 9.8 db_nv.js must NOT reference state, localStorage, or chatHistory
 const dbCode = dbSource
   .replace(/\/\*[\s\S]*?\*\//g, '') // strip block comments
   .replace(/\/\/[^\r\n]*/g, ''); // strip line comments
@@ -840,6 +1131,39 @@ try {
     migrated.equipped && migrated.equipped.weapon === null,
     'Migrated state added equipped object'
   );
+
+  // Regression (equipped/inventory dangling-reference bug): a save already in
+  // the stale state — state.equipped names an item that isn't in
+  // state.inventory (deleted/sold/scrapped before this fix, or a hand-edited
+  // import) — self-heals on migration, the same way any other structural
+  // migration runs on load (Protocol 34 "a save could already be in the bad
+  // state" concern). 'headgear' is untouched — it has no inventory item type
+  // backing it (AI-write-only).
+  const staleEquippedPayload = {
+    inventory: [{ name: 'Real Item', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+    equipped: { weapon: 'Ghost Rifle', armor: 'Ghost Armor', headgear: 'Ghost Hat' },
+  };
+  const migratedStale = sandbox.migrateState('2.8.0', staleEquippedPayload);
+  assert(
+    migratedStale.equipped.weapon === null && migratedStale.equipped.armor === null,
+    'migrateState() self-heals a stale equipped reference — weapon/armor slots naming an item no longer in inventory are cleared'
+  );
+  assert(
+    migratedStale.equipped.headgear === 'Ghost Hat',
+    'migrateState() leaves state.equipped.headgear untouched (no inventory item type backs it — AI-write-only)'
+  );
+
+  // No false positive: a VALID equipped reference (the item is still in
+  // inventory) must survive migration unchanged.
+  const validEquippedPayload = {
+    inventory: [{ name: 'Laser Rifle', qty: 1, wgt: 5, val: 100, type: 'weapon' }],
+    equipped: { weapon: 'Laser Rifle', armor: null, headgear: null },
+  };
+  const migratedValid = sandbox.migrateState('2.8.0', validEquippedPayload);
+  assert(
+    migratedValid.equipped.weapon === 'Laser Rifle',
+    'migrateState() does not clear a VALID equipped reference still present in inventory (no false-positive reconciliation)'
+  );
 } catch (e) {
   fail(`Runtime test failed: ${e.message}`);
 }
@@ -869,7 +1193,6 @@ try {
 // ══════════════════════════════════════════════════════════════
 //  SUITE 14 — Render Contracts (Protocol 20)
 //  Static source checks that render*() markup/class contracts are intact.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Render Contracts (Protocol 20)');
 let renderFactionRepBody = '';
@@ -953,10 +1276,9 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 15 — CSS Invariants (Protocol 20)
 //  Verifies critical CSS rules that guard mobile layout and faction button sizing.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 header('CSS Invariants (Protocol 20)');
-const cssSource = readFile('css/terminal.css');
+const cssSource = readCss();
 // Strip block comments so embedded {} in comments don't break rule-block extraction
 const cssSourceStripped = cssSource.replace(/\/\*[\s\S]*?\*\//g, '');
 // Phase 3 OPERATOR batch 2: .faction-btn/.faction-card-btns retired along
@@ -1029,7 +1351,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 16 — Service Worker Invariants (Protocol 20)
 //  Static source guards for SW install/activate/message behavior.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Service Worker Invariants (Protocol 20)');
 const swSource = readFile('sw.js');
@@ -1068,7 +1389,7 @@ assert(
   'activate handler calls caches.delete for old-cache cleanup'
 );
 assert(
-  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui-core\.js['"]/.test(swSource),
+  /['"]\.\/index\.html['"]/.test(swSource) && /['"]\.\/js\/ui\/ui-core\.js['"]/.test(swSource),
   'ASSETS list includes index.html and js/ui-core.js'
 );
 assert(
@@ -1081,7 +1402,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 17 — Structural Integrity (Protocol 20)
 //  Verifies key render functions exist, are called, and their DOM targets exist.
-//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('Structural Integrity (Protocol 20)');
 guards(uiSource, [
@@ -1112,7 +1432,6 @@ guards(indexHtml, [
 // ══════════════════════════════════════════════════════════════
 //  SUITE 18 — Detail-Current Dedup Guard (Protocol 27)
 //  Verifies scoreZoneForLoc correctly rejects substring-only matches (<50).
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Detail-Current Dedup Guard');
 try {
@@ -1146,10 +1465,9 @@ try {
 // ══════════════════════════════════════════════════════════════
 //  SUITE 19 — FO3 Database structural integrity
 //  Mirrors Suite 9 for js/db_fo3.js: CSV tables, purity contract.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('FO3 Database structural integrity');
-const dbFo3Source = readFile('js/db_fo3.js');
+const dbFo3Source = readGroup('db_fo3');
 
 // 19.1 databaseCSVs global must be declared
 assert(/const\s+databaseCSVs/.test(dbFo3Source), 'db_fo3.js: databaseCSVs global is declared');
@@ -1168,13 +1486,22 @@ const FO3_REQUIRED_TABLES = [
   '[BESTIARY.CSV]',
   '[CHEMS.CSV]',
   '[MISC.CSV]',
-  '[RECIPES.CSV]',
   '[QUEST_ITEMS.CSV]',
   '[VENDORS.CSV]',
 ];
 for (const tbl of FO3_REQUIRED_TABLES) {
   assert(dbFo3Source.includes(tbl), `db_fo3.js contains ${tbl} section`);
 }
+
+// 19.10  DELETION REGRESSION (2.8.5 tail item E) — the FO3 [RECIPES.CSV] twin of
+// Suite 9.10. Same zero-consumer reasoning; additionally, this table carried the
+// fabricated "Abraxo Cleaner Bomb" row whose Output was a non-existent "Tin
+// Grenade" (AUDIT_fo3_weapons §2 — Tin Grenade was itself deleted from WEAPONS as
+// a non-FO3 row), so the deletion also closed a dangling invented-data reference.
+assert(
+  !dbFo3Source.includes('[RECIPES.CSV]'),
+  '19.10: db_fo3.js has NO [RECIPES.CSV] table (removed — zero consumers, registry is the source of truth)'
+);
 
 // 19.4 lookupItemInDb must be referenced in db_fo3.js
 assert(/lookupItemInDb/.test(dbFo3Source), "'lookupItemInDb' function exists in db_fo3.js");
@@ -1201,7 +1528,6 @@ guards(dbFo3Code, [
 //  SUITE 20 — CSV column-count integrity
 //  Every WEAPONS.CSV data row in db_nv and db_fo3 must have the
 //  same number of fields as the header row.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('CSV column-count integrity');
 
@@ -1244,7 +1570,6 @@ checkWeaponsCsvColumnCount(dbFo3Source, 'db_fo3.js');
 //  strings (localStorage, Firestore, Gemini API) are escaped before
 //  innerHTML, and no served JS inlines a localStorage read into a
 //  template literal.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Security regression guards');
 
@@ -1276,7 +1601,7 @@ assert(
 // runner — was removed under Protocol 42). Item names are escaped and routed via a data
 // attribute, never interpolated raw into the onclick. Complements 21.4 (the buy list).
 {
-  const renSrc213 = readFile('js/ui-render.js');
+  const renSrc213 = readGroup('ui-render');
   let sellBody213 = '';
   try {
     sellBody213 = extractFunctionBody(renSrc213, 'renderTradeSellList');
@@ -1292,7 +1617,7 @@ assert(
 // 21.4 Native TRADE list is XSS-safe (WU-N2 retired the AI TRADE modal): item names are
 // escaped and routed via a data attribute, never interpolated raw into the onclick.
 {
-  const renSrc214 = readFile('js/ui-render.js');
+  const renSrc214 = readGroup('ui-render');
   let buyBody214 = '';
   try {
     buyBody214 = extractFunctionBody(renSrc214, 'renderTradeBuyList');
@@ -1389,7 +1714,6 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 22 — Critical Feature Presence (Group 1)
 //  Asserts every key control exists in index.html and is wired.
-//  30 tests
 // ══════════════════════════════════════════════════════════════
 header('Critical Feature Presence');
 // DO-N: the tab-bar's plain buttons were replaced by illuminated bezel keycaps that
@@ -1471,7 +1795,6 @@ guards(htmlSource, [
 // ══════════════════════════════════════════════════════════════
 //  SUITE 23 — Prohibited Patterns (Group 2)
 //  Static checks that banned patterns haven't crept back in.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Prohibited Patterns');
 // 23.1 No innerHTML += in ui.js (render functions must use map().join('') bulk assignment)
@@ -1568,7 +1891,6 @@ assert(
 //  SUITE 24 — Protocol Completeness (Group 3)
 //  P5: every render*() is called from loadUI(); P6: wireInput IDs
 //  exist; P7: every audio function has the double-guard pattern.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Protocol Completeness — P5 render wiring');
 {
@@ -1643,7 +1965,6 @@ header('Protocol Completeness — P7 audio double-guard');
 //  SUITE 25 — AI Contract Lock (Group 4)
 //  Verifies responseMimeType is locked and getSystemDirective()
 //  references the tri-node schema shape.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('AI Contract Lock');
 assert(
@@ -1682,11 +2003,10 @@ assert(
 //  SUITE 26 — Architectural Boundaries (Group 5)
 //  reg_fo3.js must be pure read-only reference data: no state
 //  writes, no localStorage, no chatHistory references.
-//  3 tests
 // ══════════════════════════════════════════════════════════════
 header('Architectural Boundaries — reg_fo3.js purity');
 {
-  const regFo3Source = readFile('js/reg_fo3.js');
+  const regFo3Source = readGroup('reg_fo3');
   const regFo3Code = regFo3Source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
   guards(regFo3Code, [
     [/\bstate\b/, 'reg_fo3.js does not reference state (pure reference data)', NEG],
@@ -1699,7 +2019,6 @@ header('Architectural Boundaries — reg_fo3.js purity');
 //  SUITE 27 — Assets Completeness (Group 6)
 //  Every local <script src> / <link href> in index.html must
 //  appear in sw.js ASSETS so the PWA caches the full app.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Assets Completeness');
 {
@@ -1735,178 +2054,92 @@ header('Assets Completeness');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SUITE 28 — Meta / Runner Parity (Group 7)
-//  Verifies that both runners contain all gate-guard suites (22-40)
-//  and that the canonical test count matches README.md, ARCHITECTURE.md,
-//  and (conditionally, if present) RULES.md and CLAUDE.md.
+//  SUITE 28 — Meta / Single-Runner Guard (Group 7)
+//  Guards that the deleted PowerShell runner mirror stays deleted.
 //
-//  NOTE: source-level assert() / Check() counts cannot reliably track
-//  runtime test counts because loops multiply results at runtime. Parity
-//  is enforced structurally — both runners must contain every named suite.
-//  7 tests
+//  R1 (2026-07-20): Protocol 2a (test-count sync) is RETIRED, so the
+//  cross-file count assertions that used to live here — CHANGELOG.md's
+//  "Tests: N/N" header vs README.md / ARCHITECTURE.md / RULES.md /
+//  CLAUDE.md — are REMOVED, along with the end-of-run runtime-count
+//  reconciliation they fed (see RESULTS). Retiring a rule means removing
+//  its enforcement, not just its prose (Protocol 49). The count guarded no
+//  behaviour: the runner's exit status is the only thing that ever mattered.
+//
+//  HONEST NOTE ON LOST COVERAGE: the reconciliation also incidentally
+//  caught a silently DROPPED SUITE (a smaller runtime total than the
+//  documented one). That coverage is genuinely gone. It is not replaced by
+//  a generated count, because a self-updating baseline regenerates to match
+//  whatever actually ran and therefore can never notice that less ran —
+//  the drop-detection was entirely parasitic on the number being HAND-set.
+//  Restoring it needs a mechanism that does not route through a count.
+//
+//  2.8.5 U-B3: the PowerShell mirror (tests/robco-diagnostics.ps1) was
+//  DELETED — it caught nothing the Node runner cannot (its "behavioral"
+//  tests shelled out to node/vm; its static tests were the same UTF-8 file
+//  greps) at ~13× the cost. Protocol 15 (runner parity) is RETIRED. The old
+//  "PS runner contains all suites" assertion below is now inverted into a
+//  regression guard that the mirror stays gone (Protocol 36b escape-ratchet).
+//
+//  Health-U3 slice 1 (2026-07-16) retired the old GATE_SUITES self-grep as
+//  TAUTOLOGICAL and re-pointed it at an end-of-run count reconciliation;
+//  R1 (2026-07-20) then retired that reconciliation too, with Protocol 2a.
+//
 // ══════════════════════════════════════════════════════════════
-header('Meta / Runner Parity');
+header('Meta / Single-Runner Guard');
 {
-  const jsRunner = readFile('tests/robco-diagnostics.js');
-  const psRunner = readFile('tests/robco-diagnostics.ps1');
-
-  // Structural parity: both runners must contain every gate-guard suite marker (22-40).
-  // A missing marker means a suite was added to one runner but not ported to the other.
-  const GATE_SUITES = [
-    'Suite 22',
-    'Suite 23',
-    'Suite 24',
-    'Suite 25',
-    'Suite 26',
-    'Suite 27',
-    'Suite 28',
-    'Suite 29',
-    'Suite 30',
-    'Suite 31',
-    'Suite 32',
-    'Suite 33',
-    'Suite 34',
-    'Suite 35',
-    'Suite 36',
-    'Suite 37',
-    'Suite 38',
-    'Suite 39',
-    'Suite 40',
-    'Suite 41',
-    'Suite 49',
-    'Suite 50',
-    'Suite 51',
-    'Suite 52',
-    'Suite 53',
-    'Suite 54',
-    'Suite 55',
-    'Suite 56',
-    'Suite 57',
-    'Suite 58',
-    'Suite 59',
-    'Suite 60',
-    'Suite 61',
-    'Suite 62',
-    'Suite 63',
-    'Suite 64',
-    'Suite 65',
-    'Suite 66',
-    'Suite 67',
-    'Suite 68',
-    'Suite 69',
-    'Suite 70',
-    'Suite 71',
-    'Suite 72',
-    'Suite 73',
-    'Suite 74',
-    'Suite 75',
-    'Suite 76',
-    'Suite 77',
-    'Suite 78',
-    'Suite 79',
-    'Suite 80',
-    'Suite 81',
-    'Suite 82',
-    'Suite 83',
-    'Suite 84',
-    'Suite 85',
-    'Suite 86',
-    'Suite 87',
-    'Suite 88',
-    'Suite 89',
-    'Suite 90',
-    'Suite 91',
-    'Suite 92',
-    'Suite 93',
-    'Suite 94',
-    'Suite 95',
-    'Suite 96',
-    'Suite 97',
-    'Suite 98',
-    'Suite 99',
-    'Suite 100',
-    'Suite 101',
-    'Suite 102',
-    'Suite 103',
-    'Suite 104',
-    'Suite 105',
-    'Suite 106',
-    'Suite 107',
-    'Suite 108',
-    'Suite 109',
-    'Suite 110',
-    'Suite 111',
-  ];
-  const jsMissing = GATE_SUITES.filter(s => !jsRunner.includes(s));
-  const psMissing = GATE_SUITES.filter(s => !psRunner.includes(s));
+  // Regression guard (2.8.5 U-B3, Protocol 36b): the PowerShell mirror was
+  // deleted and Protocol 15 retired — assert it does not silently creep back.
   assert(
-    jsMissing.length === 0,
-    'JS runner contains all gate-guard suites (22-41, 49-100)' +
-      (jsMissing.length ? ' — missing: ' + jsMissing.join(', ') : '')
-  );
-  assert(
-    psMissing.length === 0,
-    'PS runner contains all gate-guard suites (22-41, 49-100)' +
-      (psMissing.length ? ' — missing: ' + psMissing.join(', ') : '')
+    !fs.existsSync(path.join(ROOT, 'tests/robco-diagnostics.ps1')),
+    'PowerShell test-runner mirror (tests/robco-diagnostics.ps1) stays deleted (Protocol 15 retired — single Node runner)'
   );
 
-  // Canonical count in CHANGELOG.md matches README.md and ARCHITECTURE.md (Protocol 2a).
-  // The CHANGELOG header format is: <!-- Tests: N/N | Cache: ... -->
-  // Protocol 42 fix (v2.8.0-r3 hotfix): this used to take the FIRST "Tests: N/N"
-  // match in the file, which is always the [Unreleased] header — correct only by
-  // coincidence, since every prior push happened to leave Unreleased's count equal
-  // to the latest released block's count. The Hotfix model (Protocol 2a) explicitly
-  // freezes the Unreleased header while a hotfix updates the ALREADY-RELEASED
-  // block's header instead, so a hotfix that changes the total test count (like
-  // this one, Suite 219) legitimately diverges the two — the first-match read then
-  // picks the stale, frozen Unreleased number instead of the real current count.
-  // Fixed to take the MAXIMUM across every "Tests: N/N" header in the file: the
-  // total only ever grows within a release cycle, so the max is always the
-  // genuinely-current count, whether that's Unreleased (the normal case) or a
-  // just-hotfixed released block (this case).
+  // R1 (2026-07-20, Protocol 49): retirement-regression guard. Protocol 2a is
+  // retired — assert the count-sync obligation does not silently creep back into
+  // the docs the way the deleted PS mirror could have. CHANGELOG.md's RELEASED
+  // version blocks legitimately keep their frozen release-day "Tests: N/N"
+  // headers (that is HISTORY, not an obligation); what must NOT return is a LIVE
+  // count on the [Unreleased] header, which is the one that had to be hand-synced
+  // on every single test change.
   const changelog = readFile('CHANGELOG.md');
-  const countMatches = [...changelog.matchAll(/Tests:\s*(\d+)\/\d+/g)];
-  const canonicalCount = countMatches.length
-    ? String(Math.max(...countMatches.map(m => parseInt(m[1], 10))))
-    : '';
-  assert(!!canonicalCount, 'CHANGELOG.md contains Tests: N/N header (Protocol 2a)');
-  const readme = readFile('README.md');
+  const unreleasedHeader = (changelog.match(/^## \[Unreleased\].*$/m) || [''])[0];
   assert(
-    !!canonicalCount &&
-      (readme.includes(canonicalCount + ' tests') || readme.includes(canonicalCount + '-test')),
-    `README.md contains CHANGELOG.md canonical test count (${canonicalCount})`
-  );
-  const arch = readFile('ARCHITECTURE.md');
-  assert(
-    !!canonicalCount && arch.includes(canonicalCount),
-    `ARCHITECTURE.md contains canonical test count (${canonicalCount})`
+    !/Tests:\s*\d+/.test(unreleasedHeader),
+    'CHANGELOG.md [Unreleased] header carries no live test count (Protocol 2a retired — released blocks keep their frozen historical counts)'
   );
 
-  // Conditional: RULES.md and CLAUDE.md are untracked local files (absent on CI/fresh clone).
-  // If present, assert their count matches; if absent, skip gracefully (pass trivially).
-  const rulesPath = path.join(ROOT, 'RULES.md');
-  const rulesExists = fs.existsSync(rulesPath);
-  const rulesSrc = rulesExists ? fs.readFileSync(rulesPath, 'utf8') : null;
-  const rulesCountM = rulesSrc ? rulesSrc.match(/\b(\d+)\s*tests?\b/) : null;
+  // R3 follow-up (2026-07-20, Protocol 49): RULES.md was DELETED. It had become
+  // a 32-line pointer whose entire job was "go read CLAUDE.md" — redundant once
+  // R2 split the rulebook into CLAUDE.md (universal contract) + rules/*.md
+  // (path-scoped notes). Every assertion that named it was retargeted at the
+  // invariant it actually protected (Protocol 38 → the rulebook, Protocol 40 →
+  // the rulebook, the repomix private-file exclusion → CLAUDE.md + rules/**).
+  // Same inversion as the PS-mirror guard above: assert it stays gone, so a
+  // future session cannot silently reintroduce a second rulebook to drift from.
   assert(
-    !rulesExists || (!!rulesCountM && rulesCountM[1] === canonicalCount),
-    `RULES.md test count matches canonical (${canonicalCount}) — skipped if absent`
+    !fs.existsSync(path.join(ROOT, 'RULES.md')),
+    'RULES.md stays deleted (R3 — the rulebook is CLAUDE.md + rules/*.md, one source of truth)'
   );
-  const claudePath = path.join(ROOT, 'CLAUDE.md');
-  const claudeExists = fs.existsSync(claudePath);
-  const claudeSrc = claudeExists ? fs.readFileSync(claudePath, 'utf8') : null;
-  const claudeCountM = claudeSrc ? claudeSrc.match(/\b(\d+)\s*tests?\b/) : null;
-  assert(
-    !claudeExists || (!!claudeCountM && claudeCountM[1] === canonicalCount),
-    `CLAUDE.md test count matches canonical (${canonicalCount}) — skipped if absent`
-  );
+
+  // R3 follow-up: the per-suite "// N tests" narration comments were STRIPPED
+  // from this runner. Protocol 2a's retirement removed the obligation to keep
+  // those numbers accurate but left the numbers sitting there reading as fact —
+  // curing the tax while keeping the lie. Assert the convention does not return.
+  {
+    const selfSrc28 = readFile('tests/robco-diagnostics.js');
+    const countComments28 = (selfSrc28.match(/^\s*\/\/\s*\(?\d+ tests?\)?\s*$/gm) || []).length;
+    assert(
+      countComments28 === 0,
+      'tests/robco-diagnostics.js carries no per-suite "// N tests" count comments (Protocol 2a retired — unmaintained counts must not read as fact)' +
+        (countComments28 ? ` — found ${countComments28}` : '')
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 29 — SW Update Banner (Protocol 13/20)
 //  Regression guards: alert() replaced by in-page banner;
 //  banner element + tap→SKIP_WAITING wiring; reload guard intact.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 header('SW Update Banner');
 
@@ -1948,9 +2181,9 @@ assert(
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 30 — Phase 1b Guards
-//  Input maxlength caps, enforcing CSP (Stage 2), monotonic cache
-//  guard in pre-commit hook, proactive localStorage quota warning.
-//  5 tests
+//  Input maxlength caps, enforcing CSP (Stage 2), the branch-agnostic
+//  cache-bump guard (exercised behaviourally in a throwaway git repo),
+//  proactive localStorage quota warning.
 // ══════════════════════════════════════════════════════════════
 header('Phase 1b Guards');
 
@@ -1975,13 +2208,232 @@ guards(htmlSource, [
   ],
 ]);
 
-// 30.3 Pre-commit hook enforces monotonic rev increase
+// 30.3a–30.3d  BEHAVIORAL cache-bump guard (Defect-1 fix, r-review).
+//   The old 30.3 merely grepped the installed hook for the textual pattern
+//   "LOCAL_N -gt ORIGIN_N" — it proved a comparison EXISTED, not that it compared
+//   against the RIGHT baseline. That guard compared against origin/main and was
+//   therefore INERT on dev (local rev is always > main's), so a green 30.3 was
+//   flattering a broken mechanism. This replaces it with a real red-then-green
+//   run of the ACTUAL production guard (scripts/cache-bump-guard.js) inside a
+//   throwaway git repo: served file staged + CACHE_NAME unchanged from HEAD must
+//   FAIL; a changed CACHE_NAME must PASS; an unreachable HEAD baseline must PASS
+//   (fail-safe); a non-served commit must SKIP. Proven by running it, not grepping.
 {
-  const hookPath = path.join(ROOT, '.git', 'hooks', 'pre-commit');
-  const hookSource = fs.existsSync(hookPath) ? fs.readFileSync(hookPath, 'utf8') : '';
+  const os30 = require('os');
+  const cp30 = require('child_process');
+  const guard30 = path.join(ROOT, 'scripts', 'cache-bump-guard.js');
+  // Scrub GIT_* from the env so the child git/guard operate on the temp repo,
+  // never the parent repo's index (git sets GIT_DIR/GIT_INDEX_FILE when it runs
+  // a hook, and those must not leak into the throwaway repo).
+  const env30 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/.test(k)) env30[k] = process.env[k];
+
+  const SW = v => "const CACHE_NAME = 'robco-terminal-v9.9.9-r" + v + "';\n";
+  const g = (repo, args) =>
+    cp30.spawnSync('git', args, { cwd: repo, env: env30, encoding: 'utf8' });
+  const commit = repo =>
+    g(repo, [
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=test',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'x',
+    ]);
+  const runGuard = repo =>
+    cp30.spawnSync('node', [guard30], { cwd: repo, env: env30, encoding: 'utf8' }).status;
+
+  let redStatus = null;
+  let greenStatus = null;
+  let failsafeStatus = null;
+  let skipStatus = null;
+  let setupErr = null;
+  const roots30 = [];
+  try {
+    // ── Repo A: sw.js IS committed at HEAD (r1). Covers red / green / skip. ──
+    const a = fs.mkdtempSync(path.join(os30.tmpdir(), 'robco-cacheguard-a-'));
+    roots30.push(a);
+    g(a, ['init', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SW('1'), 'utf8');
+    fs.writeFileSync(path.join(a, 'index.html'), 'a', 'utf8');
+    fs.writeFileSync(path.join(a, 'README.md'), 'r', 'utf8');
+    g(a, ['add', '-A']);
+    commit(a);
+
+    // RED: change a served file (index.html), stage it, leave CACHE_NAME at HEAD.
+    fs.writeFileSync(path.join(a, 'index.html'), 'b', 'utf8');
+    g(a, ['add', 'index.html']);
+    redStatus = runGuard(a); // expect non-zero (served staged, CACHE == HEAD)
+
+    // GREEN: bump CACHE_NAME to r2 and stage it alongside the served change.
+    g(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SW('2'), 'utf8');
+    g(a, ['add', 'sw.js', 'index.html']);
+    greenStatus = runGuard(a); // expect 0 (CACHE differs from HEAD)
+
+    // SKIP: stage only a NON-served file — the guard must not require a bump.
+    g(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'README.md'), 'r2', 'utf8');
+    g(a, ['add', 'README.md']);
+    skipStatus = runGuard(a); // expect 0 (no served file staged)
+
+    // ── Repo B: sw.js NOT in HEAD → baseline unreachable → fail-safe PASS. ──
+    const b = fs.mkdtempSync(path.join(os30.tmpdir(), 'robco-cacheguard-b-'));
+    roots30.push(b);
+    g(b, ['init', '-q']);
+    fs.writeFileSync(path.join(b, 'index.html'), 'a', 'utf8');
+    g(b, ['add', '-A']);
+    commit(b); // HEAD has no sw.js
+    fs.writeFileSync(path.join(b, 'index.html'), 'b', 'utf8');
+    fs.writeFileSync(path.join(b, 'sw.js'), SW('1'), 'utf8'); // valid format, new file
+    g(b, ['add', '-A']);
+    failsafeStatus = runGuard(b); // expect 0 (no baseline; warn + pass)
+  } catch (e) {
+    setupErr = (e && e.message) || String(e);
+  } finally {
+    for (const r of roots30) {
+      try {
+        fs.rmSync(r, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
+
   assert(
-    /LOCAL_N.*-gt.*ORIGIN_N|-gt.*ORIGIN_N.*LOCAL_N/.test(hookSource),
-    'pre-commit hook enforces strict monotonic rev increase (LOCAL_N -gt ORIGIN_N)'
+    setupErr === null && redStatus !== 0,
+    '30.3a: [behavioral] cache-bump guard FAILS when a served file is staged and CACHE_NAME is unchanged from HEAD (branch-agnostic — the real Protocol 1 invariant)' +
+      (setupErr ? ' — setup error: ' + setupErr : ' — guard exited ' + redStatus)
+  );
+  assert(
+    setupErr === null && greenStatus === 0,
+    '30.3b: [behavioral] cache-bump guard PASSES once CACHE_NAME differs from HEAD (red-then-green proof)' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
+  );
+  assert(
+    setupErr === null && failsafeStatus === 0,
+    '30.3c: [behavioral] cache-bump guard PASSES (fail-safe) when HEAD:sw.js baseline is unreachable — a missing baseline never blocks a commit' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
+  );
+  assert(
+    setupErr === null && skipStatus === 0,
+    '30.3d: [behavioral] cache-bump guard SKIPS (passes) when no served/precached file is staged' +
+      (setupErr ? ' — setup error: ' + setupErr : '')
+  );
+}
+
+// 30.3e  BEHAVIORAL real-path proof of the classifier fix (knowledge-arch audit,
+//   Defect-1). Before the fix, scripts/cache-bump-guard.js's SERVED_RE matched a
+//   ROOT-anchored `icon[^/]*\.png` and therefore matched NO real precached asset, so
+//   staging a change to ./assets/icon.png (a genuine sw.js ASSETS entry) SKIPPED the
+//   guard and required no cache bump — cached users silently kept the stale asset under
+//   a fully green gate. This runs the ACTUAL production guard against a staged assets/
+//   change and proves it now FAILS without a bump and PASSES with one (red-then-green).
+{
+  const os30e = require('os');
+  const cp30e = require('child_process');
+  const guard30e = path.join(ROOT, 'scripts', 'cache-bump-guard.js');
+  const env30e = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/.test(k)) env30e[k] = process.env[k];
+  const SWe = v =>
+    "const CACHE_NAME = 'robco-terminal-v9.9.9-r" +
+    v +
+    "';\nconst ASSETS = ['./assets/icon.png'];\n";
+  const ge = (repo, args) =>
+    cp30e.spawnSync('git', args, { cwd: repo, env: env30e, encoding: 'utf8' });
+  const commite = repo =>
+    ge(repo, [
+      '-c',
+      'user.email=t@example.com',
+      '-c',
+      'user.name=test',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'x',
+    ]);
+  const runGuarde = repo =>
+    cp30e.spawnSync('node', [guard30e], { cwd: repo, env: env30e, encoding: 'utf8' }).status;
+  let assetRed = null;
+  let assetGreen = null;
+  let setupErrE = null;
+  const rootsE = [];
+  try {
+    const a = fs.mkdtempSync(path.join(os30e.tmpdir(), 'robco-cacheguard-asset-'));
+    rootsE.push(a);
+    ge(a, ['init', '-q']);
+    fs.mkdirSync(path.join(a, 'assets'));
+    fs.writeFileSync(path.join(a, 'sw.js'), SWe('1'), 'utf8');
+    fs.writeFileSync(path.join(a, 'assets', 'icon.png'), 'a', 'utf8');
+    ge(a, ['add', '-A']);
+    commite(a);
+    // RED: change the precached asset, stage it, leave CACHE_NAME at HEAD.
+    fs.writeFileSync(path.join(a, 'assets', 'icon.png'), 'b', 'utf8');
+    ge(a, ['add', 'assets/icon.png']);
+    assetRed = runGuarde(a); // pre-fix bug: this was 0 (SKIP). Post-fix: non-zero.
+    // GREEN: bump CACHE_NAME alongside the same asset change.
+    ge(a, ['reset', '-q']);
+    fs.writeFileSync(path.join(a, 'sw.js'), SWe('2'), 'utf8');
+    ge(a, ['add', 'sw.js', 'assets/icon.png']);
+    assetGreen = runGuarde(a); // expect 0
+  } catch (e) {
+    setupErrE = (e && e.message) || String(e);
+  } finally {
+    for (const r of rootsE) {
+      try {
+        fs.rmSync(r, { recursive: true, force: true });
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+  }
+  assert(
+    setupErrE === null && assetRed !== 0,
+    '30.3e: [behavioral] cache-bump guard FAILS when a precached assets/ file (assets/icon.png) is staged without a CACHE_NAME bump — the classifier now covers assets/ (knowledge-arch audit Defect-1)' +
+      (setupErrE ? ' — setup error: ' + setupErrE : ' — guard exited ' + assetRed)
+  );
+  assert(
+    setupErrE === null && assetGreen === 0,
+    '30.3e: [behavioral] cache-bump guard PASSES once CACHE_NAME is bumped alongside the assets/ change (red-then-green)' +
+      (setupErrE ? ' — setup error: ' + setupErrE : '')
+  );
+}
+
+// 30.3f  The classifier must AGREE WITH THE REAL PRECACHE LIST, not a hardcoded example.
+//   A guard that tests one filename is exactly how the assets/ gap stayed hidden. This
+//   parses SERVED_RE straight out of scripts/cache-bump-guard.js and every path sw.js
+//   actually precaches — the install-time ASSETS array PLUS the best-effort
+//   cache.add('./CHANGELOG.md') — and asserts SERVED_RE classifies every one as served.
+//   If a future sw.js precaches a new path type the classifier doesn't cover, this fails.
+{
+  const guardSrc30f = readFile('scripts/cache-bump-guard.js');
+  const reM30f = /const SERVED_RE\s*=\s*(\/.*\/)\s*;/m.exec(guardSrc30f);
+  let served30f = null;
+  if (reM30f) {
+    const lit = reM30f[1];
+    served30f = new RegExp(lit.slice(1, lit.lastIndexOf('/')));
+  }
+  // Real precache corpus, parsed from sw.js (the single source of truth): the ASSETS
+  // array + every best-effort cache.add('...') outside it (addAll(ASSETS) is excluded —
+  // `add\(` does not match `addAll\(`).
+  const assetsM30f = swSource.match(/const ASSETS\s*=\s*\[([\s\S]*?)\];/);
+  const precached30f = assetsM30f ? [...assetsM30f[1].matchAll(/'([^']+)'/g)].map(m => m[1]) : [];
+  for (const m of swSource.matchAll(/cache\.add\(\s*'([^']+)'/g)) precached30f.push(m[1]);
+  // Normalise: strip leading './', drop the bare-root './' placeholder.
+  const normalised30f = precached30f.map(p => p.replace(/^\.\//, '')).filter(p => p.length > 0);
+  const missed30f = served30f ? normalised30f.filter(p => !served30f.test(p)) : normalised30f;
+  assert(
+    served30f !== null && normalised30f.length > 0 && missed30f.length === 0,
+    'cache-bump-guard SERVED_RE classifies EVERY sw.js precache entry as served (classifier ⇄ real precache list agreement — Protocol 1)' +
+      (served30f === null
+        ? ' — could not parse SERVED_RE from the guard source'
+        : missed30f.length
+          ? ' — UNCOVERED precached paths: ' + missed30f.join(', ')
+          : '')
   );
 }
 
@@ -1999,8 +2451,8 @@ assert(
 //  bump (never a bare push to main); deploy keeps a defense-in-depth
 //  success+main job guard + manual dispatch;
 //  hook-install and boot-smoke scripts exist;
-//  pre-commit hook is conditional (served-file gate).
-//  14 tests
+//  the cache-bump gate is delegated to the Node guard (served-file gate);
+//  gate.js messages describe the single Node runner.
 // ══════════════════════════════════════════════════════════════
 header('CI/CD Automation Guards');
 
@@ -2013,13 +2465,18 @@ header('CI/CD Automation Guards');
   );
 }
 
-// 31.2 gate.js runs PowerShell persistence runner + ci.yml calls npm run gate
+// 31.2 gate.js runs the single Node runner (no PowerShell mirror) + ci.yml calls npm run gate
+// 2.8.5 U-B3: inverted from the old "gate runs the PS runner" parity check —
+// the PowerShell mirror was deleted and Protocol 15 retired. gate.js must run
+// the Node runner and must NOT reference the deleted .ps1 (Protocol 36b guard).
 {
   const gateSrc = readFile('scripts/gate.js');
   const ciSource = readFile('.github/workflows/ci.yml');
   assert(
-    /robco-diagnostics\.ps1/.test(gateSrc) && /npm run gate/.test(ciSource),
-    'gate.js runs PowerShell persistence runner and ci.yml calls npm run gate (Protocol 15 parity)'
+    /node tests\/robco-diagnostics\.js/.test(gateSrc) &&
+      !/robco-diagnostics\.ps1/.test(gateSrc) &&
+      /npm run gate/.test(ciSource),
+    'gate.js runs the Node runner only (no .ps1 mirror) and ci.yml calls npm run gate (single-runner gate)'
   );
 }
 
@@ -2057,10 +2514,7 @@ assert(
 // 31.7 ci.yml does not contain stale "(386 tests)" label
 {
   const ciSource = readFile('.github/workflows/ci.yml');
-  assert(
-    !/\(386 tests\)/.test(ciSource),
-    'ci.yml does not contain stale "(386 tests)" label (updated to 519)'
-  );
+  assert(!/\(386 tests\)/.test(ciSource), 'ci.yml does not contain stale "(386 tests)" label');
 }
 
 // 31.8 deploy.yml trigger is release-gated (workflow_call — invoked only by release.yml)
@@ -2090,21 +2544,30 @@ assert(
   );
 }
 
-// 31.10 scripts/pre-commit gates cache-bump on staged served files (conditional)
+// 31.10 pre-commit delegates the cache-bump gate to the Node guard, which detects
+//       staged served files via git diff --cached (conditional Protocol 1)
 {
   const hookSource = readFile('scripts/pre-commit');
+  const guardSource = readFile('scripts/cache-bump-guard.js');
   assert(
-    /git diff --cached --name-only/.test(hookSource) && /SERVED=/.test(hookSource),
-    'scripts/pre-commit gates cache-bump check on staged served files via git diff --cached (conditional Protocol 1)'
+    /node\s+scripts\/cache-bump-guard\.js/.test(hookSource) &&
+      /diff --cached --name-only/.test(guardSource) &&
+      /SERVED_RE/.test(guardSource),
+    'scripts/pre-commit invokes node scripts/cache-bump-guard.js, which gates on staged served files via git diff --cached (conditional Protocol 1)'
   );
 }
 
-// 31.11 scripts/pre-commit has SKIP branch for non-served commits
+// 31.11 the guard has a SKIP branch for non-served commits AND compares the staged
+//       CACHE_NAME against THIS branch's own HEAD (git show HEAD:sw.js) — never
+//       against origin/main, and with no monotonic-rev arithmetic (Defect-1 fix)
 {
-  const hookSource = readFile('scripts/pre-commit');
+  const guardSource = readFile('scripts/cache-bump-guard.js');
   assert(
-    /SKIP.*No served|cache bump not required/.test(hookSource),
-    'scripts/pre-commit has SKIP branch — non-served commits bypass the cache-bump check'
+    /cache bump not required|\[SKIP\]/.test(guardSource) &&
+      /show HEAD:sw\.js/.test(guardSource) &&
+      !/show\s+origin\/main|origin\/main:sw/.test(guardSource) &&
+      !/ORIGIN_N/.test(guardSource),
+    'cache-bump guard SKIPs non-served commits and compares against HEAD (branch-agnostic) — never a `git show origin/main` baseline, no ORIGIN_N monotonic arithmetic'
   );
 }
 
@@ -2142,12 +2605,24 @@ assert(
   );
 }
 
+// 31.15 gate.js user-facing messages describe ONE runner (Defect-3 fix, r-review).
+//       The PowerShell mirror was deleted and Protocol 15 retired in 2.8.5 U-B3,
+//       but the --iter block still told the user the commit/push gates "run both
+//       test runners." A message that contradicts the mechanism is exactly the
+//       "green flatters a broken story" failure this project guards against.
+{
+  const gateSrc = readFile('scripts/gate.js');
+  assert(
+    !/both\s+(?:test\s+)?runners/i.test(gateSrc),
+    'scripts/gate.js contains no "both runners" / "both test runners" message — the second runner was deleted (Protocol 15 retired, single Node runner)'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  SUITE 32 — Phase 2a Guards (Help Menu Rebuild + Chem Boost Fix)
 //  Data-driven COMMAND_REGISTRY; no box-drawing glyphs; removed commands
 //  absent from both ui.js and api.js; .skill-row markup in index.html;
 //  _applyChemHighlights targets .skill-row selector.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2a Guards');
 
@@ -2201,7 +2676,7 @@ assert(
 
 // 32.6 renderSkills() in ui-core.js generates .skill-row elements dynamically
 {
-  const uiCoreSrc32 = readFile('js/ui-core.js');
+  const uiCoreSrc32 = readGroup('ui-core');
   // Phase 3 OPERATOR batch 2: each row now also carries .vu-row (the BUS-05
   // VU meter skin) alongside .skill-row — prefix match tolerates either.
   assert(
@@ -2227,13 +2702,12 @@ assert(
 // Suite 33 -- Phase 2b Guards (Optics RGB, Empty-State, Utility Classes)
 // --robco-green-rgb CSS var chain; emptyState() helper; utility classes;
 // config-summary toggle; no residual rgba(20,253,206) literals.
-// 10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2b Guards');
 
 // 33.1 --robco-green-rgb defined in terminal.css :root
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /--robco-green-rgb\s*:\s*20,\s*253,\s*206/.test(cssSrc33),
     '--robco-green-rgb: 20, 253, 206 defined in terminal.css :root (P1-1)'
@@ -2242,7 +2716,7 @@ header('Phase 2b Guards');
 
 // 33.2 No rgba(20,253,206, literal survives in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     !/rgba\(20,\s*253,\s*206,/.test(cssSrc33),
     'No hardcoded rgba(20,253,206,...) literal remains in terminal.css (P1-1)'
@@ -2263,8 +2737,8 @@ header('Phase 2b Guards');
 //      replaced by "the THEMES table covers ≥6 colours AND changeOpticsColor delegates to the
 //      single table-driven applier" (P1-1, repointed for the WU-T1 refactor).
 {
-  const state33d = readFile('js/state.js');
-  const audio33d = readFile('js/ui-audio.js');
+  const state33d = readGroup('state');
+  const audio33d = readGroup('ui-audio');
   const themesBlock33d = (state33d.match(/const THEMES = \{([\s\S]*?)\n\};/) || ['', ''])[1];
   const colourCount = (themesBlock33d.match(/rgb:\s*'/g) || []).length;
   assert(
@@ -2275,7 +2749,7 @@ header('Phase 2b Guards');
 
 // 33.5 .empty-state CSS class defined in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /\.empty-state\s*\{/.test(cssSrc33),
     '.empty-state CSS class defined in terminal.css (P1-2)'
@@ -2299,7 +2773,7 @@ assert(
 
 // 33.8 .audio-row CSS class defined in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /\.audio-row\s*\{/.test(cssSrc33),
     '.audio-row utility class defined in terminal.css (P1-3)'
@@ -2308,7 +2782,7 @@ assert(
 
 // 33.9 config-summary::after toggle CSS exists in terminal.css
 {
-  const cssSrc33 = readFile('css/terminal.css');
+  const cssSrc33 = readCss();
   assert(
     /config-summary::after/.test(cssSrc33) && /content\s*:\s*['"]\s*\[\+\]/.test(cssSrc33),
     'summary.config-summary::after [+]/[-] toggle CSS exists in terminal.css (P1-4)'
@@ -2325,25 +2799,24 @@ assert(
 // ══════════════════════════════════════════════════════════════
 //  SUITE 34 — Phase 2c Guards (CSS Hygiene, List-Row, Btn-Sm, Empty-State Vocab)
 //  Deleted dead CSS, unified delete-btn flex pattern, .btn-sm utility, vocab fix.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 2c Guards');
 
 // 34.1 .faction-item rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(!/\.faction-item\s*\{/.test(css34), '.faction-item rule deleted from terminal.css (P2-1)');
 }
 
 // 34.2 .faction-name rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(!/\.faction-name\s*\{/.test(css34), '.faction-name rule deleted from terminal.css (P2-1)');
 }
 
 // 34.3 .faction-standing rule absent from terminal.css (P2-1 dead CSS removed)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(
     !/\.faction-standing\s*\{/.test(css34),
     '.faction-standing rule deleted from terminal.css (P2-1)'
@@ -2352,7 +2825,7 @@ header('Phase 2c Guards');
 
 // 34.4 .list-row-content utility defined in terminal.css (P2-2 flex pattern)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(
     /\.list-row-content\s*\{/.test(css34),
     '.list-row-content utility defined in terminal.css (P2-2)'
@@ -2361,13 +2834,13 @@ header('Phase 2c Guards');
 
 // 34.5 .btn-sm utility defined in terminal.css (P2-3 compact button)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   assert(/\.btn-sm\s*\{/.test(css34), '.btn-sm utility class defined in terminal.css (P2-3)');
 }
 
 // 34.6 .delete-btn has min-height:28px in terminal.css (P2-3 tap target Protocol 17)
 {
-  const css34 = readFile('css/terminal.css');
+  const css34 = readCss();
   const css34Stripped = css34.replace(/\/\*[\s\S]*?\*\//g, '');
   const deleteBtnRule = (css34Stripped.match(/\.delete-btn\s*\{[^}]*\}/) || [''])[0];
   assert(
@@ -2419,15 +2892,14 @@ header('Phase 2c Guards');
 //  SUITE 35 — Phase 3a Performance Guards (P7 optimizations)
 //  campaign_notes cap, saveState dirty-check, standby interval/animation
 //  pause, beforeunload v8 key, registrySearch cache.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 3a Performance Guards');
-const apiSrc35 = readFile('js/api.js');
-const stateSrc35 = readFile('js/state.js');
-const uiSrc35 = readFile('js/ui-core.js');
-const cssSrc35 = readFile('css/terminal.css');
-const regNvSrc35 = readFile('js/reg_nv.js');
-const regCoreSrc35 = readFile('js/registry-core.js');
+const apiSrc35 = readGroup('api');
+const stateSrc35 = readGroup('state');
+const uiSrc35 = readGroup('ui-core');
+const cssSrc35 = readCss();
+const regNvSrc35 = readGroup('reg_nv');
+const regCoreSrc35 = readGroup('registry-core');
 
 // 35.1 P4: the Terminal Record eventLog is capped via the single _logEvent()
 //      writer (state.js); api.js auto-log sites (faction/quest/AI-notes) route
@@ -2463,11 +2935,15 @@ assert(
 );
 
 // 35.5 beforeunload flush writes robco_v8, not robco_v7 (P7-8)
+// The flush body was factored into the shared _flush() closure (single source for
+// the beforeunload + visibilitychange→hidden triggers, Protocol 22) — inspect it
+// there, and confirm beforeunload is still wired to it.
 {
-  const blIdx = uiSrc35.indexOf("addEventListener('beforeunload'");
-  const blSnippet = blIdx >= 0 ? uiSrc35.slice(blIdx, blIdx + 350) : '';
+  const flushBody35 = extractFunctionBody(uiSrc35, '_flushUnload');
   assert(
-    blSnippet.includes('robco_v8') && !blSnippet.includes('robco_v7'),
+    flushBody35.includes('robco_v8') &&
+      !flushBody35.includes('robco_v7') &&
+      /addEventListener\('beforeunload',\s*_flushUnload\)/.test(uiSrc35),
     'beforeunload flush writes robco_v8, not robco_v7 (P7-8)'
   );
 }
@@ -2482,11 +2958,10 @@ assert(
 //  SUITE 36 — Keyboard Shortcuts Group ([?] menu discoverability)
 //  COMMAND_REGISTRY has KEYBOARD SHORTCUTS group with ≥6 entries;
 //  global keydown handler closes modal on Escape; closeModal() exists.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 header('Keyboard Shortcuts Group');
 {
-  const uiSrc36 = readFile('js/ui-core.js'); // COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
+  const uiSrc36 = readGroup('ui-core'); // COMMAND_REGISTRY and keydown listener in ui-core.js (Slice E)
 
   // 36.1 COMMAND_REGISTRY contains a KEYBOARD SHORTCUTS group
   const cmdRegM36 = uiSrc36.match(/const COMMAND_REGISTRY\s*=\s*\[[\s\S]*?\];/);
@@ -2537,7 +3012,6 @@ header('Keyboard Shortcuts Group');
 //  Every list-mutator calls its targeted render* + updateMath()
 //  instead of loadUI(). updateMath() tail must still hold saveState()
 //  and _updatePanelBadges(). toggleCollectible latent-bug fix verified.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('Render Fan-out (P7-1)');
 {
@@ -2595,6 +3069,90 @@ header('Render Fan-out (P7-1)');
       'updateMath() contains saveState() AND _updatePanelBadges() — shared-tail invariant intact'
     );
   }
+
+  // 37.17+ CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C3). checkMutator()
+  // above greps each CRUD mutator for the render-token + updateMath() presence +
+  // no-loadUI() — a legitimate architectural guard (kept), but it CANNOT prove
+  // call ORDERING. updateMath() is the single persistence choke point (it calls
+  // saveState()), so a mutator that renders/saves BEFORE it mutates state persists
+  // a STALE save — the exact class that shipped once as the 42.10 mutate-after-save
+  // bug — and every grep above stays green. These EXECUTE representative delete
+  // mutators in an isolated vm with spy render/updateMath fns: they assert the
+  // state array is actually shortened AND that at the moment updateMath() (the save
+  // choke) fires the mutation is ALREADY visible, AND that updateMath() runs AFTER
+  // the panel re-render. Twin-check (U2 §2): no test.html/vm suite executes these
+  // mutators — the only prior coverage was checkMutator's token greps.
+  {
+    const vm37 = require('vm');
+    // Each entry: [fnName, stateKey, renderFn] — a guarded splice-then-render-then-updateMath mutator.
+    const mutators37 = [
+      ['delItem', 'inventory', 'renderInventory'],
+      ['removeStatusEffect', 'status', 'renderStatus'],
+      ['removePerk', 'perks', 'renderPerks'],
+      ['removeCampaignNote', 'campaign_notes', 'renderCampaignNotes'],
+    ];
+    for (const [fn37, key37, render37] of mutators37) {
+      const src37 = uiSrc37.match(new RegExp('function ' + fn37 + '\\([\\s\\S]*?\\n\\}'));
+      if (!src37) {
+        fail(`37.17(${fn37}): could not extract mutator from ui-render family`);
+        continue;
+      }
+      const order37 = [];
+      let snapAtSave37 = null; // deep snapshot of the target array taken WHEN updateMath (the save choke) fires
+      const seed37 = ['A', 'B', 'C', 'D'];
+      const sb37 = {
+        state: { [key37]: seed37.slice() },
+        reconcileEquipped: () => false,
+        renderEquipped: () => order37.push('renderEquipped'),
+        updateMath: () => {
+          order37.push('updateMath');
+          snapAtSave37 = sb37.state[key37].slice();
+        },
+      };
+      // the mutator's own render fn — records order (distinct from updateMath)
+      sb37[render37] = () => order37.push(render37);
+      vm37.createContext(sb37);
+      vm37.runInContext(src37[0], sb37);
+      // remove index 1 ('B')
+      vm37.runInContext(fn37 + '(1);', sb37);
+
+      // sentinel + actual mutation: 'B' is gone, length dropped 4→3
+      assert(
+        src37[0].length > 40 && sb37.state[key37].length === 3 && !sb37.state[key37].includes('B'),
+        `37.17(${fn37}): [behavioral] splices the target row out of state.${key37} (4→${sb37.state[key37].length}, 'B' removed)`
+      );
+      // mutate-BEFORE-save: at updateMath (save choke) time the removal was already applied
+      assert(
+        snapAtSave37 !== null && snapAtSave37.length === 3 && !snapAtSave37.includes('B'),
+        `37.17b(${fn37}): [behavioral] the mutation is visible to updateMath()/saveState() when it fires (no stale save — 42.10 mutate-after-save class)`
+      );
+      // ordering: the panel re-render runs, and updateMath() is the LAST call
+      assert(
+        order37.includes(render37) &&
+          order37[order37.length - 1] === 'updateMath' &&
+          order37.indexOf(render37) < order37.lastIndexOf('updateMath'),
+        `37.17c(${fn37}): [behavioral] ${render37}() runs before updateMath() (render → persist order: [${order37.join(', ')}])`
+      );
+    }
+
+    // guarded mutators are no-ops on an out-of-range index (removeStatusEffect/Perk/Note guard `length > idx`)
+    {
+      const srcRSE = uiSrc37.match(/function removeStatusEffect\([\s\S]*?\n\}/);
+      const order37b = [];
+      const sb37b = {
+        state: { status: ['only'] },
+        renderStatus: () => order37b.push('renderStatus'),
+        updateMath: () => order37b.push('updateMath'),
+      };
+      vm37.createContext(sb37b);
+      vm37.runInContext(srcRSE[0], sb37b);
+      vm37.runInContext('removeStatusEffect(9);', sb37b); // idx 9 out of range
+      assert(
+        sb37b.state.status.length === 1 && order37b.length === 0,
+        `37.17d: [behavioral] removeStatusEffect(out-of-range) is a guarded no-op — no splice, no render, no save (got len=${sb37b.state.status.length}, calls=[${order37b.join(', ')}])`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2603,7 +3161,6 @@ header('Render Fan-out (P7-1)');
 //  match in [WEAPONS.CSV], and every WEAPONS.CSV row must have a
 //  registry entry. Guards against future drift in either direction.
 //  Plus WU-D6 O'cta Brain canon-removal regression guard.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('DB↔Registry Weapon Parity');
 {
@@ -2636,8 +3193,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.1 FNV: every registry weapon exists in WEAPONS.CSV
   {
-    const dbNv = readFile('js/db_nv.js');
-    const regNv = readFile('js/reg_nv.js');
+    const dbNv = readGroup('db_nv');
+    const regNv = readGroup('reg_nv');
     const dbW = getDbWeaponNames(dbNv);
     const regW = getRegWeaponNames(regNv);
     const missing = [...regW].filter(n => !dbW.has(n));
@@ -2649,8 +3206,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.2 FNV: every WEAPONS.CSV row exists in registry
   {
-    const dbNv = readFile('js/db_nv.js');
-    const regNv = readFile('js/reg_nv.js');
+    const dbNv = readGroup('db_nv');
+    const regNv = readGroup('reg_nv');
     const dbW = getDbWeaponNames(dbNv);
     const regW = getRegWeaponNames(regNv);
     const missing = [...dbW].filter(n => !regW.has(n));
@@ -2662,8 +3219,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.3 FO3: every registry weapon exists in WEAPONS.CSV
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     const dbW = getDbWeaponNames(dbFo3);
     const regW = getRegWeaponNames(regFo3);
     const missing = [...regW].filter(n => !dbW.has(n));
@@ -2675,8 +3232,8 @@ header('DB↔Registry Weapon Parity');
 
   // 38.4 FO3: every WEAPONS.CSV row exists in registry
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     const dbW = getDbWeaponNames(dbFo3);
     const regW = getRegWeaponNames(regFo3);
     const missing = [...dbW].filter(n => !regW.has(n));
@@ -2691,8 +3248,8 @@ header('DB↔Registry Weapon Parity');
   //      WEAPONS.CSV and the FO3 registry. Removing it from only one file would break the
   //      38.3/38.4 parity guards; this pins it gone in both. fallout.wiki-verified (Protocol 3).
   {
-    const dbFo3 = readFile('js/db_fo3.js');
-    const regFo3 = readFile('js/reg_fo3.js');
+    const dbFo3 = readGroup('db_fo3');
+    const regFo3 = readGroup('reg_fo3');
     assert(
       !/cta Brain/.test(dbFo3) && !/cta Brain/.test(regFo3),
       'FO3: fabricated weapon "O\'cta Brain" stays removed from WEAPONS.CSV + registry (WU-D6)'
@@ -2704,7 +3261,6 @@ header('DB↔Registry Weapon Parity');
 //  SUITE 39 — Ammo Token Split (Energy Cell / MFC / ECP)
 //  AMMO.CSV must carry three distinct caliber names; no bare EC
 //  token may remain as a caliber or as a weapon Ammo_Type.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Ammo Token Split (EC→3)');
 {
@@ -2741,7 +3297,7 @@ header('Ammo Token Split (EC→3)');
     return types;
   }
 
-  const nvSrc39 = readFile('js/db_nv.js');
+  const nvSrc39 = readGroup('db_nv');
   const nvCals39 = getAmmoCalibers39(nvSrc39);
   // 39.1 FNV AMMO.CSV contains Energy Cell
   assert(nvCals39.has('Energy Cell'), 'FNV AMMO.CSV contains Energy Cell caliber');
@@ -2758,7 +3314,7 @@ header('Ammo Token Split (EC→3)');
   const nvTypes39 = getWeaponAmmoTypes39(nvSrc39);
   assert(!nvTypes39.has('EC'), 'FNV WEAPONS.CSV: no weapon has Ammo_Type EC');
 
-  const fo3Src39 = readFile('js/db_fo3.js');
+  const fo3Src39 = readGroup('db_fo3');
   const fo3Cals39 = getAmmoCalibers39(fo3Src39);
   // 39.6 FO3 AMMO.CSV contains Energy Cell
   assert(fo3Cals39.has('Energy Cell'), 'FO3 AMMO.CSV contains Energy Cell caliber');
@@ -2780,7 +3336,6 @@ header('Ammo Token Split (EC→3)');
 //  SUITE 40 — Inventory Category Filter + Mod Type (Phase 4d-i)
 //  'mod' is accepted in schema + autoImportState; filter bar exists;
 //  renderInventory() honours the active filter; mod in type select.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 header('Inventory Category Filter + Mod Type');
 
@@ -2837,12 +3392,11 @@ guards(htmlSource, [
 //  [WEAPON_MODS.CSV] structural guard: section exists, correct
 //  column header, all rows 5 cols; parity between db_nv.js CSV
 //  and reg_nv.js 'mod' entries in both directions.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Weapon Mods CSV + Registry Parity');
 {
-  const dbNv41 = readFile('js/db_nv.js');
-  const regNv41 = readFile('js/reg_nv.js');
+  const dbNv41 = readGroup('db_nv');
+  const regNv41 = readGroup('reg_nv');
 
   // 41.1  [WEAPON_MODS.CSV] section exists in db_nv.js
   assert(dbNv41.includes('[WEAPON_MODS.CSV]'), 'db_nv.js contains [WEAPON_MODS.CSV] section');
@@ -2936,11 +3490,14 @@ header('Weapon Mods CSV + Registry Parity');
 //  _nativeSleep/_nativeWait must call loadUI() BEFORE saveState()
 //  so state→DOM is written first and syncStateFromDom reads back
 //  the new values (not the stale ones from unchanged inputs).
-//  11 tests
+//  42.12–42.15 (U3 slice 3 / B1) execute the real handlers in a vm:
+//  the +80/hours×10 tick math, the HP/limb restore, and the real
+//  loadUI→saveState call order + sleep.completed emit — the mutation
+//  math the static asserts above never run.
 // ══════════════════════════════════════════════════════════════
 header('Native Command Router (Phase 5a)');
 {
-  const apiSrc42 = readFile('js/api.js');
+  const apiSrc42 = readGroup('api');
 
   // 42.1  NATIVE_COMMAND_ROUTER object is defined in api.js
   guards(apiSrc42, [
@@ -3038,17 +3595,116 @@ header('Native Command Router (Phase 5a)');
       '_nativeWait calls loadUI() before saveState() (syncStateFromDom round-trip guard)'
     );
   }
+
+  // ── BEHAVIORAL (U3 slice 3 / B1) — run the REAL _nativeSleep / _nativeWait in an
+  //    isolated vm and assert the mutation MATH + the loadUI→saveState call ORDER.
+  //    The static 42.9/42.10/42.11 asserts above prove the tokens are present and
+  //    ordered in SOURCE; they stay green if the [SLEEP] heal math, the tick advance,
+  //    or the limb restore is inverted or dropped. These execute the handlers so a
+  //    wrong tick delta, an un-restored limb, or a save-before-load swap actually fails.
+  {
+    const vm42 = require('vm');
+    function declareFn42(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+
+    // Fresh sandbox per run: injured Courier (10/200 HP, four damaged limbs), a spy
+    // event bus, and order-recording loadUI/saveState/appendToChat stubs.
+    function runNative42(fnName, arg) {
+      const order = [];
+      let emitted = null;
+      const sb = {
+        state: {
+          ticks: 20,
+          hpCur: 10,
+          hpMax: 200,
+          la: 'MAIMED',
+          ra: 'INJURED',
+          ll: 'INJURED',
+          rl: 'OK',
+          hd: 'INJURED',
+        },
+        appendToChat: () => order.push('chat'),
+        RobcoEvents: {
+          emit: (name, payload) => {
+            emitted = { name, payload };
+            order.push('emit');
+          },
+        },
+        loadUI: () => order.push('loadUI'),
+        saveState: () => order.push('saveState'),
+      };
+      vm42.createContext(sb);
+      vm42.runInContext(declareFn42(apiSrc42, fnName), sb);
+      if (arg === undefined) sb[fnName]();
+      else sb[fnName](arg);
+      return { state: sb.state, order, emitted };
+    }
+
+    // 42.12  _nativeSleep advances ticks by exactly +80 (8 hours) — executed, not grepped
+    {
+      const r = runNative42('_nativeSleep');
+      assert(
+        r.state.ticks === 100,
+        `42.12: _nativeSleep() advances ticks by +80 (20 → 100) — real mutation (got ${r.state.ticks})`
+      );
+    }
+
+    // 42.13  _nativeSleep restores HP to hpMax and heals ALL five limbs to 'OK'
+    {
+      const r = runNative42('_nativeSleep');
+      const limbs = [r.state.la, r.state.ra, r.state.ll, r.state.rl, r.state.hd];
+      assert(
+        r.state.hpCur === 200 && limbs.every(l => l === 'OK'),
+        `42.13: _nativeSleep() restores HP to hpMax (200) and heals all limbs to OK (got HP ${r.state.hpCur}, limbs ${limbs.join('/')})`
+      );
+    }
+
+    // 42.14  _nativeSleep calls loadUI() BEFORE saveState() (real order) and emits
+    //        'sleep.completed' with the actual ticksAdded (+80) — the syncStateFromDom
+    //        round-trip guard, proven by recorded call order rather than source indexOf
+    {
+      const r = runNative42('_nativeSleep');
+      const loadAt = r.order.indexOf('loadUI');
+      const saveAt = r.order.indexOf('saveState');
+      assert(
+        loadAt !== -1 &&
+          saveAt !== -1 &&
+          loadAt < saveAt &&
+          r.emitted &&
+          r.emitted.name === 'sleep.completed' &&
+          r.emitted.payload &&
+          r.emitted.payload.ticksAdded === 80,
+        `42.14: _nativeSleep() runs loadUI() before saveState() and emits sleep.completed{ticksAdded:80} (order ${r.order.join('>')}, emit ${r.emitted && r.emitted.name})`
+      );
+    }
+
+    // 42.15  _nativeWait(hours) advances ticks by exactly hours×10 and also runs
+    //        loadUI() before saveState() — 3 Hrs → +30 ticks (20 → 50)
+    {
+      const r = runNative42('_nativeWait', 3);
+      const loadAt = r.order.indexOf('loadUI');
+      const saveAt = r.order.indexOf('saveState');
+      assert(
+        r.state.ticks === 50 && loadAt !== -1 && saveAt !== -1 && loadAt < saveAt,
+        `42.15: _nativeWait(3) advances ticks by +30 (20 → 50) and runs loadUI before saveState (got ticks ${r.state.ticks}, order ${r.order.join('>')})`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 43 — GAME_DEFS Structural Integrity (Phase 5b)
 //  Aggregation layer: GAME_DEFS in state.js + _activeDef() helper.
 //  Collapses FNV/FO3 ternaries into config lookups; zero behavior change.
-//  11 tests
 // ══════════════════════════════════════════════════════════════
 header('GAME_DEFS Structural Integrity (Phase 5b)');
 {
-  const stateSrc43 = readFile('js/state.js');
+  const stateSrc43 = readGroup('state');
 
   // 43.1  state.js declares const GAME_DEFS = {
   guards(stateSrc43, [
@@ -3124,7 +3780,6 @@ header('GAME_DEFS Structural Integrity (Phase 5b)');
 //  SUITE 44 — Anonymous Auth + Security Rules + XSS Coercion Fix (Phase 5c-i)
 //  Closed P0 hole: auth-gated Firestore paths, per-uid rules, App Check gate,
 //  and XSS bypass via cloud pull routed through sanitizeImportedContainer.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-i: Auth + Rules + XSS Fix');
 
@@ -3300,7 +3955,7 @@ header('Phase 5c-i: Auth + Rules + XSS Fix');
 //  SUITE 45 — Google Sign-In + Account Panel (Phase 5c-ii)
 //  Durable identity: Google auth link, collision recovery,
 //  sign-out → re-anon, popup-only flow, ACCOUNT UI panel, boot guard.
-//  15 tests
+//  Plus Gap 5 (warning-surface): real sign-in failures surface a modal.
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-ii: Google Sign-In + Account Panel');
 
@@ -3435,6 +4090,77 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
       'cloud.js signInWithGoogle: first await is linkWithPopup (gesture-safe — popup opened with no prior async work)'
     );
   }
+
+  // 45.16  BEHAVIORAL (Gap 5 — warning-surface): the sign-in cancel classifier.
+  //        Only a user-dismissed popup stays silent; every other failure code is a
+  //        real failure the user must be shown. Live signInWithPopup needs Google
+  //        (cannot run in the sandbox — Protocol 13 exemption), but the pure decision
+  //        that gates the modal is unit-testable here.
+  {
+    let cancelFn = null;
+    try {
+      const idx = cloudSource.indexOf('window._isCancelSignInError');
+      if (idx !== -1) {
+        let i = cloudSource.indexOf('{', idx);
+        let depth = 0;
+        const start = i;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            eval('cancelFn = function (code) ' + cloudSource.slice(start, i + 1) + ';');
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (cancelFn) {
+      assert(
+        cancelFn('auth/popup-closed-by-user') === true &&
+          cancelFn('auth/cancelled-popup-request') === true &&
+          cancelFn('auth/network-request-failed') === false &&
+          cancelFn('auth/popup-blocked') === false &&
+          cancelFn('auth/internal-error') === false &&
+          cancelFn(undefined) === false,
+        '_isCancelSignInError: only the two user-cancel codes are silent; network/blocked/unknown/undefined are real failures that must surface (Gap 5)'
+      );
+    } else {
+      fail('_isCancelSignInError could not be evaluated from cloud.js');
+    }
+  }
+
+  // 45.17  STATIC (Gap 5): signInWithGoogle routes non-cancel failures through the
+  //        modal notice instead of console-only — the classifier + the notice must
+  //        both be referenced inside the function body.
+  {
+    let signInBody = '';
+    const idx = cloudSource.indexOf('window.signInWithGoogle');
+    if (idx !== -1) {
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) {
+          signInBody = cloudSource.slice(start, i + 1);
+          break;
+        }
+        i++;
+      }
+    }
+    assert(
+      /_isCancelSignInError/.test(signInBody) && /_showSignInFailedNotice/.test(signInBody),
+      'signInWithGoogle: real (non-cancel) sign-in failures are surfaced via a modal notice, not console-only (Gap 5)'
+    );
+  }
+
+  // 45.18  STATIC (Gap 5): the notice opens a diegetic point-of-use SIGN-IN FAILED
+  //        modal (reuses openModal — no auth-flow change, Protocol 30 popup-only intact).
+  assert(
+    /function _showSignInFailedNotice[\s\S]*?openModal/.test(cloudSource) &&
+      /SIGN-IN FAILED/.test(cloudSource),
+    '_showSignInFailedNotice opens a diegetic SIGN-IN FAILED modal at point of use (Gap 5)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3446,7 +4172,8 @@ header('Phase 5c-ii: Google Sign-In + Account Panel');
 //  Plus the prod-2.7.0 → 2.8.0 save-migration pre-flight (46.20–46.22): a
 //  released-2.7.0 save is missing eventLog + padBindings; both must default
 //  cleanly with no pre-2.8.0 data loss (Protocol 4/16/34, data-safety-critical).
-//  22 tests
+//  Plus Gap 3/4 (warning-surface): listCloudSaves rethrows on fetch failure and
+//  the sync summary never falsely reports "SYNC COMPLETE".
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iii: Cloud Save Picker + Local Migration');
 
@@ -3767,6 +4494,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           '\n' +
           _decl(stateSource, '_migrateEventLog') +
           '\n' +
+          _decl(stateSource, 'reconcileEquipped') +
+          '\n' +
           _decl(stateSource, 'migrateState'),
         sandbox
       );
@@ -3856,6 +4585,8 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
           '\n' +
           _decl(stateSource, '_migrateEventLog') +
           '\n' +
+          _decl(stateSource, 'reconcileEquipped') +
+          '\n' +
           _decl(stateSource, 'migrateState'),
         sandbox
       );
@@ -3939,13 +4670,113 @@ header('Phase 5c-iii: Cloud Save Picker + Local Migration');
       'prod-2.7.0→2.8.0: legacy [T#] notes migrate into eventLog while purely-manual campaign_notes are preserved (no note lost)'
     );
   }
+
+  // 46.23  BEHAVIORAL (Gap 4 — warning-surface): the sync summary line must never
+  //        claim "SYNC COMPLETE" when uploads failed. Live uploads need Firebase
+  //        (Protocol 13 sandbox exemption), but the pure message-selection is testable.
+  {
+    let summaryFn = null;
+    try {
+      const idx = cloudSource.indexOf('window._syncSummaryLine');
+      if (idx !== -1) {
+        let i = cloudSource.indexOf('{', idx);
+        let depth = 0;
+        const start = i;
+        while (i < cloudSource.length) {
+          if (cloudSource[i] === '{') depth++;
+          else if (cloudSource[i] === '}' && --depth === 0) {
+            eval(
+              'summaryFn = function (uploaded, skipped, failed) ' +
+                cloudSource.slice(start, i + 1) +
+                ';'
+            );
+            break;
+          }
+          i++;
+        }
+      }
+    } catch (_) {}
+    if (summaryFn) {
+      // 46.23  zero failures → the honest "SYNC COMPLETE" is allowed
+      const ok = summaryFn(2, 1, 0);
+      assert(
+        /^SYNC COMPLETE/.test(ok) && /2 uploaded/.test(ok) && /1 already synced/.test(ok),
+        '_syncSummaryLine: zero upload failures reports "SYNC COMPLETE" with the upload/skip tallies (Gap 4)'
+      );
+      // 46.24  any failure → NEVER says "SYNC COMPLETE"; names the failed count
+      const bad = summaryFn(2, 0, 2);
+      assert(
+        !/SYNC COMPLETE/.test(bad) && /2 FAILED/.test(bad) && /INCOMPLETE/.test(bad),
+        '_syncSummaryLine: a partial failure never claims "SYNC COMPLETE" and names the failed count (Gap 4)'
+      );
+    } else {
+      fail('_syncSummaryLine could not be evaluated from cloud.js');
+    }
+  }
+
+  // 46.25  STATIC (Gap 3 — warning-surface): listCloudSaves must RETHROW a genuine
+  //        fetch failure (not swallow to []) so the account panel's already-written
+  //        "ARCHIVE LINK FAILED" state is reachable instead of masquerading as
+  //        "NO ARCHIVES ON FILE". The catch body must throw and must not return [].
+  {
+    let listBody = '';
+    const idx = cloudSource.indexOf('window.listCloudSaves');
+    if (idx !== -1) {
+      let i = cloudSource.indexOf('{', idx);
+      let depth = 0;
+      const start = i;
+      while (i < cloudSource.length) {
+        if (cloudSource[i] === '{') depth++;
+        else if (cloudSource[i] === '}' && --depth === 0) {
+          listBody = cloudSource.slice(start, i + 1);
+          break;
+        }
+        i++;
+      }
+    }
+    // isolate the catch block only, and strip line comments so prose that merely
+    // MENTIONS "return []" (e.g. describing the early guards) can't trip the guard —
+    // we assert on actual code, not comments (Protocol 42: harden the harness).
+    const catchIdx = listBody.indexOf('catch');
+    const catchBody = (catchIdx !== -1 ? listBody.slice(catchIdx) : '').replace(/\/\/[^\n]*/g, '');
+    assert(
+      /throw\s/.test(catchBody) && !/return\s*\[\s*\]/.test(catchBody),
+      'listCloudSaves: a fetch failure rethrows (does not swallow to []) so ARCHIVE LINK FAILED is reachable (Gap 3)'
+    );
+  }
+
+  // 46.26  DOC-SAFETY (knowledge-arch audit, Defect-2): ARCHITECTURE.md's Cloud Push
+  //        section must describe the REAL additive write and must NEVER prescribe a
+  //        save-destroying setDoc. The doc formerly showed `setDoc(firestore, { … state:
+  //        stateObj … })` — a whole-document overwrite — while cloud.js uses additive
+  //        addDoc (Protocol 34: a blind setDoc would clobber a campaign with no recovery).
+  //        A session implementing from the canonical architecture doc would have built the
+  //        clobbering version. Assert the Cloud Push block prescribes addDoc and carries
+  //        neither the setDoc(firestore,…) call nor the `state: stateObj` overwrite field.
+  //        (Prose that merely NAMES setDoc — "never a blind setDoc" — is fine; only the
+  //        dangerous call/field patterns are forbidden.)
+  {
+    const archMd46 = readFile('ARCHITECTURE.md');
+    const pushIdx46 = archMd46.indexOf('### Cloud Push');
+    const pullIdx46 = archMd46.indexOf('### Cloud Pull', pushIdx46 + 1);
+    const pushSection46 =
+      pushIdx46 !== -1
+        ? archMd46.slice(pushIdx46, pullIdx46 !== -1 ? pullIdx46 : pushIdx46 + 1400)
+        : '';
+    assert(
+      pushSection46.length > 0 &&
+        /\baddDoc\b/.test(pushSection46) &&
+        !/setDoc\s*\(\s*firestore/.test(pushSection46) &&
+        !/state:\s*stateObj/.test(pushSection46),
+      'ARCHITECTURE.md Cloud Push section prescribes additive addDoc, not a save-destroying setDoc(firestore,{…state}) (Protocol 34 — the canonical doc must not describe the clobbering write)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 47 — Gemini Key Sync + AI Studio Link (Phase 5c-iv)
 //  Security: key never leaves device for anon or sync-OFF.
 //  Picker: NAME button, date rendered once.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 
@@ -4077,12 +4908,11 @@ header('Phase 5c-iv: Gemini Key Sync + AI Studio Link');
 //  Session-scoped auto-disable on repeated failures (FAIL_THRESHOLD=3).
 //  Plus WU-B6 behavioral coverage: isFeatureEnabled fail-open reads +
 //  loadRemoteConfig leaves flags enabled when the config fetch fails.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 {
-  const cloudSrc48 = readFile('js/cloud.js');
-  const apiSrc48 = readFile('js/api.js');
+  const cloudSrc48 = readGroup('cloud');
+  const apiSrc48 = readGroup('api');
   const rulesSrc48 = fs.existsSync(path.join(ROOT, 'firestore.rules'))
     ? fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8')
     : '';
@@ -4258,7 +5088,6 @@ header('Remote Kill-Switch + Client Auto-Disable (Protocol 32/35)');
 //  SUITE 49 — CI / Repo Hardening Guards (Q-series)
 //  Asset-manifest completeness, Firestore no-allow-all, release.yml CI gating,
 //  deploy.yml shortcut-icon staging guard (Protocol 36 escape-ratchet).
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 49 — CI / Repo Hardening Guards');
 {
@@ -4270,7 +5099,7 @@ header('Suite 49 — CI / Repo Hardening Guards');
   }
 
   // 49.1  Every js/ file is listed in sw.js ASSETS
-  const jsFiles49 = fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js'));
+  const jsFiles49 = allJsFiles().map(f => f.rel);
   const jsMissing49 = jsFiles49.filter(f => !assetsSet49.has('./js/' + f));
   assert(
     jsMissing49.length === 0,
@@ -4327,7 +5156,6 @@ header('Suite 49 — CI / Repo Hardening Guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 50 — Gate Parity Guards (Protocol 36)
 //  Verify that the local gate == CI gate and the escape-ratchet is wired.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 50 — Gate Parity Guards (Protocol 36)');
 {
@@ -4348,10 +5176,16 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     'scripts/gate.js enforces ESLint --max-warnings 0 (Protocol 36 — escape-ratchet)'
   );
 
-  // 50.3  boot-smoke.mjs uses an HTTP static server (not file://)
+  // 50.3  boot-smoke.mjs serves the app over HTTP — the static server was
+  //        extracted to the shared tests/static-server.mjs (Protocol 22, U1),
+  //        so http.createServer now lives THERE and boot-smoke imports it.
+  const staticServerSrc50 = readFile('tests/static-server.mjs');
   assert(
-    bootSmokeSrc50.includes('http.createServer') && bootSmokeSrc50.includes('BASE_URL'),
-    'boot-smoke.mjs uses HTTP static server (http.createServer + BASE_URL navigation)'
+    staticServerSrc50.includes('http.createServer') &&
+      /export\s+(async\s+)?function\s+startStaticServer/.test(staticServerSrc50) &&
+      bootSmokeSrc50.includes("from './static-server.mjs'") &&
+      bootSmokeSrc50.includes('startStaticServer'),
+    'boot-smoke.mjs serves over HTTP via the shared static-server.mjs (http.createServer lives there; boot-smoke imports startStaticServer — Protocol 22, no duplicated server)'
   );
 
   // 50.4  package.json has a gate script wiring npm run gate
@@ -4366,10 +5200,15 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     'scripts/gate.js has --fast flag that skips browser steps (Protocol 36 — fast commit / full push split)'
   );
 
-  // 50.6  gate.js falls back to powershell when pwsh absent
+  // 50.6  gate.js invokes no PowerShell (single Node runner — Protocol 15 retired)
+  // 2.8.5 U-B3: inverted from the old "gate.js falls back to powershell" check.
+  // The PowerShell mirror was deleted; the gate must contain no pwsh/powershell
+  // invocation and no .ps1 reference (Protocol 36b regression guard).
   assert(
-    gateSrc50.includes('pwsh') && gateSrc50.includes('powershell'),
-    'scripts/gate.js falls back to powershell when pwsh absent (Protocol 36 — Windows PS 5.1 support)'
+    !/\bpwsh\b/.test(gateSrc50) &&
+      !/\bpowershell\b/i.test(gateSrc50) &&
+      !/robco-diagnostics\.ps1/.test(gateSrc50),
+    'scripts/gate.js invokes no PowerShell and references no .ps1 mirror (single Node runner — Protocol 15 retired)'
   );
 
   // 50.7  scripts/pre-push exists and invokes full npm run gate
@@ -4385,6 +5224,56 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     installHooksSrc50.includes('pre-push'),
     'scripts/install-hooks.js installs pre-push hook (Protocol 36 — full gate at push boundary)'
   );
+
+  // ── U1 (HEALTH_BATCH_PLAN.md §4) — real browser coverage at BOTH boundaries ──
+  // Before U1, gate:fast opened zero browsers, so commit-green meant only "the
+  // source greps clean." These guards keep the two new browser checks wired at
+  // their boundaries so they can never be silently dropped (Protocol 20/36b).
+
+  // 50.9  the fast commit gate runs a browser boot smoke (commit-green = boots)
+  assert(
+    /if \(fast\)/.test(gateSrc50) && /boot-smoke\.mjs --fast/.test(gateSrc50),
+    'scripts/gate.js runs the fast boot smoke (boot-smoke.mjs --fast) in the fast/commit path — commit-green means the shell boots and paints (U1)'
+  );
+
+  // 50.10  the full push gate runs the offline-first behavioral test
+  assert(
+    /offline-first\.mjs/.test(gateSrc50),
+    'scripts/gate.js runs the offline-first behavioral test (offline-first.mjs) in the full/push path (U1)'
+  );
+
+  // 50.11  offline-first.mjs cuts the network for REAL (setOffline — not a mocked
+  //         flag), asserts boot READY offline, and drives a native tool
+  assert(
+    fs.existsSync(path.join(ROOT, 'tests', 'offline-first.mjs')) &&
+      (() => {
+        const s = readFile('tests/offline-first.mjs');
+        return /setOffline\(true\)/.test(s) && /bootScreen/.test(s) && /databankSearch/.test(s);
+      })(),
+    'tests/offline-first.mjs cuts the network (context.setOffline(true)), asserts boot-to-READY offline, and drives a native offline tool (CONSULT databankSearch) — a true cut, not a mock (U1)'
+  );
+
+  // 50.12  boot-smoke.mjs supports the cheap --fast commit-smoke mode
+  assert(
+    /--fast/.test(bootSmokeSrc50) && /const FAST/.test(bootSmokeSrc50),
+    'tests/boot-smoke.mjs supports a --fast commit-smoke mode (cheap functional-paint signal for the commit gate — U1)'
+  );
+
+  // 50.13  the cloud-serialization guard (QUEUE.md A3) runs on BOTH boundaries.
+  //         Wired 2026-07-21 ("wire it") into the pure-Node section that runs
+  //         UNCONDITIONALLY — before the `if (fast)` boot smoke — so it fires on
+  //         gate:fast (commit) AND gate (push), the same class as the boot-chain
+  //         preflight. This guard locks it against silent removal and against
+  //         accidental demotion into the browser-only `if (!fast)` push block,
+  //         where it would stop running at commit (Protocol 20/36b escape-ratchet).
+  {
+    const cloudIdx50 = gateSrc50.indexOf('cloud-serialization-check.js');
+    const fastSmokeIdx50 = gateSrc50.indexOf('boot-smoke.mjs --fast');
+    assert(
+      cloudIdx50 !== -1 && fastSmokeIdx50 !== -1 && cloudIdx50 < fastSmokeIdx50,
+      'scripts/gate.js invokes the cloud-serialization guard (cloud-serialization-check.js) in the shared pure-Node section (before the fast boot smoke), so it runs on both the fast commit gate and the full push gate (QUEUE.md A3 — modeled guard promoted from opt-in into the gate)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4392,13 +5281,12 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
 //  Verify checksum stamping, forward-compat guard, and rolling backup
 //  ring are wired consistently across all load/save paths. Plus WU-B6
 //  TS-GAP-2: an end-to-end behavioral restoreRollingBackup proof.
-//  57 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 51 — Save Integrity + Rolling Backups');
 {
-  const stateSrc51 = readFile('js/state.js');
+  const stateSrc51 = readGroup('state');
   const uiSrc51 = uiSource; // concatenated — save functions now in ui-saves.js
-  const cloudSrc51 = readFile('js/cloud.js');
+  const cloudSrc51 = readGroup('cloud');
   const indexSrc51 = readFile('index.html');
 
   // 51.1  computeSaveChecksum exists in state.js (FNV-1a global helper)
@@ -5048,6 +5936,8 @@ header('Suite 51 — Save Integrity + Rolling Backups');
           '\n' +
           _declFn(stateSrc51, '_migrateEventLog') +
           '\n' +
+          _declFn(stateSrc51, 'reconcileEquipped') +
+          '\n' +
           _declFn(stateSrc51, 'migrateState') +
           '\n' +
           _declFn(uiSrc51, '_restoreBackupApply'),
@@ -5080,7 +5970,6 @@ header('Suite 51 — Save Integrity + Rolling Backups');
 //  Suite 52 — Repo / Site Enrichment Guards (Protocol 37)
 //  Verifies static site files, repomix config tuning, manifest
 //  enrichment, and README CI badge are present and correct.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
 {
@@ -5117,10 +6006,16 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
     'repomix.config.json customPatterns excludes package-lock.json (lockfile)'
   );
 
-  // 52.6  customPatterns excludes RULES.md (private agent file)
+  // 52.6  customPatterns excludes the private agent rulebook.
+  //        R3: was `includes('RULES.md')`. That file is deleted; the invariant
+  //        it protected — the private agent files never enter the repomix AI
+  //        context pack — is retargeted at the files that actually hold the
+  //        rulebook now (CLAUDE.md + the rules/ notes).
   assert(
-    Array.isArray(patterns52) && patterns52.includes('RULES.md'),
-    'repomix.config.json customPatterns excludes RULES.md (private agent file)'
+    Array.isArray(patterns52) &&
+      patterns52.includes('CLAUDE.md') &&
+      patterns52.some(p => p.startsWith('rules/')),
+    'repomix.config.json customPatterns excludes the private agent rulebook (CLAUDE.md + rules/**)'
   );
 
   // 52.7  .nojekyll exists at root (stops GitHub Pages running Jekyll)
@@ -5158,17 +6053,26 @@ header('Suite 52 — Repo / Site Enrichment Guards (Protocol 37)');
     readmeSrc52.includes('ci.yml') && readmeSrc52.includes('badge'),
     'README.md contains GitHub Actions CI badge referencing ci.yml'
   );
+
+  // 52.14  manifest.json start_url/scope stay the GitHub Pages subdirectory
+  //        root (Protocol 36b-adjacent: the r15 portrait-lock incident showed
+  //        nothing in the gate reconciled manifest.json against the app's
+  //        real deployment shape at all — start_url/scope drifting off './'
+  //        would break install/launch exactly as silently as that lock did)
+  assert(
+    manifest52.start_url === './' && manifest52.scope === './',
+    "manifest.json start_url and scope stay './' (the GitHub Pages subdirectory deploy root)"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 53 — AI + Gemini-Key Resilience Guards
 //  Key validation hardening, bounded exponential backoff,
 //  error classification, Tri-Node schema validation.
-//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 53 — AI + Gemini-Key Resilience Guards');
 {
-  const apiSrc53 = readFile('js/api.js');
+  const apiSrc53 = readGroup('api');
 
   // 53.1  _AI_RETRY_MAX constant defined
   assert(/_AI_RETRY_MAX\s*=\s*\d+/.test(apiSrc53), '_AI_RETRY_MAX constant defined in api.js');
@@ -5388,12 +6292,11 @@ header('Suite 53 — AI + Gemini-Key Resilience Guards');
 //  Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning
 //  Injection-resistance directive, player-input wrapper,
 //  HTML + JS length caps, saveState quota handling.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 {
-  const apiSrc54 = readFile('js/api.js');
-  const stateSrc54 = readFile('js/state.js');
+  const apiSrc54 = readGroup('api');
+  const stateSrc54 = readGroup('state');
   const htmlSource54 = readFile('index.html');
   // U1: the injection-resistance copy lives in _directiveInjectionBoundary() now —
   // check the full composed directive body, not getSystemDirective()'s own short body.
@@ -5499,12 +6402,11 @@ header('Suite 54 — Prompt-Injection Hardening, Input Caps, Quota Warning');
 //  Protocol-20 origin guard (load-bearing CSP origins),
 //  unsafe-inline tripwire, blob: img-src guard, Firebase version-pin guard,
 //  'wasm-unsafe-eval' guard (Visual Upload OCR Unit 1).
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 {
   const htmlSource55 = readFile('index.html');
-  const cloudSrc55 = readFile('js/cloud.js');
+  const cloudSrc55 = readGroup('cloud');
 
   // 55.1 generativelanguage.googleapis.com present in CSP (Gemini API)
   guards(htmlSource55, [
@@ -5616,35 +6518,34 @@ header('Suite 55 — CSP Stage 1 Origin Guards + Firebase Pin');
 //  Protocol-20 static guards: each ui-*.js must exist, appear
 //  in sw.js ASSETS, and be wired in index.html before api.js.
 //  Also guards the document.write → createElement migration.
-//  35 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 56 — UI Module Split Guards');
 {
   const htmlSource56 = readFile('index.html');
   const swSrc56 = readFile('sw.js');
 
-  // 56.1 js/ui-audio.js file exists on disk
+  // 56.1 js/ui/ui-audio.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-audio.js')),
-    'js/ui-audio.js file exists (Slice A: audio module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-audio.js')),
+    'js/ui/ui-audio.js file exists (Slice A: audio module extracted)'
   );
 
-  // 56.2 ./js/ui-audio.js appears in sw.js ASSETS list
+  // 56.2 ./js/ui/ui-audio.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-audio\.js['"]/.test(swSrc56),
-    "'./js/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
+    /['"]\.\/js\/ui\/ui-audio\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-audio.js' in sw.js ASSETS (cache covers the audio module)"
   );
 
-  // 56.3 <script src="js/ui-audio.js"> appears in index.html
+  // 56.3 <script src="js/ui/ui-audio.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-audio\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-audio.js"> present in index.html'
+    /src=['"]js\/ui\/ui-audio\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-audio.js"> present in index.html'
   );
 
   // 56.4 ui-audio.js script appears before api.js in index.html (load-order guard)
   {
-    const audioIdx56 = htmlSource56.indexOf('js/ui-audio.js');
-    const apiIdx56 = htmlSource56.indexOf('js/api.js');
+    const audioIdx56 = htmlSource56.indexOf('js/ui/ui-audio.js');
+    const apiIdx56 = htmlSource56.indexOf('js/services/api.js');
     assert(
       audioIdx56 !== -1 && apiIdx56 !== -1 && audioIdx56 < apiIdx56,
       'ui-audio.js <script> appears before api.js in index.html (load-order guard)'
@@ -5653,36 +6554,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.5 ui-audio.js script appears before ui.js in index.html (ui-audio must load first)
   {
-    const audioIdx56b = htmlSource56.indexOf('js/ui-audio.js');
-    const uiIdx56 = htmlSource56.indexOf('"js/ui-core.js"');
+    const audioIdx56b = htmlSource56.indexOf('js/ui/ui-audio.js');
+    const uiIdx56 = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       audioIdx56b !== -1 && uiIdx56 !== -1 && audioIdx56b < uiIdx56,
       'ui-audio.js <script> appears before ui.js in index.html (audio loads before core)'
     );
   }
 
-  // 56.6 js/ui-render.js file exists on disk
+  // 56.6 js/ui/ui-render.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-render.js')),
-    'js/ui-render.js file exists (Slice B: render module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-render.js')),
+    'js/ui/ui-render.js file exists (Slice B: render module extracted)'
   );
 
-  // 56.7 ./js/ui-render.js appears in sw.js ASSETS list
+  // 56.7 ./js/ui/ui-render.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-render\.js['"]/.test(swSrc56),
-    "'./js/ui-render.js' in sw.js ASSETS (cache covers the render module)"
+    /['"]\.\/js\/ui\/ui-render\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-render.js' in sw.js ASSETS (cache covers the render module)"
   );
 
-  // 56.8 <script src="js/ui-render.js"> appears in index.html
+  // 56.8 <script src="js/ui/ui-render.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-render\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-render.js"> present in index.html'
+    /src=['"]js\/ui\/ui-render\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-render.js"> present in index.html'
   );
 
   // 56.9 ui-render.js script appears before api.js in index.html
   {
-    const renderIdx56 = htmlSource56.indexOf('js/ui-render.js');
-    const apiIdx56b = htmlSource56.indexOf('js/api.js');
+    const renderIdx56 = htmlSource56.indexOf('js/ui/ui-render.js');
+    const apiIdx56b = htmlSource56.indexOf('js/services/api.js');
     assert(
       renderIdx56 !== -1 && apiIdx56b !== -1 && renderIdx56 < apiIdx56b,
       'ui-render.js <script> appears before api.js in index.html (load-order guard)'
@@ -5691,36 +6592,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.10 ui-render.js script appears before ui.js in index.html
   {
-    const renderIdx56b = htmlSource56.indexOf('js/ui-render.js');
-    const uiIdx56b = htmlSource56.indexOf('"js/ui-core.js"');
+    const renderIdx56b = htmlSource56.indexOf('js/ui/ui-render.js');
+    const uiIdx56b = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       renderIdx56b !== -1 && uiIdx56b !== -1 && renderIdx56b < uiIdx56b,
       'ui-render.js <script> appears before ui.js in index.html (render loads before core)'
     );
   }
 
-  // 56.11 js/ui-saves.js file exists on disk
+  // 56.11 js/ui/ui-saves.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-saves.js')),
-    'js/ui-saves.js file exists (Slice C: saves module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-saves.js')),
+    'js/ui/ui-saves.js file exists (Slice C: saves module extracted)'
   );
 
-  // 56.12 ./js/ui-saves.js appears in sw.js ASSETS list
+  // 56.12 ./js/ui/ui-saves.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-saves\.js['"]/.test(swSrc56),
-    "'./js/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
+    /['"]\.\/js\/ui\/ui-saves\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-saves.js' in sw.js ASSETS (cache covers the saves module)"
   );
 
-  // 56.13 <script src="js/ui-saves.js"> appears in index.html
+  // 56.13 <script src="js/ui/ui-saves.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-saves\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-saves.js"> present in index.html'
+    /src=['"]js\/ui\/ui-saves\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-saves.js"> present in index.html'
   );
 
   // 56.14 ui-saves.js script appears before api.js in index.html
   {
-    const savesIdx56 = htmlSource56.indexOf('js/ui-saves.js');
-    const apiIdx56c = htmlSource56.indexOf('js/api.js');
+    const savesIdx56 = htmlSource56.indexOf('js/ui/ui-saves.js');
+    const apiIdx56c = htmlSource56.indexOf('js/services/api.js');
     assert(
       savesIdx56 !== -1 && apiIdx56c !== -1 && savesIdx56 < apiIdx56c,
       'ui-saves.js <script> appears before api.js in index.html (load-order guard)'
@@ -5729,36 +6630,36 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.15 ui-saves.js script appears before ui.js in index.html
   {
-    const savesIdx56b = htmlSource56.indexOf('js/ui-saves.js');
-    const uiIdx56c = htmlSource56.indexOf('"js/ui-core.js"');
+    const savesIdx56b = htmlSource56.indexOf('js/ui/ui-saves.js');
+    const uiIdx56c = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       savesIdx56b !== -1 && uiIdx56c !== -1 && savesIdx56b < uiIdx56c,
       'ui-saves.js <script> appears before ui.js in index.html (saves loads before core)'
     );
   }
 
-  // 56.16 js/ui-account.js file exists on disk
+  // 56.16 js/ui/ui-account.js file exists on disk
   assert(
-    fs.existsSync(path.join(ROOT, 'js/ui-account.js')),
-    'js/ui-account.js file exists (Slice D: account module extracted)'
+    fs.existsSync(path.join(ROOT, 'js/ui/ui-account.js')),
+    'js/ui/ui-account.js file exists (Slice D: account module extracted)'
   );
 
-  // 56.17 ./js/ui-account.js appears in sw.js ASSETS list
+  // 56.17 ./js/ui/ui-account.js appears in sw.js ASSETS list
   assert(
-    /['"]\.\/js\/ui-account\.js['"]/.test(swSrc56),
-    "'./js/ui-account.js' in sw.js ASSETS (cache covers the account module)"
+    /['"]\.\/js\/ui\/ui-account\.js['"]/.test(swSrc56),
+    "'./js/ui/ui-account.js' in sw.js ASSETS (cache covers the account module)"
   );
 
-  // 56.18 <script src="js/ui-account.js"> appears in index.html
+  // 56.18 <script src="js/ui/ui-account.js"> appears in index.html
   assert(
-    /src=['"]js\/ui-account\.js['"]/.test(htmlSource56),
-    '<script src="js/ui-account.js"> present in index.html'
+    /src=['"]js\/ui\/ui-account\.js['"]/.test(htmlSource56),
+    '<script src="js/ui/ui-account.js"> present in index.html'
   );
 
   // 56.19 ui-account.js script appears before api.js in index.html
   {
-    const acctIdx56 = htmlSource56.indexOf('js/ui-account.js');
-    const apiIdx56d = htmlSource56.indexOf('js/api.js');
+    const acctIdx56 = htmlSource56.indexOf('js/ui/ui-account.js');
+    const apiIdx56d = htmlSource56.indexOf('js/services/api.js');
     assert(
       acctIdx56 !== -1 && apiIdx56d !== -1 && acctIdx56 < apiIdx56d,
       'ui-account.js <script> appears before api.js in index.html (load-order guard)'
@@ -5767,8 +6668,8 @@ header('Suite 56 — UI Module Split Guards');
 
   // 56.20 ui-account.js script appears before ui-core.js in index.html
   {
-    const acctIdx56b = htmlSource56.indexOf('js/ui-account.js');
-    const uiIdx56d = htmlSource56.indexOf('"js/ui-core.js"');
+    const acctIdx56b = htmlSource56.indexOf('js/ui/ui-account.js');
+    const uiIdx56d = htmlSource56.indexOf('"js/ui/ui-core.js"');
     assert(
       acctIdx56b !== -1 && uiIdx56d !== -1 && acctIdx56b < uiIdx56d,
       'ui-account.js <script> appears before ui-core.js in index.html (account loads before core)'
@@ -5804,20 +6705,32 @@ header('Suite 56 — UI Module Split Guards');
       'boot loader sets script.async = false (preserves db→state→reg load order)',
     ],
 
-    // 56.26 Boot loader references js/db_nv.js (FNV database)
-    [/js\/db_nv\.js/, 'boot loader references js/db_nv.js (FNV database path present)'],
+    // 56.26 Boot loader references js/data/db_nv.js (FNV database)
+    [/js\/data\/db_nv\.js/, 'boot loader references js/data/db_nv.js (FNV database path present)'],
 
-    // 56.27 Boot loader references js/db_fo3.js (FO3 database)
-    [/js\/db_fo3\.js/, 'boot loader references js/db_fo3.js (FO3 database path present)'],
+    // 56.27 Boot loader references js/data/db_fo3.js (FO3 database)
+    [
+      /js\/data\/db_fo3\.js/,
+      'boot loader references js/data/db_fo3.js (FO3 database path present)',
+    ],
 
-    // 56.28 Boot loader references js/state.js (shared state module)
-    [/js\/state\.js/, 'boot loader references js/state.js (shared state module path present)'],
+    // 56.28 Boot loader references js/core/state.js (shared state module)
+    [
+      /js\/core\/state\.js/,
+      'boot loader references js/core/state.js (shared state module path present)',
+    ],
 
-    // 56.29 Boot loader references js/reg_nv.js (FNV registry)
-    [/js\/reg_nv\.js/, 'boot loader references js/reg_nv.js (FNV registry path present)'],
+    // 56.29 Boot loader references js/data/reg_nv.js (FNV registry)
+    [
+      /js\/data\/reg_nv\.js/,
+      'boot loader references js/data/reg_nv.js (FNV registry path present)',
+    ],
 
-    // 56.30 Boot loader references js/reg_fo3.js (FO3 registry)
-    [/js\/reg_fo3\.js/, 'boot loader references js/reg_fo3.js (FO3 registry path present)'],
+    // 56.30 Boot loader references js/data/reg_fo3.js (FO3 registry)
+    [
+      /js\/data\/reg_fo3\.js/,
+      'boot loader references js/data/reg_fo3.js (FO3 registry path present)',
+    ],
 
     // 56.31 Boot loader reads activeContext (primary context selector)
     [/activeContext/, 'boot loader reads activeContext (primary game-context selector)'],
@@ -5856,13 +6769,12 @@ header('Suite 56 — UI Module Split Guards');
 //  SHORTCUT_ROUTES / routeLaunchShortcut implementation.
 //  Also checks custom per-shortcut icon files exist and are
 //  listed in sw.js ASSETS.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 57 — PWA App Shortcuts Guards');
 {
   const manifestSrc57 = readFile('manifest.json');
   const manifest57 = JSON.parse(manifestSrc57);
-  const uiCoreSrc57 = readFile('js/ui-core.js');
+  const uiCoreSrc57 = readGroup('ui-core');
 
   // 57.1  manifest.shortcuts is an array of exactly 4 entries
   assert(
@@ -6003,12 +6915,11 @@ header('Suite 57 — PWA App Shortcuts Guards');
 //  Suite 58 — Client Error Ring-Buffer Guards (Item C)
 //  Verifies ERROR_LOG_KEY/CAP, _recordError, both handlers wired,
 //  showErrorLog + escapeHtml + [LOGS] in router, no-exfil.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 58 — Client Error Ring-Buffer Guards');
 {
-  const uiCoreSrc58 = readFile('js/ui-core.js');
-  const apiSrc58 = readFile('js/api.js');
+  const uiCoreSrc58 = readGroup('ui-core');
+  const apiSrc58 = readGroup('api');
 
   // 58.1  ERROR_LOG_KEY, ERROR_LOG_CAP, _recordError all defined in ui-core.js
   assert(
@@ -6063,7 +6974,6 @@ header('Suite 58 — Client Error Ring-Buffer Guards');
 //  Suite 59 — Inline Handler Integrity (Item D-proxy)
 //  Scans index.html for on*="..." inline handlers, extracts
 //  standalone function names, asserts all resolve in js/*.js.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 59 — Inline Handler Integrity');
 {
@@ -6071,10 +6981,27 @@ header('Suite 59 — Inline Handler Integrity');
   const jsFiles59 = [
     'js/ui-audio.js',
     'js/ui-render.js',
+    'js/ui-render-inventory.js',
+    'js/ui-render-character.js',
+    'js/ui-render-record.js',
+    'js/ui-render-ledger.js',
+    'js/ui-render-map.js',
+    'js/ui-render-factions.js',
+    'js/ui-render-economy.js',
+    'js/ui-render-loot.js',
+    'js/ui-render-databank.js',
     'js/ui-saves.js',
     'js/ui-account.js',
     'js/ui-core.js',
+    'js/ui-core-nav.js',
+    'js/ui-core-overseer.js',
+    'js/ui-core-chassis.js',
+    'js/ui-core-modulebay.js',
+    'js/ui-core-cmd.js',
     'js/api.js',
+    'js/api-directive.js',
+    'js/api-import.js',
+    'js/api-router.js',
     'js/cloud.js',
     'js/state.js',
     'js/reg_nv.js',
@@ -6186,7 +7113,6 @@ header('Suite 59 — Inline Handler Integrity');
 //  Suite 60 — A11y Gate Guards
 //  Verifies @axe-core/playwright devDep, a11y-check.mjs + baseline
 //  exist, gate.js invokes a11y step, package.json has a11y script.
-//  5 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 60 — A11y Gate Guards');
 {
@@ -6231,11 +7157,10 @@ header('Suite 60 — A11y Gate Guards');
 //  Regression guards for r75 mobile layout stretch fix.
 //  Ensures minmax(0,1fr) grid track, overflow-wrap on panels/rows,
 //  inventory-span wrap rule, and mobile column clip are in place.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 61 — Mobile Layout Overflow Guards');
 {
-  const css61 = readFile('css/terminal.css');
+  const css61 = readCss();
 
   // 61.1 .main-grid uses minmax(0, 1fr) — not bare 1fr (which silently expands grid track)
   assert(
@@ -6307,11 +7232,10 @@ header('Suite 61 — Mobile Layout Overflow Guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 62 — Changelog viewer guards
-//  25 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 62 — Changelog viewer guards');
 {
-  const uiCoreSrc62 = readFile('js/ui-core.js');
+  const uiCoreSrc62 = readGroup('ui-core');
 
   // 62.1 Both changelog viewers route through the structured renderer
   //      (_showChangelogModal) — the boot-time PATCH NOTES viewer no longer dumps
@@ -6426,23 +7350,14 @@ header('Suite 62 — Changelog viewer guards');
   // NOT FOUND". These four guards lock every runtime-fetched local asset into all
   // three publish/precache sets so this class can't recur (Protocol 36b/42).
   {
-    const jsAll62 = [
-      'js/ui-core.js',
-      'js/api.js',
-      'js/ui-render.js',
-      'js/ui-saves.js',
-      'js/ui-account.js',
-      'js/ui-audio.js',
-      'js/state.js',
-      'js/cloud.js',
-      'js/registry-core.js',
-      'js/reg_nv.js',
-      'js/reg_fo3.js',
-      'js/db_nv.js',
-      'js/db_fo3.js',
-    ]
-      .filter(f => fs.existsSync(path.join(ROOT, f)))
-      .map(f => readFile(f))
+    // 2.8.5 U-A2 (closes AUDIT_U4 Finding A): derived from a full js/**/*.js
+    // glob rather than hand-maintained — a hardcoded list silently stopped
+    // covering the 5 ui-core-*.js siblings after the U-A1 split (this was
+    // never caught because none of them happened to contain a fetch() call
+    // yet). Scanning every js file makes this class of gap structurally
+    // impossible: a future file split or add is covered for free.
+    const jsAll62 = allJsFiles()
+      .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
       .join('\n');
     // Discover same-origin (non-http) string literals passed to fetch().
     const localFetched62 = [
@@ -6495,7 +7410,7 @@ header('Suite 62 — Changelog viewer guards');
   }
 
   // ── WU-C11 part (c): the changelog viewer visual glow-up structure guards ──
-  const cssSrc62 = readFile('css/terminal.css');
+  const cssSrc62 = readCss();
   let parseBody62 = '';
   let showBody62 = '';
   try {
@@ -6643,11 +7558,10 @@ header('Suite 62 — Changelog viewer guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 63 — Save/Cloud UI consolidation guards (Phase 6 Task 7)
 //  saveCurrentToCloud additive, renderSavesList unified, new HTML elements
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 63 — Save/Cloud UI consolidation guards');
 {
-  const cloudSrc63 = readFile('js/cloud.js');
+  const cloudSrc63 = readGroup('cloud');
 
   // 63.1  cloud.js defines window.saveCurrentToCloud (replaces pushToCloud)
   assert(
@@ -6727,11 +7641,10 @@ header('Suite 63 — Save/Cloud UI consolidation guards');
 // ══════════════════════════════════════════════════════════════
 //  Suite 64 — SPECIAL stats editable (commit-on-blur) guards (Phase 6 Task 1+follow-up)
 //  commitStat replaces clampStat; capStatMax upper cap on input; syncStateFromDom clamp
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 {
-  const uiCoreSrc64 = readFile('js/ui-core.js');
+  const uiCoreSrc64 = readGroup('ui-core');
   const specialIds = ['s_s', 's_p', 's_e', 's_c', 's_i', 's_a', 's_l'];
 
   // 64.1  All 7 SPECIAL inputs have onchange="commitStat(this)" (commit-on-blur)
@@ -6769,50 +7682,140 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // 64.3  commitStat is defined in ui-core.js
   assert(/function commitStat\s*\(/.test(uiCoreSrc64), 'commitStat is defined in ui-core.js');
 
-  // 64.4–64.7: inspect commitStat body — commitStat now DELEGATES its clamp/
-  // save/emit to the shared _nativeSetSpecial() choke point (Native USE +
-  // TERMINAL stat-edits plan, Protocol 22 — one clamp shared by the DOM
-  // onchange path, the USE handler, and the TERMINAL stat grammar), so 64.4–64.6
-  // check the CONCATENATION of both bodies — the same guarantee, just spanning
-  // the two cooperating functions instead of living in commitStat alone.
+  // 64.4–64.7: CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C5). commitStat
+  // DELEGATES its clamp/save/emit to the shared _nativeSetSpecial() choke point
+  // (Native USE + TERMINAL stat-edits, Protocol 22 — one clamp shared by the DOM
+  // onchange path, the USE handler, and the TERMINAL grammar). The OLD checks
+  // grepped a CONCATENATION of both function bodies for Math.max/min /
+  // updateMath / saveState / isNaN tokens — a call-chain break BETWEEN the two
+  // cooperating functions (commitStat computes v but never reaches
+  // _nativeSetSpecial's clamp, or the clamp runs on the wrong operand order) was
+  // invisible: every token stayed present. These EXECUTE the real
+  // _nativeSetSpecial + commitStat in an isolated vm and assert the actual
+  // clamped return value, the persisted state[k], and the updateMath→saveState
+  // order. Twin-check (U2 §2 discipline): no test.html or vm suite runs either
+  // function — the only prior coverage was this suite's greps.
   {
-    let commitStatBody = '';
-    let nativeSetSpecialBody64 = '';
-    try {
-      commitStatBody = extractFunctionBody(uiCoreSrc64, 'commitStat');
-    } catch (_) {}
-    try {
-      nativeSetSpecialBody64 = extractFunctionBody(uiCoreSrc64, '_nativeSetSpecial');
-    } catch (_) {}
-    const combined64 = commitStatBody + '\n' + nativeSetSpecialBody64;
+    const vm64 = require('vm');
+    const fnSpecial64 = uiCoreSrc64.match(/function _nativeSetSpecial\([\s\S]*?\n\}/);
+    const fnCommit64 = uiCoreSrc64.match(/function commitStat\([\s\S]*?\n\}/);
+    if (!fnSpecial64 || !fnCommit64) {
+      fail('64.4-64.7: could not extract _nativeSetSpecial / commitStat from ui-core family');
+    } else {
+      const calls64 = [];
+      const domVals64 = {};
+      const sb64 = {
+        state: { s: 5, p: 5, e: 5, c: 5, i: 5, a: 5, l: 5 },
+        document: {
+          getElementById: id => ({
+            get value() {
+              return id in domVals64 ? domVals64[id] : '';
+            },
+            set value(x) {
+              domVals64[id] = x;
+            },
+          }),
+        },
+        RobcoEvents: { emit: () => {} },
+        updateMath: () => calls64.push('updateMath'),
+        saveState: () => calls64.push('saveState'),
+      };
+      vm64.createContext(sb64);
+      vm64.runInContext(fnSpecial64[0] + '\n' + fnCommit64[0], sb64);
+      const setSpecial64 = (k, v) =>
+        vm64.runInContext(`_nativeSetSpecial(${JSON.stringify(k)}, ${JSON.stringify(v)})`, sb64);
+      // commitStat() persists via the choke point but returns nothing — assert on state[k]
+      const commit64 = (id, v) => {
+        calls64.length = 0;
+        vm64.runInContext(
+          `commitStat({ id: ${JSON.stringify(id)}, value: ${JSON.stringify(v)} })`,
+          sb64
+        );
+      };
 
-    // 64.4  1–10 clamp on commit only
-    guards(combined64, [
-      [
-        /Math\.max\s*\(\s*1,\s*Math\.min\s*\(\s*10,/,
-        'commitStat (via _nativeSetSpecial) clamps value to 1–10 on commit (Math.max/min guard)',
-      ],
+      // sentinel — real, non-trivial functions were extracted (anti-vacuous)
+      assert(
+        typeof sb64._nativeSetSpecial === 'function' &&
+          typeof sb64.commitStat === 'function' &&
+          fnSpecial64[0].length > 200,
+        '64.4-guard: _nativeSetSpecial + commitStat extracted as non-trivial functions (anti-vacuous sentinel)'
+      );
 
-      // 64.5  calls updateMath() for downstream recalcs
-      [
-        /updateMath\s*\(\s*\)/,
-        'commitStat (via _nativeSetSpecial) calls updateMath() to trigger downstream recalcs',
-      ],
+      // 64.4  over-max value is clamped DOWN to 10 (returned, persisted, mirrored to DOM)
+      {
+        const ret = setSpecial64('s', '14');
+        assert(
+          ret === 10 && sb64.state.s === 10 && domVals64.s_s === '10',
+          `64.4: _nativeSetSpecial('s','14') clamps to 10 — return/state[k]/DOM all 10 (got ret=${ret}, state.s=${sb64.state.s}, dom=${domVals64.s_s})`
+        );
+      }
 
-      // 64.6  calls saveState() to persist
-      [
-        /saveState\s*\(\s*\)/,
-        'commitStat (via _nativeSetSpecial) calls saveState() to debounce-persist the new value',
-      ],
-    ]);
+      // 64.5  below-min value 0 is clamped UP to 1 (floor is 1, never 0)
+      {
+        const ret = setSpecial64('p', '0');
+        assert(
+          ret === 1 && sb64.state.p === 1,
+          `64.5: _nativeSetSpecial('p','0') clamps up to 1 (floor, not 0) (got ret=${ret}, state.p=${sb64.state.p})`
+        );
+      }
 
-    // 64.7  isNaN guard reverts to prior state value (not a hard 1)
-    assert(
-      /isNaN\s*\(v\)/.test(combined64) &&
-        /state\s*\[.*k.*\]/.test(combined64) &&
-        /\|\|\s*5/.test(combined64),
-      'commitStat reverts empty/NaN to state[k]||5 (not forced to 1) — regression guard'
-    );
+      // 64.6  negative value is clamped UP to 1 (min-side clamp, executed)
+      {
+        const ret = setSpecial64('e', '-5');
+        assert(
+          ret === 1 && sb64.state.e === 1,
+          `64.6: _nativeSetSpecial('e','-5') clamps up to 1 (got ret=${ret}, state.e=${sb64.state.e})`
+        );
+      }
+
+      // 64.7  empty/NaN reverts to the PRIOR state[k] (not forced to 1) — the documented regression
+      {
+        vm64.runInContext('state.c = 8;', sb64);
+        const ret = setSpecial64('c', '');
+        assert(
+          ret === 8 && sb64.state.c === 8,
+          `64.7: _nativeSetSpecial('c','') on empty input reverts to prior state.c=8 (NOT hard 1) (got ret=${ret}, state.c=${sb64.state.c})`
+        );
+      }
+
+      // 64.7b  an in-range value passes through unchanged (no spurious clamp)
+      {
+        const ret = setSpecial64('i', '6');
+        assert(
+          ret === 6 && sb64.state.i === 6,
+          `64.7b: _nativeSetSpecial('i','6') passes an in-range value through unchanged (got ret=${ret})`
+        );
+      }
+
+      // 64.7c  a genuine commit calls updateMath() THEN saveState() (recalc-then-persist order)
+      {
+        calls64.length = 0;
+        setSpecial64('a', '9');
+        assert(
+          calls64.length === 2 && calls64[0] === 'updateMath' && calls64[1] === 'saveState',
+          `64.7c: a committed SPECIAL edit calls updateMath() then saveState() in that order (got [${calls64.join(', ')}])`
+        );
+      }
+
+      // 64.7d  commitStat(el) reads el.id.slice(2) + el.value and delegates to the clamp choke point
+      {
+        commit64('s_l', '99');
+        assert(
+          sb64.state.l === 10,
+          `64.7d: commitStat({id:'s_l',value:'99'}) delegates to _nativeSetSpecial → persists clamped state.l=10 (got ${sb64.state.l})`
+        );
+      }
+
+      // 64.7e  commitStat on a non-numeric field reverts to the prior value (not 1) via the shared choke point
+      {
+        vm64.runInContext('state.l = 7;', sb64);
+        commit64('s_l', 'abc');
+        assert(
+          sb64.state.l === 7,
+          `64.7e: commitStat({id:'s_l',value:'abc'}) reverts to prior state.l=7 (NaN-revert through the choke point, not hard 1) (got ${sb64.state.l})`
+        );
+      }
+    }
   }
 
   // 64.8  All 7 SPECIAL inputs have inputmode="numeric"
@@ -6881,7 +7884,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 64.13  syncStateFromDom clamps SPECIAL reads to 1–10 (defense-in-depth)
   {
-    const stateSrc64 = readFile('js/state.js');
+    const stateSrc64 = readGroup('state');
     let syncBody = '';
     try {
       syncBody = extractFunctionBody(stateSrc64, 'syncStateFromDom');
@@ -6898,11 +7901,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  #updateModal replaces #updateBanner; full-screen blocking dialog;
 //  focus trap, Esc blocked, fail-safe, robust _isGenuineUpdate() gate.
 //  Case C already-installing fix + idempotency + WU-SW2 focus/visibility re-check.
-//  18 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Blocking Update Modal');
-  const uiCoreSrc65 = readFile('js/ui-core.js');
+  const uiCoreSrc65 = readGroup('ui-core');
 
   // 65.1  #updateModal exists in index.html (replaced #updateBanner)
   guards(htmlSource, [
@@ -6979,7 +7981,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 65.12  #updateModalMsg is left-aligned in terminal.css (message body reads flush-left, not ragged/centered)
-  const cssSrc65 = readFile('css/terminal.css');
+  const cssSrc65 = readCss();
   assert(
     /#updateModalMsg[\s\S]{0,100}text-align\s*:\s*left/.test(cssSrc65),
     '#updateModalMsg has text-align:left in terminal.css (update modal message body is flush-left, not centered)'
@@ -7051,19 +8053,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 66 — FO3 Lincoln Memorabilia Tracker (Phase 6 Task 4)
-//  state.lincolnItems, migration, autoImportState validated map,
-//  reg_fo3 array, GAME_DEFS.FO3.tracksLincoln, render/handler guards,
-//  'other' vocab removed + coercion guard.
-//  20 tests
+//  state.lincolnItems, migration, reg_fo3 array,
+//  GAME_DEFS.FO3.tracksLincoln, render/handler guards, 'other' vocab removed.
+//  Health-U3 slice 1 (2026-07-16): the four static autoImportState() greps
+//  (66.3 plain-object check, 66.4 vocab, 66.5 registry-key filter, 66.20
+//  legacy-'other' coercion — the last satisfiable by a comment) were
+//  CONVERTED to behavioral tests that execute the real function against the
+//  real reg_fo3.js — now Suite 76's 76.12–76.14.
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 Lincoln Memorabilia Tracker');
-  const stateSrc66 = readFile('js/state.js');
-  const apiSrc66 = readFile('js/api.js');
-  const uiRenderSrc66 = readFile('js/ui-render.js');
-  const uiCoreSrc66 = readFile('js/ui-core.js');
-  const fo3RegSrc66 = readFile('js/reg_fo3.js');
-  const nvRegSrc66 = readFile('js/reg_nv.js');
+  const stateSrc66 = readGroup('state');
+  const apiSrc66 = readGroup('api');
+  const uiRenderSrc66 = readGroup('ui-render');
+  const uiCoreSrc66 = readGroup('ui-core');
+  const fo3RegSrc66 = readGroup('reg_fo3');
+  const nvRegSrc66 = readGroup('reg_nv');
 
   // 66.1  state.lincolnItems default {} in state.js
   assert(
@@ -7085,43 +8090,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 66.3  autoImportState() has lincolnItems plain-object check
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /lincolnItems/.test(importBody) && /Array\.isArray/.test(importBody),
-      'autoImportState() validates lincolnItems as plain object (not array) before importing'
-    );
-  }
-
-  // 66.4  autoImportState() validates vocabulary before accepting disposition values
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /LINCOLN_VOCAB/.test(importBody) &&
-        /hannibal/.test(importBody) &&
-        /washington/.test(importBody),
-      'autoImportState() uses LINCOLN_VOCAB list to validate disposition values (Protocol 24)'
-    );
-  }
-
-  // 66.5  autoImportState() filters keys against registry item names (no arbitrary keys accepted)
-  {
-    let importBody = '';
-    try {
-      importBody = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /registryNames/.test(importBody) && /lincolnMemorabilia/.test(importBody),
-      'autoImportState() filters lincolnItems keys against registry names (Protocol 24 — no arbitrary keys)'
-    );
-  }
+  // 66.3–66.5  CONVERTED to behavioral (Health-U3 slice 1) — the plain-object
+  //  check, disposition-vocab validation, and registry-key filtering of the
+  //  autoImportState() Lincoln path are now EXECUTED for real in Suite 76
+  //  (76.12–76.14) against the real reg_fo3.js, replacing the token-presence
+  //  greps that stayed green with the logic inverted.
 
   // 66.6  reg_fo3.js has lincolnMemorabilia array (non-empty)
   assert(
@@ -7237,17 +8210,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     "ui-render.js opts array does not include 'other' option — removed in Change 2"
   );
 
-  // 66.20  autoImportState() coerces legacy 'other' disposition to 'found'
-  {
-    let importBody66b = '';
-    try {
-      importBody66b = extractFunctionBody(apiSrc66, 'autoImportState');
-    } catch (_) {}
-    assert(
-      /other.*found|coerced/.test(importBody66b),
-      "autoImportState() coerces legacy 'other' disposition to 'found' for backward-compatibility"
-    );
-  }
+  // 66.20  CONVERTED to behavioral (Health-U3 slice 1) — the legacy-'other'→
+  //  'found' coercion grep (/other.*found|coerced/ — satisfiable by a source
+  //  COMMENT) is now Suite 76's 76.12, which imports {"Lincoln's Repeater":
+  //  "other"} through the real function and asserts the stored disposition.
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -7256,16 +8222,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  reg_nv traits 16-item array, GAME_DEFS.FNV.hasTraits,
 //  renderTraits/toggleTrait guards, #traitsDisplay distinct from #perksList,
 //  #traitFilter input + renderTraits substring-filter guard.
-//  19 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Traits Tracker');
-  const stateSrc67 = readFile('js/state.js');
-  const apiSrc67 = readFile('js/api.js');
-  const uiRenderSrc67 = readFile('js/ui-render.js');
-  const uiCoreSrc67 = readFile('js/ui-core.js');
-  const nvRegSrc67 = readFile('js/reg_nv.js');
-  const fo3RegSrc67 = readFile('js/reg_fo3.js');
+  const stateSrc67 = readGroup('state');
+  const apiSrc67 = readGroup('api');
+  const uiRenderSrc67 = readGroup('ui-render');
+  const uiCoreSrc67 = readGroup('ui-core');
+  const nvRegSrc67 = readGroup('reg_nv');
+  const fo3RegSrc67 = readGroup('reg_fo3');
 
   // 67.1  state.traits default [] in state object
   assert(
@@ -7288,7 +8253,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
   // 67.3  autoImportState() validates traits as array before importing
   {
-    const importBody67 = readFile('js/api.js');
+    const importBody67 = readGroup('api');
     assert(
       /Array\.isArray\(raw\)/.test(importBody67) && /traits/.test(importBody67),
       'autoImportState() validates traits as array before importing'
@@ -7450,11 +8415,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  SUITE 68 — FNV Location Database Expansion (Phase 6 Task 6)
 //  Adds 22 verified minor/notable NV locations sourced from fallout.wiki.
 //  Floor guard, type validity, dedup, seed examples, zone↔registry parity.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FNV Location Database Expansion');
-  const nvRegSrc68 = readFile('js/reg_nv.js');
+  const nvRegSrc68 = readGroup('reg_nv');
 
   // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
   const locsSectionMatch = nvRegSrc68.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
@@ -7563,12 +8527,11 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  Root cause: onGameContextChange never updated state.gameContext,
 //  so beforeunload/saveState re-derived activeContext='FNV' and
 //  clobbered the deliberate 'FO3' localStorage write.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('FO3 game-switch regression guard');
-  const uiCoreSrc69 = readFile('js/ui-core.js');
-  const stateSrc69 = readFile('js/state.js');
+  const uiCoreSrc69 = readGroup('ui-core');
+  const stateSrc69 = readGroup('state');
 
   // Extract the body of onGameContextChange for targeted checks
   let gcBody69 = '';
@@ -7588,29 +8551,134 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'onGameContextChange() sets window._contextSwitching = true before reload — guards beforeunload/saveState from clobbering the switch (regression guard)'
   );
 
-  // 69.3  beforeunload handler early-exits when _contextSwitching is set
+  // 69.3  beforeunload flush early-exits when _contextSwitching is set
   {
-    // Find the beforeunload callback body
-    const buMatch = uiCoreSrc69.match(
-      /addEventListener\s*\(\s*['"]beforeunload['"]\s*,\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\}\s*\)/
-    );
-    const buBody = buMatch ? buMatch[1] : '';
+    // The flush body now lives in the shared _flush() closure (fed by both the
+    // beforeunload and visibilitychange→hidden triggers, Protocol 22) — the guard
+    // is asserted there, plus that beforeunload is still wired to it.
+    const buBody = extractFunctionBody(uiCoreSrc69, '_flushUnload');
     assert(
-      /_contextSwitching/.test(buBody) && /return/.test(buBody),
+      /_contextSwitching/.test(buBody) &&
+        /return/.test(buBody) &&
+        /addEventListener\('beforeunload',\s*_flushUnload\)/.test(uiCoreSrc69),
       'beforeunload handler early-exits when window._contextSwitching is set — prevents clobbering the deliberate FO3 write (regression guard)'
     );
   }
 
-  // 69.4  saveState debounced body early-exits when _contextSwitching is set
+  // 69.4  saveState debounced body early-exits when _contextSwitching is set —
+  //        CONVERTED TO BEHAVIORAL (Health-U3 slice 5, U2 §2 C4). The OLD check
+  //        grepped the saveState body for the tokens `_contextSwitching` and
+  //        `return` in the same string — a guard that checked the WRONG flag, was
+  //        placed AFTER the localStorage.setItem (too late), or was `return`-less
+  //        (e.g. `if (…) { }`) all stayed green while a stale debounced write
+  //        clobbered a just-loaded campaign. This EXECUTES the real saveState() in
+  //        an isolated vm (whole state.js loaded, synchronous setTimeout so the
+  //        debounce callback runs inline) and asserts the actual robco_v8 write is
+  //        SKIPPED under _contextSwitching / _loadingSave and PERFORMED when both
+  //        are clear. Twin-check (U2 §2 discipline): no test.html or vm suite runs
+  //        saveState's write-gating — save-survival.mjs proves boot-path survival,
+  //        not the debounce guard; render-check only mentions the flag in a comment.
+  //        (The beforeunload half stays static above + push-gate save-survival, per C4.)
   {
-    // Extract the setTimeout callback body inside saveState
-    const saveStateMatch = stateSrc69.match(
-      /function saveState\s*\(\s*\)([\s\S]*?)(?=\nfunction |\nlet |\nconst |\nvar |$)/
+    const vm69 = require('vm');
+    const setItems69 = [];
+    const store69 = {};
+    const domVals69 = {};
+    let harnessErr69 = null;
+    const sandbox69 = {
+      window: {},
+      document: {
+        getElementById: id => ({
+          get value() {
+            return id in domVals69 ? domVals69[id] : '';
+          },
+          set value(x) {
+            domVals69[id] = x;
+          },
+        }),
+      },
+      localStorage: {
+        getItem: k => (k in store69 ? store69[k] : null),
+        setItem: (k, v) => {
+          store69[k] = v;
+          setItems69.push(k);
+        },
+        removeItem: k => {
+          delete store69[k];
+        },
+      },
+      // synchronous debounce — run the setTimeout callback inline so the write
+      // (or the guarded skip) has resolved by the time saveState() returns
+      setTimeout: fn => {
+        fn();
+        return 1;
+      },
+      clearTimeout: () => {},
+      calendarToTicks: () => 0, // lives in ui-render-character.js, out of this sandbox
+      appendToChat: () => {},
+      loadUI: () => {},
+      expandPanelForCategory: () => {},
+      RobcoEvents: { emit: () => {} },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    try {
+      vm69.createContext(sandbox69);
+      vm69.runInContext(stateSrc69, sandbox69);
+    } catch (e) {
+      harnessErr69 = e;
+    }
+    const saved69 = () => {
+      setItems69.length = 0;
+      vm69.runInContext('saveState();', sandbox69);
+      return setItems69.includes('robco_v8');
+    };
+    function behav69(label, fn) {
+      if (harnessErr69) {
+        fail(label + '  (harness error: ' + harnessErr69.message + ')');
+        return;
+      }
+      try {
+        assert(fn(), label);
+      } catch (e) {
+        fail(label + '  (runtime error: ' + e.message + ')');
+      }
+    }
+
+    behav69(
+      '69.4a: [behavioral] a normal saveState() (both guard flags clear) WRITES robco_v8 to localStorage — the debounce path persists',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '100';
+        return saved69() === true;
+      }
     );
-    const saveBody = saveStateMatch ? saveStateMatch[1] : '';
-    assert(
-      /_contextSwitching/.test(saveBody) && /return/.test(saveBody),
-      'saveState() debounced setTimeout body early-exits when window._contextSwitching is set — prevents pending debounce from clobbering the FO3 write (regression guard)'
+    behav69(
+      '69.4b: [behavioral] with window._contextSwitching = true, saveState() SKIPS the robco_v8 write even though DOM state changed — a pending debounce cannot clobber the deliberate FO3 switch (the r-regression)',
+      () => {
+        sandbox69.window._contextSwitching = true;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '200'; // genuinely changed state — only the guard should block it
+        return saved69() === false;
+      }
+    );
+    behav69(
+      '69.4c: [behavioral] with window._loadingSave = true, saveState() SKIPS the write — a stale debounce cannot land after a save-slot/cloud load (same clobber class)',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = true;
+        domVals69.c_caps = '300';
+        return saved69() === false;
+      }
+    );
+    behav69(
+      '69.4d: [behavioral] once both flags clear again, saveState() resumes WRITING — the guard is transient, not a permanent stuck-off',
+      () => {
+        sandbox69.window._contextSwitching = false;
+        sandbox69.window._loadingSave = false;
+        domVals69.c_caps = '400';
+        return saved69() === true;
+      }
     );
   }
 }
@@ -7623,13 +8691,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  apparel, Vault 13 Canteen in MISC + registry,
 //  seedNewCampaignInventory definition + guards,
 //  WU-D2 Mysterious Stranger Outfit DT + WU-D6 1st Recon DT regressions.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 70 — FNV unique apparel + Vault 13 Canteen');
-  const dbNv70 = readFile('js/db_nv.js');
-  const regNv70 = readFile('js/reg_nv.js');
-  const uiCore70 = readFile('js/ui-core.js');
+  const dbNv70 = readGroup('db_nv');
+  const regNv70 = readGroup('reg_nv');
+  const uiCore70 = readGroup('ui-core');
 
   // Helper: extract ARMOR.CSV data rows (excluding header)
   function getArmorRows70(src) {
@@ -7668,11 +8735,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     return names;
   }
 
-  // 70.1  ARMOR.CSV row count ≥ 103 (62 original + 41 new unique apparel)
+  // 70.1  ARMOR.CSV row count ≥ 100 (62 original + 41 new unique apparel, minus
+  //        the 3 rows removed in the 2026-07-15 Protocol 3 cleanup: the fake
+  //        "Vault Utility Suit" and the two duplicate NCR-Ranger names now
+  //        aliased to canonical NCR Ranger Combat Armor — see Suite 232.23/232.24)
   const armorRows70 = getArmorRows70(dbNv70);
   assert(
-    armorRows70.length >= 103,
-    `ARMOR.CSV has ≥ 103 entries (found ${armorRows70.length}) — floor guard after unique apparel sweep`
+    armorRows70.length >= 100,
+    `ARMOR.CSV has ≥ 100 entries (found ${armorRows70.length}) — floor guard after unique apparel sweep + 2026-07-15 dedup`
   );
 
   // 70.2  MISC.CSV has Vault 13 Canteen
@@ -7843,14 +8913,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  no-dup-header guard, Lincoln data-lname onclick safety,
 //  setLincolnDisposition re-render guard, Lincoln no-inline-flex guard,
 //  Traits no-inline-flex guard (compact rows matching collectibles density).
-//  23 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 71 — Phase 6 UI Consistency');
   const htmlSrc71 = readFile('index.html');
-  const uiRenderSrc71 = readFile('js/ui-render.js');
-  const uiCoreSrc71 = readFile('js/ui-core.js');
-  const cssSrc71 = readFile('css/terminal.css');
+  const uiRenderSrc71 = readGroup('ui-render');
+  const uiCoreSrc71 = readGroup('ui-core');
+  const cssSrc71 = readCss();
 
   // 71.1  #traitsSection is a <details> element (collapsible sub-panel)
   guards(htmlSrc71, [
@@ -8059,14 +9128,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 72 — Fix A: location datalist per-game bleed + Fix B: update-modal whitespace
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 72 — Location datalist bleed fix + update-modal whitespace');
   const htmlSrc72 = readFile('index.html');
-  const uiSavesSrc72 = readFile('js/ui-saves.js');
-  const uiCoreSrc72 = readFile('js/ui-core.js');
-  const cssSrc72 = readFile('css/terminal.css');
+  const uiSavesSrc72 = readGroup('ui-saves');
+  const uiCoreSrc72 = readGroup('ui-core');
+  const cssSrc72 = readCss();
 
   // 72.1  Static nv_locations datalist is gone from index.html
   guards(htmlSrc72, [
@@ -8125,13 +9193,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 73 — Skills panel game-aware render (FNV/FO3 bleed fix)');
   const htmlSrc73 = readFile('index.html');
-  const uiCoreSrc73 = readFile('js/ui-core.js');
-  const stateSrc73 = readFile('js/state.js');
+  const uiCoreSrc73 = readGroup('ui-core');
+  const stateSrc73 = readGroup('state');
 
   // 73.1  #skillsGrid container exists in index.html
   guards(htmlSrc73, [
@@ -8237,14 +9304,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  gridRow/gridCol on every FNV/FO3 collectible + lincoln entry,
 //  cells match existing zones[], coord-based badge source guard,
 //  regression: no name-based badge logic, lincoln check present,
-//  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix.
-//  13 tests
+//  WU-D1 unique FO3 zone-name guard, WU-D5 'Vault 92 South' fix,
+//  bobblehead location-canon guard (Explosives→WKML, Unarmed→Rockopolis).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 74 — Collectibles Map Coord Guards');
-  const nvRegSrc74 = readFile('js/reg_nv.js');
-  const fo3RegSrc74 = readFile('js/reg_fo3.js');
-  const uiRenderSrc74 = readFile('js/ui-render.js');
+  const nvRegSrc74 = readGroup('reg_nv');
+  const fo3RegSrc74 = readGroup('reg_fo3');
+  const uiRenderSrc74 = readGroup('ui-render');
 
   // 74.1  All FNV collectibles have gridRow and gridCol (both numbers in 1..6)
   {
@@ -8444,18 +9511,40 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     !/Vault 92 South/.test(fo3RegSrc74) && /'Bethesda Offices East'/.test(fo3RegSrc74),
     "reg_fo3.js: fabricated 'Vault 92 South' replaced by real 'Bethesda Offices East' in the Bethesda Ruins zone (WU-D5)"
   );
+
+  // 74.14  Bobblehead location-canon guard: the Explosives and Unarmed collectible
+  //        location strings were pointing at the wrong in-game place (Explosives at
+  //        'Minefield — House #103', Unarmed at 'Sewers — Beneath Tepid Sewer').
+  //        fallout.wiki-verified (Protocol 3): the Explosives bobblehead is in the
+  //        sealed cistern at WKML Broadcast Station; the Unarmed bobblehead is in the
+  //        unmarked Rockopolis cave. Lock both corrected locations and fail if either
+  //        wrong string ever returns.
+  {
+    const exploLoc74 = (fo3RegSrc74.match(
+      /name:\s*'Explosives'[\s\S]{0,120}?location:\s*'([^']+)'/
+    ) || [])[1];
+    const unarmedLoc74 = (fo3RegSrc74.match(
+      /name:\s*'Unarmed'[\s\S]{0,120}?location:\s*'([^']+)'/
+    ) || [])[1];
+    assert(
+      /WKML BROADCAST STATION/.test(exploLoc74 || '') &&
+        /ROCKOPOLIS/.test(unarmedLoc74 || '') &&
+        !/MINEFIELD/.test(fo3RegSrc74) &&
+        !/TEPID/.test(fo3RegSrc74),
+      "reg_fo3.js: Explosives bobblehead → WKML Broadcast Station, Unarmed bobblehead → Rockopolis (fallout.wiki-verified); wrong 'Minefield'/'Tepid Sewer' strings stay gone"
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 75 — Registry items[] no-duplicate-names guard
 //  behavioral: extract items section, build name set, assert no name appears twice.
 //  Also regression-guards the Rebound weapon typo fix.
-//  3 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 75 — Registry items[] No-Duplicate-Names Guard');
-  const nvSrc75 = readFile('js/reg_nv.js');
-  const fo3Src75 = readFile('js/reg_fo3.js');
+  const nvSrc75 = readGroup('reg_nv');
+  const fo3Src75 = readGroup('reg_fo3');
 
   function extractItemsSection75(src) {
     const start = src.indexOf('items:');
@@ -8519,43 +9608,174 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // 75.3  Regression: {name:'Rebound', type:'weapon'} appears exactly once in reg_nv.js items[]
-  //       (Previously appeared twice due to a copy-paste error — this guards against recurrence)
+  // 75.3  Regression: {name:'Rebound', type:'weapon'} is GONE from reg_nv.js items[].
+  //       Rebound is a Fallout: New Vegas CHEM, never a weapon — the 2026-07-15 NV
+  //       data-provenance correction removed the fabricated weapon entry (and its
+  //       matching db_nv.js WEAPONS.CSV row) while keeping the real Rebound as an
+  //       'aid' entry. (This once guarded a copy-paste duplicate at "exactly once";
+  //       the correct count is now zero — the weapon entry should never exist. The
+  //       real chem's survival is asserted by Suite 232.13.)
   {
     const section = extractItemsSection75(nvSrc75);
     const count = (section.match(/name\s*:\s*'Rebound'[\s\S]{0,30}type\s*:\s*'weapon'/g) || [])
       .length;
-    assert(count === 1, `reg_nv.js: Rebound weapon entry appears exactly once (found ${count})`);
+    assert(count === 0, `reg_nv.js: fabricated Rebound weapon entry is removed (found ${count})`);
   }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 76 — autoImportState Hardening Guards (F1/F2/F3)
-//  9 tests
+//  Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) —
+//  BEHAVIORAL (Health-U3 slice 1, 2026-07-16).
+//
+//  F1 (status-type whitelist) and F2 (explicit null clears an equipped slot)
+//  were previously asserted by token-presence greps over the function source
+//  — green even with the logic inverted. They now EXECUTE the REAL extracted
+//  autoImportState() body in a vm sandbox against the REAL js/core/state.js +
+//  registry (the Suite 133/229 harness idiom) and assert the actual resulting
+//  state. The Lincoln disposition validation (formerly Suite 66's static
+//  66.3–66.5/66.20 — 66.20 was satisfiable by a comment) folds into the same
+//  harness here, against the REAL reg_fo3.js.
+//
+//  Twin-check (U2 §2 A1, re-verified against source before converting):
+//  - test.html Suite 4 only sets equipped on a FRESH state (preserves a null
+//    headgear; never proves CLEARING a previously-set slot).
+//  - test.html Suite 7's status tests use only valid types.
+//  - test.html Suite 8's 'weird'→BUFF + 'other'→found coverage exercises
+//    sanitizeImportedContainer() — a DIFFERENT function from this one.
+//  - Suite 221.9 proves reconcileEquipped()'s dangling-clear (inventory
+//    omission) — a different mechanism from the explicit-null clear.
+//  - Suite 229.6 proves lincolnItems SURVIVES a registry mismatch — not the
+//    trusted-path validation semantics.
+//  None of the behavioral tests below duplicates existing coverage. F3
+//  (collectibles registry allow-list) already has behavioral twins (Suite
+//  133's collectibles test + 229.7/229.8 + test.html Suite 6), so its static
+//  Protocol-20 pins are KEPT as-is, not re-proven.
+//
+//  76.15–76.21 (AI_OVERSEER Finding 1, 2026-07-18): the inventory silent-deletion
+//  guard. autoImportState() now reconciles the AI inventory array as a PROPOSAL
+//  (additions applied, removals confirm-gated) instead of full-replacing
+//  state.inventory — an empty/short AI array can no longer wipe natively-held
+//  items. 76.15 is the load-bearing Protocol-13 regression (empty array deletes
+//  nothing); 76.21 is the async confirm-gate proof (removal applies only on
+//  approval).
+//  76.22–76.43 (AI_OVERSEER Finding 1 — CLASS fix, 2026-07-18): the SAME
+//  reconcile-and-confirm contract extended to every other durable collection that
+//  shared the full-replace pattern — squad/perks/quests/status/ammo and the
+//  registry-gated trackers (collectibles/traits/skillBooks/magazines/lincolnItems).
+//  One wipe-protection test per field (each red-then-green proven), the additive/
+//  merge behavior, the perk rank-reduction confirm gate (76.43 async), and 76.42
+//  is the ⭐ STATIC RATCHET that fails the build if any durable field is ever again
+//  assigned wholesale from AI-parsed data (state.<field> = parsed.<field> / .map).
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3)');
-  const apiSrc76 = readFile('js/api.js');
+  header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
+  const apiSrc76 = readGroup('api');
   let importBody76 = '';
   try {
     importBody76 = extractFunctionBody(apiSrc76, 'autoImportState');
   } catch (_) {}
 
-  // ── Fix 2: equipped unequip ──────────────────────────────────────────────
+  // ── vm harness (Suite 133/229 idiom: real state.js + real registry +
+  //    real extracted autoImportState body, executed — not grepped) ─────────
+  const vm76 = require('vm');
+  let hNV76 = null;
+  let hFO76 = null;
+  let harnessErr76 = null;
+  function makeHarness76(regStem) {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+    };
+    vm76.createContext(sandbox);
+    vm76.runInContext(stateSource, sandbox);
+    vm76.runInContext(readGroup(regStem), sandbox);
+    vm76.runInContext(
+      'function autoImportState(jsonString)' +
+        importBody76 +
+        '\nthis.autoImportState = autoImportState;',
+      sandbox
+    );
+    return {
+      sandbox,
+      defaults: vm76.runInContext('JSON.parse(JSON.stringify(state))', sandbox),
+    };
+  }
+  try {
+    hNV76 = makeHarness76('reg_nv');
+    hFO76 = makeHarness76('reg_fo3');
+  } catch (e) {
+    harnessErr76 = e;
+  }
+  function live76(h) {
+    return vm76.runInContext('JSON.parse(JSON.stringify(state))', h.sandbox);
+  }
+  function behavior76(label, h, seed, fn) {
+    if (!h) {
+      fail(`${label}  (harness error: ${harnessErr76 && harnessErr76.message})`);
+      return;
+    }
+    try {
+      const s = Object.assign({}, h.defaults, seed || {});
+      vm76.runInContext('state = ' + JSON.stringify(s) + ';', h.sandbox);
+      assert(fn(), label);
+    } catch (e) {
+      fail(`${label}  (runtime error: ${e.message})`);
+    }
+  }
+  // Every weapon/armor name below is ALSO seeded into inventory, so the
+  // reconcileEquipped() pass autoImportState runs afterwards (state.js) can
+  // never be the thing clearing a slot — these tests isolate the
+  // explicit-null 'key in obj' semantics, not the dangling-item reconciler
+  // (that mechanism is Suite 221.9's subject).
+  const EQUIP_SEED76 = {
+    inventory: [
+      { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+      { name: 'Hunting Rifle', qty: 1, wgt: 7, val: 300, type: 'weapon' },
+      { name: 'Leather Armor', qty: 1, wgt: 8, val: 120, type: 'armor' },
+    ],
+    equipped: { weapon: '10mm Pistol', armor: 'Leather Armor', headgear: 'Lucky Shades' },
+  };
 
-  // 76.1  equipped block uses 'key' in obj (key-present test — distinguishes null from absent)
-  assert(
-    /'weapon'\s+in\s+e/.test(importBody76),
-    "autoImportState equipped: 'weapon' in e pattern present (key-present test, not falsy-check)"
+  // ── Fix 2 (F2): explicit null clears an equipped slot — BEHAVIORAL ──────
+  behavior76(
+    "76.1: [behavioral] {equipped:{weapon:null}} CLEARS the equipped weapon slot, while the slots whose keys are absent (armor/headgear) keep their values — the 'key in obj' null-vs-absent semantics, executed for real",
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ equipped: { weapon: null } }));
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === null && eq.armor === 'Leather Armor' && eq.headgear === 'Lucky Shades';
+    }
+  );
+  behavior76(
+    '76.2: [behavioral] explicit null clears ALL THREE slots (weapon/armor/headgear) when the AI sends all three as null — no slot is exempt from the unequip path',
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ equipped: { weapon: null, armor: null, headgear: null } })
+      );
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === null && eq.armor === null && eq.headgear === null;
+    }
+  );
+  behavior76(
+    '76.3: [behavioral] the positive path is unregressed — {equipped:{weapon:"Hunting Rifle"}} re-equips the named (inventory-present) item and leaves the untouched slots alone',
+    hNV76,
+    EQUIP_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ equipped: { weapon: 'Hunting Rifle' } }));
+      const eq = live76(hNV76).equipped;
+      return eq.weapon === 'Hunting Rifle' && eq.armor === 'Leather Armor';
+    }
   );
 
-  // 76.2  all three slots use 'in' check
-  assert(
-    /'armor'\s+in\s+e/.test(importBody76) && /'headgear'\s+in\s+e/.test(importBody76),
-    "autoImportState equipped: 'armor' in e and 'headgear' in e also present (all three slots covered)"
-  );
-
-  // 76.3  Regression: old || short-circuit absent from equipped section
+  // 76.4  Regression NEG (kept static — absence can only be grepped): old ||
+  //       short-circuit stays gone from the equipped section
   {
     const eqIdx76 = importBody76.indexOf('parsed.equipped');
     const eqBlock76 = eqIdx76 !== -1 ? importBody76.slice(eqIdx76, eqIdx76 + 400) : '';
@@ -8565,21 +9785,22 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // ── Fix 3: collectibles registry-validation ──────────────────────────────
+  // ── Fix 3: collectibles registry-validation (kept static — behavioral
+  //    twins already exist: Suite 133 + 229.7/229.8 + test.html Suite 6) ────
 
-  // 76.4  collectibles block references FALLOUT_REGISTRY.collectibles
+  // 76.5  collectibles block references FALLOUT_REGISTRY.collectibles
   assert(
     /FALLOUT_REGISTRY\.collectibles/.test(importBody76),
     'autoImportState collectibles: FALLOUT_REGISTRY.collectibles referenced (registry-validated, not freeform)'
   );
 
-  // 76.5  collectibles block uses Set-based name guard
+  // 76.6  collectibles block uses Set-based name guard
   assert(
     /_collectNames\.has\(c\)/.test(importBody76),
     'autoImportState collectibles: _collectNames.has(c) guard active (hallucinated names rejected)'
   );
 
-  // 76.6  Regression: old permissive c.trim() filter absent from collectibles block
+  // 76.7  Regression: old permissive c.trim() filter absent from collectibles block
   {
     const colIdx76 = importBody76.indexOf('parsed.collectibles');
     const colBlock76 = colIdx76 !== -1 ? importBody76.slice(colIdx76, colIdx76 + 600) : '';
@@ -8589,42 +9810,688 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     );
   }
 
-  // ── Fix 1: status type whitelist ─────────────────────────────────────────
-
-  // 76.7  status type assignment uses BUFF/DEBUFF/NEUTRAL whitelist
-  {
-    const stIdx76 = importBody76.indexOf('st.map(item =>');
-    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
-    assert(
-      /\['BUFF',\s*'DEBUFF',\s*'NEUTRAL'\]/.test(stBlock76),
-      'autoImportState status: BUFF/DEBUFF/NEUTRAL whitelist array present in status type assignment'
-    );
-  }
-
-  // 76.8  status uses item.type with .toUpperCase() normalization
-  assert(
-    /String\(item\.type\)\.toUpperCase\(\)/.test(importBody76),
-    'autoImportState status: String(item.type).toUpperCase() present (type normalized to uppercase)'
+  // ── Fix 1 (F1): status-type whitelist — BEHAVIORAL ──────────────────────
+  // ticks: 0 (permanent) throughout, so the tick-down pass that runs after
+  // the status map can never expire the effects under test.
+  behavior76(
+    "76.8: [behavioral] a status type outside the BUFF/DEBUFF/NEUTRAL whitelist ('banana') is coerced to 'BUFF' — never stored raw (broken invalid types would corrupt the tick-down/render contract)",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ status: [{ name: 'Mystery Glow', ticks: 0, type: 'banana' }] })
+      );
+      const st = live76(hNV76).status;
+      return st.length === 1 && st[0].name === 'Mystery Glow' && st[0].type === 'BUFF';
+    }
+  );
+  behavior76(
+    "76.9: [behavioral] lowercase whitelist members are normalized, not rejected — 'debuff' → 'DEBUFF', 'neutral' → 'NEUTRAL' (the String(...).toUpperCase() path, executed)",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          status: [
+            { name: 'Slowed', ticks: 0, type: 'debuff' },
+            { name: 'Focused', ticks: 0, type: 'neutral' },
+          ],
+        })
+      );
+      const st = live76(hNV76).status;
+      return (
+        st.length === 2 &&
+        st.find(e => e.name === 'Slowed').type === 'DEBUFF' &&
+        st.find(e => e.name === 'Focused').type === 'NEUTRAL'
+      );
+    }
+  );
+  behavior76(
+    "76.10: [behavioral] a bare-string status entry is normalized to the full shape { name, ticks: 0, type: 'BUFF' } — the AI's shorthand form never stores a malformed effect",
+    hNV76,
+    undefined,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ status: ['Well Rested'] }));
+      const st = live76(hNV76).status;
+      return (
+        st.length === 1 &&
+        st[0].name === 'Well Rested' &&
+        st[0].ticks === 0 &&
+        st[0].type === 'BUFF'
+      );
+    }
   );
 
-  // 76.9  Regression: raw item.type || 'BUFF' (no whitelist) absent from status section
+  // 76.11  Regression NEG (kept static): raw item.type || 'BUFF' passthrough stays gone.
+  //  Anchor updated for the AI_OVERSEER F1 status RECONCILE (the old full-replace
+  //  `st.map(item => ...)` became a merge loop `st.forEach(item => ...)`); the anchor
+  //  MUST resolve (indexOf !== -1) or the negative check would be vacuously true.
   {
-    const stIdx76 = importBody76.indexOf('st.map(item =>');
-    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 400) : '';
+    const stIdx76 = importBody76.indexOf('st.forEach(item =>');
+    assert(
+      stIdx76 !== -1,
+      'autoImportState status merge loop (st.forEach) present — anchor resolves'
+    );
+    const stBlock76 = stIdx76 !== -1 ? importBody76.slice(stIdx76, stIdx76 + 600) : '';
     assert(
       !/type\s*:\s*item\.type\s*\|\|\s*'BUFF'/.test(stBlock76),
       "autoImportState status: raw item.type || 'BUFF' passthrough removed (whitelist active)"
     );
   }
+
+  // ── Lincoln disposition validation (FO3) — BEHAVIORAL (converted from
+  //    Suite 66's static 66.3–66.5/66.20) ──────────────────────────────────
+  // Seeds set gameContext: 'FO3' so FALLOUT_REGISTRY.game ('FO3', reg_fo3.js)
+  // matches and _registryTrusted holds — these exercise the TRUSTED-path
+  // validation (Suite 229.6 owns the mismatch path).
+  behavior76(
+    "76.12: [behavioral] legacy 'other' Lincoln disposition is coerced to 'found' on import — the real coercion executes, not a comment-satisfiable grep (formerly 66.20)",
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: {} },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'other' } })
+      );
+      return live76(hFO76).lincolnItems["Lincoln's Repeater"] === 'found';
+    }
+  );
+  behavior76(
+    "76.13: [behavioral] Lincoln import keeps ONLY registry-named keys with whitelisted dispositions — an arbitrary AI-injected key and an off-vocabulary disposition are both dropped (formerly 66.4/66.5's grep)",
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: {} },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({
+          lincolnItems: {
+            "Lincoln's Repeater": 'hannibal',
+            'Totally Fake Artifact 76': 'found',
+            "Lincoln's Hat": 'bogus-disposition',
+          },
+        })
+      );
+      const li = live76(hFO76).lincolnItems;
+      return Object.keys(li).length === 1 && li["Lincoln's Repeater"] === 'hannibal';
+    }
+  );
+  behavior76(
+    '76.14: [behavioral] an array-shaped lincolnItems payload is ignored — the plain-object check leaves existing dispositions untouched (formerly 66.3)',
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: { "Lincoln's Hat": 'washington' } },
+    () => {
+      hFO76.sandbox.autoImportState(JSON.stringify({ lincolnItems: ['found', 'hannibal'] }));
+      const li = live76(hFO76).lincolnItems;
+      return Object.keys(li).length === 1 && li["Lincoln's Hat"] === 'washington';
+    }
+  );
+
+  // ── INVENTORY RECONCILE / SILENT-DELETION GUARD (AI_OVERSEER Finding 1) ──────
+  // The AI inventory array is a PROPOSAL reconciled against current state, never a
+  // full replace. These execute the REAL autoImportState() against real state.js +
+  // reg_nv.js. The seed always holds two natively-owned items so a wipe is visible.
+  const INV_SEED76 = {
+    inventory: [
+      { name: '10mm Pistol', qty: 1, wgt: 3, val: 100, type: 'weapon' },
+      { name: 'Stimpak', qty: 5, wgt: 0, val: 0, type: 'aid' },
+    ],
+  };
+  // 76.15 — THE load-bearing regression (Protocol 13): an AI turn returning an
+  // EMPTY inventory array must NOT delete natively-held items. Proven red against
+  // the pre-fix full-replace (state.inventory = inv.map(...) wiped both to []),
+  // green after the reconcile.
+  behavior76(
+    '76.15: [behavioral] an AI turn returning an EMPTY inventory array ({inventory:[]}) deletes NOTHING — both natively-held items survive (AI_OVERSEER F1 — the silent-item-deletion guard)',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [] }));
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 2 &&
+        inv.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5)
+      );
+    }
+  );
+  // 76.16 — a SHORT array that mentions only a reduced-qty item is a proposed
+  // REMOVAL: it is confirm-gated (deferred), so NOTHING is applied synchronously —
+  // the unmentioned item is kept AND the reduced item keeps its full qty until the
+  // Courier confirms. (No confirm surface in this harness → items retained.)
+  behavior76(
+    '76.16: [behavioral] a SHORT array proposing a qty reduction ({inventory:[{Stimpak,qty:2}]}) removes nothing synchronously — the unmentioned 10mm Pistol is kept and Stimpak stays at qty 5 (reduction deferred to the confirm gate)',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 2 &&
+        inv.some(i => i.name === '10mm Pistol' && i.qty === 1) &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5)
+      );
+    }
+  );
+  // 76.17 — ADDITIONS stay un-gated (narrative looting unchanged): a new item
+  // merges in alongside the existing holdings.
+  behavior76(
+    '76.17: [behavioral] a new item ({inventory:[{Combat Knife,qty:1}]}) is added immediately and the existing items are kept — narrative looting is unregressed',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ inventory: [{ name: 'Combat Knife', qty: 1, type: 'weapon' }] })
+      );
+      const inv = live76(hNV76).inventory;
+      return (
+        inv.length === 3 &&
+        inv.some(i => i.name === '10mm Pistol') &&
+        inv.some(i => i.name === 'Stimpak' && i.qty === 5) &&
+        inv.some(i => i.name === 'Combat Knife' && i.qty === 1)
+      );
+    }
+  );
+  // 76.18 — a qty INCREASE is a non-destructive addition, applied immediately.
+  behavior76(
+    '76.18: [behavioral] a qty increase ({inventory:[{Stimpak,qty:9}]}) is applied immediately (non-destructive) — Stimpak rises 5 → 9, no confirm needed',
+    hNV76,
+    INV_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 9 }] }));
+      const inv = live76(hNV76).inventory;
+      return inv.length === 2 && inv.find(i => i.name === 'Stimpak').qty === 9;
+    }
+  );
+
+  // 76.19 — STATIC (Protocol 20 escape-ratchet): the old full-replace assignment
+  // (state.inventory = inv...) is gone; the raw AI array `inv` is never assigned
+  // to state.inventory wholesale.
+  assert(
+    !/state\.inventory\s*=\s*inv\b/.test(importBody76),
+    '76.19: autoImportState no longer assigns the raw AI array to state.inventory (old full-replace removed — AI_OVERSEER F1)'
+  );
+  // 76.20 — STATIC: the reconcile + confirm-gate wiring is present (a deferred
+  // removal path and the reused confirmAction() surface).
+  assert(
+    /_invRemovals/.test(importBody76) &&
+      /_confirmInventoryRemovals/.test(importBody76) &&
+      /confirmAction\(/.test(apiSrc76),
+    '76.20: autoImportState collects proposed removals and confirm-gates them via _confirmInventoryRemovals()/confirmAction() (Protocol 22/34)'
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  AI_OVERSEER Finding 1 — CLASS FIX (2026-07-18). Inventory (76.15–76.21) was
+  //  the first field fixed; 76.22–76.44 extend the SAME reconcile-and-confirm
+  //  contract to every OTHER durable collection that shared the full-replace-from-
+  //  AI pattern. One behavioral wipe-protection test per field (each proven RED
+  //  against the pre-fix full-replace, GREEN after the reconcile — see the
+  //  session's red-then-green proof), plus the additive/merge behavior, the perk
+  //  confirm gate, and the ⭐ STATIC RATCHET (76.42) that stops the whole class
+  //  from ever returning one field at a time.
+  // ══════════════════════════════════════════════════════════════════════════
+  const SQUAD_SEED76 = {
+    squad: [
+      { name: 'Boone', hp: 100, hpMax: 100, condition: 'Good' },
+      { name: 'Veronica', hp: 100, hpMax: 100, condition: 'Good' },
+    ],
+  };
+  // 76.22 — squad: an EMPTY AI array deletes no companions (the load-bearing wipe guard).
+  behavior76(
+    '76.22: [behavioral] an AI turn returning an EMPTY squad array deletes NO companions — both are kept (AI_OVERSEER F1 squad guard)',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ squad: [] }));
+      return live76(hNV76).squad.length === 2;
+    }
+  );
+  // 76.23 — squad: a SHORT array keeps the omitted companion and updates the named one.
+  behavior76(
+    '76.23: [behavioral] a SHORT squad array ([{Boone,hp:80}]) keeps the omitted Veronica AND updates Boone in place — never a removal-by-omission',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ squad: [{ name: 'Boone', hp: 80, hpMax: 100 }] })
+      );
+      const sq = live76(hNV76).squad;
+      return (
+        sq.length === 2 &&
+        sq.some(m => m.name === 'Veronica') &&
+        sq.find(m => m.name === 'Boone').hp === 80
+      );
+    }
+  );
+  // 76.24 — squad: a NEW companion is added un-gated (additions unregressed).
+  behavior76(
+    '76.24: [behavioral] a new companion ([{Cass}]) is added immediately and existing companions are kept — additions stay un-gated',
+    hNV76,
+    SQUAD_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ squad: [{ name: 'Cass', hp: 100, hpMax: 100 }] })
+      );
+      const sq = live76(hNV76).squad;
+      return sq.length === 3 && sq.some(m => m.name === 'Cass');
+    }
+  );
+
+  const PERK_SEED76 = {
+    perks: [
+      { name: 'Cowboy', rank: 1, level_taken: 6 },
+      { name: 'Toughness', rank: 2, level_taken: 4 },
+    ],
+  };
+  // 76.25 — perks: an EMPTY AI array wipes no earned perks.
+  behavior76(
+    '76.25: [behavioral] an AI turn returning an EMPTY perks array wipes NO earned perks — both kept (AI_OVERSEER F1 perks guard)',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ perks: [] }));
+      return live76(hNV76).perks.length === 2;
+    }
+  );
+  // 76.26 — perks: a NEW perk / a HIGHER rank applies immediately (progression grows freely).
+  behavior76(
+    '76.26: [behavioral] a new perk and a rank INCREASE apply immediately, un-gated — Cowboy rises 1→2, a new perk is added, Toughness (omitted) is kept',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          perks: [
+            { name: 'Cowboy', rank: 2, level_taken: 6 },
+            { name: 'Bloody Mess', rank: 1, level_taken: 8 },
+          ],
+        })
+      );
+      const pk = live76(hNV76).perks;
+      return (
+        pk.length === 3 &&
+        pk.find(p => p.name === 'Cowboy').rank === 2 &&
+        pk.some(p => p.name === 'Bloody Mess') &&
+        pk.some(p => p.name === 'Toughness' && p.rank === 2)
+      );
+    }
+  );
+  // 76.27 — perks: a rank REDUCTION is deferred to the confirm gate — with no confirm
+  // surface in this harness, the perk is KEPT at its higher rank (never silently reduced).
+  behavior76(
+    '76.27: [behavioral] a rank REDUCTION ([{Toughness,rank:1}]) is confirm-gated — with no confirm surface the rank stays at 2 (never silently reduced)',
+    hNV76,
+    PERK_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+      );
+      const pk = live76(hNV76).perks;
+      return pk.length === 2 && pk.find(p => p.name === 'Toughness').rank === 2;
+    }
+  );
+
+  const QUEST_SEED76 = {
+    quests: [
+      { name: 'Ghost Town Gunfight', status: 'active', objective: 'Defend Goodsprings' },
+      { name: 'They Went That-a-Way', status: 'complete', objective: null },
+    ],
+  };
+  // 76.28 — quests: an EMPTY AI array wipes no quest-log entries.
+  behavior76(
+    '76.28: [behavioral] an AI turn returning an EMPTY quests array wipes NO quest-log entries — both kept, completed entry preserved (AI_OVERSEER F1 quests guard)',
+    hNV76,
+    QUEST_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ quests: [] }));
+      const q = live76(hNV76).quests;
+      return (
+        q.length === 2 && q.some(x => x.name === 'They Went That-a-Way' && x.status === 'complete')
+      );
+    }
+  );
+  // 76.29 — quests: a status change applies to the named quest (lateral, un-gated) and the
+  // omitted quest is kept; a brand-new quest is added.
+  behavior76(
+    '76.29: [behavioral] a quest status change ([Ghost Town Gunfight→complete]) applies in place, the omitted quest is kept, and a new quest is added',
+    hNV76,
+    QUEST_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({
+          quests: [
+            { name: 'Ghost Town Gunfight', status: 'complete' },
+            { name: 'Back in the Saddle', status: 'active' },
+          ],
+        })
+      );
+      const q = live76(hNV76).quests;
+      return (
+        q.length === 3 &&
+        q.find(x => x.name === 'Ghost Town Gunfight').status === 'complete' &&
+        q.some(x => x.name === 'They Went That-a-Way') &&
+        q.some(x => x.name === 'Back in the Saddle')
+      );
+    }
+  );
+
+  const STATUS_SEED76 = {
+    status: [
+      { name: 'Well Rested', ticks: 0, type: 'BUFF' },
+      { name: 'Poisoned', ticks: 5, type: 'DEBUFF' },
+    ],
+  };
+  // 76.30 — status: an EMPTY AI array wipes no active effects (transient, so kept —
+  // native tick-down still expires timed effects naturally; the WIPE is what's closed).
+  behavior76(
+    '76.30: [behavioral] an AI turn returning an EMPTY status array wipes NO active effects — both kept (AI_OVERSEER F1 status treatment: transient, never wiped by omission)',
+    hNV76,
+    STATUS_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ status: [] }));
+      const s = live76(hNV76).status;
+      return (
+        s.length === 2 &&
+        s.some(e => e.name === 'Well Rested') &&
+        s.some(e => e.name === 'Poisoned')
+      );
+    }
+  );
+  // 76.31 — status: a new effect is added and the omitted effect kept (no gate — effects are transient).
+  behavior76(
+    '76.31: [behavioral] a new effect ([Rad Resistance]) is added and the omitted effects are kept — status reductions/expiry are never confirm-gated',
+    hNV76,
+    STATUS_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(
+        JSON.stringify({ status: [{ name: 'Rad Resistance', ticks: 0, type: 'BUFF' }] })
+      );
+      const s = live76(hNV76).status;
+      return s.some(e => e.name === 'Rad Resistance') && s.some(e => e.name === 'Well Rested');
+    }
+  );
+
+  const AMMO_SEED76 = { ammo: { '5.56mm': 120, '10mm': 45 } };
+  // 76.32 — ammo: an EMPTY {} wipes no stockpile (the map-shaped wipe guard).
+  behavior76(
+    '76.32: [behavioral] an AI turn returning an EMPTY ammo object ({}) wipes NO ammo — the whole stockpile survives (AI_OVERSEER F1 ammo treatment)',
+    hNV76,
+    AMMO_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ ammo: {} }));
+      const a = live76(hNV76).ammo;
+      return a['5.56mm'] === 120 && a['10mm'] === 45;
+    }
+  );
+  // 76.33 — ammo: a mentioned caliber applies (up OR down — firing is normal), an omitted
+  // caliber is kept. Reductions are NOT gated (a gate on every shot would be unusable).
+  behavior76(
+    '76.33: [behavioral] a mentioned caliber applies ({10mm:40} — a reduction, un-gated because ammo is consumable) and the omitted 5.56mm is kept',
+    hNV76,
+    AMMO_SEED76,
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ ammo: { '10mm': 40 } }));
+      const a = live76(hNV76).ammo;
+      return a['5.56mm'] === 120 && a['10mm'] === 40;
+    }
+  );
+
+  // Registry-gated trackers — ADD-ONLY (permanent acquisitions). gameContext FNV so
+  // FALLOUT_REGISTRY.game ('FNV', reg_nv.js) matches and _registryTrusted holds.
+  // 76.34 — collectibles: an EMPTY array wipes no found collectibles.
+  behavior76(
+    '76.34: [behavioral] an AI turn returning an EMPTY collectibles array wipes NO found collectibles (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', collectibles: ['Goodsprings'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ collectibles: [] }));
+      const c = live76(hNV76).collectibles;
+      return c.length === 1 && c[0] === 'Goodsprings';
+    }
+  );
+  // 76.35 — collectibles: a valid NEW name unions in; existing kept.
+  behavior76(
+    '76.35: [behavioral] a new valid collectible (Hoover Dam) unions in and the existing one is kept — add-only merge',
+    hNV76,
+    { gameContext: 'FNV', collectibles: ['Goodsprings'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ collectibles: ['Hoover Dam'] }));
+      const c = live76(hNV76).collectibles;
+      return c.length === 2 && c.includes('Goodsprings') && c.includes('Hoover Dam');
+    }
+  );
+  // 76.36 — traits: an EMPTY array wipes no chosen traits.
+  behavior76(
+    '76.36: [behavioral] an AI turn returning an EMPTY traits array wipes NO chosen traits (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', traits: ['Built to Destroy'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ traits: [] }));
+      return live76(hNV76).traits.length === 1;
+    }
+  );
+  // 76.37 — skillBooks: an EMPTY array wipes no read books.
+  behavior76(
+    '76.37: [behavioral] an AI turn returning an EMPTY skillBooks array wipes NO read books (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', skillBooks: ['Tales of a Junktown Jerky Vendor'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ skillBooks: [] }));
+      return live76(hNV76).skillBooks.length === 1;
+    }
+  );
+  // 76.38 — magazines: an EMPTY array wipes no found magazines.
+  behavior76(
+    '76.38: [behavioral] an AI turn returning an EMPTY magazines array wipes NO found magazines (AI_OVERSEER F1 add-only)',
+    hNV76,
+    { gameContext: 'FNV', magazines: ['Boxing Times'] },
+    () => {
+      hNV76.sandbox.autoImportState(JSON.stringify({ magazines: [] }));
+      return live76(hNV76).magazines.length === 1;
+    }
+  );
+  // 76.39 — lincolnItems: an EMPTY object wipes no found memorabilia (FO3 harness).
+  behavior76(
+    '76.39: [behavioral] an AI turn returning an EMPTY lincolnItems object wipes NO found memorabilia (AI_OVERSEER F1 — FO3)',
+    hFO76,
+    { gameContext: 'FO3', lincolnItems: { "Lincoln's Repeater": 'found' } },
+    () => {
+      hFO76.sandbox.autoImportState(JSON.stringify({ lincolnItems: {} }));
+      return Object.keys(live76(hFO76).lincolnItems).length === 1;
+    }
+  );
+  // 76.40 — lincolnItems: a disposition CHANGE applies to the named key (lateral) and the
+  // omitted key is kept.
+  behavior76(
+    '76.40: [behavioral] a Lincoln disposition change (Repeater found→hannibal) applies and an omitted key (Hat) is kept — never a removal-by-omission (FO3)',
+    hFO76,
+    {
+      gameContext: 'FO3',
+      lincolnItems: { "Lincoln's Repeater": 'found', "Lincoln's Hat": 'washington' },
+    },
+    () => {
+      hFO76.sandbox.autoImportState(
+        JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'hannibal' } })
+      );
+      const li = live76(hFO76).lincolnItems;
+      return (
+        Object.keys(li).length === 2 &&
+        li["Lincoln's Repeater"] === 'hannibal' &&
+        li["Lincoln's Hat"] === 'washington'
+      );
+    }
+  );
+
+  // 76.41 — STATIC: the perk rank-reduction gate + the ONE shared confirm surface are wired.
+  assert(
+    /_perkRemovals/.test(importBody76) &&
+      /_confirmPerkRemovals/.test(importBody76) &&
+      /_confirmDirectorRemovals/.test(apiSrc76),
+    '76.41: autoImportState collects proposed perk rank reductions and confirm-gates them via _confirmPerkRemovals()/_confirmDirectorRemovals() (the ONE shared surface — Protocol 22)'
+  );
+
+  // 76.42 — ⭐ THE RATCHET (Protocol 36b / Protocol 20). A STATIC gate guard that
+  // FAILS THE BUILD if ANY durable-collection state field is (re)introduced as a
+  // wholesale assignment from AI-parsed data — the `state.<field> = parsed.<field>`
+  // or `state.<field> = <rawLocal>.map/filter(...)` shape that every one of these
+  // silent-wipe bugs took at the source. This is what stops the class from
+  // returning one field at a time. Comments are stripped FIRST (code-only scan) so
+  // the reconcile comments that deliberately quote the old shapes never
+  // false-positive — the guard holds at ZERO false positives (verified this session:
+  // against the pre-fix body all 9 wholesale shapes matched; against the fixed body
+  // none do). A NEW durable field written with the same wholesale shape is caught here.
+  {
+    const _stripComments76 = s =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const _codeOnly76 = _stripComments76(importBody76);
+    const _DURABLE76 =
+      'inventory|squad|perks|quests|status|ammo|collectibles|traits|skillBooks|magazines|lincolnItems';
+    const _wholesaleParsed76 = new RegExp('state\\.(' + _DURABLE76 + ')\\s*=\\s*parsed\\.', 'g');
+    const _wholesaleMapped76 = new RegExp(
+      'state\\.(' + _DURABLE76 + ')\\s*=\\s*\\w+\\s*\\.(map|filter)\\s*\\(',
+      'g'
+    );
+    const _pm76 = _codeOnly76.match(_wholesaleParsed76) || [];
+    const _mm76 = _codeOnly76.match(_wholesaleMapped76) || [];
+    assert(
+      _pm76.length === 0 && _mm76.length === 0,
+      '76.42: [STATIC RATCHET] no durable-collection field is assigned wholesale from AI-parsed data (state.<field> = parsed.<field> or = <raw>.map/filter) — every such field MUST reconcile (AI_OVERSEER F1 class guard)' +
+        (_pm76.length || _mm76.length ? ' — found: ' + _pm76.concat(_mm76).join(', ') : '')
+    );
+  }
+
+  // ── CONFIRM-GATE BEHAVIORAL (async) — the removal APPLIES only on approval ────
+  // Builds a self-contained sandbox (real state.js + reg + the REAL extracted
+  // autoImportState AND _confirmInventoryRemovals) with a stubbed confirmAction so
+  // both the APPROVE and KEEP paths execute for real. Deferred onto _pendingAsync
+  // (the Suite 137 idiom) because the confirm gate resolves on a microtask.
+  function declareFn76(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function makeGateSandbox76(confirmResolves) {
+    const sb = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+      confirmAction: () => Promise.resolve(confirmResolves),
+    };
+    vm76.createContext(sb);
+    vm76.runInContext(stateSource, sb);
+    vm76.runInContext(readGroup('reg_nv'), sb);
+    // Neutralize the debounced localStorage writer (no localStorage in-sandbox).
+    vm76.runInContext('saveState = function(){};', sb);
+    // AI_OVERSEER F1 (class fix): _confirmInventoryRemovals/_confirmPerkRemovals now
+    // delegate to the ONE shared _confirmDirectorRemovals surface (Protocol 22), so
+    // that must be declared here too or the delegating wrappers throw ReferenceError.
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmDirectorRemovals'), sb);
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmInventoryRemovals'), sb);
+    vm76.runInContext(declareFn76(apiSrc76, '_confirmPerkRemovals'), sb);
+    vm76.runInContext(declareFn76(apiSrc76, 'autoImportState'), sb);
+    vm76.runInContext(
+      'state.inventory = [' +
+        "{name:'10mm Pistol',qty:1,wgt:3,val:100,type:'weapon'}," +
+        "{name:'Stimpak',qty:5,wgt:0,val:0,type:'aid'}];" +
+        "state.perks = [{name:'Toughness',rank:2,level_taken:4}];",
+      sb
+    );
+    return sb;
+  }
+  // Flush the microtask queue so the confirm gate's confirmAction().then(...)
+  // (the stub resolves synchronously) has run before we read state back.
+  const flush76 = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+  _pendingAsync.push(
+    (async () => {
+      let approveInv = null;
+      let keepInv = null;
+      let dropInv = null;
+      let errG76 = null;
+      try {
+        // APPROVE: a proposed qty reduction is applied after the Courier approves.
+        const sbYes = makeGateSandbox76(true);
+        sbYes.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+        await flush76();
+        approveInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbYes);
+        // APPROVE + qty 0: the item is dropped entirely on approval.
+        const sbDrop = makeGateSandbox76(true);
+        sbDrop.autoImportState(JSON.stringify({ inventory: [{ name: '10mm Pistol', qty: 0 }] }));
+        await flush76();
+        dropInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbDrop);
+        // KEEP: the same reduction proposal is declined → nothing changes.
+        const sbNo = makeGateSandbox76(false);
+        sbNo.autoImportState(JSON.stringify({ inventory: [{ name: 'Stimpak', qty: 2 }] }));
+        await flush76();
+        keepInv = vm76.runInContext('JSON.parse(JSON.stringify(state.inventory))', sbNo);
+      } catch (e) {
+        errG76 = e;
+      }
+      header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
+      const approveOk =
+        approveInv &&
+        approveInv.length === 2 &&
+        approveInv.find(i => i.name === 'Stimpak').qty === 2;
+      const dropOk =
+        dropInv && dropInv.length === 1 && !dropInv.some(i => i.name === '10mm Pistol');
+      const keepOk =
+        keepInv &&
+        keepInv.length === 2 &&
+        keepInv.find(i => i.name === 'Stimpak').qty === 5 &&
+        keepInv.some(i => i.name === '10mm Pistol');
+      assert(
+        approveOk && dropOk && keepOk && !errG76,
+        '76.21: [behavioral async] the confirm gate applies a removal ONLY on approval — APPROVE reduces Stimpak 5→2, APPROVE+qty0 drops the 10mm Pistol, KEEP leaves both items untouched' +
+          (errG76 ? ' — ' + errG76.message : '')
+      );
+    })()
+  );
+  // 76.43 — the PERK rank-reduction gate through the SAME shared surface: APPROVE
+  // lowers the rank, KEEP retains it. Proves the generalized _confirmDirectorRemovals
+  // drives a second collection, not just inventory (Protocol 22).
+  _pendingAsync.push(
+    (async () => {
+      let approveP76 = null;
+      let keepP76 = null;
+      let errP76 = null;
+      try {
+        const sbYes = makeGateSandbox76(true);
+        sbYes.autoImportState(
+          JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+        );
+        await flush76();
+        approveP76 = vm76.runInContext('JSON.parse(JSON.stringify(state.perks))', sbYes);
+        const sbNo = makeGateSandbox76(false);
+        sbNo.autoImportState(
+          JSON.stringify({ perks: [{ name: 'Toughness', rank: 1, level_taken: 4 }] })
+        );
+        await flush76();
+        keepP76 = vm76.runInContext('JSON.parse(JSON.stringify(state.perks))', sbNo);
+      } catch (e) {
+        errP76 = e;
+      }
+      header('Suite 76 — autoImportState Hardening Guards (F1/F2/F3 + Lincoln) — behavioral');
+      const approveOkP = approveP76 && approveP76.length === 1 && approveP76[0].rank === 1;
+      const keepOkP = keepP76 && keepP76.length === 1 && keepP76[0].rank === 2;
+      assert(
+        approveOkP && keepOkP && !errP76,
+        '76.43: [behavioral async] the perk confirm gate (same shared surface) applies a RANK REDUCTION only on approval — APPROVE lowers Toughness 2→1, KEEP leaves it at rank 2 (AI_OVERSEER F1)' +
+          (errP76 ? ' — ' + errP76.message : '')
+      );
+    })()
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 77 — Faction Rep Regression: Canon Thresholds + ±5 Increment');
-  const uiSrc77 = readFile('js/ui-render.js');
+  const uiSrc77 = readGroup('ui-render');
 
   // Reuse vm sandbox to run getFactionStanding with new canonical thresholds
   let gfs77 = null;
@@ -8740,11 +10607,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 78 — VENDORS.CSV structural integrity
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 78 — VENDORS.CSV structural integrity');
-  const nvSrc78 = readFile('js/db_nv.js');
+  const nvSrc78 = readGroup('db_nv');
   // Extract the VENDORS.CSV block
   const vStart = nvSrc78.indexOf('[VENDORS.CSV]');
   const vEnd = nvSrc78.indexOf('\n[', vStart + 1);
@@ -8772,11 +10638,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 79 — FO3 location database expansion (57 → 90)
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 79 — FO3 location database expansion (57 → 90)');
-  const fo3RegSrc79 = readFile('js/reg_fo3.js');
+  const fo3RegSrc79 = readGroup('reg_fo3');
 
   // Isolate main locations array (between LOCATIONS and COMPANIONS section comments)
   const locsSectionMatch79 = fo3RegSrc79.match(/\/\/ ── LOCATIONS[\s\S]*?\/\/ ── COMPANIONS/);
@@ -8830,20 +10695,20 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)
-//  9 tests
+//  Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)
 // ══════════════════════════════════════════════════════════════
 {
-  header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 76)');
-  const nvSrc80 = readFile('js/db_nv.js');
+  header('Suite 80 — [CHEMS.CSV] consumables expansion (40 → 75)');
+  const nvSrc80 = readGroup('db_nv');
   const cStart80 = nvSrc80.indexOf('[CHEMS.CSV]');
   const cEnd80 = nvSrc80.indexOf('\n[', cStart80 + 1);
   const cBlock80 = nvSrc80.slice(cStart80, cEnd80 === -1 ? undefined : cEnd80);
   const cLines80 = cBlock80.split('\n').filter(l => l.trim() && !l.startsWith('['));
   const cData80 = cLines80.slice(1); // skip header row
 
-  // 80.a  exactly 76 data rows
-  assert(cData80.length === 76, `[CHEMS.CSV] has exactly 76 data rows (got ${cData80.length})`);
+  // 80.a  exactly 75 data rows (was 76; the fabricated "Whiskey Rose" consumable
+  //       was removed on 2026-07-15 — it is a Cass companion perk, not a chem)
+  assert(cData80.length === 75, `[CHEMS.CSV] has exactly 75 data rows (got ${cData80.length})`);
 
   // 80.b  every row has exactly 8 comma-separated fields (stray-comma guard)
   const badFields80 = cData80.filter(r => r.split(',').length !== 8);
@@ -8889,11 +10754,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 removed NV bleed)
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 81 — FO3 [ARMOR.CSV] (61 rows; WU-D2 NV-bleed removal)');
-  const fo3Src81 = readFile('js/db_fo3.js');
+  const fo3Src81 = readGroup('db_fo3');
   const aStart81 = fo3Src81.indexOf('[ARMOR.CSV]');
   const aEnd81 = fo3Src81.indexOf('\n[', aStart81 + 1);
   const aBlock81 = fo3Src81.slice(aStart81, aEnd81 === -1 ? undefined : aEnd81);
@@ -8956,11 +10820,10 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 82 — FO3 quests (64, WU-D1 canon fix + WU-D5 Anchorage completeness) + quest items (15→25)
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 82 — FO3 quests (64) + quest items (15→25)');
-  const fo3Src82 = readFile('js/reg_fo3.js');
+  const fo3Src82 = readGroup('reg_fo3');
 
   // Extract quests array block
   const qStart82 = fo3Src82.indexOf('  quests: [');
@@ -9042,7 +10905,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   );
 
   // 82.f  QUEST_ITEMS.CSV: exactly 25 data rows
-  const fo3Db82 = readFile('js/db_fo3.js');
+  const fo3Db82 = readGroup('db_fo3');
   const qiStart82 = fo3Db82.indexOf('[QUEST_ITEMS.CSV]');
   const qiEnd82 = fo3Db82.indexOf('\n[', qiStart82 + 1);
   const qiBlock82 = fo3Db82.slice(qiStart82, qiEnd82 === -1 ? undefined : qiEnd82);
@@ -9085,18 +10948,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 83 — Crafting recipe + breakdown registry (NV + FO3)
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 83 — Crafting recipe + breakdown registry (NV + FO3)');
 
-  const nvSrc83 = readFile('js/reg_nv.js');
+  const nvSrc83 = readGroup('reg_nv');
   const nvRecStart83 = nvSrc83.indexOf('\n  recipes: [');
   const nvBdStart83 = nvSrc83.indexOf('\n  breakdowns: [', nvRecStart83);
   const nvRecBlock83 = nvSrc83.slice(nvRecStart83, nvBdStart83);
   const nvBdBlock83 = nvSrc83.slice(nvBdStart83);
 
-  const fo3Src83 = readFile('js/reg_fo3.js');
+  const fo3Src83 = readGroup('reg_fo3');
   const fo3RecStart83 = fo3Src83.indexOf('\n  recipes: [');
   const fo3BdStart83 = fo3Src83.indexOf('\n  breakdowns:', fo3RecStart83);
   const fo3RecBlock83 = fo3Src83.slice(fo3RecStart83, fo3BdStart83);
@@ -9215,13 +11077,12 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)
-//  24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 84 — Craft panel UI + mechanics (behavioral + data-safety)');
 
-  const uiRSrc84 = readFile('js/ui-render.js');
-  const uiCSrc84 = readFile('js/ui-core.js');
+  const uiRSrc84 = readGroup('ui-render');
+  const uiCSrc84 = readGroup('ui-core');
   const idxSrc84 = readFile('index.html');
 
   // ── Structural ───────────────────────────────────────────────────────────
@@ -9391,6 +11252,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
         lookupItemInDb: () => null,
         SKILL_LABELS: { repair: 'Repair' },
         RobcoEvents: { emit: () => {} }, // U7 — doCraft/doScrap emit craft.completed/craft.scrapped
+        reconcileEquipped: () => false, // Suite 221 fix — _craftConsume's new equipped-reconciliation call; this suite doesn't exercise equipped, so a no-op stub is correct
       };
       vm84.createContext(sb);
       vm84.runInContext(craftCode84, sb);
@@ -9575,16 +11437,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 //  guards (BUS-05a — top-level board, single-flowing shelf, no more
 //  READ/UNREAD sub-panel split), WU-B8 shared _renderReadTracker
 //  consolidation guards.
-//  27 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 85 — Skill Books Tracker (FNV+FO3, Protocol 4)');
-  const stateSrc85 = readFile('js/state.js');
-  const apiSrc85 = readFile('js/api.js');
-  const uiRenderSrc85 = readFile('js/ui-render.js');
-  const uiCoreSrc85 = readFile('js/ui-core.js');
-  const nvRegSrc85 = readFile('js/reg_nv.js');
-  const fo3RegSrc85 = readFile('js/reg_fo3.js');
+  const stateSrc85 = readGroup('state');
+  const apiSrc85 = readGroup('api');
+  const uiRenderSrc85 = readGroup('ui-render');
+  const uiCoreSrc85 = readGroup('ui-core');
+  const nvRegSrc85 = readGroup('reg_nv');
+  const fo3RegSrc85 = readGroup('reg_fo3');
 
   const FNV_SKILL_KEYS = [
     'barter',
@@ -9852,7 +11713,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
   assert(
     !/skillBooksPanel/.test(skillMatrixBlock85) &&
-      /<details class="panel bay-board" data-tab="stat" id="skillBooksPanel">/.test(htmlSource),
+      /<details class="panel bay-board fo3-flat" data-tab="stat" id="skillBooksPanel">/.test(
+        htmlSource
+      ),
     '85.23: #skillBooksPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
   );
 
@@ -9905,7 +11768,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-// Suite 86 — Maskable shortcut icons + OPTICS label wrap (6 tests)
+// Suite 86 — Maskable shortcut icons + OPTICS label wrap
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 86 — Maskable shortcut icons + OPTICS label wrap');
@@ -9948,16 +11811,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)
 // Phase 3 OPERATOR batch 3: periodical-rack reskin guards (BUS-05b — top-
 // level board, no more READ/UNREAD sub-panel split).
-// 24 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 87 — NV Skill Magazines tracker (FNV-only, Protocol 4)');
 
-  const nvRegSrc87 = readFile('js/reg_nv.js');
-  const fo3RegSrc87 = readFile('js/reg_fo3.js');
-  const stateSrc87 = readFile('js/state.js');
-  const apiSrc87 = readFile('js/api.js');
-  const uiRenderSrc87 = readFile('js/ui-render.js');
+  const nvRegSrc87 = readGroup('reg_nv');
+  const fo3RegSrc87 = readGroup('reg_fo3');
+  const stateSrc87 = readGroup('state');
+  const apiSrc87 = readGroup('api');
+  const uiRenderSrc87 = readGroup('ui-render');
   const idxSrc87 = readFile('index.html');
 
   const fnvSkillKeys87 = [
@@ -10063,10 +11925,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       'autoImportState magazines block filters to registry names (magNames.has(m))',
     ],
 
-    // 87.15  magazines import dedups
+    // 87.15  magazines import merges into state (AI_OVERSEER F1 ADD-ONLY reconcile —
+    //  the old wholesale `state.magazines = raw.filter(...)` was replaced by an
+    //  add-only union `state.magazines = _mergedMags` so a short/empty AI array can
+    //  no longer wipe found magazines; registry filtering + dedup still apply).
     [
-      /state\.magazines\s*=\s*raw\.filter/,
-      'autoImportState assigns state.magazines from registry-filtered dedup (state.magazines = raw.filter)',
+      /state\.magazines\s*=\s*_mergedMags/,
+      'autoImportState assigns state.magazines from an add-only registry-filtered merge (state.magazines = _mergedMags)',
     ],
   ]);
 
@@ -10164,7 +12029,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        data-tab="stat"> — no longer nested inside SKILL MATRIX.
   assert(
     !/magazinesPanel/.test(skillMatrixBlock87) &&
-      /<details class="panel bay-board" data-tab="stat" id="magazinesPanel">/.test(idxSrc87),
+      /<details class="panel bay-board fo3-flat" data-tab="stat" id="magazinesPanel">/.test(
+        idxSrc87
+      ),
     '87.26: index.html #magazinesPanel is a top-level <details class="panel bay-board" data-tab="stat">, not nested inside SKILL MATRIX'
   );
 
@@ -10179,7 +12046,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   //        a nested sub-panel — the generic top-level details.open handling
   //        already reveals it (Phase 3 OPERATOR batch 3 promotion).
   {
-    const uiCoreSrc87 = readFile('js/ui-core.js');
+    const uiCoreSrc87 = readGroup('ui-core');
     let expandBody87 = '';
     try {
       expandBody87 = extractFunctionBody(uiCoreSrc87, 'expandPanelForCategory');
@@ -10193,14 +12060,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 88 — GATE-UI: UI consistency structural guards (8 tests)
+//  Suite 88 — GATE-UI: UI consistency structural guards
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 88 — GATE-UI: UI consistency structural guards');
-  const uiRenderSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
-  const uiCoreSrc88 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiRenderSrc88 = readGroup('ui-render');
+  const uiCoreSrc88 = readGroup('ui-core');
   const idxSrc88 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const cssSrc88 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const cssSrc88 = readCss();
 
   // 88.1  Every details.panel (not sub-panel) in index.html has a summary > h2 starting with ">" or "&gt;"
   const panelDetails88 = [...idxSrc88.matchAll(/<details[^>]*class="[^"]*\bpanel\b[^"]*"[^>]*>/g)]
@@ -10304,15 +12171,15 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards (16 tests)
+//  Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 89 — GATE-AGNOSTIC: game-agnostic refactor guards');
-  const apiSrc89 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
-  const uiCore89 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
-  const stateSrc89 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
+  const apiSrc89 = readGroup('api');
+  const uiCore89 = readGroup('ui-core');
+  const stateSrc89 = readGroup('state');
   const htmlSrc89 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const rulesSrc89 = fs.readFileSync(path.join(__dirname, '../RULES.md'), 'utf8');
+  const rulesSrc89 = readRulebook();
 
   // 89.1  api.js: no two-game coercion pattern (=== 'FO3' ? 'FO3' : 'FNV')
   assert(
@@ -10416,10 +12283,13 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
     'GATE-AGNOSTIC-11: GAME_DEFS.FO3 has seedInventory array — GA-6 seed data in state.js'
   );
 
-  // 89.12  RULES.md contains Protocol 38 (game-agnostic codification)
+  // 89.12  the rulebook codifies Protocol 38 (game-agnostic feature code).
+  //        R3: was a RULES.md grep. RULES.md is deleted; the real invariant is
+  //        that Protocol 38 is written down somewhere a session will retrieve
+  //        it — since R2 that is rules/game-data.md, inside the rulebook.
   assert(
     /Protocol 38/.test(rulesSrc89),
-    'GATE-AGNOSTIC-12: RULES.md contains Protocol 38 (game-agnostic feature code)'
+    'GATE-AGNOSTIC-12: the rulebook (CLAUDE.md + rules/*.md) codifies Protocol 38 (game-agnostic feature code)'
   );
 
   // 89.13  index.html: boot data-file selection is the sanctioned GAME_FILES manifest
@@ -10454,7 +12324,9 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding (11 tests)
+//  Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding
+//  (dynamic: every non-vendor js/**/*.js file + 3 docs + 1 CHANGELOG check —
+//  see audit N5 note below for why the count is no longer hand-typed)
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 90 — UTF-8 CORRUPTION GUARD: no symbol double-encoding');
@@ -10463,24 +12335,28 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
   // (em-dash, en-dash, curly quotes, etc.). â– covers E2-96-xx box-drawing
   // (U+25B2 triangle, U+2588 full-block, etc.). � is the replacement character.
   const MOJIBAKE90 = /�|â€|â–/;
-  const srcFiles90 = [
-    '../js/api.js',
-    '../js/state.js',
-    '../js/ui-core.js',
-    '../js/ui-render.js',
-    '../js/ui-saves.js',
-    '../js/ui-audio.js',
-    '../js/ui-account.js',
-    '../index.html',
-    '../README.md',
-    '../ARCHITECTURE.md',
-  ];
+  // 2.8.5 U-A3 (closes AUDIT_U5 Finding N5): widened from a hand-maintained
+  // file list to a full glob over every non-vendor js/**/*.js file, via
+  // allJsFiles() (Suite 62's own family helper). The prior hand list omitted
+  // the per-game data files (db_nv.js/db_fo3.js/reg_nv.js/reg_fo3.js) that
+  // Protocol 39 explicitly says DO contain non-ASCII (æ/¡) — so a
+  // PowerShell-corruption of one of them would have gone completely
+  // undetected (a pre-existing gap, not introduced by any one split).
+  // Globbing means every future file (a new split, a new data file) is
+  // automatically covered with zero manual widening step — the guard can no
+  // longer go stale the way this exact list already did once (2.8.5 U-A2
+  // widened it for the ui-core-*.js siblings and still missed the data
+  // files). The tradeoff: this suite's test COUNT now moves with the file
+  // count instead of being Protocol-2a-stable — accepted, since a moving
+  // count that's always complete beats a fixed count that silently isn't.
+  const jsFiles90 = allJsFiles().map(f => `js/${f.rel}`);
+  const docFiles90 = ['index.html', 'README.md', 'ARCHITECTURE.md'];
+  const srcFiles90 = [...jsFiles90, ...docFiles90];
   srcFiles90.forEach((rel, i) => {
-    const label = rel.replace('../', '');
-    const src = fs.readFileSync(path.join(__dirname, rel), 'utf8');
+    const src = readFile(rel);
     assert(
       !MOJIBAKE90.test(src),
-      `GATE-CORRUPT-${i + 1}: ${label} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
+      `GATE-CORRUPT-${i + 1}: ${rel} has no U+FFFD or \\u00E2\\u20AC/\\u00E2\\u2013 mojibake (double-encoded UTF-8 from PowerShell write)`
     );
   });
   // CHANGELOG.md: uses FULL 3-char sequence check only — the 2-char prefix would
@@ -10495,18 +12371,18 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
       !changelog90.includes(enDashCorrupt90) &&
       !changelog90.includes(mulSignCorrupt90) &&
       !changelog90.includes(rfChar90doc),
-    'GATE-CORRUPT-11: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)'
+    `GATE-CORRUPT-${srcFiles90.length + 1}: CHANGELOG.md has no full-sequence mojibake (em/en-dash, multiplication sign double-encoding from PowerShell write)`
   );
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS (9 tests)
+//  Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 91 — loadUI DIRTY-CHECK / TARGETED RE-RENDER GUARDS');
   // Protocol 13 regression guards for WU-A3 (loadUI dirty-check).
   // Static assertions — no DOM required.
-  const uiCore91 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiCore91 = readGroup('ui-core');
 
   // 91.1  _renderSig module-level cache exists
   guards(uiCore91, [
@@ -10565,14 +12441,14 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS (7 tests)
+//  Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 92 — VERTICAL-BROKEN-TEXT ANTI-RECURRENCE GUARDS');
   // Protocol 13 + Protocol 36b escape-ratchet: closes the "element squeezed
   // to ~0 width wraps one glyph per line" bug class (WU-C7/C9/C10/C12/C14).
-  const css92 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
-  const uiRender92 = fs.readFileSync(path.join(__dirname, '../js/ui-render.js'), 'utf8');
+  const css92 = readCss();
+  const uiRender92 = readGroup('ui-render');
   const html92 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 
   // 92.1  .tag class carries white-space: nowrap in terminal.css
@@ -10631,7 +12507,7 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 93 — FO3 AUTOCOMPLETE GUARD (8 tests)
+//  Suite 93 — FO3 AUTOCOMPLETE GUARD
 //  Protocol 13 + 36b: registrySearch lives in always-loaded
 //  registry-core.js so FO3 campaigns have working autocomplete.
 //  WU-B11 root cause: fn was only in reg_nv.js; boot loads only
@@ -10639,17 +12515,17 @@ header('Suite 64 — SPECIAL stats editable (commit-on-blur) guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 93 — FO3 Autocomplete Guard');
 {
-  const rc93 = readFile('js/registry-core.js');
+  const rc93 = readGroup('registry-core');
   const swSrc93 = readFile('sw.js');
   const indexSrc93 = readFile('index.html');
-  const nvSrc93 = readFile('js/reg_nv.js');
+  const nvSrc93 = readGroup('reg_nv');
 
   // 93.1  registry-core.js file exists (readFile exits if absent)
   assert(rc93.length > 0, 'registry-core.js file exists on disk');
 
   // 93.2  registry-core.js is listed in sw.js ASSETS
   assert(
-    swSrc93.includes('./js/registry-core.js'),
+    swSrc93.includes('./js/data/registry-core.js'),
     'registry-core.js is listed in sw.js ASSETS (service worker will cache it)'
   );
 
@@ -10673,24 +12549,24 @@ header('Suite 93 — FO3 Autocomplete Guard');
 
   // 93.6  FO3 boot path in index.html includes registry-core.js after reg_fo3.js
   {
-    const fo3Idx = indexSrc93.indexOf("'js/reg_fo3.js'");
+    const fo3Idx = indexSrc93.indexOf("'js/data/reg_fo3.js'");
     const rcNearFo3 =
-      fo3Idx >= 0 && indexSrc93.slice(fo3Idx, fo3Idx + 200).includes("'js/registry-core.js'");
+      fo3Idx >= 0 && indexSrc93.slice(fo3Idx, fo3Idx + 200).includes("'js/data/registry-core.js'");
     assert(rcNearFo3, 'FO3 boot path in index.html includes registry-core.js after reg_fo3.js');
   }
 
   // 93.7  FNV boot path in index.html includes registry-core.js after reg_nv.js
   {
-    const nvIdx = indexSrc93.indexOf("'js/reg_nv.js'");
+    const nvIdx = indexSrc93.indexOf("'js/data/reg_nv.js'");
     const rcNearNv =
-      nvIdx >= 0 && indexSrc93.slice(nvIdx, nvIdx + 200).includes("'js/registry-core.js'");
+      nvIdx >= 0 && indexSrc93.slice(nvIdx, nvIdx + 200).includes("'js/data/registry-core.js'");
     assert(rcNearNv, 'FNV boot path in index.html includes registry-core.js after reg_nv.js');
   }
 
   // 93.8  Behavioral: registrySearch executed against FO3 registry returns FO3 quests.
   //       Verifies the extracted function reads FALLOUT_REGISTRY dynamically (game-agnostic).
   {
-    const fo3Src93 = readFile('js/reg_fo3.js');
+    const fo3Src93 = readGroup('reg_fo3');
     let fo3SearchResult = [];
     try {
       const FR93 = new Function(fo3Src93 + '\nreturn FALLOUT_REGISTRY;')();
@@ -10709,16 +12585,16 @@ header('Suite 93 — FO3 Autocomplete Guard');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 94 — ACCESSIBILITY GUARDS (10 tests)
+//  Suite 94 — ACCESSIBILITY GUARDS
 //  WCAG 2.1 AA: focus-visible indicators, prefers-reduced-motion
 //  (seizure-hazard flicker freeze), aria-live chat region, and
 //  sysModal dialog ARIA semantics. A-1/A-S4/A-7/A-S1 spec items.
 // ══════════════════════════════════════════════════════════════
 header('Suite 94 — Accessibility Guards');
 {
-  const css94 = fs.readFileSync(path.join(__dirname, '../css/terminal.css'), 'utf8');
+  const css94 = readCss();
   const idx94 = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  const uiCore94 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
+  const uiCore94 = readGroup('ui-core');
 
   // 94.1  :focus-visible rule exists in terminal.css (WCAG 2.4.7 — keyboard focus ring)
   guards(css94, [
@@ -10786,7 +12662,7 @@ header('Suite 94 — Accessibility Guards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression) (9 tests)
+//  Suite 95 — SAVE-LOAD RELOAD GUARD (import clobber regression)
 //  Regression for the d0f0429 beforeunload bug: a load path writes the new
 //  robco_v8 then calls location.reload(); the beforeunload flush fired during
 //  teardown and re-serialized the STALE in-memory state over robco_v8, so
@@ -10796,11 +12672,11 @@ header('Suite 94 — Accessibility Guards');
 // ══════════════════════════════════════════════════════════════
 header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
 {
-  const uiCore95 = fs.readFileSync(path.join(__dirname, '../js/ui-core.js'), 'utf8');
-  const state95 = fs.readFileSync(path.join(__dirname, '../js/state.js'), 'utf8');
-  const saves95 = fs.readFileSync(path.join(__dirname, '../js/ui-saves.js'), 'utf8');
-  const cloud95 = fs.readFileSync(path.join(__dirname, '../js/cloud.js'), 'utf8');
-  const api95 = fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8');
+  const uiCore95 = readGroup('ui-core');
+  const state95 = readGroup('state');
+  const saves95 = readGroup('ui-saves');
+  const cloud95 = readGroup('cloud');
+  const api95 = readGroup('api');
 
   // 95.1  beforeunload flush is guarded by _loadingSave (not an unconditional robco_v8 write)
   assert(
@@ -10940,11 +12816,12 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
     );
   }
 
-  // 95.9  STATIC ORDER GUARD — in the beforeunload handler the guard return must come
-  //       BEFORE the robco_v8 write, so a refactor cannot move the write above the guard.
+  // 95.9  STATIC ORDER GUARD — in the flush the guard return must come BEFORE the
+  //       robco_v8 write, so a refactor cannot move the write above the guard. The
+  //       flush body is the shared _flush() closure (beforeunload + visibilitychange
+  //       both call it, Protocol 22) — assert the ordering inside it.
   {
-    const bi = uiCore95.indexOf("addEventListener('beforeunload'");
-    const handler = bi !== -1 ? uiCore95.slice(bi, bi + 800) : '';
+    const handler = extractFunctionBody(uiCore95, '_flushUnload');
     const guardIdx = handler.search(/_loadingSave[\s\S]{0,40}?return/);
     const writeIdx = handler.indexOf("setItem('robco_v8'");
     assert(
@@ -10955,7 +12832,7 @@ header('Suite 95 — Save-Load Reload Guard (import clobber regression)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 96 — test.html RUNTIME MIRROR PARITY (8 tests)
+//  Suite 96 — test.html RUNTIME MIRROR PARITY
 //  Protocol 40: the browser-side runtime audit (tests/test.html) must stay in
 //  sync with the live import contract and the canonical runners. These guards
 //  fail if test.html drifts — wrong boot chain, stale dead stubs, a suite-count
@@ -10974,13 +12851,21 @@ header('Suite 96 — test.html Runtime Mirror Parity');
     '96.1: tests/test.html is the runtime persistence audit (executes autoImportState)'
   );
 
-  // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core → api)
+  // 96.2  test.html loads the current FNV boot chain in order (db → state → reg → registry-core →
+  // api-import — 2.8.5 U-A3: test.html only exercises autoImportState()/sanitizeImportedContainer(),
+  // which now live in api-import.js, not the api.js hub)
   {
-    const chain = ['db_nv.js', 'state.js', 'reg_nv.js', 'registry-core.js', 'api.js'];
+    const chain = [
+      'data/db_nv.js',
+      'core/state.js',
+      'data/reg_nv.js',
+      'data/registry-core.js',
+      'services/api-import.js',
+    ];
     const missing = chain.filter(f => !th.includes('../js/' + f));
     assert(
       missing.length === 0,
-      '96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api)' +
+      '96.2: test.html loads the current boot chain (db_nv, state, reg_nv, registry-core, api-import)' +
         (missing.length ? ' — missing: ' + missing.join(', ') : '')
     );
   }
@@ -11022,19 +12907,19 @@ header('Suite 96 — test.html Runtime Mirror Parity');
     '96.7: tests/test-html-check.mjs exists and scripts/gate.js runs it (test.html executed in gate)'
   );
 
-  // 96.8  Protocol 40 is codified in RULES.md and CLAUDE.md
+  // 96.8  Protocol 40 is codified in the rulebook (CLAUDE.md + rules/*.md).
+  //        R3: the RULES.md half of this assertion is dropped with the file.
   {
-    const rules96 = readFile('RULES.md');
-    const claude96 = readFile('CLAUDE.md');
+    const claude96 = readRulebook();
     assert(
-      /Protocol 40/.test(rules96) && /Protocol 40/.test(claude96),
-      '96.8: Protocol 40 (test.html sync) present in RULES.md and CLAUDE.md'
+      /Protocol 40/.test(claude96),
+      '96.8: Protocol 40 (test.html sync) present in the rulebook (CLAUDE.md + rules/*.md)'
     );
   }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 97 — CHANGELOG category-heading integrity (Protocol 21) (2 tests)
+//  Suite 97 — CHANGELOG category-heading integrity (Protocol 21)
 //  Keep a Changelog convention: under one `## [version]` block there must be
 //  exactly ONE heading per category (a single ### Added / ### Fixed / etc.).
 //  This guards against the recurrence of a duplicate-heading split (e.g. two
@@ -11052,7 +12937,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
     'Fixed',
     'Security',
     'Improved',
-    'Hotfix', // post-release fix folded into a shipped version's block (RULES.md hotfix model)
+    'Hotfix', // post-release fix folded into a shipped version's block (Protocol 2 hotfix model)
     'Under the Hood',
   ];
   // Split into version blocks on top-level `## [` headers.
@@ -11098,7 +12983,7 @@ header('Suite 97 — CHANGELOG category-heading integrity');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 98 — Project-root cleanliness (Protocol 41) (2 tests)
+//  Suite 98 — Project-root cleanliness (Protocol 41)
 //  Flags leftover/junk that reappears at the project root so the end-of-task
 //  cleanup sweep can't silently regress. The gate only FLAGS (fails) — it never
 //  auto-deletes. Tracked files and the gitignored planning/ folder are untouched.
@@ -11131,7 +13016,7 @@ header('Suite 98 — Project-root cleanliness (Protocol 41)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 99 — WU-B7 dead-code purge + duplication consolidation (16 tests)
+//  Suite 99 — WU-B7 dead-code purge + duplication consolidation
 //  Locks the removals so a refactor can't silently re-introduce the dead
 //  code, and proves the consolidated helpers stayed consolidated. Each
 //  removed symbol had zero call sites at purge time (grep-verified); each
@@ -11139,12 +13024,12 @@ header('Suite 98 — Project-root cleanliness (Protocol 41)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
 {
-  const audio99 = readFile('js/ui-audio.js');
-  const render99 = readFile('js/ui-render.js');
-  const api99 = readFile('js/api.js');
-  const core99 = readFile('js/ui-core.js');
-  const saves99 = readFile('js/ui-saves.js');
-  const account99 = readFile('js/ui-account.js');
+  const audio99 = readGroup('ui-audio');
+  const render99 = readGroup('ui-render');
+  const api99 = readGroup('api');
+  const core99 = readGroup('ui-core');
+  const saves99 = readGroup('ui-saves');
+  const account99 = readGroup('ui-account');
   const eslint99 = readFile('eslint.config.mjs');
 
   // ── Dead-code purge (must stay absent) ──
@@ -11228,13 +13113,22 @@ header('Suite 99 — WU-B7 dead-code purge + duplication consolidation');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 100 — Staging build output guards (Cloudflare Pages) (4 tests)
+//  Suite 100 — Staging build output guards (Cloudflare Pages)
 //  The staging PWA registers a service worker at root scope. A service-worker
 //  script fetch that returns a 3xx redirect cannot be registered/updated —
 //  browsers reject it ("The script resource is behind a redirect, which is
 //  disallowed"). cf-staging-build.mjs emits a _redirects file pinning sw.js +
 //  manifest.json to a direct 200 serve so Cloudflare's path canonicalization can
 //  never redirect them. These guards lock that emission + sw.js-at-root.
+//
+//  100.5/100.6 (2026-07-13 staging-freeze fix): the SW *install* precache is
+//  also redirect-fragile. cache.addAll() is all-or-nothing and the Cache API
+//  REJECTS a redirected response, so a single precached entry that Cloudflare
+//  308-canonicalizes fails the entire install → the new SW never activates →
+//  the staging PWA freezes on the old build and "REBOOT TERMINAL" is a no-op.
+//  './index.html' is exactly such an entry (Cloudflare 308s '/index.html' → '/'),
+//  so the staging build DROPS it from the staged sw.js precache (the './' entry
+//  already caches the identical shell) AND pins '/index.html' to a 200 serve.
 // ══════════════════════════════════════════════════════════════
 header('Suite 100 — Staging build output guards (Cloudflare Pages)');
 {
@@ -11264,11 +13158,28 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
       /FILES\s*=\s*\[[^\]]*'sw\.js'/,
       '100.4: cf-staging-build.mjs stages sw.js at the served root (root-scope SW registration)',
     ],
+
+    // 100.5 _redirects pins /index.html to a direct 200 so a direct hit is not
+    //       308-canonicalized to / (defense-in-depth for the deployed artifact).
+    [
+      /\/index\.html\s+\/index\.html\s+200/,
+      '100.5: staging _redirects pins /index.html to a direct 200 serve (Cloudflare never 308-canonicalizes it)',
+    ],
+
+    // 100.6 the STAGED sw.js drops './index.html' from its precache — Cloudflare
+    //       308s '/index.html' → '/', and a redirected asset fails cache.addAll()
+    //       (all-or-nothing), which would freeze the staging PWA on the old build.
+    //       This regex matches the strip's replace target ('\.\/index\.html' in
+    //       the build's regex literal), so it fails if the strip is ever removed.
+    [
+      /'\\\.\\\/index\\\.html'/,
+      "100.6: cf-staging-build.mjs strips './index.html' from the staged sw.js precache (redirected asset would fail SW install)",
+    ],
   ]);
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 101 — WU-B9 cloud.js → state.js boundary fix (8 tests)
+//  Suite 101 — WU-B9 cloud.js → state.js boundary fix
 //  Protocol 23 module boundary: cloud.js (the cloud-sync module) must never reach
 //  into the global `state` object directly — it reads the active game context and
 //  snapshots state ONLY through the sanctioned state.js accessors. These guards lock
@@ -11277,8 +13188,8 @@ header('Suite 100 — Staging build output guards (Cloudflare Pages)');
 // ══════════════════════════════════════════════════════════════
 header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 {
-  const state101 = readFile('js/state.js');
-  const cloud101 = readFile('js/cloud.js');
+  const state101 = readGroup('state');
+  const cloud101 = readGroup('cloud');
 
   // ── state.js sanctioned accessors exist + are exposed for the module boundary ──
   assert(
@@ -11331,7 +13242,7 @@ header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 102 — WU-B10 boot-drone autoplay timing (6 tests)
+//  Suite 102 — WU-B10 boot-drone autoplay timing
 //  The browser autoplay policy blocks audio before the first user gesture, so
 //  the boot drone is armed to the first click/key. The bug: it fired on the
 //  user's first interaction WHENEVER it happened — including a mid-session menu
@@ -11343,7 +13254,7 @@ header('Suite 101 — WU-B9 cloud.js → state.js boundary fix');
 // ══════════════════════════════════════════════════════════════
 header('Suite 102 — WU-B10 boot-drone autoplay timing');
 {
-  const audio102 = readFile('js/ui-audio.js');
+  const audio102 = readGroup('ui-audio');
   let bootSeq102 = '';
   let firstInteract102 = '';
   let bootDrone102 = '';
@@ -11420,7 +13331,7 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 103 — WU-C13 SAVE MENU "?" help affordance (8 tests)
+//  Suite 103 — WU-C13 SAVE MENU "?" help affordance
 //  A diegetic "?" button in the save panel header opens a help modal explaining
 //  each save action. Reuses the shared sysModal entry point (_openSysModal,
 //  WU-C4) so it inherits the focus-trap + ARIA dialog semantics. Game-agnostic
@@ -11431,7 +13342,7 @@ header('Suite 102 — WU-B10 boot-drone autoplay timing');
 // ══════════════════════════════════════════════════════════════
 header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 {
-  const uiCore103 = readFile('js/ui-core.js');
+  const uiCore103 = readGroup('ui-core');
   // The save-menu "?" button tag (attributes span lines; [^>] matches newlines).
   const btnTag103 = (htmlSource.match(/<button\b[^>]*showSaveHelpModal[^>]*>/) || [''])[0];
   let helpBody103 = '';
@@ -11521,7 +13432,7 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified) (19 tests)
+//  Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified)
 //  Locks the canon coefficients that feed the Phase-N native calculators
 //  (WU-N1 VATS / WU-N2 TRADE / WU-N3 THREAT). Sources (Protocol 3, fallout.wiki):
 //    • Barter buy/sell — "Barter (Fallout: New Vegas)" / "Barter (Fallout 3)":
@@ -11533,7 +13444,7 @@ header('Suite 103 — WU-C13 SAVE MENU "?" help affordance');
 // ══════════════════════════════════════════════════════════════
 header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-verified)');
 {
-  const stateSrc104 = readFile('js/state.js');
+  const stateSrc104 = readGroup('state');
   // Slice GAME_DEFS into per-game regions (both games define barter/vats/ammoPerAttack).
   const fo3At104 = stateSrc104.indexOf('FO3: {');
   const fnvSlice104 =
@@ -11665,7 +13576,11 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 105 — WU-N1 VATS native calculator (21 tests)
+//  Suite 105 — WU-N1 VATS native calculator
+//  105.22–105.33 (U3 slice 4 / B2) EXECUTE the shipped _vatsCompute in a vm — the
+//  hit-%/AP-cost/damage math was extracted out of the DOM-entangled recomputeVATS()
+//  into a pure helper (Protocol 22/23; behavior-identical), so a sign flip / wrong
+//  clamp order / broken AP formula now fails a real number, not just a token grep.
 //  The deterministic V.A.T.S. calc (showVATSOverlay/recomputeVATS) consuming the
 //  WU-D4a coefficients (crit bonus + hit-% clamp) and the WU-N1 GAME_DEFS additions
 //  (combatSkills, vats.regions, vats.apBase/apPerAgility — canon AP formula). Locks:
@@ -11674,10 +13589,10 @@ header('Suite 104 — WU-D4 deterministic-feature coefficients (fallout.wiki-ver
 // ══════════════════════════════════════════════════════════════
 header('Suite 105 — WU-N1 VATS native calculator');
 {
-  const st105 = readFile('js/state.js');
-  const ui105 = readFile('js/ui-core.js');
-  const dbnv105 = readFile('js/db_nv.js');
-  const dbfo3105 = readFile('js/db_fo3.js');
+  const st105 = readGroup('state');
+  const ui105 = readGroup('ui-core');
+  const dbnv105 = readGroup('db_nv');
+  const dbfo3105 = readGroup('db_fo3');
   const fo3At = st105.indexOf('FO3: {');
   const fnv105 = fo3At > 0 ? st105.slice(st105.indexOf('FNV: {'), fo3At) : '';
   const fo3105 = fo3At > 0 ? st105.slice(fo3At) : '';
@@ -11695,6 +13610,14 @@ header('Suite 105 — WU-N1 VATS native calculator');
   try {
     vatsBody = extractFunctionBody(ui105, 'recomputeVATS');
   } catch (_) {}
+  // _vatsCompute uses a destructured param ({ def, ... }), which breaks extractFunctionBody's
+  // first-`{`-is-the-body assumption — grab the whole function via a regex instead (same
+  // pattern the behavioral vm block below uses to load it).
+  const vatsComputeBody = (ui105.match(/function _vatsCompute\([\s\S]*?\n\}/) || [''])[0];
+  // U3 slice 4: the pure math (hit-% clamp, crit bonus, AP formula, region table) was
+  // extracted from recomputeVATS() into the DOM-free _vatsCompute(). The config-token
+  // greps below now search BOTH bodies so they follow the code across the refactor.
+  const vatsMath = vatsBody + '\n' + vatsComputeBody;
 
   // 105.1 FNV combatSkills present with the firearm + melee + unarmed weapon skills
   assert(
@@ -11766,23 +13689,23 @@ header('Suite 105 — WU-N1 VATS native calculator');
   );
   // 105.10 hit-% clamp comes from GAME_DEFS (hitChanceMin/Max), not hardcoded 5/95
   assert(
-    /hitChanceMin/.test(vatsBody) && /hitChanceMax/.test(vatsBody),
-    '105.10: recomputeVATS() reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
+    /hitChanceMin/.test(vatsMath) && /hitChanceMax/.test(vatsMath),
+    '105.10: VATS math reads hitChanceMin/hitChanceMax from GAME_DEFS (WU-D4a clamp)'
   );
   // 105.11 VATS crit bonus comes from the GAME_DEFS coefficient
   assert(
-    /critBonus/.test(vatsBody),
-    '105.11: recomputeVATS() uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
+    /critBonus/.test(vatsMath),
+    '105.11: VATS math uses critBonus from GAME_DEFS (WU-D4a per-game coefficient)'
   );
   // 105.12 AP pool derived from the canon coefficients
   assert(
-    /apBase/.test(vatsBody) && /apPerAgi/.test(vatsBody),
-    '105.12: recomputeVATS() derives the AP pool from apBase + apPerAgility (canon formula)'
+    /apBase/.test(vatsMath) && /apPerAgi/.test(vatsMath),
+    '105.12: VATS math derives the AP pool from apBase + apPerAgility (canon formula)'
   );
   // 105.13 region table read from GAME_DEFS, not re-hardcoded in ui-core
   assert(
-    /\.regions\b/.test(vatsBody) && !/mod:\s*-40/.test(ui105),
-    '105.13: recomputeVATS() reads vats.regions from GAME_DEFS — no hardcoded region table in ui-core.js (GA-7)'
+    /\.regions\b/.test(vatsMath) && !/mod:\s*-40/.test(ui105),
+    '105.13: VATS math reads vats.regions from GAME_DEFS — no hardcoded region table in ui-core.js (GA-7)'
   );
   // 105.14 MELEE-SCOPE gate shape (§1.6) — playstyle==='melee' || weaponIsMelee, never mode alone
   assert(
@@ -11807,13 +13730,13 @@ header('Suite 105 — WU-N1 VATS native calculator');
       /function lookupWeaponStats\s*\(/.test(dbfo3105),
     '105.17: lookupWeaponStats() defined in both db_nv.js and db_fo3.js'
   );
-  // 105.18 read-only — the calc never writes state (no saveState/pushToCloud in the body)
+  // 105.18 read-only — the calc never writes state (no saveState/pushToCloud in either body)
   assert(
-    !/saveState\s*\(/.test(vatsBody) && !/pushToCloud\s*\(/.test(vatsBody),
-    '105.18: recomputeVATS() is read-only (no saveState/pushToCloud writes)'
+    !/saveState\s*\(/.test(vatsMath) && !/pushToCloud\s*\(/.test(vatsMath),
+    '105.18: recomputeVATS()/_vatsCompute() are read-only (no saveState/pushToCloud writes)'
   );
   // ── VATS-still-AI retirement (Protocol 42) ───────────────────────────────────
-  const api105 = readFile('js/api.js');
+  const api105 = readGroup('api');
   const routerBody105 = (api105.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
   ])[0];
@@ -11841,10 +13764,209 @@ header('Suite 105 — WU-N1 VATS native calculator');
     ),
     '105.21: all router-driven natives (THREAT/CONSULT/BIO-SCAN/LOOT/VATS) have a NATIVE_COMMAND_ROUTER entry (native end-to-end, no AI fall-through)'
   );
+
+  // ── Behavioral: run the shipped _vatsCompute in an isolated vm and assert exact math ──
+  // U3 slice 4 (B2): the VATS hit-%/AP-cost/damage math was DOM-entangled inside
+  // recomputeVATS(), so 105.10–105.13 could only GREP for coefficient tokens — a sign flip,
+  // wrong clamp order, or broken AP formula shipped green. The math is now a pure
+  // _vatsCompute(); these tests EXECUTE it and assert the actual numbers (mirrors 107's
+  // _threatCompute conversion). No test.html/vm twin exists for VATS (twin-check per U2 §2).
+  // 105.22 the pure math helper is defined + extractable
+  assert(
+    /function _vatsCompute\b/.test(ui105),
+    '105.22: _vatsCompute() pure math helper defined in ui-core family (extracted from recomputeVATS)'
+  );
+  const vmVats = require('vm');
+  const fnMatch105 = ui105.match(/function _vatsCompute\([\s\S]*?\n\}/);
+  if (!fnMatch105) {
+    fail('105.x: could not extract _vatsCompute from ui-core family');
+  } else {
+    const sb105 = {};
+    vmVats.createContext(sb105);
+    vmVats.runInContext(fnMatch105[0], sb105);
+    const vc = sb105._vatsCompute;
+    assert(
+      typeof vc === 'function' && fnMatch105[0].length > 200,
+      '105.x-guard: _vatsCompute extracted as a non-trivial function (anti-vacuous sentinel)'
+    );
+    // Fixture per-game def: FNV-style AP formula (65 + 3×AGI), 5/95 clamp, 5% crit, 3 regions.
+    const defFix = {
+      vats: {
+        hitChanceMin: 5,
+        hitChanceMax: 95,
+        critBonus: 0.05,
+        apBase: 65,
+        apPerAgility: 3,
+        regions: [
+          { name: 'HEAD', mod: -20, ap: 8 },
+          { name: 'TORSO', mod: 0, ap: 4 },
+          { name: 'LEGS', mod: -10, ap: 3 },
+        ],
+      },
+    };
+
+    // Case 1 — mid-range with a weapon equipped. per5/agi5/skill50/chem0, 30-dmg weapon, DT0.
+    //   apPool = 65 + 3×5 = 80.  base = 5×2 + 5×1.5 + (50+0)/3 = 34.1666…
+    //   HEAD clamp(round(34.17−20))=14 · TORSO clamp(round(34.17))=34 · LEGS clamp(round(24.17))=24
+    //   effDmg = max(1, round(30−0)) = 30.  best DMG/AP region = LEGS (30/3 = 10, the highest).
+    const r1 = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: { name: 'Test Rifle', baseDamage: 30 },
+      targetDT: 0,
+    });
+    // 105.23 AP pool = apBase + apPerAgility × AGI (canon formula, executed not grepped)
+    assert(r1.apPool === 80, `105.23: AP pool = 65 + 3×5 = 80 (got ${r1.apPool})`);
+    // 105.24 base hit-% formula (PER×2 + AGI×1.5 + (skill+chem)/3) with per-region mod + clamp
+    assert(
+      r1.hitRows[0].pct === 14 && r1.hitRows[1].pct === 34 && r1.hitRows[2].pct === 24,
+      `105.24: per-region hit-% = HEAD 14 / TORSO 34 / LEGS 24 (got ${r1.hitRows
+        .map(h => h.pct)
+        .join('/')})`
+    );
+    // 105.25 effective damage = max(1, round(baseDamage − targetDT))
+    assert(
+      r1.ap.effDmg === 30,
+      `105.25: effective damage = round(30 − 0) = 30 (got ${r1.ap.effDmg})`
+    );
+    // 105.26 AP-strike counts = floor(apPool / regionAP); optimal = highest DMG/AP region
+    const legs1 = r1.ap.rows.find(x => x.name === 'LEGS');
+    const torso1 = r1.ap.rows.find(x => x.name === 'TORSO');
+    assert(
+      torso1.strikes === 20 &&
+        legs1.strikes === 26 &&
+        legs1.dpa === 10 &&
+        r1.ap.bestRegion === 'LEGS',
+      `105.26: strikes floor(80/ap) → TORSO 20 / LEGS 26; best DMG/AP region = LEGS (got ${torso1.strikes}/${legs1.strikes}, best ${r1.ap.bestRegion})`
+    );
+    // 105.27 crit % = round(critBonus × 100)
+    assert(r1.critPct === 5, `105.27: crit % = round(0.05 × 100) = 5 (got ${r1.critPct})`);
+
+    // Case 2 — hit-% clamp both ends + no weapon. per10/agi10/skill100/chem0, DT0, stats null.
+    //   base = 20 + 15 + 100/3 = 68.333…  OVER mod +100 → 168 → clamp 95 · UNDER mod −200 → −132 → clamp 5
+    const defClamp = {
+      vats: {
+        hitChanceMin: 5,
+        hitChanceMax: 95,
+        critBonus: 0.05,
+        apBase: 65,
+        apPerAgility: 3,
+        regions: [
+          { name: 'OVER', mod: 100, ap: 4 },
+          { name: 'UNDER', mod: -200, ap: 4 },
+        ],
+      },
+    };
+    const r2 = vc({
+      def: defClamp,
+      per: 10,
+      agi: 10,
+      skillValue: 100,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.28 hit-% clamps to [hitChanceMin, hitChanceMax] at both extremes
+    assert(
+      r2.hitRows[0].pct === 95 && r2.hitRows[1].pct === 5,
+      `105.28: hit-% clamps to 95 (ceiling) / 5 (floor) (got ${r2.hitRows[0].pct}/${r2.hitRows[1].pct})`
+    );
+    // 105.29 no weapon equipped → no AP-strike section fabricated
+    assert(
+      r2.ap === null,
+      `105.29: no weapon → ap section null, no math fabricated (got ${r2.ap})`
+    );
+
+    // Case 3 — target DT ≥ base damage floors effective damage at 1 (no zero/negative).
+    const r3 = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: { name: 'Weak', baseDamage: 10 },
+      targetDT: 50,
+    });
+    // 105.30 effDmg floors at 1 when DT ≥ damage; burst = strikes × 1
+    const torso3 = r3.ap.rows.find(x => x.name === 'TORSO');
+    assert(
+      r3.ap.effDmg === 1 && torso3.burst === torso3.strikes,
+      `105.30: DT≥damage floors effDmg at 1 → burst = strikes×1 (got effDmg ${r3.ap.effDmg}, burst ${torso3.burst}, strikes ${torso3.strikes})`
+    );
+
+    // Case 4 — a region AP of 0 falls back to 1; AGI 0 → apPool = apBase only.
+    const defAp0 = {
+      vats: { apBase: 10, apPerAgility: 0, regions: [{ name: 'Z', mod: 0, ap: 0 }] },
+    };
+    const r4 = vc({
+      def: defAp0,
+      per: 5,
+      agi: 0,
+      skillValue: 0,
+      chemBonus: 0,
+      stats: { name: 'w', baseDamage: 5 },
+      targetDT: 0,
+    });
+    // 105.31 region AP 0/missing → cost 1 (no divide-by-zero); apPool = apBase at AGI 0
+    assert(
+      r4.apPool === 10 && r4.ap.rows[0].ap === 1 && r4.ap.rows[0].strikes === 10,
+      `105.31: apPool = apBase at AGI 0 (10); region ap 0 → 1, strikes floor(10/1)=10 (got apPool ${r4.apPool}, ap ${r4.ap.rows[0].ap}, strikes ${r4.ap.rows[0].strikes})`
+    );
+
+    // Case 5 — chem bonus feeds the skill term of the base hit-% (delta = chem/3).
+    const noChem = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 0,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    const withChem = vc({
+      def: defFix,
+      per: 5,
+      agi: 5,
+      skillValue: 0,
+      chemBonus: 30,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.32 chemBonus adds to the skill term (30 chem → base +10)
+    assert(
+      withChem.base - noChem.base === 10,
+      `105.32: chemBonus feeds the skill term — 30 chem raises base by 10 (got ${withChem.base - noChem.base})`
+    );
+
+    // Case 6 — empty def → the documented canon fallbacks (5/95 clamp, 65+3×AGI, single TORSO region, 5% crit).
+    const r6 = vc({
+      def: {},
+      per: 5,
+      agi: 5,
+      skillValue: 50,
+      chemBonus: 0,
+      stats: null,
+      targetDT: 0,
+    });
+    // 105.33 missing GAME_DEFS.vats → canon defaults, still fully usable offline (Protocol 24)
+    assert(
+      r6.apPool === 80 &&
+        r6.hitRows.length === 1 &&
+        r6.hitRows[0].name === 'TORSO' &&
+        r6.critPct === 5,
+      `105.33: empty def → canon fallbacks (apPool 80, single TORSO region, crit 5%) (got apPool ${r6.apPool}, regions ${r6.hitRows.length}, crit ${r6.critPct})`
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 106 — WU-N2 TRADE native barter terminal (22 tests)
+//  Suite 106 — WU-N2 TRADE native barter terminal
+//  106.23–106.25 (U3 slice 3 / B3) execute the shipped _tradeBuyPrice/
+//  _tradeSellPrice in a vm — exact prices across barter 0/50/100 + the
+//  floor(1)/clamp(0)/margin — the arithmetic 106.4/106.5 only re-implement.
 //  The deterministic, offline barter terminal consuming the WU-D4b coefficients
 //  (GAME_DEFS[ctx].barter). Locks: db catalog/vendor lookups, the price math + its
 //  canon invariants (buy ≥ value, sell < buy), additive + confirm-gated mutation
@@ -11853,14 +13975,14 @@ header('Suite 105 — WU-N1 VATS native calculator');
 // ══════════════════════════════════════════════════════════════
 header('Suite 106 — WU-N2 TRADE native barter terminal');
 {
-  const ren106 = readFile('js/ui-render.js');
-  const dbnv106 = readFile('js/db_nv.js');
-  const dbfo3106 = readFile('js/db_fo3.js');
-  const api106 = readFile('js/api.js');
-  const core106 = readFile('js/ui-core.js');
+  const ren106 = readGroup('ui-render');
+  const dbnv106 = readGroup('db_nv');
+  const dbfo3106 = readGroup('db_fo3');
+  const api106 = readGroup('api');
+  const core106 = readGroup('ui-core');
   const html106 = htmlSource;
-  const css106 = readFile('css/terminal.css');
-  const st106 = readFile('js/state.js');
+  const css106 = readCss();
+  const st106 = readGroup('state');
   let doBuyBody = '';
   let doSellBody = '';
   try {
@@ -12065,10 +14187,88 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
       /trade:\s*'>\s*BARTER UPLINK'/.test(core106),
     "106.22: Tool Deck TRADE row → expandPanelForCategory('trade') → maps trade→inv + '> BARTER UPLINK' (row→panel-open end-to-end)"
   );
+
+  // ── BEHAVIORAL (U3 slice 3 / B3) — run the REAL price functions in an isolated vm
+  //    and assert EXACT prices across the barter curve. 106.4/106.5 above validate the
+  //    coefficient DATA under a test-side re-implementation of the formula — they never
+  //    call the shipped _tradeBuyPrice/_tradeSellPrice, so a sign flip, a wrong clamp,
+  //    or a broken interpolation in the real functions ships green past them. These
+  //    execute the shipped functions (through _tradeBarterCoef/_tradeBarterSkill) so the
+  //    arithmetic itself is guarded, not just the numbers it reads.
+  {
+    const vm106 = require('vm');
+    function declareFn106(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    // Canonical FNV barter block (parsed-data value asserted by 104.5 / 106.4).
+    const BARTER106 = { buyBase: 1.55, sellBase: 0.45, slopePerPoint: 0.0045 };
+
+    // Compute a price by running the SHIPPED functions with the barter skill set to `b`.
+    function priceAt106(fnName, value, b) {
+      const sb = {
+        Math,
+        state: { skills: { barter: b } },
+        getGameContext: () => 'FNV',
+        GAME_DEFS: { FNV: { barter: BARTER106 } },
+      };
+      vm106.createContext(sb);
+      vm106.runInContext(
+        [
+          declareFn106(ren106, '_tradeBarterCoef'),
+          declareFn106(ren106, '_tradeBarterSkill'),
+          declareFn106(ren106, '_tradeBuyPrice'),
+          declareFn106(ren106, '_tradeSellPrice'),
+        ].join('\n'),
+        sb
+      );
+      return sb[fnName](value);
+    }
+
+    // 106.23  BUY price = round(value × (1.55 − 0.0045×barter)), executed at 0/50/100.
+    //   value 200 avoids any .5 rounding ambiguity: b0→310, b50→265, b100→220.
+    {
+      const b0 = priceAt106('_tradeBuyPrice', 200, 0);
+      const b50 = priceAt106('_tradeBuyPrice', 200, 50);
+      const b100 = priceAt106('_tradeBuyPrice', 200, 100);
+      assert(
+        b0 === 310 && b50 === 265 && b100 === 220,
+        `106.23: _tradeBuyPrice(200) executes to 310/265/220 across barter 0/50/100 (got ${b0}/${b50}/${b100})`
+      );
+    }
+
+    // 106.24  SELL price = round(value × (0.45 + 0.0045×barter)), executed at 0/50/100.
+    //   value 200: b0→90, b50→135, b100→180.
+    {
+      const s0 = priceAt106('_tradeSellPrice', 200, 0);
+      const s50 = priceAt106('_tradeSellPrice', 200, 50);
+      const s100 = priceAt106('_tradeSellPrice', 200, 100);
+      assert(
+        s0 === 90 && s50 === 135 && s100 === 180,
+        `106.24: _tradeSellPrice(200) executes to 90/135/180 across barter 0/50/100 (got ${s0}/${s50}/${s100})`
+      );
+    }
+
+    // 106.25  Clamps + margin, executed: buy floored at 1 and sell clamped ≥ 0 for a
+    //   value-0 item; and the vendor margin holds (sell < buy) even at max barter 100.
+    {
+      const buy0 = priceAt106('_tradeBuyPrice', 0, 100);
+      const sell0 = priceAt106('_tradeSellPrice', 0, 100);
+      const buyMax = priceAt106('_tradeBuyPrice', 200, 100);
+      const sellMax = priceAt106('_tradeSellPrice', 200, 100);
+      assert(
+        buy0 === 1 && sell0 === 0 && sellMax < buyMax,
+        `106.25: value-0 buy floors at 1 and sell clamps at 0; sell < buy margin holds at barter 100 (got buy0 ${buy0}, sell0 ${sell0}, ${sellMax} < ${buyMax})`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 107 — WU-N3 THREAT native bestiary + TTK (17 tests)
+//  Suite 107 — WU-N3 THREAT native bestiary + TTK
 //  Deterministic offline THREAT assessment: BESTIARY.CSV lookup → enemy card +
 //  TTK = ceil(HP / max(1, weaponDPS − DT)) + ammo-burn (WU-D4c coefficient) +
 //  weakness highlight. Routed natively (the AI TTK directive is retired). The math
@@ -12077,7 +14277,7 @@ header('Suite 106 — WU-N2 TRADE native barter terminal');
 // ══════════════════════════════════════════════════════════════
 header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 {
-  const renSrc107 = readFile('js/ui-render.js');
+  const renSrc107 = readGroup('ui-render');
 
   // 107.1 / 107.2  lookupBestiaryEntry mirrored in both game db runners (Protocol 38)
   assert(
@@ -12198,7 +14398,7 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 108 — WU-N4 CONSULT native databank lookup (18 tests)
+//  Suite 108 — WU-N4 CONSULT native databank lookup
 //  `> CONSULT <topic>` (+ [CONSULT] / [CON]) routed through NATIVE_COMMAND_ROUTER to a
 //  deterministic, offline, read-only registry+DB lookup. Locks: the router wiring, the
 //  registry/DB cross-reference, the NO-ENTRY path (Protocol 3 — never invents), XSS-safe
@@ -12206,10 +14406,10 @@ header('Suite 107 — WU-N3 THREAT native bestiary + TTK');
 // ══════════════════════════════════════════════════════════════
 header('Suite 108 — WU-N4 CONSULT native databank lookup');
 {
-  const ren108 = readFile('js/ui-render.js');
-  const api108 = readFile('js/api.js');
-  const core108 = readFile('js/ui-core.js');
-  const css108 = readFile('css/terminal.css');
+  const ren108 = readGroup('ui-render');
+  const api108 = readGroup('api');
+  const core108 = readGroup('ui-core');
+  const css108 = readCss();
   // The CONSULT engine spans renderConsult + the shared _consultSearch / _consultRenderHTML
   // core (WU-N4b option C, Protocol 22). Concatenate so the engine-level checks (108.4–108.9,
   // 108.13) verify the behavior wherever it lives across the split.
@@ -12284,12 +14484,16 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
     '108.9: renderConsult is read-only (no saveState/pushToCloud/state writes)'
   );
   // 108.10 game-agnostic (Protocol 38) — no FNV/FO3/Fallout literals in the consult code.
-  // Use a stable source slice (from the _CONSULT_CATS decl to the next function) rather than
+  // Use a stable source slice (from the _CONSULT_CATS decl to end-of-file) rather than
   // brace-counted body extraction, which diverges between runners on template-literal-heavy code.
+  // 2.8.5 U-A4: _CONSULT_CATS through BIO-SCAN all live in js/ui/ui-render-databank.js, and
+  // _updateContextPanels (the original end-of-file marker) moved OUT to the ui-render.js hub —
+  // scope to just this one file (its own EOF is the correct boundary) rather than the whole
+  // ui-render-*.js family, whose readGroup() join order is alphabetical, not source order.
   {
-    const cs = ren108.indexOf('const _CONSULT_CATS');
-    const ce = ren108.indexOf('function _updateContextPanels');
-    const region = cs >= 0 && ce > cs ? ren108.slice(cs, ce) : '';
+    const databank108 = readGroup('ui-render-databank');
+    const cs = databank108.indexOf('const _CONSULT_CATS');
+    const region = cs >= 0 ? databank108.slice(cs) : '';
     assert(
       region !== '' && !/\bFNV\b|\bFO3\b|Fallout|New Vegas/.test(region),
       '108.10: renderConsult/_consultDetail carry no FNV/FO3/Fallout literals (Protocol 38 — registry-driven)'
@@ -12368,7 +14572,7 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
   assert(
     /<details class="panel[^"]*"[^>]*id="databankPanel"/.test(html108) &&
       /data-tab="data"/.test(databankPanel108) &&
-      /<h2>[\s\S]*?CATALOG QUERY<\/h2>/.test(databankPanel108) &&
+      /<h2>[\s\S]*?CATALOG QUERY\s*<\/h2>/.test(databankPanel108) &&
       /id="databankSearch"[\s\S]*?oninput="renderDatabankPanel\(\)"/.test(databankPanel108) &&
       /aria-label="[^"]+"/.test(databankPanel108) &&
       /id="databankResults"/.test(databankPanel108) &&
@@ -12404,7 +14608,7 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 109 — WU-N5 BIO-SCAN native medical advisory (13 tests)
+//  Suite 109 — WU-N5 BIO-SCAN native medical advisory
 //  `> [BIO-SCAN]` (+ [BIO]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
 //  offline, read-only limb/HP/radiation/addiction advisory computed from state +
 //  CHEMS. Locks: router wiring, the pure compute core (behavioral), the AI-path
@@ -12413,13 +14617,13 @@ header('Suite 108 — WU-N4 CONSULT native databank lookup');
 // ══════════════════════════════════════════════════════════════
 header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 {
-  const ren109 = readFile('js/ui-render.js');
-  const api109 = readFile('js/api.js');
-  const core109 = readFile('js/ui-core.js');
-  const css109 = readFile('css/terminal.css');
+  const ren109 = readGroup('ui-render');
+  const api109 = readGroup('api');
+  const core109 = readGroup('ui-core');
+  const css109 = readCss();
   const html109 = readFile('index.html');
-  const dbnv109 = readFile('js/db_nv.js');
-  const dbfo3109 = readFile('js/db_fo3.js');
+  const dbnv109 = readGroup('db_nv');
+  const dbfo3109 = readGroup('db_fo3');
   const routerBlock109 = (api109.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
   ])[0];
@@ -12570,7 +14774,7 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 110 — WU-N6 LOOT native add/value terminal (13 tests)
+//  Suite 110 — WU-N6 LOOT native add/value terminal
 //  `> [LOOT]` (+ [LT]) routed through NATIVE_COMMAND_ROUTER to a deterministic,
 //  offline salvage terminal: pick a DB-catalog item, ADD it additively to
 //  state.inventory[] at its DB value, confirm-gated. Locks: router wiring, the
@@ -12580,21 +14784,23 @@ header('Suite 109 — WU-N5 BIO-SCAN native medical advisory');
 // ══════════════════════════════════════════════════════════════
 header('Suite 110 — WU-N6 LOOT native add/value terminal');
 {
-  const ren110 = readFile('js/ui-render.js');
-  const api110 = readFile('js/api.js');
-  const core110 = readFile('js/ui-core.js');
-  const css110 = readFile('css/terminal.css');
+  const ren110 = readGroup('ui-render');
+  const api110 = readGroup('api');
+  const core110 = readGroup('ui-core');
+  const css110 = readCss();
   const html110 = readFile('index.html');
   const routerBlock110 = (api110.match(/const NATIVE_COMMAND_ROUTER\s*=\s*\{[\s\S]*?\n\};/) || [
     '',
   ])[0];
   // Stable source slice of the LOOT core (the pure helper through doLoot).
-  const lootRegionStart = ren110.indexOf('function _lootAdd');
-  const lootRegionEnd = ren110.indexOf('// ── WU-N3: THREAT');
-  const lootRegion =
-    lootRegionStart >= 0 && lootRegionEnd > lootRegionStart
-      ? ren110.slice(lootRegionStart, lootRegionEnd)
-      : '';
+  // 2.8.5 U-A4: _lootAdd through the end of the Visual Upload OCR apply flow all live in
+  // js/ui/ui-render-loot.js, immediately followed (in the ORIGINAL monolith) by the WU-N3
+  // THREAT section, which now lives in a different sibling (ui-render-databank.js) — scope to
+  // just this one file (its own EOF is the correct boundary) rather than the whole
+  // ui-render-*.js family, whose readGroup() join order is alphabetical, not source order.
+  const loot110 = readGroup('ui-render-loot');
+  const lootRegionStart = loot110.indexOf('function _lootAdd');
+  const lootRegion = lootRegionStart >= 0 ? loot110.slice(lootRegionStart) : '';
   let doLootBody = '';
   let lootAddBody = '';
   try {
@@ -12730,7 +14936,7 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 111 — WU-E1 diegetic terminology / voice standards (11 tests)
+//  Suite 111 — WU-E1 diegetic terminology / voice standards
 //  Locks the HOUSE_STANDARD terminology pass: ALL-CAPS content
 //  placeholders + empty-states, game-agnostic out-of-frame manifest
 //  copy, DIRECTOR (not "AI"/"Gemini") narrative-error voice, and the
@@ -12740,8 +14946,8 @@ header('Suite 110 — WU-N6 LOOT native add/value terminal');
 header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   const html111 = readFile('index.html');
-  const api111 = readFile('js/api.js');
-  const acct111 = readFile('js/ui-account.js');
+  const api111 = readGroup('api');
+  const acct111 = readGroup('ui-account');
   const manifest111 = JSON.parse(readFile('manifest.json'));
 
   // 111.1 every content-input placeholder is ALL-CAPS (no lowercase letters) — MN-6
@@ -12840,11 +15046,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  reusable <template> banners — NEVER deleted. Guards they still EXIST
 //  and are disabled-by-default (wrapped in <template>, so the browser
 //  parses but never renders/activates them on their own).
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('WU-E2 reusable disabled banner templates');
-  const cssSrc112 = readFile('css/terminal.css');
+  const cssSrc112 = readCss();
 
   // 112.1  #updateBannerTemplate <template> still EXISTS (not deleted)
   assert(
@@ -12907,12 +15112,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Locks COMMAND_REGISTRY (ui-core.js) ↔ NATIVE_COMMAND_ROUTER (api.js) ↔ the
 //  [FEATURES] help modal so the in-app command reference can't drift from reality:
 //  every native terminal is advertised, retired AI macros stay gone.
-//  7 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 113 — WU-E3 FEATURES / command-reference consistency');
-  const uiCore113 = readFile('js/ui-core.js');
-  const api113 = readFile('js/api.js');
+  const uiCore113 = readGroup('ui-core');
+  const api113 = readGroup('api');
   const registry113 = (uiCore113.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
     '',
     '',
@@ -13006,17 +15210,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  location-change path and the AI import path record it via the shared
 //  recordLocationVisit() helper (deduped, permanent), and renderWorldMap reads
 //  locationHistory for CURRENT / VISITED / UNKNOWN status. (Protocol 42 map fix)
-//  8 tests
+//  114.2/2b/2c behavioral (Health-U3 slice 2): recordLocationVisit() executed
+//  in a vm sandbox — dedup, case-folding, no-truncation, null/whitespace no-op.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 114 — Map location discovery persistence');
-  const stateSrc114 = readFile('js/state.js');
-  const apiSrc114 = readFile('js/api.js');
-  const uiCoreSrc114 = readFile('js/ui-core.js');
-  const uiRenderSrc114 = readFile('js/ui-render.js');
-  const recordBody114 = (stateSrc114.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [
-    '',
-  ])[0];
+  const stateSrc114 = readGroup('state');
+  const apiSrc114 = readGroup('api');
+  const uiCoreSrc114 = readGroup('ui-core');
+  const uiRenderSrc114 = readGroup('ui-render');
 
   // 114.1  shared helper recordLocationVisit() defined in state.js (Protocol 22/23)
   assert(
@@ -13024,13 +15226,87 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '114.1: recordLocationVisit() helper defined in state.js (single source for map-discovery recording)'
   );
 
-  // 114.2  helper dedups case-insensitively AND is permanent (no destructive cap)
-  assert(
-    /toLowerCase\(\)/.test(recordBody114) &&
-      /\.some\(/.test(recordBody114) &&
-      /state\.locationHistory\.push\(/.test(recordBody114) &&
-      !/slice\(-?\d+\)/.test(recordBody114),
-    '114.2: recordLocationVisit dedups case-insensitively and never truncates (permanent fog-of-war discovery)'
+  // 114.2  helper dedups case-insensitively AND is permanent — CONVERTED TO
+  //        BEHAVIORAL (Health-U3 slice 2). recordLocationVisit() is now
+  //        EXECUTED for real in a vm sandbox (whole state.js loaded), not
+  //        grepped: the old assert (toLowerCase/.some/.push present, no slice)
+  //        stayed green with the dedup predicate inverted or the push
+  //        unreachable — it never proved a single location was actually
+  //        deduped, kept case-insensitively, or preserved. These do.
+  //        (No behavioral twin exists: test.html Suite 7 only proves a changed
+  //        loc lands in history via autoImportState — not dedup, case-folding,
+  //        or no-truncation.)
+  const vm114 = require('vm');
+  let h114 = null;
+  let harnessErr114 = null;
+  try {
+    const sandbox114 = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+      RobcoEvents: { emit: () => {} },
+    };
+    vm114.createContext(sandbox114);
+    vm114.runInContext(stateSrc114, sandbox114);
+    h114 = sandbox114;
+  } catch (e) {
+    harnessErr114 = e;
+  }
+  function rec114(arg) {
+    vm114.runInContext('recordLocationVisit(' + JSON.stringify(arg) + ');', h114);
+  }
+  function hist114() {
+    return vm114.runInContext('JSON.parse(JSON.stringify(state.locationHistory))', h114);
+  }
+  function reset114() {
+    vm114.runInContext('state.locationHistory = [];', h114);
+  }
+  function behav114(label, fn) {
+    if (!h114) {
+      fail(label + '  (harness error: ' + (harnessErr114 && harnessErr114.message) + ')');
+      return;
+    }
+    try {
+      assert(fn(), label);
+    } catch (e) {
+      fail(label + '  (runtime error: ' + e.message + ')');
+    }
+  }
+
+  behav114(
+    '114.2: [behavioral] recordLocationVisit dedups case-insensitively — Goodsprings / goodsprings / GOODSPRINGS collapse to a single entry, keeping the first spelling',
+    () => {
+      reset114();
+      rec114('Goodsprings');
+      rec114('goodsprings');
+      rec114('GOODSPRINGS');
+      const d = hist114();
+      return d.length === 1 && d[0] === 'Goodsprings';
+    }
+  );
+  behav114(
+    '114.2b: [behavioral] 60 distinct visits all persist (no destructive cap) — the earliest discovery is never un-discovered as new locations are found',
+    () => {
+      reset114();
+      for (let i = 0; i < 60; i++) rec114('Loc' + i);
+      const p = hist114();
+      return p.length === 60 && p[0] === 'Loc0' && p[59] === 'Loc59';
+    }
+  );
+  behav114(
+    '114.2c: [behavioral] null / empty / whitespace-only names are ignored (trimmed to empty → early return, no blank entry pushed)',
+    () => {
+      reset114();
+      rec114('Novac');
+      rec114(null);
+      rec114('');
+      rec114('   ');
+      const n = hist114();
+      return n.length === 1 && n[0] === 'Novac';
+    }
   );
 
   // 114.3  manual path: onLocationChange records the LEFT + NEW location via the helper
@@ -13106,11 +15382,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Keep-display-lit toggle: feature-detected, graceful fallback when unsupported,
 //  re-acquire on visibilitychange, release on toggle-off, persisted as a localStorage
 //  device preference. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 115 — WU-F1 Sustained Power Cell (Wake Lock)');
-  const uiCore115 = readFile('js/ui-core.js');
+  const uiCore115 = readGroup('ui-core');
   const html115 = htmlSource;
 
   // 115.1  preference constant + getter (localStorage-backed device setting, not state)
@@ -13213,13 +15488,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Brief chassis buzz on key events: feature-detected, opt-in localStorage device
 //  preference (default OFF), graceful no-op when navigator.vibrate is unavailable,
 //  and SUPPRESSED under prefers-reduced-motion. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 116 — WU-F2 Haptic Solenoid (Vibration)');
-  const uiAudio116 = readFile('js/ui-audio.js');
-  const uiCore116 = readFile('js/ui-core.js');
-  const api116 = readFile('js/api.js');
+  const uiAudio116 = readGroup('ui-audio');
+  const uiCore116 = readGroup('ui-core');
+  const api116 = readGroup('api');
   const html116 = htmlSource;
 
   // 116.1  preference constant + getter (localStorage-backed device setting, not state)
@@ -13314,11 +15588,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Ejects the comm-link log as a holotape transcript via navigator.share, with a
 //  three-tier graceful fallback (share → clipboard → download). Feature-detected,
 //  reuses _buildHolotapeText() formatting. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 117 — WU-F3 Eject Holotape (Web Share)');
-  const saves117 = readFile('js/ui-saves.js');
+  const saves117 = readGroup('ui-saves');
   const html117 = htmlSource;
   let eject117 = '';
   try {
@@ -13397,11 +15670,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Posts the active-quest count on the installed icon while backgrounded, clears
 //  it when the terminal is open. Feature-detected, graceful no-op when unsupported,
 //  reuses the QUEST LOG count. Game-agnostic, offline, no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 118 — WU-F4 Pending-Directives Tally (Badge)');
-  const uiCore118 = readFile('js/ui-core.js');
+  const uiCore118 = readGroup('ui-core');
   const manifest118 = readFile('manifest.json');
   let badgeFn = '';
   try {
@@ -13475,11 +15747,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  uptime) surfaced as a DATA-tab read-out. Persisted as a localStorage device
 //  stat (NOT campaign state — no Protocol-4 path), reuses the session clock, no
 //  web API, no AI, no network, game-agnostic. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header("Suite 119 — WU-F7 Overseer's Maintenance Log");
-  const uiCore119 = readFile('js/ui-core.js');
+  const uiCore119 = readGroup('ui-core');
   const html119 = htmlSource;
 
   // 119.1  telemetry store constant + tolerant reader (localStorage device stat, not state)
@@ -13611,12 +15882,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  pref) AND the OS prefers-contrast: more media query — both applying the same
 //  pure-CSS boosts (pure-black bg, glow removed, dimmed surfaces lifted, scanline
 //  veil dropped). Game-agnostic (layers over any optics colour), no AI. (Phase F)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 120 — WU-F8 High-Lumen Optics (high-contrast)');
-  const css120 = readFile('css/terminal.css');
-  const uiCore120 = readFile('js/ui-core.js');
+  const css120 = readCss();
+  const uiCore120 = readGroup('ui-core');
   const html120 = htmlSource;
   // Slice each activation path so we can assert the boosts live in BOTH.
   const manualBlock120 = css120.slice(
@@ -13731,12 +16001,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  A procedural station bed (static + carrier + tonal motifs), fully generated
 //  via WebAudio (no audio files). Opt-in player, respects masterMute, autoplay-
 //  safe. Game-agnostic, offline, no AI. (Phase F, Protocol 7)
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 121 — WU-F5 Pip-Boy Radio (synthesized)');
-  const uiAudio121 = readFile('js/ui-audio.js');
-  const uiCore121 = readFile('js/ui-core.js');
+  const uiAudio121 = readGroup('ui-audio');
+  const uiCore121 = readGroup('ui-core');
   const html121 = htmlSource;
   let start121 = '';
   let toggle121 = '';
@@ -13835,12 +16104,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  gated once by robco_booted_before), or a RARE degraded "cold tube" variant
 //  that rolls on ANY boot (NOT first-boot-gated — owner pref). Honors reduced-
 //  motion, leaves the normal boot unchanged. Game-agnostic, offline, no AI.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 122 — WU-F6 Cold-Start / Degraded-Tube Boot');
-  const uiAudio122 = readFile('js/ui-audio.js');
-  const css122 = readFile('css/terminal.css');
+  const uiAudio122 = readGroup('ui-audio');
+  const css122 = readCss();
   let pick122 = '';
   let bootLines122 = '';
   let runBoot122 = '';
@@ -13939,12 +16207,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  DATABANK panel, "consult <topic>" still runs the native lookup). Formerly bundled
 //  with the WU-F9 TERMLINK Command Console tests; TERMLINK was fully retired — see
 //  Suite 168 — and its tests removed rather than renumbered in place.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 123 — WU-HF2/HF3 precise-pointer refocus + native panel navigation');
-  const api123 = readFile('js/api.js');
-  const uiCore123 = readFile('js/ui-core.js');
+  const api123 = readGroup('api');
+  const uiCore123 = readGroup('ui-core');
   const html123 = readFile('index.html');
   const aliasBlock123 = (api123.match(/const PANEL_NAV_ALIASES = \{([\s\S]*?)\n\};/) || [
     '',
@@ -14092,7 +16359,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /data-tab="data"[^>]*id="databankPanel"|id="databankPanel"[^>]*data-tab="data"/.test(
         html123
       ) &&
-      /CATALOG QUERY<\/h2>/.test(html123),
+      /CATALOG QUERY\s*<\/h2>/.test(html123),
     '123.10: #databankPanel (CATALOG QUERY h2, data-tab="data") exists as the consult/databank/lookup target'
   );
 }
@@ -14103,14 +16370,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  changeOpticsColor (ui-audio) and the duplicated fgMap (ui-saves); each GAME_DEFS entry
 //  declares theme.defaultOptics resolved via _activeDef() (no game literal); a real WCAG
 //  relative-luminance computation enforces AA ≥4.5:1 for every contrastSafe default.
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 124 — WU-T1 per-game theming + AA contrast');
-  const state124 = readFile('js/state.js');
-  const audio124 = readFile('js/ui-audio.js');
-  const saves124 = readFile('js/ui-saves.js');
-  const core124 = readFile('js/ui-core.js');
+  const state124 = readGroup('state');
+  const audio124 = readGroup('ui-audio');
+  const saves124 = readGroup('ui-saves');
+  const core124 = readGroup('ui-core');
   const html124 = readFile('index.html');
 
   // Real WCAG 2.x relative-luminance + contrast-ratio (sRGB). Self-improving guard: a new
@@ -14291,14 +16557,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  unit): the device-telemetry half moved again, from #systemStatusPanel into
 //  its own BUS-22 #unitPowerPlantPanel board (#systemStatusPanel is now BUS-23
 //  IDENTITY PLATE & BREAKERS — see Suite 192).
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 125 — WU-F10 session stats merged into OVERSEER LOG');
   const html125 = readFile('index.html');
-  const render125 = readFile('js/ui-render.js');
-  const core125 = readFile('js/ui-core.js');
-  const saves125 = readFile('js/ui-saves.js');
+  const render125 = readGroup('ui-render');
+  const core125 = readGroup('ui-core');
+  const saves125 = readGroup('ui-saves');
   const statusPanel125 = (html125.match(/id="unitPowerPlantPanel"[\s\S]*?<\/details>/) || [''])[0];
   const logPanel125 = (html125.match(/id="campaignLogPanel"[\s\S]*?<\/details>/) || [''])[0];
   const sessFn125 = (render125.match(/function renderSessionStats\(\)[\s\S]*?\n\}/) || [''])[0];
@@ -14388,13 +16653,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  A per-row LOG VISIT button on the WORLD GRID flags a location discovered directly,
 //  add-only (no un-mark), routed through the single-source recordLocationVisit() helper
 //  with NO AI. Accessible (<button>, aria-label, ≥28px tap target), game-agnostic.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 126 — WU-F11 native mark-visited map control');
-  const render126 = readFile('js/ui-render.js');
-  const state126 = readFile('js/state.js');
-  const css126 = readFile('css/terminal.css');
+  const render126 = readGroup('ui-render');
+  const state126 = readGroup('state');
+  const css126 = readCss();
   const markFn126 = (render126.match(/function markLocationVisited\(loc\)[\s\S]*?\n\}/) || [''])[0];
   const recFn126 = (state126.match(/function recordLocationVisit\([\s\S]*?\n\}/) || [''])[0];
   // Phase 3 · Piece 3 renamed the button to MARK SURVEYED (class="mark") as
@@ -14474,14 +16738,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  The boot sequence shows the active game's Pip-Boy model + wasteland uplink, and the
 //  save manager shows its saveLabel — all sourced from GAME_DEFS[ctx].theme (Protocol 38).
 //  The identity line is injected flavor-independently so WU-F6 cold/degraded boot is intact.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 127 — WU-T3 per-game identity strings + save header');
-  const state127 = readFile('js/state.js');
-  const audio127 = readFile('js/ui-audio.js');
-  const account127 = readFile('js/ui-account.js');
-  const css127 = readFile('css/terminal.css');
+  const state127 = readGroup('state');
+  const audio127 = readGroup('ui-audio');
+  const account127 = readGroup('ui-account');
+  const css127 = readCss();
   const fnvTheme127 = (state127.match(/FNV:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
   const fo3Theme127 = (state127.match(/FO3:[\s\S]*?theme:\s*\{([\s\S]*?)\}/) || ['', ''])[1];
   const grab127 = (block, k) => (block.match(new RegExp(k + ":\\s*'([^']+)'")) || [])[1] || '';
@@ -14568,11 +16831,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 128 — WU-REN test-runner rename escape-ratchet (Protocol 36b)
-//  The runners were renamed to tests/robco-diagnostics.{js,ps1}. This guard fails the
+//  The runner was renamed to tests/robco-diagnostics.js. This guard fails the
 //  gate if ANY stale reference to the legacy runner name reappears anywhere — code,
 //  scripts, hooks, CI, or docs — so the rename can never silently regress.
 //  (The forbidden literal is assembled at runtime so this guard file never self-matches.)
-//  5 tests
+//  2.8.5 U-B3: the PowerShell mirror (.ps1) was deleted; these guards now cover
+//  the single Node runner only, and 128.5 asserts the gate is single-runner.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 128 — WU-REN runner-rename escape-ratchet');
@@ -14592,10 +16856,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     }
   };
 
-  // 128.1  the renamed runners exist under the RobCo-themed names
+  // 128.1  the renamed Node runner exists under the RobCo-themed name
   assert(
-    _exists('tests/robco-diagnostics.js') && _exists('tests/robco-diagnostics.ps1'),
-    '128.1: tests/robco-diagnostics.js + tests/robco-diagnostics.ps1 both exist (runners renamed)'
+    _exists('tests/robco-diagnostics.js'),
+    '128.1: tests/robco-diagnostics.js exists (canonical Node runner, RobCo-themed name)'
   );
 
   // 128.2  the legacy-named runner files are gone (git mv, not copy)
@@ -14612,15 +16876,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     'scripts/pre-push',
     'scripts/install-hooks.js',
     'tests/test.html',
-    'tests/run-tests.bat',
     'tests/robco-diagnostics.js',
-    'tests/robco-diagnostics.ps1',
     '.github/workflows/nightly-tests.yml',
     '.github/workflows/ci.yml',
     'README.md',
     'ARCHITECTURE.md',
     'CHANGELOG.md',
-    'RULES.md',
     'CLAUDE.md',
   ];
   const offenders = scanList.filter(f => _readIf(f).includes(_legacy));
@@ -14630,22 +16891,22 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       (offenders.length ? ' — OFFENDERS: ' + offenders.join(', ') : '')
   );
 
-  // 128.4  the runtime invocations were actually repointed to the new names
+  // 128.4  the runtime invocations were actually repointed to the new name
   const gate128 = _readIf('scripts/gate.js');
   const pkg128 = _readIf('package.json');
   const nightly128 = _readIf('.github/workflows/nightly-tests.yml');
   assert(
     /node tests\/robco-diagnostics\.js/.test(gate128) &&
-      /robco-diagnostics\.ps1/.test(gate128) &&
       /tests\/robco-diagnostics\.js/.test(pkg128) &&
-      /tests\/robco-diagnostics\.(js|ps1)/.test(nightly128),
-    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed runners'
+      /tests\/robco-diagnostics\.js/.test(nightly128),
+    '128.4: gate.js, package.json, and nightly-tests.yml all invoke the renamed Node runner'
   );
 
-  // 128.5  gate.js still pairs BOTH runners (parity invocation intact under the new names)
+  // 128.5  the gate is single-runner: gate.js runs the Node runner and does NOT
+  //        reference the deleted PowerShell mirror (2.8.5 U-B3, Protocol 15 retired)
   assert(
-    /robco-diagnostics\.js/.test(gate128) && /robco-diagnostics\.ps1/.test(gate128),
-    '128.5: scripts/gate.js references both robco-diagnostics.js and robco-diagnostics.ps1 (dual-runner gate intact)'
+    /robco-diagnostics\.js/.test(gate128) && !/robco-diagnostics\.ps1/.test(gate128),
+    '128.5: scripts/gate.js references the Node runner only, not the deleted .ps1 mirror (single-runner gate)'
   );
 }
 
@@ -14655,12 +16916,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  hover so a touch phone can NEVER boot into the PC layout, even if a first-paint
 //  layout-viewport race momentarily reports ≥1000px. The JS panel-open default must use
 //  the same matchMedia gate, not a raw window.innerWidth read.
-//  4 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 129 — first-load desktop-layout pointer/hover gate');
-  const css129 = readFile('css/terminal.css');
-  const core129 = readFile('js/ui-core.js');
+  const css129 = readCss();
+  const core129 = readGroup('ui-core');
   const GATE = '(min-width: 1000px) and (hover: hover) and (pointer: fine)';
 
   // 129.1  the desktop app-shell media query carries the pointer/hover gate
@@ -14702,14 +16962,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Item 5: the chosen optic persists PER GAME (robco_optic_<ctx>), resolved per-game pick →
 //  game default → green. Both are game-agnostic / N-game scalable (keyed by gameContext) —
 //  adding a game needs ZERO theming-code change.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 130 — per-game optics + dynamic (Default) label');
-  const audio130 = readFile('js/ui-audio.js');
-  const core130 = readFile('js/ui-core.js');
+  const audio130 = readGroup('ui-audio');
+  const core130 = readGroup('ui-core');
   const html130 = readFile('index.html');
-  const saves130 = readFile('js/ui-saves.js');
+  const saves130 = readGroup('ui-saves');
   const keyFn130 = (audio130.match(/function _opticStorageKey\([\s\S]*?\n\}/) || [''])[0];
   const resolveOpticFn130 = (audio130.match(/function _resolveOptic\(\)[\s\S]*?\n\}/) || [''])[0];
   const changeFn130 = (audio130.match(/function changeOpticsColor\([\s\S]*?\n\}/) || [''])[0];
@@ -14797,7 +17056,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  11-point state matrix (both games x every playstyle/playthroughType/
 //  campaignMode branch) and the SHA-256 of each assembled directive is asserted
 //  against the pre-refactor golden hash — proving byte-identical output.
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 131 — U1 directive decomposition + GA-5 retirement (golden-master)');
@@ -14869,83 +17127,125 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
+    // v2.8.5 RELEASE VERSION BUMP (2026-07-22): ALL 11 rows' hashes moved. The
+    // directive embeds ${APP_VERSION} verbatim ("[SYSTEM MSG]: RobCo U.O.S.
+    // ${APP_VERSION} Active." — api-directive.js) so bumping APP_VERSION 2.8.0→2.8.5
+    // shifts every directive's hash by exactly that substring and nothing else. This
+    // is the ONLY change this pass — proven before re-pinning by regenerating each
+    // directive at 2.8.5, substituting '2.8.5'→'2.8.0' in the output, and confirming
+    // it reproduces the pre-bump golden hash byte-for-byte (all 11 rows). A version
+    // bump moving these hashes is expected and NOT a regression (Protocol 2/14);
+    // re-pinned via the same in-sandbox getSystemDirective() the matrix below hashes.
+    //
+    // LEVEL OWNERSHIP → THE PLAYER (2026-07-20, owner directive): ALL 11 rows'
+    // hashes moved. A new line in the ROBCO_DEV_MANUAL progression block tells the
+    // AI that level is player-owned and READ-ONLY to it — "lvl" may now only
+    // ANNOUNCE an earned promotion (and only upward), never store a value. That
+    // text rides in every directive, so every ctx/playstyle/playthrough/campaign
+    // combination's hash changed. An intentional content change, not a regression
+    // (Protocol 14 — the contract change is guarded by Suite 173.13/173.14, and the
+    // code-side enforcement by 173.10/173.11/173.12). Regenerated via the same
+    // in-sandbox getSystemDirective() the matrix below hashes.
+    //
+    // AI_OVERSEER Finding 4 (persona game-agnostic, 2026-07-19): ONLY the two FO3
+    // rows' hashes moved this pass. The player noun is now per-game DATA
+    // (GAME_DEFS[ctx].identity.playerNoun — api-directive.js/state.js): FNV resolves
+    // to 'Courier' so every FNV directive stays byte-identical (all 9 FNV hashes
+    // UNCHANGED — the golden-master proves the fix is a no-op for the existing game),
+    // while FO3 now correctly says 'Lone Wanderer' instead of 'Courier' throughout,
+    // so both FO3 hashes changed. An intentional content change, not a regression
+    // (Protocol 42/14). Regenerated via the same in-sandbox getSystemDirective().
+    //
+    // Prior pass — ALL 11 rows' hashes changed (AI_OVERSEER Finding 1 — CLASS fix,
+    // 2026-07-18 — APP_VERSION stays 2.8.0, 2.8.5 unreleased work, NOT a version
+    // bump). The first pass (8f834e6) rewrote the "Inventory & Squad Persistence"
+    // instruction; this pass extends the same root-cause fix to the OTHER
+    // full-replace fields by rewriting three more instructions that told the AI to
+    // resend whole arrays: the "Always return the FULL state.factions object"
+    // (_directiveFactions), "Always return the FULL state.perks array" and "Always
+    // return the FULL state.quests array" (_directiveSystems) lines now instruct
+    // the AI to report ONLY what CHANGED (matching the inventory rule). Because that
+    // text rides in every directive, every ctx/playstyle/playthrough/campaign
+    // combination's hash moved. An intentional content change, not a regression
+    // (Protocol 42) — see js/services/api-directive.js and js/services/api-import.js.
+    // Regenerated via the same in-sandbox getSystemDirective() the matrix below hashes.
     const GOLDEN_MATRIX = [
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '2fab15de30815451a041e71a48cfb2c5c10830c93302c76f791433fca32b0b13',
+        sha256: 'a133e00fedfa9a3ac5892b800bcf4a2e8ee4449591cd01e86448272205bb80b6',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '4fe38b6130cb6a5aa53b9eaad79d8f0dea044369f5fab4a55ac3f36d275357f3',
+        sha256: '38e263007ce9081c336e447024b8d4c7dcc32569dafbe0325ea2a5cb9cbad787',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: 'c08152e192bc3ca88a8c2cee734c0ffb4e684865e7cc75643012e03820a14a3e',
+        sha256: '7ead096e5127f6089e951c7a732d1f3815ff168c72e744b6a5c77f9d55d254dd',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'f43a208c6c6e1cdb794d530c5c22353f921176ba22f38ce8025d70bdcc61a498',
+        sha256: 'af56e67ebd2b4008fec3bbcb03609e4983ccf5f48b0b2be9476648e007574a35',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '5634c2b2c85ad0f848fc269fef7da318f2b9661692d05fb1ea367ae273b5bfe7',
+        sha256: 'c46cb89cb94a1ab7da0b40766461a1388a484e29029283937bd4d742ae21967e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: 'dda36c2be2bb76069e5e55ca900229a9063b64bc13ba195ec4039250299a9508',
+        sha256: 'd059ea01dfaa6f866a5dc6d3b660578eb56e1d220049d9647b2bd27bf0a519d7',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: '82ba297d3821af528667f684918a99914311e2ffbac27e2a09a1366250e3a05f',
+        sha256: 'e5b5ebbc069224dbc5a66919aa13b022fdf97dedff1fa2ee1155cc6891781dbc',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: '86e2affd92e0fab06d2b16fbb73a1bee6c770d42903211611dd6cf19e0a83fd1',
+        sha256: '8160d97e7a865d83659d779cfbe89abb5787c4ca07c828a60b62b61ec9d348cc',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '09a4b018aa2345ee2c22b5f0e7a133b707a6a2b29d270017b51e1d1d9047588f',
+        sha256: '9eaa663c27a98fdcbfb5a2a6b2fb595bc8dcef65bf4c22b9b565ab19e49dc919',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '670c553882eea505a3e2783a132a3f9afeb87416284db02d48daad3b1b226203',
+        sha256: '03303ddb4df3cf43813f6c69a1335b28cd95fcbe2a09a8c8e290411d7538388f',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'dd225f948525b08999b6713a3fb28b76dad344b1007f84aa5d750afbdf93d721',
+        sha256: 'a67ae4b47779b637d6a167a58311e27c560a30fb7d82d35df50ac6ec45388c07',
       },
     ];
 
@@ -15011,11 +17311,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  that made _startAmbientTimers() able to reach _startUptimeClock/
 //  _startMemCycle in the first place), and window.onload itself stays a
 //  slim composition instead of drifting back into a monolith.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 132 — U2 window.onload boot decomposition');
-  const uiCoreSrc132 = readFile('js/ui-core.js');
+  const uiCoreSrc132 = readGroup('ui-core');
 
   const bootPhaseFns132 = [
     '_hydrateStateFromStorage',
@@ -15083,10 +17382,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     // DO-N added one legitimate named call (_initBezelChrome()) — bumped per this test's
     // own stated intent (headroom for natural named-call growth, not a monolith guard).
     // CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) —
-    // bumped again for the same reason.
+    // bumped again for the same reason. FO3 PIP-BOY BUILD U1 added one more
+    // (_applyRailGrouping()) — bumped again, same reason. FO3 PIP-BOY BUILD U2
+    // owner-feedback pass added one more (_applyFo3NavLabels()) — bumped again, same reason.
+    // SAVE_INTEGRITY_PASS added one more (_requestPersistentStorage()) — bumped again, same reason.
+    // P8 live-container recovery added one more (await _restoreLiveContainerFromIdb()) — bumped again, same reason.
     assert(
-      onloadLineCount < 55,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 55)`
+      onloadLineCount < 61,
+      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 61)`
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -15172,7 +17475,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  malformed AI response (e.g. `{"s":"abc"}`) silently corrupted player state
 //  with NaN (discovered by actually running the function under this harness,
 //  not by inspection). Fixed by matching the established `|| 0` idiom.
-//  27 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 133 — U3 autoImportState() VM-sandbox behavioral test');
@@ -15195,7 +17497,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     };
     vm.createContext(sandbox);
     vm.runInContext(stateSource, sandbox);
-    vm.runInContext(readFile('js/reg_nv.js'), sandbox);
+    vm.runInContext(readGroup('reg_nv'), sandbox);
     const autoImportBody133 =
       'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
     vm.runInContext(autoImportBody133 + '\nthis.autoImportState = autoImportState;', sandbox);
@@ -15287,9 +17589,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   });
 
   // ── C. Hostile / injection-shaped payloads ────────────────────────────
+  // Carrier field changed lvl → xp (2026-07-20): level is now player-owned and
+  // the AI cannot write it, so `lvl` no longer proves the payload was processed.
+  // `xp` is a field the AI legitimately still writes, so it demonstrates the same
+  // thing — the payload imported normally while the pollution attempt failed.
   behavior133('__proto__ pollution attempt does not pollute Object.prototype', undefined, () => {
-    callThrows133(JSON.stringify({ __proto__: { polluted133: 'yes' }, lvl: 7 }));
-    return Object.prototype.polluted133 === undefined && liveState133().lvl === 7;
+    callThrows133(JSON.stringify({ __proto__: { polluted133: 'yes' }, xp: 7 }));
+    return Object.prototype.polluted133 === undefined && liveState133().xp === 7;
   });
   behavior133(
     'constructor.prototype pollution attempt does not pollute Object.prototype',
@@ -15425,14 +17731,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // ── G. Valid / partial payloads (positive path through the hardening) ──
+  // Carrier field changed lvl → xp (2026-07-20), same reason as the __proto__
+  // case above: the AI can no longer write lvl, so it cannot demonstrate a
+  // successful partial import. lvl is asserted UNCHANGED here instead, which
+  // makes this case cover both halves of the contract at once.
   behavior133('well-formed partial payload updates only the included field', undefined, () => {
-    callThrows133(JSON.stringify({ lvl: 5 }));
+    const lvlBefore133 = liveState133().lvl;
+    callThrows133(JSON.stringify({ xp: 5 }));
     const st = liveState133();
-    return (
-      st.lvl === 5 &&
-      st.xp === harness133.defaultState133.xp &&
-      st.caps === harness133.defaultState133.caps
-    );
+    return st.xp === 5 && st.lvl === lvlBefore133 && st.caps === harness133.defaultState133.caps;
   });
   behavior133(
     'well-formed payload updates SPECIAL + factions + inventory correctly',
@@ -15506,7 +17813,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  a registered device key directly (the only sanctioned exception — the
 //  index.html pre-paint scripts that run before state.js loads — is proven
 //  to sit strictly before the first js/*.js <script> tag).
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 134 — U6 MetaStore boundary gate');
@@ -15737,13 +18043,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  wrapped in a named _wire*EventBusSubscribers() function called from
 //  window.onload, since a bare top-level call in a static <script> file could
 //  execute before state.js (dynamically, context-conditionally loaded) had run.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 135 — U7/U8 OS event bus + faction-agnostic fix + auto-log');
 
-  const uiRenderSrc135 = readFile('js/ui-render.js');
-  const uiCoreSrc135 = readFile('js/ui-core.js');
+  const uiRenderSrc135 = readGroup('ui-render');
+  const uiCoreSrc135 = readGroup('ui-core');
 
   // 135.1  structural: state.js declares the bus (on/emit) and exposes it globally
   assert(
@@ -15907,11 +18212,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // ── U7 detector migration (static) ────────────────────────────────────────
 
-  // 135.10  level-up and faction-threshold detectors in api.js emit through the bus
+  // 135.10  the faction-threshold detector in api.js emits through the bus.
+  //         UPDATED 2026-07-20: the level-up half was removed with the AI's
+  //         ability to write the level. The import path no longer emits
+  //         'level.up' because it no longer changes the level — nativeLevelUp()
+  //         is the sole emitter now (Suite 173.4/173.10).
   assert(
-    /RobcoEvents\.emit\(\s*'level\.up'/.test(apiSource) &&
-      /RobcoEvents\.emit\(\s*'faction\.threshold'/.test(apiSource),
-    "135.10: autoImportState()'s level-up and faction-threshold detectors emit 'level.up' / 'faction.threshold' through RobcoEvents"
+    /RobcoEvents\.emit\(\s*'faction\.threshold'/.test(apiSource),
+    "135.10: autoImportState()'s faction-threshold detector emits 'faction.threshold' through RobcoEvents"
   );
 
   // 135.11  HP-critical detector in ui-core.js emits through the bus
@@ -15998,7 +18306,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // by wrapping each cross-file subscriber registration in a named
   // _wire*EventBusSubscribers() function called from window.onload, once
   // state.js is guaranteed to have run.
-  const uiAudioSrc135 = readFile('js/ui-audio.js');
+  const uiAudioSrc135 = readGroup('ui-audio');
 
   // 135.15  structural: each cross-file subscriber registration is wrapped in a
   //         named wiring function, and window.onload calls all three
@@ -16085,17 +18393,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (reverse Protocol-38 leak — FO3 has no weapon-mod data at all); and closes
 //  the one live player-authority violation the U10 audit found — squad
 //  affinity was AI-write-only, now has native [+]/[-] buttons.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 136 — Step 2 Phase 0 U9/U10 connector sweep + affinity fix');
   const html136 = readFile('index.html');
-  const api136 = readFile('js/api.js');
-  const uiCore136 = readFile('js/ui-core.js');
-  const uiRender136 = readFile('js/ui-render.js');
-  const css136 = readFile('css/terminal.css');
-  const dbNv136 = readFile('js/db_nv.js');
-  const dbFo3136 = readFile('js/db_fo3.js');
+  const api136 = readGroup('api');
+  const uiCore136 = readGroup('ui-core');
+  const uiRender136 = readGroup('ui-render');
+  const css136 = readCss();
+  const dbNv136 = readGroup('db_nv');
+  const dbFo3136 = readGroup('db_fo3');
 
   // 136.1  U9-1: the Projected Timeline stub is fully retired — no shell, no
   //        command, no directive references, no stray modal-consumer branch.
@@ -16274,19 +18581,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  synchronous *Apply mutation core so the gate and the mutation can each be
 //  tested independently. A real Promise-resolution behavioral proof (137.6)
 //  runs confirmAction() against a minimal synthetic DOM in a Node vm sandbox.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
   const arch137 = readFile('ARCHITECTURE.md');
-  const dbNv137 = readFile('js/db_nv.js');
-  const dbFo3137 = readFile('js/db_fo3.js');
-  const uiCore137 = readFile('js/ui-core.js');
-  const uiRender137 = readFile('js/ui-render.js');
-  const uiSaves137 = readFile('js/ui-saves.js');
-  const cloud137 = readFile('js/cloud.js');
-  const api137 = readFile('js/api.js');
-  const state137 = readFile('js/state.js');
+  const dbNv137 = readGroup('db_nv');
+  const dbFo3137 = readGroup('db_fo3');
+  const uiCore137 = readGroup('ui-core');
+  const uiRender137 = readGroup('ui-render');
+  const uiSaves137 = readGroup('ui-saves');
+  const cloud137 = readGroup('cloud');
+  const api137 = readGroup('api');
+  const state137 = readGroup('state');
 
   // 137.1  U11: the per-game data parity ledger is committed in ARCHITECTURE.md,
   //        with every row labeled GENUINE or GAP (never left ambiguous)
@@ -16646,12 +18952,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  slow/corrupt the shadow no-ops and the app is byte-identical (migration-
 //  safety). These are structural guards; the REAL IndexedDB behavioral proof
 //  (round-trip + fail-safe) runs in tests/test.html (Protocol 40 — the browser
-//  is the only runner with a native IndexedDB). 12 tests
+//  is the only runner with a native IndexedDB).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 138 — P1 IndexedDB durability shadow + write-through');
-  const idb138 = readFile('js/idb.js');
-  const state138 = readFile('js/state.js');
+  const idb138 = readGroup('idb');
+  const state138 = readGroup('state');
   const sw138 = readFile('sw.js');
   const html138 = readFile('index.html');
 
@@ -16662,13 +18968,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 138.2  the new served module is precached in sw.js ASSETS (Suite 49 sibling)
-  assert(/['"]\.\/js\/idb\.js['"]/.test(sw138), '138.2: js/idb.js is precached in sw.js ASSETS');
+  assert(
+    /['"]\.\/js\/core\/idb\.js['"]/.test(sw138),
+    '138.2: js/idb.js is precached in sw.js ASSETS'
+  );
 
   // 138.3  idb.js loads BEFORE state.js (which calls it) and before the boot
   //         loader that injects state.js — a static tag ahead of everything
   {
-    const iIdb = html138.indexOf('js/idb.js');
-    const iState = html138.indexOf('js/state.js');
+    const iIdb = html138.indexOf('js/core/idb.js');
+    const iState = html138.indexOf('js/core/state.js');
     const iLoader = html138.indexOf('GAME_FILES');
     assert(
       iIdb > -1 && iState > -1 && iLoader > -1 && iIdb < iState && iIdb < iLoader,
@@ -16774,12 +19083,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  boot; if IdbStore is absent it resolves immediately (byte-identical boot).
 //  Only the 'meta' store is touched (two-store boundary). Structural guards
 //  here; the REAL IndexedDB recovery/backfill/no-flip/corrupt-skip behavioral
-//  proof runs in tests/test.html (Protocol 40). 12 tests
+//  proof runs in tests/test.html (Protocol 40).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 139 — P2 device-pref boot hydration + reconciliation');
-  const uiCore139 = readFile('js/ui-core.js');
-  const idb139 = readFile('js/idb.js');
+  const uiCore139 = readGroup('ui-core');
+  const idb139 = readGroup('idb');
   const reconcile139 = extractFunctionBody(uiCore139, '_reconcileMetaFromIdb');
   const hydrate139 = extractFunctionBody(uiCore139, '_hydrateMetaFromIdb');
   // window.onload body (brace-matched from the async declaration)
@@ -16920,15 +19229,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  strictly newer; NEVER removes a localStorage copy). Two-store boundary: cold
 //  store uses ONLY the 'campaign' object store; device prefs stay in 'meta'.
 //  Structural guards here; the REAL IndexedDB migration/round-trip/fallback
-//  behavioral proof runs in tests/test.html (Protocol 40). 12 tests
+//  behavioral proof runs in tests/test.html (Protocol 40).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 140 — P3 cold-store IDB-primary (save slots + rolling backups)');
-  const state140 = readFile('js/state.js');
-  const uiSaves140 = readFile('js/ui-saves.js');
-  const uiAcct140 = readFile('js/ui-account.js');
-  const cloud140 = readFile('js/cloud.js');
-  const uiCore140 = readFile('js/ui-core.js');
+  const state140 = readGroup('state');
+  const uiSaves140 = readGroup('ui-saves');
+  const uiAcct140 = readGroup('ui-account');
+  const cloud140 = readGroup('cloud');
+  const uiCore140 = readGroup('ui-core');
   const coldRead140 = extractFunctionBody(state140, '_coldReadObj');
   const coldWrite140 = extractFunctionBody(state140, '_coldWriteObj');
   const migrate140 = extractFunctionBody(state140, '_migrateColdStoreToIdb');
@@ -17002,12 +19311,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 140.9  CEILING RELIEF / FAIL-SAFE: _coldWriteObj succeeds on either store
-  //         (a localStorage quota failure is non-fatal) + boot kicks the migration
+  //         (a localStorage quota failure is non-fatal) + boot kicks the migration.
+  //         SAVE_LAYER3: the return is the divergence-honest { ok, idbOk, lsOk }
+  //         object — `ok` keeps the exact either-store success basis.
   assert(
-    /return idbOk \|\| lsOk;/.test(coldWrite140) &&
+    /return \{ ok: idbOk \|\| lsOk, idbOk: idbOk, lsOk: lsOk \};/.test(coldWrite140) &&
       /catch \(_\) \{/.test(coldWrite140) &&
       /_migrateColdStoreToIdb\(\)/.test(uiCore140),
-    '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal — ceiling relief); boot fires the migration'
+    '140.9: _coldWriteObj persists on either store (localStorage quota non-fatal — ceiling relief), returning the divergence-honest { ok, idbOk, lsOk }; boot fires the migration'
   );
 
   // 140.10  renderSavesList surfaces IDB-only save slots (oversized saves)
@@ -17042,14 +19353,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  campaign_notes route into eventLog (deduped 'log' events), and it can NEVER
 //  author eventLog directly. Crossroads + a new Incident view are cheap filters
 //  over the Record. eventLog rides the campaign container (robco_v8) →
-//  cloud/export/backup via the serialized-whole path (Protocol 34). 12 tests
+//  cloud/export/backup via the serialized-whole path (Protocol 34).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 141 — P4 Terminal Record (structured eventLog + [T#] migration)');
-  const state141 = readFile('js/state.js');
-  const api141 = readFile('js/api.js');
-  const uiCore141 = readFile('js/ui-core.js');
-  const uiRender141 = readFile('js/ui-render.js');
+  const state141 = readGroup('state');
+  const api141 = readGroup('api');
+  const uiCore141 = readGroup('ui-core');
+  const uiRender141 = readGroup('ui-render');
   const html141 = readFile('index.html');
   const logEventBody = extractFunctionBody(state141, '_logEvent');
   const migrateEvBody = extractFunctionBody(state141, '_migrateEventLog');
@@ -17161,13 +19472,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  _applySlotEnvelope core loadFromSlot uses (Protocol 22). Fail-safe: no IDB →
 //  no version history offered, save/load byte-identical to pre-P5. Structural
 //  guards here; the real-IndexedDB behavioral proof lives in tests/test.html
-//  (Suite 14 — Node/PowerShell have no IndexedDB). 12 tests
+//  (Suite 14 — the Node runner has no IndexedDB).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 142 — P5 save version history (per-slot revision ring)');
-  const state142 = readFile('js/state.js');
-  const uiSaves142 = readFile('js/ui-saves.js');
-  const uiAcct142 = readFile('js/ui-account.js');
+  const state142 = readGroup('state');
+  const uiSaves142 = readGroup('ui-saves');
+  const uiAcct142 = readGroup('ui-account');
   const readVers142 = extractFunctionBody(state142, 'readSlotVersions');
   const pushVers142 = extractFunctionBody(state142, 'pushSlotVersion');
   const saveBody142 = extractFunctionBody(uiSaves142, 'saveToSlot');
@@ -17290,12 +19601,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  carries campaign/save data ONLY — device prefs ('meta' store) are excluded, so
 //  the two-store boundary holds (Protocol 23). Data-layer fns (buildFullBundle /
 //  verify / applyBundleData) live in state.js so the real-IndexedDB round-trip is
-//  proven in tests/test.html (Suite 15). 13 tests
+//  proven in tests/test.html (Suite 15).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 143 — P6 full backup bundle (export/import whole history)');
-  const state143 = readFile('js/state.js');
-  const uiSaves143 = readFile('js/ui-saves.js');
+  const state143 = readGroup('state');
+  const uiSaves143 = readGroup('ui-saves');
   const indexHtml143 = readFile('index.html');
   const buildBody143 = extractFunctionBody(state143, 'buildFullBundle');
   const verifyCkBody143 = extractFunctionBody(state143, 'verifyBundleChecksum');
@@ -17441,12 +19752,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (_uploadSaveDoc; Protocol 22/34), gated by the offlineQueue kill-switch flag
 //  (Protocol 32/33) and every auth guard the manual button uses. The storage layer
 //  round-trip is proven live in tests/test.html (Suite 16); this suite guards the
-//  wiring + the never-auto-push invariant. 12 tests
+//  wiring + the never-auto-push invariant.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 144 — P7 offline cloud-push queue (manual-push resilience)');
-  const state144 = readFile('js/state.js');
-  const cloud144 = readFile('js/cloud.js');
+  const state144 = readGroup('state');
+  const cloud144 = readGroup('cloud');
   const readQ144 = extractFunctionBody(state144, 'readCloudQueue');
   const enqQ144 = extractFunctionBody(state144, 'enqueueCloudPush');
   const writeQ144 = extractFunctionBody(state144, 'writeCloudQueue');
@@ -17466,8 +19777,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     return '';
   };
   const saveCloudBody144 = _winFn144(cloud144, 'saveCurrentToCloud');
-  const uiSource144 = readFile('js/ui-core.js');
-  const apiSource144 = readFile('js/api.js');
+  const uiSource144 = readGroup('ui-core');
+  const apiSource144 = readGroup('api');
 
   // 144.1  the queue data-layer API is defined + exposed on window
   assert(
@@ -17596,12 +19907,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Phase 2 — those consumers do NOT exist yet. Default 'full' preserves today's
 //  behavior. The ONE existing ambient behavior wired as a proof-of-seam is the
 //  periodic memory-cycle flash (_startMemCycle). The pref round-trip + thresholds
-//  are proven live in tests/test.html (Suite 17). 10 tests
+//  are proven live in tests/test.html (Suite 17).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 145 — P8 global immersion dial (Full/Balanced/Minimal)');
-  const state145 = readFile('js/state.js');
-  const uiCore145 = readFile('js/ui-core.js');
+  const state145 = readGroup('state');
+  const uiCore145 = readGroup('ui-core');
   const indexHtml145 = readFile('index.html');
   const getTierBody145 = extractFunctionBody(state145, 'getImmersionTier');
   const allowsBody145 = extractFunctionBody(state145, 'immersionAllows');
@@ -17699,7 +20010,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core (15 tests)
+//  Suite 146 — Step 2 (v2.8.0) Phase 2 A1: Ambient Runtime core
 // ──────────────────────────────────────────────────────────────
 //  The one heartbeat + observer registry + central dial enforcement, ADDITIVE:
 //  A1 tracks the canonical terminal state (OFF→COLD_BOOT→READY→ACTIVE→IDLE→
@@ -17711,31 +20022,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 146 — A1 Ambient Runtime core (state machine + scheduler + observer registry)');
-  const runtime146 = readFile('js/runtime.js');
+  const runtime146 = readGroup('runtime');
   const sw146 = readFile('sw.js');
   const index146 = readFile('index.html');
-  const uiCore146 = readFile('js/ui-core.js');
+  const uiCore146 = readGroup('ui-core');
   const transitionBody146 = extractFunctionBody(runtime146, 'transition');
   const beatBody146 = extractFunctionBody(runtime146, '_beat');
   const initRt146 = extractFunctionBody(runtime146, 'initAmbientRuntime');
 
   // 146.1  js/runtime.js exists on disk (served file)
   assert(
-    fs.existsSync(path.join(ROOT, 'js/runtime.js')),
+    fs.existsSync(path.join(ROOT, 'js/core/runtime.js')),
     '146.1: js/runtime.js exists on disk (A1 new served file)'
   );
 
   // 146.2  ./js/runtime.js is precached in sw.js ASSETS (Protocol 1 / Suite 49 completeness)
   assert(
-    /'\.\/js\/runtime\.js'/.test(sw146),
+    /'\.\/js\/core\/runtime\.js'/.test(sw146),
     "146.2: './js/runtime.js' is listed in sw.js ASSETS (PWA precaches the runtime)"
   );
 
   // 146.3  index.html loads runtime.js and orders it BEFORE ui-core.js (which calls
   //        initAmbientRuntime()), consistent with the static sibling tags
   assert(
-    /<script src="js\/runtime\.js"><\/script>/.test(index146) &&
-      index146.indexOf('js/runtime.js') < index146.indexOf('js/ui-core.js'),
+    /<script src="js\/core\/runtime\.js"><\/script>/.test(index146) &&
+      index146.indexOf('js/core/runtime.js') < index146.indexOf('js/ui/ui-core.js'),
     '146.3: index.html loads js/runtime.js as a static tag ordered before js/ui-core.js'
   );
 
@@ -17873,7 +20184,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 147 — Step 2 (v2.8.0) Phase 2 A2.1: Standby machine → runtime observer (7 tests)
+//  Suite 147 — Step 2 (v2.8.0) Phase 2 A2.1: Standby machine → runtime observer
 // ──────────────────────────────────────────────────────────────
 //  The tab-standby dim + audio ducking is migrated off its own blur/focus/
 //  visibilitychange listeners onto the Ambient Runtime's STANDBY state: _wireStandby
@@ -17885,7 +20196,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 147 — A2.1 standby machine migrated onto the Ambient Runtime (STANDBY observer)');
-  const uiCore147 = readFile('js/ui-core.js');
+  const uiCore147 = readGroup('ui-core');
   const wireStandbyBody147 = extractFunctionBody(uiCore147, '_wireStandby');
   const enterBody147 = extractFunctionBody(uiCore147, 'enterStandby');
   const exitBody147 = extractFunctionBody(uiCore147, 'exitStandby');
@@ -17954,7 +20265,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 148 — Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers → runtime observers (7 tests)
+//  Suite 148 — Step 2 (v2.8.0) Phase 2 A2.2: fixed-cadence timers → runtime observers
 // ──────────────────────────────────────────────────────────────
 //  The three fixed-cadence loops — uptime clock (1s), memory-cycle flash (15min), and
 //  overseer-log flush (30s) — are migrated off their own setIntervals onto the Ambient
@@ -17971,8 +20282,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   header(
     'Suite 148 — A2.2 uptime clock + memory cycle + overseer flush migrated to runtime observers'
   );
-  const runtime148 = readFile('js/runtime.js');
-  const uiCore148 = readFile('js/ui-core.js');
+  const runtime148 = readGroup('runtime');
+  const uiCore148 = readGroup('ui-core');
   const registerBody148 = extractFunctionBody(runtime148, 'register');
   const transitionBody148 = extractFunctionBody(runtime148, 'transition');
   const startAmbient148 = extractFunctionBody(uiCore148, '_startAmbientTimers');
@@ -18038,7 +20349,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 149 — Developer Console: the ONE canonical dev/debug console (16 tests)
+//  Suite 149 — Developer Console: the ONE canonical dev/debug console
 // ──────────────────────────────────────────────────────────────
 //  A live inspector + trigger panel for the Ambient Runtime (js/runtime.js).
 //  This IS the canonical developer/debug console the roadmap's hacking
@@ -18057,12 +20368,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 149 — Developer Console: the ONE canonical dev/debug console');
-  const testConsole149 = readFile('js/test-console.js');
+  const testConsole149 = readGroup('test-console');
   // U4b (Suite 215) deliberately, documentedly widened the Hard Boundary:
   // the STATE SETUP/RESETS/FIXTURES/INLINE apparatus (~80 registry entries +
   // their _dsh*-prefixed helper functions) explicitly reads/writes campaign
   // state and calls saveState() — that is the entire point of a cheat/reset/
-  // fixture tool, per planning/DIAGNOSTIC_SHELL_PLAN.md §4 and the file's own
+  // fixture tool, per planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4 and the file's own
   // updated header comment. 149.9/149.13 below still hold the ORIGINAL
   // Hard-Boundary/game-agnostic invariant for everything BEFORE that block —
   // the runtime/immersion-only console this suite was written to guard —
@@ -18075,31 +20386,31 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
   const sw149 = readFile('sw.js');
   const index149 = readFile('index.html');
-  const uiCore149 = readFile('js/ui-core.js');
-  const runtime149 = readFile('js/runtime.js');
+  const uiCore149 = readGroup('ui-core');
+  const runtime149 = readGroup('runtime');
   const initTestConsoleBody149 = extractFunctionBody(testConsole149, 'initTestConsole');
   const isStagingBody149 = extractFunctionBody(testConsole149, '_devConsoleUnlocked');
 
   // 149.1  js/test-console.js exists on disk (new served file)
   assert(
-    fs.existsSync(path.join(ROOT, 'js/test-console.js')),
+    fs.existsSync(path.join(ROOT, 'js/dev/test-console.js')),
     '149.1: js/test-console.js exists on disk (Test Console new served file)'
   );
 
   // 149.2  ./js/test-console.js is precached in sw.js ASSETS
   assert(
-    /'\.\/js\/test-console\.js'/.test(sw149),
+    /'\.\/js\/dev\/test-console\.js'/.test(sw149),
     "149.2: './js/test-console.js' is listed in sw.js ASSETS (PWA precaches the console)"
   );
 
   // 149.3  index.html loads test-console.js AFTER ui-core.js (needs _isStagingEnv)
   //        and before api.js, consistent with the static sibling tags
   assert(
-    /<script src="js\/test-console\.js"><\/script>/.test(index149) &&
-      index149.indexOf('<script src="js/ui-core.js"></script>') <
-        index149.indexOf('<script src="js/test-console.js"></script>') &&
-      index149.indexOf('<script src="js/test-console.js"></script>') <
-        index149.indexOf('<script src="js/api.js"></script>'),
+    /<script src="js\/dev\/test-console\.js"><\/script>/.test(index149) &&
+      index149.indexOf('<script src="js/ui/ui-core.js"></script>') <
+        index149.indexOf('<script src="js/dev/test-console.js"></script>') &&
+      index149.indexOf('<script src="js/dev/test-console.js"></script>') <
+        index149.indexOf('<script src="js/services/api.js"></script>'),
     '149.3: index.html loads js/test-console.js as a static tag ordered after js/ui-core.js and before js/api.js'
   );
 
@@ -18304,11 +20615,87 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       !/saveState|robco_v8|localStorage\./.test(rebootFn149 + wakeFn149),
     '149.16: REBOOT resets the boot screen then replays window.runBootSequence(); WAKE → ACTIVE force-states back to ACTIVE (the undo for the IDLE/STANDBY/SHUTDOWN/OFF buttons); neither touches the campaign save (owner report fix)'
   );
+
+  // 149.17  GRACEFUL ABSENCE (Health-U7, Protocol 33): window.onload invokes the
+  //         console behind a `typeof … === 'function'` guard, NOT a bare call.
+  //         The prod deploy STRIPS js/dev/test-console.js from the published
+  //         artifact (scripts/prod-strip-devshell.mjs), so on prod
+  //         `initTestConsole` is undefined — a bare call would throw a
+  //         ReferenceError inside onload → black screen. `typeof` on an
+  //         undeclared identifier is legal JS and never throws. Locks the fix
+  //         so a future refactor can't reintroduce the bare call. (149.5 above
+  //         still passes — the guarded line still contains `initTestConsole();`.)
+  assert(
+    /if \(typeof initTestConsole === 'function'\) initTestConsole\(\);/.test(uiCore149),
+    "149.17: window.onload calls initTestConsole() behind a `typeof initTestConsole === 'function'` guard (graceful-absence on the prod build that strips the shell — never a bare call that would ReferenceError → black screen)"
+  );
+
+  // 149.18  the prod-strip mechanism exists and is wired into the prod deploy
+  //         ONLY: scripts/prod-strip-devshell.mjs is committed and deploy.yml
+  //         runs it against _site; cf-staging-build.mjs never strips, so the
+  //         Cloudflare staging build keeps the shell fully working (owner tooling).
+  {
+    const deployYml149 = readFile('.github/workflows/deploy.yml');
+    const cfStaging149 = readFile('scripts/cf-staging-build.mjs');
+    assert(
+      fs.existsSync(path.join(ROOT, 'scripts/prod-strip-devshell.mjs')) &&
+        /node scripts\/prod-strip-devshell\.mjs _site/.test(deployYml149) &&
+        !/prod-strip-devshell/.test(cfStaging149),
+      '149.18: scripts/prod-strip-devshell.mjs exists and deploy.yml runs it against _site (prod artifact only); cf-staging-build.mjs never strips (staging keeps the shell)'
+    );
+  }
+
+  // 149.19  BEHAVIORAL (Health-U7): running the strip script against a staged
+  //         copy removes the shell file + its <script> tag + its sw.js precache
+  //         entry, and leaves a self-consistent artifact — every REMAINING
+  //         precache entry still resolves to a real file (the all-or-nothing
+  //         SW-install landmine turned into a hard build gate). The script exits
+  //         non-zero on any inconsistency, so execFileSync throws if it's off.
+  {
+    const os = require('os');
+    const cp = require('child_process');
+    let ok = false;
+    let detail = '';
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'u7strip-'));
+    try {
+      // Build a realistic staged tree: an empty placeholder for every precache
+      // entry (so the script's file-existence check has a real tree to walk),
+      // then the REAL index.html + sw.js written over the top so the strip
+      // operates on genuine markup.
+      const entries = [...sw149.matchAll(/'(\.\/[^']*)'/g)].map(m => m[1]);
+      for (const entry of entries) {
+        if (entry === './') continue;
+        const p = path.join(tmp, entry.slice(2));
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, '', 'utf8');
+      }
+      fs.writeFileSync(path.join(tmp, 'index.html'), index149, 'utf8');
+      fs.writeFileSync(path.join(tmp, 'sw.js'), sw149, 'utf8');
+      cp.execFileSync('node', [path.join(ROOT, 'scripts/prod-strip-devshell.mjs'), tmp], {
+        stdio: 'pipe',
+      });
+      const strippedIndex = fs.readFileSync(path.join(tmp, 'index.html'), 'utf8');
+      const strippedSw = fs.readFileSync(path.join(tmp, 'sw.js'), 'utf8');
+      ok =
+        !fs.existsSync(path.join(tmp, 'js/dev/test-console.js')) &&
+        !/<script[^>]*src=["']js\/dev\/test-console\.js["']/.test(strippedIndex) &&
+        !/['"]\.\/js\/dev\/test-console\.js['"]/.test(strippedSw);
+    } catch (e) {
+      detail = ' — ' + (e.stderr ? e.stderr.toString() : e.message);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+    assert(
+      ok,
+      '149.19: prod-strip-devshell.mjs removes the shell file + <script> tag + sw.js precache entry from a staged copy and leaves a self-consistent artifact (no surviving executable/precache reference; every remaining precache entry resolves)' +
+        detail
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 150 — Step 2 (v2.8.0) Phase 2 A3: IDLE/STANDBY/SHUTDOWN ambient
-//  experiences (9 tests)
+//  experiences
 // ──────────────────────────────────────────────────────────────
 //  The showcase consumers of the runtime states: _wireAmbientExperiences()
 //  (ui-core.js) registers three dial-gated observers — idle-phosphor (tier
@@ -18336,8 +20723,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 150 — A3 IDLE/STANDBY/SHUTDOWN ambient experiences');
-  const uiCore150 = readFile('js/ui-core.js');
-  const css150 = readFile('css/terminal.css');
+  const uiCore150 = readGroup('ui-core');
+  const css150 = readCss();
   const wireAmbient150 = extractFunctionBody(uiCore150, '_wireAmbientExperiences');
   const exitStandbyBody150 = extractFunctionBody(uiCore150, 'exitStandby');
   const isShuttingDownBody150 = extractFunctionBody(uiCore150, '_isShuttingDown');
@@ -18403,7 +20790,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       isShuttingDownBody150
     ) &&
       /if \(_isShuttingDown\(\)\) return;[\s\S]*?playWakeTone\(\);/.test(exitStandbyBody150) &&
-      /setTimeout\(\(\) => \{\s*\n(?:\s*\/\/.*\n)*\s*if \(_isShuttingDown\(\)\) return;/.test(
+      // AI_OVERSEER Finding 7: a `_wakeTimer = null;` bookkeeping line (coalescing the
+      // delayed print) may precede the shutdown re-check inside the timer body — the
+      // shutdown guard is still the first EFFECTIVE statement, which is what matters.
+      /setTimeout\(\(\) => \{\s*\n(?:\s*(?:\/\/.*|_wakeTimer = null;)\n)*\s*if \(_isShuttingDown\(\)\) return;/.test(
         exitStandbyBody150
       ),
     "150.5: _isShuttingDown() is re-checked at each half's own fire time in exitStandby() — synchronously before playWakeTone(), and again as the first statement inside the delayed setTimeout body — so a shutdown landing either as a direct edge OR mid-window both no-op their half of the wake sequence"
@@ -18485,6 +20875,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     }
     const src150 =
       'var _standbyActive = false;\n' +
+      // AI_OVERSEER Finding 7: the wake-print coalescing handle exitStandby()/
+      // enterStandby() now reference (clearTimeout is typeof-guarded, so the sandbox
+      // needs no clearTimeout stub).
+      'var _wakeTimer = null;\n' +
       declareFn150(uiCore150, '_isShuttingDown') +
       '\n' +
       declareFn150(uiCore150, 'enterStandby') +
@@ -18587,16 +20981,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  one-off `/`/`@` override prefixes, quick-log routing (killed/caps/
 //  arrived/rep) onto existing native setters, and a TERMINAL-mode
 //  autocomplete extension of the shared registry-autocomplete singleton.
-//  18 tests
+//  151.19–151.22 (U3 slice 3 / B4) execute the four quick-log tracker
+//  handlers in a vm — kill text + _logEvent, caps mutation + #c_caps
+//  mirror + clamp, trimmed onLocationChange, fame/infamy faction adjust
+//  with the unknown-key fall-through — the mutations 151.9-11 (static)
+//  and 153.3 (spy-router) never run.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 151 — Step 2 Phase 2 B1: Command-Line MODE system');
-  const stateSrc151 = readFile('js/state.js');
-  const apiSrc151 = readFile('js/api.js');
-  const uiCoreSrc151 = readFile('js/ui-core.js');
-  const uiSavesSrc151 = readFile('js/ui-saves.js');
+  const stateSrc151 = readGroup('state');
+  const apiSrc151 = readGroup('api');
+  const uiCoreSrc151 = readGroup('ui-core');
+  const uiSavesSrc151 = readGroup('ui-saves');
   const htmlSrc151 = readFile('index.html');
-  const cssSrc151 = readFile('css/terminal.css');
+  const cssSrc151 = readCss();
 
   // 151.1  robco_input_mode is registered as a DEVICE PREFERENCE (MetaStore),
   //        never campaign state — same two-store boundary as robco_immersion.
@@ -18880,9 +21278,145 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         duplicated/hardcoded here too, which would go stale on every
   //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
+
+  // ── BEHAVIORAL (U3 slice 3 / B4) — run the REAL quick-log handlers in an isolated
+  //    vm and assert the actual state mutations + the false-return fall-through. The
+  //    static 151.9/151.10/151.11 asserts above prove the tokens/idioms are present in
+  //    SOURCE, and Suite 153.3 runs _routeQuickLogMulti against a SPY _routeQuickLog —
+  //    so no test executes the four tracker handlers themselves. A wrong caps sign, a
+  //    dropped trim, a swapped fame/infamy field, or an inverted !match guard ships
+  //    green past all of them. These execute the handlers so the mutation is checked.
+  {
+    const vmQL = require('vm');
+    function declareFnQL(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      const params = src.slice(parenIdx, braceIdx);
+      return 'function ' + name + params + extractFunctionBody(src, name);
+    }
+    const srcQL = ['_quickLogKill', '_quickLogCaps', '_quickLogLocation', '_quickLogFaction']
+      .map(n => declareFnQL(apiSrc151, n))
+      .join('\n');
+    // Build a sandbox from a spy base + per-test overrides, declare all four handlers,
+    // and return the sandbox so the test can read what mutated.
+    function makeQL(overrides) {
+      const sb = Object.assign(
+        {
+          appendToChat: () => {},
+          saveState: () => {},
+          _logEvent: () => {},
+        },
+        overrides
+      );
+      vmQL.createContext(sb);
+      vmQL.runInContext(srcQL, sb);
+      return sb;
+    }
+
+    // 151.19  _quickLogKill: singular vs counted text, real _logEvent + saveState,
+    //         and an empty target returns false WITHOUT logging (shape matched, content
+    //         didn't — the fall-through convention).
+    {
+      const logged = [];
+      let saves = 0;
+      const sb = makeQL({
+        _logEvent: (type, text) => logged.push({ type, text }),
+        saveState: () => saves++,
+      });
+      const many = sb._quickLogKill(3, 'raiders');
+      const one = sb._quickLogKill(1, 'raider');
+      const empty = sb._quickLogKill(1, '   ');
+      assert(
+        many === true &&
+          one === true &&
+          empty === false &&
+          logged.length === 2 &&
+          logged[0].type === 'kill' &&
+          logged[0].text === 'Killed 3 raiders' &&
+          logged[1].text === 'Killed raider' &&
+          saves === 2,
+        `151.19: _quickLogKill logs "Killed 3 raiders"/"Killed raider" via _logEvent+saveState and returns false (no log) on an empty target (logged ${JSON.stringify(logged.map(l => l.text))}, saves ${saves}, empty ${empty})`
+      );
+    }
+
+    // 151.20  _quickLogCaps: +delta adds and mirrors to #c_caps (the WU-N2 revert guard),
+    //         over-spend clamps at 0, and a zero delta returns false without mutating or saving.
+    //         Each run gets its OWN #c_caps element so the mirrored value is isolated.
+    {
+      let maths = 0;
+      let saves = 0;
+      function runCaps(startCaps, delta) {
+        const capsEl = { value: null };
+        const sb = makeQL({
+          state: { caps: startCaps },
+          document: { getElementById: id => (id === 'c_caps' ? capsEl : null) },
+          updateMath: () => maths++,
+          saveState: () => saves++,
+        });
+        const ret = sb._quickLogCaps(delta);
+        return { ret, caps: sb.state.caps, mirror: capsEl.value };
+      }
+      const add = runCaps(100, 50);
+      const spend = runCaps(30, -500);
+      const zero = runCaps(100, 0);
+      assert(
+        add.ret === true &&
+          add.caps === 150 &&
+          Number(add.mirror) === 150 &&
+          spend.ret === true &&
+          spend.caps === 0 &&
+          zero.ret === false &&
+          zero.caps === 100 &&
+          zero.mirror === null &&
+          maths === 2 &&
+          saves === 2,
+        `151.20: _quickLogCaps(+50) → caps 150 + #c_caps mirror 150; (−500) clamps to 0; (0) returns false and never mutates/mirrors/saves (add ${add.caps}/${add.mirror}, spend ${spend.caps}, zeroOk ${zero.ret}, saves ${saves})`
+      );
+    }
+
+    // 151.21  _quickLogLocation: routes the TRIMMED name through the shared onLocationChange
+    //         setter (owner fix: sets CURRENT location), empty input returns false, no call.
+    {
+      const located = [];
+      const sb = makeQL({ onLocationChange: loc => located.push(loc) });
+      const ok = sb._quickLogLocation('  Novac  ');
+      const empty = sb._quickLogLocation('   ');
+      assert(
+        ok === true && empty === false && located.length === 1 && located[0] === 'Novac',
+        `151.21: _quickLogLocation('  Novac  ') → onLocationChange('Novac') (trimmed, current-location setter) and returns false on empty (located ${JSON.stringify(located)}, empty ${empty})`
+      );
+    }
+
+    // 151.22  _quickLogFaction: a known key (case-insensitive) adjusts fame on 'up' /
+    //         infamy on 'down' by +5 via the shared adjustFaction; an unknown key returns
+    //         false and NEVER invents a faction (the !match guard, executed).
+    {
+      const adjusted = [];
+      const sb = makeQL({
+        getFactionRegistry: () => [{ key: 'ncr', name: 'NCR' }],
+        adjustFaction: (k, f, n) => adjusted.push({ k, f, n }),
+      });
+      const up = sb._quickLogFaction('ncr', 'up');
+      const down = sb._quickLogFaction('NCR', 'down');
+      const unknown = sb._quickLogFaction('legion', 'up');
+      assert(
+        up === true &&
+          down === true &&
+          unknown === false &&
+          adjusted.length === 2 &&
+          adjusted[0].k === 'ncr' &&
+          adjusted[0].f === 'fame' &&
+          adjusted[0].n === 5 &&
+          adjusted[1].f === 'infamy' &&
+          adjusted[1].n === 5,
+        `151.22: _quickLogFaction adjusts fame (up)/infamy (down) +5 on a known key (case-insensitive) and returns false on an unknown key without adjusting (adjusted ${JSON.stringify(adjusted)}, unknown ${unknown})`
+      );
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -18892,13 +21426,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  ONLY during SHUTDOWN/OFF via the SAME body classes the observer already
 //  toggles, recovers using legal transition() edges only (never forceState,
 //  the documented TEST-ONLY escape hatch — Suite 146.15 still guards that).
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 152 — Shutdown/OFF power-on affordance (Protocol 42 fix)');
   const htmlSrc152 = readFile('index.html');
-  const cssSrc152 = readFile('css/terminal.css');
-  const uiCoreSrc152 = readFile('js/ui-core.js');
+  const cssSrc152 = readCss();
+  const uiCoreSrc152 = readGroup('ui-core');
   const powerOnBody152 = extractFunctionBody(uiCoreSrc152, '_powerOnFromShutdown');
 
   // 152.1  #powerOnBtn is a real <button> (Protocol UI-5) with a diegetic
@@ -19050,15 +21583,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  SUITE 153 — Command-Line MODE upgrades: inline `@` ping, comma
 //  multi-action quick-log, content-aware autocomplete
 //  (Step 2 Phase 2 B1 follow-up)
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 153 — Command-Line MODE upgrades: inline @, comma multi-action, content autocomplete'
   );
-  const apiSrc153 = readFile('js/api.js');
-  const dbNvSrc153 = readFile('js/db_nv.js');
-  const dbFo3Src153 = readFile('js/db_fo3.js');
+  const apiSrc153 = readGroup('api');
+  const dbNvSrc153 = readGroup('db_nv');
+  const dbFo3Src153 = readGroup('db_fo3');
 
   // 153.1  _routeQuickLogMulti(): splits on commas, trims + drops empty
   //        segments, routes EACH through the unchanged single-segment
@@ -19330,8 +21862,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        there per the rotation pattern documented at 151.18; kept generic
   //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
 }
 
@@ -19343,7 +21875,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  stored device prefs; every control still calls the setter it always
 //  called (Protocol 22/23) — zero new campaign state, zero AI involvement.
 //  The 13 SLOT-02 audio channels stay in their CURRENT (un-flipped) polarity
-//  this unit — B2b converts them to DIP chips. 37 tests (154.24-154.33 add the
+//  this unit — B2b converts them to DIP chips. (154.24-154.33 add the
 //  WU-optics-picker GREEN FAMILY phosphor-tube-picker redesign coverage; 154.34-
 //  154.37 add the owner post-ship audit's anode-nib/ghost-peek/compact-tag fixes,
 //  including the (DEFAULT) marker's own matching corner-chip treatment).
@@ -19351,11 +21883,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 154 — Step 2 Phase 2 B2a: Module Bay core reframe');
   const html154 = readFile('index.html');
-  const core154 = readFile('js/ui-core.js');
-  const audio154 = readFile('js/ui-audio.js');
-  const state154 = readFile('js/state.js');
-  const css154 = readFile('css/terminal.css');
-  const claude154 = readFile('CLAUDE.md');
+  const core154 = readGroup('ui-core');
+  const audio154 = readGroup('ui-audio');
+  const state154 = readGroup('state');
+  const css154 = readCss();
+  const claude154 = readRulebook();
 
   // 154.1  the bay chrome + all 6 SLOT sub-panels are present, each a real
   //        sub-panel (data-sub-id) defaulting OPEN on first boot (owner decision)
@@ -19619,11 +22151,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 154.18  Protocol 25 sanctioned-exception clause + the UI-1 clarification are
-  //         both recorded in CLAUDE.md (this reframe's own authorization + guardrails)
+  //         both recorded in the rulebook (this reframe's own authorization + guardrails)
   assert(
     /Sanctioned exception — owner-approved redesigns/.test(claude154) &&
       /internal headings use the sub-panel/.test(claude154),
-    '154.18: CLAUDE.md records the Protocol 25 sanctioned-exception clause and the Protocol UI-1 sub-panel-heading clarification'
+    '154.18: the rulebook (CLAUDE.md + rules/*.md) records the Protocol 25 sanctioned-exception clause and the Protocol UI-1 sub-panel-heading clarification'
   );
 
   // 154.19  Protocol 42 fix (found during this unit's gate render-check): the
@@ -19699,7 +22231,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   const uplinkStatusFn154 = (audio154.match(
     /function _updateUplinkBoardStatus\(\)[\s\S]*?\n\}/
   ) || [''])[0];
-  const apiSrc154 = readFile('js/api.js');
+  const apiSrc154 = readGroup('api');
   assert(
     /<p class="board-status alert" id="uplinkStatus">/.test(html154) &&
       /robco_gemini_validated_key/.test(state154) &&
@@ -19890,16 +22422,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  labels, Schematic View text clipping, SVC-tray centering, and a new
 //  reload-persistence pref for the Bay/Schematic view choice. One-truth model
 //  preserved throughout — every reskinned control still calls the exact
-//  setter it always called; zero forked persistence paths. 16 tests.
+//  setter it always called; zero forked persistence paths.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 155 — Step 2 Phase 2 B2b: Module Bay visual fidelity + fixes');
   const html155 = readFile('index.html');
-  const core155 = readFile('js/ui-core.js');
-  const state155 = readFile('js/state.js');
-  const css155 = readFile('css/terminal.css');
-  const claude155 = readFile('CLAUDE.md');
-  const rules155 = readFile('RULES.md');
+  const core155 = readGroup('ui-core');
+  const state155 = readGroup('state');
+  const css155 = readCss();
+  const claude155 = readRulebook();
 
   // 155.1  the chassis subheader from the mockup's bay-head row is present
   assert(
@@ -20096,27 +22627,28 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   );
 
   // 155.16  the reload-persistence standing rule + the Protocol 2a wording fix
-  //         are both recorded in the docs this unit touches
+  //         are both recorded in the docs this unit touches.
+  //         R3: the RULES.md half of the stale-sentence check is dropped —
+  //         the file is deleted, so the sentence cannot live there any more.
   assert(
     /everything remembers on reload/i.test(claude155) &&
-      !/the files are kept identical for protocol sections/.test(claude155) &&
-      !/the files are kept identical for protocol sections/.test(rules155),
-    '155.16: CLAUDE.md records the new reload-persistence standing rule, and the stale "RULES.md and CLAUDE.md are kept identical" sentence is corrected'
+      !/the files are kept identical for protocol sections/.test(claude155),
+    '155.16: the rulebook records the new reload-persistence standing rule, and the stale "kept identical" twin-rulebook sentence is gone'
   );
 }
 
 // ══════════════════════════════════════════════════════════════
 //  SUITE 156 — Step 2 (v2.8.0) Phase 2 B2c: Module Bay refinements —
 //  master-mute shows all chips pulled, draggable Immersion dial, install/
-//  eject SFX. Two owner bug/request fixes + the Module Bay's SFX unit. 16 tests.
+//  eject SFX. Two owner bug/request fixes + the Module Bay's SFX unit.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 156 — Step 2 Phase 2 B2c: Module Bay refinements + hardware SFX');
   const html156 = readFile('index.html');
-  const core156 = readFile('js/ui-core.js');
-  const audio156 = readFile('js/ui-audio.js');
-  const state156 = readFile('js/state.js');
-  const css156 = readFile('css/terminal.css');
+  const core156 = readGroup('ui-core');
+  const audio156 = readGroup('ui-audio');
+  const state156 = readGroup('state');
+  const css156 = readCss();
   const arch156 = readFile('ARCHITECTURE.md');
 
   // 156.1  FIX 1: #chipGrid id is present on the 13-chip grid so JS can target
@@ -20321,13 +22853,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  onGameContextChange()), the designOnly guards in onGameContextChange() and
 //  wipeTerminal()'s context-list loop, and the save-boundary (no
 //  saveState()/robco_v8 write anywhere in the DO-K additions — pure data + one
-//  attribute set, Protocol 26). 24 tests.
+//  attribute set, Protocol 26).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 157 — DO-K: identity keystone (GAME_DEFS.identity + data-game)');
 
   const html157 = readFile('index.html');
-  const core157 = readFile('js/ui-core.js');
+  const core157 = readGroup('ui-core');
 
   const vm157 = require('vm');
   let h157 = null;
@@ -20545,10 +23077,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 157.19  APP_VERSION is the released version (bumped at the v2.8.0 dev→release cut; Protocol 2)
+  // 157.19  APP_VERSION is the released version (bumped at the v2.8.5 dev→release cut; Protocol 2)
   assert(
-    /APP_VERSION\s*=\s*'2\.8\.0'/.test(stateSource),
-    '157.19: APP_VERSION is 2.8.0 (released this version)'
+    /APP_VERSION\s*=\s*'2\.8\.5'/.test(stateSource),
+    '157.19: APP_VERSION is 2.8.5 (released this version)'
   );
 }
 
@@ -20574,11 +23106,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  158.33-158.34 (all 7 keycaps share one fixed width via --navkey-w,
 //  with the label font shrunk to fit the longest labels at that width;
 //  desktop scales both up inside the existing hover+fine gate).
-//  39 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 158 — DO-N: bezel chrome + subsystem nav');
-  const cssSource158 = readFile('css/terminal.css');
+  const cssSource158 = readCss();
 
   // 158.1  every navkey exists with its id + hotkey label
   guards(htmlSource, [
@@ -20724,8 +23255,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+'/.test(swSource),
-    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
 
   // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
@@ -20942,11 +23473,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  phosphor rack both move to the reusable flex+wrap+justify-content:center pattern
 //  this app already established for .bay-tools, and the SAVE/cloud-sync button row
 //  gets the same treatment.
-//  2 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 159 — Owner bug-fix batch: eventLog live-render + centering rule');
-  const cssSource159 = readFile('css/terminal.css');
+  const cssSource159 = readCss();
   const logEventFn159 = (stateSource.match(/function _logEvent\(type, text\)[\s\S]*?\n\}/) || [
     '',
   ])[0];
@@ -20995,11 +23525,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  actual (responsive) width evenly, leaving a stray thin partial pin at
 //  the end — background-repeat:round rescales the tile so a whole number
 //  of pins always fits.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 160 — Owner audit: bezel bottom placement + stray-pin cleanup');
-  const cssSource160 = readFile('css/terminal.css');
+  const cssSource160 = readCss();
 
   // 160.1  the nav-cluster never wraps its own 5 tabs independently — the whole
   //        strip shrinks together instead of orphaning a key onto its own line
@@ -21071,16 +23600,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  SAVE_HELP gains it plus an OVERWRITE entry; (4) the Module Bay's view-once
 //  hatch ceremony had no way to replay for testing — a REPLAY HATCH button in the
 //  (still gated/inert) Test Console resets the exact same robco_bay_opened
-//  MetaStore key releaseBayHatch() sets. 10 tests
+//  MetaStore key releaseBayHatch() sets.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 161 — Owner batch: saves OVERWRITE + live-update sweep + save-help + hatch replay');
-  const uiAcct161 = readFile('js/ui-account.js');
-  const uiSaves161 = readFile('js/ui-saves.js');
-  const cloud161 = readFile('js/cloud.js');
-  const uiCore161 = readFile('js/ui-core.js');
+  const uiAcct161 = readGroup('ui-account');
+  const uiSaves161 = readGroup('ui-saves');
+  const cloud161 = readGroup('cloud');
+  const uiCore161 = readGroup('ui-core');
   const html161 = readFile('index.html');
-  const testConsole161 = readFile('js/test-console.js');
+  const testConsole161 = readGroup('test-console');
 
   // Assignment-form extractor (`window.X = async function (...) { ... }`) —
   // extractFunctionBody()'s `function <name>` search can't find these (Suite 137
@@ -21152,7 +23681,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        the only path that refreshed the list; a save itself never did)
   {
     const body = extractFunctionBody(uiSaves161, 'saveToSlot');
-    const okIdx = body.indexOf('if (ok) {');
+    // SAVE_LAYER3: the success check is `if (res && res.ok)` — _coldWriteObj
+    // now returns a divergence-honest object, never a bare boolean.
+    const okIdx = body.indexOf('if (res && res.ok) {');
     const renderIdx = body.indexOf('renderSavesList();');
     assert(
       okIdx !== -1 && renderIdx !== -1 && renderIdx > okIdx,
@@ -21272,7 +23803,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  textarea auto-grows from a small placeholder-fit size up to a cap instead
 //  of a fixed-height box, resets to small after every send, and the mode
 //  pill's touch-sticky hover fill is neutralized (gated back in for real
-//  hover-capable pointers only) with a blur() second line of defense. 31 tests.
+//  hover-capable pointers only) with a blur() second line of defense.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 162 — DO-O: the living Overseer (DIRECTOR UPLINK)');
@@ -21852,15 +24383,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  degrading to SHOW (never hide) a save with no recorded gameContext; (4) the
 //  row's growing button set could clip at 360/412px — rows moved from inline
 //  styles to .save-row/.save-row-actions CSS classes, with flex-wrap letting
-//  buttons wrap onto their own line instead of overflowing. 15 tests
+//  buttons wrap onto their own line instead of overflowing. 15 static tests +
+//  3 behavioral (163.16–163.18, U3 slice 6): the cloud OVERWRITE/DELETE
+//  destructive-op ORDER proven at runtime (archive-before-overwrite that
+//  captures the prior contents; purge-versions-before-parent-delete).
+
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 163 — Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter'
   );
-  const uiSaves163 = readFile('js/ui-saves.js');
-  const uiAcct163 = readFile('js/ui-account.js');
-  const cloud163 = readFile('js/cloud.js');
+  const uiSaves163 = readGroup('ui-saves');
+  const uiAcct163 = readGroup('ui-account');
+  const cloud163 = readGroup('cloud');
 
   // Assignment-form extractor (`window.X = async function (...) { ... }`) —
   // re-declared locally per the Suite 137/161 block-scoped precedent.
@@ -22097,13 +24632,174 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         a case-by-case inline style on a specific control, like the
   //         signed-out hint line, is untouched and out of scope here)
   {
+    // SAVE_LAYER3 added a third row template (the QUARANTINED RECORD fault
+    // row) built from the same structural classes — 3 of each, still zero
+    // per-row inline layout styles.
     assert(
-      (uiAcct163.match(/class="save-row"/g) || []).length === 2 &&
-        (uiAcct163.match(/class="save-row-label"/g) || []).length === 2 &&
-        (uiAcct163.match(/class="save-row-actions"/g) || []).length === 2,
-      '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for BOTH the local-slot and cloud-save row templates — no separate inline-styled layout left behind for either'
+      (uiAcct163.match(/class="save-row"/g) || []).length === 3 &&
+        (uiAcct163.match(/class="save-row-label"/g) || []).length === 3 &&
+        (uiAcct163.match(/class="save-row-actions"/g) || []).length === 3,
+      '163.15: renderSavesList() uses .save-row/.save-row-label/.save-row-actions for ALL of the local-slot, cloud-save, and quarantined-record row templates — no separate inline-styled layout left behind for any'
     );
   }
+
+  // ── 163.7 / 163.8 BEHAVIORAL — destructive-op call ORDER at runtime (U3 slice 6)
+  // 163.7 and 163.8 above assert the Protocol-34 ordering via indexOf() over the
+  // function SOURCE ("_pushCloudSaveVersion appears before updateDoc") — which a
+  // reordered call, a stray earlier mention, or a comment can spoof, and which
+  // never proves the archive captured the PRIOR contents. These run the REAL
+  // cloud.js functions (async) in a vm with the firestore primitives stubbed to
+  // record the actual call order (mirrors Suite 46.14's extract-into-vm pattern +
+  // Suite 137's _pendingAsync deferral), proving the data-safety invariant at
+  // runtime: a cloud OVERWRITE archives the prior save BEFORE it replaces it AND
+  // the archive captures the about-to-be-lost contents, and a cloud DELETE purges
+  // every retained version BEFORE deleting the parent doc. (163.12's per-game
+  // renderSavesList() filter needs a real DOM render harness or a source
+  // extraction of the inline predicate — a served-file change — so it is deferred
+  // to a render-harness slice; its verbatim-filter static guard above stands.)
+  _pendingAsync.push(
+    (async () => {
+      const vm163b = require('vm');
+      // _pushCloudSaveVersion is a plain `async function`; overwrite/delete are
+      // `window.X = async function` assignment forms (extractWindowFnBody163).
+      const pushVersionBody163 = extractFunctionBody(cloud163, '_pushCloudSaveVersion');
+      const overwriteBody163 = extractWindowFnBody163(cloud163, 'overwriteCloudSave');
+      const deleteBody163 = extractWindowFnBody163(cloud163, 'deleteCloudSave');
+
+      function buildCloudSandbox163(calls, existingData, listVersions) {
+        let vid = 0;
+        const sb = {
+          console: { warn() {}, log() {}, error() {} },
+          _currentUid: 'uid1',
+          _currentUser: { isAnonymous: false },
+          db: {},
+          CLOUD_SLOT_VERSION_CAP: 5,
+          confirmAction: async () => true,
+          doc: (...a) => ({ __path: a.slice(1).join('/') }),
+          collection: (...a) => ({ __path: a.slice(1).join('/') }),
+          getDoc: async () => ({ exists: () => true, data: () => existingData }),
+          addDoc: async (col, data) => {
+            calls.push({ op: 'addDoc', path: col.__path, robco_v8: data.robco_v8 });
+            return { id: 'v' + ++vid };
+          },
+          getDocs: async () => ({ forEach() {} }),
+          deleteDoc: async ref => {
+            calls.push({ op: 'deleteDoc', path: ref.__path });
+          },
+          updateDoc: async (ref, data) => {
+            calls.push({ op: 'updateDoc', path: ref.__path, versionCount: data.versionCount });
+          },
+          _buildSavePayload: () => ({
+            label: 'My Save',
+            gameContext: 'FNV',
+            contentHash: 'h',
+            robco_v8: { campaigns: { FNV: { caps: 1 } } },
+            chat: [],
+            playstyle: 'any',
+          }),
+          localStorage: { setItem() {} },
+          openModal: () => {},
+          playSyncTone: () => {},
+        };
+        sb.window = {
+          isFeatureEnabled: () => true,
+          renderSavesList: () => {},
+          RobcoEvents: { emit() {} },
+          APP_VERSION: '2.8.0',
+          listCloudSaveVersions: async () => listVersions || [],
+        };
+        return sb;
+      }
+
+      let over163 = null;
+      let del163 = null;
+      let err163 = null;
+      try {
+        // 163.7 — overwriteCloudSave archives the PRIOR contents before overwriting
+        {
+          const calls = [];
+          const existingData = {
+            label: 'My Save',
+            robco_v8: { campaigns: { FNV: { caps: 999 } } }, // PRIOR (about-to-be-replaced) save
+            chat: [],
+            playstyle: 'any',
+            versionCount: 2,
+            savedAt: 1,
+            version: '2.7.0',
+            contentHash: 'old',
+          };
+          const sb = buildCloudSandbox163(calls, existingData, null);
+          vm163b.createContext(sb);
+          vm163b.runInContext(
+            'async function _pushCloudSaveVersion(docId, priorData) ' +
+              pushVersionBody163 +
+              '\nasync function overwriteCloudSave(docId) ' +
+              overwriteBody163 +
+              '\nwindow.__run = overwriteCloudSave;',
+            sb
+          );
+          await sb.window.__run('doc123');
+          over163 = {
+            calls,
+            iAdd: calls.findIndex(c => c.op === 'addDoc'),
+            iUpd: calls.findIndex(c => c.op === 'updateDoc'),
+          };
+        }
+        // 163.8 — deleteCloudSave purges every retained version before parent delete
+        {
+          const calls = [];
+          const sb = buildCloudSandbox163(calls, null, [{ id: 'v1' }, { id: 'v2' }]);
+          vm163b.createContext(sb);
+          vm163b.runInContext(
+            'async function deleteCloudSave(docId) ' +
+              deleteBody163 +
+              '\nwindow.__run = deleteCloudSave;',
+            sb
+          );
+          await sb.window.__run('doc123');
+          del163 = { calls };
+        }
+      } catch (e) {
+        err163 = e;
+      }
+
+      // Self-announce the header (a deferred proof — _pendingAsync holds proofs
+      // from several suites and can resolve in any order; Suite 137 precedent).
+      header(
+        'Suite 163 — Owner batch: SAVES LIST local DELETE + cloud VERSION HISTORY + per-game filter'
+      );
+      assert(
+        !!over163 &&
+          over163.iAdd !== -1 &&
+          over163.iUpd !== -1 &&
+          over163.iAdd < over163.iUpd &&
+          over163.calls[over163.iAdd].robco_v8.campaigns.FNV.caps === 999,
+        '163.16 [behavioral]: overwriteCloudSave() archives the PRIOR save (caps 999) via addDoc BEFORE updateDoc replaces it — the archive both runs first AND captures the about-to-be-lost data (Protocol 34 archive-before-overwrite, proven at runtime not by source order)' +
+          (err163 ? ' — ' + err163.message : '')
+      );
+      assert(
+        !!over163 && typeof over163.calls[over163.iUpd].versionCount === 'number',
+        '163.17 [behavioral]: overwriteCloudSave() stamps a numeric versionCount onto the SAME updateDoc write (the VER button reads it later with no extra fetch)'
+      );
+      assert(
+        !!del163 &&
+          (() => {
+            const verDels = del163.calls.filter(
+              c => c.op === 'deleteDoc' && /\/versions\//.test(c.path)
+            );
+            const lastVer = del163.calls.reduce(
+              (acc, c, i) => (c.op === 'deleteDoc' && /\/versions\//.test(c.path) ? i : acc),
+              -1
+            );
+            const parent = del163.calls.findIndex(
+              c => c.op === 'deleteDoc' && !/\/versions\//.test(c.path)
+            );
+            return verDels.length === 2 && lastVer !== -1 && parent !== -1 && lastVer < parent;
+          })(),
+        '163.18 [behavioral]: deleteCloudSave() deletes BOTH retained version docs BEFORE deleting the parent save doc — no version is orphaned (Protocol 34 purge-before-parent-delete, proven at runtime)'
+      );
+    })()
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -22257,7 +24953,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       };
       vm164.createContext(sandbox164b);
       vm164.runInContext(stateSource, sandbox164b);
-      vm164.runInContext(readFile('js/reg_nv.js'), sandbox164b);
+      vm164.runInContext(readGroup('reg_nv'), sandbox164b);
       const autoImportBody164 =
         'function autoImportState(jsonString)' + extractFunctionBody(apiSource, 'autoImportState');
       vm164.runInContext(
@@ -22532,7 +25228,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  system (Protocol 22): AmbientRuntime.shutdown(), selectSubsystem(),
 //  showErrorLog(), and the Overseer's own _overseerRestState/
 //  _overseerRestSignals connection signal.
-//  30 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 165 — Functional casing lamps + Overseer routing + VITALS strip');
@@ -22781,7 +25476,6 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 166 — Casing/layout polish batch (owner-reported): the big purple
 //  frame outline removed, per-subsystem scroll-position memory added, and
 //  the Module Bay's BACKPLANE BUS header centered.
-//  17 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 166 — Casing/layout polish batch (outline, scroll memory, header centering)');
@@ -22844,10 +25538,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       return (
         /document\.querySelector\('\.panel\.chat-panel'\)/.test(body) &&
         /\(min-width: 1000px\) and \(hover: hover\) and \(pointer: fine\)/.test(body) &&
-        /document\.getElementById\('uiPanel'\)/.test(body)
+        /document\.getElementById\('uiPanel'\)/.test(body) &&
+        // Flat mobile view: the bounded #fo3BoardScroll internal scroller (the
+        // bottom-dock occlusion fix) gated on the (max-width:999.98px) shell
+        // media query — not window, so the map + scroll memory follow it.
+        /document\.getElementById\('fo3BoardScroll'\)/.test(body) &&
+        /\(max-width: 999\.98px\)/.test(body)
       );
     })(),
-    '166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint) and every other subsystem to #uiPanel gated by the SAME desktop matchMedia query used elsewhere (no drifted second breakpoint definition)'
+    '166.5f: _scrollElFor() maps UPLINK to .panel.chat-panel (every breakpoint), desktop/FO3-landscape to #uiPanel via their gated matchMedia queries, and the flat mobile view to the bounded #fo3BoardScroll scroller gated on the (max-width:999.98px) shell query (no drifted second breakpoint definition)'
   );
 
   // 166.6  switchTab() saves the outgoing subsystem's scroll BEFORE toggling
@@ -22959,11 +25658,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '\n' +
       declareFn166(uiSource, '_saveOutgoingScroll');
 
-    function makeSandbox166(desktop) {
+    function makeSandbox166(desktop, identity, landscape) {
       const store = {};
       const uiPanelEl = { scrollTop: 0 };
       const chatPanelEl = { scrollTop: 0 };
-      const st = { desktop: desktop !== false, scrollY: 0 };
+      const fo3BoardScrollEl = { scrollTop: 0 };
+      const st = { desktop: desktop !== false, landscape: landscape === true, scrollY: 0 };
       const sb = {
         MetaStore: {
           get(k) {
@@ -22978,11 +25678,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
             return sel === '.panel.chat-panel' ? chatPanelEl : null;
           },
           getElementById(id) {
-            return id === 'uiPanel' ? uiPanelEl : null;
+            return id === 'uiPanel' ? uiPanelEl : id === 'fo3BoardScroll' ? fo3BoardScrollEl : null;
           },
         },
         window: {
-          matchMedia() {
+          // _scrollElFor() probes THREE distinct media queries: the desktop
+          // pointer/hover query, the orientation:landscape query, and (for the
+          // flat mobile bottom-dock-occlusion shell) a (max-width:999.98px)
+          // query. The stub tells them apart — orientation → landscape flag,
+          // max-width → the negation of the desktop-width flag (mobile width),
+          // everything else → the desktop flag — so each branch is exercised
+          // independently.
+          matchMedia(q) {
+            if (/orientation/.test(q)) return { matches: st.landscape };
+            if (/max-width/.test(q)) return { matches: !st.desktop };
             return { matches: st.desktop };
           },
           get scrollY() {
@@ -22992,11 +25701,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
             st.scrollY = y;
           },
         },
+        // getIdentity() default (NV-shaped, no orientation key) so every
+        // pre-existing 166.x expectation is unaffected unless a test
+        // explicitly passes an FO3-shaped identity.
+        getIdentity() {
+          return identity || {};
+        },
         _lastScrollSubsystem: null,
       };
       vm166.createContext(sb);
       vm166.runInContext(src166, sb);
-      return { sb, store, uiPanelEl, chatPanelEl, st };
+      return { sb, store, uiPanelEl, chatPanelEl, fo3BoardScrollEl, st };
     }
 
     let r166 = null,
@@ -23046,15 +25761,20 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           restored === true && chatPanelEl.scrollTop === 400 && uiPanelEl.scrollTop === 111;
       }
 
-      // 166.15 mobile (no desktop match) uses window.scrollY/scrollTo instead
-      //        of #uiPanel for a tab-gated subsystem
+      // 166.15 flat mobile view (no desktop, no landscape shell) uses the
+      //        bounded #fo3BoardScroll internal scroller (the bottom-dock
+      //        occlusion fix, css/10-chrome.css) for a tab-gated subsystem —
+      //        NOT window.scrollY, which no longer scrolls once the flat view
+      //        is a bounded app-shell. window is left untouched.
       {
-        const { sb, st } = makeSandbox166(false);
-        st.scrollY = 333;
+        const { sb, st, fo3BoardScrollEl } = makeSandbox166(false);
+        fo3BoardScrollEl.scrollTop = 333;
+        st.scrollY = 999; // must NOT be read/written on the flat mobile path
         sb._saveScrollFor('databank');
-        st.scrollY = 0;
+        fo3BoardScrollEl.scrollTop = 0;
         const restored = sb._restoreScrollFor('databank', true);
-        r166.mobileWindowScroll = restored === true && st.scrollY === 333;
+        r166.mobileFlatScroll =
+          restored === true && fo3BoardScrollEl.scrollTop === 333 && st.scrollY === 999;
       }
 
       // 166.16 _saveOutgoingScroll() is a no-op boot-safe guard when nothing
@@ -23076,6 +25796,50 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
           restored === false &&
           uiPanelEl.scrollTop === 42 &&
           !Object.prototype.hasOwnProperty.call(store, 'robco_scroll_positions');
+      }
+
+      // 166.18 FO3 PIP-BOY BUILD U2 owner-feedback pass: on a mobile-width
+      //        breakpoint (not desktop pointer capability) with
+      //        identity.orientation === 'landscape-primary' AND the
+      //        orientation:landscape media query matching, #uiPanel is the
+      //        scroll target (the FO3 landscape shell's own bounded,
+      //        internally-scrolling region — css/60-fo3-pipboy.css section
+      //        A) — the same #uiPanel round-trip as the desktop branch, but
+      //        reached via identity data instead of a hover/pointer probe.
+      //        A plain NV-shaped identity (no orientation key) still falls
+      //        back to window.scrollY (166.15) even at the same mobile
+      //        width — proving this is data-gated, not orientation-gated
+      //        alone.
+      {
+        const { sb, uiPanelEl } = makeSandbox166(false, { orientation: 'landscape-primary' }, true);
+        uiPanelEl.scrollTop = 77;
+        sb._saveScrollFor('operator');
+        uiPanelEl.scrollTop = 0;
+        const restored = sb._restoreScrollFor('operator', true);
+        r166.fo3LandscapeShellUsesUiPanel = restored === true && uiPanelEl.scrollTop === 77;
+      }
+
+      // 166.19 the SAME mobile width + landscape orientation, but WITHOUT
+      //        identity.orientation (a plain NV-shaped identity) does NOT use
+      //        the FO3 landscape shell's #uiPanel — it uses the flat mobile
+      //        #fo3BoardScroll scroller (any <1000px width is the flat shell,
+      //        regardless of orientation, unless the identity opts into the
+      //        landscape shell). Proves 166.18 is gated on the identity DATA,
+      //        not on the orientation media query alone (Protocol 38): FO3
+      //        landscape → #uiPanel, NV → #fo3BoardScroll.
+      {
+        const { sb, st, uiPanelEl, fo3BoardScrollEl } = makeSandbox166(false, {}, true);
+        fo3BoardScrollEl.scrollTop = 88;
+        uiPanelEl.scrollTop = 555; // the FO3-landscape target — must stay untouched for NV
+        st.scrollY = 999; // window — must stay untouched too
+        sb._saveScrollFor('operator');
+        fo3BoardScrollEl.scrollTop = 0;
+        const restored = sb._restoreScrollFor('operator', true);
+        r166.landscapeNvUsesFlatScroll =
+          restored === true &&
+          fo3BoardScrollEl.scrollTop === 88 &&
+          uiPanelEl.scrollTop === 555 &&
+          st.scrollY === 999;
       }
     } catch (e) {
       err166 = e;
@@ -23099,8 +25863,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       "166.14: [behavioral] UPLINK's .panel.chat-panel scroll offset round-trips independently of #uiPanel"
     );
     assert(
-      err166 === null && r166 && r166.mobileWindowScroll === true,
-      '166.15: [behavioral] on a mobile (non-desktop) breakpoint, scroll memory reads/writes window.scrollY/scrollTo instead of #uiPanel'
+      err166 === null && r166 && r166.mobileFlatScroll === true,
+      '166.15: [behavioral] on the flat mobile view, scroll memory reads/writes the bounded #fo3BoardScroll internal scroller (the bottom-dock occlusion fix) instead of window.scrollY — and leaves window untouched'
     );
     assert(
       err166 === null && r166 && r166.bootSafeNoop === true,
@@ -23109,6 +25873,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       err166 === null && r166 && r166.invalidSubsystemGuard === true,
       '166.17: [behavioral] an unrecognized subsystem name is ignored by both _saveScrollFor() and _restoreScrollFor() (NAV_KEYS guard)'
+    );
+    assert(
+      err166 === null && r166 && r166.fo3LandscapeShellUsesUiPanel === true,
+      "166.18: [behavioral, FO3 PIP-BOY BUILD U2 owner-feedback pass] at a mobile width with identity.orientation === 'landscape-primary' AND orientation:landscape matching, #uiPanel (not window.scrollY) is the scroll target — the FO3 landscape shell's own bounded, internally-scrolling region"
+    );
+    assert(
+      err166 === null && r166 && r166.landscapeNvUsesFlatScroll === true,
+      '166.19: [behavioral] the SAME mobile-width landscape orientation with a plain NV-shaped identity (no orientation key) uses the flat mobile #fo3BoardScroll scroller, NOT the FO3 landscape shell #uiPanel — 166.18 is gated on identity data, never orientation alone (Protocol 38)'
     );
   }
 }
@@ -23122,14 +25894,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  display-only OVERSEER tag on AI-sourced transcript lines, mirroring the
 //  existing [TERM] quick-log text tag, so a shared transcript still shows at
 //  a glance which side produced each line.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 167 — [CROSSROADS] command retirement + OVERSEER transcript tag');
-  const api167 = readFile('js/api.js');
-  const uiCore167 = readFile('js/ui-core.js');
+  const api167 = readGroup('api');
+  const uiCore167 = readGroup('ui-core');
   const html167 = readFile('index.html');
-  const css167 = readFile('css/terminal.css');
+  const css167 = readCss();
   const registry167 = (uiCore167.match(/const COMMAND_REGISTRY = \[([\s\S]*?)\n\];/) || [
     '',
     '',
@@ -23217,15 +25988,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  TERMLINK is removed ENTIRELY: the router entries, the console (manifest + launcher
 //  + renderer), the COMMAND_REGISTRY entry, and the console CSS. BIO-SCAN and the Tool
 //  Deck are independent of TERMLINK and are proven untouched by this batch.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 168 — TERMLINK Command Console fully retired');
-  const api168 = readFile('js/api.js');
-  const uiCore168 = readFile('js/ui-core.js');
-  const uiRender168 = readFile('js/ui-render.js');
+  const api168 = readGroup('api');
+  const uiCore168 = readGroup('ui-core');
+  const uiRender168 = readGroup('ui-render');
   const html168 = readFile('index.html');
-  const css168 = readFile('css/terminal.css');
+  const css168 = readCss();
   const router168 = (api168.match(/const NATIVE_COMMAND_ROUTER = \{([\s\S]*?)\n\};/) || [
     '',
     '',
@@ -23323,13 +26093,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  same _scopeShouldAnimate() reduced-motion/dial/hidden/standby check every
 //  other scope motion already obeys, never a bespoke carve-out — and never
 //  writes any campaign state.
-//  12 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 169 — transcript cleanup + composer autocomplete drop-up + scope pulse');
-  const uiCore169 = readFile('js/ui-core.js');
-  const uiSaves169 = readFile('js/ui-saves.js');
-  const css169 = readFile('css/terminal.css');
+  const uiCore169 = readGroup('ui-core');
+  const uiSaves169 = readGroup('ui-saves');
+  const css169 = readCss();
   const appendBody169 = extractFunctionBody(uiCore169, 'appendToChat');
 
   // 169.1  appendToChat() adds a symmetric 'msg-tag--terminal' tag reading
@@ -23479,9 +26248,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 170 — Owner batch: CRT hum follows power state + scanline contained in screen');
-  const uiAudio170 = readFile('js/ui-audio.js');
-  const uiCore170 = readFile('js/ui-core.js');
-  const css170 = readFile('css/terminal.css');
+  const uiAudio170 = readGroup('ui-audio');
+  const uiCore170 = readGroup('ui-core');
+  const css170 = readCss();
   const html170 = readFile('index.html');
 
   // 170.1  stopCrtHum() exists and fully tears down the hum's audio graph
@@ -23589,8 +26358,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 171 — WIPE TERMINAL dialog: one cancel + Complete RNG lock warning');
-  const uiCore171 = readFile('js/ui-core.js');
-  const css171 = readFile('css/terminal.css');
+  const uiCore171 = readGroup('ui-core');
+  const css171 = readCss();
 
   // 171.1  openModal() supports hideCloseBtn, toggling a .confirm-mode class
   //        on .modal-box — the same class-toggle idiom the pre-existing
@@ -23705,11 +26474,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // (renderModuleBay()) instead of popping the ceremony. A genuine post-boot
 // user click (flag already false) still runs initModuleBay() normally.
 //
-// 2 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 172 — Boot-restore must never re-trigger the Module Bay hatch');
-  const uiCore172 = readFile('js/ui-core.js');
+  const uiCore172 = readGroup('ui-core');
   const wirePanelBody172 = extractFunctionBody(uiCore172, '_wirePanelPersistence');
 
   // 172.1  Structural guard: the flag is declared before the restore loop,
@@ -23732,8 +26500,17 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         resetIdx172 > checkIdx172 &&
         /setTimeout\(\(\) => \{\s*_restoringPanels = false;/.test(wirePanelBody172) &&
         /MetaStore\.set\('robco_bay_opened', 'true'\)/.test(wirePanelBody172) &&
-        /if \(typeof renderModuleBay === 'function'\) renderModuleBay\(\);/.test(wirePanelBody172),
-      '172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop — marking robco_bay_opened + syncing content via renderModuleBay() while restoring'
+        // AMENDED at 2.8.5 item 6. This clause used to require the restore
+        // branch to sync via a bare `renderModuleBay()` — which, it turned out,
+        // was asserting the DEFECT: renderModuleBay() never reads
+        // robco_bay_view, so the persisted Bay/Schematic choice was silently
+        // dropped on every reload (see 241.13 for the full mechanism). The
+        // branch now routes through the shared _applyBayView(), which calls
+        // renderModuleBay() itself on the 'bay' branch — so the syncing this
+        // test was written to guarantee still happens, for the 'bay' case
+        // byte-identically, and the view choice is honoured as well.
+        /_applyBayView\(/.test(wirePanelBody172),
+      '172.1: _restoringPanels is declared before the restore loop, checked in the securityConfigPanel toggle branch, and reset via a deferred setTimeout after the loop — marking robco_bay_opened + syncing content through the shared _applyBayView() while restoring'
     );
   }
 
@@ -23909,12 +26686,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // "[Sunday, 10.19.81, 12:00 AM]" instead of "[T0]". The underlying ev.t data
 // is untouched; only the display changed.
 //
-// 8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 173 — Owner batch: native LEVEL UP control + readable event-log timestamps');
-  const uiCore173 = readFile('js/ui-core.js');
-  const uiRender173 = readFile('js/ui-render.js');
+  const uiCore173 = readGroup('ui-core');
+  const uiRender173 = readGroup('ui-render');
 
   // 173.1  index.html: #btnLevelUp is a real <button> (Protocol UI-5), starts
   //        disabled (no XP banked yet on a fresh campaign), and carries a
@@ -23953,20 +26729,26 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press,
-  //        clamped at MAX_PLAYER_LEVEL, and emits the SAME 'level.up'
-  //        RobcoEvents the AI-driven autoImportState() path uses (api.js) —
-  //        reused, not forked.
+  // 173.4  nativeLevelUp() increments state.lvl by exactly +1 per press, clamped
+  //        at MAX_PLAYER_LEVEL, and emits 'level.up'.
+  //
+  //        UPDATED 2026-07-20 (level ownership → the player): this test used to
+  //        ALSO require autoImportState()'s body to emit 'level.up', on the
+  //        Protocol 22 "same event, not forked" reasoning. That coupling is now
+  //        inverted — the import path must NOT emit it, because it no longer
+  //        changes the level, and emitting a level.up the player never earned
+  //        would fire the jingle, the haptic and the campaign-note subscriber on
+  //        a state crossing that did not happen. nativeLevelUp() is now the SOLE
+  //        emitter, which is a stronger single-source guarantee than the old
+  //        two-emitter parity. The import side is guarded by 173.10 below.
   {
     const nativeLevelUpBody173c = extractFunctionBody(uiCore173, 'nativeLevelUp');
-    const autoImportBody173 = extractFunctionBody(apiSource, 'autoImportState');
     assert(
       /if \(lvl >= MAX_PLAYER_LEVEL\) return;/.test(nativeLevelUpBody173c) &&
         /const newLvl = Math\.min\(MAX_PLAYER_LEVEL, lvl \+ 1\);/.test(nativeLevelUpBody173c) &&
         /state\.lvl = newLvl;/.test(nativeLevelUpBody173c) &&
-        /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c) &&
-        /RobcoEvents\.emit\('level\.up',/.test(autoImportBody173),
-      "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up' — the same event autoImportState()'s AI-driven level-up path emits (Protocol 22)"
+        /RobcoEvents\.emit\('level\.up', \{ oldLvl: lvl, newLvl \}\)/.test(nativeLevelUpBody173c),
+      "173.4: nativeLevelUp() no-ops at MAX_PLAYER_LEVEL, otherwise always increments state.lvl by exactly +1, and emits RobcoEvents 'level.up'"
     );
   }
 
@@ -24153,6 +26935,142 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         (err173b ? ' — ' + err173b.message : '')
     );
   }
+
+  // ── LEVEL OWNERSHIP → THE PLAYER (owner directive 2026-07-20) ──────────────
+  // The AI could previously write state.lvl directly from its response, with no
+  // floor, no MAX_PLAYER_LEVEL clamp, and no gate in EITHER direction — so it
+  // could set level 0, a negative, 9999, or silently DEMOTE the player. Levelling
+  // spends perk and skill-point choices that belong to the player. The AI may now
+  // only ANNOUNCE an earned promotion; nativeLevelUp() is the sole writer.
+  //
+  // Protocol 13 (regression test for the fix) + Protocol 14 (the AI contract
+  // changed, so the schema and the import round-trip are both re-guarded).
+
+  // 173.10  STATIC — autoImportState() contains no write to state.lvl at all,
+  //         and no longer emits 'level.up' (see 173.4's updated reasoning).
+  //         Written as a broad "no assignment to state.lvl in any form" probe so
+  //         a reintroduced write cannot slip back in a differently-spelled shape.
+  {
+    // Strip comments first — the explanatory comment in the import path quotes
+    // the REMOVED `state.lvl = parseInt(lvlV) || 0` line verbatim, and a probe
+    // that counted that would be reporting on prose, not on code.
+    const autoImportBody173d = extractFunctionBody(apiSource, 'autoImportState')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+    const lvlWrites173 =
+      autoImportBody173d.match(/state\.lvl\s*(?:=[^=]|[+\-*/]{1,2}=|\+\+|--)/g) || [];
+    assert(
+      lvlWrites173.length === 0 && !/RobcoEvents\.emit\('level\.up'/.test(autoImportBody173d),
+      "173.10: autoImportState() never writes state.lvl and never emits level.up — the AI cannot set, raise, or lower the player's level (found " +
+        lvlWrites173.length +
+        ' write(s))'
+    );
+  }
+
+  // 173.11  STATIC — the import path routes an earned level through the
+  //         announcement, which itself defers to nativeLevelUp() rather than
+  //         applying the AI's number (Protocol 22 — reuses the confirm machinery
+  //         and the native authority, forks neither).
+  {
+    const announceBody173 = extractFunctionBody(apiSource, '_announceDirectorLevelUp');
+    const autoImportBody173e = extractFunctionBody(apiSource, 'autoImportState');
+    assert(
+      /_announceDirectorLevelUp\(/.test(autoImportBody173e) &&
+        /confirmAction\(/.test(announceBody173) &&
+        /nativeLevelUp\(\)/.test(announceBody173) &&
+        !/state\.lvl\s*=/.test(announceBody173),
+      "173.11: autoImportState() hands an earned level to _announceDirectorLevelUp(), which confirms with the player and then calls nativeLevelUp() — it never writes state.lvl with the AI's claimed value"
+    );
+  }
+
+  // 173.12  STATIC — the announcement inherits the safety default of the
+  //         inventory/perk gates: with no confirm surface, or no native level
+  //         authority present, it drops silently rather than acting.
+  {
+    const announceBody173b = extractFunctionBody(apiSource, '_announceDirectorLevelUp');
+    assert(
+      /typeof confirmAction !== 'function'\) return/.test(announceBody173b) &&
+        /typeof nativeLevelUp !== 'function'\) return/.test(announceBody173b),
+      '173.12: _announceDirectorLevelUp() drops the announcement when either confirmAction() or nativeLevelUp() is unavailable — never acts without both'
+    );
+  }
+
+  // 173.13  PROTOCOL 14 — the AI contract states the rule the code enforces.
+  //         A directive that still invited the AI to set a level, while the
+  //         import path silently discarded it, would make the AI narrate a
+  //         promotion it did not actually apply — the exact confusion the
+  //         AI_OVERSEER Finding 5 log incident came from.
+  {
+    const directiveSrc173 = readFile('js/services/api-directive.js');
+    assert(
+      /Level is \$\{noun\}-OWNED and READ-ONLY to you/.test(directiveSrc173) &&
+        /only ever HIGHER than the current level/.test(directiveSrc173) &&
+        /never as a value to store/.test(directiveSrc173),
+      '173.13: PROTOCOL 14 — getSystemDirective() tells the AI that level is player-owned and read-only, that "lvl" is an announcement only, and that it may never be used to store a value'
+    );
+  }
+
+  // 173.14  PROTOCOL 14 (round-trip, BEHAVIORAL) — the real autoImportState()
+  //         body, executed in a vm sandbox with a confirm surface that is never
+  //         allowed to resolve, is fed AI payloads that try to raise, lower, and
+  //         zero the level. state.lvl must survive all three untouched, while a
+  //         sibling field in the same payload still imports normally (proving the
+  //         payload really was processed, not rejected wholesale).
+  {
+    const vm173c = require('vm');
+    let lvlAfter173 = null;
+    let xpAfter173 = null;
+    let announced173 = 0;
+    let err173c = null;
+    try {
+      // Same harness footing as Suite 133 — the REAL state.js + reg_nv.js loaded
+      // into the context, so autoImportState() runs against real state defaults
+      // and a real registry rather than a hand-stubbed object.
+      const sandbox173 = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error: () => {}, log: () => {}, warn: () => {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+        confirmAction: () => new Promise(() => {}), // never resolves — nothing applied
+        nativeLevelUp: () => {},
+        getIdentity: () => ({ playerNoun: 'Courier' }),
+        MAX_PLAYER_LEVEL: 50,
+        saveState: () => {},
+        reconcileEquipped: () => {},
+        _announceCount: 0,
+      };
+      vm173c.createContext(sandbox173);
+      vm173c.runInContext(stateSource, sandbox173);
+      vm173c.runInContext(readGroup('reg_nv'), sandbox173);
+      vm173c.runInContext(
+        'function _announceDirectorLevelUp(o){ _announceCount++; }\n' +
+          'function autoImportState(jsonString)' +
+          extractFunctionBody(apiSource, 'autoImportState') +
+          '\nthis.autoImportState = autoImportState;',
+        sandbox173
+      );
+      vm173c.runInContext('state.lvl = 5; state.xp = 0;', sandbox173);
+      // raise, demote, zero, negative — none may move state.lvl
+      sandbox173.autoImportState(JSON.stringify({ lvl: 12, xp: 700 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: 1 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: 0 }));
+      sandbox173.autoImportState(JSON.stringify({ lvl: -3 }));
+      lvlAfter173 = vm173c.runInContext('state.lvl', sandbox173);
+      xpAfter173 = vm173c.runInContext('state.xp', sandbox173);
+      announced173 = vm173c.runInContext('_announceCount', sandbox173);
+    } catch (e) {
+      err173c = e;
+    }
+    assert(
+      !err173c && lvlAfter173 === 5 && xpAfter173 === 700 && announced173 === 1,
+      '173.14: PROTOCOL 14 [behavioral] — a real AI payload cannot write the level in ANY direction: raise (12), demote (1), zero (0) and negative (-3) all leave lvl at 5, while xp in the same payload imports normally (700), and only the single upward claim raises an announcement' +
+        (err173c
+          ? ' — ' + err173c.message
+          : ' — got lvl=' + lvlAfter173 + ' xp=' + xpAfter173 + ' announcements=' + announced173)
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -24168,14 +27086,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // call exportCampaignLog(fmt) (download-only, unchanged). FIRMWARE REVISION
 // LOG and INSTALL SYSTEM are untouched.
 //
-// 8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 174 — SVC tray EJECT HOLOTAPE export consolidation');
   const html174 = readFile('index.html');
-  const uiCore174 = readFile('js/ui-core.js');
-  const uiSaves174 = readFile('js/ui-saves.js');
-  const css174 = readFile('css/terminal.css');
+  const uiCore174 = readGroup('ui-core');
+  const uiSaves174 = readGroup('ui-saves');
+  const css174 = readCss();
   const eslintCfg174 = readFile('eslint.config.mjs');
 
   // 174.1  the four old export buttons are gone — only the consolidated
@@ -24280,15 +27197,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  was not allowed to start" warnings — each is now deferred to the first
 //  click/keydown via a shared _armAmbientAudio() arm, mirroring playBootDrone's
 //  (H4) own established pattern. The opening boot drone itself is untouched.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 175 — Owner batch: dead meta frame-ancestors removed + ambient audio first-gesture arm'
   );
   const html175 = readFile('index.html');
-  const uiAudio175 = readFile('js/ui-audio.js');
-  const uiCore175 = readFile('js/ui-core.js');
+  const uiAudio175 = readGroup('ui-audio');
+  const uiCore175 = readGroup('ui-core');
 
   // 175.1  frame-ancestors is gone from the meta CSP entirely (not just
   //        silently ignored) — a real regression guard against it creeping back.
@@ -24407,12 +27323,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  firmware/carrier/feature-flag readout); the campaign-stats half of the
 //  former Overseer's Log becomes its own CAMPAIGN LOG panel on DATABANK.
 //  Functional relocation only (Protocol 22) — every id/handler preserved.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 176 — SETTINGS tab [6] + CHASSIS reorg (SU-1 + SU-2)');
   const html176 = htmlSource;
-  const core176 = readFile('js/ui-core.js');
+  const core176 = readGroup('ui-core');
 
   // 176.1  the 4 SETTINGS panels exist with the exact ids the plan specifies,
   //        each data-tab="settings", and are absent from every other tab
@@ -24444,7 +27359,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       html176.indexOf('<div class="col-right">')
     );
     assert(
-      /<h2>&gt;[\s\S]*?CAMPAIGN CHRONICLE<\/h2>/.test(campgBlock176) &&
+      /<h2>\s*&gt;[\s\S]*?CAMPAIGN CHRONICLE\s*<\/h2>/.test(campgBlock176) &&
         campgBlock176.includes('data-sub-id="campaign_status"') &&
         campgBlock176.includes('data-sub-id="crossroads_record"') &&
         campgBlock176.includes('data-sub-id="incident_log"') &&
@@ -24585,14 +27500,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  STATUS carrier line, so none of them can disagree. A Node vm sandbox
 //  actually EXECUTES the real renderAccount() body (not a static grep) across
 //  all four conditions and asserts the resulting DOM text.
-//  9 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 177 — SU-4: dynamic ACCOUNT (REG PORT) status words');
   const html177 = htmlSource;
-  const acctSrc177 = readFile('js/ui-account.js');
-  const core177 = readFile('js/ui-core.js');
-  const css177 = readFile('css/terminal.css');
+  const acctSrc177 = readGroup('ui-account');
+  const core177 = readGroup('ui-core');
+  const css177 = readCss();
 
   // 177.1  index.html: #acctSummaryStatus lives in the ACCOUNT panel's <summary>,
   //        styled via .panel-substatus (visible whether the panel is open or collapsed)
@@ -24758,7 +27672,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        3 sites), and connectivity (refreshOverseerCarrier, asserted at 177.3) all
   //        end up calling renderAccount() — no path can leave it stale.
   {
-    const cloud177 = readFile('js/cloud.js');
+    const cloud177 = readGroup('cloud');
     const loadUIBody177 = extractFunctionBody(core177, 'loadUI');
     assert(
       /renderAccount\(\);/.test(loadUIBody177) &&
@@ -24788,13 +27702,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Immersion Dial technique, Protocol 17) and the new visible cartridge/
 //  rocker/detent/breaker widgets, which drive the SAME setters. New in this
 //  unit: a confirm gate in front of a game-cartridge swap (owner decision).
-//  15 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 178 — SU-3: CAMPAIGN CONFIGS modernized (P-DECK + INTERLOCK)');
   const html178 = htmlSource;
-  const core178 = readFile('js/ui-core.js');
-  const css178 = readFile('css/terminal.css');
+  const core178 = readGroup('ui-core');
+  const css178 = readCss();
   const configBlock178 = (html178.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
   ) || [''])[0];
@@ -25058,14 +27971,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Removing the override lets the label fall back to var(--robco-dark) — the
 //  SAME theme-matched dark partner the base button rule already reuses
 //  everywhere else (Protocol 22), verified by real WCAG contrast math below.
-//  18 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 179 — Owner-requested restyle: PROGRAM CARTRIDGE stack (physical pile)');
   const html179 = readFile('index.html');
-  const core179 = readFile('js/ui-core.js');
-  const state179 = readFile('js/state.js');
-  const css179 = readFile('css/terminal.css');
+  const core179 = readGroup('ui-core');
+  const state179 = readGroup('state');
+  const css179 = readCss();
 
   // 179.1  every GAME_DEFS entry (FNV/FO3/FO4) declares theme.cartridgeTape —
   //        the data seam renderCartDeck() reads instead of a hardcoded per-game
@@ -25109,20 +28021,100 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 179.4  every generated cartridge button carries a --stack-index custom
+  // 179.4  [BEHAVIORAL — 2.8.5 tail item B, the deferred U3 render-harness slice]
+  //        Every generated cartridge button carries a --stack-index custom
   //        property, keeps the UNCHANGED _seatGameCartridge(ctx) onclick wiring
   //        (Protocol 22 — tapping a peeking cartridge still swaps games), real
   //        radio ARIA, and escapes the game label/tape text (XSS safety).
+  //
+  //        WHY THIS ONE IS BEHAVIORAL: this used to be six regexes over the
+  //        function's SOURCE TEXT. Two of them (`escapeHtml(label.toUpperCase())`
+  //        / `escapeHtml(sub)`) claimed an XSS-safety property — and a source
+  //        grep cannot prove escaping actually happens, only that the call is
+  //        spelled correctly somewhere in the body. A wrong-order or
+  //        double-unescape refactor would keep the grep green while shipping the
+  //        hole. So renderCartDeck() is now EXECUTED in a vm sandbox (the Suite
+  //        177 renderAccount pattern) against a hostile GAME_DEFS fixture, and
+  //        the assertions read the markup it actually produced.
+  //
+  //        NOTE the sandbox wires the REAL escapeHtml() lifted from ui-core.js —
+  //        Suite 177's harness stubs it as a pass-through, which is fine there
+  //        (177 asserts copy, not safety) but would silently void the whole
+  //        point here.
   {
-    const renderBody179 = extractFunctionBody(core179, 'renderCartDeck');
+    const vm = require('vm');
+    const _decl179 = (src, name) => {
+      const body = extractFunctionBody(src, name);
+      const s = src.indexOf('function ' + name);
+      const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+      return 'function ' + name + p + body;
+    };
+
+    // A hostile label + tape string: if either reaches the DOM unescaped, the
+    // rendered markup contains a live <img onerror=...> node.
+    const XSS179 = '<img src=x onerror="alert(1)">';
+    const deck179 = {
+      innerHTML: '',
+      style: {
+        _p: {},
+        setProperty(k, v) {
+          this._p[k] = v;
+        },
+      },
+    };
+    const sandbox179 = {
+      console,
+      state: { gameContext: 'FNV' },
+      GAME_DEFS: {
+        FNV: { label: 'New Vegas', theme: { cartridgeTape: 'NV-01' } },
+        FO3: { label: XSS179, theme: { cartridgeTape: XSS179 } },
+        FO4: { label: 'Fallout 4', designOnly: true, theme: { cartridgeTape: 'F4' } },
+      },
+      document: { getElementById: id => (id === 'cartDeck' ? deck179 : null) },
+    };
+    vm.createContext(sandbox179);
+    let err179;
+    try {
+      vm.runInContext(
+        _decl179(readGroup('ui-core'), 'escapeHtml') +
+          '\n' +
+          _decl179(core179, '_seatableGames') +
+          '\n' +
+          _decl179(core179, 'renderCartDeck') +
+          '\nrenderCartDeck();',
+        sandbox179
+      );
+    } catch (e) {
+      err179 = e;
+    }
+    const deckHtml179 = deck179.innerHTML;
+
+    // (a) structure + wiring, read off the real output
     assert(
-      /style="--stack-index:\$\{i\}"/.test(renderBody179) &&
-        /onclick="_seatGameCartridge\('\$\{escapeHtml\(g\)\}'\)"/.test(renderBody179) &&
-        /role="radio"/.test(renderBody179) &&
-        /aria-checked="\$\{seated\}"/.test(renderBody179) &&
-        /escapeHtml\(label\.toUpperCase\(\)\)/.test(renderBody179) &&
-        /escapeHtml\(sub\)/.test(renderBody179),
-      '179.4: renderCartDeck() stamps --stack-index per button, keeps the unchanged _seatGameCartridge(ctx) onclick + role=radio/aria-checked, and escapes the rendered label/tape text'
+      !err179 &&
+        /style="--stack-index:0"/.test(deckHtml179) &&
+        /style="--stack-index:1"/.test(deckHtml179) &&
+        /onclick="_seatGameCartridge\('FNV'\)"/.test(deckHtml179) &&
+        /role="radio"/.test(deckHtml179) &&
+        /aria-checked="true"/.test(deckHtml179) &&
+        /aria-checked="false"/.test(deckHtml179) &&
+        deck179.style._p['--cart-stack-depth'] === '2',
+      '179.4: [behavioral] renderCartDeck() output stamps --stack-index per button, keeps the _seatGameCartridge(ctx) onclick + role=radio/aria-checked, and sets --cart-stack-depth to the seatable count (designOnly games excluded)' +
+        (err179 ? ' — ' + err179.message : '')
+    );
+
+    // (b) the XSS claim, now actually proven against rendered markup.
+    //     Deliberately NOT asserting `!/onerror=/` — the CORRECTLY escaped text
+    //     still contains the literal substring `onerror=&quot;`, so that check
+    //     would fail on safe output. What actually matters is that no raw `<img`
+    //     TAG is produced and the hostile string never survives verbatim.
+    assert(
+      !err179 &&
+        deckHtml179.includes(XSS179) === false &&
+        !/<img/i.test(deckHtml179) &&
+        /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/i.test(deckHtml179),
+      '179.4b: [behavioral] a hostile game label/tape string is HTML-escaped in renderCartDeck()’s real output — the raw string never survives and no live <img> tag reaches the deck markup' +
+        (err179 ? ' — ' + err179.message : '')
     );
   }
 
@@ -25333,19 +28325,18 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)
-//  Owner-approved mockup: planning/mockups/tempo-dial.html. Replaces the
+//  Owner-approved mockup: planning/2.8.0/mockups/tempo-dial.html. Replaces the
 //  decorative-dial-plus-vertical-list from Suite 178/179 with a true rotary
 //  dial: the 5 playthroughType positions ring the knob on a gauge arc and
 //  the needle (the knob's own rotation) always points at the active one.
 //  Owner directive: the knob performs NO action on tap — only a drag, a
 //  direct position tap, or the arrow keys change #playthroughTypeSelect.
-//  13 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 180 — OPERATIONAL TEMPO centered rotary dial (SU-3 rework)');
   const html180 = readFile('index.html');
-  const core180 = readFile('js/ui-core.js');
-  const css180 = readFile('css/terminal.css');
+  const core180 = readGroup('ui-core');
+  const css180 = readCss();
   const configBlock180 = (html180.match(
     /id="campaignConfigPanel"[\s\S]*?<div class="col-right">/
   ) || [''])[0];
@@ -25609,10 +28600,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 {
   header('Suite 181 — PHASE 3 OPERATOR hero-three reskin (id-preservation contract)');
   const html181 = readFile('index.html');
-  const uiCore181 = readFile('js/ui-core.js');
-  const css181 = readFile('css/terminal.css');
+  const uiCore181 = readGroup('ui-core');
+  const css181 = readCss();
 
-  // 181.1  the full fixed-id set from planning/PHASE3_OPERATOR_PLAN.md §3
+  // 181.1  the full fixed-id set from planning/2.8.0/plans/PHASE3_OPERATOR_PLAN.md §3
   //        still exists verbatim — the load-bearing constraint loadUI()/
   //        updateMath() do direct getElementById() on every render.
   const FIXED_IDS_181 = [
@@ -25704,7 +28695,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '181.2: every shipped handler (commitStat/capStatMax/toggleLimb/nativeLevelUp/onLvlInputChanged/onTimeInputChanged/onLocationChange/updateKarmaUI/renderBioScan) is still called from index.html — missing: ' +
       missingHandlers181.join(', ')
   );
-  const uiRender181 = readFile('js/ui-render.js');
+  const uiRender181 = readGroup('ui-render');
   assert(
     /function renderSkills\(\)/.test(uiCore181) &&
       /function renderFactionRep\(\)/.test(uiRender181) &&
@@ -25757,9 +28748,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // \s+ between words instead of a literal space (Protocol 42 — caught live
   // by npm run format inserting exactly this wrap on the 4 hero boards).
   const flexTitle181 = t => t.replace(/[.]/g, '\\.').replace(/ /g, '\\s+');
+  // class="panel bay-board" is a PREFIX match (no closing quote) — the FO3
+  // Batch 1 panel relayout added an additive `fo3-flat` marker class to
+  // most of these boards' class attributes (class="panel bay-board
+  // fo3-flat"); the assertion's intent (every OPERATOR board reuses the
+  // shared .bay-board class family, never a parallel one) still holds
+  // regardless of what else rides along in the attribute.
   assert(
     boardTitles181.every(t =>
-      new RegExp('class="panel bay-board"[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
+      new RegExp('class="panel bay-board[\\s\\S]{0,400}' + flexTitle181(t)).test(html181)
     ) && busTags181.every(b => new RegExp('class="bay-slot-tag">' + b + '<').test(html181)),
     '181.4: all 11 OPERATOR boards are <details class="panel bay-board"> and carry their BUS-0N slot tag (reuses the existing Module Bay board-frame class, Protocol 22)'
   );
@@ -25924,24 +28921,35 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 181.20  no campaign-state field was added or removed by this reskin —
   //         the plan's "no state field touched" constraint, checked against
-  //         the state.js default-state declaration.
-  const stateSrc181 = readFile('js/state.js');
+  //         the DECLARED `let state = {...}` field keys, not the whole
+  //         state.js file. [Protocol 42, harness-only, found during the FO3
+  //         Pip-Boy build's U0]: this guard originally string-matched the
+  //         whole file, which false-positived the instant GAME_DEFS.FO3
+  //         .identity.rails legitimately started referencing board ids like
+  //         'opVitalPanel'/'opSpecialPanel'/'opHarnessPanel' as DATA (U0's
+  //         rails map) — no `state` field was ever added, so the original
+  //         assertion's INTENT was never actually violated; only its
+  //         over-broad implementation was. Narrowed to extractStateKeys() so
+  //         it locks the real invariant (no new campaign-state field) without
+  //         colliding with unrelated GAME_DEFS identity data.
+  const stateSrc181 = readGroup('state');
+  const stateKeys181 = extractStateKeys(stateSrc181);
   assert(
-    !/opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(stateSrc181),
-    '181.20: js/state.js declares no new state field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data'
+    !stateKeys181.some(k => /opVital|opSpecial|opHarness|fdLadder|zonePlate/i.test(k)),
+    '181.20: js/state.js declares no new `state` field for this reskin — every new id is a transient DOM/display concern, never persisted campaign data (checked against the declared state field keys — GAME_DEFS.identity.rails may legitimately reference board ids as data)'
   );
 }
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 182 — PHASE 3 OPERATOR follow-up: draggable HP/XP/SPECIAL,
 //  behavioral zone-click proof, and the RAD EXPOSURE max-rads clamp
-//  (owner interactivity fold-in). 12 tests.
+//  (owner interactivity fold-in).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 182 — OPERATOR follow-up: drag controls + RAD max clamp');
-  const uiCore182 = readFile('js/ui-core.js');
-  const stateSrc182 = readFile('js/state.js');
-  const apiSrc182 = readFile('js/api.js');
+  const uiCore182 = readGroup('ui-core');
+  const stateSrc182 = readGroup('state');
+  const apiSrc182 = readGroup('api');
 
   // Reconstructs a full, standalone "function name(params) { body }" text for
   // redeclaration in a vm sandbox (mirrors Suite 137.6's declareFn137 pattern —
@@ -26288,7 +29296,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         >=28px in BOTH the base rule and the <=480px mobile override
   //         (was 22px/20px before this fold-in), and touch-action:none is
   //         scoped to the ladder itself so the surrounding page still scrolls.
-  const css182 = readFile('css/terminal.css');
+  const css182 = readCss();
   // Brace-depth extraction (not a lazy [\s\S]*?\n\}) -- the mobile media query
   // nests OTHER rules' own closing braces before its own, which a lazy match
   // would stop at prematurely (a real bug this test caught while being written).
@@ -26344,12 +29352,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  fixes bundled into the same push (Protocol 19): the BOTTLE CAPS readback
 //  value and the OPERATIONAL TEMPO dial's overlapping detent hit areas.
 //  Owner scope correction: the limb-label / RAD-row-centering content
-//  changes from the prior push were reverted — frames only. 7 tests.
+//  changes from the prior push were reverted — frames only.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 183 — OPERATOR frames + readback centering + tempo dial hit-areas');
   const html183 = readFile('index.html');
-  const css183 = readFile('css/terminal.css');
+  const css183 = readCss();
 
   // 183.1  top-level bay-board panels (OPERATOR) get the SAME 12px
   //        clearance the Module Bay's SLOT sub-panels already get from
@@ -26386,12 +29394,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 183.4  the reverted content-scope changes (per-limb labels, RAD-row
   //        centering) stay gone — a regression guard that a future commit
   //        doesn't silently re-add the over-scoped content changes the
-  //        owner explicitly asked to drop.
+  //        owner explicitly asked to drop. Tightened (FO3 Pip-Boy landscape
+  //        pass): the guard is specifically against an UNSCOPED/bare
+  //        `.rad-row { justify-content: center }` rule (the original
+  //        over-scoped mistake, affecting every game) — it must not false-
+  //        positive on a narrowly [data-game='FO3']-scoped, per-board
+  //        exception (css/60-fo3-pipboy.css's #opHarnessPanel .rad-row,
+  //        which legitimately centers the RAD row under the Vault Boy
+  //        figure and is a different, intentional rule).
   assert(
     !/\.zc-name\s*\{/.test(css183) &&
       !/class="zc-name"/.test(html183) &&
-      !/\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183),
-    '183.4: the reverted over-scoped content changes (.zc-name limb labels, .rad-row centering) stay reverted — this push is frame/layout only, per the owner scope correction'
+      !/(^|\n)\.rad-row\s*\{[^}]*justify-content:\s*center/.test(css183),
+    "183.4: the reverted over-scoped content changes (.zc-name limb labels, a BARE unscoped .rad-row centering rule) stay reverted — this push is frame/layout only, per the owner scope correction; a [data-game='FO3']-scoped .rad-row exception is a different, intentional rule and is exempt"
   );
 
   // 183.5  #c_caps (the readback-strip BOTTLE CAPS tile) joins the existing
@@ -26459,17 +29474,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  Suite 184 — Owner batch: tempo dial no-wrap fix, RAD bar drag, level/XP
 //  caps, full scroll+panel-state restore ordering, SETTINGS collapsed
 //  summary lines, plus the RAD-bar touch-action/transition-lag follow-up.
-//  21 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 184 — owner batch: tempo no-wrap, RAD drag, level/XP caps, scroll restore, SETTINGS summaries'
   );
   const html184 = readFile('index.html');
-  const css184 = readFile('css/terminal.css');
-  const core184 = readFile('js/ui-core.js');
-  const audio184 = readFile('js/ui-audio.js');
-  const acct184 = readFile('js/ui-account.js');
+  const css184 = readCss();
+  const core184 = readGroup('ui-core');
+  const audio184 = readGroup('ui-audio');
+  const acct184 = readGroup('ui-account');
   // Reconstructs a full, standalone "function name(params) { body }" text for
   // redeclaration in a vm sandbox (mirrors Suite 182's declareFn182 pattern —
   // extractFunctionBody() alone only returns the brace-matched body).
@@ -26647,7 +29661,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
   assert(
-    /id="stat_lvl"[\s\S]{0,120}max="50"/.test(html184),
+    // [^>]* keeps the scan inside the single <input> tag rather than a brittle
+    // fixed char-window (Protocol 42): U9 added an aria-label between id and
+    // max, which pushed max="50" past the old {0,120} window even though the
+    // invariant still holds. Tag-scoped match is robust to added attributes.
+    /id="stat_lvl"[^>]*max="50"/.test(html184),
     '184.7b: #stat_lvl carries a native max="50" attribute matching MAX_PLAYER_LEVEL, alongside the JS clamp'
   );
 
@@ -26662,7 +29680,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     assert(
       /75 \* \(\(lvl \+ 1\) \* \(lvl \+ 1\)\) - 25 \* \(lvl \+ 1\) - 50/.test(xpBody184) &&
         /Math\.max\(0, Math\.min\(raw, xpNext - 1\)\)/.test(xpBody184) &&
-        /id="stat_xp"[\s\S]{0,120}oninput="onXpInputChanged\(\)"/.test(html184),
+        /id="stat_xp"[\s\S]{0,200}oninput="onXpInputChanged\(\)"/.test(html184),
       '184.8: onXpInputChanged() caps the typed/stepped XP value at xpNext(lvl)-1 using the exact same per-level curve as the XP bar drag handler, and #stat_xp is wired to call it'
     );
   }
@@ -26892,16 +29910,19 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  console" reskin (BUS-10…15). Weigh bridge live beam bend, caps
 //  relocation, CARGO MANIFEST drawer bank + bounded scroll, native
 //  EQUIP + qty steppers, registry-driven SQUAD ROSTER, collapsed
-//  summary lines, id-preservation contract. 24 tests.
+//  summary lines, id-preservation contract. 185.10/11 converted to
+//  behavioral (Health-U3 slice 2): adjItemQty + toggleEquipItem
+//  executed in a vm sandbox (clamp/remove/target-row, equip/toggle/
+//  replace/no-op).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 185 — Phase 3 Piece 2: OPERATIONS quartermaster freight console (BUS-10 to 15)');
   const html185 = readFile('index.html');
-  const css185 = readFile('css/terminal.css');
-  const core185 = readFile('js/ui-core.js');
-  const render185 = readFile('js/ui-render.js');
-  const api185 = readFile('js/api.js');
-  const stateSrc185 = readFile('js/state.js');
+  const css185 = readCss();
+  const core185 = readGroup('ui-core');
+  const render185 = readGroup('ui-render');
+  const api185 = readGroup('api');
+  const stateSrc185 = readGroup('state');
 
   // 185.1  BOTTLE CAPS + WEIGHT tiles are gone from the OPERATOR readback
   //        strip (only MAX AP + GRADE ADVANCE remain); #c_caps/#display_weight
@@ -27029,35 +30050,214 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     '185.9: robco_cargo_drawer is a registered MetaStore device pref, written by setInvFilter() and restored by _restoreDevicePrefs() at boot (Protocol UI-6)'
   );
 
-  // 185.10  per-row quantity ± stepper: adjItemQty(idx, delta) is a new
-  //         native write path — clamped >=0, and hitting 0 removes the row
-  //         entirely (there is no zero-quantity cargo tag).
+  // 185.10 / 185.11  CONVERTED TO BEHAVIORAL (Health-U3 slice 2).
+  //   adjItemQty() and toggleEquipItem() are two native WRITE paths into
+  //   state.inventory (splice-by-index) and state.equipped. The old asserts
+  //   grepped the function bodies for token presence (Math.max(0,…),
+  //   next===0, splice(idx,1), the equipped ternary) — all of which stay
+  //   present while the logic silently targets the WRONG row (the
+  //   filtered-view-index vs _origIdx class Suite 221 polices elsewhere),
+  //   fails to clamp, or emits the wrong slot. There is no behavioral twin
+  //   anywhere (test.html never touches these; the runner never executes
+  //   them). These extract the real bodies and run them in a vm sandbox.
+  const vm185 = require('vm');
   const adjQtyBody185 = extractFunctionBody(render185, 'adjItemQty');
+  const toggleEquipBody185 = extractFunctionBody(render185, 'toggleEquipItem');
+  function makeInvSandbox185(seedState) {
+    const calls = { save: 0, renderInv: 0, renderEq: 0, updateMath: 0, reconcile: 0 };
+    const emitted = [];
+    const sb = {
+      state: seedState,
+      Math,
+      parseInt,
+      String,
+      Array,
+      Number,
+      Boolean,
+      document: { getElementById: () => null },
+      setTimeout: () => {},
+      reconcileEquipped: () => {
+        calls.reconcile++;
+        return false;
+      },
+      renderEquipped: () => {
+        calls.renderEq++;
+      },
+      renderInventory: () => {
+        calls.renderInv++;
+      },
+      updateMath: () => {
+        calls.updateMath++;
+      },
+      saveState: () => {
+        calls.save++;
+      },
+      RobcoEvents: { emit: (name, p) => emitted.push({ name, p }) },
+    };
+    vm185.createContext(sb);
+    vm185.runInContext(
+      'function adjItemQty(idx, delta)' + adjQtyBody185 + '\nthis.adjItemQty = adjItemQty;',
+      sb
+    );
+    vm185.runInContext(
+      'function toggleEquipItem(idx)' +
+        toggleEquipBody185 +
+        '\nthis.toggleEquipItem = toggleEquipItem;',
+      sb
+    );
+    return { sb, calls, emitted };
+  }
+  const EQ_ZERO185 = () => ({ weapon: null, armor: null, headgear: null });
+
+  // 185.10  per-row qty ± stepper — decrement keeps the row + saves once.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 3, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, -1);
+    assert(
+      sb.state.inventory.length === 1 && sb.state.inventory[0].qty === 2 && calls.save === 1,
+      '185.10: [behavioral] adjItemQty(0,-1) decrements a qty-3 row to 2, keeps the row, and calls saveState() exactly once'
+    );
+  }
+  // 185.10b  clamp at 0 — a -5 delta on a qty-1 row removes it (never negative).
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 1, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, -5);
+    assert(
+      sb.state.inventory.length === 0,
+      '185.10b: [behavioral] adjItemQty clamps at 0 — a -5 delta on a qty-1 row removes it entirely, never leaving a negative quantity'
+    );
+  }
+  // 185.10c  hitting 0 splices the TARGETED index (not row 0), leaving the
+  //         others untouched, and runs reconcileEquipped() for dangling equips.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [
+        { name: 'A', qty: 5, type: 'misc' },
+        { name: 'B', qty: 1, type: 'misc' },
+        { name: 'C', qty: 5, type: 'misc' },
+      ],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(1, -1);
+    const names = sb.state.inventory.map(i => i.name);
+    assert(
+      sb.state.inventory.length === 2 &&
+        names[0] === 'A' &&
+        names[1] === 'C' &&
+        calls.reconcile === 1,
+      '185.10c: [behavioral] hitting 0 splices the targeted index (row B), leaves A and C byte-for-byte untouched, and runs reconcileEquipped() (dangling-equip cleanup)'
+    );
+  }
+  // 185.10d  increment arithmetic.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 2, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(0, 1);
+    assert(
+      sb.state.inventory[0].qty === 3,
+      '185.10d: [behavioral] adjItemQty(0,+1) increments the targeted row quantity to 3'
+    );
+  }
+  // 185.10e  out-of-range index is a safe no-op (no throw, no save).
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 2, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.adjItemQty(99, -1);
+    assert(
+      sb.state.inventory.length === 1 && sb.state.inventory[0].qty === 2 && calls.save === 0,
+      '185.10e: [behavioral] adjItemQty on an out-of-range index is a guarded no-op (no throw, no mutation, no save)'
+    );
+  }
+  // 185.10f  static wiring guard retained (Protocol 20 render markup contract).
   assert(
-    /Math\.max\(0, \(parseInt\(it\.qty\) \|\| 0\) \+ delta\)/.test(adjQtyBody185) &&
-      /next === 0/.test(adjQtyBody185) &&
-      /state\.inventory\.splice\(idx, 1\)/.test(adjQtyBody185) &&
-      /saveState\(\)/.test(adjQtyBody185) &&
-      /data-qtyidx=/.test(render185) &&
-      /data-qtydelta=/.test(render185),
-    '185.10: adjItemQty(idx, delta) clamps >=0 and removes the row at 0 — a new native per-row qty ± write path, wired via data-qtyidx/data-qtydelta'
+    /data-qtyidx=/.test(render185) && /data-qtydelta=/.test(render185),
+    '185.10f: adjItemQty is wired to the ± stepper via the data-qtyidx / data-qtydelta attributes (render markup contract)'
   );
 
-  // 185.11  native EQUIP control (closes the U10 audit gap): one equipped
-  //         item per slot family — 'weapon' items occupy state.equipped.weapon,
-  //         'armor' items occupy state.equipped.armor. Tapping the equipped
-  //         item's own button unequips it (toggle), tapping another of the
-  //         same family replaces it (single-apply).
-  const toggleEquipBody185 = extractFunctionBody(render185, 'toggleEquipItem');
+  // 185.11  native EQUIP — equip a weapon, save once, emit item.equipped once.
+  {
+    const { sb, calls, emitted } = makeInvSandbox185({
+      inventory: [{ name: '10mm Pistol', qty: 1, type: 'weapon' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === '10mm Pistol' &&
+        calls.save === 1 &&
+        emitted.length === 1 &&
+        emitted[0].name === 'item.equipped' &&
+        emitted[0].p.slot === 'weapon',
+      '185.11: [behavioral] toggleEquipItem equips a weapon into state.equipped.weapon, saves once, and emits item.equipped{slot:weapon} once'
+    );
+  }
+  // 185.11b  re-tapping the equipped item unequips it (slot→null) and fires
+  //         NO item.equipped (a stamp lands only once, never on unequip).
+  {
+    const { sb, emitted } = makeInvSandbox185({
+      inventory: [{ name: '10mm Pistol', qty: 1, type: 'weapon' }],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === null && emitted.length === 0,
+      '185.11b: [behavioral] re-tapping the equipped item toggles the slot back to null and emits NO item.equipped (equip stamp fires once only)'
+    );
+  }
+  // 185.11c  equipping another item of the same family REPLACES the slot
+  //         (single-apply), rather than stacking.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [
+        { name: '10mm Pistol', qty: 1, type: 'weapon' },
+        { name: 'Hunting Rifle', qty: 1, type: 'weapon' },
+      ],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(1);
+    assert(
+      sb.state.equipped.weapon === 'Hunting Rifle',
+      '185.11c: [behavioral] equipping a second weapon replaces the slot (single-apply per family) — weapon becomes Hunting Rifle'
+    );
+  }
+  // 185.11d  the armor family is independent — an armor item fills
+  //         state.equipped.armor without disturbing the weapon slot.
+  {
+    const { sb } = makeInvSandbox185({
+      inventory: [{ name: 'Leather Armor', qty: 1, type: 'armor' }],
+      equipped: { weapon: '10mm Pistol', armor: null, headgear: null },
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.armor === 'Leather Armor' && sb.state.equipped.weapon === '10mm Pistol',
+      '185.11d: [behavioral] an armor-typed item occupies state.equipped.armor and leaves the weapon slot untouched (per-family slots)'
+    );
+  }
+  // 185.11e  a non-weapon/armor item has no slot family — a guarded no-op.
+  {
+    const { sb, calls } = makeInvSandbox185({
+      inventory: [{ name: 'Stimpak', qty: 1, type: 'aid' }],
+      equipped: EQ_ZERO185(),
+    });
+    sb.toggleEquipItem(0);
+    assert(
+      sb.state.equipped.weapon === null && sb.state.equipped.armor === null && calls.save === 0,
+      '185.11e: [behavioral] an aid item (no weapon/armor slot family) makes toggleEquipItem a no-op — no equip, no save'
+    );
+  }
+  // 185.11f  static wiring guard retained (Protocol 20 render markup contract).
   assert(
-    /cat === 'weapon' \? 'weapon' : cat === 'armor' \? 'armor' : null/.test(toggleEquipBody185) &&
-      /state\.equipped\[slot\] = state\.equipped\[slot\] === it\.name \? null : it\.name/.test(
-        toggleEquipBody185
-      ) &&
-      /renderEquipped\(\)/.test(toggleEquipBody185) &&
-      /saveState\(\)/.test(toggleEquipBody185) &&
-      /data-equip=/.test(render185),
-    '185.11: toggleEquipItem(idx) writes state.equipped.weapon/.armor (one per slot family, toggle-off on re-tap) — a new native EQUIP write path, wired via data-equip'
+    /data-equip=/.test(render185),
+    '185.11f: toggleEquipItem is wired to the EQUIP control via the data-equip attribute (render markup contract)'
   );
 
   // 185.12  autoImportState()'s AI-write equip path stays intact — the native
@@ -27275,14 +30475,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (SKILL MATRIX → VU array, STATUS EFFECTS → compound lamps, FACTION
 //  STANDING → reputation console). id/handler-preservation + game-agnostic
 //  + no-new-campaign-state + centering + reduced-motion guards, plus the
-//  owner follow-up restoring the MAJOR/MINOR faction grouping. 20 tests.
+//  owner follow-up restoring the MAJOR/MINOR faction grouping.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 186 — Phase 3 OPERATOR batch 2: BUS-05/07/08 ground-up reskin');
-  const core186 = readFile('js/ui-core.js');
-  const render186 = readFile('js/ui-render.js');
-  const css186 = readFile('css/terminal.css');
-  const stateSrc186 = readFile('js/state.js');
+  const core186 = readGroup('ui-core');
+  const render186 = readGroup('ui-render');
+  const css186 = readCss();
+  const stateSrc186 = readGroup('state');
   const skillsBody186 = extractFunctionBody(core186, 'renderSkills');
   const statusBody186 = extractFunctionBody(render186, 'renderStatus');
   const factionBody186 = extractFunctionBody(render186, 'renderFactionRep');
@@ -27499,13 +30699,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  scroll+search + FNV trait chips, BUS-09 EVIL/GOOD swing-needle karma
 //  gauge (now a universal board with a nested FO3-only KARMA CENTER
 //  appendix). id/handler-preservation + game-agnostic + no-new-campaign-
-//  state + centering + reduced-motion guards. 20 tests.
+//  state + centering + reduced-motion guards.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 187 — Phase 3 OPERATOR batch 3: CHRONO/PERKS/BOOKS/MAGS/KARMA ground-up reskin');
-  const core187 = readFile('js/ui-core.js');
-  const render187 = readFile('js/ui-render.js');
-  const css187 = readFile('css/terminal.css');
+  const core187 = readGroup('ui-core');
+  const render187 = readGroup('ui-render');
+  const css187 = readCss();
   const html187 = readFile('index.html');
   const perksBody187 = extractFunctionBody(render187, 'renderPerks');
   const karmaBody187 = extractFunctionBody(core187, 'updateKarmaUI');
@@ -27662,24 +30862,52 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let fnvOk = false;
     let errMsg187 = '';
     try {
-      const runOnce = usesKarmaCenter => {
+      // Karma Engine rebuild: renderKarmaCenter() now calls the sibling
+      // engine functions (getKarmaTier/getKarmaTitle/getKarmaHitSquad/
+      // getKarmaCompanions) plus escapeHtml/emptyState (ui-core.js) — a
+      // usesKarmaCenter=true run must declare all of them, not just
+      // renderKarmaCenter's own extracted body, or it throws ReferenceError
+      // before ever reaching the display-toggle lines this test proves.
+      const karmaTiersDecl187 = (core187.match(/const _KARMA_TIERS = \[[\s\S]*?\];/) || [''])[0];
+      const bandLabelsDecl187 = (render187.match(
+        /const _FO3_KARMA_BAND_LABELS = \[[\s\S]*?\];/
+      ) || [''])[0];
+      const emptyKarmaData187 = {
+        hitSquads: [],
+        companions: [],
+        titles: { good: [], neutral: [], bad: [] },
+        events: [],
+        titleMaxLevel: 30,
+      };
+      const runOnce = (usesKarmaCenter, karmaData) => {
         const dom = makeKarmaDom187();
         const sandbox = {
           document: dom,
-          state: { karma: 0 },
-          _activeDef: () => ({ usesKarmaCenter }),
+          state: { karma: 0, lvl: 1 },
+          _activeDef: () => ({ usesKarmaCenter, karma: karmaData }),
+          escapeHtml: s => String(s),
+          emptyState: msg => '<span class="empty-state">' + msg + '</span>',
           console,
         };
         vm.createContext(sandbox);
-        vm.runInContext(declareFn187(render187, 'renderKarmaCenter'), sandbox);
+        vm.runInContext(karmaTiersDecl187, sandbox);
+        vm.runInContext(bandLabelsDecl187, sandbox);
+        [
+          'getKarmaTier',
+          'getTitleAlignment',
+          'getKarmaTitle',
+          'getKarmaHitSquad',
+          'getKarmaCompanions',
+          'renderKarmaCenter',
+        ].forEach(fn => vm.runInContext(declareFn187(render187, fn), sandbox));
         vm.runInContext('renderKarmaCenter()', sandbox);
         return dom._registry;
       };
-      const fo3Reg = runOnce(true);
+      const fo3Reg = runOnce(true, emptyKarmaData187);
       fo3Ok =
         fo3Reg.get('karmaCenterBlock').style.display === '' &&
         fo3Reg.get('karmaNeedleReadout').style.display === 'none';
-      const fnvReg = runOnce(false);
+      const fnvReg = runOnce(false, null);
       fnvOk =
         fnvReg.get('karmaCenterBlock').style.display === 'none' &&
         fnvReg.get('karmaNeedleReadout').style.display === '';
@@ -27690,6 +30918,98 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       fo3Ok && fnvOk,
       '187.9c: [behavioral] renderKarmaCenter() run against a real DOM stub — usesKarmaCenter=true shows ONLY Karma Center (needle hidden), usesKarmaCenter=false shows ONLY the needle (Karma Center hidden)' +
         (errMsg187 ? ' — error: ' + errMsg187 : '')
+    );
+  }
+
+  // 187.9d  Karma Engine rebuild (Protocol 8 Stage 2): the Karma Center's
+  //         companion-availability roster is per-game DATA
+  //         (GAME_DEFS.FO3.karma.companions), never a hardcoded literal in
+  //         feature code. getKarmaCompanions() must read _activeDef().karma
+  //         and neither it nor renderKarmaCenter() may contain any of the 8
+  //         FO3 companion names as string literals.
+  {
+    const getCompanionsBody187 = extractFunctionBody(render187, 'getKarmaCompanions');
+    assert(
+      /_activeDef\(\)\.karma/.test(getCompanionsBody187) &&
+        !/Dogmeat|Fawkes|Star Paladin Cross|Clover|Jericho|Charon|Sergeant RL-3|Butch DeLoria/.test(
+          getCompanionsBody187 + karmaCenterBody187
+        ),
+      '187.9d: getKarmaCompanions() reads the roster from _activeDef().karma, and neither it nor renderKarmaCenter() hardcodes an FO3 companion name (Protocol 38)'
+    );
+  }
+
+  // 187.9e  GAME_DEFS.FO3.karma.companions carries the real 8-companion
+  //         roster with the corrected gate classes (Dogmeat/Charon: none;
+  //         Fawkes/Star Paladin Cross: good; Butch DeLoria/Sergeant RL-3:
+  //         neutral; Clover/Jericho: evil) — this is a per-game DEFINITION
+  //         entry (GAME_DEFS), not a Protocol 4 `state` field.
+  const fo3DefBlockM187 = stateSource.match(/FO3:\s*\{[\s\S]*?\n {2}FO4:/);
+  const fo3DefBlock187 = fo3DefBlockM187 ? fo3DefBlockM187[0] : '';
+  assert(
+    /name:\s*'Dogmeat',\s*\n\s*karmaReq:\s*'none'/.test(fo3DefBlock187) &&
+      /name:\s*'Charon',\s*\n\s*karmaReq:\s*'none'/.test(fo3DefBlock187) &&
+      /name:\s*'Fawkes',\s*\n\s*karmaReq:\s*'good'/.test(fo3DefBlock187) &&
+      /name:\s*'Star Paladin Cross',\s*\n\s*karmaReq:\s*'good'/.test(fo3DefBlock187) &&
+      /name:\s*'Butch DeLoria',\s*\n\s*karmaReq:\s*'neutral'/.test(fo3DefBlock187) &&
+      /name:\s*'Sergeant RL-3',\s*\n\s*karmaReq:\s*'neutral'/.test(fo3DefBlock187) &&
+      /name:\s*'Clover',\s*\n\s*karmaReq:\s*'evil'/.test(fo3DefBlock187) &&
+      /name:\s*'Jericho',\s*\n\s*karmaReq:\s*'evil'/.test(fo3DefBlock187),
+    '187.9e: GAME_DEFS.FO3.karma.companions carries all 8 companions with the corrected gate classes (Dogmeat/Charon=none, Fawkes/Cross=good, Butch/RL-3=neutral, Clover/Jericho=evil)'
+  );
+
+  // 187.9f  Behavioral (VM sandbox, real GAME_DEFS data): getKarmaCompanions()
+  //         run at each karma tier, sourcing the REAL GAME_DEFS.FO3.karma
+  //         data (loaded from the real state.js, not a hand-written stub),
+  //         partitions the roster correctly — proves the data plumbing
+  //         end-to-end, not just that the literals are absent.
+  {
+    const vm = require('vm');
+    let tiersOk187 = false;
+    let errMsg187f = '';
+    try {
+      const stateSandbox187 = { window: {} };
+      vm.createContext(stateSandbox187);
+      vm.runInContext(stateSource, stateSandbox187);
+      const realKarma187 = vm.runInContext('GAME_DEFS.FO3.karma', stateSandbox187);
+
+      function declareFn187f(src, name) {
+        const nameIdx = src.indexOf('function ' + name);
+        const parenIdx = src.indexOf('(', nameIdx);
+        const braceIdx = src.indexOf('{', parenIdx);
+        const params = src.slice(parenIdx, braceIdx);
+        return 'function ' + name + params + extractFunctionBody(src, name);
+      }
+      const runAt = karmaVal => {
+        const sandbox = {
+          _activeDef: () => ({ karma: realKarma187 }),
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(declareFn187f(render187, 'getKarmaCompanions'), sandbox);
+        return vm.runInContext(`getKarmaCompanions(${karmaVal})`, sandbox).map(c => c.name);
+      };
+      const goodNames = runAt(500);
+      const evilNames = runAt(-500);
+      const neutralNames = runAt(0);
+      tiersOk187 =
+        goodNames.includes('Dogmeat') &&
+        goodNames.includes('Charon') &&
+        goodNames.includes('Fawkes') &&
+        goodNames.includes('Star Paladin Cross') &&
+        !goodNames.includes('Clover') &&
+        evilNames.includes('Clover') &&
+        evilNames.includes('Jericho') &&
+        !evilNames.includes('Fawkes') &&
+        neutralNames.includes('Butch DeLoria') &&
+        neutralNames.includes('Sergeant RL-3') &&
+        !neutralNames.includes('Clover') &&
+        !neutralNames.includes('Fawkes');
+    } catch (e) {
+      errMsg187f = e && e.message;
+    }
+    assert(
+      tiersOk187,
+      '187.9f: [behavioral] getKarmaCompanions() sources the REAL GAME_DEFS.FO3.karma.companions data end-to-end — good/evil/neutral tiers partition the correct roster, Dogmeat/Charon always included' +
+        (errMsg187f ? ' — error: ' + errMsg187f : '')
     );
   }
 
@@ -27823,7 +31143,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         'PERK LOADOUT',
         'KARMA ALIGNMENT',
       ].every(t =>
-        new RegExp('<h2>[\\s\\S]{0,20}?&gt;[\\s\\S]{0,80}?' + flexTitle187(t)).test(html187)
+        new RegExp('<h2>[\\s\\S]{0,40}?&gt;[\\s\\S]{0,80}?' + flexTitle187(t)).test(html187)
       ),
       '187.20: SKILL BOOKS/SKILL MAGAZINES/PERK LOADOUT/KARMA ALIGNMENT headings all start with the mandatory "> " glyph'
     );
@@ -27835,7 +31155,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 188 — CARGO TAG row fix: USE button clipping (owner report)');
-  const css188 = readFile('css/terminal.css');
+  const css188 = readCss();
 
   // 188.1  Root cause (Protocol 27): the pre-existing .inventory-list li rule
   //        (element+class, specificity 0-1-1) beats .mrow's bare class
@@ -27877,7 +31197,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        renderInventory() row template (data-use/data-idx delegation,
   //        .hole/.use-btn/.tag/.m-id/.m-ctrl element order) is byte-identical
   //        to before this fix.
-  const render188 = readFile('js/ui-render.js');
+  const render188 = readGroup('ui-render');
   const invBody188 = (render188.match(/function renderInventory\(\)[\s\S]*?\n\}/) || [''])[0];
   assert(
     /data-use="\$\{it\._origIdx\}"/.test(invBody188) &&
@@ -27899,14 +31219,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  owner-locked Q3), the status-drawer + search filters, identity.databank
 //  per-game flavor, and the full id-preservation contract across all six
 //  boards (Protocol 22 — every original id/handler survives the reskin).
-//  20 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 189 — Phase 3 Piece 3: DATABANK Records Bay (BUS-16...21)');
   const html189 = readFile('index.html');
-  const render189 = readFile('js/ui-render.js');
-  const state189src = readFile('js/state.js');
-  const css189 = readFile('css/terminal.css');
+  const render189 = readGroup('ui-render');
+  const state189src = readGroup('state');
+  const css189 = readCss();
   const mapBody189 = (() => {
     try {
       return extractFunctionBody(render189, 'renderWorldMap');
@@ -28037,7 +31356,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   // 189.9  the CYCLE key is additive — autoImportState()'s own AI-write quest
   //        status path is untouched (Protocol 14/24 — a second entry point,
   //        never a fork of the AI path)
-  const apiSrc189 = readFile('js/api.js');
+  const apiSrc189 = readGroup('api');
   assert(
     /status/.test(apiSrc189) &&
       /quests/i.test(apiSrc189) &&
@@ -28214,15 +31533,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  MAGAZINES live-count + stamp wrap, Module Bay panel-reopen fix, MINOR
 //  FACTIONS collapsible, faction pin-strip uniform width, RAD-drag
 //  transition-lag follow-up (dragging-class transition suppression).
-//  17 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 190 — owner batch: RAD trace drag, skill books/mags, panel persistence, MINOR FACTIONS, pin-strip'
   );
-  const core190 = readFile('js/ui-core.js');
-  const render190 = readFile('js/ui-render.js');
-  const css190 = readFile('css/terminal.css');
+  const core190 = readGroup('ui-core');
+  const render190 = readGroup('ui-render');
+  const css190 = readCss();
 
   function declareFn190(src, name) {
     const nameIdx = src.indexOf('function ' + name);
@@ -28539,8 +31857,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       /container\.classList\.add\('dragging'\)/.test(wireBody190b) &&
         /container\.classList\.remove\('dragging'\)/.test(wireBody190b) &&
         (wireBody190b.match(/container\.classList\.add\('dragging'\)/g) || []).length === 2 &&
-        (wireBody190b.match(/container\.classList\.remove\('dragging'\)/g) || []).length === 2,
-      "190.12: _wireRadDragSurface() adds the 'dragging' class on both mousedown AND touchstart, and removes it on both mouseup AND touchend — the RAD drag surface is marked dragging for the full duration of either input method"
+        // U6 Strand 1 (Protocol 42): a third removal site was added for
+        // 'touchcancel' — a cancelled gesture (call, app switch) previously
+        // left both `dragging` (the JS flag) and this CSS class stuck true
+        // forever. 3, not 2, is now correct.
+        (wireBody190b.match(/container\.classList\.remove\('dragging'\)/g) || []).length === 3,
+      "190.12: _wireRadDragSurface() adds the 'dragging' class on mousedown AND touchstart, and removes it on mouseup, touchend, AND touchcancel (U6) — the RAD drag surface is marked dragging for the full duration of any input method, including a cancelled one"
     );
   }
 
@@ -28575,15 +31897,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  sizes to its own content (no more mid-glyph clipping) with native
 //  form-control chrome stripped via appearance:none so the box stays
 //  compact and consistent across devices (Protocol 17 floors preserved).
-//  25 tests.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 191 — CURIO ARCHIVE: shelves-inside-a-sealed-case themed objects');
-  const state191 = readFile('js/state.js');
-  const render191 = readFile('js/ui-render.js');
-  const reg191 = readFile('js/reg_fo3.js');
+  const state191 = readGroup('state');
+  const render191 = readGroup('ui-render');
+  const reg191 = readGroup('reg_fo3');
   const html191 = readFile('index.html');
-  const css191 = readFile('css/terminal.css');
+  const css191 = readCss();
 
   // 191.1  The pre-existing tracker-toggle contract is fully preserved —
   //        every function the mockup notes promise stays unchanged is
@@ -28930,16 +32251,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  into its own dedicated readout window in the always-visible casing-top
 //  header (#chassisScreenMini), since it read poorly squeezed next to the
 //  Overseer waveform.
-//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 192 — Design Overhaul CHASSIS unit: THE LIVING CORE');
   const html192 = readFile('index.html');
-  const core192 = readFile('js/ui-core.js');
-  const audio192 = readFile('js/ui-audio.js');
-  const saves192 = readFile('js/ui-saves.js');
-  const cloud192 = readFile('js/cloud.js');
-  const css192 = readFile('css/terminal.css');
+  const core192 = readGroup('ui-core');
+  const audio192 = readGroup('ui-audio');
+  const saves192 = readGroup('ui-saves');
+  const cloud192 = readGroup('cloud');
+  const css192 = readCss();
 
   // 192.1  the three BUS-22/23/24 boards exist on the CHASSIS tab, each a real
   //        .panel.bay-board with its own BUS slot tag
@@ -29671,12 +32991,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the Lincoln cell to a fixed compact width (min-width:0 to escape the
 //  flexbox min-width:auto trap) so the select now sizes to its CELL
 //  instead, with ellipsis for any label too long for that compact width.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 193 — Owner polish batch: tap-highlight kill + Lincoln side-by-side grid');
   const html193 = readFile('index.html');
-  const css193 = readFile('css/terminal.css');
+  const css193 = readCss();
   const cssStripped193 = css193.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // 193.1  -webkit-tap-highlight-color:transparent is declared on a broad
@@ -29811,16 +33130,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the small casing-top mini core (33-54px, already sharing its circle
 //  with 3 rings + the heart) without hurting the design; guarded here by
 //  a negative check that no half-shipped readout markup exists.
-//  21 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 194 — CHASSIS LIVING CORE: 10 owner-approved new behaviors (batch 2)');
   const html194 = readFile('index.html');
-  const css194 = readFile('css/terminal.css');
+  const css194 = readCss();
   const cssStripped194 = css194.replace(/\/\*[\s\S]*?\*\//g, '');
-  const core194 = readFile('js/ui-core.js');
-  const audio194 = readFile('js/ui-audio.js');
-  const state194 = readFile('js/state.js');
+  const core194 = readGroup('ui-core');
+  const audio194 = readGroup('ui-audio');
+  const state194 = readGroup('state');
 
   // 194.1  #1 thermal glow: a real activity-derived accumulator (_coreTemp),
   //        mutated ONLY by _coreThermalTick() (never by _coreRefresh(),
@@ -30203,11 +33521,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  actually too large, especially in the mini) — and the core "?" button
 //  sat close enough to the shape's corner that the r1 ring crossed
 //  through it.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 195 — LIVING CORE ring visual-parity fix (owner audit)');
-  const css195 = readFile('css/terminal.css');
+  const css195 = readCss();
   const cssStripped195 = css195.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // 195.1  perspective holds the SAME ratio-to-own-size at EVERY mini tier
@@ -30417,7 +33734,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  mechanism, 4 new additive RobcoEvents emits (rad.tier/limb.state/
 //  quest.status/location.visited + the collectible.acquired AI-path emit),
 //  and the 8 Tier-S flagship home-panel animations
-//  (planning/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1). Extended with two
+//  (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md — WAVE 1). Extended with two
 //  owner-reported bug fixes: the CASE-CLOSED/FAILED stamp overlapping the
 //  CYCLE button (196.28), and the CRITICAL USE-dims-the-screen lockup
 //  (196.29 — a pre-existing transmitMessage() gap, not a Wave 1 regression).
@@ -30426,16 +33743,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  map scrolling away when backing out of a zoomed node (196.31), and the
 //  survey-ping route line drawing itself already-complete instead of being
 //  watchable (196.32/196.33).
-//  50 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
-  const stateSrc196 = readFile('js/state.js');
-  const coreSrc196 = readFile('js/ui-core.js');
-  const renderSrc196 = readFile('js/ui-render.js');
-  const apiSrc196 = readFile('js/api.js');
+  const stateSrc196 = readGroup('state');
+  const coreSrc196 = readGroup('ui-core');
+  const renderSrc196 = readGroup('ui-render');
+  const apiSrc196 = readGroup('api');
   const htmlSrc196 = readFile('index.html');
-  const css196 = readFile('css/terminal.css');
+  const css196 = readCss();
   const cssStripped196 = css196.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── New additive emits (§4 of the build plan) ──────────────────────────
@@ -30492,8 +33808,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       '196.5: cycleQuestStatus() emits quest.status on a genuine complete/failed transition'
     );
   }
+  // AI_OVERSEER F1 (quests reconcile): the quest-status diff moved from the old
+  // full-replace loop (`prev`/`curr` over questsBefore) to the per-quest merge
+  // (`existing`/`prevStatus`/`norm`) — the emit contract is unchanged, only the
+  // local names, so this anchor tracks the new shape.
   assert(
-    /if \(prev && prev\.status !== curr\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(
+    /if \(existing && prevStatus !== norm\.status\) \{[\s\S]{0,1200}RobcoEvents\.emit\(\s*['"]quest\.status['"]/.test(
       apiSrc196
     ),
     '196.6: the AI quest-status-diff in autoImportState() also emits quest.status (same event as the native cycle key)'
@@ -30906,11 +34226,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       }
       // Re-emit the Suite 196 header immediately before this deferred proof's
       // own assert() (the Suite 137/137.6 precedent): _pendingAsync now holds
-      // proofs from TWO suites, and gate.js's per-suite parity parser
-      // attributes each console line to whichever header printed LAST — the
-      // generic re-emit right before Promise.all() below only covers
-      // whichever suite is named there, so each deferred proof must announce
-      // its own suite immediately before its own result line prints.
+      // proofs from TWO suites, and the per-suite output grouping attributes
+      // each console line to whichever header printed LAST — the generic
+      // re-emit right before Promise.all() below only covers whichever suite is
+      // named there, so each deferred proof must announce its own suite
+      // immediately before its own result line prints. (This kept the now-removed
+      // gate.js parity parser honest too; retained for correct output grouping.)
       header('Suite 196 — FEEDBACK ANIMATION WAVE 1: annunciator + new emits + 8 flagships');
       assert(
         !threw &&
@@ -31035,8 +34356,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 197 — FEEDBACK ANIMATION WAVE 2: the 9 Tier-A animations + the
-//  one new additive item.added emit (planning/FEEDBACK_ANIMATION_BUILD_
-//  PLAN.md — WAVE 2). item.added fires from three call sites (addItem()'s
+//  one new additive item.added emit (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md
+//  — WAVE 2). item.added fires from three call sites (addItem()'s
 //  manual path, doLoot()'s loot-apply path, and the AI inventory-merge diff
 //  in autoImportState(), Protocol 14 AI-contract precedent). The 9 home-
 //  panel reactions live in _wireCoreEventBusSubscribers() (ui-core.js);
@@ -31044,14 +34365,13 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  get an annunciator echo push in _wireFeedbackEchoSubscribers() — INK
 //  STAMP/WELD SPARKS/CLOCK SPIN-DOZE/HOLOTAPE COMMIT are home-only by
 //  owner decision and deliberately carry no echo.
-//  26 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 197 — FEEDBACK ANIMATION WAVE 2: item.added + 9 Tier-A animations');
-  const coreSrc197 = readFile('js/ui-core.js');
-  const renderSrc197 = readFile('js/ui-render.js');
-  const apiSrc197 = readFile('js/api.js');
-  const css197 = readFile('css/terminal.css');
+  const coreSrc197 = readGroup('ui-core');
+  const renderSrc197 = readGroup('ui-render');
+  const apiSrc197 = readGroup('api');
+  const css197 = readCss();
   const cssStripped197 = css197.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── item.added — the one new additive emit (3 call sites) ─────────────
@@ -31292,8 +34612,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 {
   header('Suite 198 — DATABANK map re-fix (node-back scroll anchor) + OPERATOR TRAITS chip reskin');
-  const renderSrc198 = readFile('js/ui-render.js');
-  const css198 = readFile('css/terminal.css');
+  const renderSrc198 = readGroup('ui-render');
+  const css198 = readCss();
   const cssStripped198 = css198.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── DATABANK CARTOGRAPHY TABLE — node-back scroll re-fix (owner report:
@@ -31493,8 +34813,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 199 — FEEDBACK ANIMATION WAVE 3: the 13 remaining Tier-B/C
-//  animations + the 5 new additive emits (planning/FEEDBACK_ANIMATION_
-//  BUILD_PLAN.md — WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
+//  animations + the 5 new additive emits (planning/2.8.0/plans/FEEDBACK_ANIMATION_BUILD_PLAN.md
+//  — WAVE 3, the final wave; #5 RADAWAY DRAIN and #7 SPLINT
 //  WRAP shipped early as free companions of #4/#6 in WAVE 1). The 5 new
 //  emits (karma.tier/item.equipped/effect.applied/effect.expiring/
 //  weight.seized) fire at their existing setters (U7/U8 precedent); the 13
@@ -31503,16 +34823,15 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  [home + echo] items also get an annunciator push in
 //  _wireFeedbackEchoSubscribers() — the remaining 7 are home-only by the
 //  build plan's routing table and deliberately carry no echo.
-//  31 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 199 — FEEDBACK ANIMATION WAVE 3: 5 new emits + the final 13 Tier-B/C animations');
-  const coreSrc199 = readFile('js/ui-core.js');
-  const renderSrc199 = readFile('js/ui-render.js');
-  const savesSrc199 = readFile('js/ui-saves.js');
-  const apiSrc199 = readFile('js/api.js');
-  const stateSrc199 = readFile('js/state.js');
-  const css199 = readFile('css/terminal.css');
+  const coreSrc199 = readGroup('ui-core');
+  const renderSrc199 = readGroup('ui-render');
+  const savesSrc199 = readGroup('ui-saves');
+  const apiSrc199 = readGroup('api');
+  const stateSrc199 = readGroup('state');
+  const css199 = readCss();
   const cssStripped199 = css199.replace(/\/\*[\s\S]*?\*\//g, '');
 
   // ── the 5 new additive emits ────────────────────────────────────────
@@ -31860,13 +35179,12 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  (ui-core.js) + the extracted _applyStatusEffect() (Protocol 22),
 //  decrementing qty by exactly 1 only when at least one effect was
 //  genuinely applied.
-//  14 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 200 — Native USE (deterministic item consumption, no AI)');
-  const renderSrc200 = readFile('js/ui-render.js');
-  const dbNvSrc200 = readFile('js/db_nv.js');
-  const dbFo3Src200 = readFile('js/db_fo3.js');
+  const renderSrc200 = readGroup('ui-render');
+  const dbNvSrc200 = readGroup('db_nv');
+  const dbFo3Src200 = readGroup('db_fo3');
 
   function declareFn200(src, name) {
     const nameIdx = src.indexOf('function ' + name);
@@ -32103,7 +35421,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         together in one sandbox (the Suite 133/182 real-function idiom).
   {
     const vm200d = require('vm');
-    const coreSrc200d = readFile('js/ui-core.js');
+    const coreSrc200d = readGroup('ui-core');
     function declareFnCore200d(name) {
       const nameIdx = coreSrc200d.indexOf('function ' + name);
       const parenIdx = coreSrc200d.indexOf('(', nameIdx);
@@ -32141,6 +35459,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
       _emitStatChangeIfDiffers: () => {},
       _resolveMaxRads: () => 1000,
       _pendingEffectWarmup: [],
+      // Suite 221 fix (F1): nativeUseItem() now calls reconcileEquipped(state)
+      // when a depleted item is spliced out — this suite doesn't exercise
+      // equipped, so a no-op stub is correct (real behavioral proof is 221.13).
+      reconcileEquipped: () => false,
+      renderEquipped: () => {},
       Math,
       parseInt,
       String,
@@ -32271,12 +35594,11 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  _resolveStatToken() (universal scalar/SPECIAL alias maps + getSkillKeys()
 //  for the per-game skill set, Protocol 38) and applied through the SAME A.2
 //  native setters Native USE uses (Protocol 22). Zero AI on every path.
-//  6 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 201 — TERMINAL stat edits (deterministic, no AI)');
-  const apiSrc201 = readFile('js/api.js');
-  const coreSrc201 = readFile('js/ui-core.js');
+  const apiSrc201 = readGroup('api');
+  const coreSrc201 = readGroup('ui-core');
 
   function declareFnApi201(name) {
     const nameIdx = apiSrc201.indexOf('function ' + name);
@@ -32641,9 +35963,9 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 202 — AI→native: GPS/MAP, level-up skill points, eligible perks');
-  const apiSrc202 = readFile('js/api.js');
-  const uiCoreSrc202 = readFile('js/ui-core.js');
-  const uiRenderSrc202 = readFile('js/ui-render.js');
+  const apiSrc202 = readGroup('api');
+  const uiCoreSrc202 = readGroup('ui-core');
+  const uiRenderSrc202 = readGroup('ui-render');
 
   // 202.1  static — the native router carries [GPS]/[MAP] → _nativeOpenMap()
   //        and [PERKS]/[PK] → renderEligiblePerks(); all four functions exist.
@@ -32855,7 +36177,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let err202c = null;
     try {
       const declared202c =
-        'function expandPanelForCategory(categoryKey)' +
+        // AI_OVERSEER Finding 6: the real signature gained an `opts` parameter
+        // (the {navigate:false} the post-sync AI import path passes). Declared here
+        // so this harness keeps exercising the REAL body, not a stale signature.
+        'function expandPanelForCategory(categoryKey, opts)' +
         extractFunctionBody(uiCoreSrc202, 'expandPanelForCategory');
       function makeDetails202c(initialOpen) {
         const details = {
@@ -32911,7 +36236,7 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 203 — native TRAVEL HERE map control');
-  const render203 = readFile('js/ui-render.js');
+  const render203 = readGroup('ui-render');
   const travelFn203 = extractFunctionBody(render203, 'travelToLocation');
   const travelBtnSrc203 = (render203.match(/const travelBtn = isYou[\s\S]*?<\/button>`;/) || [
     '',
@@ -33057,16 +36382,21 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 //  the SURVEYED annunciator reaction (location.visited, new-discovery-only)
 //  are both untouched. Plain @keyframes (Protocol UI-9), zero campaign-state
 //  write, mobile-safe fixed positioning (Protocol 17).
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 204 — LOCATION CONFIRMATION CARD (top-right arrival toast)');
-  const coreSrc204 = readFile('js/ui-core.js');
+  const coreSrc204 = readGroup('ui-core');
   const htmlSrc204 = readFile('index.html');
-  const css204 = readFile('css/terminal.css');
+  const css204 = readCss();
   const cssStripped204 = css204.replace(/\/\*[\s\S]*?\*\//g, '');
   const onLocChangeBody204 = extractFunctionBody(coreSrc204, 'onLocationChange');
   const showBody204 = extractFunctionBody(coreSrc204, '_locationCardShow');
+  // AI_OVERSEER Finding 6: the card is now fed by a bounded FIFO queue so a post-sync
+  // burst of change cards plays in sequence through the SAME element instead of each
+  // clobbering the last. _locationCardShow() is now the enqueue call site; _cardPump()
+  // owns the render/escape/dismiss lifecycle these tests exercise.
+  const enqueueBody204 = extractFunctionBody(coreSrc204, '_cardEnqueue');
+  const pumpBody204 = extractFunctionBody(coreSrc204, '_cardPump');
   const wireLocBody204 = extractFunctionBody(coreSrc204, '_wireLocationCardSubscriber');
   const wireEchoBody204 = extractFunctionBody(coreSrc204, '_wireFeedbackEchoSubscribers');
 
@@ -33162,8 +36492,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        escapeHtml() helper used app-wide before writing it into the DOM
   //        (XSS-safe).
   assert(
-    /escapeHtml\(String\(loc\)\)/.test(showBody204) && /labelEl\.innerHTML =/.test(showBody204),
-    '204.4: _locationCardShow() escapes the location name via escapeHtml() before writing it into .loc-card-label'
+    /escapeHtml\(next\.text\)/.test(pumpBody204) && /labelEl\.innerHTML =/.test(pumpBody204),
+    '204.4: the card render path (_cardPump) escapes the card text via escapeHtml() before writing it into .loc-card-label — every card, arrival or post-sync change, goes through this one escape'
   );
 
   // 204.5  BEHAVIORAL (vm sandbox) — _locationCardShow() shows the card
@@ -33177,7 +36507,14 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     let err204b = null;
     try {
       const declared204b =
-        'let _locCardTimer = null; let _locCardHideTimer = null;\nfunction _locationCardShow(loc)' +
+        'let _locCardTimer = null; let _locCardHideTimer = null;\n' +
+        'let _cardQueue = []; let _cardBusy = false;\n' +
+        'const CARD_QUEUE_MAX = 5; const CARD_DWELL_MS = 2200; const CARD_DWELL_CHANGE_MS = 1700;\n' +
+        'function _cardEnqueue(text, dwellMs)' +
+        enqueueBody204 +
+        '\nfunction _cardPump()' +
+        pumpBody204 +
+        '\nfunction _locationCardShow(loc)' +
         showBody204;
       const timers204b = [];
       const classes204b = new Set();
@@ -33308,24 +36645,26 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §7 Stage 1: vendor + lazy-load
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §7 Stage 1: vendor + lazy-load
 //  self-hosted Tesseract.js, the 'wasm-unsafe-eval' CSP addition, the
 //  install-safe SW caching split (small shims in ASSETS, heavy core+lang
 //  runtime-best-effort only), and a raw-text-dump proof wired into the
 //  staging-only Dev Console. NO parser, NO state write, NO change to the
 //  existing AI-vision Visual Upload path anywhere in this unit (Unit 2/3).
-//  20 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 {
-  const ocrSrc205 = readFile('js/ocr.js');
+  const ocrSrc205 = readGroup('ocr');
   const htmlSrc205 = readFile('index.html');
   const swSrc205 = readFile('sw.js');
-  const consoleSrc205 = readFile('js/test-console.js');
+  const consoleSrc205 = readGroup('test-console');
   const repomix205 = readFile('repomix.config.json');
 
   // 205.1 js/ocr.js exists on disk
-  assert(fs.existsSync(path.join(ROOT, 'js/ocr.js')), 'js/ocr.js file exists (Unit 1 infra)');
+  assert(
+    fs.existsSync(path.join(ROOT, 'js/services/ocr.js')),
+    'js/ocr.js file exists (Unit 1 infra)'
+  );
 
   // 205.2 the vendored Tesseract.js files exist on disk (self-hosted, no CDN)
   assert(
@@ -33339,13 +36678,16 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   );
 
   // 205.3 <script src="js/ocr.js"> present in index.html
-  assert(/"js\/ocr\.js"/.test(htmlSrc205), '<script src="js/ocr.js"> present in index.html');
+  assert(
+    /"js\/services\/ocr\.js"/.test(htmlSrc205),
+    '<script src="js/ocr.js"> present in index.html'
+  );
 
   // 205.4 ocr.js loads after ui-render.js and before ui-core.js (plan-mandated boot order)
   {
-    const renderIdx205 = htmlSrc205.indexOf('"js/ui-render.js"');
-    const ocrIdx205 = htmlSrc205.indexOf('"js/ocr.js"');
-    const coreIdx205 = htmlSrc205.indexOf('"js/ui-core.js"');
+    const renderIdx205 = htmlSrc205.indexOf('"js/ui/ui-render.js"');
+    const ocrIdx205 = htmlSrc205.indexOf('"js/services/ocr.js"');
+    const coreIdx205 = htmlSrc205.indexOf('"js/ui/ui-core.js"');
     assert(
       renderIdx205 !== -1 &&
         ocrIdx205 !== -1 &&
@@ -33359,7 +36701,7 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   // 205.5 './js/ocr.js' and the small vendor shims (tesseract.min.js/worker.min.js) are
   //       in the all-or-nothing sw.js ASSETS precache list
   assert(
-    /['"]\.\/js\/ocr\.js['"]/.test(swSrc205) &&
+    /['"]\.\/js\/services\/ocr\.js['"]/.test(swSrc205) &&
       /['"]\.\/js\/vendor\/tesseract\.min\.js['"]/.test(swSrc205) &&
       /['"]\.\/js\/vendor\/worker\.min\.js['"]/.test(swSrc205),
     "sw.js ASSETS precache includes './js/ocr.js', './js/vendor/tesseract.min.js', and './js/vendor/worker.min.js' (small, safe shims)"
@@ -33544,8 +36886,8 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
   //        handleImageSelection() and transmitMessage()'s inlineData branch
   //        still exist unmodified (Unit 1 is additive-only).
   {
-    const savesSrc205 = readFile('js/ui-saves.js');
-    const apiSrc205 = readFile('js/api.js');
+    const savesSrc205 = readGroup('ui-saves');
+    const apiSrc205 = readGroup('api');
     assert(
       /function handleImageSelection\(event\)/.test(savesSrc205) &&
         /attachedImageData = e\.target\.result;/.test(savesSrc205) &&
@@ -33568,7 +36910,7 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §3.3/3.4/3.5: the deterministic,
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §3.3/3.4/3.5: the deterministic,
 //  game-agnostic _parseOcrText() (js/ocr.js), the confirm-gated preview
 //  modal (renderVisualParsePreview/_confirmVisualParse), and the validated
 //  additive apply (_visualParseInventoryMerge/applyVisualParse, both
@@ -33578,15 +36920,14 @@ header('Suite 205 — VISUAL UPLOAD OCR Unit 1 (infra proof)');
 //  No hybrid/kill-switch routing here (Unit 3 scope) — the pipeline is
 //  reached via the staging-only Dev Console SCAN & PARSE board, same
 //  visibility gate as Unit 1.
-//  16 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply)');
 {
-  const ocrSrc206 = readFile('js/ocr.js');
-  const renderSrc206 = readFile('js/ui-render.js');
-  const apiSrc206 = readFile('js/api.js');
-  const coreSrc206 = readFile('js/ui-core.js');
-  const consoleSrc206 = readFile('js/test-console.js');
+  const ocrSrc206 = readGroup('ocr');
+  const renderSrc206 = readGroup('ui-render');
+  const apiSrc206 = readGroup('api');
+  const coreSrc206 = readGroup('ui-core');
+  const consoleSrc206 = readGroup('test-console');
   const htmlSrc206 = readFile('index.html');
 
   // 206.1 static — _parseOcrText is defined in js/ocr.js and exposed on window
@@ -34086,7 +37427,7 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)
-//  planning/VISUAL_UPLOAD_OCR_PLAN.md §4: the two fail-open feature flags
+//  planning/2.8.0/plans/VISUAL_UPLOAD_OCR_PLAN.md §4: the two fail-open feature flags
 //  (visualOcr primary / visualAiVision fallback, js/cloud.js), the hybrid
 //  router (routeVisualUpload(), js/ocr.js) wired into the REAL composer [+]
 //  attach flow (handleImageSelection(), js/ui-saves.js), the TRY AI VISION
@@ -34097,16 +37438,15 @@ header('Suite 206 — VISUAL UPLOAD OCR Unit 2 (parser + preview/confirm + apply
 //  pre-existing AI-vision transmitMessage() inlineData branch is reused
 //  verbatim as the fallback (Protocol 22) — this unit retires the AI-ONLY
 //  default without deleting or forking that code path.
-//  17 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 {
-  const ocrSrc207 = readFile('js/ocr.js');
-  const savesSrc207 = readFile('js/ui-saves.js');
-  const apiSrc207 = readFile('js/api.js');
-  const renderSrc207 = readFile('js/ui-render.js');
-  const coreSrc207 = readFile('js/ui-core.js');
-  const cloudSrc207 = readFile('js/cloud.js');
+  const ocrSrc207 = readGroup('ocr');
+  const savesSrc207 = readGroup('ui-saves');
+  const apiSrc207 = readGroup('api');
+  const renderSrc207 = readGroup('ui-render');
+  const coreSrc207 = readGroup('ui-core');
+  const cloudSrc207 = readGroup('cloud');
 
   // 207.1 static — cloud.js registers both fail-open flags (Protocol 32/33)
   assert(
@@ -34574,7 +37914,7 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 // ══════════════════════════════════════════════════════════════
 //  Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5): campaign ignition,
 //  Director greeting, firmware flash, long-absence recalibration, SEAT verb
-//  planning/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
+//  planning/2.8.0/slates/CEREMONY_MOMENTS_SLATE.md Tier 1: M1 Campaign Ignition (a short,
 //  skippable commissioning ceremony replacing wipeTerminal()'s two bare chat
 //  lines), M2 Director on the Wire (consumes the previously-orphaned
 //  identity.overseer.greeting), M3 Firmware Flash (a post-update boot POST
@@ -34584,16 +37924,15 @@ header('Suite 207 — VISUAL UPLOAD OCR Unit 3 (hybrid wiring + kill-switch)');
 //  SEAT (the Protocol UI-9 pending motion verb, adopted at 4 install call
 //  sites). Every moment is transient/MetaStore-only (Protocol 4 not
 //  triggered) and game-agnostic (Protocol 38).
-//  29 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 {
-  const coreSrc208 = readFile('js/ui-core.js');
-  const audioSrc208 = readFile('js/ui-audio.js');
-  const stateSrc208 = readFile('js/state.js');
-  const css208 = readFile('css/terminal.css');
+  const coreSrc208 = readGroup('ui-core');
+  const audioSrc208 = readGroup('ui-audio');
+  const stateSrc208 = readGroup('state');
+  const css208 = readCss();
   const cssStripped208 = css208.replace(/\/\*[\s\S]*?\*\//g, '');
-  const claudeSrc208 = readFile('CLAUDE.md');
+  const claudeSrc208 = readRulebook();
 
   const ignitionBody208 = extractFunctionBody(coreSrc208, '_runCampaignIgnition');
   const wipeBody208 = extractFunctionBody(coreSrc208, 'wipeTerminal');
@@ -35115,13 +38454,13 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
     '208.26: toggleMasterMute() fires the SEAT flourish only on the reseat (un-mute) branch, never on eject (mute)'
   );
 
-  // 208.27 static — CLAUDE.md documents SEAT as adopted at this unit
+  // 208.27 static — the rulebook documents SEAT as adopted at this unit
   //         (Protocol UI-9).
   assert(
     /Protocol UI-9 — Motion-Verb Grammar \(adopted at the Design Overhaul DO-N unit, SWEEP token; SEAT adopted at the Ceremony Moments Wave 1 unit\)/.test(
       claudeSrc208
     ) && /\*\*SEAT\*\* \(introduced at Ceremony Moments Wave 1, M5\)/.test(claudeSrc208),
-    '208.27: CLAUDE.md’s Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit'
+    '208.27: the rulebook’s Protocol UI-9 documents SEAT as adopted at the Ceremony Moments Wave 1 unit'
   );
 
   // ── CROSS-CUTTING ────────────────────────────────────────────────────────
@@ -35150,7 +38489,7 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 209 — MOBILE DENSITY STANDARD, TIER-1 (planning/MOBILE_DENSITY_PLAN.md
+//  Suite 209 — MOBILE DENSITY STANDARD, TIER-1 (planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md
 //  §2/§3, owner-approved Tier-1 only): a small mobile-only spacing-token scale
 //  (--d-board-pad-block/-btm/-inline, --d-board-gap, --d-section-gap,
 //  --d-subtitle-mb) plus the 8 concrete F1-F8 fixes (shared board shell,
@@ -35161,11 +38500,10 @@ header('Suite 208 — CEREMONY MOMENTS WAVE 1 (M1-M5)');
 //  .bay-part-no subtitle is never hidden (Protocol 25). The whole block is
 //  deliberately placed at the END of terminal.css so it always wins the
 //  cascade over each selector's earlier, unconditional base rule.
-//  10 tests
 // ══════════════════════════════════════════════════════════════
 header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 {
-  const css209 = readFile('css/terminal.css');
+  const css209 = readCss();
   const cssStripped209 = css209.replace(/\/\*[\s\S]*?\*\//g, '');
 
   const rootMatch209 = cssStripped209.match(/:root\s*\{[^}]*\}/);
@@ -35314,7 +38652,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage) (14 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  The Developer Console (Suite 149) is re-founded on a data-driven
 //  DIAGNOSTIC_SHELL_TOOLS registry that auto-filters by a two-signal
@@ -35336,11 +38674,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 210 — Diagnostic Shell U1: registry spine + two-signal gate');
-  const testConsole210 = readFile('js/test-console.js');
+  const testConsole210 = readGroup('test-console');
   const index210 = readFile('index.html');
 
   // 210.1  DIAGNOSTIC_SHELL_TOOLS registers one entry for each of the 9
-  //        migrated controls (planning/DIAGNOSTIC_SHELL_PLAN.md §1.3).
+  //        migrated controls (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §1.3).
   {
     const ids210 = [
       'inspect-runtime-state',
@@ -35723,7 +39061,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage) (13 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §6, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  U1's document-flow <details class="panel"> (which shoved the whole
 //  machine down on mobile whenever the console mounted) is replaced by a
@@ -35743,9 +39081,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 211 — Diagnostic Shell U2: mobile overlay + identity + icons');
-  const testConsole211 = readFile('js/test-console.js');
+  const testConsole211 = readGroup('test-console');
   const index211 = readFile('index.html');
-  const css211 = readFile('css/terminal.css');
+  const css211 = readCss();
   const tplStart211 = index211.indexOf('<template id="testConsoleTemplate">');
   const tplEnd211 = index211.indexOf('</template>', tplStart211);
   const tplSrc211 = tplStart211 !== -1 ? index211.slice(tplStart211, tplEnd211) : '';
@@ -36086,8 +39424,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
-//  (16 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§7/§11, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  ~45 new registry entries under category:'triggers' — fire any of the 33
 //  feedback animations (bus-emit + pending-var), force each Living Core
@@ -36107,8 +39444,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 212 — Diagnostic Shell U3: TRIGGERS catalog + Protocol 44');
-  const testConsole212 = readFile('js/test-console.js');
-  const claude212 = readFile('CLAUDE.md');
+  const testConsole212 = readGroup('test-console');
+  const claude212 = readRulebook();
 
   // Live-evaluate the REAL DIAGNOSTIC_SHELL_TOOLS array (the eval-sandbox
   // technique Suite 210 already established) — every assertion below reads
@@ -36216,7 +39553,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 159 &&
+        tools212.length === 167 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -36225,7 +39562,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 159 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 167 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -36253,7 +39590,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           t.id !== 'a11y-immersion' &&
           t.id !== 'inspect-observers' &&
           t.id !== 'replay-hatch' &&
-          !t.id.startsWith('inspect-') // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
+          !t.id.startsWith('inspect-') && // the 7 U4a INSPECT tools (Suite 214) aren't part of U3's 45
+          t.id !== 'fire-sync-change-cards' && // AI_OVERSEER Finding 6's Protocol 44 trigger — a later addition, not one of U3's 45
+          t.group !== 'SAVE INTEGRITY' // SAVE_LAYER3's 6 tools landed after U3 (own suite covers them)
       );
       const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
       ok212 =
@@ -36608,11 +39947,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     'robco_booted_before',
   ];
   function _scanRealEmitEvents212() {
-    const jsDir = path.join(ROOT, 'js');
-    const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js') && f !== 'test-console.js');
+    const files = allJsFiles({ exclude: ['test-console.js'] });
     const names = new Set();
     files.forEach(f => {
-      const src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+      const src = fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8');
       const re = /RobcoEvents\.emit\(\s*'([^']+)'/g;
       let m;
       while ((m = re.exec(src))) names.add(m[1]);
@@ -36688,7 +40026,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //         details.sub-panel rule.
   {
     const renderShellBody212 = extractFunctionBody(testConsole212, '_renderShell');
-    const css212 = readFile('css/terminal.css');
+    const css212 = readCss();
     assert(
       /flex-wrap:\s*wrap/.test(renderShellBody212) &&
         !/\.dsh-tool-subhead\s*\{/.test(css212) &&
@@ -36734,7 +40072,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
   }
 
-  // 212.15  Protocol 44 is documented in CLAUDE.md (canonical) with its
+  // 212.15  Protocol 44 is documented in the rulebook (canonical) with its
   //         enforcement mechanism.
   assert(
     /## Protocol 44 — Every Hard-to-Trigger Feature Ships a Diagnostic Shell Trigger/.test(
@@ -36742,7 +40080,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     ) &&
       /triggers:\s*\[\.\.\.\]/.test(claude212) &&
       /RobcoEvents\.emit\('<name>', …\)/.test(claude212),
-    '212.15: Protocol 44 is documented in CLAUDE.md (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
+    '212.15: Protocol 44 is documented in the rulebook (canonical), naming its enforcement mechanism (the triggers[] cross-reference against every RobcoEvents.emit literal)'
   );
 
   // 212.16  BEHAVIORAL: _replayAbsence(), run against a synthetic
@@ -36786,7 +40124,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Suite 213 — Diagnostic Shell mobile chrome fixes (owner report) (8 tests)
+//  Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)
 // ──────────────────────────────────────────────────────────────
 //  Five presentation fixes on top of U1-U3, MOBILE ONLY (the exact inverse
 //  of the (min-width:1000px)... Suite 129 desktop gate) — desktop stays
@@ -36806,9 +40144,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 213 — Diagnostic Shell mobile chrome fixes (owner report)');
-  const testConsole213 = readFile('js/test-console.js');
+  const testConsole213 = readGroup('test-console');
   const index213 = readFile('index.html');
-  const css213 = readFile('css/terminal.css');
+  const css213 = readCss();
   // Pulls every top-level @media(max-width:999.98px){...} block's body and
   // concatenates them — this file has several such blocks (bezel, FAB,
   // drawer/sheet, telemetry), so a single-block regex would miss content in
@@ -36979,8 +40317,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out
-//  (planning/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
-//  (16 tests)
+//  (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §3.1/§11 U4, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  Two U4a deliverables: (1) EVERY registry `group` (not just the top-level
 //  CATEGORY) is now its own collapsible details.sub-panel, nested inside its
@@ -37000,7 +40337,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 214 — Diagnostic Shell U4a: collapsible groups + INSPECT build-out');
-  const testConsole214 = readFile('js/test-console.js');
+  const testConsole214 = readGroup('test-console');
   const index214 = readFile('index.html');
   const tplStart214 = index214.indexOf('<template id="testConsoleTemplate">');
   const tplEnd214 = index214.indexOf('</template>', tplStart214);
@@ -37268,9 +40605,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok214 =
         // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
-        // more after this unit shipped, so the registry now totals 159
-        // (61 at this unit's own ship time + 80 U4b + 18 U5).
-        tools214.length === 159 &&
+        // more after this unit shipped, so the registry now totals 166
+        // (61 at this unit's own ship time + 80 U4b + 18 U5 + 1 P8 eviction-recovery trigger).
+        tools214.length === 167 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -37283,7 +40620,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (159 tools, after U4b+U5) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (167 tools, after U4b+U5+SAVE_LAYER3+the AI_OVERSEER change-card trigger) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -37531,8 +40868,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES +
-//  submenu visual hierarchy (planning/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
-//  Protocol 8 Sonnet stage) (16 tests — 14 initial + 2 Protocol 42
+//  submenu visual hierarchy (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md §4/§5/§11 U4,
+//  Protocol 8 Sonnet stage) (plus 2 Protocol 42
 //  regressions found by this unit's own live Playwright verification: the
 //  DOM-sync revert bug in the fixture/FRESH START preset, and the shell's
 //  own confirm dialog rendering unreachable behind itself)
@@ -37559,9 +40896,9 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 215 — Diagnostic Shell U4b: STATE SETUP + RESETS + FIXTURES + submenu hierarchy');
-  const testConsole215 = readFile('js/test-console.js');
+  const testConsole215 = readGroup('test-console');
   const index215 = readFile('index.html');
-  const terminalCss215 = readFile('css/terminal.css');
+  const terminalCss215 = readCss();
 
   function _evalRealTools215() {
     const toolsStart = testConsole215.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
@@ -37577,7 +40914,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 215.1  every one of the 80 new U4b tool ids is registered exactly once,
-  //        and the full registry now totals 159 (61 from U1/U3/U4a + 80 U4b + 18 U5).
+  //        and the full registry now totals 166 (61 from U1/U3/U4a + 80 U4b + 18 U5 + 7 SAVE INTEGRITY [6 SAVE_LAYER3 + 1 P8]).
   {
     let ok215 = false;
     let err215 = null;
@@ -37668,7 +41005,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 159 &&
+        tools215.length === 167 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -37676,7 +41013,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 (after this unit + U5) with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 (after this unit + U5 + SAVE_LAYER3 + the AI_OVERSEER change-card trigger) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -38604,8 +41941,8 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock
-//  ceremony + FINAL leak-proof audit (planning/DIAGNOSTIC_SHELL_PLAN.md
-//  §4/§7/§11 U5, Protocol 8 Sonnet stage) (22 tests)
+//  ceremony + FINAL leak-proof audit (planning/2.8.0/plans/DIAGNOSTIC_SHELL_PLAN.md
+//  §4/§7/§11 U5, Protocol 8 Sonnet stage)
 // ──────────────────────────────────────────────────────────────
 //  18 new registry entries: 8 tier:'staging' feature-flag override toggles
 //  (control:'toggle', a new synthesis path in _renderShell()) routing
@@ -38624,7 +41961,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  _shellTier() completely unchanged (still staging-signal-only), so an
 //  unlocked production build shows the shell but renders ONLY tier:'prod'
 //  tools — leak-proof by construction, proved exhaustively below over the
-//  FULL, now-159-tool registry. _fireUnlockCeremony() is the short
+//  FULL, now-166-tool registry. _fireUnlockCeremony() is the short
 //  in-fiction "RESTRICTED ACCESS GRANTED" flourish (a plain animation:,
 //  Protocol UI-9, auto-neutralized by the existing global reduced-motion
 //  block).
@@ -38633,11 +41970,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   header(
     'Suite 216 — Diagnostic Shell U5: RESILIENCE/INFRA + minigame unlock ceremony + FINAL leak-proof audit'
   );
-  const testConsole216 = readFile('js/test-console.js');
-  const cloudSrc216 = readFile('js/cloud.js');
-  const stateSrc216 = readFile('js/state.js');
+  const testConsole216 = readGroup('test-console');
+  const cloudSrc216 = readGroup('cloud');
+  const stateSrc216 = readGroup('state');
   const index216 = readFile('index.html');
-  const terminalCss216 = readFile('css/terminal.css');
+  const terminalCss216 = readCss();
 
   function _evalRealTools216() {
     const toolsStart = testConsole216.indexOf('var DIAGNOSTIC_SHELL_TOOLS = [');
@@ -38653,7 +41990,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   }
 
   // 216.1  every one of the 18 new U5 tool ids is registered exactly once,
-  //        and the full registry now totals 159 (141 from U1-U4b + 18).
+  //        and the full registry now totals 166 (141 from U1-U4b + 18 U5 + 7 SAVE INTEGRITY [6 SAVE_LAYER3 + 1 P8]).
   {
     let ok216 = false;
     let err216 = null;
@@ -38682,7 +42019,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok216 =
         newIds216.length === 18 &&
-        tools216.length === 159 &&
+        tools216.length === 167 &&
         newIds216.every(id => ids216.includes(id)) &&
         new Set(ids216).size === ids216.length;
     } catch (e) {
@@ -38690,7 +42027,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 159 with no duplicate id' +
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 with no duplicate id' +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -38883,7 +42220,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const stagingTools216 = tools216.filter(t => t.tier === 'staging');
       const prodTools216 = tools216.filter(t => t.tier === 'prod');
       ok216 =
-        tools216.length === 159 &&
+        tools216.length === 167 &&
         stagingTools216.length > 0 &&
         prodTools216.length > 0 &&
         stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
@@ -38898,7 +42235,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 159-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
+      "216.6: FINAL LEAK-PROOF AUDIT (1/2) — BEHAVIORAL re-proof over the COMPLETE, final 167-tool registry (every unit U1-U5): every tier:'staging' tool is invisible under a stubbed 'prod' tier and visible under 'staging'; every tier:'prod' tool is visible under both — no cheat/reset/raw-internal/flag-override/AI-sim tool can ever leak to a production player" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -39350,7 +42687,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     try {
       const tools216 = _evalRealTools216();
       ok216 =
-        tools216.length === 159 &&
+        tools216.length === 167 &&
         tools216.every(t => !t.destructive || t.tier === 'staging') &&
         tools216.every(
           t =>
@@ -39362,7 +42699,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      "216.18: static leak-proof invariant re-derived against the FULL, final 159-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
+      "216.18: static leak-proof invariant re-derived against the FULL, final 167-tool registry — every destructive:true tool is tier:'staging', and every tool in a staging-only category (state/resets/infra/fixtures/inline) is tier:'staging' — no destructive/cheat/inspection/flag-override/AI-sim tool can ever be prod-tier" +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -39375,10 +42712,10 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     let ok216 = false;
     let err216 = null;
     try {
-      const jsFiles216 = fs
-        .readdirSync(path.join(ROOT, 'js'))
-        .filter(f => f.endsWith('.js') && f !== 'test-console.js');
-      const allJsSrc216 = jsFiles216.map(f => readFile('js/' + f)).join('\n');
+      const jsFiles216 = allJsFiles({ exclude: ['test-console.js'] });
+      const allJsSrc216 = jsFiles216
+        .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
+        .join('\n');
       const emitNames216 = new Set(
         [...allJsSrc216.matchAll(/RobcoEvents\.emit\(\s*'([^']+)'/g)].map(m => m[1])
       );
@@ -39438,15 +42775,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  Feedback Animation Waves). These tests lock that audit as a regression
 //  guard: CARGO SEIZED and the RNG interlock banners stay state-driven
 //  (never converted to a timed auto-dismiss), and no new full-width banner
-//  class sneaks in outside the known, already-reviewed set.
-//  9 tests
+//  class sneaks in outside the known, already-reviewed set. SAVE_INTEGRITY_PASS
+//  added .storage-warning-banner to that reviewed set (217.7b) alongside its
+//  own inert-template guard, same as .update-banner/.fo3-warning-banner.
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 217 — Mobile UX polish: cloud-save prominence + toast audit');
   const htmlSource217 = readFile('index.html');
-  const uiCore217 = readFile('js/ui-core.js');
-  const uiAccount217 = readFile('js/ui-account.js');
-  const cssSource217 = readFile('css/terminal.css');
+  const uiCore217 = readGroup('ui-core');
+  const uiAccount217 = readGroup('ui-account');
+  const cssSource217 = readCss();
 
   // 217.1  #btnSaveToCloud sits in the SAME row as the EXPORT SAVE button —
   //        the two primary "preserve your campaign" actions at equal weight.
@@ -39503,11 +42841,14 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       '#dshEnvBanner',
       '.update-banner',
       '.rng-banner',
+      // SAVE_INTEGRITY_PASS: same inert-<template> pattern as .update-banner/
+      // .fo3-warning-banner above (WU-E2), reviewed at that same bar — see 217.7b.
+      '.storage-warning-banner',
     ]);
     const unknown217 = [...bannerSelectors217].filter(s => !known217.has(s));
     assert(
       bannerSelectors217.size > 0 && unknown217.length === 0,
-      '217.5: every "*banner*" CSS selector is one of the four known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner) — no new full-width banner-style popup introduced' +
+      '217.5: every "*banner*" CSS selector is one of the five known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner/.storage-warning-banner) — no new full-width banner-style popup introduced' +
         (unknown217.length ? ' — unexpected: ' + unknown217.join(', ') : '')
     );
   }
@@ -39533,6 +42874,19 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     assert(
       tplIdx217b !== -1 && /fo3-warning-banner|fo3WarningBanner/.test(tplBody217b),
       '217.7: .fo3-warning-banner/#fo3WarningBanner markup lives inside <template id="fo3WarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
+    );
+  }
+
+  // 217.7b  .storage-warning-banner stays inert — same inert-template pattern
+  //         (SAVE_INTEGRITY_PASS). Only _showStorageWarningBanner() (ui-core.js)
+  //         ever clones it into the live DOM, and only on a denied persist() result.
+  {
+    const tplIdx217c = htmlSource217.indexOf('id="storageWarningBannerTemplate"');
+    const tplEnd217c = htmlSource217.indexOf('</template>', tplIdx217c);
+    const tplBody217c = htmlSource217.slice(tplIdx217c, tplEnd217c);
+    assert(
+      tplIdx217c !== -1 && /storage-warning-banner|storageWarningBanner/.test(tplBody217c),
+      '217.7b: .storage-warning-banner/#storageWarningBanner markup lives inside <template id="storageWarningBannerTemplate"> (inert-by-default, never a live rendered banner)'
     );
   }
 
@@ -39574,15 +42928,14 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  inactive-subsystem panel — no override was actually winning — so MF-1's
 //  fix here is an explicit, un-overridable hardening of the existing
 //  invariant rather than a repair of a reproduced break. MF-3 are real fixes.
-//  8 tests
 // ══════════════════════════════════════════════════════════════
 {
   header(
     'Suite 218 — NV overhaul design audit: mobile gating hardened, dead GPS modal + game literals retired'
   );
-  const cssSource218 = readFile('css/terminal.css');
-  const apiSrc218 = readFile('js/api.js');
-  const uiCoreSrc218 = readFile('js/ui-core.js');
+  const cssSource218 = readCss();
+  const apiSrc218 = readGroup('api');
+  const uiCoreSrc218 = readGroup('ui-core');
 
   // 218.1  MF-1 — the base subsystem-content gate still exists, unconditional.
   assert(
@@ -39658,7 +43011,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   //        actually generalizes past the two shipped games rather than merely
   //        renaming the same two-way ternary.
   {
-    const stateSrc218 = readFile('js/state.js');
+    const stateSrc218 = readGroup('state');
     const fo4Idx218 = stateSrc218.indexOf('FO4:');
     const fo4Slice218 = stateSrc218.slice(fo4Idx218, fo4Idx218 + 400);
     assert(
@@ -39685,12 +43038,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  falling back to a literal array (_SYSTEM_STATUS_FLAGS_FALLBACK) only
 //  when that accessor isn't available (a reduced test harness). Also fixes
 //  a Protocol 42 gate defect this hotfix's own net test-count change exposed
-//  (Suite 28's canonical-count reader picked a stale, frozen count). 7 tests.
+//  (Suite 28's canonical-count reader picked a stale, frozen count).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 219 — v2.8.0 Hotfix: SYSTEM STATUS breaker readout single-sourced');
-  const cloudSrc219 = readFile('js/cloud.js');
-  const uiCoreSrc219 = readFile('js/ui-core.js');
+  const cloudSrc219 = readGroup('cloud');
+  const uiCoreSrc219 = readGroup('ui-core');
 
   // 219.1  cloud.js exports window.getFeatureFlagKeys() as the single source
   //        of every real flag key (Object.keys(_featureFlags) — never a
@@ -39823,34 +43176,7695 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     '219.6: every key _systemStatusFlagKeys() returns is rendered as its own ENABLED/DISABLED breaker in the rack — no silent per-flag drop'
   );
 
-  // 219.7  PROTOCOL 42 — while shipping this very hotfix (a net test-count
-  //        change), Suite 28's "canonical test count" reader was found to read
-  //        only the FIRST "Tests: N/N" header in CHANGELOG.md (always the
-  //        [Unreleased] header) — correct only by coincidence, since every prior
-  //        push happened to leave Unreleased's count equal to the latest
-  //        released block's count. The Hotfix model (Protocol 2a) explicitly
-  //        freezes Unreleased while a hotfix updates the ALREADY-RELEASED
-  //        block's header instead, so a hotfix that changes the total test
-  //        count (this one) legitimately diverges the two, and the old
-  //        first-match read picked the stale, frozen number. REAL shipped-code
-  //        defect (the gate runs on every commit) — fixed in the SAME commit
-  //        (both runners) to take the MAXIMUM across every header, and locked
-  //        here with a behavioral proof against a synthetic frozen-Unreleased /
-  //        hotfixed-released pair.
+  // 219.7  REMOVED by R1 (2026-07-20, Protocol 49). It was a behavioral proof
+  //        that Suite 28's canonical-count reader took the MAXIMUM across every
+  //        CHANGELOG.md "Tests: N/N" header rather than the first (stale) match.
+  //        That reader was deleted with Protocol 2a, so this test now guards
+  //        nothing — a guard whose subject no longer exists is retired with it,
+  //        not left asserting against dead code.
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 220 — Documentation reference integrity (doc-drift guard)
+// ══════════════════════════════════════════════════════════════
+//  WHY (Protocol 45): Protocol 2/2a already say "keep the docs current,"
+//  but they are honor-system rules and drift happened anyway —
+//  window.pushToCloud / window.pullFromCloud were documented for months
+//  yet never existed (the real names are saveCurrentToCloud / loadCloudSave),
+//  and the script load-order list silently omitted idb/ocr/runtime/
+//  test-console. Per the escape-ratchet (Protocol 36b), a defect class that
+//  escapes every layer gets a GATE GUARD at that layer. This suite FAILS
+//  THE BUILD when a load-bearing doc names code that does not exist.
+//
+//  DELIBERATELY NARROW — precision over recall. A scanner that flags
+//  ordinary prose gets ignored, then weakened, then it is dead. Only exact,
+//  unambiguous reference forms are checked.
+//
+//  SCANNED: CLAUDE.md, ARCHITECTURE.md, README.md (all committed).
+//  NOT scanned for PROSE content: library/BRAIN_DUMP.md — gitignored (absent
+//  on a clean CI checkout) and its "Known documentation drift" ledger
+//  deliberately quotes retired/wrong names to warn sessions off them.
+//
+//  220.7/220.8 (Protocol 46, 2.8.5 U-B2) extend this to library/…  POINTER
+//  PATHS themselves — the Reference Pointer Index names library/CODE_MAP.md,
+//  library/BRAIN_DUMP.md, library/TEST_CATALOG.md, but library/ is gitignored
+//  so a naive fs.existsSync() would either false-positive-fail on every clean
+//  CI checkout (files never exist there) or silently pass forever if skipped
+//  outright (a guard that can never fail is worse than none). The fix:
+//  library/MANIFEST.txt is a small COMMITTED exception to the library/
+//  gitignore (a filename-only list) — 220.7 checks every doc-referenced
+//  library/<file> against it (real on CI AND locally); 220.8 checks the
+//  manifest against library/'s ACTUAL contents when present (real only
+//  locally, where the drift it catches is actually visible).
+//
+//  220.9 (Health-U6 audit follow-up) adds protocol-heading reference
+//  integrity: every "Protocol N" cross-reference across the docs + js/ +
+//  tests/ must resolve to a real heading in CLAUDE.md, with compound/merged
+//  headings (29/30/31, 32/33/35) and body sub-parts (36b, 2a) handled.
+//  220.10 (r-review Defect-2) proves 220.9's report names its allowlisted
+//  forward-references (Protocol 47) explicitly instead of overstating.
+//  220.11 (r-review Defect-4) guards that the ARCHITECTURE.md File Map
+//  carries no hardcoded byte/KB sizes. 220.12 (r-review) guards that
+//  CLAUDE.md's gate block pushes to dev, not main (Protocol 43).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 220 — Documentation reference integrity (doc-drift guard)');
+
+  // 2.8.5 U-R2 (the rules restructure): the scanned set follows the rule text.
+  // CLAUDE.md kept the universal contract and shed every surface-scoped
+  // protocol into rules/*.md — so the doc-drift guard scans the notes too.
+  // Scanning only CLAUDE.md after the split would have quietly halved this
+  // suite's coverage while still reporting green (Protocol 49: moving content
+  // moves its enforcement in the same commit).
+  // The robco-uos skill (skill/SKILL.md) is a fourth context source a session
+  // reads. It is a POINTER at the canonical rules, not a copy — but it still
+  // NAMES paths and protocol numbers, and the one real failure on record was it
+  // naming things that no longer existed (a dead repo path, the deleted RULES.md,
+  // retired Protocol 2a). Rather than a bespoke suite that duplicates the checks
+  // below, the skill is simply folded into THIS existing scan (Protocol 22): any
+  // js/css/tests/scripts/rules path or "Protocol N" it names is validated by the
+  // same 220.2 / 220.9 machinery as the docs. A pointer has little to drift; this
+  // costs nothing and catches the exact RULES.md-style dead reference if it recurs.
+  const DOC_FILES_220 = [
+    'CLAUDE.md',
+    'ARCHITECTURE.md',
+    'README.md',
+    'skill/SKILL.md',
+    ...ruleNoteFiles(),
+  ];
+  const docText220 = {};
+  for (const d of DOC_FILES_220) docText220[d] = readFile(d);
+  const docBlob220 = DOC_FILES_220.map(d => docText220[d]).join('\n');
+
+  // Existence corpus: every js/**/*.js plus index.html (window.* may be
+  // assigned in the index.html pre-paint head scripts, not only in js/).
+  // 2.8.5 U-A2: js/ is no longer flat — walk every js/<subfolder>/ (see
+  // allJsFiles(), shared with Suites 49/212/216's own js-file scans).
+  const srcCorpus220 =
+    allJsFiles()
+      .map(f => fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8'))
+      .join('\n') +
+    '\n' +
+    readFile('index.html');
+
+  const normOrder220 = s => s.replace(/^db_(?:nv|fo3)$/, 'db').replace(/^reg_(?:nv|fo3)$/, 'reg');
+  const dedupeConsec220 = a => a.filter((x, i) => i === 0 || x !== a[i - 1]);
+
+  // ── 220.1  every window.<name> in the docs resolves to a real assignment ──
+  // Allowlist: platform globals the docs legitimately reference but the app
+  // never assigns. Kept tiny — every app-owned window.* the docs mention DOES
+  // appear in js/ or index.html.
+  const WIN_ALLOW_220 = new Set([
+    'innerWidth', // browser layout global (Protocol 17 mobile checks)
+    'location', // browser navigation global
+    'onload', // boot entry point, assigned inline in index.html
+    'matchMedia', // browser media-query global
+    'navigator', // browser global
+  ]);
   {
-    const synthetic219 =
-      '## [Unreleased]<!-- Tests: 2938/2938 | Cache: x -->\n\n## [v2.8.0]<!-- Tests: 2944/2944 | Cache: y -->\n';
-    const matches219 = [...synthetic219.matchAll(/Tests:\s*(\d+)\/\d+/g)];
-    const max219 = matches219.length
-      ? String(Math.max(...matches219.map(m => parseInt(m[1], 10))))
-      : '';
-    const suite28Src219 = readFile('tests/robco-diagnostics.js');
+    const winRe = /window\.([A-Za-z_$][A-Za-z0-9_$]*)/g;
+    const winExists = new Set();
+    let m;
+    while ((m = winRe.exec(srcCorpus220))) winExists.add(m[1]);
+    const missingWin = new Set();
+    winRe.lastIndex = 0;
+    while ((m = winRe.exec(docBlob220))) {
+      const n = m[1];
+      if (!winExists.has(n) && !WIN_ALLOW_220.has(n)) missingWin.add(n);
+    }
     assert(
-      max219 === '2944' &&
-        /matchAll\(\/Tests:\\s\*\(\\d\+\)\\\/\\d\+\/g\)/.test(suite28Src219) &&
-        /Math\.max\(\.\.\.countMatches\.map/.test(suite28Src219),
-      '219.7: PROTOCOL 42 — Suite 28\'s canonical-count reader takes the MAXIMUM across every CHANGELOG.md "Tests: N/N" header (behavioral proof: a synthetic frozen-Unreleased/hotfixed-released pair correctly resolves to 2944, the current value, not 2938, the first/stale match) — the bug this hotfix\'s own net test-count change exposed'
+      missingWin.size === 0,
+      '220.1: every window.<name> named in CLAUDE/ARCHITECTURE/README resolves to a real assignment in js/*.js or index.html' +
+        (missingWin.size ? ' — DRIFT: ' + [...missingWin].join(', ') : '')
     );
+  }
+
+  // ── 220.2  every explicit repo file path in the docs exists on disk ──
+  // Single-segment paths only (topdir/name.ext) so slash-joined prose lists
+  // and multi-dot vendored names can never produce a phantom path. The
+  // negative lookbehind rejects a "topdir" that is really a file-extension
+  // tail (e.g. "...account.js/index.html" must not yield "js/index.html").
+  const PATH_ALLOW_220 = new Set([
+    // MUST-NOT-EXIST: retired in the ui-* split, guarded by Suite 56; the docs
+    // name it precisely to warn it off, which is correct, not drift.
+    'js/ui.js',
+    // MUST-NOT-EXIST: the PowerShell test-runner mirror, deleted in 2.8.5 U-B3
+    // when Protocol 15 (runner parity) was retired. The docs name it precisely
+    // to record the retirement (CLAUDE.md Protocol 15, the file trees), which is
+    // correct, not drift. Its absence is guarded by Suites 28/50.6/128.5.
+    'tests/robco-diagnostics.ps1',
+  ]);
+  {
+    // U-R2: `rules/<note>.md` joins the scanned prefixes so a retrieval-map row
+    // or a cross-note pointer naming a subsystem note that does not exist fails
+    // the build — the same drift class, one directory later.
+    const pathRe =
+      /(?<![.\w/])(?:js|css|tests|scripts|rules)\/[A-Za-z0-9_-]+\.(?:js|mjs|ps1|css|json|html|md)\b/g;
+    const missingPath = new Set();
+    let m;
+    while ((m = pathRe.exec(docBlob220))) {
+      const p = m[0];
+      if (!PATH_ALLOW_220.has(p) && !fs.existsSync(path.join(ROOT, p))) missingPath.add(p);
+    }
+    assert(
+      missingPath.size === 0,
+      '220.2: every explicit js/ css/ tests/ scripts/ file path in the docs exists on disk (allowlist: js/ui.js — guarded MUST-NOT-EXIST, Suite 56)' +
+        (missingPath.size ? ' — DRIFT: ' + [...missingPath].join(', ') : '')
+    );
+  }
+
+  // ── Canonical boot order, derived mechanically from index.html ──
+  // (shared by 220.3–220.6): the first static <script src="js/…"> tag (idb.js),
+  // then the GAME_FILES manifest arrays, then the remaining static tags.
+  const canonicalOrder220 = (() => {
+    const html = readFile('index.html');
+    const statics = [];
+    let m;
+    // 2.8.5 U-A2: js/ is subfoldered (js/ui/ui-core.js, ...) — the optional
+    // '<subfolder>/' group absorbs it; the captured stem (group 2) is what
+    // normOrder220 operates on, same as the pre-reorg flat js/<stem>.js form.
+    const sr = /<script[^>]*\ssrc=["']js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js["']/g;
+    while ((m = sr.exec(html))) statics.push(m[1]);
+    const gf = /FNV:\s*\[([^\]]+)\]/.exec(html);
+    const game = gf
+      ? [...gf[1].matchAll(/js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js/g)].map(x => x[1])
+      : [];
+    return dedupeConsec220([statics[0], ...game, ...statics.slice(1)].map(normOrder220));
+  })();
+
+  // Extract the ordered js modules from a doc's LOAD-ORDER-GUARD block: on each
+  // numbered list line, take only the SUBJECT before the first "→"/"->" arrow.
+  const extractDocOrder220 = text => {
+    const b = /LOAD-ORDER-GUARD:BEGIN([\s\S]*?)LOAD-ORDER-GUARD:END/.exec(text);
+    if (!b) return null;
+    const out = [];
+    for (const line of b[1].split(/\r?\n/)) {
+      if (!/^\s*\d+\./.test(line)) continue;
+      const subj = line.split(/→|->/)[0];
+      let mm;
+      const fr = /js\/(?:[A-Za-z0-9_-]+\/)?([A-Za-z0-9_-]+)\.js/g;
+      while ((mm = fr.exec(subj))) out.push(normOrder220(mm[1]));
+    }
+    return dedupeConsec220(out);
+  };
+
+  // ── 220.3  the rulebook's load-order block == the real boot order ──
+  // U-R2: the block moved from CLAUDE.md's Architecture Quick Reference into
+  // rules/file-layout.md (its actual subsystem). The marker pair moved with it
+  // verbatim, and so does this check — the guard tracks the block, not the file
+  // it used to sit in.
+  {
+    const o = extractDocOrder220(docText220['rules/file-layout.md']);
+    assert(
+      o !== null && JSON.stringify(o) === JSON.stringify(canonicalOrder220),
+      '220.3: rules/file-layout.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order (idb → GAME_FILES → static tags)'
+    );
+  }
+
+  // ── 220.4  ARCHITECTURE.md load-order block == the real boot order ──
+  {
+    const o = extractDocOrder220(docText220['ARCHITECTURE.md']);
+    assert(
+      o !== null && JSON.stringify(o) === JSON.stringify(canonicalOrder220),
+      '220.4: ARCHITECTURE.md LOAD-ORDER-GUARD block lists exactly the real index.html boot order'
+    );
+  }
+
+  // ── 220.5  regression: the exact drift this unit fixed stays fixed ──
+  assert(
+    !/window\.(?:pushToCloud|pullFromCloud)\b/.test(docBlob220),
+    '220.5: no doc names window.pushToCloud / window.pullFromCloud (retired; real names are window.saveCurrentToCloud / window.loadCloudSave) — regression guard'
+  );
+
+  // ── 220.6  self-integrity: canonical order is real, not an empty parse ──
+  // Guards against 220.3/220.4 passing on a silently-empty parse ([] === []).
+  assert(
+    canonicalOrder220.length >= 8 &&
+      canonicalOrder220[0] === 'idb' &&
+      canonicalOrder220[canonicalOrder220.length - 1] === 'cloud' &&
+      canonicalOrder220.includes('state') &&
+      canonicalOrder220.includes('api'),
+    '220.6: the canonical boot order derived from index.html is non-trivial (starts idb, ends cloud, includes state + api) — prevents 220.3/220.4 passing on an empty parse'
+  );
+
+  // ── shared setup for 220.7/220.8: read library/MANIFEST.txt if present ──
+  const libDir220 = path.join(ROOT, 'library');
+  const manifestPath220 = path.join(libDir220, 'MANIFEST.txt');
+  const manifestExists220 = fs.existsSync(manifestPath220);
+  const manifestNames220 = manifestExists220
+    ? new Set(
+        fs
+          .readFileSync(manifestPath220, 'utf8')
+          .split(/\r?\n/)
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#'))
+      )
+    : new Set();
+
+  // ── 220.7  every library/<file> pointer in the docs resolves against the
+  //           committed manifest — the guard that is REAL on CI ──
+  {
+    // Accepts a nested path (library/PROMPT_LIBRARY/Foo.md) as well as a flat
+    // one — library/ gained a subdirectory at R4, and a regex that only matched
+    // flat names would let every nested pointer skip the guard silently.
+    const libRe220 = /(?<![.\w/])library\/((?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.(?:md|txt))\b/g;
+    const missingLib220 = new Set();
+    let m;
+    while ((m = libRe220.exec(docBlob220))) {
+      const name = m[1];
+      if (name === 'MANIFEST.txt') continue; // naming the manifest itself isn't drift
+      if (!manifestNames220.has(name)) missingLib220.add(name);
+    }
+    assert(
+      manifestExists220 && missingLib220.size === 0,
+      '220.7: every library/<file> pointer named in CLAUDE/ARCHITECTURE/README resolves against the committed library/MANIFEST.txt (real on CI too — library/ itself is gitignored and absent there, but the manifest is not)' +
+        (missingLib220.size ? ' — DRIFT: ' + [...missingLib220].join(', ') : '') +
+        (!manifestExists220 ? ' — library/MANIFEST.txt is missing' : '')
+    );
+  }
+
+  // ── 220.8  LOCAL-ONLY: the manifest matches library/'s actual contents ──
+  // No-ops (passes trivially) on a clean CI checkout — but library/ ITSELF
+  // always exists there too, because library/MANIFEST.txt is committed and
+  // git checks out its parent dir. A bare fs.existsSync(libDir220) is NOT
+  // the right CI-vs-local signal (verified this the hard way: it fails the
+  // build on a simulated clean checkout, since none of the real gitignored
+  // docs are present to match the manifest). The real signal is whether any
+  // NON-manifest file is present — that only happens on the owner's machine.
+  // This is the only check that can catch the manifest itself going stale
+  // (a file added to/removed from library/ without updating MANIFEST.txt);
+  // 220.7 treats the manifest as ground truth and cannot.
+  {
+    // Recursive walk (R4): library/ now holds a subdirectory (PROMPT_LIBRARY/).
+    // A flat readdirSync would have listed the DIRECTORY entry, then dropped it
+    // on the .md/.txt extension filter below — so every file inside it would
+    // have escaped the manifest guard entirely while 220.8 still reported PASS.
+    // Paths are relative to library/ and forward-slashed to match the manifest.
+    const walkLib220 = (dir, prefix = '') =>
+      fs
+        .readdirSync(dir, { withFileTypes: true })
+        .flatMap(e =>
+          e.isDirectory()
+            ? walkLib220(path.join(dir, e.name), prefix + e.name + '/')
+            : [prefix + e.name]
+        );
+    const nonManifestFiles220 = fs.existsSync(libDir220)
+      ? walkLib220(libDir220).filter(f => f !== 'MANIFEST.txt')
+      : [];
+    if (nonManifestFiles220.length > 0) {
+      const actual220 = new Set(nonManifestFiles220.filter(f => /\.(?:md|txt)$/.test(f)));
+      const undocumented220 = [...actual220].filter(f => !manifestNames220.has(f));
+      const stale220 = [...manifestNames220].filter(f => !actual220.has(f));
+      assert(
+        undocumented220.length === 0 && stale220.length === 0,
+        "220.8 (local-only — no-op on a clean CI checkout): library/MANIFEST.txt exactly matches library/'s real file list" +
+          (undocumented220.length
+            ? ' — UNDOCUMENTED in manifest: ' + undocumented220.join(', ')
+            : '') +
+          (stale220.length
+            ? ' — STALE in manifest (no longer on disk): ' + stale220.join(', ')
+            : '')
+      );
+    } else {
+      assert(
+        true,
+        "220.8 (local-only): skipped — no non-manifest file present under library/ on this checkout (expected on CI, where only the committed MANIFEST.txt exists; this half of the guard only runs on the owner's machine)"
+      );
+    }
+  }
+
+  // ── 220.8b  STATIC (real on CI): 220.8's library/ scan stays RECURSIVE ──
+  // Protocol 42 lock. Found during the R4 re-pin: 220.8 used a flat
+  // readdirSync + an .md/.txt extension filter, so when library/ gained a
+  // subdirectory the directory entry was filtered out and every file inside it
+  // escaped the manifest guard — while 220.8 still reported PASS. That is the
+  // worst shape a guard can take (silently covering less than it claims), so
+  // the recursion is pinned here rather than left to be reverted by the next
+  // person who finds walkLib220 more verbose than readdirSync.
+  {
+    const selfSrc220 = fs.readFileSync(path.join(__dirname, 'robco-diagnostics.js'), 'utf8');
+    const walkDecl220 =
+      /const walkLib220 = \(dir, prefix = ''\) =>[\s\S]{0,400}?walkLib220\(path\.join\(dir, e\.name\)/.test(
+        selfSrc220
+      );
+    assert(
+      walkDecl220 && /walkLib220\(libDir220\)/.test(selfSrc220),
+      '220.8b: 220.8 scans library/ with a RECURSIVE walk (walkLib220 recurses into subdirectories and is what feeds nonManifestFiles220) — a flat readdirSync would let files inside a library/ subdirectory skip the manifest guard while still reporting PASS'
+    );
+  }
+
+  // ── 220.9  every "Protocol N" reference resolves to a real protocol heading ──
+  // WHY (Health-U6 audit follow-up, Protocol 36b escape-ratchet): the U6
+  // consolidation MERGED protocol headings — 29/30/31 into one Authentication
+  // section, 32/33/35 into one Kill-Switch section — and the whole repo relies
+  // on every "Protocol N" cross-reference still landing on a real rule. U6 kept
+  // that property by author discipline; nothing in the gate enforced it, so a
+  // future renumber/merge could silently orphan a reference. This closes that
+  // gap the same way 220.1–220.8 close theirs.
+  //
+  // The DEFINED set is parsed from CLAUDE.md's ACTUAL heading structure, so a
+  // compound heading (Protocols 29 / 30 / 31, Protocol 32 / 33 / 35) defines
+  // EACH number inside it. A reference to a body sub-part (Protocol 36b,
+  // Protocol 2a) resolves by its base number (36, 2), and a retired-but-defined
+  // number (Protocol 15 — RETIRED, still explained under its own heading) counts
+  // as defined. Compound references (Protocol 32/33/35, Protocol 4/UI-6) are
+  // split and every piece must resolve.
+  //
+  // ZERO FALSE POSITIVES is the bar (Protocol 45 discipline): only the literal
+  // token Protocol[s] <id> counts as a reference, and REF_ALLOW_220 carries the
+  // one intentional forward-reference — the not-yet-authored catalog
+  // generator+diff protocol, named by number in CLAUDE.md's 3-class library
+  // model before its heading exists. Remove that entry when the heading lands.
+  {
+    // Scan set: the load-bearing docs + all js + all tests (mirrors the file
+    // set Suite 220 reads, widened to QUEUE.md and tests/ per the
+    // finding). Full-file text, not just comments — proven zero-FP because the
+    // token only appears in prose/comments/descriptions across these files.
+    const REF_DOCS_220 = [
+      'CLAUDE.md',
+      ...ruleNoteFiles(), // U-R2: the subsystem notes are rulebook text too
+      'ARCHITECTURE.md',
+      'README.md',
+      'QUEUE.md',
+      'QUEUE_LOG.md', // the shipped-work archive cites protocol numbers — validate they resolve
+      'skill/SKILL.md', // the pointer-skill cites protocol numbers — validate they resolve
+    ];
+    const refCorpusFiles220 = [
+      ...REF_DOCS_220,
+      ...allJsFiles().map(f => `js/${f.rel}`),
+      ...fs
+        .readdirSync(path.join(ROOT, 'tests'))
+        .filter(f => /\.(?:js|mjs|html)$/.test(f))
+        .map(f => `tests/${f}`),
+    ];
+
+    // DEFINED set, parsed from CLAUDE.md headings. Stop at the first em-dash
+    // (—) so a title number ("(extends 36b)", a date) can never masquerade
+    // as a defined id.
+    // U-R2: parsed from the WHOLE rulebook's heading structure (CLAUDE.md's
+    // universal contract + every rules/*.md subsystem note), because that is
+    // where the headings now live. definedIn220 records WHICH file defines each
+    // id, so 220.13 can prove no number is defined twice.
+    const definedNum220 = new Set();
+    const definedUi220 = new Set();
+    const definedIn220 = new Map(); // id → [files that define it]
+    for (const rel of rulebookFiles()) {
+      for (const line of readFile(rel).split(/\r?\n/)) {
+        const h = /^#{2,4}\s+Protocols?\s+([^—]*?)\s*—/.exec(line);
+        if (!h) continue;
+        for (const id of h[1].match(/(?:UI-)?\d+[a-z]?/gi) || []) {
+          let key;
+          if (/^UI-/i.test(id)) {
+            key = 'UI-' + id.replace(/^UI-/i, '');
+            definedUi220.add(key);
+          } else {
+            key = id.match(/^\d+/)[0];
+            definedNum220.add(key);
+          }
+          // Set, not array: a number legitimately appears twice in ONE file
+          // (Protocol 2 and the retired Protocol 2a both reduce to base "2").
+          // The drift 220.13 hunts is the SAME number defined in TWO files.
+          if (!definedIn220.has(key)) definedIn220.set(key, new Set());
+          definedIn220.get(key).add(rel);
+        }
+      }
+    }
+
+    // The one sanctioned forward-reference: a planned protocol named by number
+    // in CLAUDE.md's 3-class library model before its heading is authored (the
+    // GENERATED-class catalog generator+diff). Naming a not-yet-created protocol
+    // is intentional, not drift — delete this entry when its heading lands.
+    const REF_ALLOW_220 = new Set(['47']);
+
+    const protoRefRe220 = /\bProtocols?\s+((?:UI-)?\d+[a-z]?(?:\s*\/\s*(?:UI-)?\d+[a-z]?)*)/gi;
+    const danglingRef220 = new Map(); // token → Set(files it appears in)
+    const allowlistedHits220 = new Set(); // tokens that resolve ONLY via REF_ALLOW_220
+    for (const rel of refCorpusFiles220) {
+      const text = readFile(rel);
+      let m;
+      protoRefRe220.lastIndex = 0;
+      while ((m = protoRefRe220.exec(text))) {
+        for (const raw of m[1].split('/')) {
+          const tok = raw.trim();
+          if (!tok) continue;
+          let resolves;
+          if (/^UI-\d+$/i.test(tok)) {
+            resolves = definedUi220.has('UI-' + tok.replace(/^UI-/i, ''));
+          } else {
+            const base = (tok.match(/^\d+/) || [])[0];
+            const definedDirect = !!base && definedNum220.has(base);
+            // Distinguish "resolves to a real heading" from "only survived because
+            // it is an allowlisted forward-reference" — the latter is reported
+            // explicitly below instead of being folded into a blanket pass.
+            const allowlisted = !!base && !definedDirect && REF_ALLOW_220.has(base);
+            if (allowlisted) allowlistedHits220.add(base);
+            resolves = definedDirect || allowlisted;
+          }
+          if (!resolves) {
+            if (!danglingRef220.has(tok)) danglingRef220.set(tok, new Set());
+            danglingRef220.get(tok).add(rel);
+          }
+        }
+      }
+    }
+
+    // Self-integrity: the DEFINED parse must be non-trivial (guards the whole
+    // check against passing vacuously if the heading regex ever matches nothing
+    // — the empty-parse trap 220.6 guards for the load-order block). Requiring
+    // '33' proves a compound heading (32 / 33 / 35) was actually split apart.
+    const defineParseOk220 =
+      definedNum220.size >= 40 &&
+      definedNum220.has('1') &&
+      definedNum220.has('46') &&
+      definedNum220.has('33') &&
+      definedUi220.has('UI-1');
+
+    const danglingList220 = [...danglingRef220.entries()].map(
+      ([t, files]) => `${t} (${[...files].join(', ')})`
+    );
+    // Defect-2 fix (r-review): report the allowlisted forward-references EXPLICITLY
+    // rather than letting a blanket "every reference resolves" claim quietly absorb
+    // them. A reference on the allowlist did NOT resolve to a real heading — it was
+    // deliberately excused because its heading is not authored yet (Protocol 47, the
+    // reserved catalog generator). Saying so keeps the pass honest about what it
+    // actually verified vs. what it waived.
+    const allowlistNote220 = allowlistedHits220.size
+      ? ' — ALLOWLISTED forward-reference(s), reserved and NOT verified as resolving: ' +
+        [...allowlistedHits220].sort((a, b) => Number(a) - Number(b)).join(', ')
+      : ' — no allowlisted exceptions were applied';
+    assert(
+      defineParseOk220 && danglingRef220.size === 0,
+      '220.9: every "Protocol N" reference across the docs + js/ + tests/ either resolves to a real heading in CLAUDE.md OR is an explicitly allowlisted forward-reference (compound headings 29/30/31 & 32/33/35 define each number; sub-parts like 36b/2a resolve by base)' +
+        allowlistNote220 +
+        (danglingList220.length ? ' — DANGLING: ' + danglingList220.join('; ') : '') +
+        (!defineParseOk220 ? ' — DEFINED-set parse looks empty/wrong (self-integrity failed)' : '')
+    );
+
+    // 220.10  Defect-2 regression (r-review): the 220.9 report must not overstate.
+    //   Protocol 47 is referenced by number in CLAUDE.md's 3-class library model but
+    //   has no heading yet (reserved) — so it MUST show up as an applied allowlist
+    //   exception, and the report string MUST name it explicitly rather than folding
+    //   it into a blanket "every reference resolves." This is the exact overstatement
+    //   the review flagged; the test fails if the report reverts to hiding it.
+    assert(
+      allowlistedHits220.has('47') &&
+        /ALLOWLISTED/.test(allowlistNote220) &&
+        /\b47\b/.test(allowlistNote220),
+      '220.10: the 220.9 report names its allowlisted forward-reference(s) explicitly (Protocol 47, reserved) instead of overstating that every reference resolves'
+    );
+
+    // 220.11  Defect-4 regression (r-review): ARCHITECTURE.md's File Map must carry
+    //   NO hardcoded byte/KB size annotations. Those are script-computable facts that
+    //   rotted badly (state.js "7.6KB" when it was 116K, etc.); deleting the column
+    //   is the fix, and this guard fails the build if a size string creeps back into
+    //   the file-map rows so the rot cannot silently restart.
+    {
+      const archSrc220 = docText220['ARCHITECTURE.md'];
+      const fileMapStart = archSrc220.indexOf('## File Map');
+      const afterMap = archSrc220.indexOf('## Script Load Order', fileMapStart);
+      const fileMapBlock =
+        fileMapStart >= 0
+          ? archSrc220.slice(fileMapStart, afterMap > 0 ? afterMap : fileMapStart + 4000)
+          : '';
+      // A size annotation is a standalone number immediately followed by a byte unit
+      // (KB / MB / B), e.g. "7.6KB", "~111KB", "592B", "2.2M". Real prose numbers
+      // (versions, "360px", "3404 tests") never carry these units in this block.
+      const sizeToken220 = /(?:^|\s|~)\d[\d.]*\s*(?:KB|MB|GB|B)\b/;
+      assert(
+        fileMapStart >= 0 && !sizeToken220.test(fileMapBlock),
+        '220.11: ARCHITECTURE.md File Map carries no hardcoded KB/byte size annotations (size column deleted — script-computable rot cannot restart)'
+      );
+    }
+
+    // 220.12  Branch-consistency regression (r-review): CLAUDE.md's Pre-Commit /
+    //   Pre-Push Gate code block must push to `dev` (the working branch, Protocol 43),
+    //   never `origin main`. Sessions were handed directly conflicting branch
+    //   instructions (top block said push main; Protocol 43 says main is release-only).
+    {
+      const claudeSrc220 = docText220['CLAUDE.md'];
+      const gateBlockM = /## Pre-Commit \/ Pre-Push Gate[\s\S]*?```powershell([\s\S]*?)```/.exec(
+        claudeSrc220
+      );
+      const gateBlock = gateBlockM ? gateBlockM[1] : '';
+      assert(
+        !!gateBlock &&
+          /git push origin dev\b/.test(gateBlock) &&
+          !/git push origin main\b/.test(gateBlock),
+        '220.12: CLAUDE.md Pre-Commit/Pre-Push Gate block pushes to origin dev (Protocol 43 working branch), not origin main'
+      );
+    }
+
+    // 220.13  U-R2 structural guard: every protocol number is defined in exactly
+    //   ONE rulebook file. The restructure's whole safety property is "each rule
+    //   lives in exactly one place" — the moment a protocol is copy-pasted into
+    //   a second note, the two copies start drifting and a session gets whichever
+    //   one it happened to load. Cross-references between notes are fine and
+    //   expected; a duplicated HEADING is not.
+    {
+      const dupes220 = [...definedIn220.entries()]
+        .filter(([, files]) => files.size > 1)
+        .map(([id, files]) => `${id} (${[...files].join(' + ')})`);
+      assert(
+        dupes220.length === 0,
+        '220.13: every protocol number is defined by a heading in exactly one rulebook file (CLAUDE.md or one rules/*.md note) — no rule exists in two places to drift apart' +
+          (dupes220.length ? ' — DUPLICATED: ' + dupes220.join('; ') : '')
+      );
+    }
+
+    // 220.14  U-R2 structural guard: the retrieval map is honest. Every
+    //   `rules/<note>.md` CLAUDE.md routes a session to must exist on disk, and
+    //   every note that exists must be reachable from the map — a note nothing
+    //   points at is a rule nobody retrieves, which is the exact failure the
+    //   restructure was built to fix ("written is not retrieved").
+    {
+      const claudeSrc220 = docText220['CLAUDE.md'];
+      const mapped220 = new Set(
+        (claudeSrc220.match(/rules\/[A-Za-z0-9_-]+\.md/g) || []).map(s => s.trim())
+      );
+      const onDisk220 = new Set(ruleNoteFiles());
+      const unreachable220 = [...onDisk220].filter(f => !mapped220.has(f));
+      const phantom220 = [...mapped220].filter(f => !onDisk220.has(f));
+      assert(
+        onDisk220.size >= 5 && unreachable220.length === 0 && phantom220.length === 0,
+        '220.14: CLAUDE.md reaches every rules/*.md subsystem note and names none that is missing (the retrieval map is the only way a session finds a scoped rule)' +
+          (unreachable220.length
+            ? ' — UNREACHABLE from CLAUDE.md: ' + unreachable220.join(', ')
+            : '') +
+          (phantom220.length ? ' — NAMED but absent: ' + phantom220.join(', ') : '') +
+          (onDisk220.size < 5 ? ' — rules/ looks empty or missing' : '')
+      );
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)
+// ══════════════════════════════════════════════════════════════
+//  WHY: state.equipped stores an item NAME per slot, not a reference. Every
+//  path that can remove an inventory item (delItem, adjItemQty draining to
+//  0, _craftConsume — shared by CRAFT ingredient consumption and SCRAP,
+//  doSell, nativeUseItem draining a consumable to 0, and autoImportState's
+//  wholesale AI inventory replace) used to leave a stale state.equipped
+//  entry pointing at gear the Courier no longer carries — reproduced live
+//  (browser) before this fix landed. reconcileEquipped() in state.js is the
+//  ONE shared fix (Protocol 22); this suite locks that every removal path
+//  actually calls it, and behaviorally proves the real functions (not
+//  stubs) clear the stale reference. It also locks that the v8 BOOT
+//  fast-path (js/ui/ui-core.js _hydrateStateFromStorage(), which
+//  deliberately skips migrateState()) reconciles too — an independent
+//  audit (planning/2.8.5/audits/AUDIT_U9_bugfixes.md, F1/F2) found nativeUseItem was a
+//  missed removal path, and that a plain reload of an existing save did
+//  NOT actually self-heal a stale reference as the original commit claimed
+//  (the v8 fast-path skipped migrateState, where the heal lived).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 221 — Equipped/Inventory Reconciliation (Protocol 13 regression)');
+
+  const delItemBody221 = extractFunctionBody(uiSource, 'delItem');
+  const adjQtyBody221 = extractFunctionBody(uiSource, 'adjItemQty');
+  const craftConsumeBody221 = extractFunctionBody(uiSource, '_craftConsume');
+  const doSellBody221 = extractFunctionBody(uiSource, 'doSell');
+  const autoImportBody221 = extractFunctionBody(apiSource, 'autoImportState');
+
+  // 221.1  delItem() calls reconcileEquipped(state) right after splicing the
+  //        item out, and only re-renders the equipped display when it
+  //        actually changed something (no unconditional re-render).
+  assert(
+    /state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);/.test(
+      delItemBody221
+    ),
+    '221.1: delItem() calls reconcileEquipped(state) after splicing, and calls renderEquipped() only when it changed something'
+  );
+
+  // 221.2  adjItemQty() calls reconcileEquipped(state) INSIDE the next===0
+  //        branch (the row-removed case) — not unconditionally, and not in
+  //        the qty-decrement branch where the item survives.
+  {
+    const zeroBranch221 = (adjQtyBody221.match(/if \(next === 0\) \{([\s\S]*?)\} else \{/) ||
+      [])[1];
+    assert(
+      !!zeroBranch221 &&
+        /state\.inventory\.splice\(idx, 1\);/.test(zeroBranch221) &&
+        /reconcileEquipped\(state\)/.test(zeroBranch221),
+      '221.2: adjItemQty() calls reconcileEquipped(state) inside the next===0 (row-removed) branch, alongside the splice'
+    );
+  }
+
+  // 221.3  _craftConsume() — shared by CRAFT ingredient consumption AND
+  //        SCRAP (doScrap → _scrapApply → _craftConsume, Protocol 22) —
+  //        calls reconcileEquipped(state) when an item is fully depleted.
+  assert(
+    /if \(state\.inventory\[idx\]\.qty === 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)/.test(
+      craftConsumeBody221
+    ),
+    '221.3: _craftConsume() (shared by CRAFT and SCRAP) calls reconcileEquipped(state) when an item is fully depleted'
+  );
+
+  // 221.4  doSell() calls reconcileEquipped(state) when the sold item's qty
+  //        drops to zero and is spliced out of inventory.
+  assert(
+    /if \(it\.qty <= 0\) \{\s*\n\s*state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)/.test(
+      doSellBody221
+    ),
+    '221.4: doSell() calls reconcileEquipped(state) when the sold item is fully depleted and removed from inventory'
+  );
+
+  // 221.5  autoImportState() calls reconcileEquipped(state) after applying
+  //        the AI's equipped block — validates the AI's equipped slots
+  //        against whatever inventory it just (possibly) replaced wholesale,
+  //        even if the AI omitted 'equipped' this turn (Protocol 24 — AI
+  //        output is never trusted without validation).
+  assert(
+    /if \('headgear' in e\) state\.equipped\.headgear = e\.headgear \|\| null;\s*\n\s*\}\s*\n[\s\S]{0,600}reconcileEquipped\(state\)/.test(
+      autoImportBody221
+    ),
+    "221.5: autoImportState() calls reconcileEquipped(state) after applying the AI's equipped block"
+  );
+
+  // 221.6  Behavioral (VM sandbox, REAL source): equip an item, delete it via
+  //        the real delItem(), and confirm state.equipped is actually
+  //        cleared and renderEquipped() was actually invoked — not just that
+  //        the call is present in the source text.
+  {
+    const vm = require('vm');
+    let renderEquippedCalls221 = 0;
+    let after221 = null;
+    let errMsg221 = '';
+    try {
+      const sandbox = {
+        window: {},
+        document: { getElementById: () => null },
+        renderInventory: () => {},
+        renderEquipped: () => {
+          renderEquippedCalls221++;
+        },
+        updateMath: () => {},
+        saveState: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function delItem(idx)' + delItemBody221, sandbox);
+      vm.runInContext(
+        "state.inventory = [{name:'Ghost Rifle',qty:1,wgt:1,val:1,type:'weapon'}];" +
+          "state.equipped = {weapon:'Ghost Rifle',armor:null,headgear:null};" +
+          'delItem(0);',
+        sandbox
+      );
+      after221 = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221 = e && e.message;
+    }
+    assert(
+      after221 && after221.weapon === null && renderEquippedCalls221 === 1,
+      '221.6: [behavioral] the REAL delItem() clears state.equipped.weapon and calls renderEquipped() exactly once when the equipped item is deleted' +
+        (errMsg221 ? ' — error: ' + errMsg221 : '')
+    );
+  }
+
+  // 221.7  Behavioral (VM sandbox, REAL source): adjItemQty() draining an
+  //        equipped item's qty to 0 clears state.equipped; draining a
+  //        multi-qty stack down to a SURVIVING row (qty 2 -> 1) must NOT
+  //        touch state.equipped (no false-positive reconciliation).
+  {
+    const vm = require('vm');
+    let drainedTo0_221 = null;
+    let survives221 = null;
+    let errMsg221b = '';
+    try {
+      function runAdj(startQty, delta) {
+        const sandbox = {
+          window: {},
+          document: { getElementById: () => null },
+          renderInventory: () => {},
+          renderEquipped: () => {},
+          updateMath: () => {},
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(stateSource, sandbox);
+        // stateSource declares its OWN real saveState()/syncStateFromDom(), which
+        // overwrites this sandbox's initial stub and reads real DOM fields
+        // (document.getElementById(...).value) unconditionally — override it back
+        // to a no-op AFTER loading stateSource, not before.
+        sandbox.saveState = () => {};
+        vm.runInContext('function adjItemQty(idx, delta)' + adjQtyBody221, sandbox);
+        vm.runInContext(
+          `state.inventory = [{name:'Ghost Armor',qty:${startQty},wgt:1,val:1,type:'armor'}];` +
+            "state.equipped = {weapon:null,armor:'Ghost Armor',headgear:null};" +
+            `adjItemQty(0, ${delta});`,
+          sandbox
+        );
+        return vm.runInContext('state.equipped', sandbox);
+      }
+      drainedTo0_221 = runAdj(1, -1); // 1 -> 0, row removed
+      survives221 = runAdj(2, -1); // 2 -> 1, row survives
+    } catch (e) {
+      errMsg221b = e && e.message;
+    }
+    assert(
+      drainedTo0_221 &&
+        drainedTo0_221.armor === null &&
+        survives221 &&
+        survives221.armor === 'Ghost Armor',
+      "221.7: [behavioral] the REAL adjItemQty() clears state.equipped when qty drains to 0, but leaves a surviving row's equipped reference untouched" +
+        (errMsg221b ? ' — error: ' + errMsg221b : '')
+    );
+  }
+
+  // 221.8  Behavioral (VM sandbox, REAL source): _craftConsume() fully
+  //        depleting an equipped-named item clears state.equipped.
+  {
+    const vm = require('vm');
+    let after221c = null;
+    let errMsg221c = '';
+    try {
+      const sandbox = { window: {}, state: {} };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _craftConsume(itemName, qty)' + craftConsumeBody221, sandbox);
+      vm.runInContext(
+        "state.inventory = [{name:'Scrap Metal',qty:1,wgt:1,val:1,type:'misc'}];" +
+          "state.equipped = {weapon:'Scrap Metal',armor:null,headgear:null};" +
+          "_craftConsume('Scrap Metal', 1);",
+        sandbox
+      );
+      after221c = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221c = e && e.message;
+    }
+    assert(
+      after221c && after221c.weapon === null,
+      '221.8: [behavioral] the REAL _craftConsume() clears state.equipped when it fully depletes the equipped-named item' +
+        (errMsg221c ? ' — error: ' + errMsg221c : '')
+    );
+  }
+
+  // 221.9  Behavioral (VM sandbox, REAL source) — CONTRACT FLIP (AI_OVERSEER
+  //        Finding 1, 2026-07-18). Before the fix, an AI turn that resent
+  //        inventory WITHOUT a previously-held, equipped item DELETED that item
+  //        (full replace) and reconcileEquipped() then cleared the dangling slot.
+  //        That deletion-by-omission was the very silent-item-loss bug. Under the
+  //        new reconcile an OMITTED item is UNCHANGED (never a removal), so the
+  //        held item SURVIVES and its equipped slot stays valid — this asserts the
+  //        omission path can no longer silently destroy a held item. (The
+  //        reconcileEquipped-clears-a-confirmed-removal path is proven in Suite
+  //        76.21; native depletion paths in 221.8/221.12.)
+  {
+    const vm = require('vm');
+    let after221d = null;
+    let errMsg221d = '';
+    try {
+      const sandbox = {
+        window: {},
+        document: { getElementById: () => null },
+        console: { error: () => {}, log: () => {}, warn: () => {} },
+        loadUI: () => {},
+        appendToChat: () => {},
+        expandPanelForCategory: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext(readGroup('reg_nv'), sandbox);
+      vm.runInContext(
+        'function autoImportState(jsonString)' +
+          autoImportBody221 +
+          '\nthis.autoImportState = autoImportState;',
+        sandbox
+      );
+      vm.runInContext(
+        "state.inventory = [{name:'Old Rifle',qty:1,wgt:1,val:1,type:'weapon'}];" +
+          "state.equipped = {weapon:'Old Rifle',armor:null,headgear:null};",
+        sandbox
+      );
+      // AI reports only a newly-looted item (per the new directive) and omits the
+      // held 'Old Rifle' and 'equipped' entirely.
+      const aiJson = JSON.stringify({
+        inventory: [{ name: 'Laser Pistol', qty: 1, wgt: 3, val: 50, type: 'weapon' }],
+      });
+      sandbox.autoImportState(aiJson);
+      after221d = {
+        inventory: vm.runInContext('JSON.parse(JSON.stringify(state.inventory))', sandbox),
+        equipped: vm.runInContext('state.equipped', sandbox),
+      };
+    } catch (e) {
+      errMsg221d = e && e.message;
+    }
+    assert(
+      after221d &&
+        after221d.inventory.length === 2 &&
+        after221d.inventory.some(i => i.name === 'Old Rifle') &&
+        after221d.inventory.some(i => i.name === 'Laser Pistol') &&
+        after221d.equipped.weapon === 'Old Rifle',
+      '221.9: [behavioral] the REAL autoImportState() KEEPS a held, equipped item the AI omits (never a removal-by-omission) — the item survives and its equipped slot stays valid (AI_OVERSEER F1 contract flip)' +
+        (errMsg221d ? ' — error: ' + errMsg221d : '')
+    );
+  }
+
+  // 221.10  Protocol 22 — reconcileEquipped() is defined exactly ONCE (in
+  //         state.js). No caller forks its own local reconcile/cleanup
+  //         helper for this same concern.
+  const reconcileDefCount221 =
+    (stateSource.match(/function reconcileEquipped\(/g) || []).length +
+    (uiSource.match(/function reconcileEquipped\(/g) || []).length +
+    (apiSource.match(/function reconcileEquipped\(/g) || []).length;
+  assert(
+    reconcileDefCount221 === 1 && /function reconcileEquipped\(s\)/.test(stateSource),
+    '221.10: reconcileEquipped() is defined exactly once, in state.js (Protocol 22 — one shared reconciler, not forked per-caller)'
+  );
+
+  // 221.11  migrateState() calls reconcileEquipped() so a save already in
+  //         the stale state (from before this fix) self-heals on load —
+  //         the full behavioral proof lives in Suite 12; this locks the
+  //         call site stays wired.
+  const migrateBody221 = extractFunctionBody(stateSource, 'migrateState');
+  assert(
+    /reconcileEquipped\(s\);/.test(migrateBody221),
+    '221.11: migrateState() calls reconcileEquipped(s) so a pre-existing stale save self-heals on load'
+  );
+
+  // 221.12  MISSED REMOVAL PATH (independent audit F1): nativeUseItem() also
+  //         calls reconcileEquipped(state) when a consumed item's qty drains
+  //         to 0 and is spliced out of inventory — closing the enumeration
+  //         gap the original commit's implementer didn't know about.
+  const nativeUseBody221 = extractFunctionBody(uiSource, 'nativeUseItem');
+  assert(
+    /state\.inventory\.splice\(idx, 1\);\s*\n\s*if \(reconcileEquipped\(state\)\) renderEquipped\(\);/.test(
+      nativeUseBody221
+    ),
+    '221.12: nativeUseItem() calls reconcileEquipped(state) after splicing a depleted consumable out of inventory'
+  );
+
+  // 221.13  Behavioral (VM sandbox, REAL source): nativeUseItem only removes
+  //         'aid'-type items, so a stale reference here needs the contrived
+  //         audit F1 scenario (a weapon/armor named identically to an aid
+  //         item) to actually produce a dangling state.equipped entry.
+  //         Proves the REAL nativeUseItem clears it anyway.
+  {
+    const vm = require('vm');
+    let after221e = null;
+    let renderEquippedCalls221e = 0;
+    let errMsg221e = '';
+    try {
+      const computeAidBody221 = extractFunctionBody(uiSource, '_computeAidUse');
+      const sandbox = {
+        window: {},
+        state: {},
+        getChemsTable: () => [{ name: 'Ghost Aid', effect: 'restore 20 hp', duration: '0' }],
+        _durationToTicks: () => 0,
+        _nativeSetHp: () => {},
+        _nativeSetRads: () => {},
+        _applyStatusEffect: () => {},
+        appendToChat: () => {},
+        renderStatus: () => {},
+        renderInventory: () => {},
+        renderEquipped: () => {
+          renderEquippedCalls221e++;
+        },
+        loadUI: () => {},
+        updateMath: () => {},
+        saveState: () => {},
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      // stateSource declares its OWN real saveState()/syncStateFromDom() (Suite
+      // 221.7 precedent), which reads real DOM fields unconditionally — override
+      // it back to a no-op AFTER loading stateSource, not before.
+      sandbox.saveState = () => {};
+      vm.runInContext('function _computeAidUse(chemEntry)' + computeAidBody221, sandbox);
+      vm.runInContext('function nativeUseItem(idx)' + nativeUseBody221, sandbox);
+      vm.runInContext(
+        // A weapon "Ghost Aid" was equipped, then removed some other way,
+        // but the name lives on as a separate 'aid' item (the only real-world
+        // way nativeUseItem's splice can strand an equipped slot).
+        "state.inventory = [{name:'Ghost Aid',qty:1,wgt:1,val:1,type:'aid'}];" +
+          "state.equipped = {weapon:'Ghost Aid',armor:null,headgear:null};" +
+          'state.hpCur = 50; state.hpMax = 100;' +
+          'state.status = [];' +
+          'nativeUseItem(0);',
+        sandbox
+      );
+      after221e = vm.runInContext('state.equipped', sandbox);
+    } catch (e) {
+      errMsg221e = e && e.message;
+    }
+    assert(
+      after221e && after221e.weapon === null && renderEquippedCalls221e === 1,
+      '221.13: [behavioral] the REAL nativeUseItem() clears a dangling state.equipped.weapon reference and calls renderEquipped() when the depleted consumable shared its name' +
+        (errMsg221e ? ' — error: ' + errMsg221e : '')
+    );
+  }
+
+  // 221.14  OVERSTATED CLAIM FIX (independent audit F2): the v8 BOOT
+  //         fast-path (_hydrateStateFromStorage in js/ui/ui-core.js)
+  //         deliberately skips migrateState() (see the P4 comment right
+  //         above it), so it must call reconcileEquipped(state) directly —
+  //         otherwise a plain reload of an existing save never actually
+  //         self-heals a stale equipped reference, despite the code
+  //         comment/commit/CHANGELOG having claimed it does.
+  const hydrateBody221 = extractFunctionBody(uiSource, '_hydrateStateFromStorage');
+  assert(
+    /_migrateEventLog\(state\);[\s\S]{0,600}reconcileEquipped\(state\);/.test(hydrateBody221),
+    '221.14: the v8 boot fast-path (_hydrateStateFromStorage) calls reconcileEquipped(state) directly, since it skips migrateState()'
+  );
+
+  // 221.15  Behavioral (VM sandbox, REAL source): the REAL
+  //         _hydrateStateFromStorage(), given an existing robco_v8 save
+  //         whose equipped.weapon names an item no longer in inventory,
+  //         actually clears it on a plain reload — WITHOUT migrateState()
+  //         ever running (proves the fast-path claim is literally true, not
+  //         just present in the source text).
+  {
+    const vm = require('vm');
+    let afterBoot221 = null;
+    let errMsg221f = '';
+    try {
+      const stalePayload221 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            gameContext: 'FNV',
+            inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+            equipped: { weapon: 'Ghost Rifle', armor: null, headgear: null },
+          },
+        },
+      };
+      const store221 = { robco_v8: JSON.stringify(stalePayload221) };
+      const sandbox = {
+        window: {},
+        console: { error: () => {} },
+        localStorage: {
+          getItem: k => (Object.prototype.hasOwnProperty.call(store221, k) ? store221[k] : null),
+          setItem: (k, v) => {
+            store221[k] = v;
+          },
+          removeItem: k => {
+            delete store221[k];
+          },
+        },
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _hydrateStateFromStorage()' + hydrateBody221, sandbox);
+      // migrateState is intentionally NOT stubbed to a spy that would mask a
+      // real call — it's the REAL migrateState from stateSource. If the
+      // fast-path ever regressed to calling it, this test would still pass
+      // (migrateState also reconciles) — 221.14's static call-site guard is
+      // what specifically locks the fast-path's OWN direct call.
+      vm.runInContext('_hydrateStateFromStorage();', sandbox);
+      afterBoot221 = vm.runInContext('state', sandbox);
+    } catch (e) {
+      errMsg221f = e && e.message;
+    }
+    assert(
+      afterBoot221 && afterBoot221.equipped && afterBoot221.equipped.weapon === null,
+      '221.15: [behavioral] the REAL v8 boot fast-path self-heals a stale state.equipped.weapon reference on a plain reload (no migrateState involved)' +
+        (errMsg221f ? ' — error: ' + errMsg221f : '')
+    );
+  }
+
+  // 221.16  Behavioral (VM sandbox, REAL source, false-positive guard): the
+  //         v8 boot fast-path must NOT clear a slot naming an item the
+  //         Courier still legitimately carries.
+  {
+    const vm = require('vm');
+    let afterBoot221b = null;
+    let errMsg221g = '';
+    try {
+      const validPayload221 = {
+        activeContext: 'FNV',
+        campaigns: {
+          FNV: {
+            gameContext: 'FNV',
+            inventory: [{ name: 'Real Rifle', qty: 1, wgt: 1, val: 1, type: 'weapon' }],
+            equipped: { weapon: 'Real Rifle', armor: null, headgear: null },
+          },
+        },
+      };
+      const store221b = { robco_v8: JSON.stringify(validPayload221) };
+      const sandbox = {
+        window: {},
+        console: { error: () => {} },
+        localStorage: {
+          getItem: k => (Object.prototype.hasOwnProperty.call(store221b, k) ? store221b[k] : null),
+          setItem: (k, v) => {
+            store221b[k] = v;
+          },
+          removeItem: k => {
+            delete store221b[k];
+          },
+        },
+      };
+      vm.createContext(sandbox);
+      vm.runInContext(stateSource, sandbox);
+      vm.runInContext('function _hydrateStateFromStorage()' + hydrateBody221, sandbox);
+      vm.runInContext('_hydrateStateFromStorage();', sandbox);
+      afterBoot221b = vm.runInContext('state', sandbox);
+    } catch (e) {
+      errMsg221g = e && e.message;
+    }
+    assert(
+      afterBoot221b && afterBoot221b.equipped && afterBoot221b.equipped.weapon === 'Real Rifle',
+      '221.16: [behavioral] the v8 boot fast-path does not clear a still-legitimately-equipped item (no false-positive reconciliation on boot)' +
+        (errMsg221g ? ' — error: ' + errMsg221g : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 222 — FO3 PIP-BOY BUILD U0: board ids + rails data (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: the FO3 landscape Pip-Boy's second nav axis (a sub-tab rail inside
+//  each of the three lamps) is pure DATA (Protocol 38) — GAME_DEFS.FO3
+//  .identity.rails groups shared board ids into named sub-tabs; NV/FO4 carry
+//  no `rails` key at all, so the U1 stamper/selector this data drives is a
+//  complete no-op for them (the data's ABSENCE is what keeps the axis
+//  dormant, not a game-name branch anywhere in feature code). This suite
+//  locks: (a) the rails object shape is exactly what the build plan
+//  specifies, (b) NV and FO4 carry no rails key, (c) every id named in rails
+//  resolves to exactly one real `<details data-tab>` board in index.html on
+//  the correct tab, and (d) the no-rail allowlist (weigh bridge · the 3
+//  CHASSIS boards · the 4 SETTINGS boards) is EXHAUSTIVE — derived directly
+//  from index.html, not hand-copied, so a future un-allowlisted board can't
+//  silently fall through the cracks of both lists.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 222 — FO3 PIP-BOY BUILD U0 (board ids + rails data)');
+
+  const vm222 = require('vm');
+  let h222 = null;
+  let err222 = null;
+  try {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    vm222.createContext(sandbox);
+    vm222.runInContext(stateSource, sandbox);
+    h222 = { GAME_DEFS: sandbox.window.GAME_DEFS };
+  } catch (e) {
+    err222 = e;
+  }
+  assert(
+    h222 && !err222,
+    '222.1: js/core/state.js loads cleanly in a fresh VM sandbox' +
+      (err222 ? ' — ' + String(err222.message || err222) : '')
+  );
+
+  const EXPECTED_RAILS_222 = {
+    operator: {
+      STATUS: ['opVitalPanel', 'opHarnessPanel', 'statusEffectsPanel'],
+      SPECIAL: ['opSpecialPanel'],
+      SKILLS: ['skillMatrixPanel', 'skillBooksPanel', 'magazinesPanel'],
+      PERKS: ['perkLoadoutPanel'],
+      GENERAL: ['positionClockPanel', 'factionPanel', 'karmaPanel'],
+    },
+    operations: {
+      MANIFEST: ['opsManifestPanel'],
+      CRAFT: ['craftPanel'],
+      BARTER: ['tradePanel'],
+      SQUAD: ['squadPanel'],
+      CURIO: ['curioPanel'],
+    },
+    databank: {
+      MAP: ['worldMapPanel'],
+      QUESTS: ['questLogPanel'],
+      NOTES: ['campaignNotesPanel'],
+      LOG: ['campaignLogPanel', 'campgPanel'],
+      QUERY: ['databankPanel'],
+    },
+  };
+  // The tab each rail-group's boards must actually carry (databank splits
+  // across the two merged tabs — every id except campgPanel lives on 'data').
+  const RAIL_SUBSYSTEM_TAB_222 = { operator: 'stat', operations: 'inv', databank: 'data' };
+
+  // 222.2 — GAME_DEFS.FO3.identity.rails is EXACTLY the build-plan shape (§2)
+  if (h222) {
+    const fo3rails222 = h222.GAME_DEFS.FO3 && h222.GAME_DEFS.FO3.identity.rails;
+    assert(
+      JSON.stringify(fo3rails222) === JSON.stringify(EXPECTED_RAILS_222),
+      '222.2: GAME_DEFS.FO3.identity.rails matches the build-plan §2 board→sub-tab map exactly'
+    );
+  } else {
+    assert(false, '222.2: skipped — sandbox failed to load');
+  }
+
+  // 222.3 — NV and FO4 identity carry NO `rails` key at all (Protocol 38: the
+  //         axis is inert for them because the DATA is simply absent — this
+  //         is what U1's stamper/selector no-op on, not a game-name check).
+  if (h222) {
+    ['FNV', 'FO4'].forEach(ctx => {
+      const id222 = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      assert(
+        id222 && id222.rails === undefined,
+        `222.3.${ctx}: GAME_DEFS.${ctx}.identity has no "rails" key (the second nav axis stays fully dormant)`
+      );
+    });
+  } else {
+    assert(false, '222.3: skipped — sandbox failed to load');
+  }
+
+  // 222.4 — orientation + statusStrip identity fields are present on FO3 only
+  if (h222) {
+    const fo3id222 = h222.GAME_DEFS.FO3 && h222.GAME_DEFS.FO3.identity;
+    assert(
+      fo3id222 && fo3id222.orientation === 'landscape-primary',
+      '222.4: GAME_DEFS.FO3.identity.orientation === "landscape-primary"'
+    );
+    assert(
+      Array.isArray(fo3id222 && fo3id222.statusStrip) && fo3id222.statusStrip.length > 0,
+      '222.4b: GAME_DEFS.FO3.identity.statusStrip is a non-empty field list (data, not a hardcoded strip)'
+    );
+    ['FNV', 'FO4'].forEach(ctx => {
+      const id222b = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      assert(
+        id222b && id222b.orientation === undefined && id222b.statusStrip === undefined,
+        `222.4c.${ctx}: GAME_DEFS.${ctx}.identity carries no orientation/statusStrip (FO3-only facets)`
+      );
+    });
+
+    // 222.4d — Protocol 36b escape-ratchet: manifest.json's orientation lock
+    //          must never contradict a game whose identity requires landscape.
+    //          The r15 incident: manifest.json shipped "orientation": "portrait"
+    //          while GAME_DEFS.FO3.identity.orientation was "landscape-primary" —
+    //          the @media(orientation:landscape) CSS this whole build depends on
+    //          (css/60-fo3-pipboy.css) can never match on an INSTALLED PWA, because
+    //          the OS honours the manifest lock and refuses to rotate the app past
+    //          it, regardless of what CSS asks for. This escaped design, plan,
+    //          build, AND audit because every one of them verified in a browser
+    //          TAB, where the manifest orientation lock does not apply — only an
+    //          installed, standalone PWA enforces it. This assertion is the guard.
+    const manifest222d = JSON.parse(readFile('manifest.json'));
+    const landscapeGames222d = Object.keys(h222.GAME_DEFS).filter(ctx => {
+      const id = h222.GAME_DEFS[ctx] && h222.GAME_DEFS[ctx].identity;
+      return id && id.orientation === 'landscape-primary';
+    });
+    assert(
+      landscapeGames222d.length === 0 || !/^portrait/.test(manifest222d.orientation || ''),
+      `222.4d: manifest.json orientation ("${manifest222d.orientation}") must not lock to ` +
+        `portrait while ${landscapeGames222d.join(', ')} identity.orientation is ` +
+        `landscape-primary — an installed PWA cannot rotate past a manifest portrait lock`
+    );
+  } else {
+    assert(false, '222.4: skipped — sandbox failed to load');
+  }
+
+  // ── Derive the REAL id→tab map straight from index.html (house rule: if a
+  //    list can be derived, derive it — never hand-maintain what the file
+  //    already knows) — every <details> that carries BOTH a data-tab and an
+  //    id attribute, regardless of attribute order or single-/multi-line tags.
+  const DETAILS_TAG_RE_222 = /<details\b[^>]*>/gs;
+  const derivedIdToTab222 = {};
+  let dm222;
+  while ((dm222 = DETAILS_TAG_RE_222.exec(htmlSource))) {
+    const tag = dm222[0];
+    const tabMatch = tag.match(/data-tab="([a-z]+)"/);
+    const idMatch = tag.match(/\bid="([a-zA-Z0-9_]+)"/);
+    if (tabMatch && idMatch) {
+      assert(
+        derivedIdToTab222[idMatch[1]] === undefined,
+        `222.5: index.html has no duplicate data-tab board id "${idMatch[1]}"`
+      );
+      derivedIdToTab222[idMatch[1]] = tabMatch[1];
+    }
+  }
+
+  // 222.6 — every id named in every rail resolves to exactly one real board
+  //         in index.html, carrying the tab that rail's subsystem requires.
+  Object.keys(EXPECTED_RAILS_222).forEach(subsystem => {
+    const expectedTab = RAIL_SUBSYSTEM_TAB_222[subsystem];
+    Object.keys(EXPECTED_RAILS_222[subsystem]).forEach(subtab => {
+      EXPECTED_RAILS_222[subsystem][subtab].forEach(id => {
+        const realTab = derivedIdToTab222[id];
+        // LOG absorbs both merged DATABANK tabs (data + campg) — campgPanel
+        // is the one rail id that legitimately carries 'campg', not 'data'.
+        const okTab = id === 'campgPanel' ? realTab === 'campg' : realTab === expectedTab;
+        assert(
+          okTab,
+          `222.6: rails.${subsystem}.${subtab} id "${id}" resolves to a real index.html board on the expected tab (found: ${realTab || 'MISSING'})`
+        );
+      });
+    });
+  });
+
+  // 222.7 — the no-rail allowlist is EXHAUSTIVE: every data-tab board id in
+  //         index.html that is NOT named in any rail is exactly this set
+  //         (weigh bridge · 3 CHASSIS boards · 4 SETTINGS boards) — derived
+  //         so a future un-ided/un-allowlisted board can't silently fall
+  //         through the cracks of both the rails map and this allowlist.
+  const railedIds222 = new Set();
+  Object.values(EXPECTED_RAILS_222).forEach(subtabs =>
+    Object.values(subtabs).forEach(ids => ids.forEach(id => railedIds222.add(id)))
+  );
+  const NO_RAIL_ALLOWLIST_222 = [
+    'opsBridgePanel', // LOAD-CELL WEIGH BRIDGE → folds into the top-strip Wg segment, no rail
+    'unitPowerPlantPanel',
+    'systemStatusPanel',
+    'serviceFaultConsolePanel', // CHASSIS — stays stacked under FO3, no rail
+    'accountPanel',
+    'securityConfigPanel',
+    'savesPanel',
+    'campaignConfigPanel', // SETTINGS — stays stacked under FO3, no rail
+  ].sort();
+  const unrailedRealIds222 = Object.keys(derivedIdToTab222)
+    .filter(id => !railedIds222.has(id))
+    .sort();
+  assert(
+    JSON.stringify(unrailedRealIds222) === JSON.stringify(NO_RAIL_ALLOWLIST_222),
+    '222.7: every data-tab board id in index.html is EITHER in a rail OR in the exhaustive no-rail allowlist (weigh bridge / 3 CHASSIS / 4 SETTINGS) — derived: ' +
+      JSON.stringify(unrailedRealIds222)
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 223 — FO3 PIP-BOY BUILD U1: second nav axis, inert (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: U1 ships the MECHANISM for the second nav axis
+//  (_applyRailGrouping/selectSubtab/_applyRails, js/ui/ui-core-nav.js) with
+//  no FO3 skin yet — #fo3SubtabRail stays `hidden` until a later unit's CSS
+//  reveals it. This suite behaviorally proves the REAL extracted function
+//  bodies (not a reimplementation of their logic) against a minimal fake
+//  DOM/MetaStore harness: the axis is a complete no-op the instant
+//  identity.rails is absent (the NV/FO4-today case), rails-bearing boards
+//  get grouped/toggled correctly, the choice persists per-subsystem and
+//  restores on a fresh "reload" (a fresh _applyRails() call with no live
+//  in-memory state), and switchTab() calls _applyRails() from the ONE choke
+//  point every entry path (including boot) funnels through.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 223 — FO3 PIP-BOY BUILD U1 (second nav axis, inert)');
+
+  const navSrc223 = readGroup('ui-core-nav');
+
+  // 223.1 — the three new functions are all defined, extractably, in ui-core-nav.js
+  let bodies223 = null;
+  let extractErr223 = null;
+  try {
+    bodies223 = {
+      grouping: extractFunctionBody(navSrc223, '_applyRailGrouping'),
+      selectSubtab: extractFunctionBody(navSrc223, 'selectSubtab'),
+      applyRails: extractFunctionBody(navSrc223, '_applyRails'),
+    };
+  } catch (e) {
+    extractErr223 = e;
+  }
+  assert(
+    bodies223 && bodies223.grouping && bodies223.selectSubtab && bodies223.applyRails,
+    '223.1: _applyRailGrouping()/selectSubtab()/_applyRails() are all defined in js/ui/ui-core-nav.js' +
+      (extractErr223 ? ' — ' + extractErr223.message : '')
+  );
+
+  // 223.1b — Protocol 38: none of the three carry a hardcoded game-name branch;
+  //          the axis is switched entirely by whether identity.rails exists.
+  if (bodies223) {
+    const allBodies223 = bodies223.grouping + bodies223.selectSubtab + bodies223.applyRails;
+    assert(
+      !/['"]FO3['"]|['"]FNV['"]|['"]FO4['"]/.test(allBodies223),
+      '223.1b: no game-name literal (FO3/FNV/FO4) appears anywhere in the three new functions — the axis switches on identity.rails alone (Protocol 38)'
+    );
+  } else {
+    assert(false, '223.1b: skipped — extraction failed');
+  }
+
+  // ── minimal fake DOM + MetaStore harness the REAL extracted bodies run
+  //    against — not a reimplementation of their logic. _renderFo3SubtabRail
+  //    (a pure rendering side-effect) is the one stubbed dependency.
+  function makeSandbox223(rails) {
+    const elements = new Map();
+    function elFor(id) {
+      if (!elements.has(id)) {
+        const classes = new Set();
+        elements.set(id, {
+          dataset: {},
+          innerHTML: '',
+          classList: {
+            toggle(cls, force) {
+              const has = classes.has(cls);
+              const want = force === undefined ? !has : !!force;
+              if (want) classes.add(cls);
+              else classes.delete(cls);
+              return want;
+            },
+            contains: cls => classes.has(cls),
+          },
+        });
+      }
+      return elements.get(id);
+    }
+    const metaStore = {};
+    const renderCalls = [];
+    const bodyEl = { dataset: {} };
+    const sandbox = {
+      document: {
+        getElementById: id => elFor(id),
+        querySelectorAll: sel => {
+          if (sel !== '[data-subtab]') return [];
+          return Array.from(elements.values()).filter(el => el.dataset.subtab !== undefined);
+        },
+        body: bodyEl,
+      },
+      getIdentity: () => ({ rails }),
+      MetaStore: {
+        get: k => (Object.prototype.hasOwnProperty.call(metaStore, k) ? metaStore[k] : null),
+        set: (k, v) => {
+          metaStore[k] = v;
+        },
+      },
+      _renderFo3SubtabRail: (subsystem, name) => renderCalls.push([subsystem, name]),
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const vm223 = require('vm');
+    vm223.createContext(sandbox);
+    vm223.runInContext(
+      'function _applyRailGrouping()' +
+        bodies223.grouping +
+        '\nfunction selectSubtab(name)' +
+        bodies223.selectSubtab +
+        '\nfunction _applyRails(subsystem)' +
+        bodies223.applyRails,
+      sandbox
+    );
+    return { sandbox, elFor, metaStore, renderCalls, bodyEl };
+  }
+
+  const TEST_RAILS_223 = {
+    operator: { STATUS: ['boardA', 'boardB'], SPECIAL: ['boardC'] },
+    operations: { MANIFEST: ['boardD'] },
+  };
+
+  if (bodies223) {
+    // 223.2 — _applyRailGrouping() stamps data-subtab on every rail'd id
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      assert(
+        h.elFor('boardA').dataset.subtab === 'STATUS' &&
+          h.elFor('boardB').dataset.subtab === 'STATUS' &&
+          h.elFor('boardC').dataset.subtab === 'SPECIAL' &&
+          h.elFor('boardD').dataset.subtab === 'MANIFEST',
+        '223.2: _applyRailGrouping() stamps data-subtab="<SUBTAB>" on every board id named in identity.rails'
+      );
+    }
+
+    // 223.3 — axis-inert-for-NV: _applyRailGrouping() is a COMPLETE no-op
+    //         when identity.rails is undefined (the NV/FO4 case today)
+    {
+      const h = makeSandbox223(undefined);
+      let threw223 = false;
+      try {
+        h.sandbox._applyRailGrouping();
+      } catch (_) {
+        threw223 = true;
+      }
+      assert(
+        !threw223 && h.sandbox.document.querySelectorAll('[data-subtab]').length === 0,
+        '223.3: axis-inert-for-NV — _applyRailGrouping() throws nothing and stamps zero data-subtab attributes when identity.rails is absent'
+      );
+    }
+
+    // 223.4 — selectSubtab(name) toggles .subtab-active onto exactly the
+    //         boards carrying that data-subtab, persists a per-subsystem
+    //         MetaStore pref, and renders the rail's active state
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox.selectSubtab('STATUS');
+      assert(
+        h.elFor('boardA').classList.contains('subtab-active') &&
+          h.elFor('boardB').classList.contains('subtab-active') &&
+          !h.elFor('boardC').classList.contains('subtab-active') &&
+          !h.elFor('boardD').classList.contains('subtab-active'),
+        '223.4a: selectSubtab("STATUS") activates exactly boardA/boardB (data-subtab=STATUS) and leaves boardC/boardD inactive'
+      );
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        '223.4b: selectSubtab() persists the choice to MetaStore as robco_fo3_subtab_<subsystem>'
+      );
+      assert(
+        h.renderCalls.some(c => c[0] === 'operator' && c[1] === 'STATUS'),
+        '223.4c: selectSubtab() re-renders the rail via _renderFo3SubtabRail(subsystem, name)'
+      );
+    }
+
+    // 223.5 — selectSubtab() no-ops (no throw, no MetaStore write, no class
+    //         change) when: rails absent, current subsystem has no rails
+    //         entry, or the name isn't a real sub-tab of that subsystem
+    {
+      const h1 = makeSandbox223(undefined);
+      h1.bodyEl.dataset.subsystem = 'operator';
+      h1.sandbox.selectSubtab('STATUS');
+      const h2 = makeSandbox223(TEST_RAILS_223);
+      h2.sandbox._applyRailGrouping();
+      h2.bodyEl.dataset.subsystem = 'chassis'; // no rails.chassis entry
+      h2.sandbox.selectSubtab('STATUS');
+      const h3 = makeSandbox223(TEST_RAILS_223);
+      h3.sandbox._applyRailGrouping();
+      h3.bodyEl.dataset.subsystem = 'operator';
+      h3.sandbox.selectSubtab('NOT_A_REAL_SUBTAB');
+      assert(
+        Object.keys(h1.metaStore).length === 0 &&
+          Object.keys(h2.metaStore).length === 0 &&
+          Object.keys(h3.metaStore).length === 0 &&
+          !h3.elFor('boardA').classList.contains('subtab-active'),
+        '223.5: selectSubtab() no-ops with no MetaStore write and no class change for (a) no rails, (b) a subsystem with no rails entry, (c) an unreal sub-tab name'
+      );
+    }
+
+    // 223.6 — subtab-persists (Protocol UI-6): _applyRails(subsystem) resolves
+    //         to the FIRST sub-tab on a genuine first visit, and to whatever
+    //         was persisted on every subsequent call ("reload restores the
+    //         last sub-tab") — including falling back to the first sub-tab
+    //         when the persisted value no longer names a real one.
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        "223.6a: _applyRails() defaults a genuine first visit to the rail's FIRST declared sub-tab (STATUS)"
+      );
+      h.metaStore['robco_fo3_subtab_operator'] = 'SPECIAL';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.elFor('boardC').classList.contains('subtab-active') &&
+          !h.elFor('boardA').classList.contains('subtab-active'),
+        '223.6b: [reload simulation] _applyRails() restores the PERSISTED sub-tab (SPECIAL) instead of defaulting back to the first one'
+      );
+      h.metaStore['robco_fo3_subtab_operator'] = 'DELETED_SUBTAB';
+      h.sandbox._applyRails('operator');
+      assert(
+        h.metaStore['robco_fo3_subtab_operator'] === 'STATUS',
+        "223.6c: a stale/unreal persisted sub-tab name falls back to the rail's first sub-tab rather than erroring"
+      );
+    }
+
+    // 223.7 — _applyRails() no-ops (and clears any stale rail content) for a
+    //         subsystem with no rails entry — CHASSIS/SETTINGS/UPLINK keep
+    //         their current stacked behavior under FO3 (U0's no-rail allowlist)
+    {
+      const h = makeSandbox223(TEST_RAILS_223);
+      h.sandbox._applyRailGrouping();
+      h.elFor('fo3SubtabRail').innerHTML = 'STALE CONTENT';
+      h.bodyEl.dataset.subsystem = 'chassis';
+      h.sandbox._applyRails('chassis');
+      assert(
+        Object.keys(h.metaStore).length === 0 && h.elFor('fo3SubtabRail').innerHTML === '',
+        '223.7: _applyRails() for a rails-less subsystem (e.g. CHASSIS) writes nothing to MetaStore and clears any stale #fo3SubtabRail content'
+      );
+    }
+
+    // 223.8 — axis-inert-for-NV, full sequence: with no identity.rails at
+    //         all, the complete boot-equivalent call sequence
+    //         (_applyRailGrouping then _applyRails) never touches the DOM,
+    //         MetaStore, or the render stub — selectSubsystem/switchTab's
+    //         routing is therefore untouched for NV (nothing new executes).
+    {
+      const h = makeSandbox223(undefined);
+      h.bodyEl.dataset.subsystem = 'operator';
+      h.sandbox._applyRailGrouping();
+      h.sandbox._applyRails('operator');
+      assert(
+        h.sandbox.document.querySelectorAll('[data-subtab]').length === 0 &&
+          Object.keys(h.metaStore).length === 0 &&
+          h.renderCalls.length === 0,
+        '223.8: axis-inert-for-NV — the full _applyRailGrouping()+_applyRails() boot sequence stamps nothing, writes nothing, and renders nothing when identity.rails is absent'
+      );
+    }
+  } else {
+    assert(false, '223.2-223.8: skipped — function extraction failed');
+  }
+
+  // 223.9 — switchTab() calls _applyRails(subsystem) AFTER _syncBezelNav(subsystem)
+  //         — the ONE choke point every entry path (hotkey, #go=, bezel click,
+  //         AND the boot-time initTabs() restore) funnels through, so "reload
+  //         restores the last sub-tab" actually holds on a fresh page load.
+  const switchTabBody223 = extractFunctionBody(navSrc223, 'switchTab');
+  const syncIdx223 = switchTabBody223.indexOf('_syncBezelNav(subsystem)');
+  const applyRailsIdx223 = switchTabBody223.indexOf('_applyRails(subsystem)');
+  assert(
+    syncIdx223 !== -1 && applyRailsIdx223 !== -1 && applyRailsIdx223 > syncIdx223,
+    '223.9: switchTab() calls _applyRails(subsystem) after _syncBezelNav(subsystem) — covers every entry path including the boot-time restore (initTabs() calls switchTab() directly, bypassing selectSubsystem())'
+  );
+
+  // 223.10 — window.onload calls _applyRailGrouping() before initTabs(), so
+  //          the boot-time sub-tab restore has real data-subtab attributes
+  //          to work with (the stamper must run before the first switchTab()).
+  const onloadSrc223 = readGroup('ui-core');
+  const groupingCallIdx223 = onloadSrc223.indexOf('_applyRailGrouping();');
+  const initTabsCallIdx223 = onloadSrc223.indexOf('initTabs();');
+  assert(
+    groupingCallIdx223 !== -1 &&
+      initTabsCallIdx223 !== -1 &&
+      groupingCallIdx223 < initTabsCallIdx223,
+    '223.10: window.onload calls _applyRailGrouping() before initTabs() — the stamper must run before the first switchTab()'
+  );
+
+  // 223.11 — #fo3SubtabRail exists exactly once in index.html, ships `hidden`
+  //          (a plain HTML boolean attribute — U1 adds no new CSS file), and
+  //          is a labelled role=tablist (a later unit's a11y requirement,
+  //          already satisfied by construction).
+  const fo3RailMatches223 = (htmlSource.match(/id="fo3SubtabRail"/g) || []).length;
+  assert(fo3RailMatches223 === 1, '223.11a: index.html has exactly one #fo3SubtabRail element');
+  assert(
+    /<div\s+id="fo3SubtabRail"[^>]*\bhidden\b[^>]*>/.test(htmlSource) ||
+      /<div\s+id="fo3SubtabRail"[\s\S]{0,120}?\bhidden\b[\s\S]{0,120}?>/.test(htmlSource),
+    '223.11b: #fo3SubtabRail ships the `hidden` boolean attribute (U1 has no FO3 skin yet — no new CSS file exists to govern its visibility)'
+  );
+  assert(
+    /<div\s+id="fo3SubtabRail"[\s\S]{0,200}?role="tablist"[\s\S]{0,200}?aria-label="[^"]+"/.test(
+      htmlSource
+    ),
+    '223.11c: #fo3SubtabRail carries role="tablist" and a real aria-label (a11y groundwork)'
+  );
+
+  // 223.12 — U1 itself adds NO new CSS file (that job belongs to a later
+  //          unit). This assertion's threshold is milestone-scoped and
+  //          expected to move: at U1 alone the split order was still
+  //          exactly the 12 pre-U1 files; U2 (see Suite 224) legitimately
+  //          adds exactly one FO3-named file on top of it. Checked here as
+  //          "at least the 12 pre-U1 files, at most one of them FO3-named"
+  //          so this suite keeps documenting U1's own boundary without
+  //          re-failing the moment U2 lands (Suite 224 owns U2's own count).
+  const fo3CssFiles223 = CSS_SPLIT_FILES.filter(f => /fo3/i.test(f));
+  assert(
+    CSS_SPLIT_FILES.length >= 12 && fo3CssFiles223.length <= 1,
+    '223.12: css/ split order carries at most one FO3-named file (zero as of U1 alone; U2 legitimately adds exactly one — see Suite 224)'
+  );
+
+  // 223.13 — robco_fo3_subtab_ is registered in META_MANIFEST as a device
+  //          pref (Protocol 23 — never campaign state), not a `state` field.
+  assert(
+    /robco_fo3_subtab_:\s*\{[\s\S]{0,200}?family:\s*true/.test(stateSource),
+    '223.13a: robco_fo3_subtab_ is registered in META_MANIFEST as a per-subsystem device-pref family key'
+  );
+  const stateKeys223 = extractStateKeys(readGroup('state'));
+  assert(
+    !stateKeys223.some(k => /fo3.?subtab/i.test(k)),
+    '223.13b: no `state` field was added for the sub-tab preference — it lives only in META_MANIFEST (device pref), never campaign state'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 224 — FO3 PIP-BOY BUILD U2: landscape casing shell, THE SPINE
+//  (Protocol 8 stage 2)
+// ══════════════════════════════════════════════════════════════
+//  WHY: U2 ships the first VISIBLE piece of the FO3 Pip-Boy — a new,
+//  own-numbered CSS file (css/60-fo3-pipboy.css, Protocol UI-7: a third
+//  game ADDS a file, never edits one) that re-skins the EXISTING bezel
+//  keycaps into lamp/knob/gauge/toggle form, reveals U1's sub-tab rail and
+//  a new in-glass top strip, and applies the rails-reveal hide rule. The
+//  NV-unchanged hard invariant is proven MECHANICALLY here, not just
+//  asserted: every single rule in the new file (bar one root token
+//  override) is asserted to carry a [data-game='FO3'] selector, which can
+//  never match under any other game context — combined with the fact
+//  (verifiable via `git diff --stat` against every pre-U2 CSS file, run
+//  and recorded in the commit) that NOT ONE byte of 8 of the 12
+//  pre-existing CSS files changed (U7 declared four narrow, disclosed,
+//  individually-investigated exceptions — real cross-game bug fixes found
+//  while broadening render-integrity.mjs's coverage, see 224.2's own
+//  comment), NV cannot possibly render differently after this unit for
+//  anything besides those declared fixes. This suite also
+//  locks: the casing selectors sit inside exactly
+//  one @media(orientation:landscape) block (so FO3 PORTRAIT — "the legacy
+//  view" — stays untouched too), zero image assets, no board control is
+//  functionally disabled by the re-skin, and the new
+//  _renderFo3TopStrip()/_fo3StripFieldValue() functions are no-ops
+//  without identity.statusStrip. 224.11 (owner-feedback pass) additionally
+//  locks the casing-top/glass-frame/bezel flex `order` values that keep the
+//  visual stack (hood -> glass -> casing bar) correct despite the bezel's
+//  real DOM position sitting BEFORE the glass. 224.13 (U8) locks the
+//  render-integrity.mjs allowlist tightening from a bare-tag-name match to
+//  a precise `.closest('.bezel')` dock-membership check.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 224 — FO3 PIP-BOY BUILD U2 (landscape casing shell, the spine)');
+
+  // 224.1 — the new CSS file exists on disk and is registered everywhere
+  //         a served/precached file must be (Protocol 1): index.html
+  //         <link>, sw.js ASSETS, and CSS_SPLIT_FILES' derived cascade
+  //         order (after 55-feedback-animations, before 99-mobile).
+  const fo3CssPath224 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  assert(fs.existsSync(fo3CssPath224), '224.1a: css/60-fo3-pipboy.css exists on disk');
+  const fo3Css224 = fs.existsSync(fo3CssPath224) ? fs.readFileSync(fo3CssPath224, 'utf8') : '';
+  const cssIdx224 = CSS_SPLIT_FILES.indexOf('60-fo3-pipboy.css');
+  const idx55_224 = CSS_SPLIT_FILES.indexOf('55-feedback-animations.css');
+  const idx99_224 = CSS_SPLIT_FILES.indexOf('99-mobile.css');
+  assert(
+    cssIdx224 !== -1 && cssIdx224 === idx55_224 + 1 && cssIdx224 === idx99_224 - 1,
+    "224.1b: css/60-fo3-pipboy.css sits in index.html's <link> order directly after 55-feedback-animations.css and directly before 99-mobile.css"
+  );
+  const swText224 = readFile('sw.js');
+  assert(
+    swText224.includes("'./css/60-fo3-pipboy.css'"),
+    '224.1c: sw.js ASSETS precaches css/60-fo3-pipboy.css (Protocol 1)'
+  );
+
+  // 224.2 — NV-unchanged, mechanically proven: NOT ONE of the 8 remaining
+  //         pre-existing CSS files changed by even a byte in this unit
+  //         (verified directly against the git index — the strongest
+  //         available proof short of a live-browser pixel diff).
+  //
+  //         U7 EXCEPTIONS (Protocol 42, each individually declared and
+  //         investigated — not a blanket carve-out). Broadening
+  //         render-integrity.mjs to actually run its claimed 12-load matrix
+  //         (New Vegas + FO3 portrait, never probed before) surfaced real,
+  //         pre-existing, CROSS-GAME defects. Each was fixed at its root,
+  //         with a live-browser measurement backing the fix, not guessed:
+  //
+  //         - css/35-operator-boards.css: .stlamp-purge (the status-effect
+  //           "✕" remove button) never overrode the base button{background:
+  //           var(--robco-green)} rule — its red glyph sat on a solid green
+  //           fill at ~1.4:1 contrast on BOTH games.
+  //         - css/45-databank.css: the quest board's .cyc/.del buttons had
+  //           the identical bug — amber/red text on their own inherited
+  //           green background, ~1.3-2.9:1 contrast.
+  //         - css/10-chrome.css: the mobile fixed bezel dock's reserved
+  //           padding-bottom was a flat 100px while the dock itself
+  //           measured 112px tall (live at 412x915) — the last ~12px of
+  //           whatever content sat at the true bottom of the page rendered
+  //           partially under the dock.
+  //         - css/25-toolbar.css: #cal_year and #stat_rads (multi-digit
+  //           numeric fields) sat inside the global 56px mobile max-width
+  //           cap on number inputs with their native spin-button reserve
+  //           still eating ~20px of it — clipping a 3-4 digit value by a
+  //           few px. Fixed the same way the other compact fields in that
+  //           same selector list already were: strip the spin button
+  //           nobody drags on these fields anyway.
+  //
+  //         None of these carry [data-game='FO3'] scoping, because none of
+  //         them are FO3-specific — they fix both games identically. This
+  //         is not an FO3-only hack leaking into shared CSS; it is real,
+  //         disclosed, universal defects this unit's own broadened test
+  //         coverage found and fixed, each with its own comment at the fix
+  //         site. See the U7 report for the ONE remaining, confirmed,
+  //         NOT-silenced pre-existing defect this unit found but did not
+  //         fix (the bezel dock structurally covering content on narrow
+  //         mobile viewports — flagged, not allowlisted-as-a-false-
+  //         positive, in tests/render-integrity.mjs's own
+  //         filterKnownPreexisting(), which U8 tightened from a bare-tag-name
+  //         match to a precise `.closest('.bezel')` dock-membership check —
+  //         see 224.13). Every OTHER file on the list below stays held to
+  //         the strict byte-identical bar.
+  {
+    // Protocol 42 fix (discovered while verifying an unrelated later unit,
+    // the FO3 Karma Engine rebuild): this originally diffed against the
+    // literal string 'HEAD', which only proved "U2 touched nothing" for the
+    // ONE commit where U2 itself was being verified pre-commit — once U2
+    // merged, HEAD moved past it, and the check silently became "has
+    // anything changed these files since the most recent commit," a
+    // permanent trap that fails on ANY later, unrelated, legitimate change
+    // to any of the 8 files (exactly what happened here: the Karma Engine
+    // unit added CSS to css/40-curio-operations.css, a fully disclosed,
+    // in-scope change with no relation to U2). Pinning the diff to U2's own
+    // commit (against its parent) makes this a permanent, meaningful,
+    // point-in-time proof — "U2 introduced zero byte changes to these
+    // files" — that stays true forever, instead of a moving goalpost that
+    // blocks all future work on these files.
+    const U2_COMMIT_224 = '95c5b1f';
+    let gitDiffOut224 = '';
+    let gitErr224 = null;
+    try {
+      gitDiffOut224 = require('child_process')
+        .execSync(
+          `git diff --stat ${U2_COMMIT_224}^ ${U2_COMMIT_224} -- css/05-base.css css/15-overseer.css ` +
+            'css/20-diagnostic-shell.css css/30-modulebay.css ' +
+            'css/40-curio-operations.css ' +
+            'css/50-chassis.css css/55-feedback-animations.css css/99-mobile.css',
+          { cwd: ROOT, encoding: 'utf8' }
+        )
+        .trim();
+    } catch (e) {
+      gitErr224 = e;
+    }
+    // Skips rather than fails when git/the pinned commit is unavailable
+    // (e.g. a shallow clone) — this check is a bonus proof on top of
+    // 224.3's structural [data-game='FO3']-scoping guarantee below, not the
+    // sole line of defense.
+    assert(
+      gitErr224 !== null || gitDiffOut224 === '',
+      '224.2: git diff --stat confirms zero bytes changed in any of the 8 pre-existing CSS files besides the four declared U7 exceptions (NV-unchanged, mechanically verified against the git index)' +
+        (gitDiffOut224 ? ' — DIFF FOUND: ' + gitDiffOut224 : '')
+    );
+  }
+
+  // 224.3 — EVERY rule in the new file (bar the one root token-override
+  //         block) carries a [data-game='FO3'] selector — the structural
+  //         guarantee that NV can never match anything in this file,
+  //         regardless of what the file's CSS actually says (Protocol 20).
+  //         Comments are stripped first — this file's own header prose
+  //         mentions both [data-game='FO3'] and @media(orientation:...)
+  //         in plain English, which must not be counted as real rules.
+  //         This is a REAL parse (brace-depth walk), not a occurrence-count
+  //         heuristic — a naive count can't tell "one unscoped rule swapped
+  //         in for a scoped one" from "the totals happen to still add up"
+  //         (caught live: an earlier count-based version of this check
+  //         passed even after the FO3 hide rule's own selector was
+  //         deliberately unscoped, because it only checked the total count
+  //         outside the media block, never that every rule INSIDE it is
+  //         individually scoped).
+  // Hoisted so 224.6 (below) can reuse the same brace-depth-parsed rule list
+  // (selector + declaration body) instead of re-parsing or falling back to a
+  // fragile comment-boundary regex.
+  let rules224 = [];
+  if (fo3Css224) {
+    const fo3CssNoComments224 = fo3Css224.replace(/\/\*[\s\S]*?\*\//g, '');
+    const mediaOpenMarker224 = '@media (orientation: landscape) {';
+    const mediaOpenIdx224 = fo3CssNoComments224.indexOf(mediaOpenMarker224);
+    const beforeMedia224 =
+      mediaOpenIdx224 === -1 ? fo3CssNoComments224 : fo3CssNoComments224.slice(0, mediaOpenIdx224);
+    const fo3SelectorsBeforeMedia224 = (beforeMedia224.match(/\[data-game='FO3'\]/g) || []).length;
+    assert(
+      mediaOpenIdx224 !== -1,
+      '224.3a: css/60-fo3-pipboy.css has exactly one @media(orientation:landscape) block opener'
+    );
+    assert(
+      fo3SelectorsBeforeMedia224 === 1,
+      "224.3b: exactly ONE [data-game='FO3'] selector sits outside the @media(orientation:landscape) block (the root --bezel-wire token override)"
+    );
+    // 224.3c — no other @media(orientation:*) block exists (a second,
+    //          differently-scoped block would be easy to miss in review).
+    const mediaBlockCount224 = (fo3CssNoComments224.match(/@media\s*\([^)]*orientation/g) || [])
+      .length;
+    assert(
+      mediaBlockCount224 === 1,
+      '224.3c: exactly one orientation-scoped @media block exists in the file — no stray second block a reviewer could miss'
+    );
+
+    // 224.3d — walk the media block's REAL rule structure (brace-depth
+    //          parse) and assert every top-level rule's selector list is
+    //          FO3-scoped on EVERY comma-separated part — the actual
+    //          mechanical guarantee that FO3 PORTRAIT (the legacy view)
+    //          can never be touched by anything in this file.
+    if (mediaOpenIdx224 !== -1) {
+      const bodyStart224 = mediaOpenIdx224 + mediaOpenMarker224.length - 1; // index of the media block's own '{'
+      let depth224 = 0;
+      let i224 = bodyStart224;
+      let mediaBodyEnd224 = -1;
+      for (; i224 < fo3CssNoComments224.length; i224++) {
+        if (fo3CssNoComments224[i224] === '{') depth224++;
+        else if (fo3CssNoComments224[i224] === '}' && --depth224 === 0) {
+          mediaBodyEnd224 = i224;
+          break;
+        }
+      }
+      const mediaInner224 = fo3CssNoComments224.slice(bodyStart224 + 1, mediaBodyEnd224);
+
+      // Split the media block's own inner content into top-level
+      // "selector { declarations }" rules (depth-1 relative to mediaInner224).
+      // Also captures each rule's declaration body (declBody) so 224.6 below
+      // can check per-rule properties instead of scanning a comment-bounded
+      // text slice.
+      let ruleDepth224 = 0;
+      let selStart224 = 0;
+      let declStart224 = -1;
+      for (let j = 0; j < mediaInner224.length; j++) {
+        const c = mediaInner224[j];
+        if (c === '{') {
+          if (ruleDepth224 === 0) {
+            rules224.push({ selectorText: mediaInner224.slice(selStart224, j) });
+            declStart224 = j + 1;
+          }
+          ruleDepth224++;
+        } else if (c === '}') {
+          ruleDepth224--;
+          if (ruleDepth224 === 0) {
+            rules224[rules224.length - 1].declBody = mediaInner224.slice(declStart224, j);
+            selStart224 = j + 1;
+          }
+        }
+      }
+
+      const unscoped224 = [];
+      rules224.forEach(r => {
+        r.selectorText
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+          .forEach(sel => {
+            if (!sel.startsWith("[data-game='FO3']")) unscoped224.push(sel);
+          });
+      });
+      assert(
+        rules224.length > 0 && unscoped224.length === 0,
+        "224.3d: EVERY top-level rule inside the @media(orientation:landscape) block is [data-game='FO3']-scoped on every comma-separated selector part" +
+          (unscoped224.length ? ' — UNSCOPED: ' + unscoped224.join(' | ') : '')
+      );
+    } else {
+      assert(false, '224.3d: skipped — no @media(orientation:landscape) block found');
+    }
+  } else {
+    assert(false, '224.3: skipped — css/60-fo3-pipboy.css not found');
+  }
+
+  // 224.4 — the rails-reveal hide rule (U1's mechanism, U2's skin) is
+  //         present, exactly matching the build plan's §1 step 4 form —
+  //         it is what actually makes "selecting OPERATOR shows only the
+  //         STATUS group" true, now that a real stylesheet governs it.
+  assert(
+    /\[data-game='FO3'\]\s*\.panel\[data-tab\]\.tab-visible\[data-subtab\]:not\(\.subtab-active\)\s*\{\s*display:\s*none;?\s*\}/.test(
+      fo3Css224
+    ),
+    "224.4: the FO3 hide rule [data-game='FO3'] .panel[data-tab].tab-visible[data-subtab]:not(.subtab-active){display:none} is present verbatim"
+  );
+
+  // 224.5 — no image assets anywhere in the new CSS or the new index.html
+  //         markup this unit added (#fo3TopStrip/#fo3SubtabRail region) —
+  //         all casing chrome is gradients/shadows/borders (design doc §1/
+  //         build plan invariant 6).
+  assert(
+    !/url\(/i.test(fo3Css224),
+    '224.5a: css/60-fo3-pipboy.css contains zero url(...) references — no external image assets'
+  );
+  const fo3StripIdx224 = htmlSource.indexOf('id="fo3TopStrip"');
+  const fo3RailIdx224 = htmlSource.indexOf('id="fo3SubtabRail"');
+  const fo3RailCloseIdx224 =
+    fo3RailIdx224 === -1 ? -1 : htmlSource.indexOf('</div>', fo3RailIdx224);
+  const fo3MarkupRegion224 =
+    fo3StripIdx224 !== -1 && fo3RailCloseIdx224 !== -1
+      ? htmlSource.slice(fo3StripIdx224, fo3RailCloseIdx224)
+      : '';
+  assert(
+    fo3MarkupRegion224 !== '' && !/<img\b/i.test(fo3MarkupRegion224),
+    '224.5b: the U1/U2 sub-tab-rail + top-strip markup region carries no <img> tags'
+  );
+
+  // 224.6 — the board re-skin never functionally disables a CONTROL — no
+  //         rule whose selector names button/input (any comma-separated
+  //         part) may set display:none, visibility:hidden, or
+  //         pointer-events:none (editing-survives — no tab ever goes
+  //         read-only, build plan invariant 2). This is a per-RULE check
+  //         over the real brace-parsed rule list (rules224, hoisted from
+  //         224.3d above), not a comment-boundary text-slice heuristic — the
+  //         owner-feedback pass's austere-glass rules legitimately hide
+  //         DECORATIVE elements (.bay-slot-tag/.bay-part-no/.board-led,
+  //         none of which are buttons or inputs), and a naive substring scan
+  //         over that whole region would false-positive on them.
+  {
+    const controlSelectorRe224 = /(^|[\s,>+~.[])(button|input)\b/i;
+    const offenders224 = [];
+    rules224.forEach(r => {
+      const isControlRule = r.selectorText
+        .split(',')
+        .map(s => s.trim())
+        .some(sel => controlSelectorRe224.test(sel));
+      if (!isControlRule) return;
+      const body = r.declBody || '';
+      if (
+        /display:\s*none/.test(body) ||
+        /visibility:\s*hidden/.test(body) ||
+        /pointer-events:\s*none/.test(body)
+      ) {
+        offenders224.push(r.selectorText.trim());
+      }
+    });
+    assert(
+      rules224.length > 0 && offenders224.length === 0,
+      '224.6: no rule whose selector names button/input ever sets display:none/visibility:hidden/pointer-events:none — every inline control stays exactly as tappable as it is today' +
+        (offenders224.length ? ' — OFFENDERS: ' + offenders224.join(' | ') : '')
+    );
+  }
+
+  // 224.7 — _renderFo3TopStrip()/_fo3StripFieldValue() are defined, and the
+  //         strip render is a complete no-op without identity.statusStrip
+  //         (NV/FO4 today) — behavioral proof against the real extracted
+  //         function body, mirroring Suite 223's harness style.
+  const navSrc224 = readGroup('ui-core-nav');
+  let topStripBody224 = null;
+  let topStripErr224 = null;
+  try {
+    topStripBody224 = extractFunctionBody(navSrc224, '_renderFo3TopStrip');
+  } catch (e) {
+    topStripErr224 = e;
+  }
+  assert(
+    topStripBody224 !== null && navSrc224.includes('function _fo3StripFieldValue('),
+    '224.7a: _renderFo3TopStrip() and _fo3StripFieldValue() are both defined in js/ui/ui-core-nav.js' +
+      (topStripErr224 ? ' — ' + topStripErr224.message : '')
+  );
+  if (topStripBody224) {
+    const elements224 = new Map();
+    function elFor224(id) {
+      if (!elements224.has(id)) elements224.set(id, { innerHTML: '' });
+      return elements224.get(id);
+    }
+    const sandbox224 = {
+      document: { getElementById: id => elFor224(id) },
+      getIdentity: () => ({ statusStrip: undefined }),
+      escapeHtml: s => s,
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const vm224 = require('vm');
+    vm224.createContext(sandbox224);
+    vm224.runInContext('function _renderFo3TopStrip()' + topStripBody224, sandbox224);
+    elFor224('fo3TopStrip').innerHTML = 'STALE';
+    let threw224 = false;
+    try {
+      sandbox224._renderFo3TopStrip();
+    } catch (_) {
+      threw224 = true;
+    }
+    assert(
+      !threw224 && elFor224('fo3TopStrip').innerHTML === '',
+      '224.7b: axis-inert-for-NV — _renderFo3TopStrip() throws nothing and clears #fo3TopStrip to empty when identity.statusStrip is absent'
+    );
+  } else {
+    assert(false, '224.7b: skipped — _renderFo3TopStrip extraction failed');
+  }
+
+  // 224.8 — _refreshBezelTelemetry() calls _renderFo3TopStrip() — the ONE
+  //         choke point that already keeps the NV bezel LCD live now also
+  //         keeps the FO3 top strip live, with zero new call-site wiring
+  //         (temptation item 2 — "ONE writer, two projection targets").
+  const refreshBody224 = extractFunctionBody(navSrc224, '_refreshBezelTelemetry');
+  assert(
+    /_renderFo3TopStrip\(\);/.test(refreshBody224),
+    '224.8: _refreshBezelTelemetry() calls _renderFo3TopStrip() — the shared choke point every HP/rads/limb/connection change already runs through'
+  );
+
+  // 224.9 — #fo3TopStrip exists exactly once in index.html and ships
+  //         `hidden` by default, same U1-precedent pattern as #fo3SubtabRail
+  //         (an author-origin CSS rule — 224.4's sibling rules in the new
+  //         file — always wins over the UA [hidden] default).
+  assert(
+    (htmlSource.match(/id="fo3TopStrip"/g) || []).length === 1,
+    '224.9a: index.html has exactly one #fo3TopStrip element'
+  );
+  assert(
+    /<div id="fo3TopStrip" hidden><\/div>/.test(htmlSource),
+    '224.9b: #fo3TopStrip ships the `hidden` boolean attribute by default'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3TopStrip\s*\{[^}]*display:\s*flex/.test(fo3Css224),
+    "224.9c: css/60-fo3-pipboy.css reveals #fo3TopStrip under [data-game='FO3'] landscape"
+  );
+
+  // 224.10 — Protocol 13/42 regression test: a live-browser check (Suite 224
+  //          is static-analysis-only and could not have caught this) found
+  //          .fo3-subtab-btn rendering as 5 STACKED full-width rows instead
+  //          of one inline row — the codebase's global `button{width:100%}`
+  //          base rule (Protocol UI-5) was silently winning because this
+  //          rule never overrode it. Fixed by adding `width: auto`; locked
+  //          here so a future edit can't silently drop it again.
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-subtab-btn\s*\{[^}]*width:\s*auto/.test(fo3Css224),
+    '224.10: [live-browser regression, Protocol 42] .fo3-subtab-btn sets width:auto, overriding the global button{width:100%} base rule — without it every sub-tab button renders full-width, stacking the rail into 5 rows instead of one'
+  );
+
+  // 224.11 — Protocol 13/42 regression test (owner-feedback pass): a live-
+  //          browser geometry check (getBoundingClientRect, not a static
+  //          text scan) found the casing bar rendering BETWEEN the hood and
+  //          the glass instead of BELOW the glass. Root cause: the real DOM
+  //          order is casing-top -> .bezel -> .glass-frame (the bezel sits
+  //          between the header and the screen in the shared desktop/NV
+  //          layout; it only becomes a bottom dock via position:fixed on
+  //          mobile) — flipping .bezel off position:fixed without also
+  //          reordering it left it in its natural (visually wrong) DOM
+  //          position. Originally fixed with flex `order`: .glass-frame
+  //          order:1, .bezel order:2. Superseded in part by Suite 225
+  //          (owner round-2 pass): .casing-top itself no longer needs an
+  //          `order` — it is fully display:none (Suite 225.1).
+  //
+  //          U6 Strand 3 superseded the mechanism again: #uosMachine became
+  //          a CSS Grid (the casing left/right rails + hood), .bezel/
+  //          .nav-row flattened to display:contents (so `order` no longer
+  //          applies to them at all — a flattened element isn't a flex/grid
+  //          item itself), and the glass-vs-lamp-bar ordering is now
+  //          guaranteed by explicit GRID ROW placement instead:
+  //          .glass-frame sits in grid-row:2, the lamp-bar material
+  //          (.casing-lampbar) and the flattened .nav-cluster it now hosts
+  //          both sit in grid-row:3 — a later row, so the glass always
+  //          paints above the casing bar. Locked here so a future edit
+  //          can't silently drop this and reintroduce the "casing sits
+  //          above the glass" bug.
+  assert(
+    /\[data-game='FO3'\]\s*\.glass-frame\s*\{[^}]*grid-row:\s*2/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.casing-lampbar\s*\{[^}]*grid-row:\s*3/.test(fo3Css224) &&
+      /\[data-game='FO3'\]\s*\.nav-cluster\s*\{[^}]*grid-row:\s*3/.test(fo3Css224),
+    '224.11: [U6 Strand 3 update, Protocol 42] .glass-frame is grid-row:2 while .casing-lampbar/.nav-cluster are grid-row:3 — without this the casing bar could render ABOVE or overlapping the glass instead of below it (visual order, matching the Pip-Boy reference); supersedes the pre-U6 flex-order mechanism, which no longer applies now that .bezel/.nav-row are display:contents'
+  );
+
+  // 224.12 — U7 regression (Protocol 13/42): an independent audit found the
+  //          top-strip's name chip STUCK on whichever subsystem last edited
+  //          a stat (e.g. permanently "STATS" even on the ITEMS/DATA
+  //          screens) — 224.8 only proved _refreshBezelTelemetry() (fired
+  //          by stat edits) calls _renderFo3TopStrip(); nothing proved the
+  //          strip refreshes on a SUBSYSTEM SWITCH, which is the actual
+  //          user action that was broken. Two checks close both halves of
+  //          that gap: (a) static — _syncBezelNav() (the ONE choke point
+  //          every subsystem-change entry path funnels through — switchTab,
+  //          selectSubsystem's 'uplink' branch, hotkeys, #go= deep-links)
+  //          now calls _renderFo3TopStrip() too; (b) behavioral — against
+  //          the REAL extracted _renderFo3TopStrip() function body, proving
+  //          it reads document.body.dataset.subsystem and renders a
+  //          DIFFERENT value per subsystem, not just SOME value once. A
+  //          check that only verified the chip's PRESENCE (as the U6 gate
+  //          did) would have stayed green through this entire bug — this
+  //          asserts the chip's VALUE.
+  const syncBezelNavBody224_12 = extractFunctionBody(navSrc224, '_syncBezelNav');
+  assert(
+    /_renderFo3TopStrip\(\);/.test(syncBezelNavBody224_12),
+    '224.12a: _syncBezelNav() — the one choke point every subsystem-switch entry path (switchTab, the standalone uplink path, hotkeys, deep-links) actually funnels through — calls _renderFo3TopStrip(), not only _refreshBezelTelemetry() (which only fires on stat edits, never on a subsystem switch)'
+  );
+  if (topStripBody224) {
+    const elements224_12 = new Map();
+    function elFor224_12(id) {
+      if (!elements224_12.has(id)) elements224_12.set(id, { innerHTML: '' });
+      return elements224_12.get(id);
+    }
+    function keycapFor224_12(label) {
+      return { querySelector: sel => (sel === '.nk-label' ? { textContent: label } : null) };
+    }
+    const bodyDataset224_12 = {};
+    const sandbox224_12 = {
+      document: {
+        body: { dataset: bodyDataset224_12 },
+        getElementById: id => {
+          if (id === 'navkey-operator') return keycapFor224_12('STATS');
+          if (id === 'navkey-operations') return keycapFor224_12('ITEMS');
+          return elFor224_12(id);
+        },
+      },
+      getIdentity: () => ({ statusStrip: ['LVL'] }),
+      escapeHtml: s => s,
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+    };
+    const fieldValueBody224_12 = extractFunctionBody(navSrc224, '_fo3StripFieldValue');
+    const vm224_12 = require('vm');
+    vm224_12.createContext(sandbox224_12);
+    vm224_12.runInContext(
+      'function _fo3StripFieldValue(key)' + fieldValueBody224_12,
+      sandbox224_12
+    );
+    vm224_12.runInContext('function _renderFo3TopStrip()' + topStripBody224, sandbox224_12);
+    bodyDataset224_12.subsystem = 'operator';
+    sandbox224_12._renderFo3TopStrip();
+    const stripOnOperator224_12 = elFor224_12('fo3TopStrip').innerHTML;
+    bodyDataset224_12.subsystem = 'operations';
+    sandbox224_12._renderFo3TopStrip();
+    const stripOnOperations224_12 = elFor224_12('fo3TopStrip').innerHTML;
+    assert(
+      stripOnOperator224_12.includes('STATS') &&
+        stripOnOperations224_12.includes('ITEMS') &&
+        !stripOnOperations224_12.includes('STATS'),
+      '224.12b: _renderFo3TopStrip() renders the CURRENT document.body.dataset.subsystem\'s own name — "STATS" while dataset.subsystem is operator, "ITEMS" (not still "STATS") once it changes to operations — the exact value-correctness check the U6 gate never ran' +
+        ' — got operator="' +
+        stripOnOperator224_12 +
+        '" operations="' +
+        stripOnOperations224_12 +
+        '"'
+    );
+  } else {
+    assert(false, '224.12b: skipped — _renderFo3TopStrip extraction failed');
+  }
+
+  // 224.13 — Bottom-dock occlusion FIXED (planning/2.8.5/plans/DOCK_OCCLUSION_PLAN.md,
+  //          Protocol 13/36b escape-ratchet). render-integrity.mjs USED to
+  //          quarantine the flat-view (New Vegas + FO3-portrait) bezel-dock
+  //          occlusions — U7 flagged 14 controls the 112px position:fixed dock
+  //          covered at landing scroll, U8 tightened the allowlist to a precise
+  //          hit.closest('.bezel') dock-membership check (filterKnownPreexisting
+  //          + the RI_NO_ALLOWLIST audit switch + pageProbe()'s hitInBezelDock
+  //          field). That root cause is now fixed at the SOURCE: the flat mobile
+  //          view is a bounded 100dvh flex column whose #fo3BoardScroll scroller
+  //          ends above the fixed dock (css/10-chrome.css), the same app-shell
+  //          UPLINK and FO3-landscape already use — so the 14 occlusions no
+  //          longer exist. The entire quarantine is DELETED: render-integrity
+  //          passes WITHOUT any filter, and any future dock overlap fails the
+  //          gate normally at the exact viewports that failed before the fix.
+  //          This locks the quarantine machinery gone for good, so no allowlist
+  //          of any generation can ever silently mask a real dock occlusion
+  //          again (the escape-ratchet turns the old exception into a hard
+  //          assertion).
+  const riSrc224_13 = readFile('tests/render-integrity.mjs');
+  // Match on CODE signatures, not bare words — the file's own header comment
+  // legitimately NAMES the deleted machinery to explain the fix, so we assert
+  // the actual constructs are gone: the function definition, the env read, and
+  // the in-page probe property (none of which can appear in prose).
+  assert(
+    !/function\s+filterKnownPreexisting|process\.env\.RI_NO_ALLOWLIST|hitInBezelDock\s*:/.test(
+      riSrc224_13
+    ),
+    "224.13a: the dock-occlusion quarantine (filterKnownPreexisting() / the RI_NO_ALLOWLIST env switch / pageProbe()'s hitInBezelDock capture) is fully removed from render-integrity.mjs — the flat scroller is now bounded so occlusions no longer exist, and any future dock overlap fails the gate normally instead of being allowlisted away"
+  );
+  assert(
+    !/CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS/.test(riSrc224_13),
+    '224.13b: the old bare-tag-name allowlist Set (CONFIRMED_PREEXISTING_DEFECT_BEZEL_DOCK_OCCLUSION_HITS) remains gone — no quarantine of any generation can silently forgive a dock occlusion'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 225 — FO3 PIP-BOY landscape feedback pass round 2 (Protocol 8
+//  stage 2): reclaim the room (casing-top removed entirely, the mobile
+//  carrier strip and the Director Uplink header hidden on the glass),
+//  fix the sub-tab-rail-overlays-content bug (live-browser
+//  getBoundingClientRect regression, Protocol 42 — position:sticky inside
+//  a scrolling container that also held the (much taller) board content
+//  let the rail's pinned screen position and a board's normal-flow content
+//  share the same pixels while scrolling), the Vault Boy STATUS figure
+//  (design doc §5), and the karmaCenterDisplay literal-id leak (Protocol
+//  38/41). Every assertion is static-analysis-only, matching Suite 223/224's
+//  house style; NV-untouched is proven by requiring every new/changed
+//  selector to carry the [data-game='FO3'] prefix.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 225 — FO3 PIP-BOY landscape feedback pass round 2 (room reclaim + Vault Boy)');
+
+  const fo3CssPath225 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css225 = fs.existsSync(fo3CssPath225) ? fs.readFileSync(fo3CssPath225, 'utf8') : '';
+  const navSrc225 = readGroup('ui-core-nav');
+
+  // 225.1 — the ROBCO INDUSTRIES header band is fully removed from FO3
+  //         landscape layout (not merely shrunk, as the prior pass left it —
+  //         the owner's explicit "a real Pip-Boy has no such thing").
+  assert(
+    /\[data-game='FO3'\]\s*\.casing-top\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.1: [data-game='FO3'] .casing-top is display:none outright under FO3 landscape (fully removed, not shrunk)"
+  );
+
+  // 225.2 — the mobile "Overseer never fully leaves the screen" carrier
+  //         strip (css/15-overseer.css, amber-colored via --bezel-wire) is
+  //         hidden under FO3 landscape — this was the owner's "floating
+  //         orange button" report, confirmed by live DOM geometry
+  //         (getBoundingClientRect showed it at the very top of the glass
+  //         content region) before this fix.
+  assert(
+    /\[data-game='FO3'\]\s*#carrierStrip\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.2: [live-browser regression, Protocol 42] [data-game='FO3'] #carrierStrip is display:none — without this the amber mobile carrier strip renders inside the glass on every non-uplink subsystem"
+  );
+
+  // 225.3 — the Director Uplink header bar (DIRECTOR UPLINK / CARRIER LINK
+  //         / PURGE) is hidden under FO3 landscape ("the AI-chat header has
+  //         no business on a Pip-Boy screen" — the AI stays reachable via
+  //         the unchanged UPLINK knob/transcript/composer).
+  assert(
+    /\[data-game='FO3'\]\s*\.ovs-head\s*\{\s*display:\s*none;\s*\}/.test(fo3Css225),
+    "225.3: [data-game='FO3'] .ovs-head is display:none — the Director Uplink header no longer renders on the FO3 glass"
+  );
+
+  // 225.4 — #fo3BoardScroll: a plain, non-decorative layout wrapper (no aria
+  //         role — grouping only) around every existing board panel, added
+  //         once in index.html between #fo3SubtabRail and the boards.
+  assert(
+    (htmlSource.match(/id="fo3BoardScroll"/g) || []).length === 1,
+    '225.4a: index.html has exactly one #fo3BoardScroll element'
+  );
+  {
+    const wrapStart = htmlSource.indexOf('id="fo3BoardScroll"');
+    const firstBoard = htmlSource.indexOf('id="opVitalPanel"');
+    const wrapEnd = htmlSource.indexOf('<!-- /#fo3BoardScroll -->');
+    assert(
+      wrapStart !== -1 && firstBoard !== -1 && wrapEnd !== -1 && wrapStart < firstBoard,
+      '225.4b: #fo3BoardScroll opens before the first board panel'
+    );
+    assert(
+      firstBoard < wrapEnd,
+      '225.4c: #fo3BoardScroll closes after the board panels — every board sits inside the wrapper'
+    );
+  }
+
+  // 225.5 — Protocol 13/42 regression test for the "sub-tab rail overlays
+  //         content" bug: a live-browser geometry check (scrolling
+  //         #fo3BoardScroll to its end and testing every visible board's
+  //         rect against the rail's rect) found board content rendering
+  //         under the sticky rail. Root cause: position:sticky computed its
+  //         stuck offset against a scroll container (#uiPanel) that ALSO
+  //         held the (much taller than the viewport) board content in the
+  //         same flow, so the rail's pinned screen position and a board's
+  //         normal-flow content could occupy the same pixels while
+  //         scrolling. Fixed structurally: #fo3BoardScroll is now the ONE
+  //         scrolling region, sitting in normal flow (flex order 0/1/2)
+  //         between the non-scrolling top strip and rail — no
+  //         position:sticky is used anywhere in this file anymore.
+  const fo3Css225NoComments = fo3Css225.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert(
+    !/position:\s*sticky/.test(fo3Css225NoComments),
+    '225.5a: [live-browser regression, Protocol 42] css/60-fo3-pipboy.css no longer uses position:sticky in any actual rule (comments discussing the old bug are exempt) — the rail-overlays-content bug was caused by sticky positioning inside a scroll container that also held taller board content'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3TopStrip\s*\{\s*order:\s*0;\s*\}/.test(fo3Css225) &&
+      /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{[^}]*order:\s*1/.test(fo3Css225) &&
+      /\[data-game='FO3'\]\s*#fo3SubtabRail\s*\{\s*order:\s*2;\s*\}/.test(fo3Css225),
+    '225.5b: #fo3TopStrip/#fo3BoardScroll/#fo3SubtabRail carry flex order 0/1/2 — the rail is a true sibling AFTER the scrollable board region, never an overlay on top of it'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{[^}]*overflow-y:\s*auto/.test(fo3Css225),
+    '225.5c: #fo3BoardScroll (not #uiPanel) is the internally-scrolling region'
+  );
+
+  // 225.6 — Protocol 38/41 regression: the KARMA CENTER real-label used to
+  //         show the literal internal element id ("FO3 — karmaCenterDisplay")
+  //         directly on screen — a hardcoded game literal AND a leaked
+  //         implementation identifier, unlike every other .real-label on the
+  //         page (which name a plain real-world term, e.g. "(HP)", never a
+  //         DOM id). Locked so it cannot silently regress.
+  assert(
+    !/real-label">\(FO3\s*—\s*karmaCenterDisplay\)/.test(htmlSource),
+    '225.6a: [Protocol 38/41 regression] the karmaCenterDisplay real-label no longer contains the literal game name + raw element id'
+  );
+  assert(
+    /KARMA CENTER — VAULT LEGEND INDEX[\s\S]{0,40}real-label">\(KARMA LEGEND/.test(htmlSource),
+    '225.6b: the KARMA CENTER real-label now names a plain real-world term, matching every other real-label on the page'
+  );
+
+  // 225.7 — the Vault Boy figure (design doc §5 — "the single most Pip-Boy
+  //         thing in the project"): original inline SVG, zero image assets,
+  //         decorative (aria-hidden), ships `hidden` by default so NV
+  //         (which shares this exact markup — Protocol 22, no new render
+  //         path) never shows it without needing any [data-game='FNV']
+  //         exclusion rule.
+  assert(
+    (htmlSource.match(/class="vaultboy-fig"/g) || []).length === 1,
+    '225.7a: index.html has exactly one .vaultboy-fig element'
+  );
+  assert(
+    /<div class="vaultboy-fig" aria-hidden="true" hidden>/.test(htmlSource),
+    '225.7b: .vaultboy-fig is aria-hidden and ships the `hidden` boolean attribute by default (NV-inert without any FNV-exclusion CSS)'
+  );
+  assert(
+    !/<img[^>]*vaultboy/i.test(htmlSource) &&
+      /<div class="vaultboy-fig"[^>]*>\s*<svg/.test(htmlSource),
+    '225.7c: the Vault Boy figure is inline SVG markup — zero image assets'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.zone-body\s*\{\s*display:\s*none;\s*\}/.test(
+      fo3Css225
+    ) &&
+      /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\{[^}]*display:\s*flex/.test(
+        fo3Css225
+      ),
+    "225.7d: under [data-game='FO3'] landscape the old top-down zone plate is hidden and the Vault Boy figure is revealed — NV keeps the zone plate (no rule outside the [data-game='FO3'] scope touches it)"
+  );
+
+  // 225.8 — the five existing toggleLimb() buttons are the ONLY limb toggle
+  //         control — the Vault Boy view re-flows them via CSS `order`, it
+  //         does not duplicate them (Protocol 22 — one id, one control).
+  ['btn_l_hd', 'btn_l_la', 'btn_l_ra', 'btn_l_ll', 'btn_l_rl'].forEach(id => {
+    assert(
+      (htmlSource.match(new RegExp('id="' + id + '"', 'g')) || []).length === 1,
+      '225.8: #' +
+        id +
+        ' still appears exactly once — the Vault Boy re-layout did not duplicate any limb button'
+    );
+  });
+
+  // 225.9 — _fo3BumpNumberInput() (the HP/RAD stepper helper) is
+  //         game-agnostic (Protocol 38): it re-dispatches the target
+  //         input's own native 'input' event rather than calling any
+  //         game-specific setter directly, so the input's EXISTING oninput
+  //         handler (updateMath()/capRadsMax()) stays the single source of
+  //         truth (Protocol 22 — no forked state path).
+  const bumpBody225 = extractFunctionBody(navSrc225, '_fo3BumpNumberInput');
+  assert(
+    typeof bumpBody225 === 'string' && /dispatchEvent\(new Event\('input'/.test(bumpBody225),
+    "225.9: _fo3BumpNumberInput() re-dispatches the target input's native 'input' event rather than duplicating updateMath()/capRadsMax() logic"
+  );
+
+  // 225.10 — the HP/RAD stepper button groups ship `hidden` by default in
+  //          the markup (the same game-agnostic-default pattern as
+  //          #fo3TopStrip/#fo3SubtabRail/.vaultboy-fig above) — NV, which
+  //          shares this exact markup, never sees them.
+  assert(
+    (htmlSource.match(/class="fo3-stepper-btn-group" hidden/g) || []).length === 2,
+    '225.10: both HP and RAD stepper button groups ship the `hidden` boolean attribute by default'
+  );
+
+  // 225.11 — NV-untouched proof: every FO3-scoped rule this suite locks
+  //          above lives ONLY inside the [data-game='FO3'] selector list —
+  //          spot-check that none of the new selectors this pass introduced
+  //          (#carrierStrip, .ovs-head, #opHarnessPanel, #fo3BoardScroll)
+  //          appear anywhere in this file WITHOUT that prefix.
+  ['#carrierStrip', '.ovs-head', '#opHarnessPanel', '#fo3BoardScroll'].forEach(sel => {
+    const escaped = sel.replace(/[.#]/g, '\\$&');
+    const bare = new RegExp("(?<!\\[data-game='FO3'\\]\\s{0,3})" + escaped + '\\s*\\{', 'g');
+    assert(
+      !bare.test(fo3Css225),
+      '225.11: every ' + sel + " rule in css/60-fo3-pipboy.css carries the [data-game='FO3'] prefix"
+    );
+  });
+
+  // 225.12 — Protocol 17 mobile baseline: every new interactive control this
+  //          pass adds (the HP/RAD stepper buttons) meets the >=28px tap
+  //          target minimum.
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-stepper-btn\s*\{[^}]*width:\s*28px[^}]*height:\s*28px/.test(
+      fo3Css225
+    ),
+    '225.12: .fo3-stepper-btn is 28x28px — meets the Protocol 17 minimum tap target'
+  );
+
+  // 225.13 — Protocol 22/23 architectural boundary: the Vault Boy re-layout
+  //          and the board-scroll fix are pure CSS (`order`/`display`) plus
+  //          one layout-only markup wrapper — no second render function was
+  //          added for STATUS (grep guard: no renderStatusFO3-style function
+  //          exists anywhere in the codebase).
+  assert(
+    !/function\s+renderStatusFO3|function\s+renderVaultBoy/.test(navSrc225),
+    '225.13: no second STATUS render path was introduced — the Vault Boy view is a CSS re-layout of the existing render pipeline (Protocol 22)'
+  );
+}
+
+{
+  header(
+    'Suite 226 — FO3 PIP-BOY BUILD Batch 1 (STATUS/SPECIAL/SKILLS/PERKS/GENERAL/MANIFEST re-layout, Protocol 8 stage 2)'
+  );
+
+  const fo3CssPath226 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css226 = fs.existsSync(fo3CssPath226) ? fs.readFileSync(fo3CssPath226, 'utf8') : '';
+  const uiCoreSrc226 = readGroup('ui-core');
+  const invSrc226 = readGroup('ui-render-inventory');
+  const charSrc226 = readGroup('ui-render-character');
+  const cmdSrc226 = readGroup('ui-core-cmd');
+
+  // 226.1 — every board this batch re-laid out carries the .fo3-flat marker
+  //         (the shared "drop the per-board title bar, force always-open"
+  //         convention — Section H), and the CSS actually hides the summary
+  //         + the Section-A stepper/kit rules are present.
+  const flatBoardIds226 = [
+    'opVitalPanel',
+    'opHarnessPanel',
+    'statusEffectsPanel',
+    'opSpecialPanel',
+    'skillMatrixPanel',
+    'skillBooksPanel',
+    'magazinesPanel',
+    'perkLoadoutPanel',
+    'positionClockPanel',
+    'factionPanel',
+    'karmaPanel',
+    'opsManifestPanel',
+  ];
+  assert(
+    flatBoardIds226.every(id =>
+      new RegExp('class="panel bay-board[^"]*fo3-flat[^"]*"[^>]*id="' + id + '"').test(htmlSource)
+    ),
+    '226.1: all 12 Batch 1 boards carry the .fo3-flat marker class on their <details> tag'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-flat\s*>\s*summary\s*\{\s*display:\s*none;\s*\}/.test(fo3Css226),
+    "226.2: [data-game='FO3'] .fo3-flat > summary is display:none — the Pip-Boy screen has no per-board title bar"
+  );
+
+  // 226.3 — Protocol 42 regression: _wirePanelPersistence() must force a
+  //         .fo3-flat board open (gated on identity.rails, never a hardcoded
+  //         game literal — Protocol 38), defensively guarding classList in
+  //         case a caller ever runs this against a minimal mock element
+  //         (the exact crash a live behavioral test — 172.2 — surfaced when
+  //         this guard was first added without the `d.classList &&` check).
+  //         U6 Strand 1 (Protocol 42) widened the condition so the SAME
+  //         "force open" rule also covers every OTHER rail-grouped board
+  //         (CURIO/CRAFT/BARTER/SQUAD — not just the Batch 1 .fo3-flat
+  //         class list): any board carrying `d.dataset.subtab` (stamped by
+  //         _applyRailGrouping() for every board named in identity.rails)
+  //         is forced open too, since the sub-tab selector is already the
+  //         one gate deciding visibility and a collapsed <details> under it
+  //         is pure dead-end chrome. The `d.classList &&` guard and the
+  //         `.fo3-flat` check both still exist — no longer immediately
+  //         adjacent, since the widened OR-condition sits between them.
+  assert(
+    /d\.classList\s*&&/.test(uiCoreSrc226) &&
+      /getIdentity\(\)\.rails/.test(uiCoreSrc226) &&
+      /d\.classList\.contains\('fo3-flat'\)/.test(uiCoreSrc226) &&
+      /d\.dataset\.subtab/.test(uiCoreSrc226),
+    '226.3: [U6 update] _wirePanelPersistence() forces open any .fo3-flat board OR any board carrying d.dataset.subtab, only when the active identity carries `rails` data, and defensively checks classList exists first (Protocol 42 — a minimal test mock without classList must not throw)'
+  );
+
+  // 226.4 — STATUS full-bleed merge: #fo3BoardScroll is a single-column grid
+  //         by default (identical stacking to every other sub-tab/rail —
+  //         GENERAL's 3 boards, SKILLS' 3 boards, etc. all still just
+  //         stack), and :has() switches it to 2 columns ONLY while the
+  //         STATUS group's own harness board is active, with the 3 STATUS
+  //         boards explicitly placed into that grid.
+  assert(
+    /\[data-game='FO3'\]\s*#fo3BoardScroll\s*\{\s*display:\s*grid;/.test(fo3Css226) &&
+      /#fo3BoardScroll:has\(#opHarnessPanel\.subtab-active\)/.test(fo3Css226),
+    '226.4a: #fo3BoardScroll is a single-column grid by default, switching to a 2-column template only via :has(#opHarnessPanel.subtab-active) — every other rail (single-board or multi-board-but-stacked) keeps the same visual stacking it had before this batch'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1\s*\/\s*span 2;\s*\}/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opVitalPanel\s*\{\s*grid-column:\s*2;\s*grid-row:\s*1;\s*\}/.test(
+        fo3Css226
+      ) &&
+      /\[data-game='FO3'\]\s*#statusEffectsPanel\s*\{\s*grid-column:\s*2;\s*grid-row:\s*2;\s*\}/.test(
+        fo3Css226
+      ),
+    '226.4b: the Skeletal Harness board spans both grid rows on the left; Vital Telemetry and Status Effects stack on the right — the three previously-separate stacked boards now read as one merged screen'
+  );
+
+  // 226.5 — Protocol 42 regression: the vitals column is only ~190px wide
+  //         (the STATUS merge above) — narrow enough that the shipped HP/RAD
+  //         stepper group silently overflowed #fo3BoardScroll's own
+  //         overflow-x:clip and lost its second (▼) button. `.t-read` is
+  //         constrained to its own trace's width so flex-wrap can actually
+  //         engage (a content-sized `flex:0 0 auto` item ignores flex-wrap
+  //         entirely without a width constraint — the root cause).
+  assert(
+    /\[data-game='FO3'\]\s*#opVitalPanel\s*\.t-read\s*\{[^}]*flex:\s*1 1 100%;[^}]*max-width:\s*100%;[^}]*flex-wrap:\s*wrap;/.test(
+      fo3Css226
+    ),
+    '226.5: [live-browser regression, Protocol 42] #opVitalPanel .t-read is width-constrained (flex:1 1 100%; max-width:100%) so flex-wrap actually engages — without the width constraint the HP/RAD stepper group silently lost its ▼ button off the edge of the narrow STATUS vitals column'
+  );
+
+  // 226.6 — SPECIAL Shape B: the segment-ladder graphic is hidden, the row
+  //         is horizontal, and the real attribute name (previously only a
+  //         `title` tooltip) is shown as visible text via the same
+  //         `hidden`-attribute-then-CSS-reveal idiom already proven by
+  //         .fo3-stepper-btn-group.
+  const specialNames226 = [
+    'Strength',
+    'Perception',
+    'Endurance',
+    'Charisma',
+    'Intelligence',
+    'Agility',
+    'Luck',
+  ];
+  assert(
+    specialNames226.every(n =>
+      new RegExp('<span class="fd-name" hidden>' + n + '</span>').test(htmlSource)
+    ),
+    '226.6a: all seven SPECIAL stats carry a hidden .fd-name span with the real attribute name, revealed only under FO3'
+  );
+  // U6 Strand 2 (J-1) re-purposed the segment ladder from hidden dead
+  // weight into the mockup's horizontal fill bar (Protocol 22 — reuses the
+  // SAME ten <i> segments updateMath() already lights, never a second value
+  // source) — display:none is no longer correct; it must now be a visible,
+  // non-interactive (pointer-events:none) horizontal bar.
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-ladder\s*\{\s*display:\s*flex;[^}]*pointer-events:\s*none;\s*\}/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fader\s*\{[^}]*flex-direction:\s*row;/.test(
+        fo3Css226
+      ),
+    '226.6b: [U6 update] the segment-ladder graphic is repurposed into a visible, non-interactive (pointer-events:none) horizontal fill bar (Shape B) — no longer hidden — and each SPECIAL row is a horizontal flat row, not the NV vertical fader'
+  );
+  // 226.7 — Protocol 42 regression: the base NV .fd-steps rule stacks the
+  //         +/- buttons in a COLUMN (its own vertical-fader idiom) and never
+  //         sets a button color — both silently carried over into FO3
+  //         unless explicitly overridden, producing near-invisible
+  //         dark-on-dark stacked squares instead of a legible horizontal
+  //         stepper.
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-steps\s*\{[^}]*flex-direction:\s*row;/.test(
+      fo3Css226
+    ) &&
+      /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fd-steps button\s*\{[^}]*color:\s*var\(\s*--robco-green\s*\);/.test(
+        fo3Css226
+      ),
+    '226.7: [live-browser regression, Protocol 42] #opSpecialPanel .fd-steps is explicitly flex-direction:row with an explicit button color — the base NV rule stacks them in a column with no color set, which silently produced invisible dark-on-dark stacked squares under FO3'
+  );
+
+  // 226.8 — SKILLS/PERKS/MANIFEST Shape A: each board's detail pane exists,
+  //         ships `hidden` by default (NV/portrait never reveal it — no
+  //         FNV-exclusion CSS needed), and the shared .fo3-split/.fo3-list-col
+  //         control-kit wraps the existing list markup rather than forking
+  //         a second list renderer.
+  ['fo3SkillDetail', 'fo3PerkDetail', 'fo3ManifestDetail'].forEach(id => {
+    assert(
+      new RegExp('id="' + id + '" class="fo3-detail" hidden').test(htmlSource),
+      '226.8: #' + id + ' exists and ships the `hidden` boolean attribute by default'
+    );
+  });
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-detail\s*\{\s*display:\s*block;/.test(fo3Css226),
+    '226.9: .fo3-detail overrides its own `hidden` attribute with display:block, scoped to FO3 landscape only'
+  );
+
+  // 226.10 — tap-parity guard: PERKS keeps its real inline ✕ delete button
+  //          in the list row (only MANIFEST's actions move to detail-only,
+  //          per the design's own accepted tradeoff) — a static guard that
+  //          the delete-btn markup was never removed from renderPerks().
+  assert(
+    /class="delete-btn pk-x"/.test(charSrc226) && /removePerk\(/.test(charSrc226),
+    '226.10: renderPerks() still emits the real inline ✕ delete button on every row — PERKS keeps zero-tap-regression delete, unlike the flagged MANIFEST case'
+  );
+
+  // 226.11 — MANIFEST's detail-only actions call the exact same mutators
+  //          the inline row always called — no forked state path.
+  assert(
+    /toggleEquipItem\(/.test(invSrc226) &&
+      /nativeUseItem\(/.test(invSrc226) &&
+      /adjItemQty\(/.test(invSrc226) &&
+      /delItem\(/.test(invSrc226) &&
+      !/function\s+_fo3ManifestEquip|function\s+_fo3ManifestUse|function\s+_fo3ManifestDrop/.test(
+        invSrc226
+      ),
+    '226.11: _renderFo3ManifestDetail() calls the existing toggleEquipItem/nativeUseItem/adjItemQty/delItem handlers — no parallel action-handler family was invented for the detail pane (Protocol 22)'
+  );
+
+  // 226.12 — Protocol 42 regression: LOAD-CELL WEIGH BRIDGE (#opsBridgePanel)
+  //          carries no data-subtab (by design — its one live figure already
+  //          rides #fo3TopStrip's Wg segment), which also meant the
+  //          Section-C hide rule could never match it: it rendered
+  //          permanently ABOVE whichever OPERATIONS board was actually
+  //          selected, fully consuming the 360px-tall content region and
+  //          burying the real MANIFEST/CRAFT/BARTER/SQUAD/CURIO board out of
+  //          view without a scroll. Found live while verifying the MANIFEST
+  //          flagship.
+  assert(
+    /\[data-game='FO3'\]\s*#opsBridgePanel\s*\{\s*display:\s*none;\s*\}/.test(fo3Css226),
+    "226.12: [live-browser regression, Protocol 42] [data-game='FO3'] #opsBridgePanel is display:none — un-hidden, it rendered above every OPERATIONS board (no data-subtab to gate it) and fully buried the MANIFEST/CRAFT/BARTER/SQUAD/CURIO rail content on a 360px-tall screen"
+  );
+
+  // 226.13 — SKILLS list value stays legible: the compact read-only input in
+  //          the list row is wide enough to show 2-digit values without
+  //          clipping (Protocol 42 regression — 34px silently clipped "15"
+  //          down to "1"). U6 re-measured against the approved mockup's
+  //          real rendered pixels and found 44px STILL clipped a 2-digit
+  //          value (the font-size:16px iOS-zoom guard plus the native
+  //          number-input spinner reserve leaves too little room) — widened
+  //          to 52px; see Suite 227.
+  assert(
+    /\[data-game='FO3'\]\s*#skillMatrixPanel\s*\.vu-input\s*\{[^}]*width:\s*52px;/.test(fo3Css226),
+    '226.13: [live-browser regression, Protocol 42] #skillMatrixPanel .vu-input is 52px wide — 44px (this suite\'s own earlier fix) still clipped a 2-digit value ("15" rendered as "1"), re-measured and widened in U6'
+  );
+
+  // 226.14 — no second render path anywhere in this batch: every detail/
+  //          selection helper is additive, the shared render*() functions
+  //          are unchanged in name and still own their list's markup.
+  assert(
+    /function\s+renderSkills\s*\(/.test(cmdSrc226) &&
+      /function\s+renderPerks\s*\(/.test(charSrc226) &&
+      /function\s+renderInventory\s*\(/.test(invSrc226),
+    '226.14: renderSkills()/renderPerks()/renderInventory() all still own their list markup under their original names — the FO3 detail panes are additive helpers, never a parallel renderer'
+  );
+}
+
+{
+  header(
+    'Suite 227 — FO3 PIP-BOY UNIT U6 (scroll trap, render-integrity, mockup density pass, casing, STATUS figure wiring)'
+  );
+
+  const fo3CssPath227 = path.join(ROOT, 'css', '60-fo3-pipboy.css');
+  const fo3Css227 = fs.existsSync(fo3CssPath227) ? fs.readFileSync(fo3CssPath227, 'utf8') : '';
+  const cmdSrc227 = readGroup('ui-core-cmd');
+  const navSrc227 = readGroup('ui-core-nav');
+  const uiCoreSrc227 = readGroup('ui-core');
+
+  // 227.1 — Protocol 42: the owner's touchcancel state-corruption bug, found
+  //         while tracing the scroll trap. Without a touchcancel listener a
+  //         cancelled gesture (incoming call, app switch) left `dragging`
+  //         true forever, so every LATER touchmove anywhere on the document
+  //         silently rewrote HP/XP/RAD from whatever X the finger was at.
+  //         All three drag surfaces (HP, XP, and the shared RAD wiring
+  //         function covering both radDragTrack and opRadLineWrap) must
+  //         register touchcancel alongside touchend.
+  const touchcancelCount = (cmdSrc227.match(/addEventListener\('touchcancel'/g) || []).length;
+  assert(
+    touchcancelCount === 3,
+    "227.1: [Protocol 42 regression] all three drag-surface wiring functions (setupHpBarInteraction, setupXpBarInteraction, _wireRadDragSurface) register a 'touchcancel' listener alongside their 'touchend' listener — found " +
+      touchcancelCount +
+      ' — without it a cancelled gesture left `dragging` stuck true, and every later touchmove anywhere on the page silently rewrote HP/XP/RAD'
+  );
+
+  // 227.2 — the scroll trap fix (Strand 1): .curio-caselist and .tray-list
+  //         are fixed-px inner scroll containers authored for NV's tall
+  //         portrait layout (css/40-curio-operations.css) — dropped inside
+  //         FO3-landscape's ~211-224px glass they were nearly twice as tall
+  //         as their region and `overscroll-behavior:contain` explicitly
+  //         refused to hand an exhausted gesture up to #fo3BoardScroll, the
+  //         one scroller the whole design is built around. Confirmed via
+  //         planning/_probe_scroll.mjs (a real CDP touch-drag moved
+  //         #fo3BoardScroll.scrollTop on every board tested).
+  assert(
+    /\[data-game='FO3'\]\s*\.curio-caselist,\s*\n\s*\[data-game='FO3'\]\s*\.tray-list\s*\{\s*max-height:\s*none;\s*overscroll-behavior:\s*auto;/.test(
+      fo3Css227
+    ),
+    "227.2: [live-browser regression, Protocol 27/42] .curio-caselist and .tray-list are neutralised to max-height:none + overscroll-behavior:auto under [data-game='FO3'] — the NV-authored fixed-px scroll trap that swallowed the owner's CURIO/MANIFEST touch-drag"
+  );
+
+  // 227.3 — Protocol 42 regression: the native <input type="search"> drawer
+  //         filter bar (MANIFEST, PERKS, CURIO — every board sharing
+  //         .tray-head) had no dark styling anywhere in the shared CSS, so
+  //         it rendered as a plain white UA search box — the single worst
+  //         visual break in the U5 screenshots. Fixed at the class level
+  //         (Protocol 36b), not per-board.
+  assert(
+    /\[data-game='FO3'\]\s*\.col-left\s*\.tray-head\s*input\[type='search'\]\s*\{[^}]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.35\);[^}]*color:\s*var\(\s*--robco-green\s*\);/.test(
+      fo3Css227
+    ),
+    "227.3: [live-browser regression, Protocol 42] .col-left .tray-head input[type='search'] is restyled dark/green under FO3 — the shared class-level fix for MANIFEST/PERKS/CURIO's identical white search-bar break"
+  );
+
+  // 227.4 — Protocol 42 regression (M-1, the "amber leak"): the owner's
+  //         GENERAL screenshot showed an amber dashed divider and an
+  //         amber-bordered input. Traced to details.bay-board::after
+  //         (css/30-modulebay.css) — a hardcoded #d9a24a "connector pin"
+  //         strip on the bottom edge of EVERY board, game-agnostic and
+  //         un-scoped. FO3's amber is spent only on the lamp/knob/toggle —
+  //         fixed at the class level so no future board can leak it back in.
+  assert(
+    /\[data-game='FO3'\]\s*\.col-left\s*\.panel\.bay-board::after\s*\{\s*display:\s*none;\s*\}/.test(
+      fo3Css227
+    ),
+    "227.4: [live-browser regression, Protocol 42] [data-game='FO3'] .col-left .panel.bay-board::after is display:none — neutralises the game-agnostic amber connector-pin strip (css/30-modulebay.css) every board otherwise inherits, which the owner's GENERAL screenshot caught bleeding through as NV-style chrome"
+  );
+
+  // 227.5 — G-5 (owner correction, 2026-07-13): real FO3 reference
+  //         screenshots supersede the plan's original "crippled limb reads
+  //         red" treatment, which was a designer guess, not the game's real
+  //         convention. The game's own treatment is a DASHED outline with
+  //         the CRIPPLED text already shown — NO colour change anywhere.
+  //         The shared (NV-facing) button.limb-crip rule (css/05-base.css)
+  //         sets color/border-color to --robco-danger red; FO3 explicitly
+  //         resets both back to green. A static guard also locks out any
+  //         reintroduction of the red hex/rgba this unit shipped and then
+  //         corrected, so the mistake can't quietly come back.
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.zone-chips button\[aria-pressed='true'\]\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);\s*border-style:\s*dashed;/.test(
+      fo3Css227
+    ),
+    "227.5a: [owner correction, Protocol 42] #opHarnessPanel .zone-chips button[aria-pressed='true'] is dashed + explicitly reset to green (color and border-color) under FO3 — never red"
+  );
+  assert(
+    !/#ff6a50/i.test(fo3Css227) && !/rgba\(\s*255,\s*106,\s*80/i.test(fo3Css227),
+    '227.5b: [owner correction — regression guard] the red crippled-limb hex/rgba this unit shipped and then corrected per real reference screenshots does not reappear anywhere in css/60-fo3-pipboy.css'
+  );
+
+  // 227.6 — Strand 6, U8 drop-in: the STATUS Vault Boy figure is wired to
+  //         reflect limb damage from the SAME state the readout buttons
+  //         already use (one code path, Protocol 22/24) — dashed outline +
+  //         a blinking CRIPPLED text label, never a colour change (the same
+  //         owner correction as G-5). U8 replaced the U6 placeholder with
+  //         Fable's approved VARIANT A drawing
+  //         (planning/2.8.5/mockups/FO3/fo3-status-figure.html); the outer <g data-limb="..."> wrapper
+  //         (toggled by loadUI()) now contains a nested <g class="limbline">
+  //         (the drawn outline) rather than carrying both attributes on the
+  //         same element, so the apply logic (227.6c) — the one thing this
+  //         swap was designed not to touch — needed no change at all.
+  assert(
+    (htmlSource.match(/<g data-limb="(hd|la|ra|ll|rl)">/g) || []).length === 5,
+    '227.6a: the Vault Boy figure (.vaultboy-fig svg) wraps all five tracked limbs in their own <g data-limb="..."> group (Fable\'s VARIANT A drawing), matching the exact contract loadUI() already applies .crippled against'
+  );
+  assert(
+    (htmlSource.match(/<text class="slottxt"[^>]*>CRIPPLED<\/text>/g) || []).length === 5,
+    '227.6b: each tracked limb group carries its own hidden-by-default, blinking CRIPPLED text label (.slottxt), shown only while that limb is crippled'
+  );
+  assert(
+    /const\s+figLimb\s*=\s*document\.querySelector\(\s*'\.vaultboy-fig \[data-limb="'\s*\+\s*k\s*\+\s*'"\]'\s*\)/.test(
+      uiCoreSrc227
+    ) && /figLimb\.classList\.toggle\('crippled',\s*isCrippled\)/.test(uiCoreSrc227),
+    "227.6c: loadUI() toggles .crippled on the Vault Boy figure's matching [data-limb] group from the SAME isCrippled value the btn_l_* readout buttons already use — never a second state read"
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\.fig\s*\[data-limb\]\.crippled\s*\.limbline\s*\{\s*stroke-dasharray:/.test(
+      fo3Css227
+    ) && !/\.vaultboy-fig[^}]*\.crippled[^}]*color:\s*#/i.test(fo3Css227),
+    '227.6d: the crippled figure treatment is a dashed stroke — no colour override anywhere on the .vaultboy-fig crippled state'
+  );
+  assert(
+    /\[data-game='FO3'\]\s*#opHarnessPanel\s*\.vaultboy-fig\s*\.fig\s*\[data-limb='hd'\]\.crippled\s*\.face-crpl\s*\{\s*display:\s*initial;/.test(
+      fo3Css227
+    ),
+    "227.6e: [U8] the head additionally swaps to Fable's referenced wail face (.face-crpl) when crippled — the one limb-specific face swap variant A documents"
+  );
+
+  // 227.7 — §2.7: the mockup leads the top strip with the active
+  //         subsystem's own name as a bold "current channel" chip, read
+  //         straight off the real keycap's existing .nk-label text (zero
+  //         new state, zero game literal — Protocol 38).
+  assert(
+    /const\s+nameLabel\s*=\s*keycap\s*&&\s*keycap\.querySelector\('\.nk-label'\)/.test(navSrc227) &&
+      /fo3-strip-seg fo3-strip-name/.test(navSrc227),
+    "227.7: _renderFo3TopStrip() prepends a .fo3-strip-name chip read from the active keycap's own .nk-label text — no hardcoded game literal, no new state"
+  );
+
+  // 227.8 — §2.8: the mockup separates sub-tab names with a dash connector
+  //         (STATUS — SPECIAL — SKILLS …), aria-hidden so it never reaches
+  //         AT (the buttons' own role=tab/aria-selected already carry the
+  //         real structure).
+  assert(
+    /\.join\('<span class="fo3-rail-dash" aria-hidden="true">—<\/span>'\)/.test(navSrc227),
+    '227.8: _renderFo3SubtabRail() joins its buttons with an aria-hidden dash connector span, matching the mockup'
+  );
+
+  // 227.9 — Strand 3: the casing left/right rails + hood + lamp-bar. CSS-only
+  //         chrome layered around the working shell (Protocol UI-7) — no
+  //         control moves in the DOM. #uosMachine becomes a 3x3 grid; the
+  //         four decorative casing divs (index.html, hidden by default) are
+  //         un-hidden into their cells; .bezel/.nav-row flatten via
+  //         display:contents so the three side controls (chassis/uplink/
+  //         settings) can be positioned onto the rails without leaving the
+  //         DOM — tab order, role=tab, aria-selected, onclick, hotkeys,
+  //         #go= deep-links all stay untouched.
+  assert(
+    /\[data-game='FO3'\]\s*#uosMachine\.container\.machine\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*86px minmax\(0,\s*1fr\)\s*44px;/.test(
+      fo3Css227
+    ),
+    "227.9a: [data-game='FO3'] #uosMachine.container.machine is a 3-column grid (86px | 1fr | 44px) — the ID+class specificity matches Section A's own #uosMachine.container.machine selector exactly, a Protocol 42 regression the implementer caught by screenshot (a plain #uosMachine selector here would lose to Section A's display:flex despite later source order)"
+  );
+  assert(
+    /\[data-game='FO3'\]\s*\.bezel,\s*\n\s*\[data-game='FO3'\]\s*\.nav-row\s*\{\s*display:\s*contents;\s*\}/.test(
+      fo3Css227
+    ),
+    '227.9b: .bezel/.nav-row flatten via display:contents so .nav-cluster becomes a real grid item in the lamp-bar cell — the three side controls (chassis/uplink/settings) are then positioned via CSS only, never moved in the DOM'
+  );
+  ['navkey-chassis', 'navkey-uplink', 'navkey-settings'].forEach(id => {
+    assert(
+      new RegExp("\\[data-game='FO3'\\]\\s*#" + id + '\\s*\\{\\s*position:\\s*absolute;').test(
+        fo3Css227
+      ),
+      '227.9c: #' + id + ' is positioned (not moved) onto its casing rail via CSS only'
+    );
+  });
+  ['casingRailLeft', 'casingHood', 'casingRailRight', 'casingLampBar'].forEach(id => {
+    assert(
+      new RegExp(
+        '<div class="casing-[a-z-]+"\\s+id="' + id + '"\\s+hidden aria-hidden="true">'
+      ).test(htmlSource),
+      '227.9d: #' +
+        id +
+        ' ships the `hidden` boolean attribute by default (game-agnostic default — NV/FO4/FO3-portrait never render it)'
+    );
+  });
+
+  // 227.10 — Protocol 42 regression (found verifying the density pass by
+  //          screenshot): the base NV .fader rule sets flex:0 0 38px to
+  //          size a column in NV's horizontal fader-row; under FO3's
+  //          flex-direction:column that silently became a fixed 38px ROW
+  //          HEIGHT. The FO3 override's own min-height:28px alone still
+  //          measured 31px in the live browser (an inherited line-height
+  //          contribution on the flex container, not any single child) —
+  //          an explicit max-height:28px was needed to actually hit the
+  //          mockup's row pitch and fit all 7 SPECIAL rows in the ~211px
+  //          budget.
+  assert(
+    /\[data-game='FO3'\]\s*#opSpecialPanel\s*\.fader\s*\{[^}]*min-height:\s*28px;\s*max-height:\s*28px;/.test(
+      fo3Css227
+    ),
+    "227.10: [live-browser regression, Protocol 42] #opSpecialPanel .fader has both min-height AND max-height at 28px — min-height alone still measured 31px live, one row-height short of the mockup's 28px pitch needed for all 7 SPECIAL rows to fit"
+  );
+
+  // 227.11 — NV-untouched proof: every new selector this unit introduces
+  //          lives ONLY inside the [data-game='FO3'] selector list. Plain
+  //          standalone selectors are checked generically; .fo3-strip-name
+  //          and the Vault Boy figure's classes are always COMPOUND
+  //          (attached directly to .fo3-strip-seg / used only as a
+  //          descendant inside .vaultboy-fig rules) so the generic "prefix
+  //          immediately precedes the selector" lookbehind can't see past
+  //          the attached/intervening class — checked with their own full
+  //          compound-selector regex instead (227.11b/c).
+  [
+    '#casingRailLeft',
+    '#casingHood',
+    '#casingRailRight',
+    '#casingLampBar',
+    '.fo3-rail-dash',
+  ].forEach(sel => {
+    const escaped = sel.replace(/[.#]/g, '\\$&');
+    const bare = new RegExp("(?<!\\[data-game='FO3'\\]\\s{0,3})" + escaped + '\\s*[,{]', 'g');
+    assert(
+      !bare.test(fo3Css227),
+      '227.11a: every ' +
+        sel +
+        " rule in css/60-fo3-pipboy.css carries the [data-game='FO3'] prefix"
+    );
+  });
+  assert(
+    /\[data-game='FO3'\]\s*\.fo3-strip-seg\.fo3-strip-name\s*\{/.test(fo3Css227) &&
+      (fo3Css227.match(/\.fo3-strip-name/g) || []).length === 1,
+    "227.11b: .fo3-strip-name is declared exactly once, as a compound class on .fo3-strip-seg inside the [data-game='FO3'] scope"
+  );
+  {
+    // U8: .crip-label is gone (replaced by the Vault Boy figure's Fable-
+    // drawing classes — .limbline/.fig-detail/.face-ok/.face-crpl/.gfill/
+    // .slottxt/.slotbar, every one a descendant of .vaultboy-fig). Every
+    // physical line touching one of them must itself begin with the
+    // [data-game='FO3'] prefix.
+    const figClasses227c = [
+      '.limbline',
+      '.fig-detail',
+      '.face-ok',
+      '.face-crpl',
+      '.gfill',
+      '.slottxt',
+      '.slotbar',
+    ];
+    const figRuleLines227c = fo3Css227
+      .split('\n')
+      .filter(line => line.includes('.vaultboy-fig') && figClasses227c.some(c => line.includes(c)));
+    assert(
+      figRuleLines227c.length >= figClasses227c.length &&
+        figRuleLines227c.every(line => line.includes("[data-game='FO3']")),
+      "227.11c: [U8] every Vault Boy figure rule (.limbline/.fig-detail/.face-ok/.face-crpl/.gfill/.slottxt/.slotbar, each a descendant of .vaultboy-fig) carries the [data-game='FO3'] prefix"
+    );
+  }
+
+  // 227.12 — U8 (MANIFEST density, audit punch-list item 2): the always-
+  //          visible drawer filter search row ate a whole row of the FO3
+  //          landscape MANIFEST board's ~211px budget for a rarely-used
+  //          optional filter, leaving only ~4-5 item rows visible against
+  //          the mockup's ~6. Fixed by collapsing that row behind a toggle
+  //          — hidden by default under FO3 landscape only, one tap away —
+  //          rather than deleting the filtering capability (Protocol 26).
+  //          NV's own always-visible search row is untouched (227.12a/b).
+  {
+    const invSrc227 = readGroup('ui-render-inventory');
+    assert(
+      (htmlSource.match(/id="mfFilterToggle"/g) || []).length === 1 &&
+        /id="mfFilterToggle"[^>]*onclick="toggleManifestFilterRow\(\)"[^>]*hidden/.test(htmlSource),
+      '227.12a: exactly one #mfFilterToggle button exists, wired to toggleManifestFilterRow(), and ships `hidden` by default (game-agnostic default, matching the #casingRailLeft idiom)'
+    );
+    assert(
+      /<div class="tray-head" id="opsManifestFilterRow" hidden>/.test(htmlSource),
+      '227.12b: the MANIFEST drawer search row (.tray-head) carries id="opsManifestFilterRow" and ships `hidden` by default — inert for NV (.tray-head\'s own unscoped display:flex rule already defeats [hidden] there, so NV keeps its search row always visible)'
+    );
+    assert(
+      /function toggleManifestFilterRow\(\)\s*\{[\s\S]{0,400}?row\.hidden\s*=\s*!opening[\s\S]{0,200}?aria-expanded[\s\S]{0,150}?focus\(\)/.test(
+        invSrc227
+      ),
+      "227.12c: toggleManifestFilterRow() flips #opsManifestFilterRow.hidden, updates #mfFilterToggle's aria-expanded, and focuses #invDrawerSearch when opening — a real reveal, not a dead stub"
+    );
+    assert(
+      /\[data-game='FO3'\]\s*#opsManifestPanel\s*\.tray-head\[hidden\]\s*\{\s*display:\s*none;/.test(
+        fo3Css227
+      ),
+      "227.12d: [data-game='FO3'] #opsManifestPanel .tray-head[hidden] forces display:none — without this, the row's own base display:flex rule (css/40-curio-operations.css, unscoped) would defeat the shipped `hidden` attribute under FO3 too, same as it correctly does for NV"
+    );
+    assert(
+      !/id="mfFilterToggle"[^>]*class="[^"]*\bdrawer\b/.test(htmlSource) &&
+        /\[data-game='FO3'\]\s*#mfFilterToggle\s*\{[^}]*display:\s*flex;[^}]*width:\s*auto;/.test(
+          fo3Css227
+        ),
+      "227.12e: #mfFilterToggle carries no shared .drawer class (button.drawer's own unscoped display:flex base rule would defeat its `hidden` attribute everywhere, including NV — the same bug class 227.12d guards against on the row) and explicitly overrides width:auto (Protocol 17 — the global button{width:100%} base rule has nothing to do with `hidden` and would otherwise stretch it full-width)"
+    );
+  }
+
+  // 227.13 — U8 (audit punch-list item 3): the limb-status readout chip
+  //          (btn_l_*, js/ui/ui-core.js) showed the abbreviation "CRIP"
+  //          while the Vault Boy figure right next to it (on FO3 landscape)
+  //          spells out "CRIPPLED" in full — a disclosed inconsistency the
+  //          U7 audit flagged as minor but left as-is. Verified it fits:
+  //          live-measured on FO3 landscape (106px grid column) the text
+  //          wraps onto two lines with no clipping/overlap, and on NV
+  //          (content-width chip, no fixed column) scrollWidth===clientWidth
+  //          — zero overflow either game. Shared code (Protocol 22) — one
+  //          render path, both games get the full word together.
+  {
+    const uiCoreSrc227_13 = readGroup('ui-core');
+    assert(
+      /zone-status">\[░░░░░░\] CRIPPLED<\/span>/.test(uiCoreSrc227_13),
+      '227.13a: the crippled-limb chip now renders the full word "CRIPPLED", matching the Vault Boy figure\'s own label instead of the shorthand "CRIP"'
+    );
+    assert(
+      !/zone-status">\[░░░░░░\] CRIP<\/span>/.test(uiCoreSrc227_13),
+      '227.13b: the old "CRIP" shorthand does not reappear in the crippled-limb chip markup'
+    );
+  }
+
+  // 227.14 — U8 (audit punch-list item 5): the real FO3 Pip-Boy screen is
+  //          one green — no red anywhere. The perk-slot delete "✕" button
+  //          (.pk-x, shared .delete-btn base rule in css/05-base.css sets
+  //          --robco-danger red) was the one remaining red element on the
+  //          FO3 landscape glass, outside U7's stated red-removal scope
+  //          (HP/SPECIAL/CRITICAL). Reset to green here, the same pattern
+  //          as the G-5 crippled-limb-chip fix — scoped to .pk-x only, so
+  //          NV's own red delete buttons (squad dismiss, inventory row
+  //          remove, save-slot delete) stay exactly as they are.
+  {
+    const fo3Css227_14 = fo3Css227;
+    assert(
+      /\[data-game='FO3'\]\s*#perkLoadoutPanel\s*\.slot-row\s*\.pk-x\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);/.test(
+        fo3Css227_14
+      ),
+      "227.14a: [data-game='FO3'] #perkLoadoutPanel .slot-row .pk-x is explicitly reset to green (color and border-color) — never red — matching the whole-screen all-green discipline"
+    );
+    assert(
+      !/#perkLoadoutPanel[^}]*\.pk-x[^}]*--robco-danger/.test(fo3Css227_14) &&
+        !/\.pk-x[^}]*#e74c3c/i.test(fo3Css227_14),
+      "227.14b: no rule scoped to the FO3 perk delete button reintroduces --robco-danger or its hex — the mistake corrected at G-5 (227.5b) can't quietly come back here either"
+    );
+  }
+
+  // 227.15 — U9 (Protocol 8 stage 2 round 3, Protocol 13 regression for the
+  //          owner-reported mirrored-limb-controls bug, root-caused in
+  //          planning/2.8.5/audits/FO3/AUDIT_FO3_U8.md): the box grid columns were on the
+  //          OPPOSITE side from the anatomically-drawn (front-facing) figure
+  //          limb they toggle — L.ARM/L.LEG sat in the left column beside
+  //          the figure's RIGHT-side `la`/`ll` groups, and vice versa. Fixed
+  //          by swapping which box occupies each column: R.ARM/R.LEG now sit
+  //          in the left column (beside `ra`/`rl`, drawn on the viewer's
+  //          left) and L.ARM/L.LEG in the right column (beside `la`/`ll`,
+  //          drawn on the viewer's right). This static check locks the
+  //          SOURCE assignment; the live computed-geometry check (comparing
+  //          each box's on-screen side against its figure limb's own
+  //          on-screen side — the render-integrity-class check the audit
+  //          asked for, since source text alone can't observe a live mirror)
+  //          lives in tests/render-integrity.mjs assertion 6, run at push-gate.
+  assert(
+    /#btn_l_ra\s*\{\s*grid-column:\s*1;/.test(fo3Css227) &&
+      /#btn_l_rl\s*\{\s*grid-column:\s*1;/.test(fo3Css227) &&
+      /#btn_l_la\s*\{\s*grid-column:\s*3;/.test(fo3Css227) &&
+      /#btn_l_ll\s*\{\s*grid-column:\s*3;/.test(fo3Css227),
+    "227.15a: [Protocol 13, owner-reported mirror bug] R.ARM/R.LEG boxes sit in grid-column 1 (beside the figure's left-side ra/rl groups) and L.ARM/L.LEG sit in grid-column 3 (beside the figure's right-side la/ll groups) — not the naive screen-side placement that caused the mirror"
+  );
+  assert(
+    /#btn_l_hd::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_ra::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_rl::after\s*\{/.test(
+      fo3Css227
+    ) &&
+      /#btn_l_la::after,\s*\n\s*\[data-game='FO3'\]\s*#opHarnessPanel\s*#btn_l_ll::after\s*\{/.test(
+        fo3Css227
+      ),
+    '227.15b: the dash leader-line ::after rules follow the same column swap as 227.15a (HEAD/R.ARM/R.LEG point right toward the figure, L.ARM/L.LEG point left) — the connector never points at the wrong limb'
+  );
+
+  // 227.16 — U9 (Protocol 8 stage 2 round 3, Protocol 13 regression for the
+  //          audit's finding A: the U8 CHANGELOG falsely claimed the perk-
+  //          delete ✕ was "the last remaining red element" on the FO3
+  //          landscape glass. Three more red states remained, all driven by
+  //          the SAME shared (game-agnostic) updateMath() inline styles this
+  //          file already overrides above for HP/rad-debuff — reset to green
+  //          here with the identical !important pattern, plus the unscoped
+  //          global critical-HP vignette gets its own green keyframe.
+  {
+    const fo3Css227_16 = fo3Css227;
+    assert(
+      /#opVitalPanel\s*#stat_rads\s*\{\s*color:\s*var\(\s*--robco-green\s*\)\s*!important;/.test(
+        fo3Css227_16
+      ),
+      "227.16a: [Protocol 13, audit finding A] [data-game='FO3'] #opVitalPanel #stat_rads is reset to green !important, overriding updateMath()'s inline red/orange rad-escalation colour"
+    );
+    assert(
+      /#opVitalPanel\s*#radAwayAlert\s*\{\s*color:\s*var\(\s*--robco-green\s*\)\s*!important;/.test(
+        fo3Css227_16
+      ),
+      "227.16b: [Protocol 13, audit finding A] [data-game='FO3'] #opVitalPanel #radAwayAlert is reset to green !important, overriding updateMath()'s inline red \"NONE IN PACK\" colour — the alert's own text still carries the meaning"
+    );
+    assert(
+      /#statusEffectsPanel\s*\.stlamp-purge\s*\{\s*color:\s*var\(\s*--robco-green\s*\);\s*border-color:\s*rgba\(var\(--robco-green-rgb\),\s*0\.55\);/.test(
+        fo3Css227_16
+      ),
+      "227.16c: [Protocol 13, audit finding A] [data-game='FO3'] #statusEffectsPanel .stlamp-purge (the ACTIVE EFFECTS purge ✕) is reset to green — the ✕ glyph and its aria-label still carry the meaning"
+    );
+    assert(
+      /body\.hp-critical-vignette\s*\.glass-frame\s*\{\s*animation-name:\s*fo3HpVignetteBreathe;/.test(
+        fo3Css227_16
+      ) &&
+        /@keyframes\s+fo3HpVignetteBreathe\s*\{[^}]*rgba\(var\(--robco-green-rgb\),/.test(
+          fo3Css227_16
+        ),
+      '227.16d: [Protocol 13, audit finding A] the FO3 critical-HP edge vignette rides its own fo3HpVignetteBreathe keyframe (green rgba) instead of the shared red one, same spread/timing, still visibly alarming at HP < 25%'
+    );
+    assert(
+      !/#stat_rads[^}]*--robco-danger/.test(fo3Css227_16) &&
+        !/#radAwayAlert[^}]*--robco-danger/.test(fo3Css227_16) &&
+        !/\.stlamp-purge[^}]*--robco-danger/.test(fo3Css227_16),
+      "227.16e: no FO3-scoped override of #stat_rads/#radAwayAlert/.stlamp-purge reintroduces --robco-danger — the false-CHANGELOG mistake (audit finding A) can't quietly come back"
+    );
+  }
+
+  // 227.17 — U9 (carry-forward, audit finding B): the STATUS vitals column
+  //          (#opVitalPanel, row 1 of the 2-row STATUS grid merge) was
+  //          measured at only ~141px visible against ~495px of content,
+  //          clipping the RAD value below the fold — the U7 "CONDITION and
+  //          RAD visible without scrolling" claim was optimistic. Giving
+  //          row 1 an explicit floor (186px, verified against a real
+  //          Playwright measurement at 780x360: RAD's own bottom edge needs
+  //          179px) reclaims just enough space for RAD to clear the fold,
+  //          without shrinking #statusEffectsPanel (row 2) below its own
+  //          natural content height — verified empirically that row 2 keeps
+  //          scrollHeight === clientHeight (no new clipping introduced).
+  assert(
+    /grid-template-rows:\s*minmax\(186px,\s*auto\)\s*auto;/.test(fo3Css227),
+    "227.17: [Protocol 13, audit finding B] #fo3BoardScroll:has(#opHarnessPanel.subtab-active) gives the vitals row (row 1) an explicit 186px floor — enough for the RAD value to clear the fold without scrolling, verified against a live measurement, and without starving #statusEffectsPanel's own natural content height"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 228 — cross-game local-slot switch: stale-registry regression
+//  (Protocol 13, owner report: "FO3 suggests NV locations"). Root cause:
+//  _applySlotEnvelope() (js/ui/ui-saves.js — the shared core behind LOAD SLOT
+//  and VERSION RESTORE) applied a cross-game slot IN PLACE (loadUI() only, no
+//  reload) even though it already detects and confirms the context mismatch.
+//  FALLOUT_REGISTRY/databaseCSVs are boot-time-only globals (index.html's
+//  GAME_FILES manifest loads exactly ONE of reg_nv.js/reg_fo3.js +
+//  db_nv.js/db_fo3.js) — an in-place apply left them stuck on the OLD game's
+//  data while state.gameContext silently flipped to the new game. Fixed: the
+//  cross-game branch now persists robco_v8 and reloads, exactly like every
+//  other cross-game apply path (onGameContextChange, loadCloudSave,
+//  restoreCloudSaveVersion) already did. 228.1-228.4 are static regression
+//  guards on the fixed shape; 228.5/228.6 (deferred, async) are BEHAVIORAL —
+//  they execute the REAL extracted _applySlotEnvelope() against a mocked
+//  boot environment, because a source-text grep cannot see a stale global
+//  object surviving in memory, which is exactly how this bug shipped past
+//  every prior test in this file. The full real-browser, real-registry proof (actual
+//  reg_nv.js/reg_fo3.js, actual reload) lives in tests/render-check.mjs.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 228 — cross-game local-slot switch stale-registry regression');
+
+  const uiSaves228 = readGroup('ui-saves');
+  let applyBody228;
+  try {
+    applyBody228 = extractFunctionBody(uiSaves228, '_applySlotEnvelope');
+  } catch (e) {
+    fail('Cannot extract _applySlotEnvelope: ' + e.message);
+  }
+
+  // 228.1 — the crossGame branch calls window.location.reload().
+  assert(
+    typeof applyBody228 === 'string' && /window\.location\.reload\(\)/.test(applyBody228),
+    '228.1: _applySlotEnvelope() calls window.location.reload() — a cross-game slot load must reboot, not apply in place'
+  );
+
+  // 228.2 — the crossGame branch sets window._loadingSave = true before the
+  //         reload (Suite 95.8/95.9 precedent: guards the beforeunload flush
+  //         from clobbering the just-written robco_v8 before boot re-reads it).
+  assert(
+    typeof applyBody228 === 'string' && /window\._loadingSave\s*=\s*true/.test(applyBody228),
+    '228.2: _applySlotEnvelope() sets window._loadingSave = true before reload (beforeunload-flush clobber guard, Suite 95.8/95.9 precedent)'
+  );
+
+  // 228.3 — the crossGame branch persists activeContext as slotCtx (the NEW
+  //         game), not curCtx — the exact inversion that would silently
+  //         reboot back into the wrong game.
+  assert(
+    typeof applyBody228 === 'string' &&
+      /window\.robco_v8\.activeContext\s*=\s*slotCtx/.test(applyBody228),
+    "228.3: _applySlotEnvelope() persists robco_v8.activeContext = slotCtx (the slot's game) before reload"
+  );
+
+  // 228.4 — the common (same-game) path is unchanged: still calls loadUI()
+  //         in place, with no reload for that case (regression guard so this
+  //         fix doesn't turn every LOAD into a full reboot).
+  assert(
+    typeof applyBody228 === 'string' && /loadUI\(\)/.test(applyBody228),
+    '228.4: _applySlotEnvelope() still calls loadUI() for the same-game path (in-place apply, unregressed)'
+  );
+
+  // 228.5/228.6 — BEHAVIORAL (deferred, per the Suite 137.6/207.16 precedent):
+  // execute the REAL extracted _applySlotEnvelope() in a vm sandbox that
+  // mocks a booted-NV environment, once loading a FO3 slot (crossGame) and
+  // once loading an FNV slot (same-game), and assert the actual runtime
+  // effects — not just source shape.
+  _pendingAsync.push(
+    (async () => {
+      const vm228 = require('vm');
+      let ok228a = false; // crossGame behavioral
+      let ok228b = false; // same-game behavioral
+      let err228 = null;
+      try {
+        const nameIdx = uiSaves228.indexOf('function _applySlotEnvelope');
+        const asyncPrefix =
+          uiSaves228.slice(Math.max(0, nameIdx - 6), nameIdx) === 'async ' ? 'async ' : '';
+        const params = uiSaves228.slice(
+          uiSaves228.indexOf('(', nameIdx),
+          uiSaves228.indexOf('{', uiSaves228.indexOf('(', nameIdx))
+        );
+        const fnSrc228 = asyncPrefix + 'function _applySlotEnvelope' + params + applyBody228;
+
+        function makeSandbox228() {
+          const calls = { reload: 0, loadUI: 0, snapRollingBackup: 0, openModal: [] };
+          const ls = {};
+          const sb = {
+            state: { gameContext: 'FNV', lvl: 5 },
+            APP_VERSION: '2.9.0',
+            confirmAction: () => Promise.resolve(true),
+            migrateState: (v, s) => s,
+            restoreChatHistory: () => {},
+            appendToChat: () => {},
+            openModal: opts => calls.openModal.push(opts),
+            loadUI: () => {
+              calls.loadUI++;
+            },
+            document: { getElementById: () => null },
+            _slotLabel: n => 'SLOT ' + n,
+            setTimeout: fn => {
+              fn(); // invoke the reload timer synchronously — no real wait needed
+              return 0;
+            },
+            location: {
+              reload: () => {
+                calls.reload++;
+              },
+            },
+            localStorage: {
+              getItem: k => (Object.prototype.hasOwnProperty.call(ls, k) ? ls[k] : null),
+              setItem: (k, v) => {
+                ls[k] = String(v);
+              },
+            },
+            console,
+          };
+          sb.window = sb;
+          sb.window.robco_v8 = {
+            activeContext: 'FNV',
+            campaigns: { FNV: { gameContext: 'FNV', lvl: 5 } },
+          };
+          sb.window.snapRollingBackup = () => {
+            calls.snapRollingBackup++;
+          };
+          vm228.createContext(sb);
+          vm228.runInContext(fnSrc228, sb);
+          return { sb, calls, ls };
+        }
+
+        // Case A — CROSS-GAME: booted FNV, load a FO3 slot.
+        const A228 = makeSandbox228();
+        const envA228 = {
+          gameContext: 'FO3',
+          version: '1.0.0',
+          state: { gameContext: 'FO3', lvl: 1 },
+          chat: [{ sender: 'sys', text: 'hi' }],
+          playstyle: 'melee',
+          savedAt: 123,
+        };
+        const retA228 = await A228.sb._applySlotEnvelope(envA228, 1, {});
+        const v8A228 = JSON.parse(A228.ls.robco_v8 || '{}');
+        ok228a =
+          retA228 === true &&
+          A228.calls.reload === 1 &&
+          A228.calls.loadUI === 0 &&
+          A228.calls.snapRollingBackup === 1 &&
+          v8A228.activeContext === 'FO3' &&
+          !!v8A228.campaigns &&
+          v8A228.campaigns.FO3 &&
+          v8A228.campaigns.FO3.gameContext === 'FO3' &&
+          v8A228.campaigns.FNV &&
+          v8A228.campaigns.FNV.gameContext === 'FNV';
+
+        // Case B — SAME-GAME: booted FNV, load an FNV slot (unregressed fast path).
+        const B228 = makeSandbox228();
+        const envB228 = {
+          gameContext: 'FNV',
+          version: '1.0.0',
+          state: { gameContext: 'FNV', lvl: 9 },
+          chat: [],
+          playstyle: 'any',
+          savedAt: 456,
+        };
+        const retB228 = await B228.sb._applySlotEnvelope(envB228, 2, {});
+        ok228b =
+          retB228 === true &&
+          B228.calls.reload === 0 &&
+          B228.calls.loadUI === 1 &&
+          B228.sb.state.lvl === 9 && // applied in place
+          B228.ls.robco_v8 === undefined; // in-place path never touches robco_v8 at all
+      } catch (e) {
+        err228 = e;
+      }
+      // Re-emit this suite's header (Protocol 42, Suite 137.6/207.16
+      // precedent) so the deferred result line prints under the right group.
+      header('Suite 228 — cross-game local-slot switch stale-registry regression');
+      assert(
+        ok228a,
+        '228.5: [behavioral] _applySlotEnvelope() applied to a REAL booted-FNV sandbox loading a FO3 slot: confirms context mismatch, snapshots a rolling backup, persists robco_v8 (activeContext=FO3, both campaigns present), sets no in-place loadUI(), and reloads — this is the exact scenario that used to leave FALLOUT_REGISTRY stuck on FNV data' +
+          (err228 ? ' — ' + err228.message : '')
+      );
+      assert(
+        ok228b,
+        '228.6: [behavioral] _applySlotEnvelope() applied to a REAL booted-FNV sandbox loading an FNV slot: applies state in place (loadUI(), no reload, no robco_v8 write) — the common case is unregressed by this fix' +
+          (err228 ? ' — ' + err228.message : '')
+      );
+    })()
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 229 — autoImportState() registry/game-context trust guard
+//  (Protocol 42 defense-in-depth — planning/2.8.5/audits/AUDIT_registry_leak.md §2/§4).
+//  FALLOUT_REGISTRY is a boot-time-only global (index.html's GAME_FILES
+//  manifest loads exactly one of reg_nv.js/reg_fo3.js); every known
+//  cross-game load path already reboots before autoImportState() can run
+//  (commit 2210b57), so registryGame and state.gameContext should never
+//  disagree in a real session. But the audit reproduced real durable data
+//  loss in that window: a stale registry recognises none of the current
+//  campaign's own real names, so the AI's next turn (which echoes state
+//  every message) silently wipes collectibles/traits/skillBooks/magazines/
+//  lincolnItems to empty and persists it. 229.1-229.4 are static regression
+//  guards on the fixed shape (an authoritative FALLOUT_REGISTRY.game tag +
+//  the _registryTrusted gate on all five registry-validated fields);
+//  229.5-229.8 are BEHAVIORAL — they execute the REAL extracted
+//  autoImportState() body in a vm sandbox against a REAL reg_nv.js, because
+//  a source-text grep cannot see a stale FALLOUT_REGISTRY global surviving
+//  in memory, which is exactly how the original leak escaped every prior
+//  test in this file (Suite 133 precedent).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 229 — autoImportState() registry/game-context trust guard');
+
+  const regNv229 = readGroup('reg_nv');
+  const regFo3_229 = readGroup('reg_fo3');
+  let apiImportBody229;
+  try {
+    apiImportBody229 = extractFunctionBody(apiSource, 'autoImportState');
+  } catch (e) {
+    fail('Cannot extract autoImportState: ' + e.message);
+  }
+
+  // 229.1 — reg_nv.js declares an authoritative per-registry game tag.
+  assert(
+    /game\s*:\s*['"]FNV['"]/.test(regNv229),
+    "229.1: reg_nv.js declares FALLOUT_REGISTRY.game = 'FNV' (authoritative registry/game-context signal)"
+  );
+
+  // 229.2 — reg_fo3.js declares the FO3 counterpart.
+  assert(
+    /game\s*:\s*['"]FO3['"]/.test(regFo3_229),
+    "229.2: reg_fo3.js declares FALLOUT_REGISTRY.game = 'FO3' (authoritative registry/game-context signal)"
+  );
+
+  // 229.3 — autoImportState() derives a trust flag comparing the loaded
+  //         registry's game tag against state.gameContext BEFORE any
+  //         registry-gated field is validated.
+  assert(
+    typeof apiImportBody229 === 'string' &&
+      /_registryTrusted\s*=\s*!_registryGame\s*\|\|\s*_registryGame\s*===\s*\(state\.gameContext/.test(
+        apiImportBody229
+      ),
+    '229.3: autoImportState() computes _registryTrusted by comparing FALLOUT_REGISTRY.game to state.gameContext before registry validation'
+  );
+
+  // 229.4 — every one of the five registry-validated field blocks
+  //         (collectibles, lincolnItems, traits, skillBooks, magazines) is
+  //         gated on _registryTrusted — not just collectibles. A partial
+  //         gate would leave the other four fields exploitable exactly like
+  //         the original bug.
+  assert(
+    typeof apiImportBody229 === 'string' &&
+      (apiImportBody229.match(/_registryTrusted\s*&&/g) || []).length >= 5,
+    '229.4: all five registry-validated fields (collectibles/lincolnItems/traits/skillBooks/magazines) are gated on _registryTrusted'
+  );
+
+  const vm229 = require('vm');
+
+  function makeSandbox229(regSource) {
+    const sandbox = {
+      window: {},
+      document: { getElementById: () => null },
+      console: { error: () => {}, log: () => {}, warn: () => {} },
+      loadUI: () => {},
+      appendToChat: () => {},
+      expandPanelForCategory: () => {},
+    };
+    vm229.createContext(sandbox);
+    vm229.runInContext(stateSource, sandbox);
+    vm229.runInContext(regSource, sandbox);
+    const fnSrc229 = 'function autoImportState(jsonString)' + apiImportBody229;
+    vm229.runInContext(fnSrc229 + '\nthis.autoImportState = autoImportState;', sandbox);
+    return sandbox;
+  }
+  function setState229(sandbox, overrides) {
+    const base = vm229.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+    const merged = Object.assign({}, base, overrides);
+    vm229.runInContext('state = ' + JSON.stringify(merged) + ';', sandbox);
+  }
+  function getState229(sandbox) {
+    return vm229.runInContext('JSON.parse(JSON.stringify(state))', sandbox);
+  }
+
+  // 229.5 — MISMATCH (collectibles, array-of-strings shape): the NV registry
+  //         is loaded (FALLOUT_REGISTRY.game === 'FNV') but state.gameContext
+  //         is 'FO3' — the exact stale-registry window the audit reproduced.
+  //         The AI echoes the campaign's own real FO3 bobbleheads ("Strength",
+  //         "Perception" — real reg_fo3.js collectible names, absent from
+  //         reg_nv.js). Pre-fix, neither name matches the loaded NV registry,
+  //         so the filter empties state.collectibles to [] (empirically
+  //         reproduced in the audit). Post-fix, the mismatch is detected and
+  //         the field is left untouched.
+  try {
+    const sb229a = makeSandbox229(regNv229);
+    setState229(sb229a, { gameContext: 'FO3', collectibles: ['Strength', 'Perception'] });
+    sb229a.autoImportState(JSON.stringify({ collectibles: ['Strength', 'Perception'] }));
+    const after229a = getState229(sb229a);
+    assert(
+      Array.isArray(after229a.collectibles) &&
+        after229a.collectibles.length === 2 &&
+        after229a.collectibles.includes('Strength') &&
+        after229a.collectibles.includes('Perception'),
+      "229.5: [behavioral] registry/gameContext mismatch (NV registry loaded, state.gameContext=FO3) — an AI turn echoing the campaign's own real FO3 collectibles (Strength/Perception) does NOT get wiped to [] (the exact durable-data-loss scenario reproduced in the audit)"
+    );
+  } catch (e) {
+    fail('229.5: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.6 — MISMATCH (lincolnItems, object-map shape): same mismatch, but
+  //         against the differently-shaped lincolnItems field (a map, not an
+  //         array) to prove the guard generalises across both data shapes,
+  //         not just collectibles. "Lincoln's Repeater" is a real
+  //         reg_fo3.js lincolnMemorabilia name, absent from reg_nv.js.
+  try {
+    const sb229b = makeSandbox229(regNv229);
+    setState229(sb229b, {
+      gameContext: 'FO3',
+      lincolnItems: { "Lincoln's Repeater": 'hannibal' },
+    });
+    sb229b.autoImportState(JSON.stringify({ lincolnItems: { "Lincoln's Repeater": 'hannibal' } }));
+    const after229b = getState229(sb229b);
+    assert(
+      after229b.lincolnItems && after229b.lincolnItems["Lincoln's Repeater"] === 'hannibal',
+      '229.6: [behavioral] registry/gameContext mismatch also protects lincolnItems (object-map shape) — a real FO3 memorabilia disposition survives instead of being dropped for not matching the NV registry'
+    );
+  } catch (e) {
+    fail('229.6: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.7 — SAME-GAME (trusted): registry and state.gameContext AGREE (both
+  //         FNV). Protocol 24 must still reject a genuinely hallucinated
+  //         name that matches nothing in either game's registry — the guard
+  //         must not have weakened normal validation.
+  try {
+    const sb229c = makeSandbox229(regNv229);
+    setState229(sb229c, { gameContext: 'FNV', collectibles: [] });
+    sb229c.autoImportState(
+      JSON.stringify({ collectibles: ['Goodsprings', 'TOTALLY HALLUCINATED ITEM 229'] })
+    );
+    const after229c = getState229(sb229c);
+    assert(
+      Array.isArray(after229c.collectibles) &&
+        after229c.collectibles.length === 1 &&
+        after229c.collectibles[0] === 'Goodsprings',
+      '229.7: [behavioral] same-game (trusted) import still drops a genuinely hallucinated collectible name not present in the registry (Protocol 24 intact — the guard only protects against a MISMATCHED registry, not against real validation)'
+    );
+  } catch (e) {
+    fail('229.7: [behavioral] threw — ' + e.message);
+  }
+
+  // 229.8 — SAME-GAME (trusted): the normal accept path for a real,
+  //         registry-recognised name is unregressed by this change.
+  try {
+    const sb229d = makeSandbox229(regNv229);
+    setState229(sb229d, { gameContext: 'FNV', collectibles: [] });
+    sb229d.autoImportState(JSON.stringify({ collectibles: ['Goodsprings'] }));
+    const after229d = getState229(sb229d);
+    assert(
+      Array.isArray(after229d.collectibles) &&
+        after229d.collectibles.length === 1 &&
+        after229d.collectibles[0] === 'Goodsprings',
+      '229.8: [behavioral] same-game (trusted) import still accepts and keeps a real registry-recognised collectible name — the normal path is unregressed'
+    );
+  } catch (e) {
+    fail('229.8: [behavioral] threw — ' + e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 230 — FO3 Karma Engine: Protocol 3 citation guard + deterministic
+//  engine behavior (Protocol 8 Stage 2 build, 2026-07-15).
+//  The chokepoint that makes the invented "ENCLAVE HIT SQUAD" class of
+//  defect un-recurrable: every karma constant must carry a structured `src`
+//  citing fallout.wiki, UNVERIFIED/CONFLICT entries must ship numeric fields
+//  as null, and the exact invented faction can never come back. Plus
+//  behavioral proof of the five deterministic engine functions
+//  (getKarmaTier/getTitleAlignment/getKarmaTitle/getKarmaHitSquad/
+//  applyKarmaEvent) sourced from the REAL GAME_DEFS.FO3.karma data.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 230 — FO3 Karma Engine: Protocol 3 citation guard + engine behavior');
+
+  const vm230 = require('vm');
+  function loadRealKarma230() {
+    const sandbox = { window: {} };
+    vm230.createContext(sandbox);
+    vm230.runInContext(stateSource, sandbox);
+    return vm230.runInContext('GAME_DEFS.FO3.karma', sandbox);
+  }
+  const realKarma230 = loadRealKarma230();
+
+  // 230.1 — the KARMA-DATA-GUARD:BEGIN/END markers exist in state.js,
+  //         bounding the whole cited dataset for a coarse region grep.
+  assert(
+    /KARMA-DATA-GUARD:BEGIN/.test(stateSource) && /KARMA-DATA-GUARD:END/.test(stateSource),
+    '230.1: state.js carries the KARMA-DATA-GUARD:BEGIN/END markers around the cited karma dataset'
+  );
+
+  // The citation-guard validator — the actual chokepoint logic. Returns a
+  // list of violation strings; empty means the dataset is clean. This same
+  // function is run against the REAL data (230.3) and a deliberately
+  // corrupted fixture (230.2) to prove it fails red and passes green.
+  function _validateKarmaCitations(karma) {
+    const violations = [];
+    const isCited = src => typeof src === 'string' && /fallout\.wiki/.test(src);
+    const UNVERIFIED = new Set(['unverified', 'conflict']);
+
+    (karma.hitSquads || []).forEach((h, i) => {
+      if (!isCited(h.src))
+        violations.push(`hitSquads[${i}] (${h.faction}) missing fallout.wiki src`);
+      if (/enclave/i.test(h.faction || ''))
+        violations.push(`hitSquads[${i}] names an Enclave faction`);
+      if (UNVERIFIED.has(h.verificationStatus)) {
+        if (h.spawnFrequency !== null)
+          violations.push(
+            `hitSquads[${i}] (${h.faction}) is ${h.verificationStatus} but spawnFrequency !== null`
+          );
+        if (h.squadSize !== null && h.verificationStatus !== 'verified')
+          violations.push(
+            `hitSquads[${i}] (${h.faction}) is ${h.verificationStatus} but squadSize !== null`
+          );
+      }
+    });
+
+    (karma.companions || []).forEach((c, i) => {
+      if (!isCited(c.src)) violations.push(`companions[${i}] (${c.name}) missing fallout.wiki src`);
+    });
+
+    if (!isCited(karma.titlesSrc)) violations.push('titlesSrc missing fallout.wiki citation');
+
+    (karma.events || []).forEach((e, i) => {
+      if (!isCited(e.src)) violations.push(`events[${i}] (${e.id}) missing fallout.wiki src`);
+      if (UNVERIFIED.has(e.verificationStatus) && e.delta !== null)
+        violations.push(`events[${i}] (${e.id}) is ${e.verificationStatus} but delta !== null`);
+    });
+
+    const regulators = (karma.hitSquads || []).find(h => h.faction === 'Regulators');
+    const talon = (karma.hitSquads || []).find(h => h.faction === 'Talon Company');
+    if (!regulators || regulators.threshold !== -250)
+      violations.push('Regulators missing or not at threshold -250');
+    if (!talon || talon.threshold !== 250)
+      violations.push('Talon Company missing or not at threshold 250');
+
+    return violations;
+  }
+
+  // 230.2 — RED: a deliberately corrupted fixture (un-cited hit-squad entry,
+  //         a fabricated Enclave faction, and an unverified event shipping a
+  //         non-null delta) must fail every one of the three checks it
+  //         breaks. Proves the guard actually catches the class of defect it
+  //         exists to prevent — not just that it passes on already-clean data.
+  {
+    const brokenKarma230 = {
+      hitSquads: [
+        { faction: 'Enclave', alignment: 'evil', threshold: -750, src: '' },
+        { faction: 'Talon Company', alignment: 'good', threshold: 250, src: 'fallout.wiki "x"' },
+      ],
+      companions: [
+        { name: 'Dogmeat', karmaReq: 'none', src: 'fallout.wiki "Dogmeat (Fallout 3)"' },
+      ],
+      titlesSrc: 'fallout.wiki "Karma (Fallout 3)"',
+      events: [
+        {
+          id: 'fake_event',
+          delta: 999,
+          verificationStatus: 'unverified',
+          src: 'fallout.wiki "Karma (Fallout 3)"',
+        },
+      ],
+    };
+    const violations230 = _validateKarmaCitations(brokenKarma230);
+    assert(
+      violations230.some(v => v.includes('missing fallout.wiki src')) &&
+        violations230.some(v => v.includes('names an Enclave faction')) &&
+        violations230.some(v => v.includes('fake_event') && v.includes('delta !== null')) &&
+        violations230.some(v => v.includes('Regulators missing')),
+      '230.2: [RED] the citation-guard validator flags an un-cited entry, a fabricated Enclave faction, and a non-null delta on an unverified event — ' +
+        JSON.stringify(violations230)
+    );
+  }
+
+  // 230.3 — GREEN: the validator finds ZERO violations against the REAL,
+  //         shipped GAME_DEFS.FO3.karma data — proves the guard passes clean
+  //         data, not just that it can detect broken data.
+  {
+    const violations230b = _validateKarmaCitations(realKarma230);
+    assert(
+      violations230b.length === 0,
+      '230.3: [GREEN] the citation-guard validator finds zero violations in the real GAME_DEFS.FO3.karma data — ' +
+        JSON.stringify(violations230b)
+    );
+  }
+
+  // 230.4 — anti-regression for F1: the invented ENCLAVE HIT SQUAD string
+  //         does not exist ANYWHERE in the shipped karma dataset or the
+  //         render/engine source, and the two real factions sit at the
+  //         correct thresholds.
+  // Local re-read (Suite 187 already defines render187, but suite bodies are
+  // isolated blocks in this runner — re-derive rather than reach across
+  // block scope).
+  const karmaCenterBody230 = extractFunctionBody(readGroup('ui-render'), 'renderKarmaCenter');
+  assert(
+    !/enclave hit squad/i.test(JSON.stringify(realKarma230)) &&
+      !/enclave hit squad/i.test(karmaCenterBody230) &&
+      realKarma230.hitSquads.find(h => h.faction === 'Regulators').threshold === -250 &&
+      realKarma230.hitSquads.find(h => h.faction === 'Talon Company').threshold === 250,
+    '230.4: [anti-regression] no "ENCLAVE HIT SQUAD" string anywhere in the karma data or renderKarmaCenter() — Regulators at -250, Talon Company at +250'
+  );
+
+  // 230.5 — GAME_DEFS.FNV carries no `karma` field at all (Protocol 38 — NV
+  //         never reaches this data; usesKarmaCenter: false gates it out).
+  const fnvDefBlockM230 = stateSource.match(/FNV:\s*\{[\s\S]*?\n {2}FO3:/);
+  const fnvDefBlock230 = fnvDefBlockM230 ? fnvDefBlockM230[0] : '';
+  assert(
+    !/\bkarma:\s*\{/.test(fnvDefBlock230),
+    '230.5: GAME_DEFS.FNV declares no `karma:` data block (Protocol 38 — the FO3 karma dataset never reaches NV)'
+  );
+
+  // 230.6 — the 90-title table is complete: 30 entries per alignment column,
+  //         all three columns present.
+  assert(
+    Array.isArray(realKarma230.titles.good) &&
+      realKarma230.titles.good.length === 30 &&
+      realKarma230.titles.neutral.length === 30 &&
+      realKarma230.titles.bad.length === 30,
+    '230.6: GAME_DEFS.FO3.karma.titles has all 90 entries (30 per Good/Neutral/Bad column)'
+  );
+
+  // 230.7 — the 8 companions carry the corrected gate classes (F5-F8):
+  //         Dogmeat/Charon = none, Fawkes/Star Paladin Cross = good,
+  //         Butch DeLoria/Sergeant RL-3 = neutral, Clover/Jericho = evil.
+  {
+    const byName230 = Object.fromEntries(realKarma230.companions.map(c => [c.name, c.karmaReq]));
+    assert(
+      realKarma230.companions.length === 8 &&
+        byName230['Dogmeat'] === 'none' &&
+        byName230['Charon'] === 'none' &&
+        byName230['Fawkes'] === 'good' &&
+        byName230['Star Paladin Cross'] === 'good' &&
+        byName230['Butch DeLoria'] === 'neutral' &&
+        byName230['Sergeant RL-3'] === 'neutral' &&
+        byName230['Clover'] === 'evil' &&
+        byName230['Jericho'] === 'evil',
+      '230.7: all 8 companions carry the corrected karma gate classes'
+    );
+  }
+
+  // ── Engine function behavior (declared fresh in an isolated sandbox from
+  //    the real source, exercised against the real GAME_DEFS.FO3.karma data
+  //    loaded above) ──
+  function declareFn230(src, name) {
+    const nameIdx = src.indexOf('function ' + name);
+    const parenIdx = src.indexOf('(', nameIdx);
+    const braceIdx = src.indexOf('{', parenIdx);
+    const params = src.slice(parenIdx, braceIdx);
+    return 'function ' + name + params + extractFunctionBody(src, name);
+  }
+  function makeEngineSandbox230() {
+    const core230 = readGroup('ui-core');
+    const render230 = readGroup('ui-render');
+    const karmaTiersDecl230 = (core230.match(/const _KARMA_TIERS = \[[\s\S]*?\];/) || [''])[0];
+    const bandLabelsDecl230 = (render230.match(/const _FO3_KARMA_BAND_LABELS = \[[\s\S]*?\];/) || [
+      '',
+    ])[0];
+    const sandbox = { _activeDef: () => ({ karma: realKarma230 }) };
+    vm230.createContext(sandbox);
+    vm230.runInContext(karmaTiersDecl230, sandbox);
+    vm230.runInContext(bandLabelsDecl230, sandbox);
+    [
+      'getKarmaTier',
+      'getTitleAlignment',
+      'getKarmaTitle',
+      'getKarmaHitSquad',
+      'getKarmaCompanions',
+    ].forEach(fn => vm230.runInContext(declareFn230(render230, fn), sandbox));
+    return sandbox;
+  }
+
+  // 230.8 — getKarmaTitle(karma, lvl): L1 and L30 across all 3 alignments,
+  //         plus the mandatory L50-clamped-to-30 edge case (app allows level
+  //         50; the title table caps at 30).
+  {
+    const sb230 = makeEngineSandbox230();
+    const title = (karma, lvl) => vm230.runInContext(`getKarmaTitle(${karma}, ${lvl})`, sb230);
+    assert(
+      title(500, 1) === 'Vault Guardian' &&
+        title(0, 1) === 'Vault Dweller' &&
+        title(-500, 1) === 'Vault Delinquent' &&
+        title(500, 30) === 'Messiah' &&
+        title(0, 30) === 'True Mortal' &&
+        title(-500, 30) === 'Devil' &&
+        title(500, 50) === 'Messiah' &&
+        title(500, 31) === 'Messiah',
+      '230.8: [behavioral] getKarmaTitle() returns the correct level-scaled, alignment-scaled title at L1/L30, and clamps L31-50 to the L30 title'
+    );
+  }
+
+  // 230.9 — getKarmaHitSquad(karma): boundary behavior at -250/+250 (Suite
+  //         187.12-style boundary check, extended to the new hit-squad fn).
+  {
+    const sb230b = makeEngineSandbox230();
+    const squad = karma => vm230.runInContext(`getKarmaHitSquad(${karma})`, sb230b);
+    assert(
+      squad(-250).faction === 'Regulators' &&
+        squad(-1000).faction === 'Regulators' &&
+        squad(-249) === null &&
+        squad(250).faction === 'Talon Company' &&
+        squad(1000).faction === 'Talon Company' &&
+        squad(249) === null &&
+        squad(0) === null,
+      '230.9: [behavioral] getKarmaHitSquad() returns Regulators at karma<=-250, Talon Company at karma>=250, null in between — boundary-exact'
+    );
+  }
+
+  // 230.10 — getTitleAlignment(karma): 3-way collapse, distinct from the
+  //          5-band tier (Very Good+Good->good, Neutral->neutral, Very
+  //          Evil+Evil->bad).
+  {
+    const sb230c = makeEngineSandbox230();
+    const align = karma => vm230.runInContext(`getTitleAlignment(${karma})`, sb230c);
+    assert(
+      align(1000) === 'good' &&
+        align(250) === 'good' &&
+        align(249) === 'neutral' &&
+        align(-249) === 'neutral' &&
+        align(-250) === 'bad' &&
+        align(-1000) === 'bad',
+      '230.10: [behavioral] getTitleAlignment() collapses the 5-band scale into good/neutral/bad at the +250/-250 boundaries'
+    );
+  }
+
+  // 230.11 — applyKarmaEvent(): clamps at +/-1000, guards a null-delta
+  //          (UNVERIFIED) event as a no-op, applies a cited delta correctly.
+  {
+    let errMsg230 = '';
+    let ok230 = false;
+    try {
+      const render230b = readGroup('ui-render');
+      const sandbox = {
+        _activeDef: () => ({ karma: realKarma230 }),
+        state: { karma: 990 },
+        document: { getElementById: () => null },
+        saveState: () => {},
+        updateKarmaUI: () => {},
+        renderKarmaCenter: () => {},
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(render230b, 'applyKarmaEvent'), sandbox);
+      // water_to_beggar = +50, cited, verified — 990 + 50 clamps to 1000.
+      vm230.runInContext(`applyKarmaEvent('water_to_beggar')`, sandbox);
+      const afterClamp = vm230.runInContext('state.karma', sandbox);
+      // good_quest_act has delta: null (UNVERIFIED) — must be a no-op.
+      vm230.runInContext(`applyKarmaEvent('good_quest_act')`, sandbox);
+      const afterNoop = vm230.runInContext('state.karma', sandbox);
+      // steal_owned_container = -5, cited, verified.
+      vm230.runInContext('state.karma = -998;', sandbox);
+      vm230.runInContext(`applyKarmaEvent('steal_owned_container')`, sandbox);
+      const afterLowClamp = vm230.runInContext('state.karma', sandbox);
+      ok230 = afterClamp === 1000 && afterNoop === 1000 && afterLowClamp === -1000;
+    } catch (e) {
+      errMsg230 = e && e.message;
+    }
+    assert(
+      ok230,
+      '230.11: [behavioral] applyKarmaEvent() clamps at +/-1000, applies a cited delta correctly, and no-ops on a null-delta UNVERIFIED event' +
+        (errMsg230 ? ' — error: ' + errMsg230 : '')
+    );
+  }
+
+  // 230.12 — Protocol 42 regression (found live via Playwright while
+  //          verifying this unit): updateKarmaUI() now syncs state.karma
+  //          from the slider's own DOM value synchronously. Before this fix,
+  //          state.karma only updated via the DEBOUNCED syncStateFromDom()
+  //          inside saveState() (~500ms later), so renderKarmaCenter()
+  //          (which reads state.karma) rendered stale title/tier/hit-squad/
+  //          companion data for up to half a second after every drag.
+  {
+    const core230b = readGroup('ui-core');
+    const karmaUiBody230 = extractFunctionBody(core230b, 'updateKarmaUI');
+    assert(
+      /state\.karma\s*=\s*k;/.test(karmaUiBody230),
+      '230.12: updateKarmaUI() synchronously writes state.karma from the #stat_karma slider value (no debounce lag before the Karma Center can recompute)'
+    );
+  }
+
+  // 230.13 — Protocol 42 regression: the live-recompute hook lives in
+  //          updateMath() — the ONE function every path that can change
+  //          karma or level actually calls (the slider's oninput chain,
+  //          onLvlInputChanged(), nativeLevelUp()). A prior version of this
+  //          hook lived in loadUI(), which NONE of those paths call, so
+  //          dragging the slider or bumping the level left the Karma
+  //          Center's title/tier/hit-squad/companion readout stale until
+  //          the next full repaint (tab switch, campaign load). loadUI()
+  //          still calls renderKarmaCenter() once too (Suite "P5" — every
+  //          render*() reachable from loadUI(), for the initial paint), but
+  //          the LIVE recompute must be here.
+  {
+    const core230c = readGroup('ui-core');
+    const updateMathBody230 = extractFunctionBody(core230c, 'updateMath');
+    assert(
+      /_isDirty\(\s*'karma'/.test(updateMathBody230) &&
+        /renderKarmaCenter\(\)/.test(updateMathBody230),
+      "230.13: updateMath() — called by the #stat_karma slider's oninput and by both level-change handlers — recomputes the Karma Center via its own karma dirty-check, not just loadUI()"
+    );
+  }
+
+  // 230.14 — [behavioral] end-to-end proof of 230.12+230.13 together: the
+  //          real updateKarmaUI() body, run against a stub DOM whose
+  //          #stat_karma.value differs from state.karma, updates state.karma
+  //          synchronously with no debounce/timer involved.
+  {
+    let errMsg230d = '';
+    let ok230d = false;
+    try {
+      const core230d = readGroup('ui-core-cmd');
+      const sandbox = {
+        state: { karma: -800 },
+        document: {
+          getElementById: id => {
+            if (id === 'stat_karma') return { value: '900' };
+            return null;
+          },
+        },
+        _KARMA_TIERS: [
+          { label: 'Very Evil', test: k => k <= -750 },
+          { label: 'Evil', test: k => k <= -250 },
+          { label: 'Neutral', test: k => k < 250 },
+          { label: 'Good', test: k => k < 750 },
+          { label: 'Messiah', test: () => true },
+        ],
+        _lastKarmaTier: null,
+        RobcoEvents: { emit: () => {} },
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(core230d, 'updateKarmaUI'), sandbox);
+      vm230.runInContext('updateKarmaUI()', sandbox);
+      ok230d = vm230.runInContext('state.karma', sandbox) === 900;
+    } catch (e) {
+      errMsg230d = e && e.message;
+    }
+    assert(
+      ok230d,
+      '230.14: [behavioral] updateKarmaUI() run against a real DOM stub — state.karma synchronously takes on the #stat_karma slider value, no debounce' +
+        (errMsg230d ? ' — error: ' + errMsg230d : '')
+    );
+  }
+
+  // 230.15 — [behavioral] Protocol 8 Stage 2 UX polish (owner report: karma
+  //          actions gave no confirmation on tap). applyKarmaEvent() now
+  //          fires the SAME top-right toast a location change uses
+  //          (_locationCardShow, Protocol 22 — never a second toast
+  //          component) with the applied sign/delta and the event's own
+  //          label, exactly once per real apply — and never for a
+  //          null-delta UNVERIFIED no-op.
+  {
+    let errMsg23015 = '';
+    let ok23015 = false;
+    try {
+      const render230e = readGroup('ui-render');
+      const toastCalls23015 = [];
+      const sandbox = {
+        _activeDef: () => ({ karma: realKarma230 }),
+        state: { karma: 990 },
+        document: { getElementById: () => null },
+        saveState: () => {},
+        updateKarmaUI: () => {},
+        renderKarmaCenter: () => {},
+        _locationCardShow: msg => toastCalls23015.push(msg),
+      };
+      vm230.createContext(sandbox);
+      vm230.runInContext(declareFn230(render230e, 'applyKarmaEvent'), sandbox);
+      vm230.runInContext(`applyKarmaEvent('water_to_beggar')`, sandbox);
+      vm230.runInContext(`applyKarmaEvent('good_quest_act')`, sandbox); // null-delta, must stay silent
+      ok23015 =
+        toastCalls23015.length === 1 &&
+        /KARMA \+50/.test(toastCalls23015[0]) &&
+        toastCalls23015[0].includes('Gave Purified Water to a beggar');
+    } catch (e) {
+      errMsg23015 = e && e.message;
+    }
+    assert(
+      ok23015,
+      '230.15: [behavioral] applyKarmaEvent() fires _locationCardShow (the existing top-right toast) exactly once for a real applied delta, carrying the karma sign/amount and the event label — and never for a null-delta UNVERIFIED no-op' +
+        (errMsg23015 ? ' — error: ' + errMsg23015 : '')
+    );
+  }
+
+  // 230.16 — [static] owner report ("messy, confusing, not organized or
+  //          clickable looking"): each karma action row now renders a
+  //          distinct label/badge structure (karma-event-text/
+  //          karma-event-label/karma-event-badge) instead of bare inline
+  //          tracker-toggle text, and .kc-events .karma-event-row carries a
+  //          real bordered/filled CSS affordance — extends
+  //          .tracker-row/.tracker-toggle rather than forking a new
+  //          component (Protocol 22).
+  {
+    const karmaCenterBody23016 = extractFunctionBody(readGroup('ui-render'), 'renderKarmaCenter');
+    const css23016 = readCss().replace(/\/\*[\s\S]*?\*\//g, '');
+    assert(
+      /class="karma-event-text"/.test(karmaCenterBody23016) &&
+        /class="karma-event-label"/.test(karmaCenterBody23016) &&
+        /class="karma-event-badge/.test(karmaCenterBody23016) &&
+        /onclick="applyKarmaEvent\('\$\{e\.id\}'\)"/.test(karmaCenterBody23016) &&
+        /\.kc-events \.karma-event-row \{[^}]*border:\s*1px solid/.test(css23016) &&
+        /\.kc-events \.karma-event-row \{[^}]*background:/.test(css23016),
+      '230.16: [static] each karma action row carries a distinct label/badge markup structure (karma-event-text/karma-event-label/karma-event-badge) and a real bordered/filled CSS affordance (.kc-events .karma-event-row), not bare inline tracker-toggle text — and the click wiring (onclick="applyKarmaEvent(...)") is unchanged'
+    );
+  }
+
+  // 230.17 — [static] Protocol 17 audit F-2: #karmaEventFilter now carries an
+  //          UNCONDITIONAL 16px font-size rule (css/40-curio-operations.css)
+  //          rather than only inside 60-fo3-pipboy.css's landscape-only
+  //          media query — portrait previously inherited the shared 14px
+  //          body size (iOS/Android focus-zoom risk on the owner's primary
+  //          orientation).
+  {
+    const curioCss23017 = readFile('css/40-curio-operations.css');
+    assert(
+      /#karmaEventFilter\s*\{\s*font-size:\s*16px;\s*\}/.test(curioCss23017),
+      "230.17: [static] #karmaEventFilter carries an unconditional 16px font-size rule in css/40-curio-operations.css (not gated inside 60-fo3-pipboy.css's landscape-only media query) — portrait now clears the iOS/Android focus-zoom threshold too, not just FO3-landscape"
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 231 — FO3 Perk Registry: Protocol 3 citation guard + FIX-PERK-
+//  INVENTED / FIX-PERK-LEVELS data-correction regression. Sibling to the
+//  Suite 230 karma citation guard, extended per the FO3_DATA_PROVENANCE
+//  sweep's recommendation (2026-07-15): generalize the per-entry `src:`
+//  requirement to the perk registry, the other surface the sweep found
+//  invented/wrong data concentrated in. Data was corrected FIRST against
+//  the live fallout.wiki "Fallout 3 Perks" page, THEN cited — never the
+//  reverse (Protocol 3).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 231 — FO3 Perk Registry: Protocol 3 citation guard + data-correction regression');
+
+  const vm231 = require('vm');
+  function loadRealFo3Perks231() {
+    const sandbox = { window: {} };
+    vm231.createContext(sandbox);
+    vm231.runInContext(readGroup('reg_fo3'), sandbox);
+    return vm231.runInContext('FALLOUT_REGISTRY.perks', sandbox);
+  }
+  const realPerks231 = loadRealFo3Perks231();
+
+  // The citation-guard validator — the actual chokepoint logic. Returns a
+  // list of violation strings; empty means the dataset is clean. Run
+  // against a deliberately corrupted fixture (231.2) and the real shipped
+  // data (231.3) to prove it fails red and passes green.
+  const FO3_PERK_TYPES_231 = new Set(['regular', 'special', 'quest']);
+  function _validatePerkCitations(perks) {
+    const violations = [];
+    const isCited = src => typeof src === 'string' && /fallout\.wiki/.test(src);
+    const seen = new Set();
+    (perks || []).forEach((p, i) => {
+      if (!isCited(p.src)) violations.push(`perks[${i}] (${p.name}) missing fallout.wiki src`);
+      if (!FO3_PERK_TYPES_231.has(p.type))
+        violations.push(`perks[${i}] (${p.name}) has invalid type "${p.type}"`);
+      if (p.type === 'companion')
+        violations.push(`perks[${i}] (${p.name}) is type "companion" — FO3 has no companion perks`);
+      if ((p.type === 'special' || p.type === 'quest') && p.level !== 0)
+        violations.push(`perks[${i}] (${p.name}) is ${p.type} but level !== 0`);
+      if (p.type === 'regular' && !(parseInt(p.level, 10) > 0))
+        violations.push(`perks[${i}] (${p.name}) is regular but has no positive level`);
+      const key = String(p.name || '').toLowerCase();
+      if (seen.has(key)) violations.push(`perks[${i}] (${p.name}) is a duplicate name`);
+      seen.add(key);
+    });
+    return violations;
+  }
+
+  // 231.1 — RED: a fixture reintroducing one of the F1 fabricated
+  //         "companion perks", one un-cited entry, and one bad-type entry
+  //         must fail every check it breaks by name. Proves the guard
+  //         actually catches the class of defect it exists to prevent.
+  {
+    const brokenPerks231 = [
+      { name: 'Black Widow', type: 'regular', level: 2, src: 'fallout.wiki "Fallout 3 Perks"' },
+      { name: 'Mercy', type: 'companion', level: 0, src: 'fallout.wiki "Fallout 3 Perks"' },
+      { name: 'Ghoul Ecology', type: 'special', level: 0 },
+      { name: 'Cannibal', type: 'bogus', level: 12, src: 'fallout.wiki "Fallout 3 Perks"' },
+    ];
+    const violations2311 = _validatePerkCitations(brokenPerks231);
+    assert(
+      violations2311.some(v => v.includes('Mercy') && v.includes('companion')) &&
+        violations2311.some(
+          v => v.includes('Ghoul Ecology') && v.includes('missing fallout.wiki src')
+        ) &&
+        violations2311.some(v => v.includes('Cannibal') && v.includes('invalid type')),
+      '231.1: [RED] the citation-guard validator flags a fabricated companion perk, an un-cited entry, and an invalid type — ' +
+        JSON.stringify(violations2311)
+    );
+  }
+
+  // 231.2 — GREEN: the validator finds ZERO violations against the REAL,
+  //         shipped FALLOUT_REGISTRY.perks (FO3) data.
+  {
+    const violations2312 = _validatePerkCitations(realPerks231);
+    assert(
+      violations2312.length === 0,
+      '231.2: [GREEN] the citation-guard validator finds zero violations in the real FO3 FALLOUT_REGISTRY.perks data — ' +
+        JSON.stringify(violations2312)
+    );
+  }
+
+  // 231.3 — anti-regression for F1/F2/F3: none of the fabricated /
+  //         cross-game perk names (the 3 invented "companion perks", the
+  //         NV-only "Laser Commander", the misnamed "Scavenger", and the
+  //         two NV-only gender perks "Confirmed Bachelor" / "Cherchez La
+  //         Femme" found live re-verifying this unit — NV registry confirms
+  //         both are New Vegas perks, absent from the live FO3 perks page)
+  //         exist anywhere in the FO3 perk registry.
+  const fo3PerkNames231 = new Set(realPerks231.map(p => p.name));
+  assert(
+    !fo3PerkNames231.has('Mercy') &&
+      !fo3PerkNames231.has('Search and Mark') &&
+      !fo3PerkNames231.has('Sneak Bobblehead Effect') &&
+      !fo3PerkNames231.has('Laser Commander') &&
+      !fo3PerkNames231.has('Scavenger') &&
+      !fo3PerkNames231.has('Confirmed Bachelor') &&
+      !fo3PerkNames231.has('Cherchez La Femme') &&
+      !realPerks231.some(p => p.type === 'companion'),
+    '231.3: [anti-regression] none of the fabricated ("Mercy", "Search and Mark", "Sneak Bobblehead Effect") or cross-game ("Laser Commander", "Scavenger", "Confirmed Bachelor", "Cherchez La Femme") perks exist in the FO3 registry, and no perk carries type "companion" (FO3 has no companion-perk system)'
+  );
+
+  // 231.4 — F3: "Scrounger" (the real FO3 perk "Scavenger" was misnamed
+  //         for) exists at the correct level (8, Luck 5 per fallout.wiki).
+  {
+    const scrounger231 = realPerks231.find(p => p.name === 'Scrounger');
+    assert(
+      scrounger231 && scrounger231.level === 8 && scrounger231.type === 'regular',
+      '231.4: [F3 fix] "Scrounger" (the correctly-named FO3 perk) exists as a regular perk at level 8'
+    );
+  }
+
+  // 231.5 — F4: spot-check a representative sample of the ~28 corrected
+  //         perk levels against the live fallout.wiki "Fallout 3 Perks"
+  //         page (re-verified 2026-07-15), spanning every level tier that
+  //         had a wrong gate.
+  {
+    const byName231 = Object.fromEntries(realPerks231.map(p => [p.name, p]));
+    const expected231 = {
+      'Gun Nut': 2,
+      'Little Leaguer': 2,
+      'Child at Heart': 4,
+      Entomologist: 4,
+      Scoundrel: 4,
+      'Fortune Finder': 6,
+      'Lead Belly': 6,
+      'Strong Back': 8,
+      'Animal Friend': 10,
+      'Mysterious Stranger': 10,
+      'Nerd Rage!': 10,
+      'Night Person': 10,
+      'Mister Sandman': 10,
+      Cannibal: 12,
+      'Life Giver': 12,
+      Pyromaniac: 12,
+      'Robotics Expert': 12,
+      Sniper: 12,
+      'Silent Running': 12,
+      'Action Boy': 16,
+      'Action Girl': 16,
+      'Better Criticals': 16,
+      'Chem Resistant': 16,
+      Infiltrator: 18,
+      'Computer Whiz': 18,
+      'Concentrated Fire': 18,
+      'Light Step': 14,
+      'Master Trader': 14,
+    };
+    const wrong231 = Object.entries(expected231).filter(
+      ([name, lvl]) => !byName231[name] || byName231[name].level !== lvl
+    );
+    assert(
+      wrong231.length === 0,
+      '231.5: [F4 fix] every re-verified perk level matches the live fallout.wiki "Fallout 3 Perks" page — ' +
+        JSON.stringify(wrong231)
+    );
+  }
+
+  // 231.6 — F9: type misclassifications corrected — Cyborg (regular, 14)
+  //         and Almost Perfect (regular, 30) were wrongly "special";
+  //         Pitt Fighter and Survival Expert are quest-reward perks with
+  //         no level gate, not "special" / "regular level:22".
+  {
+    const byName2316 = Object.fromEntries(realPerks231.map(p => [p.name, p]));
+    assert(
+      byName2316['Cyborg'] &&
+        byName2316['Cyborg'].type === 'regular' &&
+        byName2316['Cyborg'].level === 14 &&
+        byName2316['Almost Perfect'] &&
+        byName2316['Almost Perfect'].type === 'regular' &&
+        byName2316['Almost Perfect'].level === 30 &&
+        byName2316['Pitt Fighter'] &&
+        byName2316['Pitt Fighter'].type === 'quest' &&
+        byName2316['Pitt Fighter'].level === 0 &&
+        byName2316['Survival Expert'] &&
+        byName2316['Survival Expert'].type === 'quest' &&
+        byName2316['Survival Expert'].level === 0,
+      '231.6: [F9 fix] Cyborg/Almost Perfect are regular perks (14/30); Pitt Fighter/Survival Expert are quest perks with no level gate'
+    );
+  }
+
+  // 231.7 — every regular perk that only the ELIGIBLE PERKS survey
+  //         (_computeEligiblePerks, ui-render-databank.js) treats as
+  //         level-gated actually carries a positive level, and the total
+  //         perk count reflects the FIX-PERK-INVENTED deletions (62 → 56:
+  //         -3 fabricated companions, -1 NV "Laser Commander", -2 NV gender
+  //         perks found re-verifying this unit; "Scavenger"->"Scrounger"
+  //         is a rename, net zero).
+  assert(
+    realPerks231.length === 56 && realPerks231.every(p => p.type !== 'regular' || p.level > 0),
+    `231.7: FO3 perk registry has 56 entries post-cleanup (was 62) and every regular perk carries a positive level — got ${realPerks231.length}`
+  );
+
+  // 231.8 — NV untouched: the FNV registry still carries "Confirmed
+  //         Bachelor" and "Cherchez La Femme" at level 2 (they are real NV
+  //         perks — only their FO3 cross-game leak was removed) and its
+  //         perk count is unchanged by this unit.
+  {
+    const nvSandbox231 = { window: {} };
+    vm231.createContext(nvSandbox231);
+    vm231.runInContext(readGroup('reg_nv'), nvSandbox231);
+    const nvPerks231 = vm231.runInContext('FALLOUT_REGISTRY.perks', nvSandbox231);
+    const nvByName231 = Object.fromEntries(nvPerks231.map(p => [p.name, p]));
+    assert(
+      nvByName231['Confirmed Bachelor'] &&
+        nvByName231['Confirmed Bachelor'].level === 2 &&
+        nvByName231['Cherchez La Femme'] &&
+        nvByName231['Cherchez La Femme'].level === 2,
+      '231.8: [NV untouched] reg_nv.js still carries "Confirmed Bachelor" and "Cherchez La Femme" at level 2 — this unit only removed their FO3 cross-game leak, NV itself is unmodified'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 232 — FO3 Weapon Data: Protocol 3 golden-master + plausibility
+//  guard + FIX-WEAPON-DATA regression. Sibling to the Suite 231 perk
+//  citation guard, per the FO3_WEAPON_DATA sweep (2026-07-15): the FO3
+//  WEAPONS.CSV combat + economy fields were model-estimated, not
+//  transcribed, then stamped with a file-header citation they never
+//  earned (Sniper Rifle value 3500 vs wiki 300; 10mm fire-rate 1.7 vs 6).
+//  Data was corrected FIRST against the live fallout.wiki "Fallout 3
+//  Weapons" master table (explosives' blast pulled per-page), THEN cited
+//  (Protocol 3). The golden-master pins the NUMBERS — the reframing lesson:
+//  a citation label proves nothing about a value; the pin does.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 232 — FO3 + NV Weapon Data: Protocol 3 golden-master + plausibility guard');
+
+  // Parse any db_*.js WEAPONS.CSV block into { name: [base,crit,mult,atk,wt,val] }
+  // — the 6 consumed/displayed numeric fields, in code order. Same extraction
+  // idiom as checkWeaponsCsvColumnCount (Suite 20); game-agnostic (Protocol 38):
+  // hand it any game's source, get that game's weapon stats.
+  function parseWeaponStats232(src) {
+    const out = {};
+    const block = src.match(/\[WEAPONS\.CSV\]([\s\S]*?)(?=\[|`;)/);
+    if (!block) return out;
+    const lines = block[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      out[c[0]] = [1, 2, 3, 4, 5, 6].map(j => parseFloat(c[j]));
+    }
+    return out;
+  }
+  const FIELD_NAMES_232 = [
+    'Base_Damage',
+    'Crit_Damage',
+    'Crit_Multiplier',
+    'Attacks_Per_Second',
+    'Weight',
+    'Value',
+  ];
+  const dbFo3Raw232 = readGroup('db_fo3');
+  const fo3Weapons232 = parseWeaponStats232(dbFo3Raw232);
+  const nvWeapons232 = parseWeaponStats232(readGroup('db_nv'));
+
+  // The golden fixture: every FO3 weapon's 6 consumed fields, pinned to the
+  // values re-verified against fallout.wiki on 2026-07-15 (see
+  // planning/2.8.5/data/FO3/FO3_WEAPON_DATA.md). Field order: [Base_Damage, Crit_Damage,
+  // Crit_Multiplier, Attacks_Per_Second, Weight, Value].
+  const FO3_WEAPON_GOLDEN_232 = {
+    '10mm Pistol': [9, 9, 1, 6, 3, 225],
+    '.32 Pistol': [6, 6, 1, 3, 2, 110],
+    'Scoped .44 Magnum': [35, 35, 2, 2.25, 4, 300],
+    '10mm Submachine Gun': [7, 7, 1, 10, 5, 330],
+    'Hunting Rifle': [25, 25, 1, 0.75, 6, 150],
+    'Combat Shotgun': [55, 27, 1, 1.5, 7, 200],
+    'Assault Rifle': [8, 8, 1, 8, 7, 300],
+    'Sniper Rifle': [40, 40, 5, 1.0714, 10, 300],
+    'Chinese Assault Rifle': [11, 10, 1, 8, 7, 500],
+    "Lincoln's Repeater": [50, 50, 2, 0.75, 5, 500],
+    "Sydney's 10mm Ultra SMG": [9, 9, 1, 10, 5, 430],
+    'Xuanlong Assault Rifle': [12, 12, 1, 8, 7, 400],
+    'Victory Rifle': [40, 40, 3, 1.0714, 10, 450],
+    "Colonel Autumn's 10mm Pistol": [13, 13, 1, 6, 3, 325],
+    'The Terrible Shotgun': [80, 40, 1, 1.5, 10, 250],
+    'Laser Pistol': [12, 12, 1.5, 6, 3, 320],
+    'Laser Rifle': [23, 22, 1.5, 2.0455, 8, 1000],
+    'Plasma Pistol': [25, 25, 2, 3, 3, 360],
+    'Plasma Rifle': [45, 44, 2, 2, 8, 1799],
+    'A3-21 Plasma Rifle': [50, 50, 2.5, 2, 8, 2200],
+    'Gatling Laser': [8, 6, 1, 20, 18, 2000],
+    Mesmetron: [1, 0, 1, 1.0345, 2, 500],
+    Minigun: [5, 0, 0, 20, 18, 1000],
+    'Missile Launcher': [150, 0, 0, 1.5789, 20, 500],
+    'Fat Man': [1600, 0, 0, 1.5789, 30, 1000],
+    'Rock-It Launcher': [50, 25, 1, 3.3333, 8, 200],
+    Flamer: [16, 1, 4, 8, 15, 500],
+    'Heavy Incinerator': [35, 5, 4, 4, 15, 500],
+    'Frag Grenade': [100, 0, 1, 0.6522, 0.5, 25],
+    'Plasma Grenade': [150, 0, 1, 0.6522, 0.5, 50],
+    'Pulse Grenade': [10, 0, 1, 0.6522, 0.5, 40],
+    'Bottlecap Mine': [500, 0, 1, 0.3261, 0.5, 75],
+    'Frag Mine': [100, 0, 1, 0.5, 0.5, 25],
+    'Baseball Bat': [9, 9, 1, 1.4286, 3, 55],
+    Sledgehammer: [20, 10, 1, 1.4286, 12, 130],
+    'Super Sledge': [25, 25, 1, 1.4286, 20, 180],
+    Shishkebab: [35, 24, 2, 2.3077, 3, 200],
+    'Combat Knife': [7, 13, 3, 3, 1, 50],
+    Switchblade: [5, 9, 2, 3, 1, 35],
+    'Power Fist': [20, 20, 1, 1.0909, 6, 100],
+    'Brass Knuckles': [6, 6, 1, 1.5789, 1, 20],
+    'Tire Iron': [6, 6, 1, 2.3077, 3, 40],
+    'Lead Pipe': [9, 18, 1, 2.3077, 3, 75],
+    "Chinese Officer's Sword": [10, 15, 2, 2.3077, 3, 75],
+    Ripper: [30, 0, 0, 1, 6, 100],
+    'Pool Cue': [3, 0, 0, 1.4286, 1, 15],
+    'Rolling Pin': [3, 8, 0, 1.7308, 1, 10],
+    'Nail Board': [8, 0, 0, 1.4286, 4, 30],
+    'Board of Education': [12, 12, 1, 1.4286, 4, 60],
+    Blackhawk: [55, 45, 2, 2.25, 4, 500],
+    'Alien Blaster': [100, 100, 100, 3, 2, 500],
+    Firelance: [80, 80, 100, 3, 2, 750],
+    "Jingwei's Shocksword": [35, 25, 2, 2.3077, 3, 500],
+    'The Mauler': [45, 0, 0, 1, 20, 200],
+    Stabhappy: [10, 15, 4, 3, 1, 65],
+    'Dart Gun': [6, 12, 2.5, 6, 3, 500],
+    'Deathclaw Gauntlet': [20, 30, 5, 1.6304, 10, 150],
+    'Nuka Grenade': [501, 0, 1, 0.6522, 0.5, 50],
+    'Railway Rifle': [30, 30, 3, 2, 9, 200],
+    'Chinese Pistol': [4, 4, 1, 6, 2, 190],
+    'Silenced 10mm Pistol': [8, 5, 2, 6, 3, 250],
+    'BB Gun': [4, 4, 1, 0.75, 2, 36],
+    "Reservist's Rifle": [40, 40, 5, 1.6071, 10, 500],
+    "Ol' Painless": [30, 30, 1, 1.125, 6, 250],
+    'Sawed-Off Shotgun': [50, 0, 0, 2.25, 6, 190],
+    Eugene: [7, 0, 0, 20, 18, 1500],
+    Vengeance: [11, 12, 1, 20, 18, 2400],
+    Burnmaster: [24, 1, 4, 8, 15, 500],
+    'Experimental MIRV': [12800, 0, 0, 1.5789, 30, 2498],
+    'Miss Launcher': [200, 0, 0, 1.5789, 15, 400],
+    'Wazer Wifle': [29, 28, 1.5, 2.0455, 8, 900],
+    "Smuggler's End": [18, 18, 1.5, 6, 2, 450],
+    'The Break': [6, 6, 1, 1.4286, 1, 50],
+    Jack: [30, 15, 1, 1, 6, 200],
+    "Highwayman's Friend": [10, 10, 1, 2.3077, 5, 75],
+    'Fisto!': [25, 25, 1.5, 1.0909, 6, 100],
+    'The Tenderizer': [30, 15, 1, 1.4286, 12, 230],
+    "Vampire's Edge": [15, 20, 3, 2.3077, 1, 100],
+    "Occam's Razor": [10, 13, 3, 3, 1, 65],
+    "Ant's Sting": [4, 4, 1, 3, 1, 30],
+    "Butch's Toothpick": [10, 13, 2.5, 3, 1, 50],
+    'Gauss Rifle': [100, 50, 5, 1.0714, 12, 500],
+    'Trench Knife': [7, 13, 3, 3, 1, 50],
+    'Auto Axe': [35, 0, 0, 1, 20, 200],
+    'Man Opener': [35, 0, 0, 1, 20, 200],
+    'Steel Saw': [16, 0, 0, 1, 20, 200],
+    Infiltrator: [7, 10, 1, 8, 7, 400],
+    Perforator: [10, 14, 2, 6, 7, 600],
+    "Wild Bill's Sidearm": [10, 15, 1, 3, 2, 250],
+    'Metal Blaster': [55, 27, 1.5, 2.0455, 8, 1000],
+    'Tri-beam Laser Rifle': [75, 15, 1.5, 2.7273, 9, 1000],
+    "Callahan's Magnum": [65, 50, 2, 2.25, 4, 750],
+    'Precision Gatling Laser': [8, 6, 4, 20, 18, 3000],
+    'Lever-Action Rifle': [40, 40, 5, 0.75, 8, 200],
+    'Double-Barrel Shotgun': [85, 30, 1, 2.25, 6, 175],
+    'Backwater Rifle': [45, 45, 5, 0.75, 7, 250],
+    'The Dismemberer': [25, 40, 2, 1.4286, 6, 55],
+    'Microwave Emitter': [60, 100, 2, 1.0345, 8, 500],
+    Axe: [20, 30, 2, 1.4286, 6, 60],
+    'Fertilizer Shovel': [15, 30, 3, 1.4286, 3, 55],
+    'Ritual Knife': [6, 18, 3, 3, 1, 20],
+    'Alien Atomizer': [35, 40, 1, 3, 2, 500],
+    'Alien Disintegrator': [65, 50, 2, 2, 7, 300],
+    'Atomic Pulverizer': [37, 40, 2, 3, 2, 500],
+    "Captain's Sidearm": [35, 40, 1, 3, 2, 500],
+    Destabilizer: [30, 20, 2, 4.5, 7, 1199],
+    'Drone Cannon': [40, 50, 1, 3.3333, 18, 1999],
+    'Drone Cannon Ex-B': [40, 50, 1, 3.3333, 18, 1999],
+    'Electro-Suppressor': [25, 4, 1, 2.3077, 2, 70],
+    'Cryo Grenade': [1, 0, 1, 0.6522, 0.5, 50],
+    'Cryo Mine': [1, 0, 1, 0.5, 0.5, 25],
+  };
+
+  // The golden-master validator — the chokepoint. Returns a list of drift
+  // strings (empty = clean). Run against the real shipped data (232.1, green)
+  // and a deliberately re-inflated fixture (232.2, red) to prove it fails
+  // red and passes green — and proves it catches the NUMBER, not a label.
+  function goldenDrift232(weapons) {
+    const drift = [];
+    for (const n of Object.keys(FO3_WEAPON_GOLDEN_232)) {
+      if (!(n in weapons)) {
+        drift.push(`${n}: MISSING from db_fo3.js`);
+        continue;
+      }
+      const exp = FO3_WEAPON_GOLDEN_232[n];
+      const got = weapons[n];
+      for (let f = 0; f < 6; f++) {
+        if (got[f] !== exp[f])
+          drift.push(`${n} ${FIELD_NAMES_232[f]} expected ${exp[f]} got ${got[f]}`);
+      }
+    }
+    for (const n of Object.keys(weapons))
+      if (!(n in FO3_WEAPON_GOLDEN_232)) drift.push(`${n}: UNPINNED extra weapon in db_fo3.js`);
+    return drift;
+  }
+
+  // The NV golden fixture: every NV weapon's 6 consumed fields, pinned to the
+  // values re-verified against the fallout.wiki "Fallout: New Vegas Weapons"
+  // master table on 2026-07-15 (thrown/placed/launched explosives' blast pulled
+  // from each weapon's own page; see planning/2.8.5/data/FNV/NV_DATA_PROVENANCE.md). Same shape
+  // and field order as the FO3 pin: [Base_Damage, Crit_Damage, Crit_Multiplier,
+  // Attacks_Per_Second, Weight, Value].
+  const NV_WEAPON_GOLDEN_232 = {
+    'Brass Knuckles': [18, 18, 1, 2.0526, 1, 120],
+    'Spiked Knuckles': [25, 25, 1, 2.3684, 1, 500],
+    'Love and Hate': [30, 30, 1, 2.5263, 1, 750],
+    'Power Fist': [40, 40, 1, 1.0909, 6, 800],
+    'Deathclaw Gauntlet': [20, 30, 5, 1.63, 10, 150],
+    'Saturnite Fist Super-Heated': [55, 55, 1, 1.65, 4, 2400],
+    'Ballistic Fist': [80, 80, 1, 1.0909, 6, 7800],
+    'Industrial Hand': [50, 40, 1, 3.2, 10, 2500],
+    'Combat Knife': [15, 15, 2, 3.2308, 1, 500],
+    Machete: [11, 11, 1.5, 3, 2, 50],
+    Ripper: [50, 5, 1, 1, 6, 1200],
+    'Cattle Prod': [5, 5, 2, 2.3077, 3, 450],
+    'Fire Axe': [55, 27, 1, 1.5789, 8, 2500],
+    'Knock Knock': [66, 33, 1, 1.8, 8, 3200],
+    '9mm Pistol': [16, 16, 1, 3.125, 1.5, 100],
+    '10mm Pistol': [22, 22, 1, 2.75, 3, 750],
+    '.357 Magnum Revolver': [26, 26, 1, 1.75, 2, 110],
+    '.44 Magnum Revolver': [36, 36, 1, 1.875, 3.5, 2500],
+    Lucky: [30, 30, 2.5, 2.75, 2.5, 1500],
+    '12.7mm Pistol': [40, 40, 1, 2.75, 3.5, 4000],
+    'Hunting Rifle': [52, 52, 2, 0.947369, 6, 2200],
+    'Cowboy Repeater': [32, 32, 1.25, 1.6923, 5, 800],
+    'Service Rifle': [18, 18, 1, 4.2, 8.5, 540],
+    'Marksman Carbine': [24, 24, 1, 5.7, 6, 5200],
+    'All-American': [26, 26, 1, 6, 6, 5900],
+    'Trail Carbine': [48, 48, 1, 1.5385, 5.5, 3900],
+    'Brush Gun': [75, 75, 1, 1.23, 5, 4900],
+    'Sniper Rifle': [45, 45, 2, 1.9286, 8, 4100],
+    'This Machine': [55, 55, 1, 2.1429, 9.5, 2800],
+    'Gobi Campaign Scout Rifle': [48, 80, 2, 2.1429, 4.5, 6200],
+    'Anti-Materiel Rifle': [110, 110, 1, 0.4478, 20, 5600],
+    'Hunting Shotgun': [70, 10, 1, 1.6667, 7.5, 3800],
+    'Lever-Action Shotgun': [48, 7, 1, 1.7692, 3, 2000],
+    '9mm Submachine Gun': [14, 14, 1, 11, 4, 850],
+    '.45 Auto Submachine Gun': [26, 26, 1, 11, 11, 3750],
+    '12.7mm Submachine Gun': [36, 36, 1, 9, 5, 5100],
+    Minigun: [12, 12, 0.5, 20, 25, 5500],
+    'Grenade Launcher': [100, 0, 1, 0.5556, 12, 4200],
+    'Missile Launcher': [200, 0, 0, 1.5789, 20, 3900],
+    'Fat Man': [600, 0, 0, 1.5789, 30, 6000],
+    Flamer: [16, 1, 4, 8, 15, 2350],
+    'Laser Pistol': [12, 12, 1.5, 3.75, 3, 175],
+    'Plasma Pistol': [33, 33, 1.5, 1.75, 3, 200],
+    'Laser Rifle': [22, 22, 1.5, 3.0818, 8, 800],
+    'Plasma Rifle': [47, 47, 2, 1.4, 8, 1300],
+    'Tri-beam Laser Rifle': [66, 22, 1.5, 2.7273, 9, 4800],
+    'Gauss Rifle': [120, 60, 2, 3, 7, 3000],
+    'Tesla Cannon': [80, 40, 2, 1.342105, 8, 8700],
+    'Frag Grenade': [125, 0, 1, 0.65, 0.5, 150],
+    'Plasma Grenade': [225, 0, 1, 0.6522, 0.5, 300],
+    'Incendiary Grenade': [50, 0, 1, 0.6522, 0.5, 200],
+    'Bottlecap Mine': [200, 0, 1, 0.3261, 0.5, 150],
+    'Bear Trap Fist': [27, 27, 1, 1.0909, 6, 800],
+    'Corrosive Glove': [21, 5, 1, 1.0909, 4, 1500],
+    'Cram Opener': [28, 44, 2, 1.6957, 10, 800],
+    'Displacer Glove': [50, 50, 1, 1.3636, 6, 3500],
+    'Fist of Rawr': [50, 75, 2, 1.9565, 10, 6200],
+    'Mantis Gauntlet': [30, 30, 3, 2.0217, 10, 750],
+    Pushy: [60, 60, 1, 1.4727, 6, 4200],
+    'Saturnite Fist': [35, 35, 1, 1.8, 4, 1600],
+    'Zap Glove': [35, 35, 1, 1.6364, 6, 5200],
+    'Blade of the East': [65, 30, 1, 1.5, 12, 45],
+    'Bowie Knife': [23, 35, 1.5, 3.4615, 1, 1000],
+    'Broad Machete': [15, 15, 2, 3.2308, 1, 75],
+    "Chance's Knife": [22, 22, 2, 4.1538, 1, 900],
+    Figaro: [8, 16, 4, 4.1538, 1, 400],
+    Katana: [22, 22, 2, 3.2308, 3, 2500],
+    'Machete Gladius': [28, 28, 1.5, 3, 2, 1000],
+    Shishkebab: [40, 20, 2, 2.3077, 3, 2500],
+    'Straight Razor': [5, 10, 2, 3.6923, 1, 35],
+    'Throwing Knife': [15, 15, 2, 3.2143, 0.5, 20],
+    'Throwing Knife Spear': [42, 42, 1, 0.48, 0.65, 25],
+    'Baseball Bat': [22, 22, 1, 1.65, 3, 250],
+    'Bumper Sword': [32, 32, 1, 1.4211, 12, 2500],
+    'Oh Baby!': [80, 40, 1, 1.7368, 20, 6200],
+    'Pool Cue': [15, 15, 0, 1.5789, 1, 15],
+    Sledgehammer: [24, 24, 1, 1.8947, 12, 130],
+    'Super Sledge': [70, 35, 1, 1.5789, 20, 5800],
+    'Thermic Lance': [100, 10, 1, 1, 20, 5500],
+    'Tire Iron': [15, 15, 1, 2.3077, 3, 40],
+    'Two-Step Goodbye': [70, 10, 4, 1.0909, 6, 20000],
+    'War Club': [19, 19, 1, 3, 3, 75],
+    'Hunting Revolver': [58, 58, 1, 1.5, 4, 3500],
+    '.45 Auto Pistol': [29, 29, 1, 2.75, 1.5, 1750],
+    '5.56mm Pistol': [28, 28, 2, 2.75, 5, 1200],
+    'A Light Shining in Darkness': [33, 33, 2, 4.375, 1.2, 4500],
+    "Li'l Devil": [45, 45, 2, 3.25, 3.2, 16000],
+    Maria: [20, 20, 2, 3.75, 1.5, 999],
+    'Police Pistol': [30, 45, 1, 2, 3, 1000],
+    'Ranger Sequoia': [62, 62, 1.5, 1.6875, 4, 1200],
+    'Silenced .22 Pistol': [9, 18, 3, 3.5, 3, 80],
+    'That Gun': [30, 30, 2.5, 3, 5, 1750],
+    'Weathered 10mm Pistol': [24, 24, 1, 2.75, 3, 1200],
+    'Abilene Kid LE BB Gun': [4, 70, 1.5, 1.5385, 2, 500],
+    'Assault Carbine': [13, 13, 1, 12, 6, 3950],
+    'Automatic Rifle': [40, 40, 1.5, 6, 16, 4500],
+    'Battle Rifle': [48, 48, 1, 1.9286, 9.5, 1500],
+    'BB Gun': [4, 4, 1, 1.5385, 2, 36],
+    Bozar: [19, 19, 1, 15, 15, 20000],
+    "Christine's COS Silencer Rifle": [62, 62, 2.5, 1.6071, 5.5, 6100],
+    'La Longue Carabine': [35, 35, 1.5, 2.15, 5, 1500],
+    'Light Machine Gun': [21, 21, 1, 12, 15, 5200],
+    'Medicine Stick': [78, 78, 1, 1.3846, 5.5, 20000],
+    Paciencia: [55, 110, 2, 1.184211, 6.2, 12000],
+    Ratslayer: [23, 23, 5, 1.3026, 4.5, 2000],
+    "Survivalist's Rifle": [48, 48, 1, 3.9, 8.5, 5400],
+    'Varmint Rifle': [18, 18, 1, 1.2158, 5.5, 75],
+    '10mm Submachine Gun': [19, 19, 1, 9, 5, 2370],
+    "Vance's 9mm Submachine Gun": [17, 17, 1, 13, 4, 1500],
+    'H&H Tools Nail Gun': [9, 9, 2, 14, 4, 4996],
+    'Silenced .22 SMG': [10, 20, 3, 11, 8, 1850],
+    Sleepytyme: [22, 22, 1, 10, 5, 8250],
+    'Big Boomer': [120, 9, 1, 2.5781, 4, 2500],
+    'Caravan Shotgun': [45, 6, 1, 3.2143, 3, 675],
+    'Dinner Bell': [75, 11, 1, 1.6667, 7.5, 4800],
+    'Riot Shotgun': [67, 10, 1, 4, 5, 5500],
+    'Sawed-Off Shotgun': [100, 7, 1, 2.3438, 4, 1950],
+    'Single Shotgun': [50, 7, 1, 2.5714, 7, 175],
+    'Sturdy Caravan Shotgun': [50, 7, 1, 3.2143, 3, 875],
+    'CZ57 Avenger': [13, 13, 0.5, 30, 18, 8500],
+    FIDO: [36, 18, 0.5, 7, 27, 9500],
+    'K9000 Cyberdog Gun': [26, 13, 0.5, 7, 27, 7500],
+    'Shoulder Mounted Machine Gun': [30, 20, 0, 7, 17, 7500],
+    'Alien Blaster': [75, 50, 100, 1.75, 2, 4000],
+    'Compliance Regulator': [8, 12, 1.5, 3.75, 3, 175],
+    'MF Hyperbreeder Alpha': [25, 25, 2, 7, 7, 8900],
+    'Pew Pew': [75, 50, 2.5, 2, 3, 2500],
+    'Recharger Pistol': [18, 18, 1.2, 5, 7, 2700],
+    'AER14 Prototype': [35, 35, 2, 3, 8.5, 2200],
+    "Elijah's Advanced LAER": [65, 15, 1.5, 2.75, 4, 8500],
+    LAER: [65, 15, 1.5, 2.5, 4, 8000],
+    'Laser RCW': [15, 15, 0.5, 9, 4, 2150],
+    'Recharger Rifle': [12, 12, 1.5, 4.26, 15, 250],
+    'Plasma Defender': [38, 38, 1, 2.5, 2, 3000],
+    'Q-35 Matter Modulator': [40, 62, 2, 2.4, 7, 3000],
+    'YCS/186': [140, 70, 2, 3, 8, 3000],
+    'Heavy Incinerator': [15, 5, 4, 4, 15, 7200],
+    Incinerator: [1, 1, 4, 2, 12, 1300],
+    'Multiplas Rifle': [105, 34, 1, 1, 7, 2500],
+    'Tesla-Beaton Prototype': [90, 45, 2, 1.342105, 8, 12525],
+    'Grenade Machinegun': [50, 0, 1, 3, 15, 5200],
+    'Grenade Rifle': [100, 1, 1, 2.1429, 6, 300],
+    'Red Glare': [40, 0, 0, 4, 20, 15000],
+    Annabelle: [200, 0, 0, 1.8947, 15, 5200],
+    Mercy: [100, 0, 50, 3.1, 15, 5200],
+    'Pulse Grenade': [10, 0, 1, 0.6522, 0.5, 40],
+    'Holy Frag Grenade': [800, 0, 1, 0.6522, 0.5, 500],
+    'Frag Mine': [100, 0, 1, 0.5, 0.5, 75],
+    'Plasma Mine': [150, 0, 1, 0.5, 0.5, 300],
+    'Pulse Mine': [10, 0, 1, 0.5, 0.5, 40],
+    'Tin Grenade': [100, 0, 1, 0.6522, 0.5, 25],
+    Dynamite: [75, 0, 1, 0.4054, 0.3, 25],
+    "Euclid's C-Finder": [0, 0, 50, 0.2027, 15, 1],
+    "Lily's Vertibird Blade": [24, 24, 1, 1.8, 12, 130],
+    'Mysterious Magnum': [42, 42, 1, 2.4375, 4, 3200],
+    Esther: [600, 0, 0, 1.8947, 40, 18000],
+    'Sprtel-Wood 9700': [16, 16, 1, 20, 15, 20000],
+    'Cleansing Flame': [15, 1, 1, 7, 22, 9500],
+    'The Smitty Special': [35, 35, 1, 7, 20, 20000],
+    '25mm Grenade APW': [50, 0, 1, 2.5, 8, 4200],
+    'Time Bomb': [150, 0, 1, 0.3261, 0.5, 750],
+    Chopper: [14, 14, 2, 3.92, 2, 800],
+    '9 Iron': [17, 17, 1, 2.25, 3, 55],
+    'Dress Cane': [22, 35, 1, 2.3077, 3, 40],
+    Chainsaw: [80, 8, 1, 1, 20, 2800],
+    Gehenna: [42, 21, 2, 2.7692, 3, 12000],
+    'Nuka-Breaker': [50, 50, 2, 1.44, 8, 7800],
+    'Greased Lightning': [32, 32, 1, 3, 6, 15000],
+    'Embrace of the Mantis King!': [42, 64, 3, 1.5652, 12, 8500],
+    'Cosmic Knife': [12, 12, 1, 3, 1, 35],
+    'Cosmic Knife Clean': [15, 15, 1.2, 3, 1, 50],
+    'Cosmic Knife Super-Heated': [14, 14, 5, 3, 1, 50],
+    'Knife Spear': [20, 20, 1, 1.8947, 3, 55],
+    'Knife Spear Clean': [25, 25, 1.2, 1.8947, 3, 55],
+    'Gas Bomb': [80, 0, 1, 0.3261, 5, 100],
+    Tomahawk: [30, 30, 1, 0.6585, 0.5, 75],
+    'Yao Guai Gauntlet': [20, 30, 2.5, 1.6304, 10, 150],
+    'Fire Bomb': [20, 0, 1, 0.4054, 0.5, 200],
+    'Proton Axe': [50, 25, 1, 1.9105, 8, 3500],
+    'Protonic Inversal Axe': [58, 45, 1, 1.9105, 8, 4000],
+    "Sonic Emitter - Gabriel's Bark": [55, 25, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Revelation': [31, 18, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Tarantula': [60, 30, 1, 1.0345, 2, 3500],
+    'Sonic Emitter - Robo-Scorpion': [65, 30, 1, 1.0345, 2, 3500],
+    'Old Glory': [45, 80, 1.5, 1.8947, 8, 2500],
+    'Arc Welder': [9, 1, 4, 8, 15, 3700],
+    'Flash Bang': [1, 0, 1, 0.6522, 0.5, 50],
+    'Satchel Charge': [250, 0, 1, 0.5, 0.75, 125],
+  };
+  function nvGoldenDrift232(weapons) {
+    const drift = [];
+    for (const n of Object.keys(NV_WEAPON_GOLDEN_232)) {
+      if (!(n in weapons)) {
+        drift.push(`${n}: MISSING from db_nv.js`);
+        continue;
+      }
+      const exp = NV_WEAPON_GOLDEN_232[n];
+      const got = weapons[n];
+      for (let f = 0; f < 6; f++) {
+        if (got[f] !== exp[f])
+          drift.push(`${n} ${FIELD_NAMES_232[f]} expected ${exp[f]} got ${got[f]}`);
+      }
+    }
+    for (const n of Object.keys(weapons))
+      if (!(n in NV_WEAPON_GOLDEN_232)) drift.push(`${n}: UNPINNED extra weapon in db_nv.js`);
+    return drift;
+  }
+
+  // 232.1 — [GREEN] the real shipped db_fo3.js weapon table matches the pin
+  //         exactly — every one of the 111 weapons' 6 consumed fields.
+  {
+    const drift = goldenDrift232(fo3Weapons232);
+    assert(
+      drift.length === 0,
+      '232.1: [golden-master] every FO3 weapon’s 6 consumed stats match the fallout.wiki-verified pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.2 — [RED] a fixture that re-inflates the Sniper Rifle value back to
+  //         the old 3500 AND silently restores the deleted non-FO3 "Bumper
+  //         Sword" row must fail the pin BY NAME — proving the guard catches
+  //         a wrong number and a resurrected bad row, not just a label.
+  {
+    const broken232 = { ...fo3Weapons232 };
+    broken232['Sniper Rifle'] = [40, 40, 5, 1.0714, 10, 3500];
+    broken232['Bumper Sword'] = [30, 30, 1, 1.5, 6, 1500];
+    const drift = goldenDrift232(broken232);
+    assert(
+      drift.some(d => d.includes('Sniper Rifle') && d.includes('Value') && d.includes('3500')) &&
+        drift.some(d => d.includes('Bumper Sword') && d.includes('UNPINNED')),
+      '232.2: [RED] the golden-master flags a re-inflated Sniper Rifle value (3500) and a resurrected non-FO3 row by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.3 — headline corrections restated independently of the pin above
+  //         (typed from the live fallout.wiki page), spanning every category
+  //         and both error directions (value 3500→300 down; 10mm value
+  //         100→225 up; fire-rate 1.7→6; Alien Blaster crit ×2→×100).
+  {
+    const spot232 = {
+      'Sniper Rifle': [40, 40, 5, 1.0714, 10, 300],
+      '10mm Pistol': [9, 9, 1, 6, 3, 225],
+      'Assault Rifle': [8, 8, 1, 8, 7, 300],
+      'Alien Blaster': [100, 100, 100, 3, 2, 500],
+      'Super Sledge': [25, 25, 1, 1.4286, 20, 180],
+      'Power Fist': [20, 20, 1, 1.0909, 6, 100],
+      'Deathclaw Gauntlet': [20, 30, 5, 1.6304, 10, 150],
+      Minigun: [5, 0, 0, 20, 18, 1000],
+      "Lincoln's Repeater": [50, 50, 2, 0.75, 5, 500],
+      'Combat Shotgun': [55, 27, 1, 1.5, 7, 200],
+    };
+    const wrong = Object.entries(spot232).filter(
+      ([n, exp]) =>
+        !fo3Weapons232[n] || FIELD_NAMES_232.some((_, f) => fo3Weapons232[n][f] !== exp[f])
+    );
+    assert(
+      wrong.length === 0,
+      '232.3: [spot-check] headline FO3 weapon corrections match the live fallout.wiki values — ' +
+        JSON.stringify(wrong.map(w => w[0]))
+    );
+  }
+
+  // 232.4 — explosives special case, all re-sourced from fallout.wiki: blast
+  //         damage pulled from each weapon’s OWN page (the master table lists
+  //         impact=1); fire-rate (APS) and crit-mult read from the master
+  //         table’s Fire-Rate / Crit%Mult columns. The crit nuance the audit
+  //         caught: thrown grenades and placed mines crit at the NORMAL rate
+  //         (Crit%Mult ×1) but deal ZERO bonus crit damage (Crit_Damage 0) —
+  //         so their crit-mult is 1, not 0. ONLY the projectile nukes/missiles
+  //         (Fat Man, Missile/Miss Launcher, Experimental MIRV) truly cannot
+  //         crit (Crit%Mult 0). Field order [base, crit, mult, aps, wt, val].
+  {
+    const blast232 = {
+      'Frag Grenade': 100,
+      'Plasma Grenade': 150,
+      'Pulse Grenade': 10,
+      'Nuka Grenade': 501,
+      'Frag Mine': 100,
+      'Bottlecap Mine': 500,
+      'Fat Man': 1600,
+      'Missile Launcher': 150,
+      'Miss Launcher': 200,
+      'Experimental MIRV': 12800,
+      'Rock-It Launcher': 50,
+    };
+    // Fire-rate (Attacks_Per_Second) — the field this cleanup unit re-sourced.
+    const fireRate232 = {
+      'Frag Grenade': 0.6522,
+      'Plasma Grenade': 0.6522,
+      'Pulse Grenade': 0.6522,
+      'Nuka Grenade': 0.6522,
+      'Cryo Grenade': 0.6522,
+      'Frag Mine': 0.5,
+      'Cryo Mine': 0.5,
+      'Bottlecap Mine': 0.3261,
+      'Fat Man': 1.5789,
+      'Missile Launcher': 1.5789,
+      'Miss Launcher': 1.5789,
+      'Experimental MIRV': 1.5789,
+      'Rock-It Launcher': 3.3333,
+    };
+    // Grenades + mines: crit-mult 1 (normal crit chance) AND crit-dmg 0 (no bonus).
+    const critGrenadeMine232 = [
+      'Frag Grenade',
+      'Plasma Grenade',
+      'Pulse Grenade',
+      'Nuka Grenade',
+      'Cryo Grenade',
+      'Frag Mine',
+      'Bottlecap Mine',
+      'Cryo Mine',
+    ];
+    // Projectile nukes/missiles: genuinely cannot crit — crit-mult 0.
+    const noCrit232 = ['Fat Man', 'Missile Launcher', 'Miss Launcher', 'Experimental MIRV'];
+    const badBlast = Object.entries(blast232).filter(
+      ([n, b]) => !fo3Weapons232[n] || fo3Weapons232[n][0] !== b
+    );
+    const badRate = Object.entries(fireRate232).filter(
+      ([n, r]) => !fo3Weapons232[n] || fo3Weapons232[n][3] !== r
+    );
+    const badGrenCrit = critGrenadeMine232.filter(
+      n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 1 || fo3Weapons232[n][1] !== 0
+    );
+    const badNoCrit = noCrit232.filter(n => !fo3Weapons232[n] || fo3Weapons232[n][2] !== 0);
+    assert(
+      badBlast.length === 0 &&
+        badRate.length === 0 &&
+        badGrenCrit.length === 0 &&
+        badNoCrit.length === 0,
+      '232.4: [explosives] blast + re-sourced fire-rate pinned; grenades/mines crit ×1 with 0 crit-dmg, projectile nukes crit ×0 — badBlast ' +
+        JSON.stringify(badBlast.map(b => b[0])) +
+        ' badRate ' +
+        JSON.stringify(badRate.map(b => b[0])) +
+        ' badGrenCrit ' +
+        JSON.stringify(badGrenCrit) +
+        ' badNoCrit ' +
+        JSON.stringify(badNoCrit)
+    );
+  }
+
+  // 232.5 — the 4 non-FO3 rows (cross-game / invented, same class as the
+  //         fabricated perks) are gone from BOTH the WEAPONS.CSV table (now
+  //         exactly 111 weapons) AND the reg_fo3.js autocomplete registry —
+  //         a half-deletion would leave a suggestible weapon with no DB stats.
+  {
+    const deleted232 = ['Bumper Sword', 'Golf Club', 'Plunger', 'Tin Grenade'];
+    const regFo3Raw232 = readGroup('reg_fo3');
+    const stillInReg232 = deleted232.filter(n => regFo3Raw232.includes(`'${n}'`));
+    assert(
+      deleted232.every(n => !(n in fo3Weapons232)) &&
+        Object.keys(fo3Weapons232).length === 111 &&
+        stillInReg232.length === 0,
+      `232.5: [deletions] the 4 non-FO3 rows are removed from db_fo3.js (now 111 weapons) and from the reg_fo3.js registry — got ${Object.keys(fo3Weapons232).length} weapons, still-in-DB ${JSON.stringify(deleted232.filter(n => n in fo3Weapons232))}, still-in-registry ${JSON.stringify(stillInReg232)}`
+    );
+  }
+
+  // 232.6 — [citation] the false blanket "every data row here is sourced from
+  //         fallout.wiki" header claim is GONE from db_fo3.js, replaced with a
+  //         dated, honestly-scoped provenance note. Correct-then-cite: the
+  //         citation rides ON the corrected values, and does NOT vouch for the
+  //         un-re-sourced PARKED columns / other tables.
+  assert(
+    !/every data row here is sourced from fallout\.wiki/.test(dbFo3Raw232) &&
+      /re-verified row-by-row against the fallout\.wiki/.test(dbFo3Raw232) &&
+      dbFo3Raw232.includes('2026-07-15') &&
+      dbFo3Raw232.includes('Bumper Sword, Golf Club, Plunger, Tin Grenade') &&
+      /NOT re-sourced/.test(dbFo3Raw232),
+    '232.6: [citation] db_fo3.js drops the false blanket fallout.wiki claim for a dated, scoped provenance note naming the removed rows and the un-re-sourced columns'
+  );
+
+  // ── Plausibility range guard (per-game bands, Protocol 38) ──────────
+  // FO3 — tight, audited bands: the re-verified table’s real envelope + a
+  // little headroom, chosen so the OLD inflated values trip (old Sniper value
+  // 3500 > 3000; old Fat Man 8500; old Gatling Laser 22500). Base_Damage’s
+  // ceiling is generous only because the Experimental MIRV legitimately deals
+  // 12800 (8 mini-nukes, wiki Dmg/Attack) — the guard’s teeth are on
+  // Value / Crit_Multiplier / fire-rate / Weight.
+  const FO3_BANDS_232 = {
+    Base_Damage: [0, 13000],
+    Crit_Damage: [0, 200],
+    Crit_Multiplier: [0, 100],
+    Attacks_Per_Second: [0, 25],
+    Weight: [0, 35],
+    Value: [0, 3000],
+  };
+  // FNV — retuned to the 2026-07-15 fallout.wiki re-source. The corrected NV
+  // table's real envelope is base ≤ 800 (Holy Frag Grenade blast), crit-dmg
+  // ≤ 110, crit-mult ≤ 100 (Alien Blaster), fire-rate ≤ 30 (CZ57 Avenger),
+  // weight ≤ 40 (Esther), value ≤ 20000 (Bozar / Medicine Stick / Two-Step
+  // Goodbye / Sprtel-Wood / The Smitty Special). Bands sit just above that so
+  // the OLD inflation trips: old Bozar value 75000, CZ57 62000, Minigun 22500
+  // all fall outside. (The pre-correction band's fire-rate ceiling of 25 would
+  // itself now fail the corrected CZ57's 30 — the retune is a correctness fix,
+  // not only a tightening.)
+  const NV_BANDS_232 = {
+    Base_Damage: [0, 1000],
+    Crit_Damage: [0, 200],
+    Crit_Multiplier: [0, 100],
+    Attacks_Per_Second: [0, 35],
+    Weight: [0, 50],
+    Value: [0, 20000],
+  };
+  function rangeViolations232(weapons, bands) {
+    const v = [];
+    for (const [n, s] of Object.entries(weapons)) {
+      FIELD_NAMES_232.forEach((fn, i) => {
+        const [lo, hi] = bands[fn];
+        if (!(s[i] >= lo && s[i] <= hi)) v.push(`${n} ${fn}=${s[i]} outside [${lo},${hi}]`);
+      });
+    }
+    return v;
+  }
+
+  // 232.7 — [RED] the range guard flags a wildly-out-of-band FO3 value — the
+  //         old Sniper Rifle value 3500 (> 3000) and a hypothetical 35000 —
+  //         by weapon and field. This is the "10× inflation" class the guard
+  //         exists to catch even for a future weapon the pin doesn’t cover.
+  {
+    const broken232 = { ...fo3Weapons232 };
+    broken232['Sniper Rifle'] = [40, 40, 5, 1.0714, 10, 3500];
+    broken232['Gatling Laser'] = [8, 6, 1, 20, 18, 35000];
+    const v = rangeViolations232(broken232, FO3_BANDS_232);
+    assert(
+      v.some(x => x.includes('Sniper Rifle') && x.includes('Value=3500')) &&
+        v.some(x => x.includes('Gatling Laser') && x.includes('Value=35000')),
+      '232.7: [RED] the plausibility range guard flags out-of-band FO3 values (Sniper 3500, Gatling 35000) by name — ' +
+        JSON.stringify(v)
+    );
+  }
+
+  // 232.8 — [GREEN] every corrected FO3 weapon stat sits inside the FO3 bands.
+  {
+    const v = rangeViolations232(fo3Weapons232, FO3_BANDS_232);
+    assert(
+      v.length === 0,
+      '232.8: [GREEN] every corrected FO3 weapon stat is within the audited plausibility bands — ' +
+        JSON.stringify(v.slice(0, 10))
+    );
+  }
+
+  // 232.9 — [GREEN + game-agnostic] the range guard also runs over the NV table
+  //         (Protocol 38 §4.4) and every CORRECTED NV weapon passes its retuned
+  //         bands — proving the guard covers NV and the re-sourced table sits
+  //         inside a sane envelope.
+  {
+    const v = rangeViolations232(nvWeapons232, NV_BANDS_232);
+    assert(
+      v.length === 0,
+      '232.9: [GREEN] every corrected NV weapon stat is within the retuned NV plausibility bands (guard covers both games) — ' +
+        JSON.stringify(v.slice(0, 10))
+    );
+  }
+
+  // 232.10 — [GREEN] the real shipped db_nv.js weapon table matches the NV pin
+  //          exactly — every one of the 188 weapons' 6 consumed fields, after
+  //          the 2026-07-15 fallout.wiki re-source. Sibling to 232.1 for FO3.
+  {
+    const drift = nvGoldenDrift232(nvWeapons232);
+    assert(
+      drift.length === 0,
+      '232.10: [golden-master] every NV weapon’s 6 consumed stats match the fallout.wiki-verified pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.11 — [RED] a fixture that re-inflates the Bozar value back to the old
+  //          75000 AND silently restores the deleted non-FNV "Golf Club" row
+  //          must fail the pin BY NAME — proving the guard catches a wrong
+  //          number and a resurrected leak, not just a citation label.
+  {
+    const broken = { ...nvWeapons232 };
+    broken['Bozar'] = [19, 19, 1, 15, 15, 75000];
+    broken['Golf Club'] = [18, 18, 1, 2, 2, 75];
+    const drift = nvGoldenDrift232(broken);
+    assert(
+      drift.some(d => d.includes('Bozar') && d.includes('Value') && d.includes('75000')) &&
+        drift.some(d => d.includes('Golf Club') && d.includes('UNPINNED')),
+      '232.11: [RED] the NV golden-master flags a re-inflated Bozar value (75000) and a resurrected non-FNV row by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.12 — [RED] the retuned NV range guard flags a wildly-out-of-band NV
+  //          value — the old Bozar value 75000 (> 20000) and a hypothetical
+  //          CZ57 fire-rate 99 (> 35) — by weapon and field. The inflation class
+  //          the band catches even for a weapon the pin doesn't cover.
+  {
+    const broken = { ...nvWeapons232 };
+    broken['Bozar'] = [19, 19, 1, 15, 15, 75000];
+    broken['CZ57 Avenger'] = [13, 13, 0.5, 99, 18, 8500];
+    const v = rangeViolations232(broken, NV_BANDS_232);
+    assert(
+      v.some(x => x.includes('Bozar') && x.includes('Value=75000')) &&
+        v.some(x => x.includes('CZ57 Avenger') && x.includes('Attacks_Per_Second=99')),
+      '232.12: [RED] the retuned NV plausibility band flags out-of-band NV values (Bozar 75000, CZ57 aps 99) by name — ' +
+        JSON.stringify(v)
+    );
+  }
+
+  // 232.13 — [deletions] the 4 non-FNV rows — Rebound (a chem, not a weapon),
+  //          Pump-Action Shotgun (a Fallout: Brotherhood of Steel weapon), Golf
+  //          Club (a Fallout 76 weapon), and Vance's Lucky Hat Knife (no such
+  //          weapon exists) — are gone from BOTH the db_nv.js WEAPONS.CSV table
+  //          (now exactly 188 weapons) AND the reg_nv.js autocomplete registry
+  //          as WEAPON entries — a half-deletion would leave a suggestible
+  //          weapon with no DB stats. The real Rebound CHEM survives in reg_nv.js
+  //          as an 'aid' entry. Sibling to 232.5 for FO3.
+  {
+    const gone232 = ['Rebound', 'Pump-Action Shotgun', 'Golf Club', "Vance's Lucky Hat Knife"];
+    const regNvRaw232 = readGroup('reg_nv');
+    const stillWeapon232 = gone232.filter(
+      n =>
+        regNvRaw232.includes(`{ name: '${n}', type: 'weapon' }`) ||
+        regNvRaw232.includes(`{ name: "${n}", type: 'weapon' }`)
+    );
+    const reboundAidKept232 = /\{ name: 'Rebound', type: 'aid' \}/.test(regNvRaw232);
+    assert(
+      gone232.every(n => !(n in nvWeapons232)) &&
+        Object.keys(nvWeapons232).length === 188 &&
+        stillWeapon232.length === 0 &&
+        reboundAidKept232,
+      `232.13: [deletions] the 4 non-FNV rows are removed from db_nv.js (now 188 weapons) and from the reg_nv.js weapon registry, and the real Rebound chem survives as an 'aid' — got ${Object.keys(nvWeapons232).length} weapons, still-weapon ${JSON.stringify(stillWeapon232)}, rebound-aid-kept ${reboundAidKept232}`
+    );
+  }
+
+  // 232.14 — [citation] the false blanket "every data row here is sourced from
+  //          fallout.wiki" header claim is GONE from db_nv.js, replaced with a
+  //          dated, honestly-scoped provenance note. Correct-then-cite: the
+  //          citation rides ON the corrected values and does NOT vouch for the
+  //          un-re-sourced PARKED columns / other tables. Sibling to 232.6.
+  {
+    const dbNvRaw232 = readGroup('db_nv');
+    assert(
+      !/every data row here is sourced from fallout\.wiki/.test(dbNvRaw232) &&
+        /re-verified row-by-row against the fallout\.wiki/.test(dbNvRaw232) &&
+        dbNvRaw232.includes('2026-07-15') &&
+        dbNvRaw232.includes('Missile Launcher') &&
+        /NOT[\s\S]*re-sourced/.test(dbNvRaw232),
+      '232.14: [citation] db_nv.js drops the false blanket fallout.wiki claim for a dated, scoped provenance note (names the Missile Launcher rename and the un-re-sourced columns)'
+    );
+  }
+
+  // 232.15 — [collectibles] the NV snow-globe location corrections (Protocol 3):
+  //          Test Site's find-location was CRESCENT CANYON WEST (a player found
+  //          nothing there) — corrected to the LUCKY 38 COCKTAIL LOUNGE; the
+  //          bogus "Lucky 38" globe (not a real snow globe) is renamed to its
+  //          real name "The Strip" (found in Vault 21). Goodsprings stays at the
+  //          CEMETERY — verified correct on the live wiki (the sweep's later
+  //          Doc-Mitchell claim did not hold). All 7 canonical FNV globe names
+  //          present. Regression guard (Protocol 13).
+  {
+    const regNvRaw232b = readGroup('reg_nv');
+    const collMatch232 = regNvRaw232b.match(/collectibles:\s*\[([\s\S]*?)\n {2}\],/);
+    const collBlock232 = collMatch232 ? collMatch232[1] : '';
+    const globeNames232 = (collBlock232.match(/name:\s*'([^']+)'/g) || [])
+      .map(s => s.replace(/name:\s*'|'/g, ''))
+      .sort();
+    const canonical232 = [
+      'Goodsprings',
+      'Hoover Dam',
+      'Mormon Fort',
+      'Mt. Charleston',
+      'Nellis AFB',
+      'Test Site',
+      'The Strip',
+    ].sort();
+    assert(
+      JSON.stringify(globeNames232) === JSON.stringify(canonical232) &&
+        !/name:\s*'Lucky 38'/.test(collBlock232) &&
+        !/CRESCENT CANYON/.test(collBlock232) &&
+        /LUCKY 38 COCKTAIL LOUNGE/.test(collBlock232) &&
+        /VAULT 21/.test(collBlock232) &&
+        /GOODSPRINGS CEMETERY/.test(collBlock232),
+      '232.15: [collectibles] Test Site → Lucky 38 Cocktail Lounge; bogus "Lucky 38" globe renamed to "The Strip" (Vault 21); Goodsprings stays Cemetery; all 7 canonical FNV snow-globe names present — got ' +
+        JSON.stringify(globeNames232)
+    );
+  }
+
+  // Generic [<SECTION>.CSV] column parser → { name: [parsed cols...] }, any db_*.js.
+  function parseCsvCols232(src, section, colIdx) {
+    const out = {};
+    const m = src.match(new RegExp('\\[' + section + '\\.CSV\\]([\\s\\S]*?)(?=\\n\\[|`;)'));
+    if (!m) return out;
+    const lines = m[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      out[c[0]] = colIdx.map(j => parseFloat(c[j]));
+    }
+    return out;
+  }
+  const nvArmor232 = parseCsvCols232(readGroup('db_nv'), 'ARMOR', [2, 3, 4]); // DT, Weight, Value
+  const nvChems232 = parseCsvCols232(readGroup('db_nv'), 'CHEMS', [6, 7]); // Value, Weight
+  const nvBest232 = parseCsvCols232(readGroup('db_nv'), 'BESTIARY', [1, 2, 3, 4, 5, 6, 10]); // DT,HP,PER,SPD,DMG,RATE,XP
+
+  // Pin validator: only the rows in `pin` are checked (armor/chems pin ONLY the
+  // fallout.wiki-verified rows; UNVERIFIED/unmatched rows are deliberately absent
+  // from the pin, so an "extra" un-pinned row is NOT drift here — unlike weapons).
+  function pinDrift232(pin, data, fieldNames, srcName) {
+    const drift = [];
+    for (const n of Object.keys(pin)) {
+      if (!(n in data)) {
+        drift.push(`${n}: MISSING from ${srcName}`);
+        continue;
+      }
+      pin[n].forEach((exp, f) => {
+        if (data[n][f] !== exp)
+          drift.push(`${n} ${fieldNames[f]} expected ${exp} got ${data[n][f]}`);
+      });
+    }
+    return drift;
+  }
+  // Per-table plausibility bands ([field, lo, hi], one entry per parsed column).
+  const ARMOR_BAND_232 = [
+    ['DT', 0, 40],
+    ['Weight', 0, 50],
+    ['Value', 0, 16000],
+  ];
+  const CHEMS_BAND_232 = [
+    ['Value', 0, 300],
+    ['Weight', 0, 5],
+  ];
+  const BEST_BAND_232 = [
+    ['DT', 0, 30],
+    ['HP', 0, 1000],
+    ['Perception', 0, 15],
+    ['Speed_Factor', 0, 3],
+    ['Base_Damage', 0, 250],
+    ['Attack_Rate', 0, 5],
+    ['XP_Yield', 0, 500],
+  ];
+  function bandViol232b(data, bandArr) {
+    const v = [];
+    for (const [n, s] of Object.entries(data)) {
+      bandArr.forEach(([fn, lo, hi], i) => {
+        if (!(s[i] >= lo && s[i] <= hi)) v.push(`${n} ${fn}=${s[i]} outside [${lo},${hi}]`);
+      });
+    }
+    return v;
+  }
+
+  const NV_ARMOR_GOLDEN_232 = {
+    'Wasteland Wanderer Outfit': [0, 2, 6],
+    'Leather Armor': [6, 15, 160],
+    'NCR Trooper Armor': [10, 26, 300],
+    'Gecko-Backed Leather Armor': [10, 15, 500],
+    'NCR Ranger Patrol Armor': [15, 25, 390],
+    'Stealth Suit Mk II': [14, 25, 7500],
+    'Metal Armor': [12, 30, 1100],
+    'Combat Armor': [15, 25, 6500],
+    'Combat Armor Reinforced': [17, 25, 8000],
+    'Legion Centurion Armor': [18, 35, 800],
+    'Desert Ranger Combat Armor': [22, 30, 8000],
+    'Elite Riot Gear': [22, 23, 12500],
+    'NCR Salvaged Power Armor': [20, 40, 3000],
+    'Brotherhood T-45d Power Armor': [22, 45, 4500],
+    'T-51b Power Armor': [25, 40, 5200],
+    'Remnants Power Armor': [28, 45, 6500],
+    'Enclave Power Armor': [32, 45, 780],
+    'Gannon Family Tesla Armor': [26, 35, 8194],
+    'Advanced Radiation Suit': [6, 7, 100],
+    'Armored Vault 13 Jumpsuit': [8, 15, 70],
+    'Armored Vault 21 Jumpsuit': [8, 15, 180],
+    'Assassin Suit': [14, 20, 7500],
+    "Caesar's Armor": [5, 3, 1500],
+    'Chinese Stealth Armor': [12, 20, 500],
+    'Gecko-Backed Leather Armor Reinforced': [15, 18, 2000],
+    'Gladiator Armor': [12, 15, 160],
+    'Great Khan Armored Leather': [8, 7, 100],
+    'Great Khan Simple Armor': [5, 7, 100],
+    "Joshua Graham's Armor": [15, 8, 2000],
+    'Leather Armor Reinforced': [10, 15, 1200],
+    'Lightweight Leather Armor': [8, 10, 160],
+    'NCR Trooper Fatigues': [2, 26, 300],
+    'Radiation Suit': [4, 5, 60],
+    'Raider Badlands Armor': [4, 15, 180],
+    'Raider Blastmaster Armor': [4, 15, 180],
+    'Raider Painspike Armor': [4, 15, 180],
+    'Raider Sadist Armor': [4, 15, 180],
+    'Sierra Madre Armor': [16, 15, 400],
+    'Sierra Madre Armor Reinforced': [18, 17, 1000],
+    'Space Suit': [10, 7, 800],
+    'Tribal Raiding Armor': [4, 15, 180],
+    'Advanced Riot Gear': [21, 25, 8494],
+    'Combat Armor Reinforced Mark 2': [20, 25, 8000],
+    'Lightweight Metal Armor': [12, 20, 460],
+    'NCR Bandoleer Armor': [10, 26, 300],
+    'NCR Ranger Combat Armor': [20, 30, 7500],
+    'Recon Armor': [17, 20, 7200],
+    'Riot Gear': [20, 30, 7994],
+    'Van Graff Combat Armor': [16, 25, 6500],
+    'Brotherhood T-51b Power Armor': [25, 40, 5200],
+    'Gecko-Backed Metal Armor': [17, 33, 2000],
+    "Legate's Armor": [15, 45, 250],
+    'Metal Armor Reinforced': [16, 30, 3500],
+    'Remnants Tesla Armor': [25, 45, 8200],
+    'Scorched Sierra Power Armor': [24, 40, 6500],
+    'T-45d Power Armor': [22, 45, 4500],
+    'Tesla Armor': [20, 45, 6600],
+    "Chalk's Headdress": [1, 3, 150],
+    'Marked Beast Eyes Helmet': [3, 3, 800],
+    'Marked Beast Face Helmet': [3, 3, 800],
+    'Marked Beast Helmet': [3, 3, 800],
+    'Marked Beast Tribal Helmet': [4, 2, 250],
+    "Salt-Upon-Wounds' Helmet": [4, 3, 300],
+    "Ulysses' Mask": [3, 2, 250],
+    "Ambassador Crocker's Suit": [1, 1, 6],
+    "Arcade's Lab Coat": [0, 2, 8],
+    "Benny's Suit": [1, 3, 390],
+    "Brotherhood Elder's Robe": [1, 2, 8],
+    "Daniel's Outfit": [2, 2, 700],
+    "Dean's Tuxedo": [0, 2, 6],
+    "Father Elijah's Robes": [2, 2, 6],
+    'Followers Lab Coat': [0, 2, 16],
+    "President Kimball's Suit": [0, 2, 5],
+    'RobCo Jumpsuit': [0, 1, 6],
+    Trenchcoat: [0, 3, 40],
+    'US Army General Outfit': [1, 1, 1500],
+    'Vault Lab Uniform': [0, 1, 6],
+    "Vera's Outfit": [2, 2, 250],
+    'Viva Las Vegas': [5, 1, 6],
+    "Christine's COS Recon Armor": [19, 20, 9500],
+    'Courier Duster': [13, 3, 1700],
+    "Ulysses' Duster": [13, 3, 1700],
+    'Armor of the 87th Tribe': [22, 35, 6495],
+    "Boone's Beret": [0, 0.1, 40],
+    "Caleb McCaffery's Hat": [0, 0, 0],
+    Fedora: [0, 1, 30],
+    "Jessup's Bandana": [0, 1, 6],
+    'Lucky Shades': [0, 1, 40],
+    "Motor-Runner's Helmet": [2, 0, 8],
+    'Party Hat': [0, 1, 5],
+    'Police Hat': [0, 1, 8],
+    'Suave Gambler Hat': [0, 1, 8],
+    'Tuxedo Hat': [0, 1, 8],
+    "Vance's Lucky Hat": [0, 1, 8],
+    "Vikki's Bonnet": [0, 1, 8],
+    "General Oliver's Uniform": [0, 1, 0],
+    'Naughty Nightwear': [0, 1, 200],
+    'Mysterious Stranger Outfit': [0, 3, 40], // DT held at 0 per WU-D2/Suite 70.15 (the
+    // outfit gives DR 5, not DT; the wiki infobox's DT 55 > power armor is implausible) —
+    // weight/value verified against the FNV page
+
+    '1st Recon Assault Armor': [15, 0, 300],
+    '1st Recon Survival Armor': [15, 0, 300],
+  };
+  const NV_CHEMS_GOLDEN_232 = {
+    Buffout: [20, 0],
+    'Med-X': [20, 0],
+    Psycho: [20, 0],
+    Stimpak: [75, 0],
+    'Super Stimpak': [150, 0],
+    RadAway: [20, 0],
+    'Rad-X': [20, 0],
+    Antivenom: [25, 0],
+    Hydra: [55, 0],
+    Fixer: [20, 0],
+    "Doctor's Bag": [55, 1],
+    Jet: [20, 0],
+    Ultrajet: [50, 0],
+    Turbo: [20, 0],
+    Mentats: [20, 0],
+    Slasher: [20, 0],
+    'Nuka-Cola': [20, 1],
+    'Nuka-Cola Quartz': [40, 1],
+    'Atomic Cocktail': [25, 1],
+    Steady: [20, 0],
+    Rocket: [20, 0],
+    Cateye: [20, 0],
+    "Dixon's Jet": [5, 0],
+    'Party Time Mentats': [20, 0],
+    'Blood Shield': [50, 0.5],
+    'Rushing Water': [20, 1],
+    'Ant Nectar': [20, 0.25],
+    'Healing Powder': [5, 0.03],
+    'Healing Poultice': [20, 0.03],
+    'Purified Water': [20, 1],
+    'Dirty Water': [10, 1],
+    Beer: [2, 1],
+    Scotch: [10, 1],
+    Vodka: [20, 1],
+    Wine: [10, 1],
+    Absinthe: [20, 1],
+    Moonshine: [20, 1],
+    'Gecko Steak': [5, 1],
+    'Brahmin Steak': [5, 0.8],
+    Cram: [5, 1],
+    InstaMash: [5, 1],
+    'Fancy Lads Snack Cakes': [5, 1],
+    'Dandy Boy Apples': [5, 1],
+    'YumYum Deviled Eggs': [5, 1],
+    'Salisbury Steak': [5, 1],
+    'Pre-War Steak': [5, 1],
+    MRE: [50, 0.2],
+    'Junk Food': [5, 1],
+    'Bighorner Steak': [5, 0.8],
+    'Iguana on a Stick': [5, 1],
+    'Trail Mix': [5, 3],
+    'Mole Rat Wonder Meat': [20, 1],
+    'Wasteland Omelet': [100, 1],
+    "Cook-Cook's Fiend Stew": [25, 1],
+    'Caravan Lunch': [5, 2.5],
+    'Brahmin Wellington': [5, 0.8],
+    'Desert Salad': [5, 0.2],
+    'Grilled Mantis': [8, 1],
+    'Banana Yucca Fruit': [6, 0.5],
+    'Barrel Cactus Fruit': [5, 0.2],
+    'Pinyon Nuts': [5, 0.03],
+    'Broc Flower': [3, 0.01],
+    'Xander Root': [0, 0.02],
+    'Nightstalker Tail': [18, 1],
+    'Sunset Sarsaparilla': [3, 1],
+    'Nuka-Cola Victory': [75, 1],
+    'Nuka-Cola Quantum': [30, 1],
+    Whiskey: [10, 1],
+    'Rum & Nuka': [20, 1],
+    'Wasteland Tequila': [20, 1],
+    'Sierra Madre Martini': [20, 0],
+    'Battle Brew': [150, 1],
+    Rebound: [20, 0],
+    'Sacred Datura Root': [10, 0.02],
+    'Ant Queen Pheromones': [75, 1],
+  };
+
+  // 232.16 — [GREEN] db_nv.js ARMOR.CSV DT/Weight/Value match the fallout.wiki
+  //          "Fallout: New Vegas Apparel" master-table pin for the 99 body-armor/
+  //          clothing rows that were fully verified on 2026-07-15. Headwear (on a
+  //          separate wiki page) + anomalous/unmatched rows are deliberately NOT
+  //          pinned (left at prior values, flagged UNVERIFIED in the file header).
+  {
+    const drift = pinDrift232(
+      NV_ARMOR_GOLDEN_232,
+      nvArmor232,
+      ['DT', 'Weight', 'Value'],
+      'db_nv.js armor'
+    );
+    assert(
+      drift.length === 0,
+      '232.16: [armor golden-master] every verified NV armor row’s DT/Weight/Value matches the fallout.wiki pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.17 — [RED] re-inflating Combat Armor’s value back to the old 3900 AND
+  //          corrupting a newly-pinned HEADWEAR row (Fedora value) must both fail
+  //          the armor pin BY NAME — proving the guard catches a wrong armor value
+  //          (body armor + the 2026-07-15 headwear additions), not merely that a
+  //          citation exists.
+  {
+    const broken = { ...nvArmor232 };
+    broken['Combat Armor'] = [15, 25, 3900];
+    broken['Fedora'] = [0, 1, 999];
+    const drift = pinDrift232(
+      NV_ARMOR_GOLDEN_232,
+      broken,
+      ['DT', 'Weight', 'Value'],
+      'db_nv.js armor'
+    );
+    assert(
+      drift.some(d => d.includes('Combat Armor') && d.includes('Value') && d.includes('3900')) &&
+        drift.some(d => d.includes('Fedora') && d.includes('Value') && d.includes('999')),
+      '232.17: [RED] the armor golden-master flags a re-inflated Combat Armor value (3900) and a corrupted headwear (Fedora) value by name — ' +
+        JSON.stringify(drift)
+    );
+  }
+
+  // 232.18 — [GREEN] db_nv.js CHEMS.CSV Value/Weight match the fallout.wiki
+  //          "Fallout: New Vegas Consumables" master-table pin for all 75 rows
+  //          (most FNV chems weigh 0, not the old 0.5 placeholder).
+  {
+    const drift = pinDrift232(
+      NV_CHEMS_GOLDEN_232,
+      nvChems232,
+      ['Value', 'Weight'],
+      'db_nv.js chems'
+    );
+    assert(
+      drift.length === 0,
+      '232.18: [chems golden-master] every NV chem’s Value/Weight matches the fallout.wiki pin — ' +
+        JSON.stringify(drift.slice(0, 10))
+    );
+  }
+
+  // 232.19 — [deletion + RED] the fabricated "Whiskey Rose" consumable (it is a
+  //          Cass companion PERK, not a chem) is gone from CHEMS.CSV — now exactly
+  //          75 rows — and re-inflating the Stimpak value back to the old 20 must
+  //          fail the chems pin by name.
+  {
+    const broken = { ...nvChems232 };
+    broken['Stimpak'] = [20, 0];
+    const drift = pinDrift232(NV_CHEMS_GOLDEN_232, broken, ['Value', 'Weight'], 'db_nv.js chems');
+    assert(
+      !('Whiskey Rose' in nvChems232) &&
+        Object.keys(nvChems232).length === 75 &&
+        drift.some(d => d.includes('Stimpak') && d.includes('Value') && d.includes('20')),
+      `232.19: [deletion+RED] fabricated Whiskey Rose consumable removed (75 chems) and the chems pin flags a wrong Stimpak value — count ${Object.keys(nvChems232).length}, whiskey-gone ${!('Whiskey Rose' in nvChems232)}, drift ${JSON.stringify(drift.slice(0, 3))}`
+    );
+  }
+
+  // 232.20 — [GREEN] every NV armor, chem and bestiary row sits inside its
+  //          per-field plausibility band. Bestiary carries a band ONLY (its
+  //          numbers are level-scaled/NPC-variant and were NOT pinned — see the
+  //          db_nv.js header); the band is a sane-bounds guard, not a value pin.
+  {
+    const va = bandViol232b(nvArmor232, ARMOR_BAND_232);
+    const vc = bandViol232b(nvChems232, CHEMS_BAND_232);
+    const vb = bandViol232b(nvBest232, BEST_BAND_232);
+    assert(
+      va.length === 0 && vc.length === 0 && vb.length === 0,
+      '232.20: [GREEN] NV armor/chems/bestiary all within plausibility bands — armor ' +
+        JSON.stringify(va.slice(0, 5)) +
+        ' chems ' +
+        JSON.stringify(vc.slice(0, 5)) +
+        ' bestiary ' +
+        JSON.stringify(vb.slice(0, 5))
+    );
+  }
+
+  // 232.21 — [RED] the plausibility bands flag wildly-out-of-band values in each
+  //          of the three tables (armor value 99999, bestiary HP 99999) by name.
+  {
+    const ba = { ...nvArmor232, 'Combat Armor': [15, 25, 99999] };
+    const bb = { ...nvBest232, Deathclaw: [15, 99999, 8, 1.5, 125, 1.5, 50] };
+    const va = bandViol232b(ba, ARMOR_BAND_232);
+    const vb = bandViol232b(bb, BEST_BAND_232);
+    assert(
+      va.some(x => x.includes('Combat Armor') && x.includes('Value=99999')) &&
+        vb.some(x => x.includes('Deathclaw') && x.includes('HP=99999')),
+      '232.21: [RED] the NV armor/bestiary bands flag out-of-band values (Combat Armor 99999, Deathclaw HP 99999) by name — ' +
+        JSON.stringify(va.concat(vb))
+    );
+  }
+
+  // 232.22 — [citation] the db_nv.js header carries the dated, honestly-scoped
+  //          ARMOR/CHEMS/BESTIARY provenance note (2026-07-15): armor DT/Weight/
+  //          Value + chems Value/Weight re-verified against the named master
+  //          tables, PARKED columns NOT re-sourced, bestiary numbers UNVERIFIED,
+  //          and the removed Whiskey Rose named. Correct-then-cite. Sibling to 232.6/232.14.
+  {
+    const dbNvRaw = readGroup('db_nv');
+    assert(
+      /PROTOCOL 3 \(ARMOR\.CSV \+ CHEMS\.CSV\)/.test(dbNvRaw) &&
+        dbNvRaw.includes('New Vegas Apparel') &&
+        dbNvRaw.includes('New Vegas Consumables') &&
+        /PROTOCOL 3 \(BESTIARY\.CSV\)/.test(dbNvRaw) &&
+        /UNVERIFIED/.test(dbNvRaw) &&
+        dbNvRaw.includes('Whiskey Rose') &&
+        /NOT[\s\S]*re-sourced/.test(dbNvRaw),
+      '232.22: [citation] db_nv.js header carries the dated ARMOR/CHEMS/BESTIARY provenance note (named master tables, UNVERIFIED bestiary, PARKED columns, Whiskey Rose removal)'
+    );
+  }
+
+  // 232.23 — [alias, BEHAVIORAL] the two retired duplicate armor names resolve
+  //          through the REAL lookupItemInDb() to the canonical NCR Ranger Combat
+  //          Armor stats (Weight 30, Value 7500) — proving the data-driven alias
+  //          map works end-to-end. The value distinguishes canonical (7500) from
+  //          the fuzzy-fallback's would-be wrong match Desert Ranger Combat Armor
+  //          (8000), so a green here means the alias fired, not the fuzzy pass.
+  {
+    const vm = require('vm');
+    const sb232 = { console };
+    vm.createContext(sb232);
+    vm.runInContext(readGroup('db_nv'), sb232);
+    const veteran232 = sb232.lookupItemInDb('NCR Veteran Ranger Armor');
+    const ranger232 = sb232.lookupItemInDb('Ranger Combat Armor');
+    const canonical232 = sb232.lookupItemInDb('NCR Ranger Combat Armor');
+    assert(
+      canonical232 &&
+        canonical232.val === 7500 &&
+        canonical232.wgt === 30 &&
+        veteran232 &&
+        veteran232.val === 7500 &&
+        veteran232.wgt === 30 &&
+        veteran232.type === 'armor' &&
+        ranger232 &&
+        ranger232.val === 7500 &&
+        ranger232.wgt === 30 &&
+        ranger232.type === 'armor',
+      `232.23: [alias] "NCR Veteran Ranger Armor" and "Ranger Combat Armor" both resolve via the real lookupItemInDb() to the canonical NCR Ranger Combat Armor (val 7500 / wgt 30 / armor) — got veteran ${JSON.stringify(veteran232)}, ranger ${JSON.stringify(ranger232)}, canonical ${JSON.stringify(canonical232)}`
+    );
+  }
+
+  // 232.24 — [deletions + correction] the Vault Utility Suit row (no such FNV item)
+  //          and the two duplicate NCR-Ranger rows are gone from db_nv.js ARMOR.CSV,
+  //          the canonical NCR Ranger Combat Armor survives, and the newly-verified
+  //          Wasteland Wanderer Outfit is corrected to Value 6 with its +1 END / +1
+  //          AGL effect. Sibling to 232.13 (weapon deletions) / 232.19 (chem deletion).
+  {
+    const gone232b = ['Vault Utility Suit', 'NCR Veteran Ranger Armor', 'Ranger Combat Armor'];
+    const stillPresent232b = gone232b.filter(n => n in nvArmor232);
+    const ww232 = nvArmor232['Wasteland Wanderer Outfit'];
+    const dbNvRaw232b = readGroup('db_nv');
+    assert(
+      stillPresent232b.length === 0 &&
+        'NCR Ranger Combat Armor' in nvArmor232 &&
+        ww232 &&
+        ww232[0] === 0 &&
+        ww232[1] === 2 &&
+        ww232[2] === 6 &&
+        /Wasteland Wanderer Outfit,Light,0,2,6,\+1 END \/ \+1 AGL,50%/.test(dbNvRaw232b),
+      `232.24: [deletions+correction] Vault Utility Suit + the 2 duplicate NCR-Ranger rows removed, canonical NCR Ranger Combat Armor kept, Wasteland Wanderer Outfit corrected to [DT 0, wgt 2, val 6] + effect — still-present ${JSON.stringify(stillPresent232b)}, ww ${JSON.stringify(ww232)}`
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 233 — SAVE_LAYER3: read-side fail-loud (quarantine, banners,
+//  degraded-write notice) — Protocols 13/20/26/33/34/42/44
+//
+//  The Layer-3 hard invariant: a save that cannot be READ is quarantined
+//  whole (bytes preserved, recoverable) and announced — never silently
+//  deleted — and the fail-loud layer itself can NEVER break loading a
+//  valid save or block boot. Static guards lock the source contracts;
+//  the VM behavioral tests run the REAL _hydrateStateFromStorage against
+//  corrupt / valid / helper-throw / eviction fixtures. Browser-level
+//  proof (real banners, real IndexedDB, real chat lines) lives in
+//  tests/save-survival.mjs (full push gate).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 233 — SAVE_LAYER3: read-side fail-loud');
+  const uiCore233 = readFile('js/ui-core.js');
+  const uiSaves233 = readFile('js/ui-saves.js');
+  const uiAcct233 = readFile('js/ui-account.js');
+  const state233 = readFile('js/state.js');
+  const html233 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const hydrate233 = extractFunctionBody(uiCore233, '_hydrateStateFromStorage');
+  const quarantine233 = extractFunctionBody(uiCore233, '_quarantineCorruptContainer');
+  const reportFault233 = extractFunctionBody(uiCore233, '_reportMigrationWriteFault');
+  const reconcile233 = extractFunctionBody(uiCore233, '_reconcileMetaFromIdb');
+  const saveToSlot233 = extractFunctionBody(uiSaves233, 'saveToSlot');
+  const coldWrite233 = extractFunctionBody(state233, '_coldWriteObj');
+
+  // 233.1  TEMPLATE INERT (Protocol 20, mirrors 217.7b): the READ FAULT
+  //        banner markup lives inside <template id="readFaultBannerTemplate">
+  //        — inert by default, never a live rendered element — with the
+  //        #readFaultBanner + #readFaultBannerMsg nodes and the shared
+  //        Layer-2 .storage-warning-banner class + role="alert".
+  {
+    const tplIdx233 = html233.indexOf('id="readFaultBannerTemplate"');
+    const tplOpen233 = html233.lastIndexOf('<template', tplIdx233);
+    const tplClose233 = html233.indexOf('</template>', tplIdx233);
+    const tplBody233 = tplOpen233 === -1 ? '' : html233.slice(tplOpen233, tplClose233);
+    assert(
+      tplIdx233 !== -1 &&
+        /id="readFaultBanner"/.test(tplBody233) &&
+        /class="storage-warning-banner"/.test(tplBody233) &&
+        /role="alert"/.test(tplBody233) &&
+        /id="readFaultBannerMsg"/.test(tplBody233),
+      '233.1: #readFaultBanner (+ #readFaultBannerMsg, .storage-warning-banner, role=alert) lives inside the inert <template id="readFaultBannerTemplate"> — never a live rendered banner'
+    );
+  }
+
+  // 233.2  CAPTURE-BEFORE-REMOVE (the "deletion can never silently return"
+  //        lock): both corrupt-catch paths route through
+  //        _quarantineCorruptContainer (no bare removeItem left in the
+  //        hydrate catches), and inside the helper the envelope capture of
+  //        the raw bytes precedes the removeItem.
+  {
+    const captureIdx233 = quarantine233.indexOf('raw: String(rawStr)');
+    const removeIdx233 = quarantine233.indexOf('localStorage.removeItem(sourceKey)');
+    assert(
+      /_quarantineCorruptContainer\('robco_v8', v8Str, e\)/.test(hydrate233) &&
+        /_quarantineCorruptContainer\('robco_v7', v7Str, e\)/.test(hydrate233) &&
+        !/localStorage\.removeItem\('robco_v8'\)/.test(hydrate233) &&
+        !/localStorage\.removeItem\('robco_v7'\)/.test(hydrate233) &&
+        captureIdx233 !== -1 &&
+        removeIdx233 !== -1 &&
+        captureIdx233 < removeIdx233,
+      '233.2: both corrupt-catches quarantine via _quarantineCorruptContainer (no bare removeItem in the hydrate path), and the helper captures the raw bytes into the envelope BEFORE removing the corrupt key'
+    );
+  }
+
+  // 233.3  SPLIT-TRY (trigger narrowed, not widened): the migration helpers
+  //        run OUTSIDE the outer parse try, each in its own fail-soft catch
+  //        that records the fault but never quarantines — a helper bug on a
+  //        VALID save degrades one nicety instead of destroying the campaign.
+  {
+    const outerCatch233 = hydrate233.indexOf("_quarantineCorruptContainer('robco_v8'");
+    const migrateIdx233 = hydrate233.indexOf('window._migrateEventLog(state)');
+    const reconIdx233 = hydrate233.indexOf('reconcileEquipped(state)');
+    const failSoft233 =
+      /_migrateEventLog\(state\);[\s\S]{0,400}catch \(e\) \{[\s\S]{0,400}BOOT MIGRATION FAULT \(eventLog\)/.test(
+        hydrate233
+      ) &&
+      /reconcileEquipped\(state\);[\s\S]{0,400}catch \(e\) \{[\s\S]{0,400}BOOT MIGRATION FAULT \(equipped\)/.test(
+        hydrate233
+      );
+    assert(
+      outerCatch233 !== -1 &&
+        migrateIdx233 > outerCatch233 &&
+        reconIdx233 > outerCatch233 &&
+        failSoft233,
+      '233.3: the v8 fast-path migration helpers (_migrateEventLog / reconcileEquipped) run AFTER the outer parse try in their own fail-soft catches (_recordError, never quarantine) — the helper-bug-deletes-valid-save latent defect is structurally gone'
+    );
+  }
+
+  // 233.4  NEVER OVERWRITE AN UNRESOLVED QUARANTINE: the localStorage leg
+  //        writes only when the key is absent; a second corruption goes to a
+  //        stamped IDB key with a newest-3 sweep; both-legs-failed stashes
+  //        the in-memory fallback for same-session export.
+  assert(
+    /localStorage\.getItem\('robco_v8_quarantine'\) === null/.test(quarantine233) &&
+      /'quarantine_' \+ envelope\.quarantinedAt/.test(quarantine233) &&
+      /stamped\.slice\(3\)/.test(quarantine233) &&
+      /window\._quarantinedEnvelope = envelope/.test(quarantine233),
+    '233.4: an earlier unresolved quarantine is never overwritten (absence-gated setItem; overflow goes to stamped IDB keys swept to newest 3; in-memory fallback when both legs fail)'
+  );
+
+  // 233.5  EVICTION = STRICT THREE-PART AFFIRMATIVE SIGNATURE (Protocol 33
+  //        fail-quiet): the banner requires no-v8 AND no-v7 AND the boot
+  //        marker recovered-from-IDB stash — set ONLY inside
+  //        _reconcileMetaFromIdb's recovery loop (which runs solely for keys
+  //        localStorage lacked), never a later re-read.
+  assert(
+    /!v8Str && !v7Str && window\._bootMarkerRecovered === true/.test(hydrate233) &&
+      /if \(key === 'robco_booted_before'\) window\._bootMarkerRecovered = true;/.test(
+        reconcile233
+      ),
+    '233.5: the EVICTION banner requires the strict three-part signature (no v8 AND no v7 AND the boot marker recovered from IDB this boot, stashed inside the recovery loop itself) — first-boot / swipe-away / post-quarantine / slow-IDB all stay silent'
+  );
+
+  // 233.6  _coldWriteObj CONTRACT (the §6 truthiness hazard, gate-locked):
+  //        the return is the { ok, idbOk, lsOk } object, saveToSlot checks
+  //        `.ok` (never the always-truthy bare object), its no-_coldWriteObj
+  //        fallback returns the same shape, and NO js file calls
+  //        _coldWriteObj inside a bare boolean context.
+  {
+    const bareTruthyCall233 = allJsFiles().some(f => {
+      const src = fs.readFileSync(path.join(ROOT, 'js', f.rel), 'utf8');
+      return /if \(await (window\.)?_coldWriteObj\(/.test(src);
+    });
+    assert(
+      /return \{ ok: idbOk \|\| lsOk, idbOk: idbOk, lsOk: lsOk \};/.test(coldWrite233) &&
+        /if \(res && res\.ok\) \{/.test(saveToSlot233) &&
+        /return \{ ok: true, idbOk: false, lsOk: true \};/.test(saveToSlot233) &&
+        /return \{ ok: false, idbOk: false, lsOk: false \};/.test(saveToSlot233) &&
+        !bareTruthyCall233,
+      '233.6: _coldWriteObj returns the divergence-honest { ok, idbOk, lsOk }; saveToSlot (and its fallback IIFE) consume `.ok`; no js file treats the always-truthy object return as a bare boolean'
+    );
+  }
+
+  // 233.7  META_MANIFEST registration (Protocol 4/23): both Layer-3 telemetry
+  //        prefs are registered device keys with string type + '' default.
+  assert(
+    /robco_read_fault: \{ type: 'string', default: '', owner: 'ui-core\.js' \}/.test(state233) &&
+      /robco_eviction_detected: \{ type: 'string', default: '', owner: 'ui-core\.js' \}/.test(
+        state233
+      ),
+    "233.7: robco_read_fault + robco_eviction_detected are registered META_MANIFEST device prefs (type 'string', default '', owner ui-core.js)"
+  );
+
+  // 233.8  DIAGNOSTIC SHELL COVERAGE (Protocol 44): all 6 SAVE INTEGRITY
+  //        tools registered; the two banner tools are display-only 'prod';
+  //        PLANT CORRUPT CONTAINER and both degraded-write seam setters are
+  //        'staging' + destructive (they write / degrade campaign data); the
+  //        seam reset is 'staging' non-destructive; the new prefs are covered
+  //        by triggers[] metadata.
+  {
+    const tc233 = readFile('js/test-console.js');
+    const ids233 = [
+      'save-force-read-fault-banner',
+      'save-force-eviction-banner',
+      'save-plant-corrupt-container',
+      'save-degraded-no-idb',
+      'save-degraded-no-ls',
+      'save-degraded-off',
+    ];
+    const allRegistered233 = ids233.every(id => tc233.includes(`id: '${id}'`));
+    const bannerProd233 =
+      /id: 'save-force-read-fault-banner',[\s\S]{0,400}tier: 'prod',\s*\n\s*destructive: false/.test(
+        tc233
+      ) &&
+      /id: 'save-force-eviction-banner',[\s\S]{0,400}tier: 'prod',\s*\n\s*destructive: false/.test(
+        tc233
+      );
+    const stagingDestructive233 =
+      /id: 'save-plant-corrupt-container',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-no-idb',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-no-ls',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: true/.test(
+        tc233
+      ) &&
+      /id: 'save-degraded-off',[\s\S]{0,400}tier: 'staging',\s*\n\s*destructive: false/.test(tc233);
+    const triggersCovered233 =
+      /triggers: \['robco_read_fault'\]/.test(tc233) &&
+      /triggers: \['robco_eviction_detected'\]/.test(tc233);
+    assert(
+      allRegistered233 && bannerProd233 && stagingDestructive233 && triggersCovered233,
+      '233.8: all 6 SAVE INTEGRITY shell tools registered with correct Protocol 44 tiering (banners prod/display-only; plant + seam setters staging/destructive; seam reset staging) and the new prefs covered via triggers[]'
+    );
+  }
+
+  // 233.9  DEGRADED-WRITE NOTICE: once-per-session-per-mode latch, both SYS
+  //        wordings, posted inside the success branch (the save DID persist),
+  //        and the plain-success / total-failure paths untouched.
+  assert(
+    /const _degradedWriteNoticeShown = \{ lsOnly: false, idbOnly: false \};/.test(uiSaves233) &&
+      /COLD STORAGE UNAVAILABLE — SLOT HELD IN LOCAL MEMORY ONLY\./.test(uiSaves233) &&
+      /LOCAL MIRROR FULL — SLOT HELD IN COLD STORAGE ONLY\. EXPORT A SAVE FILE WHEN CONVENIENT\./.test(
+        uiSaves233
+      ) &&
+      saveToSlot233.indexOf('_maybePostDegradedWriteNotice(res)') >
+        saveToSlot233.indexOf('[SAVE]') &&
+      /\[ERROR\] Save slot write failed — storage unavailable\./.test(saveToSlot233),
+    '233.9: the degraded-write notice posts once per session per mode from the success branch (after the success line), with both wordings; total failure keeps the loud [ERROR] line'
+  );
+
+  // 233.10 QUARANTINE ROW + AFFORDANCES (Protocol 34): renderSavesList gains
+  //        the [FAULT] QUARANTINED RECORD row wired to the shared reader;
+  //        EXPORT is non-destructive; PURGE routes through confirmAction()
+  //        before the apply core (the destructive-op confirm gate).
+  {
+    const purge233 = extractFunctionBody(uiSaves233, '_purgeQuarantineApply');
+    const confirmPurgeIdx233 = uiSaves233.indexOf('window.confirmPurgeQuarantine');
+    const confirmSlice233 = uiSaves233.slice(confirmPurgeIdx233, confirmPurgeIdx233 + 700);
+    assert(
+      /QUARANTINED RECORD/.test(uiAcct233) &&
+        /window\._readQuarantineEnvelope/.test(uiAcct233) &&
+        /window\.exportQuarantinedRecord\(\)/.test(uiAcct233) &&
+        /window\.confirmPurgeQuarantine\(\)/.test(uiAcct233) &&
+        /confirmAction\(\{/.test(confirmSlice233) &&
+        /if \(!ok\) return;/.test(confirmSlice233) &&
+        /localStorage\.removeItem\('robco_v8_quarantine'\)/.test(purge233),
+      '233.10: the saves list renders the [FAULT] QUARANTINED RECORD row with EXPORT + confirm-gated PURGE (Protocol 34); purge clears the localStorage key, stash, and IDB entries'
+    );
+  }
+
+  // 233.11 [behavioral, VM] CORRUPT CONTAINER → QUARANTINED, NOT DELETED:
+  //        the REAL _hydrateStateFromStorage + _quarantineCorruptContainer,
+  //        fed an unparseable robco_v8, must (a) remove the corrupt key,
+  //        (b) hold the EXACT raw bytes in robco_v8_quarantine, (c) record
+  //        the read fault, and (d) boot a fresh campaign without throwing.
+  function _runHydrateSandbox233(store, extraSetup) {
+    const vm = require('vm');
+    const sandbox = {
+      window: {},
+      console: { error: () => {}, warn: () => {}, log: () => {} },
+      Date: Date,
+      localStorage: {
+        getItem: k => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null),
+        setItem: (k, v) => {
+          store[k] = String(v);
+        },
+        removeItem: k => {
+          delete store[k];
+        },
+        get length() {
+          return Object.keys(store).length;
+        },
+        key: i => Object.keys(store)[i] || null,
+      },
+      document: { getElementById: () => null, body: { prepend: () => {} } },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(readFile('js/state.js'), sandbox);
+    // Spies + the REAL Layer-3 functions extracted from ui-core.js.
+    vm.runInContext(
+      'var _recordedErrors = []; function _recordError(t, m) { _recordedErrors.push(m); }' +
+        'var _bannerCalls = []; function _showReadFaultBanner(kind) { _bannerCalls.push(kind); }' +
+        'var _storageBannerCalls = 0; function _showStorageWarningBanner(x) { _storageBannerCalls++; }',
+      sandbox
+    );
+    vm.runInContext(
+      'function _quarantineCorruptContainer(sourceKey, rawStr, err)' + quarantine233,
+      sandbox
+    );
+    // SAVE_LAYER3 F1: the real write-fault reporter (write-side failures route
+    // here, never to quarantine) — extracted from source, same as the others.
+    vm.runInContext(
+      'function _reportMigrationWriteFault(sourceKey, err)' + reportFault233,
+      sandbox
+    );
+    vm.runInContext('function _hydrateStateFromStorage()' + hydrate233, sandbox);
+    if (extraSetup) vm.runInContext(extraSetup, sandbox);
+    vm.runInContext('_hydrateStateFromStorage();', sandbox);
+    return {
+      state: vm.runInContext('state', sandbox),
+      errors: vm.runInContext('_recordedErrors', sandbox),
+      banners: vm.runInContext('_bannerCalls', sandbox),
+      storageBanners: vm.runInContext('_storageBannerCalls', sandbox),
+      store,
+    };
+  }
+  {
+    let r233a = null;
+    let err233a = '';
+    try {
+      r233a = _runHydrateSandbox233({ robco_v8: '{corrupt bytes####' });
+    } catch (e) {
+      err233a = e && e.message;
+    }
+    let qEnv233 = null;
+    try {
+      qEnv233 = r233a && JSON.parse(r233a.store.robco_v8_quarantine);
+    } catch (_) {}
+    assert(
+      r233a &&
+        !('robco_v8' in r233a.store) &&
+        qEnv233 &&
+        qEnv233.raw === '{corrupt bytes####' &&
+        qEnv233.sourceKey === 'robco_v8' &&
+        r233a.errors.some(m => /READ FAULT/.test(m)) &&
+        r233a.banners.indexOf('corrupt') !== -1 &&
+        r233a.state &&
+        typeof r233a.state.lvl !== 'undefined',
+      '233.11: [behavioral] a corrupt robco_v8 is QUARANTINED (exact bytes preserved in robco_v8_quarantine), the fault is recorded, the READ FAULT banner fires, and boot continues into a fresh campaign — never a silent delete, never a thrown boot' +
+        (err233a ? ' — error: ' + err233a : '')
+    );
+  }
+
+  // 233.12 [behavioral, VM] ⭐ THE LATENT-BUG LOCK (Protocol 42): a migration
+  //        helper that THROWS on a perfectly VALID save no longer deletes or
+  //        quarantines it — the container survives byte-identical, the state
+  //        loads, and the fault is recorded fail-soft. (Under the pre-Layer-3
+  //        code this exact fixture DELETED the save.)
+  {
+    const validContainer233 = JSON.stringify({
+      activeContext: 'FNV',
+      campaigns: { FNV: { gameContext: 'FNV', lvl: 33, caps: 777 } },
+    });
+    let r233b = null;
+    let err233b = '';
+    try {
+      r233b = _runHydrateSandbox233(
+        { robco_v8: validContainer233 },
+        // A helper bug: window._migrateEventLog throws on every call.
+        "window._migrateEventLog = function () { throw new Error('helper bug'); };"
+      );
+    } catch (e) {
+      err233b = e && e.message;
+    }
+    assert(
+      r233b &&
+        r233b.store.robco_v8 === validContainer233 &&
+        !('robco_v8_quarantine' in r233b.store) &&
+        r233b.banners.length === 0 &&
+        r233b.state &&
+        r233b.state.lvl === 33 &&
+        r233b.state.caps === 777 &&
+        r233b.errors.some(m => /BOOT MIGRATION FAULT \(eventLog\)/.test(m)),
+      '233.12: [behavioral] ⭐ a migration-helper THROW on a VALID save keeps the container byte-identical, loads the campaign, records the fault fail-soft, and never quarantines/deletes/banners — the latent split-try defect is dead' +
+        (err233b ? ' — error: ' + err233b : '')
+    );
+  }
+
+  // 233.13 [behavioral, VM] EVICTION SIGNATURE both ways: with the recovery
+  //        stash set + no containers the EVICTION banner fires and the pref
+  //        records; WITHOUT the stash (the swipe-away / first-boot / slow-IDB
+  //        family) the same empty store stays completely silent.
+  {
+    let fired233 = null;
+    let silent233 = null;
+    let err233c = '';
+    try {
+      fired233 = _runHydrateSandbox233({}, 'window._bootMarkerRecovered = true;');
+      silent233 = _runHydrateSandbox233({});
+    } catch (e) {
+      err233c = e && e.message;
+    }
+    assert(
+      fired233 &&
+        fired233.banners.indexOf('evicted') !== -1 &&
+        typeof fired233.store.robco_eviction_detected === 'string' &&
+        silent233 &&
+        silent233.banners.length === 0 &&
+        !('robco_eviction_detected' in silent233.store),
+      '233.13: [behavioral] the EVICTION banner fires only on the affirmative signature (marker recovered from IDB this boot + no containers) and records the pref; the identical empty store WITHOUT the recovery stash boots completely silent' +
+        (err233c ? ' — error: ' + err233c : '')
+    );
+  }
+
+  // 233.14 TAIL RIDER + valid-path cost: the Layer-2 denied branch records
+  //        'denied-noidb' and compounds the banner copy when IndexedDB is
+  //        wholly absent; and the valid-save boot path's ONLY Layer-3 read is
+  //        the single quarantine existence check (no new parse, no new write
+  //        on L2 — the hard-invariant cost bound).
+  {
+    const persist233 = extractFunctionBody(uiCore233, '_requestPersistentStorage');
+    const shower233 = extractFunctionBody(uiCore233, '_showStorageWarningBanner');
+    const qReads233 = (hydrate233.match(/getItem\('robco_v8_quarantine'\)/g) || []).length;
+    assert(
+      /'denied-noidb'/.test(persist233) &&
+        /_showStorageWarningBanner\(result === 'denied-noidb'\)/.test(persist233) &&
+        /_STORAGE_BANNER_NOIDB_MSG/.test(shower233) &&
+        /COLD STORAGE IS OFFLINE/.test(uiCore233) &&
+        qReads233 === 1,
+      "233.14: the Layer-2 tail rider records 'denied-noidb' + compounds the banner copy when IndexedDB is absent, and the valid-save boot path carries exactly ONE quarantine existence check (the L2 near-zero-touch bound)"
+    );
+  }
+
+  // 233.15 F1 SPLIT — WRITE-side ≠ READ-side on the legacy migration path
+  //        (static): only JSON.parse(v7Str) sits in the quarantine catch; the
+  //        migrateState call + the robco_v8 persist run AFTER it, and a write
+  //        failure routes to _reportMigrationWriteFault (fail-loud, never
+  //        quarantine). The reporter reuses the Layer-2 storage banner + the
+  //        FAULT ring and NEVER calls _quarantineCorruptContainer.
+  {
+    const parseIdx233 = hydrate233.indexOf('v7Parsed = JSON.parse(v7Str)');
+    const v7QuarIdx233 = hydrate233.indexOf("_quarantineCorruptContainer('robco_v7', v7Str, e)");
+    const v7SetIdx233 = hydrate233.indexOf(
+      "localStorage.setItem('robco_v8', JSON.stringify(window.robco_v8))"
+    );
+    const writeFaultCallIdx233 = hydrate233.indexOf(
+      "_reportMigrationWriteFault('robco_v7', writeErr)"
+    );
+    const migFaultCallIdx233 = hydrate233.indexOf("_reportMigrationWriteFault('robco_v7', migErr)");
+    assert(
+      parseIdx233 !== -1 &&
+        v7QuarIdx233 !== -1 &&
+        v7SetIdx233 !== -1 &&
+        // parse (quarantine-eligible) comes BEFORE the migration write
+        parseIdx233 < v7SetIdx233 &&
+        // both write-side throw sites report loud, not quarantine
+        writeFaultCallIdx233 !== -1 &&
+        migFaultCallIdx233 !== -1 &&
+        // the reporter is loud (fault + storage banner) and never quarantines
+        /MIGRATION WRITE FAULT/.test(reportFault233) &&
+        /_showStorageWarningBanner\(\)/.test(reportFault233) &&
+        !/_quarantineCorruptContainer/.test(reportFault233),
+      '233.15: F1 — the v7 path quarantines ONLY on a parse failure; a migrateState throw or a robco_v8 persist failure routes to _reportMigrationWriteFault (loud: FAULT ring + storage banner), never to quarantine — "couldn\'t read it" ≠ "couldn\'t save it"'
+    );
+  }
+
+  // 233.16 [behavioral, VM] ⭐ F1 red-then-green: a VALID robco_v7 whose
+  //        migration WRITE (setItem 'robco_v8') fails (quota) is NOT
+  //        quarantined — the original v7 bytes stay intact and still loadable,
+  //        the campaign still boots WITH the data (not fresh), and the failure
+  //        is surfaced loudly (MIGRATION WRITE FAULT + storage banner, NOT the
+  //        READ FAULT banner). Under the pre-F1 code this exact fixture
+  //        quarantined the healthy v7 and booted fresh.
+  {
+    const VALID_V7_16 = JSON.stringify({ gameContext: 'FNV', lvl: 27, caps: 900 });
+    let r233d = null;
+    let err233d = '';
+    try {
+      r233d = _runHydrateSandbox233(
+        { robco_v7: VALID_V7_16 },
+        // Force ONLY the robco_v8 migration write to fail; every other key still
+        // writes normally (so quarantine/telemetry writes are not masked).
+        'var _origSet16 = localStorage.setItem;' +
+          'localStorage.setItem = function (k, v) {' +
+          "  if (k === 'robco_v8') { var e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }" +
+          '  return _origSet16.call(localStorage, k, v);' +
+          '};'
+      );
+    } catch (e) {
+      err233d = e && e.message;
+    }
+    assert(
+      r233d &&
+        r233d.store.robco_v7 === VALID_V7_16 &&
+        !('robco_v8_quarantine' in r233d.store) &&
+        !('robco_v8' in r233d.store) &&
+        r233d.state &&
+        r233d.state.lvl === 27 &&
+        r233d.state.caps === 900 &&
+        r233d.errors.some(m => /MIGRATION WRITE FAULT/.test(m)) &&
+        r233d.storageBanners >= 1 &&
+        r233d.banners.length === 0,
+      '233.16: [behavioral] ⭐ a VALID v7 with a failing migration WRITE (quota) is NEVER quarantined — original v7 bytes intact, campaign booted WITH the data (lvl 27), loud MIGRATION WRITE FAULT + storage banner, and NO read-fault banner' +
+        (err233d ? ' — error: ' + err233d : '')
+    );
+  }
+
+  // 233.17 [behavioral, VM] F1 — a VALID v7 on which migrateState() THROWS is a
+  //        migration bug, not unreadable bytes: NOT quarantined, the original
+  //        robco_v7 left intact for recovery once the bug is fixed, surfaced
+  //        loudly (MIGRATION WRITE FAULT + storage banner, no READ FAULT).
+  {
+    const VALID_V7_17 = JSON.stringify({ gameContext: 'FNV', lvl: 22, caps: 500, __v7probe: true });
+    let r233e = null;
+    let err233e = '';
+    try {
+      r233e = _runHydrateSandbox233(
+        { robco_v7: VALID_V7_17 },
+        // Make migrateState throw ONLY on the probed v7 payload, so the
+        // fresh-boot fallback's own migrateState(APP_VERSION, default) still
+        // works (a blanket throw would just black-screen the fresh path).
+        'var _origMig17 = migrateState;' +
+          'migrateState = function (v, s) {' +
+          "  if (s && s.__v7probe) throw new Error('migrate bug (F1)');" +
+          '  return _origMig17.apply(this, arguments);' +
+          '};'
+      );
+    } catch (e) {
+      err233e = e && e.message;
+    }
+    assert(
+      r233e &&
+        r233e.store.robco_v7 === VALID_V7_17 &&
+        !('robco_v8_quarantine' in r233e.store) &&
+        r233e.errors.some(m => /MIGRATION WRITE FAULT/.test(m)) &&
+        r233e.storageBanners >= 1 &&
+        r233e.banners.length === 0,
+      '233.17: [behavioral] a migrateState() throw on a VALID v7 is treated as a migration bug, NOT corrupt bytes — the original robco_v7 is left intact (never quarantined) and the fault is surfaced loudly (no READ FAULT banner)' +
+        (err233e ? ' — error: ' + err233e : '')
+    );
+  }
+
+  // 233.18 [behavioral, VM] REGRESSION — a genuinely UNREADABLE v7 must STILL
+  //        quarantine (Layer-3 behaviour unchanged by F1): the parse-failure
+  //        branch preserves the exact bytes, fires the READ FAULT banner, and
+  //        removes the corrupt key — and does NOT mistake it for a write fault.
+  {
+    let r233f = null;
+    let err233f = '';
+    try {
+      r233f = _runHydrateSandbox233({ robco_v7: '{unreadable v7 ####' });
+    } catch (e) {
+      err233f = e && e.message;
+    }
+    let qEnv233f = null;
+    try {
+      qEnv233f = r233f && JSON.parse(r233f.store.robco_v8_quarantine);
+    } catch (_) {}
+    assert(
+      r233f &&
+        !('robco_v7' in r233f.store) &&
+        qEnv233f &&
+        qEnv233f.raw === '{unreadable v7 ####' &&
+        qEnv233f.sourceKey === 'robco_v7' &&
+        r233f.errors.some(m => /READ FAULT/.test(m)) &&
+        r233f.banners.indexOf('corrupt') !== -1 &&
+        r233f.storageBanners === 0,
+      '233.18: [behavioral] REGRESSION — a genuinely unreadable v7 is STILL quarantined (exact bytes preserved, READ FAULT banner, corrupt key removed) and is NOT misrouted to the write-fault path — Layer-3 read-side behaviour is unchanged by F1' +
+        (err233f ? ' — error: ' + err233f : '')
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 234 — Accessibility: every form control has an accessible name
+//  (Health-batch U9, Protocol 36b/42). The push-gate axe check
+//  (tests/a11y-check.mjs) only scans the DEFAULT-boot DOM, so a control
+//  that lives in a CSS-hidden subsystem tab (e.g. #imageInput, #c_caps,
+//  #apiModelInput) can lose its label without axe ever seeing it. This
+//  static guard reads index.html directly and holds the FULL surface —
+//  every <input>/<select>/<textarea> that needs a name must carry a
+//  PROGRAMMATIC one (label[for], wrapping <label>, aria-label,
+//  aria-labelledby, or title). Deliberately STRICTER than axe: a bare
+//  placeholder does NOT count as an accessible name here, so the "give
+//  every input a real label" contract can't silently rot back to
+//  placeholder-only. U9 burned the accepted-violation baseline from 40
+//  (a stale v2.0.1 capture) to 0; 234.2 locks that floor so a re-baseline
+//  can't quietly re-inflate it.
+// ══════════════════════════════════════════════════════════════
+header('Suite 234 — Accessibility: form controls carry an accessible name (U9)');
+{
+  const html234 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+
+  // Every <label for="X"> association in the document.
+  const labelFor234 = new Set();
+  for (const m of html234.matchAll(/<label\b[^>]*\bfor\s*=\s*["']([^"']+)["']/gi)) {
+    labelFor234.add(m[1]);
+  }
+
+  // Input types that convey their own name / need no author-supplied label.
+  const EXEMPT_TYPES_234 = new Set(['hidden', 'submit', 'button', 'reset', 'image']);
+
+  const missing234 = [];
+  let scanned234 = 0;
+  for (const m of html234.matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
+    const tag = m[1].toLowerCase();
+    const attrs = m[2];
+    const typeM = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
+    const type = typeM ? typeM[1].toLowerCase() : tag === 'input' ? 'text' : tag;
+    if (EXEMPT_TYPES_234.has(type)) continue;
+    scanned234++;
+
+    const idM = attrs.match(/\bid\s*=\s*["']([^"']+)["']/i);
+    const id = idM ? idM[1] : null;
+    const hasAriaLabel = /\baria-label\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasAriaLabelledby = /\baria-labelledby\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasTitle = /\btitle\s*=\s*["'][^"']*\S[^"']*["']/i.test(attrs);
+    const hasLabelFor = id && labelFor234.has(id);
+
+    // Implicit wrapping <label>…control…</label>: an open <label> tag with no
+    // intervening </label> before this control's position.
+    const pos = m.index;
+    const lastOpen = html234.lastIndexOf('<label', pos);
+    const lastClose = html234.lastIndexOf('</label>', pos);
+    const wrapped = lastOpen !== -1 && lastOpen > lastClose;
+
+    if (!(hasAriaLabel || hasAriaLabelledby || hasTitle || hasLabelFor || wrapped)) {
+      missing234.push(id ? `#${id}` : `<${tag} type=${type}>`);
+    }
+  }
+
+  // 234.1  No form control may lack a programmatic accessible name.
+  assert(
+    missing234.length === 0,
+    `234.1: every scanned form control in index.html (${scanned234}) has a programmatic accessible name` +
+      (missing234.length ? ` — MISSING: ${missing234.join(', ')}` : '')
+  );
+
+  // 234.2  The accepted-violation baseline stays burned down to zero (U9).
+  const baseline234 = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'tests', 'a11y-baseline.json'), 'utf8')
+  );
+  const baselineTotal234 = Object.values(baseline234).reduce((a, b) => a + b, 0);
+  assert(
+    baselineTotal234 === 0,
+    `234.2: tests/a11y-baseline.json accepts 0 serious/critical violations (U9 floor) — current total ${baselineTotal234}`
+  );
+
+  // 234.3  The exact controls U9 fixed keep their aria-label — the axe-flagged
+  //        boot-visible set plus the hidden-tab set axe never reached.
+  const fixed234 = [
+    'stat_hp_cur',
+    'stat_hp_max',
+    'stat_lvl',
+    'stat_xp',
+    'stat_rads',
+    'newStatusName',
+    'newStatusType',
+    'newItemType',
+    'apiModelInput',
+    'imageInput',
+    'c_caps',
+  ];
+  const stillLabeled234 = fixed234.filter(id => {
+    const idx = html234.indexOf(`id="${id}"`);
+    if (idx === -1) return false;
+    const tagEnd = html234.indexOf('>', idx);
+    const tagStart = html234.lastIndexOf('<', idx);
+    const tagSrc = html234.slice(tagStart, tagEnd);
+    return /\baria-label\s*=\s*["'][^"']*\S/i.test(tagSrc);
+  });
+  assert(
+    stillLabeled234.length === fixed234.length,
+    `234.3: all ${fixed234.length} U9-labeled controls still carry aria-label` +
+      (stillLabeled234.length !== fixed234.length
+        ? ` — lost: ${fixed234.filter(id => !stillLabeled234.includes(id)).join(', ')}`
+        : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 235 — CI Failure-Evidence Capture (Health-batch U4)
+//  Protocol 20 static source-invariant guard. U4 made a red CI run
+//  diagnosable from the run itself (screenshots + console dumps + per-step
+//  gate logs uploaded as artifacts). This suite locks that wiring so a future
+//  refactor can't silently drop it and quietly send us back to "re-run it
+//  locally to see why" — the exact escape-ratchet spirit (Protocol 36b) the
+//  unit exists to serve. All static file reads; no browser, so it runs in the
+//  fast gate too. Reads only committed files (present on a clean CI checkout).
+// ══════════════════════════════════════════════════════════════
+header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
+{
+  const read235 = rel => {
+    const p = path.join(ROOT, rel);
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
+  };
+
+  // ── The shared capture helper ──
+  const helper = read235('tests/artifacts.mjs');
+  assert(helper !== null, '235.1: tests/artifacts.mjs (shared failure-capture helper) exists');
+  assert(
+    !!helper &&
+      /export function installFailureCapture/.test(helper) &&
+      /export function trackBrowser/.test(helper) &&
+      /export async function saveFailureArtifacts/.test(helper) &&
+      /export function captureConsole/.test(helper),
+    '235.2: artifacts.mjs exports installFailureCapture + trackBrowser + saveFailureArtifacts + captureConsole'
+  );
+  assert(
+    !!helper && /process\.env\.ROBCO_ARTIFACTS_DIR/.test(helper),
+    '235.3: artifacts.mjs resolves the artifacts dir from ROBCO_ARTIFACTS_DIR (shared with the gate)'
+  );
+  assert(
+    !!helper && /page\.screenshot\(/.test(helper) && /\.console\.log/.test(helper),
+    '235.4: saveFailureArtifacts writes a screenshot + a console-log dump'
+  );
+  // ── Anti-flake for the capture itself (Health-batch U5) ──
+  // The failure-evidence screenshot is fullPage on a page whose CRT + overseer
+  // canvases repaint continuously via rAF. On a slow CI runner a live capture
+  // can burn the whole bounded window (the "screenshot hangs on the animated
+  // canvas" flake). saveFailureArtifacts freezes the page for the capture in two
+  // coverage-neutral ways (this path is never asserted on). Lock both so a
+  // refactor can't silently drop the freeze and let the flake back in.
+  assert(
+    !!helper && /animations:\s*'disabled'/.test(helper) && /timeout:\s*5000/.test(helper),
+    "235.4b: the failure screenshot passes animations:'disabled' (freezes CSS/Web animations for the capture) AND keeps the bounded timeout:5000 (a freeze that doesn't take can never hang the run)"
+  );
+  assert(
+    !!helper &&
+      /emulateMedia\(\{\s*reducedMotion:\s*'reduce'\s*\}\)/.test(helper) &&
+      helper.indexOf("emulateMedia({ reducedMotion: 'reduce' })") <
+        helper.indexOf('page.screenshot('),
+    "235.4c: saveFailureArtifacts emulates reduced-motion BEFORE the screenshot — the app's _scopeShouldAnimate()/_coreShouldAnimate() gates stop scheduling rAF, quieting the CRT/overseer canvases so the capture is deterministic"
+  );
+
+  // ── Every entry-point browser harness is wired for capture ──
+  const CAPTURE_HARNESSES = [
+    'tests/boot-smoke.mjs',
+    'tests/offline-first.mjs',
+    'tests/render-check.mjs',
+    'tests/a11y-check.mjs',
+    'tests/test-html-check.mjs',
+    'tests/save-survival.mjs',
+  ];
+  for (const rel of CAPTURE_HARNESSES) {
+    const src = read235(rel);
+    assert(
+      !!src && /from '\.\/artifacts\.mjs'/.test(src) && /installFailureCapture\(/.test(src),
+      `235: ${rel} imports the capture helper and installs the crash net (installFailureCapture)`
+    );
+  }
+
+  // ── The gate tees per-step logs + shares the artifacts dir with harnesses ──
+  const gate235 = read235('scripts/gate.js');
+  assert(
+    !!gate235 && /process\.env\.ROBCO_ARTIFACTS_DIR\s*=\s*ARTIFACTS_DIR/.test(gate235),
+    '235.11: gate.js propagates ROBCO_ARTIFACTS_DIR so harness artifacts land in the uploaded dir'
+  );
+  assert(
+    !!gate235 &&
+      /GATE_LOG_DIR/.test(gate235) &&
+      /gate-logs/.test(gate235) &&
+      /writeFileSync/.test(gate235),
+    '235.12: gate.js tees each step to a per-step gate-logs file on CI (failing output survives as an artifact)'
+  );
+
+  // ── CI uploads the evidence, only on failure ──
+  const ci235 = read235('.github/workflows/ci.yml');
+  assert(
+    !!ci235 &&
+      /actions\/upload-artifact/.test(ci235) &&
+      /if:\s*failure\(\)/.test(ci235) &&
+      /test-artifacts/.test(ci235),
+    '235.13: ci.yml uploads test-artifacts/ via actions/upload-artifact, only on failure()'
+  );
+
+  // ── The artifacts dir is never committed ──
+  const gitignore235 = read235('.gitignore');
+  assert(
+    !!gitignore235 && /test-artifacts\//.test(gitignore235),
+    '235.14: .gitignore ignores test-artifacts/ (failure evidence is never committed)'
+  );
+
+  // ── The gate CLEARS the evidence dir at the START of every run ──
+  // Without this, stale artifacts from an earlier failed run are indistinguishable
+  // from a fresh failure — "files present ⇒ the last run failed" would be a lie.
+  // The rmSync must precede step 1 (ESLint) so no step's fresh output is caught.
+  assert(
+    !!gate235 &&
+      /fs\.rmSync\(ARTIFACTS_DIR,\s*\{\s*recursive:\s*true,\s*force:\s*true\s*\}\)/.test(gate235) &&
+      gate235.indexOf('fs.rmSync(ARTIFACTS_DIR') !== -1 &&
+      gate235.indexOf('fs.rmSync(ARTIFACTS_DIR') < gate235.indexOf('// ── 1. ESLint'),
+    '235.15: gate.js clears test-artifacts/ at the start of every run (before step 1) so "files present ⇒ the last run failed" is a true signal'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 236 — Static Architectural Conformance (Protocol 23 enforcement)
+//
+//  Protocol 23 ("rendering only renders · state.js owns state · registry is
+//  read-only · services don't own the view") was RIGHT as intent but UNENFORCED
+//  in practice — an architecture review measured ~20 saveState() calls from
+//  render files and ~26 render*()/loadUI() calls from service files, producing
+//  real UI↔services dependency cycles. An external ecosystem review independently
+//  proposed exactly this mechanism (planning/2.8.5/audits/ATLAS_ECOSYSTEM_SYNTHESIS.md §C.1).
+//  This suite turns the honor-system rule into an executable one.
+//
+//  BASELINE, don't block-everything: the violations already exist, so a check
+//  that simply failed on them could never ship. Following the accepted-baseline
+//  pattern from the a11y burn-down (U9), the CURRENT violations are captured in
+//  tests/arch-conformance-baseline.json so the gate stays GREEN today; the gate
+//  FAILS only on a NEW violation beyond the baseline (the debt can't grow). The
+//  baseline is the countable debt the 2.9.0 hardening gate burns down by
+//  inverting these edges onto the event bus — this unit does NOT fix the debt.
+//
+//  Zero false positives is the bar (Protocol 45): the scanner strips comments
+//  and string literals before matching, so a token in prose/a string is never
+//  counted. The scan + diff logic lives in tests/arch-conformance-check.js
+//  (also runnable standalone for the red-then-green proof).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 236 — Static Architectural Conformance (Protocol 23 enforcement)');
+
+  const archCheckPath = path.join(ROOT, 'tests', 'arch-conformance-check.js');
+  assert(
+    fs.existsSync(archCheckPath),
+    '236.1: tests/arch-conformance-check.js (the scanner) exists'
+  );
+
+  const arch = require('./arch-conformance-check.js');
+  const current236 = arch.scanAll();
+  const baseline236 = arch.loadBaseline();
+
+  assert(
+    baseline236 && baseline236 !== 'INVALID' && typeof baseline236 === 'object',
+    '236.2: tests/arch-conformance-baseline.json exists and is valid JSON'
+  );
+  assert(
+    !!baseline236 &&
+      baseline236 !== 'INVALID' &&
+      arch.RULES.every(r => baseline236[r.key] && typeof baseline236[r.key] === 'object'),
+    '236.3: baseline declares all three rule maps (renderWritesState, serviceCallsView, registryMutatesState)'
+  );
+
+  const { newViolations: nv236 } = arch.diff(
+    current236,
+    baseline236 === 'INVALID' ? {} : baseline236
+  );
+
+  // Make the visible debt countable in the runner output (task requirement).
+  const totals236 = arch.RULES.map(r => `${r.key}=${arch.ruleTotal(current236[r.key])}`).join(', ');
+  console.log(`  [arch] Protocol 23 debt now baselined: ${totals236}`);
+  if (nv236.length)
+    for (const v of nv236)
+      console.log(
+        `  [arch] NEW VIOLATION: ${v.rule} — ${v.file} has ${v.current} (baseline ${v.baseline})`
+      );
+
+  // ── The three enforced rules — one aggregate assert each. The assert COUNT is
+  // fixed (independent of how many violations exist) so the suite's output stays
+  // stable as the 2.9.0 debt burns down. (This originally read "so the Suite 28
+  // end-of-run count reconciliation stays stable" — that reconciliation was
+  // deleted with Protocol 2a's retirement, R1 2026-07-20; the fixed-count shape
+  // is kept on its own merits, not for a mechanism that no longer exists.) ──
+  const nvFor = key => nv236.filter(v => v.rule === key);
+  assert(
+    nvFor('renderWritesState').length === 0,
+    '236.4: RULE — render files must not write state (no saveState() from js/ui/ui-render*.js); no NEW violation beyond baseline' +
+      (nvFor('renderWritesState').length
+        ? ' — ' +
+          nvFor('renderWritesState')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+  assert(
+    nvFor('serviceCallsView').length === 0,
+    '236.5: RULE — services must not call the view (no render*()/loadUI() from js/services/**); no NEW violation beyond baseline' +
+      (nvFor('serviceCallsView').length
+        ? ' — ' +
+          nvFor('serviceCallsView')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+  assert(
+    nvFor('registryMutatesState').length === 0,
+    '236.6: RULE — registry is read-only (no saveState()/state assignment from reg_*.js/registry-core.js); no NEW violation beyond baseline (baseline is 0)' +
+      (nvFor('registryMutatesState').length
+        ? ' — ' +
+          nvFor('registryMutatesState')
+            .map(v => `${v.file}:${v.current}>${v.baseline}`)
+            .join(', ')
+        : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 237 — Local-artifact backup nudge (Protocol 48)
+//
+//  Protocol 48 adds a pre-push REMINDER to refresh the private archive when the
+//  local-only artifacts (library/, planning/, memory) have changed since the
+//  last sync. Those artifacts live nowhere but the owner's machine — the public
+//  repo gitignores them — so a machine loss destroys them. The reminder must be
+//  a NUDGE, never a gate: it can never fail or block a push, and on any machine
+//  where it can't determine state (no private archive, unresolved path, git
+//  unavailable) it stays silent and lets the push proceed (Protocol 33 DNA).
+//
+//  This suite locks the invariant that must never silently break: the nudge
+//  cannot fail a push. Both the static contract (no non-zero exit, a top-level
+//  catch, a non-blocking hook invocation that keeps the full gate) and the real
+//  behavior (bogus path → exit 0; default resolution → exit 0) are asserted.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 237 — Local-artifact backup nudge (Protocol 48)');
+
+  const nudgePath237 = path.join(ROOT, 'scripts', 'backup-nudge.js');
+  const nudgeExists237 = fs.existsSync(nudgePath237);
+  assert(nudgeExists237, '237.1: scripts/backup-nudge.js exists (Protocol 48 nudge script)');
+
+  const nudgeSrc237 = nudgeExists237 ? fs.readFileSync(nudgePath237, 'utf8') : '';
+  assert(
+    nudgeExists237 && !/process\.exit\(\s*[1-9]/.test(nudgeSrc237),
+    '237.2: the nudge never exits non-zero — no process.exit() with a non-zero code (fail-safe: it can never fail a push)'
+  );
+  assert(
+    nudgeExists237 && /\bcatch\b/.test(nudgeSrc237),
+    '237.3: the nudge wraps its logic in a top-level catch so an unexpected error can never escape to the shell'
+  );
+
+  const prePush237 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+  assert(
+    /node\s+scripts\/backup-nudge\.js/.test(prePush237),
+    '237.4: the pre-push hook invokes node scripts/backup-nudge.js'
+  );
+  assert(
+    /node\s+scripts\/backup-nudge\.js\s*\|\|\s*true/.test(prePush237),
+    '237.5: the pre-push nudge invocation is non-blocking (suffixed with `|| true`) so even a crashing node cannot fail the push'
+  );
+  assert(
+    /npm run gate\b/.test(prePush237),
+    '237.6: the pre-push hook still runs the full gate — the nudge was ADDED, not swapped in for the gate'
+  );
+
+  // ── Behavioral fail-safe: the script must exit 0 no matter what. ──
+  const { spawnSync: spawn237 } = require('child_process');
+  const bogus237 = spawn237('node', ['scripts/backup-nudge.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+    env: { ...process.env, ROBCO_BACKUP_REPO: path.join(ROOT, 'no', 'such', 'archive', 'xyz') },
+  });
+  assert(
+    bogus237.status === 0,
+    '237.7: with the archive repo pointed at a non-existent path the nudge exits 0 (cannot determine state, stays silent, push proceeds)'
+  );
+
+  const dflt237 = spawn237('node', ['scripts/backup-nudge.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert(
+    dflt237.status === 0,
+    '237.8: with default resolution the nudge exits 0 whether or not the private archive is present — it never blocks a push'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 238 — AI/Overseer pass, user-visible half (AI_OVERSEER audit
+//  Findings 2/3/4/7 + the modal-button restyle). Persona game-agnostic,
+//  retry echo collapse + failure-severity split, ambient-chatter thinning,
+//  and the phosphor-pill modal buttons.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 238 — AI/Overseer pass: persona / retry / ambient / modal buttons');
+
+  const apiSrc238 = readGroup('api');
+  const stateSrc238 = readGroup('state');
+  const uiCoreSrc238 = readGroup('ui-core');
+  const cssSrc238 = readCss();
+
+  // ── Finding 4: persona is per-game DATA (playerNoun), never hardcoded ────────
+  // Build the REAL GAME_DEFS + REAL directive builders in a vm sandbox (the Suite
+  // 131 harness) and compose the directive for FNV and FO3, proving the AI is told
+  // the correct player title per game (Protocol 14 — AI-contract safety).
+  {
+    const vm = require('vm');
+    const builderNames238 = [
+      '_directiveConstraints',
+      '_directivePersonaAndContract',
+      '_directiveCoreTracking',
+      '_directiveSkills',
+      '_directiveFactions',
+      '_directiveSystems',
+      '_directiveTrackers',
+      '_directiveInjectionBoundary',
+    ];
+    let sandbox238 = null;
+    let harnessErr238 = null;
+    try {
+      const _declFull = (src, name) => {
+        const s = src.indexOf('function ' + name);
+        const p = src.slice(src.indexOf('(', s), src.indexOf('{', src.indexOf('(', s)));
+        return 'function ' + name + p + extractFunctionBody(src, name);
+      };
+      const allFnSrc238 = builderNames238
+        .concat(['getSystemDirective'])
+        .map(n => _declFull(apiSrc238, n))
+        .join('\n\n');
+      const stateSandbox238 = { window: {} };
+      vm.createContext(stateSandbox238);
+      vm.runInContext(stateSrc238, stateSandbox238);
+      sandbox238 = {
+        state: {},
+        GAME_DEFS: stateSandbox238.window.GAME_DEFS,
+        APP_VERSION: stateSandbox238.window.APP_VERSION || '2.8.0',
+        localStorage: { getItem: () => null },
+        _commGet: () => null,
+        console,
+      };
+      vm.createContext(sandbox238);
+      vm.runInContext(allFnSrc238 + '\nthis.getSystemDirective = getSystemDirective;', sandbox238);
+    } catch (e) {
+      harnessErr238 = e;
+    }
+
+    // 238.1  playerNoun is present + correct on every game's identity block
+    if (sandbox238) {
+      const gd = sandbox238.GAME_DEFS;
+      assert(
+        gd.FNV.identity.playerNoun === 'Courier' &&
+          gd.FO3.identity.playerNoun === 'Lone Wanderer' &&
+          gd.FO4.identity.playerNoun === 'Sole Survivor',
+        '238.1: GAME_DEFS[ctx].identity.playerNoun is per-game (Courier / Lone Wanderer / Sole Survivor) — the AI persona is DATA, not a hardcoded literal (Finding 4)'
+      );
+    } else {
+      fail(`238.1 (harness error: ${harnessErr238 && harnessErr238.message})`);
+    }
+
+    // 238.2  the composed directive addresses the player by the right per-game title
+    if (sandbox238) {
+      try {
+        sandbox238.state = { gameContext: 'FNV' };
+        const fnvDir = sandbox238.getSystemDirective.call(sandbox238);
+        sandbox238.state = { gameContext: 'FO3' };
+        const fo3Dir = sandbox238.getSystemDirective.call(sandbox238);
+        assert(
+          fnvDir.includes('Courier') &&
+            !fnvDir.includes('Lone Wanderer') &&
+            fo3Dir.includes('Lone Wanderer') &&
+            !fo3Dir.includes('Courier') &&
+            fo3Dir.includes('LONE WANDERER'),
+          '238.2: [behavioral] getSystemDirective() calls an FNV player "Courier" and an FO3 player "Lone Wanderer" (incl. the uppercase Tactical Constraint) — no "Courier" leaks into an FO3 directive (Finding 4, Protocol 14)'
+        );
+      } catch (e) {
+        fail(`238.2 (runtime error: ${e.message})`);
+      }
+    } else {
+      fail('238.2 (harness unavailable)');
+    }
+
+    // 238.3  the directive builders take the noun as a parameter and getSystemDirective
+    //        sources it from GAME_DEFS[ctx].identity.playerNoun (not a hardcode)
+    {
+      const gsdBody238 = extractFunctionBody(apiSrc238, 'getSystemDirective');
+      assert(
+        /GAME_DEFS\[ctx\]\.identity\s*&&\s*GAME_DEFS\[ctx\]\.identity\.playerNoun/.test(
+          gsdBody238
+        ) &&
+          /_directivePersonaAndContract\(ctx,\s*noun\)/.test(gsdBody238) &&
+          /_directiveCoreTracking\(noun\)/.test(gsdBody238) &&
+          /_directiveSystems\(ctx,\s*noun\)/.test(gsdBody238) &&
+          /_directiveTrackers\(ctx,\s*noun\)/.test(gsdBody238),
+        '238.3: getSystemDirective() resolves the player noun from GAME_DEFS[ctx].identity.playerNoun and threads it into every builder that names the player (Finding 4, Protocol 38)'
+      );
+    }
+  }
+
+  // 238.4  the Director-removal confirm modal copy addresses the player by their
+  //        per-game title (getIdentity().playerNoun), never a hardcoded "the Courier"
+  {
+    const confirmBody238 = extractFunctionBody(apiSrc238, '_confirmDirectorRemovals');
+    assert(
+      /getIdentity\(\)/.test(confirmBody238) &&
+        /playerNoun/.test(confirmBody238) &&
+        !/the Courier currently has/.test(confirmBody238),
+      '238.4: _confirmDirectorRemovals() sources the player title from getIdentity().playerNoun — the modal no longer hardcodes "the Courier currently has" (Finding 4)'
+    );
+  }
+
+  // ── Finding 2: one send = one echo + one status line (no re-echo pile-up) ────
+  const tmBody238 = extractFunctionBody(apiSrc238, 'transmitMessage');
+
+  // 238.5  the retry path no longer re-enters transmitMessage() (the exact
+  //        mechanism that re-echoed the user line every attempt is gone)
+  assert(
+    !/document\.getElementById\('chatInput'\)\.value\s*=\s*_lastUser\.text/.test(tmBody238) &&
+      /setTimeout\(_doAttempt,/.test(tmBody238),
+    '238.5: transmitMessage() retries re-run only the inner _doAttempt() ladder — the old "write last user text back into #chatInput + call transmitMessage() again" re-entry (which re-echoed the message) is gone (Finding 2)'
+  );
+
+  // 238.6  the user line is echoed exactly ONCE, and retries mutate it in place +
+  //        keep a SINGLE status line (helpers present; no per-attempt re-echo)
+  {
+    const echoCount238 = (
+      tmBody238.match(/appendToChat\(`> \$\{displayUserText\}`, 'user'\)/g) || []
+    ).length;
+    assert(
+      echoCount238 === 1 && /_addRelayHop/.test(tmBody238) && /_setRetryStatus/.test(tmBody238),
+      '238.6: transmitMessage() echoes the user line exactly once and threads retries through _addRelayHop (in-place ">" accumulation) + _setRetryStatus (one mutating status line) — never a fresh echo per attempt (Finding 2)'
+    );
+  }
+
+  // ── Finding 3: transient failures self-heal; FATAL stays for real faults ─────
+  // 238.7  an exhausted transient/network drop reads as SIGNAL LOST + fully-usable-
+  //        offline, NOT FATAL EXCEPTION; genuinely fatal faults keep FATAL EXCEPTION
+  assert(
+    /SIGNAL LOST/.test(tmBody238) &&
+      /FULLY USABLE OFFLINE/.test(tmBody238) &&
+      /JSON PARSE FAILURE/.test(tmBody238) &&
+      /NO API KEY DETECTED/.test(apiSrc238) &&
+      /if \(_isTransient\)/.test(tmBody238),
+    '238.7: a recoverable/transient network failure renders as a self-healing SIGNAL LOST (fully usable offline), gated on _isTransient — FATAL EXCEPTION is reserved for genuinely fatal faults (JSON parse, missing key) (Finding 3)'
+  );
+
+  // ── Finding 7: ambient-chatter thinning ─────────────────────────────────────
+  const importBody238 = extractFunctionBody(apiSrc238, 'autoImportState');
+
+  // 238.8  the DELTA line no longer watches 'ticks' (a lone tick increment used to
+  //        print a DELTA every single turn — pure noise)
+  assert(
+    /\['lvl', 'xp', 'hpCur', 'hpMax', 'caps', 'rads', 'karma'\]\.forEach/.test(importBody238) &&
+      !/'karma', 'ticks'\]\.forEach/.test(importBody238),
+    "238.8: the DELTA-line watched-keys list excludes 'ticks' — a do-nothing turn (which only ticks the clock) no longer prints a DELTA line (Finding 7)"
+  );
+
+  // 238.9  the "PIP-BOY DATA SYNCED" text confirmation is throttled by a counter
+  //        (occasional, not every sync) — the sync tone still fires every sync
+  assert(
+    /_aiSyncCount/.test(apiSrc238) &&
+      /_aiSyncCount === 1 \|\| _aiSyncCount % 6 === 0/.test(importBody238) &&
+      /playSyncTone/.test(importBody238),
+    '238.9: the "PIP-BOY DATA SYNCED" text line is throttled via _aiSyncCount (first sync + every 6th), while playSyncTone() still confirms every sync (Finding 7)'
+  );
+
+  // 238.10  the Overseer idle-blip rotation is thinned (slower cadence, lower chance)
+  {
+    const blipIdx238 = uiCoreSrc238.indexOf("id: 'overseer-idle-blip'");
+    const blipBlock238 = blipIdx238 !== -1 ? uiCoreSrc238.slice(blipIdx238, blipIdx238 + 700) : '';
+    assert(
+      /cadenceMs:\s*60000/.test(blipBlock238) && /Math\.random\(\) > 0\.25/.test(blipBlock238),
+      '238.10: the overseer-idle-blip observer is thinned to a 60s cadence + 25% fire-chance so diagnostic blips read as texture, not noise (Finding 7)'
+    );
+  }
+
+  // 238.11  [behavioral] the wake "COURIER RETURNED" print is coalesced — a rapid
+  //         sleep→wake→sleep→wake within the 650ms window lands exactly ONE line,
+  //         not two consecutively (the audit's double-print). Runs the REAL
+  //         enterStandby()/exitStandby() bodies in a vm with setTimeout deferred.
+  {
+    const vm238 = require('vm');
+    function declareFn238(src, name) {
+      const nameIdx = src.indexOf('function ' + name);
+      const parenIdx = src.indexOf('(', nameIdx);
+      const braceIdx = src.indexOf('{', parenIdx);
+      return 'function ' + name + src.slice(parenIdx, braceIdx) + extractFunctionBody(src, name);
+    }
+    const src238 =
+      'var _standbyActive = false;\nvar _wakeTimer = null;\n' +
+      declareFn238(uiCoreSrc238, '_isShuttingDown') +
+      '\n' +
+      declareFn238(uiCoreSrc238, 'enterStandby') +
+      '\n' +
+      declareFn238(uiCoreSrc238, 'exitStandby');
+
+    const calls238 = { chat: [] };
+    let pending238 = [];
+    const sb238 = {
+      console: { warn() {} },
+      AmbientRuntime: { getState: () => 'ACTIVE' },
+      document: {
+        body: {
+          classList: { add() {}, remove() {}, contains: () => false },
+        },
+        getElementById: () => ({ value: '0' }),
+      },
+      geigerRunning: true,
+      geigerTimeout: null,
+      _geigerCurrentRate: 0,
+      crtHumGain: null,
+      audioCtx: null,
+      stopHeartbeat() {},
+      playWakeTone() {},
+      appendToChat(text) {
+        calls238.chat.push(text);
+      },
+      setGeigerRate() {},
+      updateMath() {},
+      // Defer: collect the delayed wake bodies; run them only after the rapid
+      // cycles are done (mimicking real timers that all fire ~650ms later).
+      setTimeout(fn) {
+        const h = { fn, cancelled: false };
+        pending238.push(h);
+        return h;
+      },
+      clearTimeout(h) {
+        if (h) h.cancelled = true;
+      },
+    };
+    let err238 = null;
+    try {
+      vm238.createContext(sb238);
+      vm238.runInContext(src238, sb238);
+      // Rapid sleep→wake→sleep→wake, all within one 650ms window (nothing fired yet).
+      sb238.enterStandby();
+      sb238.exitStandby(); // schedules print A
+      sb238.enterStandby(); // cancels print A
+      sb238.exitStandby(); // schedules print B
+      // The window elapses — run whatever timers are still live.
+      pending238.forEach(h => {
+        if (!h.cancelled) h.fn();
+      });
+    } catch (e) {
+      err238 = e;
+    }
+    const returned238 = calls238.chat.filter(t => /COURIER RETURNED/.test(t)).length;
+    assert(
+      !err238 && returned238 === 1,
+      '238.11: [behavioral] a rapid sleep→wake→sleep→wake within the wake window prints exactly ONE "COURIER RETURNED" line (the pending print is coalesced/cancelled) — never the two-consecutive prints the audit flagged (Finding 7)' +
+        (err238 ? ' — ' + err238.message : ` — got ${returned238}`)
+    );
+  }
+
+  // ── Modal buttons (Protocol 20 static guard) ────────────────────────────────
+  // 238.12  button.blue-btn is the shared phosphor-pill vocabulary (transparent +
+  //         --bezel-wire outline + pill radius), NOT the old solid-blue rectangle
+  //         and NOT an unstyled default — so it can't silently regress either way.
+  {
+    const blueIdx238 = cssSrc238.indexOf('button.blue-btn {');
+    const blueRule238 = blueIdx238 !== -1 ? cssSrc238.slice(blueIdx238, blueIdx238 + 220) : '';
+    assert(
+      blueRule238.length > 0 &&
+        /background:\s*transparent/.test(blueRule238) &&
+        /border:\s*1px solid var\(--bezel-wire\)/.test(blueRule238) &&
+        /border-radius:\s*999px/.test(blueRule238) &&
+        !/background:\s*var\(--robco-blue\)/.test(blueRule238),
+      '238.12: [Protocol 20] button.blue-btn renders as the shared phosphor pill (transparent fill, --bezel-wire outline, 999px radius) — it can never silently revert to the solid-blue rectangle or fall back to unstyled defaults'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 239 — LIVE CONTAINER DURABILITY MIRROR (Step 2 · Phase 1 · P8).
+//  The live campaign container (localStorage 'robco_v8') now shadows into the
+//  IDB 'campaign'/'live' key so an Android localStorage eviction that spares
+//  IndexedDB recovers the campaign instead of booting empty. Covered by static
+//  guards (mirror hooked on the debounced save, recovery-only restore, bounded
+//  fail-safe boot phase, visibilitychange flush, Diagnostic Shell trigger) plus
+//  behavioral (RED→GREEN eviction recovery, localStorage-wins-never-clobbered,
+//  shape + integrity gates, mirror write, deep round-trip). Protocols 22/33/34.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 239 — live container durability mirror (P8 eviction recovery)');
+
+  const stateSrc239 = readGroup('state');
+  const uiCoreSrc239 = readGroup('ui-core');
+  const dshSrc239 = readGroup('test-console');
+
+  // ── Static guards (10) ──────────────────────────────────────────────────────
+  // mirror/restore are window-assigned (window.X = [async] function) — use the
+  // assignment-form extractor, not extractFunctionBody (which finds `function X`).
+  const mirrorBody239 = extractAssignedFunction(stateSrc239, 'mirrorLiveContainer').body;
+  const restoreBody239 = extractAssignedFunction(stateSrc239, 'restoreLiveContainerFromIdb').body;
+  const saveBody239 = extractFunctionBody(stateSrc239, 'saveState');
+  const flushFamily239 = uiCoreSrc239; // _wireUnloadFlush lives in the ui-core family
+
+  // 239.1  state.js defines + exposes window.mirrorLiveContainer
+  assert(
+    /window\.mirrorLiveContainer\s*=\s*function/.test(stateSrc239) && mirrorBody239.length > 0,
+    '239.1: state.js defines + exposes window.mirrorLiveContainer (IDB durability shadow of the live container)'
+  );
+
+  // 239.2  state.js defines + exposes window.restoreLiveContainerFromIdb
+  assert(
+    /window\.restoreLiveContainerFromIdb\s*=\s*async function/.test(stateSrc239) &&
+      restoreBody239.length > 0,
+    '239.2: state.js defines + exposes window.restoreLiveContainerFromIdb (async boot-time recovery)'
+  );
+
+  // 239.3  the mirror is fire-and-forget + IDB-ONLY: it writes the 'campaign'/'live'
+  //        key from window.robco_v8 and swallows the promise (never awaited, no LS write)
+  assert(
+    /IdbStore\.set\('campaign',\s*LIVE_MIRROR_IDB_KEY,\s*window\.robco_v8\)/.test(mirrorBody239) &&
+      /\.catch\(/.test(mirrorBody239) &&
+      !/localStorage\.setItem/.test(mirrorBody239),
+    "239.3: mirrorLiveContainer writes IDB 'campaign'/'live' from window.robco_v8, fire-and-forget, and never writes localStorage (IDB-only shadow)"
+  );
+
+  // 239.4  the debounced saveState() fires the mirror AFTER the localStorage write +
+  //        dirty-check (only genuinely-changed content is mirrored — no hot-path waste)
+  {
+    const lsIdx239 = saveBody239.indexOf("localStorage.setItem('robco_v8'");
+    const mirrorIdx239 = saveBody239.indexOf('window.mirrorLiveContainer()');
+    assert(
+      lsIdx239 !== -1 && mirrorIdx239 !== -1 && mirrorIdx239 > lsIdx239,
+      '239.4: saveState() calls window.mirrorLiveContainer() AFTER the debounced localStorage write (past the dirty-check — only changed content is shadowed)'
+    );
+  }
+
+  // 239.5  RECOVERY-ONLY: restore returns false the instant localStorage holds
+  //        robco_v8, WITHOUT reading the mirror — the "localStorage wins" guard that
+  //        makes a stale-mirror clobber impossible (Protocol 34, the bitter-irony trap)
+  assert(
+    /localStorage\.getItem\('robco_v8'\)/.test(restoreBody239) &&
+      /if\s*\(ls !== null\)\s*return false/.test(restoreBody239),
+    '239.5: restoreLiveContainerFromIdb short-circuits (returns false, mirror never read) whenever localStorage still holds robco_v8 — localStorage always wins, so a stale mirror can never overwrite a newer local value'
+  );
+
+  // 239.6  restore reads the FULL envelope (getRaw) so it can verify the checksum,
+  //        and gates on both container shape and checksum before trusting the mirror
+  assert(
+    /getRaw\('campaign',\s*LIVE_MIRROR_IDB_KEY\)/.test(restoreBody239) &&
+      /container\.campaigns/.test(restoreBody239) &&
+      /computeSaveChecksum\(container,\s*\[\],\s*''\)\s*!==\s*rec\.checksum/.test(restoreBody239),
+    '239.6: restore reads the raw envelope (getRaw), then gates on container shape AND checksum before restoring — a junk or corrupt mirror record is skipped, never restored'
+  );
+
+  // 239.7  boot AWAITS the recovery BEFORE _hydrateStateFromStorage() reads the
+  //        container. Scoped to the window.onload body (the function DEFINITIONS of
+  //        both appear earlier in the file, so a whole-file indexOf would be wrong).
+  {
+    const onloadIdx239 = uiCoreSrc239.indexOf('window.onload = async function');
+    const onloadBody239 =
+      onloadIdx239 !== -1 ? uiCoreSrc239.slice(onloadIdx239, onloadIdx239 + 4000) : '';
+    const restoreCall239 = onloadBody239.indexOf('await _restoreLiveContainerFromIdb()');
+    const hydrateCall239 = onloadBody239.indexOf('_hydrateStateFromStorage()');
+    assert(
+      restoreCall239 !== -1 && hydrateCall239 !== -1 && restoreCall239 < hydrateCall239,
+      '239.7: window.onload awaits _restoreLiveContainerFromIdb() BEFORE _hydrateStateFromStorage() — the recovered container is in localStorage by the time hydration reads it'
+    );
+  }
+
+  // 239.8  the boot phase is BOUNDED + fail-safe: a slow/hung IndexedDB can never
+  //        delay boot (Promise.race against a timeout budget; resolves, never rejects)
+  {
+    const phaseBody239 = extractFunctionBody(uiCoreSrc239, '_restoreLiveContainerFromIdb');
+    assert(
+      /Promise\.race/.test(phaseBody239) &&
+        /_LIVE_RESTORE_BUDGET_MS/.test(phaseBody239) &&
+        /setTimeout/.test(phaseBody239),
+      '239.8: [Protocol 33] the _restoreLiveContainerFromIdb boot phase is bounded (Promise.race vs _LIVE_RESTORE_BUDGET_MS) so a slow/hung IndexedDB can never delay boot'
+    );
+  }
+
+  // 239.9  the unload flush also fires the mirror on visibilitychange→hidden — the
+  //        reliable mobile durability path (async put can complete before a bg-kill)
+  {
+    const wireBody239 = extractFunctionBody(flushFamily239, '_wireUnloadFlush');
+    assert(
+      /addEventListener\('visibilitychange'/.test(wireBody239) &&
+        /visibilityState === 'hidden'/.test(wireBody239) &&
+        /mirrorLiveContainer\(\)/.test(wireBody239),
+      '239.9: _wireUnloadFlush wires a visibilitychange→hidden flush that fires mirrorLiveContainer() — the reliable mobile path (page still alive, async put can land before an OS kill)'
+    );
+  }
+
+  // 239.10  Protocol 44: the hard-to-reproduce recovery path ships a Diagnostic Shell
+  //         trigger, tiered staging + destructive (it drops robco_v8 and reloads)
+  assert(
+    /id:\s*'save-simulate-eviction-recovery'/.test(dshSrc239) &&
+      /_dshSimulateEviction/.test(dshSrc239) &&
+      /function _dshSimulateEviction/.test(dshSrc239) &&
+      /tier:\s*'staging'/.test(
+        dshSrc239.slice(
+          dshSrc239.indexOf("id: 'save-simulate-eviction-recovery'"),
+          dshSrc239.indexOf("id: 'save-simulate-eviction-recovery'") + 700
+        )
+      ),
+    '239.10: [Protocol 44] the eviction+recovery path registers a staging/destructive Diagnostic Shell trigger (save-simulate-eviction-recovery → _dshSimulateEviction)'
+  );
+
+  // ── Behavioral (6) — eval the real mirror/restore against a mock IdbStore ─────
+  _pendingAsync.push(
+    (async () => {
+      const _bvm239 = require('vm');
+      const _lsStore239 = Object.create(null);
+      const _mockLS239 = {
+        getItem: k => (_lsStore239[k] !== undefined ? String(_lsStore239[k]) : null),
+        setItem: (k, v) => {
+          _lsStore239[k] = String(v);
+        },
+        removeItem: k => {
+          delete _lsStore239[k];
+        },
+      };
+      // Faithful mock of the IDB 'campaign' cold store: set() stamps a checksum via
+      // the SAME computeSaveChecksum idb.js's _wrap() uses, so restore's integrity
+      // gate exercises the real verification path (Protocol 22 — no forked hash).
+      const _idbCampaign239 = Object.create(null);
+      let _win239 = null;
+      const _mockIdb239 = {
+        set(store, key, value) {
+          let checksum = '';
+          try {
+            checksum = _win239.computeSaveChecksum(value, [], '');
+          } catch (_) {}
+          _idbCampaign239[key] = {
+            value: JSON.parse(JSON.stringify(value)),
+            checksum,
+            mt: 1,
+          };
+          return Promise.resolve(true);
+        },
+        getRaw(store, key) {
+          return Promise.resolve(_idbCampaign239[key] || null);
+        },
+      };
+
+      let _ctx239 = null;
+      let _setupErr239 = null;
+      try {
+        const _s = readGroup('state');
+        const _hStart = _s.indexOf('function _fnv1a32');
+        const _hEnd = _s.indexOf('// ── FACTION REGISTRY');
+        _ctx239 = {
+          window: {},
+          localStorage: _mockLS239,
+          JSON,
+          Math,
+          String,
+          Array,
+          Object,
+          parseInt,
+          isNaN,
+          Date,
+          Promise,
+          setTimeout,
+          console: { warn: () => {}, error: () => {} },
+        };
+        _bvm239.createContext(_ctx239);
+        _bvm239.runInContext('var APP_VERSION = "2.0.1";\n' + _s.slice(_hStart, _hEnd), _ctx239);
+        _win239 = _ctx239.window;
+        _win239.IdbStore = _mockIdb239;
+      } catch (e) {
+        _setupErr239 = e;
+      }
+
+      if (
+        !_ctx239 ||
+        !_win239 ||
+        typeof _win239.mirrorLiveContainer !== 'function' ||
+        typeof _win239.restoreLiveContainerFromIdb !== 'function' ||
+        typeof _win239.computeSaveChecksum !== 'function'
+      ) {
+        for (let i = 0; i < 6; i++)
+          fail(`239.B behavioral (setup failed${_setupErr239 ? ': ' + _setupErr239.message : ''})`);
+        return;
+      }
+
+      const _sample239 = () => ({
+        activeContext: 'FNV',
+        campaigns: { FNV: { lvl: 12, name: 'Courier Six', caps: 4200 } },
+      });
+
+      // 239.11  MIRROR WRITE: mirrorLiveContainer shadows window.robco_v8 into
+      //         IDB 'campaign'/'live' (getRaw returns the container + a checksum).
+      _win239.robco_v8 = _sample239();
+      _win239.mirrorLiveContainer();
+      const _rec239 = await _mockIdb239.getRaw('campaign', 'live');
+      assert(
+        _rec239 &&
+          _rec239.value &&
+          _rec239.value.campaigns.FNV.name === 'Courier Six' &&
+          typeof _rec239.checksum === 'string' &&
+          _rec239.checksum.length > 0,
+        "239.11: mirrorLiveContainer writes the live container into IDB 'campaign'/'live' with a checksum (the durability shadow the live campaign never had)"
+      );
+
+      // 239.12  RED→GREEN EVICTION RECOVERY (the mandatory test): localStorage
+      //         evicted (robco_v8 cleared) but IDB intact → restore recovers the
+      //         campaign into localStorage instead of leaving it empty.
+      delete _lsStore239['robco_v8']; // simulate the Android eviction (IDB mirror survives)
+      const _preEvict239 = _mockLS239.getItem('robco_v8');
+      const _recovered239 = await _win239.restoreLiveContainerFromIdb();
+      const _postRestore239 = _mockLS239.getItem('robco_v8');
+      assert(
+        _preEvict239 === null &&
+          _recovered239 === true &&
+          _postRestore239 !== null &&
+          JSON.parse(_postRestore239).campaigns.FNV.name === 'Courier Six',
+        '239.12: [RED→GREEN] with localStorage evicted but IndexedDB intact, restore recovers the live campaign back into localStorage (boots recovered, not empty)'
+      );
+
+      // 239.13  DEEP ROUND-TRIP: the recovered container is byte-identical to the
+      //         original — recovery restores the WHOLE campaign, not a partial.
+      assert(
+        JSON.stringify(JSON.parse(_postRestore239)) === JSON.stringify(_sample239()),
+        '239.13: the recovered container deep-equals the original live container — the full campaign survives the mirror→evict→restore round-trip'
+      );
+
+      // 239.14  LOCALSTORAGE WINS (the mandatory anti-clobber test): a NEWER
+      //         localStorage container must NEVER be replaced by an OLDER mirror.
+      //         Mirror holds the old campaign; localStorage holds a fresher one →
+      //         restore returns false and leaves localStorage byte-unchanged.
+      const _fresh239 = {
+        activeContext: 'FNV',
+        campaigns: { FNV: { lvl: 99, name: 'FRESHER LOCAL', caps: 9000 } },
+      };
+      _mockLS239.setItem('robco_v8', JSON.stringify(_fresh239)); // newer local present
+      // (the mirror still holds the OLD 'Courier Six' container from 239.11)
+      const _clobber239 = await _win239.restoreLiveContainerFromIdb();
+      const _afterLocal239 = JSON.parse(_mockLS239.getItem('robco_v8'));
+      assert(
+        _clobber239 === false && _afterLocal239.campaigns.FNV.name === 'FRESHER LOCAL',
+        '239.14: [ANTI-CLOBBER] when localStorage already holds a container, restore returns false and never touches it — a stale mirror can never overwrite the newer local value (Protocol 34)'
+      );
+
+      // 239.15  SHAPE GATE: a junk mirror record (no campaigns object) is refused,
+      //         localStorage is left empty (never restored from garbage).
+      _idbCampaign239['live'] = { value: { not: 'a container' }, checksum: '', mt: 1 };
+      delete _lsStore239['robco_v8'];
+      const _junk239 = await _win239.restoreLiveContainerFromIdb();
+      assert(
+        _junk239 === false && _mockLS239.getItem('robco_v8') === null,
+        '239.15: a shape-invalid mirror record (no campaigns) is refused — restore returns false and leaves localStorage empty rather than restoring garbage'
+      );
+
+      // 239.16  INTEGRITY GATE: a container with a TAMPERED checksum is refused,
+      //         localStorage stays empty (a corrupt mirror is never trusted).
+      _idbCampaign239['live'] = {
+        value: _sample239(),
+        checksum: 'deadbeef', // deliberately wrong
+        mt: 1,
+      };
+      delete _lsStore239['robco_v8'];
+      const _corrupt239 = await _win239.restoreLiveContainerFromIdb();
+      assert(
+        _corrupt239 === false && _mockLS239.getItem('robco_v8') === null,
+        '239.16: a mirror record whose checksum does not verify is refused — restore returns false and localStorage stays empty (corrupt shadow never restored)'
+      );
+    })()
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 240 — AI / OVERSEER AUDIT, BATCH 2 (behaviour half).
+//  Batch 1 (3b3331d) fixed how the Director LOOKS and SPEAKS; this batch fixes
+//  how the machinery around it BEHAVES. Four findings:
+//    • Finding 6 (owner directive) — an AI state change no longer yanks the view
+//      off the terminal to the changed panel. The panel still EXPANDS; the tab
+//      no longer switches; each change surfaces in place as a card on the same
+//      toast the location-change card already uses (Protocol 22).
+//    • Finding 5 — the downloaded log was narrative-only, silently dropping the
+//      Director's modal nodes and every confirmation dialog. That produced a
+//      real false conclusion during the audit. Exports are now assembled from a
+//      merged record so a popup, and the player's ANSWER, appear in the log.
+//    • Finding 8 — the directive authority sweep: four instructions that claimed
+//      authority over now-native systems were removed, and the example schema's
+//      all-eleven-factions block (which contradicted the delta-only rule it sat
+//      beside) was cut to one changed faction.
+//    • Finding 4 leftover — the standby wake line said "COURIER RETURNED" in
+//      every game; it now reads the per-game identity source (Protocol 38).
+//  Protocols 13/14/20/22/24/38.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 240 — AI/Overseer batch 2: cards, truthful export, directive sweep');
+
+  const uiCoreSrc240 = readGroup('ui-core');
+  const savesSrc240 = readGroup('ui-saves');
+  const stateSrc240 = readGroup('state');
+  const importSrc240 = readGroup('api');
+  const directiveSrc240 = readFile('js/services/api-directive.js');
+  const autoImportBody240 = extractFunctionBody(importSrc240, 'autoImportState');
+  const expandBody240 = extractFunctionBody(uiCoreSrc240, 'expandPanelForCategory');
+  const exitStandbyBody240 = extractFunctionBody(uiCoreSrc240, 'exitStandby');
+  const holotapeBody240 = extractFunctionBody(savesSrc240, '_buildHolotapeText');
+  const recordsBody240 = extractFunctionBody(savesSrc240, '_transcriptRecords');
+  const evtLinesBody240 = extractFunctionBody(savesSrc240, '_transcriptEventLines');
+  const confirmBody240 = extractFunctionBody(uiCoreSrc240, 'confirmAction');
+  // These suites assert about what the CODE does and what the DIRECTIVE TEXT says.
+  // Both files carry long explanatory comments that quote the very strings being
+  // asserted absent (e.g. the sweep's own "removed Consumable Purge" note), so every
+  // scan below runs on comment-stripped source — otherwise a test could pass or fail
+  // purely on prose, which is exactly the kind of dishonest guard Protocol 42 warns
+  // against.
+  const _strip240 = src =>
+    String(src)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+  const directiveCode240 = _strip240(directiveSrc240);
+  const autoImportCode240 = _strip240(autoImportBody240);
+
+  // ── FINDING 6 — cards instead of tab-jumps ─────────────────────────────────
+
+  // 240.1  the post-sync auto-expand pass no longer navigates. This is the exact
+  //        line the owner complained about: it used to call
+  //        expandPanelForCategory(cat) with default routing, so every AI state
+  //        change switched tabs away from the conversation.
+  assert(
+    /expandPanelForCategory\(cat,\s*\{\s*navigate:\s*false\s*\}\)/.test(autoImportBody240) &&
+      !/expandPanelForCategory\(cat\)\s*;/.test(autoImportBody240),
+    '240.1: [RED→GREEN, Finding 6] the post-sync auto-expand pass calls expandPanelForCategory(cat, {navigate:false}) — never the bare expandPanelForCategory(cat) that switched tabs away from the terminal mid-conversation'
+  );
+
+  // 240.2  the tab jump is gated by the flag, and the flag DEFAULTS ON so every
+  //        other caller (#go= deep links, the native router, LOOT/ammo hand-offs)
+  //        is byte-for-byte unchanged. A default of `false` would silently break
+  //        all of them — that is what this test exists to catch.
+  assert(
+    /const _navigate = !\(opts && opts\.navigate === false\)/.test(expandBody240) &&
+      /if \(_navigate && tabMap\[categoryKey\]\) switchTab/.test(expandBody240),
+    '240.2: expandPanelForCategory() gates ONLY the switchTab() call on opts.navigate, which defaults TRUE — every existing caller keeps its "take me there" behaviour and only the AI-import path opts out'
+  );
+
+  // 240.3  the panel is STILL expanded on the no-navigate path — the owner asked
+  //        to stop the tab jump, not to stop the panel opening for a user who
+  //        walks over there manually.
+  assert(
+    /expandPanelForCategory\(cat, \{ navigate: false \}\)/.test(autoImportCode240) &&
+      !/switchTab\s*\(/.test(autoImportCode240),
+    '240.3: the AI-import path still EXPANDS the changed panel (only the navigation is dropped) and never calls switchTab() itself — a user who navigates there manually still finds the board open'
+  );
+
+  // 240.4  the cards are fed from the SAME diff that builds the [DELTA] line —
+  //        an upgrade of the existing primitive, not a second change-detector
+  //        (Protocol 22, and the owner said so explicitly).
+  assert(
+    /_cardLines\.push/.test(autoImportBody240) &&
+      /_syncChangeCardsShow\(_cardLines\)/.test(autoImportBody240) &&
+      /changes\.forEach\(c => _cardLines\.push/.test(autoImportBody240),
+    '240.4: the change cards are built from the SAME `changes` diff that produces the [DELTA] chat line (one change-detector, two surfaces) and flushed once via _syncChangeCardsShow — never a parallel change-detection system'
+  );
+
+  // 240.5  the [DELTA] chat line SURVIVES. The cards are transient; the chat line
+  //        is the durable record that the log export (Finding 5) depends on.
+  assert(
+    /appendToChat\('> \[DELTA\] ' \+ changes\.join\(' \| '\)/.test(autoImportBody240),
+    '240.5: the durable [DELTA] chat line is kept alongside the transient cards — the cards are an addition, not a replacement (the log export depends on the line)'
+  );
+
+  // 240.6  _syncChangeCardsShow routes through the SHARED card queue, never its
+  //        own toast element (Protocol 22 — the owner named the existing
+  //        location-change card as the thing to reuse).
+  {
+    const syncBody240 = extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+    assert(
+      /_cardEnqueue\(line, CARD_DWELL_CHANGE_MS\)/.test(syncBody240) &&
+        !/createElement|document\.body\.append/.test(syncBody240),
+      '240.6: _syncChangeCardsShow() enqueues onto the SHARED card queue (the same #locationCard toast the arrival card uses) and never creates a second toast element of its own (Protocol 22)'
+    );
+  }
+
+  // 240.7  the queue is BOUNDED — a pathological sync can never monopolise the
+  //        corner of the screen with an unbounded backlog of cards.
+  {
+    const enqBody240 = extractFunctionBody(uiCoreSrc240, '_cardEnqueue');
+    assert(
+      /_cardQueue\.length >= CARD_QUEUE_MAX/.test(enqBody240) &&
+        /CARD_QUEUE_MAX = \d+/.test(uiCoreSrc240),
+      '240.7: the card queue is bounded by CARD_QUEUE_MAX and drops overflow — a sync that changes everything at once can never produce an unbounded backlog of toasts'
+    );
+  }
+
+  // 240.8  [behavioral] the queue actually SEQUENCES: three enqueued cards play
+  //        one at a time through the single element, each fully exiting before
+  //        the next enters — the old single-slot behaviour would have shown only
+  //        the last one.
+  {
+    const vm240 = require('vm');
+    let out240 = null;
+    let err240 = null;
+    try {
+      const decl240 =
+        'let _locCardTimer = null; let _locCardHideTimer = null;\n' +
+        'let _cardQueue = []; let _cardBusy = false;\n' +
+        'const CARD_QUEUE_MAX = 5; const CARD_DWELL_MS = 2200; const CARD_DWELL_CHANGE_MS = 1700;\n' +
+        'function _cardEnqueue(text, dwellMs)' +
+        extractFunctionBody(uiCoreSrc240, '_cardEnqueue') +
+        '\nfunction _cardPump()' +
+        extractFunctionBody(uiCoreSrc240, '_cardPump') +
+        '\nfunction _syncChangeCardsShow(lines)' +
+        extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+      const shown240 = [];
+      const timers240 = [];
+      const classes240 = new Set();
+      const labelStub240 = { innerHTML: '' };
+      const elStub240 = {
+        querySelector: () => labelStub240,
+        classList: { add: c => classes240.add(c), remove: c => classes240.delete(c) },
+        setAttribute: () => {},
+        get offsetWidth() {
+          return 0;
+        },
+      };
+      const sb240 = {
+        document: { getElementById: id => (id === 'locationCard' ? elStub240 : null) },
+        escapeHtml: s => String(s),
+        _echoShouldShow: () => true,
+        clearTimeout: () => {},
+        setTimeout: (fn, ms) => {
+          timers240.push({ fn, ms });
+          return timers240.length;
+        },
+      };
+      vm240.createContext(sb240);
+      vm240.runInContext(decl240, sb240);
+      vm240.runInContext(
+        "_syncChangeCardsShow(['CAPS 0\\u219245', 'INVENTORY 0\\u21921 items', 'PERKS UPDATED']);",
+        sb240
+      );
+      // Drain: after each card's display timer + exit timer, the next must render.
+      for (let i = 0; i < 3; i++) {
+        shown240.push(labelStub240.innerHTML);
+        const disp = timers240.find(t => t.ms === 1700 && !t.done);
+        if (!disp) break;
+        disp.done = true;
+        disp.fn();
+        const exit = timers240.find(t => t.ms === 240 && !t.done);
+        if (!exit) break;
+        exit.done = true;
+        exit.fn();
+      }
+      out240 = shown240;
+    } catch (e) {
+      err240 = e;
+    }
+    assert(
+      !err240 &&
+        out240.length === 3 &&
+        out240[0] === 'CAPS 0→45' &&
+        out240[1] === 'INVENTORY 0→1 items' &&
+        out240[2] === 'PERKS UPDATED',
+      '240.8: [behavioral, Finding 6] three change cards enqueued at once play in SEQUENCE through the one card element (CAPS, then INVENTORY, then PERKS) — the old single-slot toast would have clobbered the first two and shown only the last' +
+        (err240 ? ' — ' + err240.message : ` — got ${JSON.stringify(out240)}`)
+    );
+  }
+
+  // 240.9  the card path stays presentational — zero campaign-state write, the
+  //        same invariant Suite 204.8 locks for the arrival card.
+  {
+    const cardCode240 =
+      extractFunctionBody(uiCoreSrc240, '_cardEnqueue') +
+      extractFunctionBody(uiCoreSrc240, '_cardPump') +
+      extractFunctionBody(uiCoreSrc240, '_syncChangeCardsShow');
+    assert(
+      !/saveState\(|robco_v8|state\.[a-z]+\s*=/.test(cardCode240),
+      '240.9: the whole card path (_cardEnqueue/_cardPump/_syncChangeCardsShow) never calls saveState(), touches robco_v8, or assigns state.* — transient DOM only'
+    );
+  }
+
+  // ── FINDING 5 — truthful log export ────────────────────────────────────────
+
+  // 240.10  the txt transcript is built from the MERGED record, not chatHistory
+  //         alone. This is the precise defect: chatHistory holds no modal node,
+  //         so iterating it could never show the confirmation popup.
+  assert(
+    /_transcriptRecords\(\)\.forEach/.test(holotapeBody240) &&
+      !/chatHistory\.forEach/.test(holotapeBody240),
+    '240.10: [RED→GREEN, Finding 5] _buildHolotapeText() iterates the merged _transcriptRecords(), never chatHistory alone — chatHistory holds no modal/confirm node, which is exactly why the old export could not show them'
+  );
+
+  // 240.11  ALL THREE export formats share the one assembly point, so they can
+  //         never disagree about what happened (Protocol 22).
+  {
+    const exportBody240 = extractFunctionBody(savesSrc240, 'exportCampaignLog');
+    const uses240 = (exportBody240.match(/_transcriptRecords\(\)/g) || []).length;
+    assert(
+      uses240 >= 2 && /_transcriptRecords\(\)/.test(holotapeBody240),
+      `240.11: every export format (txt via _buildHolotapeText, plus md and html in exportCampaignLog) assembles from the SAME _transcriptRecords() merge — the three exports can never disagree about what was on screen (found ${uses240} in-export uses)`
+    );
+  }
+
+  // 240.12  a confirmation's ANSWER is recorded. Recording that the terminal
+  //         ASKED but not what the player CHOSE would still leave the log
+  //         ambiguous — and ambiguity is what produced the false conclusion.
+  assert(
+    /_tEntry\.choice = answered \? confirmLabel : cancelLabel/.test(confirmBody240) &&
+      /_recordChoice\(val\)/.test(confirmBody240),
+    "240.12: confirmAction() writes the player's ACTUAL ANSWER back into the transcript record on settle — the log shows both that the terminal asked and what was chosen, not just that a dialog existed"
+  );
+
+  // 240.13  the AI modal node is recorded at the point it is rendered.
+  assert(
+    /recordTranscriptEvent\('modal', parsedNode\.modal\.title, _modalLines\)/.test(importSrc240),
+    '240.13: an AI modal node is recorded into the transcript ledger at the moment it is rendered into #sysModal — the node that used to vanish from the log entirely'
+  );
+
+  // 240.14  the ledger anchors are REBASED when chatHistory is capped. Anchors
+  //         are indices; dropping the oldest N lines without shifting them would
+  //         silently move every recorded popup to the wrong place in the export.
+  {
+    const appendBody240 = extractFunctionBody(uiCoreSrc240, 'appendToChat');
+    assert(
+      /const _dropped = chatHistory\.length - CHAT_MAX/.test(appendBody240) &&
+        /at: \(e\.at \|\| 0\) - _dropped/.test(appendBody240) &&
+        /filter\(e => e\.at >= 0\)/.test(appendBody240),
+      '240.14: capping chatHistory rebases every transcript-event anchor by the same count and drops anchors that fall off the front — otherwise recorded popups would silently drift to the wrong position in the export'
+    );
+  }
+
+  // 240.15  [behavioral] the merge actually interleaves correctly: an event
+  //         recorded at index 1 lands BETWEEN chat lines 0 and 1, and a confirm
+  //         renders its answer.
+  {
+    const vm240b = require('vm');
+    let out240b = null;
+    let err240b = null;
+    try {
+      const decl240b =
+        'function _transcriptRecords()' +
+        recordsBody240 +
+        '\nfunction _transcriptEventLines(evt)' +
+        evtLinesBody240;
+      const sb240b = {
+        chatHistory: [
+          { text: 'level me up to 15', sender: 'user' },
+          { text: 'Confirm the jump?', sender: 'ai' },
+        ],
+        transcriptEvents: [
+          {
+            at: 1,
+            kind: 'confirm',
+            title: '> DIRECTOR PROGRESSION REQUEST',
+            lines: ['Raise level 5 → 15?'],
+            choice: 'KEEP',
+          },
+        ],
+      };
+      vm240b.createContext(sb240b);
+      vm240b.runInContext(decl240b, sb240b);
+      const recs = vm240b.runInContext('_transcriptRecords()', sb240b);
+      const lines = vm240b.runInContext(
+        '_transcriptEventLines(transcriptEvents[0]).join("\\n")',
+        sb240b
+      );
+      out240b = {
+        order: recs.map(r => (r.kind === 'event' ? 'EVENT' : r.msg.sender)),
+        lines,
+      };
+    } catch (e) {
+      err240b = e;
+    }
+    assert(
+      !err240b &&
+        JSON.stringify(out240b.order) === JSON.stringify(['user', 'EVENT', 'ai']) &&
+        /CONFIRMATION REQUESTED/.test(out240b.lines) &&
+        /Raise level 5 → 15\?/.test(out240b.lines) &&
+        /ANSWER: KEEP/.test(out240b.lines),
+      '240.15: [behavioral, Finding 5] the merged transcript places a confirmation recorded at chat index 1 BETWEEN the user line and the reply, and renders it with its prompt and the answer ("ANSWER: KEEP") — the exact record whose absence made a correctly-confirmed request read as silent compliance' +
+        (err240b ? ' — ' + err240b.message : ` — got ${JSON.stringify(out240b)}`)
+    );
+  }
+
+  // 240.16  the ledger is persisted + restored, so an export taken after a
+  //         reload is as truthful as one taken in-session.
+  assert(
+    /localStorage\.setItem\('robco_transcript_events'/.test(stateSrc240) &&
+      /localStorage\.getItem\('robco_transcript_events'\)/.test(uiCoreSrc240),
+    '240.16: the transcript-event ledger is persisted alongside robco_chat and restored at boot — a log downloaded after a reload still contains the popups'
+  );
+
+  // 240.17  purging the chat purges the ledger with it. Orphaned popups anchored
+  //         to lines that no longer exist would be a NEW way to mislead a reader.
+  {
+    const clearBody240 = extractFunctionBody(uiCoreSrc240, 'clearChat');
+    assert(
+      /transcriptEvents = \[\]/.test(clearBody240) &&
+        /removeItem\('robco_transcript_events'\)/.test(clearBody240),
+      '240.17: purging the Comm-Link clears the transcript-event ledger too — the log can never keep popups anchored to chat lines that no longer exist'
+    );
+  }
+
+  // 240.18  recording can never break the dialog it records (the recorder is a
+  //         diagnostic, and a diagnostic that can break the app is worse than none).
+  {
+    const recBody240 = extractFunctionBody(stateSrc240, 'recordTranscriptEvent');
+    assert(
+      /try \{/.test(recBody240) && /catch \(_\) \{/.test(recBody240),
+      '240.18: recordTranscriptEvent() is fully try/caught and returns null on failure — a recording failure can never break the modal or confirmation it was recording'
+    );
+  }
+
+  // ── FINDING 8 — directive authority sweep (Protocol 14) ────────────────────
+
+  // 240.19  the four now-native authority claims are GONE. Each was verified
+  //         against the native implementation before removal (Protocol 27).
+  assert(
+    !/Consumable Purge/.test(directiveCode240) &&
+      !/Financial Metrics/.test(directiveCode240) &&
+      !/Skill Point Math/.test(directiveCode240) &&
+      !/Quadratic XP Scaling/.test(directiveCode240),
+    '240.19: [Finding 8] the four directive lines claiming authority over now-native systems are removed — Consumable Purge (native nativeUseItem), Financial Metrics/Vendor Base_Cap (native barter pricing + liquidity), Skill Point Math (duplicate of the LEVEL UP deferral) and the Quadratic XP formula (which also DISAGREED with the native curve)'
+  );
+
+  // 240.20  the WRONG XP formula is replaced by a deferral, not merely deleted.
+  //         The directive taught a curve that diverges from the native one past
+  //         level 2 — a correctness hazard, not just a token cost.
+  assert(
+    !/25 \* \(Target_Level\^2\)/.test(directiveCode240) &&
+      /XP thresholds \/ level progression: native deterministic LEVEL UP terminal/.test(
+        directiveSrc240
+      ) &&
+      /Do NOT compute a level from XP/.test(directiveCode240),
+    '240.20: [Finding 8] the wrong quadratic-XP formula is replaced by an explicit deferral to the native LEVEL UP terminal — the AI is told not to compute a level from XP at all, closing the "AI returns state a native path owns" hazard'
+  );
+
+  // 240.21  the example schema no longer contradicts the delta-only rule beside
+  //         it. Demonstrating a full faction resend is the same shape that caused
+  //         the Finding 1 data loss.
+  assert(
+    !/"legion":\{"fame":0,"infamy":0\}/.test(directiveCode240) &&
+      /"factions": \{"ncr":\{"fame":5,"infamy":0\}\}/.test(directiveCode240) &&
+      /Report ONLY the factions whose standing CHANGED/.test(directiveCode240),
+    '240.21: [Finding 8] the example schema shows ONE changed faction instead of all eleven at zero — the example no longer demonstrates the whole-collection resend that the Faction Standing rule beside it forbids (and that caused the Finding 1 class of loss)'
+  );
+
+  // 240.22  the sweep did NOT over-strip. These are the instructions verified as
+  //         still genuinely AI-owned (no native implementation exists); a later
+  //         pass removing them would be a real regression, so they are pinned.
+  assert(
+    /state\.stats tracks cumulative session stats/.test(directiveCode240) &&
+      /COMPLETE RNG MODE ACTIVE/.test(directiveCode240) &&
+      /Faction Standing System/.test(directiveCode240) &&
+      /Visual Upload Fallback/.test(directiveCode240) &&
+      /Return ONLY the inventory items that CHANGED this turn/.test(directiveCode240),
+    '240.22: [Finding 8 guard-rail] the instructions verified as STILL AI-owned are pinned in place — session stats (no native writer exists), COMPLETE RNG build randomisation (no native randomiser exists), faction standing, the OCR fallback, and the batch-1 delta-only inventory rule. The sweep removes stale authority, never live authority'
+  );
+
+  // ── FINDING 4 leftover — the standby wake line ─────────────────────────────
+
+  // 240.23  the wake line reads the per-game identity source. Batch 1 fixed the
+  //         directive and the confirm copy but left this line saying "COURIER"
+  //         in every game.
+  assert(
+    /_wakeId && _wakeId\.playerNoun/.test(exitStandbyBody240) &&
+      /_wakeNoun \+ ' RETURNED/.test(exitStandbyBody240) &&
+      !/'> COURIER RETURNED/.test(exitStandbyBody240),
+    '240.23: [RED→GREEN, Finding 4 leftover] the standby wake line builds its player title from GAME_DEFS[ctx].identity.playerNoun via getIdentity() — no hardcoded "COURIER RETURNED" literal remains (Protocol 38)'
+  );
+
+  // 240.24  [behavioral] the wake line actually says the right thing per game —
+  //         the point of the fix, proven at runtime rather than by source shape.
+  {
+    const vm240c = require('vm');
+    const runWake240 = playerNoun => {
+      const decl =
+        'let _standbyActive = true;\nlet _wakeTimer = null;\n' +
+        'function _isShuttingDown()' +
+        extractFunctionBody(uiCoreSrc240, '_isShuttingDown') +
+        '\nfunction exitStandby()' +
+        exitStandbyBody240;
+      const chat = [];
+      const pending = [];
+      const sb = {
+        console: { warn() {} },
+        AmbientRuntime: { getState: () => 'ACTIVE' },
+        document: {
+          body: { classList: { add() {}, remove() {}, contains: () => false } },
+          getElementById: () => ({ value: '0' }),
+        },
+        crtHumGain: null,
+        audioCtx: null,
+        playWakeTone() {},
+        appendToChat(t) {
+          chat.push(t);
+        },
+        setGeigerRate() {},
+        updateMath() {},
+        getIdentity: () => (playerNoun ? { playerNoun } : null),
+        setTimeout: fn => {
+          pending.push(fn);
+          return pending.length;
+        },
+        clearTimeout: () => {},
+      };
+      vm240c.createContext(sb);
+      vm240c.runInContext(decl, sb);
+      sb.exitStandby();
+      pending.forEach(fn => fn());
+      return chat.join('\n');
+    };
+    let err240c = null;
+    let fnv240 = '';
+    let fo3240 = '';
+    let none240 = '';
+    try {
+      fnv240 = runWake240('Courier');
+      fo3240 = runWake240('Lone Wanderer');
+      none240 = runWake240(null);
+    } catch (e) {
+      err240c = e;
+    }
+    assert(
+      !err240c &&
+        /COURIER RETURNED/.test(fnv240) &&
+        /LONE WANDERER RETURNED/.test(fo3240) &&
+        !/COURIER/.test(fo3240) &&
+        /COURIER RETURNED/.test(none240),
+      '240.24: [behavioral, Finding 4 leftover] the wake line prints the ACTIVE game\'s player title — "COURIER RETURNED" for one game, "LONE WANDERER RETURNED" for another (and never "Courier" there), with the absence-guarded fallback still printing a sane line when no identity is available' +
+        (err240c ? ' — ' + err240c.message : ` — got FO3: ${fo3240}`)
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUITE 241 — 2.8.5 item 6: the Schematic View, made correct + per-game
+//  The Module Bay's flat fallback had drifted as the hardware boards grew.
+//  Four confirmed defects, each locked here (Protocol 13/42):
+//    (a) a hardcoded "13 CHANNEL CHIPS"/"13 rows" caption when #chipGrid holds
+//        14 — a COUNT IN A STRING, so the view silently began lying the moment
+//        a chip was added; the row was also inert (it told the reader to go
+//        back to the bay, contradicting "SAME CONTROLS").
+//    (b) SLOT 05's real payload (key, model, handshake) and the whole SVC TRAY
+//        had NO schematic representation — and because the view choice
+//        persists (Protocol UI-6), a technician could be stuck in a view with
+//        no way to reach their own API key.
+//    (c) renderModuleBay() re-synced CHECKBOXES only, so the bay's PRINT-RATE
+//        slider/readout went stale after a schematic edit until a reload.
+//    (d) zero per-game adaptation — no GAME_DEFS/getIdentity/[data-game] read
+//        anywhere in the renderer or its CSS.
+//  241.1 is the load-bearing one: a PARITY guard. Every prior test asserted
+//  only that named setters were PRESENT, which is exactly why boards could be
+//  added to the bay for months with nothing going red.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 241 — 2.8.5 item 6: Schematic View correctness + per-game framing');
+  const html241 = readFile('index.html');
+  const core241 = readGroup('ui-core');
+  const state241 = readFile('js/core/state.js');
+  const css241 = readCss();
+  const schemFn241 = (core241.match(
+    /function renderBaySchematic\(\)[\s\S]*?\nwindow\.renderBaySchematic/
+  ) || [''])[0];
+  const chipFn241 = (core241.match(
+    /function _schemChipRows\(\)[\s\S]*?\nwindow\._schemChipRows/
+  ) || [''])[0];
+
+  // ── 241.1  PARITY (the escape-ratchet guard, Protocol 36b) ──────────────
+  // Every interactive control the bay owns must be reachable from the flat
+  // view — by name, or by a documented derivation. Anything deliberately left
+  // out must be named here with a reason, so an omission is always a decision
+  // somebody wrote down rather than drift nobody noticed.
+  const bayRegion241 = html241.slice(
+    html241.indexOf('id="bayContent"'),
+    html241.indexOf('id="baySchematic"')
+  );
+  // Controls excluded on purpose. These are NOT drift:
+  //   - the visually-hidden real controls the bay's custom widgets already
+  //     drive (they are the same prefs the schematic rows write), and
+  //   - the optics tube buttons, whose PHOSPHOR TUBE <select> row is the flat
+  //     equivalent (the schematic is the plain-control projection by design).
+  const SCHEM_EXCLUDED_241 = [
+    'opticsColorInput', // driven by the PHOSPHOR TUBE select row
+    'immersionSelect', // driven by the ATMOSPHERIC REGULATOR select row
+    'opticsFamilyTube',
+    'opticsFamilyTray',
+  ];
+  const bayControlIds241 = [];
+  const ctrlRe241 = /<(input|select|button)\b[^>]*\bid="([A-Za-z0-9_-]+)"/g;
+  let m241;
+  while ((m241 = ctrlRe241.exec(bayRegion241)) !== null) bayControlIds241.push(m241[2]);
+  // A chip is covered by derivation: _schemChipRows() enumerates #chipGrid's
+  // input.chip-input nodes at render time, so it needs no per-id mention.
+  const chipIds241 = [];
+  const chipRe241 = /<input\b[^>]*\bid="([A-Za-z0-9_-]+)"[^>]*class="chip-input"/g;
+  let c241;
+  while ((c241 = chipRe241.exec(bayRegion241)) !== null) chipIds241.push(c241[1]);
+  const uncovered241 = bayControlIds241.filter(
+    id =>
+      !SCHEM_EXCLUDED_241.includes(id) &&
+      !chipIds241.includes(id) &&
+      !schemFn241.includes(id) &&
+      !core241.includes('BAY_CHECKBOX_SYNC_MAP') === false &&
+      !new RegExp(`['"]${id}['"]`).test(schemFn241) &&
+      !new RegExp(`\\b${id}\\b`).test(schemFn241)
+  );
+  // The controls the schematic reaches through its own named setters rather
+  // than by element id (the original 11 rows predate the proxy shape).
+  const SETTER_BACKED_241 = {
+    highLumenToggle: 'toggleHighLumen',
+    masterMuteToggle: 'toggleMasterMute',
+    radioToggle: 'toggleRadio',
+    wakeLockToggle: 'toggleWakeLock',
+    hapticToggle: 'toggleHaptic',
+    hardwareSfxToggle: '_schemSetHardwareSfx',
+    geminiKeySyncToggle: '_schemSetGeminiSync',
+    typerSpeedSlider: 'robco_typer_speed',
+  };
+  const reallyUncovered241 = uncovered241.filter(id => {
+    const setter = SETTER_BACKED_241[id];
+    return !(setter && schemFn241.includes(setter));
+  });
+  assert(
+    chipIds241.length > 0 && reallyUncovered241.length === 0,
+    '241.1: [PARITY] every interactive control in #bayContent is reachable from the Schematic View — by id, by named setter, or by the #chipGrid derivation — with intentional omissions named in SCHEM_EXCLUDED_241' +
+      (reallyUncovered241.length ? ` — UNCOVERED: ${reallyUncovered241.join(', ')}` : '')
+  );
+
+  // ── 241.2  defect (b): the two boards that had NO representation at all ──
+  assert(
+    /apiKeyInput/.test(schemFn241) &&
+      /apiModelInput/.test(schemFn241) &&
+      /btnFetchModels/.test(schemFn241) &&
+      /ejectHolotapeBtn/.test(schemFn241) &&
+      /holotapeFormatSelect/.test(schemFn241) &&
+      /btnInstallPwa/.test(schemFn241),
+    '241.2: the Schematic View reaches SLOT 05 (key, model, handshake) and the SVC TRAY (holotape + format, PWA install) — the boards that previously had no flat representation, leaving a persisted-schematic user unable to reach their own API key'
+  );
+
+  // ── 241.3  defect (a): the chip list is DERIVED, never a counted string ──
+  assert(
+    /getElementById\('chipGrid'\)/.test(chipFn241) &&
+      /querySelectorAll\('input\.chip-input'\)/.test(chipFn241) &&
+      !/13 rows|13 CHANNEL CHIPS/.test(core241) &&
+      !/\b1[0-9] CHANNEL CHIPS\b/.test(schemFn241),
+    '241.3: the channel chips are derived live from #chipGrid (no hardcoded count anywhere) — the old "13 CHANNEL CHIPS"/"13 rows" caption was already wrong for the 14 real chips, because the count lived in a string'
+  );
+
+  // ── 241.4  [behavioral] N chips in → N operable rows out ────────────────
+  // Proves the derivation actually runs, and that a future 15th chip needs no
+  // change here — run against a stub DOM with a deliberately ODD chip count so
+  // the assertion cannot accidentally pass against a hardcoded 13 or 14.
+  {
+    let rows241 = -1;
+    let err241 = null;
+    const CHIPS_241 = 17;
+    try {
+      const vm241 = require('vm');
+      const stubChips = [];
+      for (let i = 0; i < CHIPS_241; i++) {
+        stubChips.push({
+          id: 'muteStub' + i + 'Toggle',
+          checked: i % 2 === 0,
+          className: 'chip-input',
+        });
+      }
+      const sb241 = {
+        escapeHtml: s => String(s),
+        document: {
+          getElementById: id =>
+            id === 'chipGrid'
+              ? {
+                  querySelectorAll: () => stubChips,
+                  querySelector: sel => {
+                    const m = /for="([^"]+)"/.exec(sel);
+                    const which = m ? m[1] : '';
+                    return {
+                      textContent: which.toUpperCase() + 'CH-' + which.slice(-7, -6),
+                      querySelector: () => ({ textContent: 'CH-01' }),
+                    };
+                  },
+                }
+              : null,
+        },
+        window: {},
+      };
+      vm241.createContext(sb241);
+      vm241.runInContext(chipFn241 + '\n;globalThis.__out = _schemChipRows();', sb241);
+      rows241 = (sb241.__out.match(/class="schem-row"/g) || []).length;
+    } catch (e) {
+      err241 = e;
+    }
+    assert(
+      !err241 && rows241 === CHIPS_241,
+      `241.4: [behavioral] _schemChipRows() emits exactly one operable row per #chipGrid chip — ${CHIPS_241} stub chips produced ${rows241} rows, so a future chip appears in the flat view with no code change` +
+        (err241 ? ' — ' + err241.message : '')
+    );
+  }
+
+  // ── 241.5  defect (c): the non-checkbox re-sync, and ONE apply function ──
+  assert(
+    /function _syncBayValueControls\(\)/.test(core241) &&
+      /typerSpeedSlider/.test(core241) &&
+      /function renderModuleBay\(\)[\s\S]{0,900}_syncBayValueControls\(\)/.test(core241) &&
+      // the boot-restore path must ROUTE THROUGH the same function, not keep a
+      // second copy of the formatting (Protocol 22 / UI-6 one-apply-function)
+      !/const savedSpeed = parseFloat\(MetaStore\.get\('robco_typer_speed'/.test(core241),
+    '241.5: renderModuleBay() re-syncs the non-checkbox bay controls via the shared _syncBayValueControls(), and the boot restore routes through that same function instead of formatting the readout a second time — closes the PRINT-RATE TRIM staleness the checkbox-only sync map left open'
+  );
+
+  // ── 241.6  [behavioral] the slider + readout actually repaint ────────────
+  {
+    let sliderVal241 = null;
+    let labelText241 = null;
+    let err241b = null;
+    try {
+      const vm241b = require('vm');
+      const syncFn241 = (core241.match(/function _syncBayValueControls\(\)[\s\S]*?\n\}/) || [
+        '',
+      ])[0];
+      const nodes241 = {
+        typerSpeedSlider: { value: '1' },
+        typerSpeedVal: { textContent: '1.00×' },
+      };
+      const sb241b = {
+        MetaStore: { get: () => '2.25' },
+        document: { getElementById: id => nodes241[id] || null },
+        window: {},
+      };
+      vm241b.createContext(sb241b);
+      vm241b.runInContext(syncFn241 + '\n;_syncBayValueControls();', sb241b);
+      sliderVal241 = nodes241.typerSpeedSlider.value;
+      labelText241 = nodes241.typerSpeedVal.textContent;
+    } catch (e) {
+      err241b = e;
+    }
+    assert(
+      !err241b && sliderVal241 === '2.25' && /^2\.25/.test(labelText241),
+      `241.6: [behavioral] _syncBayValueControls() repaints BOTH the bay slider and its numeric readout from the stored pref (got value=${sliderVal241}, label=${labelText241}) — the exact staleness a Schematic View trim edit used to leave behind` +
+        (err241b ? ' — ' + err241b.message : '')
+    );
+  }
+
+  // ── 241.7  defect (d): per-game framing is DATA, with a generic fallback ─
+  assert(
+    /const SCHEMATIC_FALLBACK = \{/.test(core241) &&
+      /function _schematicFraming\(\)/.test(core241) &&
+      /getIdentity\(\)/.test(core241) &&
+      /id\.schematic/.test(core241) &&
+      !/schematic[\s\S]{0,200}gameContext ===/.test(core241),
+    '241.7: the Schematic View reads its per-game framing from GAME_DEFS via getIdentity().schematic with a literal generic SCHEMATIC_FALLBACK — data, never a per-game code branch (Protocol 38 / UI-7)'
+  );
+
+  // ── 241.8  every game declares the block, design-only ones included ──────
+  // FO4 is designOnly and unreachable at runtime; it must still carry a valid
+  // entry so the N-game abstraction stays proven rather than assumed.
+  {
+    const ids241 = state241.match(/identity: \{[\s\S]*?\n {6}schematic: \{[\s\S]*?\n {6}\}/g) || [];
+    const withAll241 = ids241.filter(b => /title:/.test(b) && /note:/.test(b) && /sig:/.test(b));
+    assert(
+      ids241.length >= 3 && withAll241.length === ids241.length,
+      `241.8: every GAME_DEFS identity block declares a schematic{title,note,sig} — including the design-only entry, so the N-game abstraction stays proven (found ${ids241.length}, complete ${withAll241.length})`
+    );
+  }
+
+  // ── 241.9  [behavioral] an unauthored game falls back GENERIC ────────────
+  // Protocol UI-10's rule: never another game's borrowed fiction.
+  {
+    let framing241 = null;
+    let err241c = null;
+    try {
+      const vm241c = require('vm');
+      const framingSrc241 =
+        (core241.match(/const SCHEMATIC_FALLBACK = \{[\s\S]*?\n\};/) || [''])[0] +
+        '\n' +
+        (core241.match(/function _schematicFraming\(\)[\s\S]*?\n\}/) || [''])[0];
+      const sb241c = {
+        // a game that authored no schematic block at all
+        getIdentity: () => ({ machine: 'unauthored-machine' }),
+        window: {},
+      };
+      vm241c.createContext(sb241c);
+      vm241c.runInContext(framingSrc241 + '\n;globalThis.__f = _schematicFraming();', sb241c);
+      framing241 = sb241c.__f;
+    } catch (e) {
+      err241c = e;
+    }
+    assert(
+      !err241c &&
+        framing241 &&
+        framing241.title === 'SCHEMATIC VIEW' &&
+        !/VAULT-TEC|PIP-BOY|ROBCO IND/.test(framing241.sig),
+      "241.9: [behavioral] a game with no authored schematic block gets the literal generic framing — never another machine's borrowed fiction (Protocol UI-10)" +
+        (err241c ? ' — ' + err241c.message : ` — got ${JSON.stringify(framing241)}`)
+    );
+  }
+
+  // ── 241.10  Protocol 17 — the flat view's own tap targets ───────────────
+  // The row list is now materially longer (14 chips + SLOT 05 + SVC TRAY), so
+  // these are controls a technician really drives, not a token fallback.
+  assert(
+    /\.schem-row-control input\[type='checkbox'\] \{[\s\S]{0,200}(width|height|min-width):\s*28px/.test(
+      css241
+    ) && /\.schem-row-control button \{[\s\S]{0,120}min-height:\s*28px/.test(css241),
+    "241.10: the Schematic View's own checkboxes and buttons meet the >=28px tap-target floor (Protocol 17)"
+  );
+
+  // 241.10a / 241.10b — both found by RENDERING this view (Protocol 42), not by
+  // reading CSS: the range input measured a 4px-tall hit box (the UA default
+  // track height; a height had never been declared for it here, so PRINT-RATE
+  // TRIM has been a 4px drag target on touch for as long as the row existed),
+  // and the text/password inputs measured 27px — one pixel under the floor.
+  assert(
+    /\.schem-row-control input\[type='range'\] \{[\s\S]{0,200}min-height:\s*28px/.test(css241),
+    '241.10a: the Schematic View range input declares a >=28px height — regression guard for the 4px-tall PRINT-RATE TRIM drag target found by rendering (Protocol 42)'
+  );
+  assert(
+    /\.schem-row-control input\[type='password'\],?[\s\S]{0,260}min-height:\s*28px/.test(css241) &&
+      /\.schem-row-control input\[type='password'\],?[\s\S]{0,320}font-size:\s*16px/.test(css241),
+    '241.10b: the Schematic View text/password inputs meet the 28px tap floor AND the 16px font floor (Protocol 17 — >=16px prevents mobile focus auto-zoom)'
+  );
+
+  // ── 241.11  per-game presentation is a [data-game] selector, not JS ──────
+  assert(
+    /\[data-game='FO3'\] \.bay-schematic/.test(css241),
+    '241.11: per-game schematic presentation rides a [data-game] attribute selector in CSS (Protocol UI-7), never a JS colour/fiction branch'
+  );
+
+  // ── 241.12  the framing is applied on EVERY render, incl. the boot restore ─
+  assert(
+    /_applySchematicFraming\(\)/.test(schemFn241) &&
+      /baySchematicTitle/.test(html241) &&
+      /baySchematicNote/.test(html241) &&
+      /baySchematicSig/.test(html241),
+    "241.12: renderBaySchematic() paints the per-game framing on every render, and index.html carries the three ids it writes — so a game switch (which reloads) always shows its own machine's heading"
+  );
+
+  // ── 241.13  Protocol UI-6 — the view choice actually survives a reload ───
+  // Found by RENDERING (Protocol 42), and it was a LIVE defect, not a harness
+  // artifact: robco_bay_view was written correctly on every toggle and then
+  // never read on the boot path. The panel-restore branch called
+  // renderModuleBay() — which repaints the bay but has no idea a view choice
+  // exists — so a returning user whose Settings panel was remembered OPEN got
+  // the hardware bay back regardless of what they last chose. Only a manual
+  // open of the panel in that same session ran initModuleBay(), the one place
+  // the restore lived. Reproduced at 360px in both games; fixed by routing the
+  // restore branch through the SAME _applyBayView() the user action uses —
+  // the one-shared-apply-function shape UI-6 mandates.
+  {
+    const restoreBranch241 = (core241.match(
+      /if \(d\.id === 'securityConfigPanel' && d\.open\) \{[\s\S]*?\n {6}\}/
+    ) || [''])[0];
+    assert(
+      /_restoringPanels/.test(restoreBranch241) &&
+        /_applyBayView/.test(restoreBranch241) &&
+        /robco_bay_view/.test(restoreBranch241),
+      '241.13: the boot panel-restore branch routes the Module Bay through the shared _applyBayView() and reads robco_bay_view — so a persisted Schematic View choice survives a reload instead of silently reverting to the bay (Protocol UI-6, found by rendering)'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 242 — Queue-drift nudge (Protocol 50)
+//
+//  Protocol 50 adds a pre-push REMINDER that lists `type: project` memories
+//  which don't appear referenced in QUEUE.md, so a plan that only ever lived
+//  in the orchestrator's memory becomes visible instead of staying invisible.
+//  Same fail-safe shape as Protocol 48's backup nudge (Suite 237): it can
+//  never fail or block a push, and on any machine where the memory store is
+//  absent or unreadable it stays silent (Protocol 33 DNA).
+//
+//  This suite locks the never-fails invariant AND proves the matcher
+//  actually works — a fabricated unreferenced memory must be flagged, and
+//  an explicitly exempt one (`queue_status: not-applicable`) must not be.
+//  A nudge that only ever proves it can't crash, and never proves it can
+//  catch the thing it exists to catch, is exactly the false-confidence
+//  shape Protocol 13/42 exist to rule out.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 242 — Queue-drift nudge (Protocol 50)');
+
+  const nudgePath242 = path.join(ROOT, 'scripts', 'queue-drift-check.js');
+  const nudgeExists242 = fs.existsSync(nudgePath242);
+  assert(nudgeExists242, '242.1: scripts/queue-drift-check.js exists (Protocol 50 nudge script)');
+
+  const nudgeSrc242 = nudgeExists242 ? fs.readFileSync(nudgePath242, 'utf8') : '';
+  assert(
+    nudgeExists242 && !/process\.exit\(\s*[1-9]/.test(nudgeSrc242),
+    '242.2: the nudge never exits non-zero — no process.exit() with a non-zero code (fail-safe: it can never fail a push)'
+  );
+  assert(
+    nudgeExists242 && /\bcatch\b/.test(nudgeSrc242),
+    '242.3: the nudge wraps its logic in a top-level catch so an unexpected error can never escape to the shell'
+  );
+
+  const prePush242 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+  assert(
+    /node\s+scripts\/queue-drift-check\.js\s*\|\|\s*true/.test(prePush242),
+    '242.4: the pre-push hook invokes node scripts/queue-drift-check.js in a non-blocking way (`|| true`)'
+  );
+  assert(
+    /npm run gate\b/.test(prePush242) && /node\s+scripts\/backup-nudge\.js/.test(prePush242),
+    '242.5: the pre-push hook still runs the full gate and the backup nudge — this nudge was ADDED, not swapped in for either'
+  );
+
+  const { spawnSync: spawn242 } = require('child_process');
+
+  // ── 242.6-7: fail-safe behavior — must exit 0 no matter what. ───────────
+  const bogus242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+    env: { ...process.env, ROBCO_MEMORY_BASE: path.join(ROOT, 'no', 'such', 'memory', 'xyz') },
+  });
+  assert(
+    bogus242.status === 0,
+    '242.6: with the memory base pointed at a non-existent path the nudge exits 0 (cannot determine state, stays silent, push proceeds)'
+  );
+  const dflt242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 20000,
+  });
+  assert(
+    dflt242.status === 0,
+    '242.7: with default resolution the nudge exits 0 whether or not a memory store is present — it never blocks a push'
+  );
+
+  // ── 242.8-10: the matcher actually catches an unreferenced memory, and ──
+  // respects the explicit exemption — built against a throwaway fixture
+  // tree so this suite never depends on the owner's real memory contents.
+  const fixtureBase242 = path.join(
+    require('os').tmpdir(),
+    'robco-queue-drift-fixture-' + process.pid
+  );
+  const fixtureMemDir242 = path.join(fixtureBase242, 'guidA', 'guidB', 'agent', 'memory');
+  try {
+    fs.mkdirSync(fixtureMemDir242, { recursive: true });
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'unqueued.md'),
+      [
+        '---',
+        'name: fake-unqueued-plan-242',
+        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, discussed but never written down anywhere else.',
+        'metadata:',
+        '  type: project',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'exempt.md'),
+      [
+        '---',
+        'name: fake-exempt-plan-242',
+        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, deliberately marked not queue-worthy.',
+        'metadata:',
+        '  type: project',
+        '  queue_status: not-applicable',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(fixtureMemDir242, 'not-a-project.md'),
+      [
+        '---',
+        'name: fake-reference-242',
+        'description: Some reference-type memory that should never be evaluated at all.',
+        'metadata:',
+        '  type: reference',
+        '---',
+        '',
+        'Body text.',
+        '',
+      ].join('\n')
+    );
+
+    const fixtureRun242 = spawn242('node', ['scripts/queue-drift-check.js'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      timeout: 20000,
+      env: { ...process.env, ROBCO_MEMORY_BASE: fixtureBase242 },
+    });
+    assert(
+      fixtureRun242.status === 0,
+      '242.8: the fixture run still exits 0 (never blocks a push, even while flagging something)'
+    );
+    assert(
+      /fake-unqueued-plan-242/.test(fixtureRun242.stdout || ''),
+      '242.9: RED-THEN-GREEN — an unreferenced project-type memory IS flagged in the nudge output (proves the matcher can actually catch the thing it exists to catch)'
+    );
+    assert(
+      !/fake-exempt-plan-242/.test(fixtureRun242.stdout || '') &&
+        !/fake-reference-242/.test(fixtureRun242.stdout || ''),
+      '242.10: an explicitly-exempt memory (`queue_status: not-applicable`) and a non-`project`-type memory are both left out of the flag list'
+    );
+  } finally {
+    fs.rmSync(fixtureBase242, { recursive: true, force: true });
   }
 }
 
@@ -39861,18 +50875,24 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 // before printing totals — the runner body above is otherwise synchronous.
 // Re-emit the Suite 137 header first (Protocol 42, harness-only): the deferred
 // proof prints its single result line HERE, at the end of output — which, once
-// Suite 138 became the last synchronous suite, fell under Suite 138's header and
-// made the per-suite parity parser (scripts/gate.js) miscount it (Node 138 = 13
-// vs PowerShell 12; Node 137 = 13 vs 14). The parser sums counts across repeated
-// headers for the same suite number and keeps the first-seen title, so re-emitting
-// Suite 137's exact header re-attributes the deferred line to Suite 137 and
-// restores parity. Any future suite added after 137 would have hit the same trap.
+// Suite 138 became the last synchronous suite, would otherwise fall under Suite
+// 138's header and misattribute the line in the per-suite output grouping.
+// Re-emitting Suite 137's exact header re-attributes the deferred line to Suite
+// 137, keeping the printed output correctly grouped. (Historically this also fed
+// the per-suite parity parser in scripts/gate.js; that parser and the PowerShell
+// mirror were removed in 2.8.5 U-B3 when Protocol 15 was retired, but the
+// re-emit stays for honest output grouping.)
 header('Suite 137 — Step 2 Phase 0 U11/U12 hygiene ledgers + modal consolidation');
 Promise.all(_pendingAsync)
   .catch(e => {
     fail('Unhandled error in an async suite: ' + (e && e.message));
   })
   .then(() => {
+    // R1 (2026-07-20, Protocol 49): the end-of-run count reconciliation that
+    // used to run HERE — runtime-executed total vs the hand-synced CHANGELOG.md
+    // count — was REMOVED with Protocol 2a. Retiring a rule removes its
+    // enforcement, not just its prose. See Suite 28's header for the honest
+    // note on the suite-drop coverage that went with it.
     console.log('\n══════════════════════════════════════════════════════════════\n');
     if (failed === 0) {
       console.log(green(`  ALL ${passed} TESTS PASSED — persistence fully verified.`));

@@ -9,7 +9,8 @@ service cloud.firestore {
     }
 
     // Deny the legacy flat saves collection entirely.
-    // The app now writes to users/{uid}/saves/main; no path under saves/ is valid.
+    // The app writes saves under users/{uid}/saves/{autoId} (addDoc + updateDoc by id);
+    // no path under this top-level saves/ collection is valid.
     match /saves/{id} {
       allow read, write: if false;
     }
