@@ -963,6 +963,34 @@ galleries. `museum/generate.mjs` in the archive is the generator; `museum/site/`
 - **The ONE hand-written part is the release account.** Shipped and approved: 2.5.0, 2.6.0, and 2.8.0 are
   frozen; 2.8.5 exists too but is explicitly `draft: true`.
 - **A graveyard of abandoned ideas, with their reasoning, exists and is live** (`museum/site/graveyard.html`).
+
+**⭐ THE ORGANIZING THESIS (owner, 2026-07-21) — record this so a future session cannot shrink the museum back
+to "app history."** The owner, verbatim: _"I want the story of the workflow and all measures put in place to
+maintain the workflow to be displayed"_ and _"all the improvements, failures leading to improvements
+EVERYTHING"_ — followed by the explicit priority ordering: _"the app history is important too, just not the
+centerpieces."_
+
+**The museum's CENTERPIECE is the story of the workflow and every measure that maintains it, told as
+failure → lesson → measure → improvement arcs — the project improving itself.** The app's feature-history
+stays in the museum but is **SUPPORTING material** (it is the proof-of-work the process produced), never the
+centerpiece. Concretely, these are all facets of the ONE story, not separate exhibits competing for
+top billing: the AI-collaboration exhibit (**P6**, above — Fable/Opus/Sonnet + blind external review), the
+bug museum (bug ↔ the guard it produced), the protocols themselves (each one is an origin-bug → rule pair),
+the gates, the audits, and the Atlas's assurance view. The raw material for this story already exists,
+scattered, across `bugs/`, `QUEUE_LOG.md`, `graveyard/`, the protocols in this file, `audits/` in the
+archive, and orchestrator memory — **the museum's job is to weave those into one visible, connected story**,
+not to invent new content.
+
+**Cross-reference — the Atlas (item I) tells the same story from the other angle.** The Atlas computes the
+CURRENT web of guards (what exists and what's assured, right now). The museum narrates WHY each guard
+exists (the failure that produced it, told historically). Same underlying story, two different angles — link,
+don't fuse, the same relationship R11 already has with both.
+
+**Recorded as thesis + reasoning only — NOT designed, NOT built.** No exhibit layout, no generator change, no
+new schema decided here; this only fixes what the museum is FOR so future design/build passes (P2's identity
+work, P6, any future exhibit) inherit the right center of gravity instead of defaulting to "release notes with
+pictures."
+
 - **Trigger: release-pinned, not pinned to `dev`.** `museum/release-pin.json` records the shipped release
   tag; advanced only by `node museum/generate.mjs --release`, and it refuses to pin a tag that doesn't
   exist.
