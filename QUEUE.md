@@ -19,7 +19,17 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-21** — an **A3 build attempt** that hit a feasibility wall and surfaced a premise
+**Last updated: 2026-07-22** — **2.8.5 "Foundations & Fidelity" is SHIPPED to production.** The
+`dev → main` release merge was performed with `--no-ff` (a fast-forward makes the tip shared with `dev`,
+which makes GitHub Pages reject the production deploy — recorded lesson), the release workflow
+auto-created the `v2.8.5` tag on CI-green `main` and deployed to GitHub Pages. `APP_VERSION` 2.8.0→2.8.5,
+cache `robco-terminal-v2.8.5-r1`, the `[Unreleased]` block consolidated into a dated `## [v2.8.5]` block
+with a fresh empty `[Unreleased]` opened, and ARCHITECTURE/README brought current. **No tag was pushed by
+hand** — pushing one would make `release.yml` see the tag already exists and skip the deploy. Owed to the
+owner: the real-device installed-PWA update check (Android). Owed to Dispatch: the post-release ritual
+(archive sync + museum regeneration).
+
+**Prior update — 2026-07-21:** an **A3 build attempt** that hit a feasibility wall and surfaced a premise
 correction; built nothing, recorded both in **A3** in place (Protocol 50). **(1)** The Firebase emulator
 **cannot run here** — the Firestore/Auth emulators are Java processes and there is **no JVM** on the
 machine (`java` absent, `JAVA_HOME` unset, no JDK/JRE/JBR anywhere, `firebase-tools` not installed), so the
@@ -53,10 +63,11 @@ running history chain in
 
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
-- **2.8.5 is essentially DONE on `dev`.** The code+test-health round (U1–U12), the library/token split,
-  the Fallout 3 Pip-Boy skin, the data-provenance re-sourcing, all three save-integrity layers, the
-  UI-truthfulness fixes, the schematic-layout fix, and the whole governance restructure (R1-R4, R8, R9)
-  have landed. Protocol 23 (layering) is now **enforced** by a static gate.
+- **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
+  round (U1–U12), the library/token split, the Fallout 3 Pip-Boy skin, the data-provenance re-sourcing,
+  all three save-integrity layers, the UI-truthfulness fixes, the schematic-layout fix, and the whole
+  governance restructure (R1-R4, R8, R9) have landed and released. Protocol 23 (layering) is now
+  **enforced** by a static gate.
 - **An external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) has been folded in (item R10).** Two
   live defects it found are **already FIXED and guarded** — the cache-bump guard was blind to the `assets/`
   icons + best-effort-precached `CHANGELOG.md`, and `ARCHITECTURE.md` prescribed a save-destroying `setDoc`.
@@ -66,12 +77,11 @@ running history chain in
   R10's remediation** (fix the trusted layer → fix the guards that under-check → route Architecture by
   section; none of it gates the release) and **adopted a knowledge-graph / retrieval-topology spec (new item
   R11)** off the same audit.
-- **What's genuinely left before the `dev → main` release:** ~~the near-term data-safety item **A3**~~ **—
-  A3 is now RESOLVED (2026-07-21):** its modeled cloud-serialization guard shipped (`npm run cloud-check`)
-  and the premise correction dropped the emulator test to the optional post-release item **A4**, so **no
-  data-safety item now gates 2.8.5** — only a short tail of small leftovers remains. The end-of-round
-  review/synthesis deliverables (F done; **G**, H, D, I) and the governance process work (R5-R7) can land
-  around the release, not before it.
+- **The `dev → main` release is DONE (2026-07-22).** A3 was resolved (2026-07-21) — its modeled
+  cloud-serialization guard shipped (`npm run cloud-check`) and the premise correction dropped the emulator
+  test to the optional post-release item **A4** — so nothing data-safety gated the ship. The end-of-round
+  review/synthesis deliverables (F done; **G**, H, D, I) and the governance process work (R5-R7) are now
+  the post-2.8.5 tail, landing on `dev` for the next cycle.
 - **Then 2.9.0** — the big one: gameplay systems, ambient world life, and the "it's a real operating
   system" round. Its hardening gate (which burns down the baselined architecture debt) sits BEFORE the OS
   services that would otherwise multiply it.

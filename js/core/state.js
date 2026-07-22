@@ -1,5 +1,5 @@
 // ── APP VERSION ───────────────────────────────────────────────
-const APP_VERSION = '2.8.0';
+const APP_VERSION = '2.8.5';
 window.APP_VERSION = APP_VERSION;
 
 // ── METASTORE — device-preference key/value store (Protocol 23 boundary) ────

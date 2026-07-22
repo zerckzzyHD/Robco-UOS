@@ -17127,6 +17127,16 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //  combined-modifiers case). A mismatch means the refactor changed what the AI
   //  is told — the exact regression this golden-master test exists to catch.
   {
+    // v2.8.5 RELEASE VERSION BUMP (2026-07-22): ALL 11 rows' hashes moved. The
+    // directive embeds ${APP_VERSION} verbatim ("[SYSTEM MSG]: RobCo U.O.S.
+    // ${APP_VERSION} Active." — api-directive.js) so bumping APP_VERSION 2.8.0→2.8.5
+    // shifts every directive's hash by exactly that substring and nothing else. This
+    // is the ONLY change this pass — proven before re-pinning by regenerating each
+    // directive at 2.8.5, substituting '2.8.5'→'2.8.0' in the output, and confirming
+    // it reproduces the pre-bump golden hash byte-for-byte (all 11 rows). A version
+    // bump moving these hashes is expected and NOT a regression (Protocol 2/14);
+    // re-pinned via the same in-sandbox getSystemDirective() the matrix below hashes.
+    //
     // LEVEL OWNERSHIP → THE PLAYER (2026-07-20, owner directive): ALL 11 rows'
     // hashes moved. A new line in the ROBCO_DEV_MANUAL progression block tells the
     // AI that level is player-owned and READ-ONLY to it — "lvl" may now only
@@ -17165,77 +17175,77 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '09979e404e096857b3c2d758460a6ff94bdf046138da8539d41ee0e6502c97e0',
+        sha256: 'a133e00fedfa9a3ac5892b800bcf4a2e8ee4449591cd01e86448272205bb80b6',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: undefined,
         cm: undefined,
-        sha256: '44e186d5374ab02e15e4385a290a5f394d133e3aaeb48bc6050fb8a0df5de540',
+        sha256: '38e263007ce9081c336e447024b8d4c7dcc32569dafbe0325ea2a5cb9cbad787',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'minmaxed',
         cm: undefined,
-        sha256: '0d03364b522a999dc91c07cfd9eaf0015467014c3dfb73911e5fb480f059b620',
+        sha256: '7ead096e5127f6089e951c7a732d1f3815ff168c72e744b6a5c77f9d55d254dd',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'completionist',
         cm: undefined,
-        sha256: 'a6f83197a03a7f47a32dff6669abee37b21b55f5bbe0fa385ed04bac73fa0c1e',
+        sha256: 'af56e67ebd2b4008fec3bbcb03609e4983ccf5f48b0b2be9476648e007574a35',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'casual',
         cm: undefined,
-        sha256: '265c78463e80a608c91c5ab2fbfed68269aebb1ba155f95ecf0b6318e5800f05',
+        sha256: 'c46cb89cb94a1ab7da0b40766461a1388a484e29029283937bd4d742ae21967e',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: 'speedrun',
         cm: undefined,
-        sha256: '9df11080498c7967bad74460abe09fc153732f0082589b6f81ea39dc606bc4da',
+        sha256: 'd059ea01dfaa6f866a5dc6d3b660578eb56e1d220049d9647b2bd27bf0a519d7',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng',
-        sha256: 'e59fbf7d417c9fc110f5cd80eb69da13b0b13720452017ecd0a40bf6cddae725',
+        sha256: 'e5b5ebbc069224dbc5a66919aa13b022fdf97dedff1fa2ee1155cc6891781dbc',
       },
       {
         ctx: 'FNV',
         ps: undefined,
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'a61620d349e3b4aa2813852cebd588262bc513bf5d1a42123f73846b2938d0c3',
+        sha256: '8160d97e7a865d83659d779cfbe89abb5787c4ca07c828a60b62b61ec9d348cc',
       },
       {
         ctx: 'FNV',
         ps: 'melee',
         pt: 'minmaxed',
         cm: 'rng-locked',
-        sha256: '3026ab20ceefe9e65b1351ee3c3f083185630a926d938894c8b9e398eaa2dc04',
+        sha256: '9eaa663c27a98fdcbfb5a2a6b2fb595bc8dcef65bf4c22b9b565ab19e49dc919',
       },
       {
         ctx: 'FO3',
         ps: undefined,
         pt: undefined,
         cm: undefined,
-        sha256: '7d9775b50b5a0d878f7d32e3947f30700481cb511923b8466fa3d419eadaef02',
+        sha256: '03303ddb4df3cf43813f6c69a1335b28cd95fcbe2a09a8c8e290411d7538388f',
       },
       {
         ctx: 'FO3',
         ps: 'melee',
         pt: undefined,
         cm: 'rng-locked',
-        sha256: 'ecc9c05dea238a3f7968bf5a30ad128922726bb5fbee3adcd2b67d77f0b87aad',
+        sha256: 'a67ae4b47779b637d6a167a58311e27c560a30fb7d82d35df50ac6ec45388c07',
       },
     ];
 
@@ -21268,8 +21278,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //         duplicated/hardcoded here too, which would go stale on every
   //         later served-file commit.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+';/.test(readFile('sw.js')),
+    '151.18: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
 
   // ── BEHAVIORAL (U3 slice 3 / B4) — run the REAL quick-log handlers in an isolated
@@ -21852,8 +21862,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
   //        there per the rotation pattern documented at 151.18; kept generic
   //        here so a later served-file bump can't make this suite stale.)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+';/.test(readFile('sw.js')),
-    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+';/.test(readFile('sw.js')),
+    '153.9: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
 }
 
@@ -23067,10 +23077,10 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
     );
   }
 
-  // 157.19  APP_VERSION is the released version (bumped at the v2.8.0 dev→release cut; Protocol 2)
+  // 157.19  APP_VERSION is the released version (bumped at the v2.8.5 dev→release cut; Protocol 2)
   assert(
-    /APP_VERSION\s*=\s*'2\.8\.0'/.test(stateSource),
-    '157.19: APP_VERSION is 2.8.0 (released this version)'
+    /APP_VERSION\s*=\s*'2\.8\.5'/.test(stateSource),
+    '157.19: APP_VERSION is 2.8.5 (released this version)'
   );
 }
 
@@ -23245,8 +23255,8 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
   // 158.16  CACHE_NAME was bumped for this served-file change (Protocol 1)
   assert(
-    /const CACHE_NAME = 'robco-terminal-v2\.8\.0-r\d+'/.test(swSource),
-    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.0-rN revision string (Protocol 1)'
+    /const CACHE_NAME = 'robco-terminal-v2\.8\.5-r\d+'/.test(swSource),
+    '158.16: CACHE_NAME is a well-formed robco-terminal-v2.8.5-rN revision string (Protocol 1)'
   );
 
   // 158.17  per-game casing flavor text is CSS-swapped, never a JS ctx branch (Protocol 38)
