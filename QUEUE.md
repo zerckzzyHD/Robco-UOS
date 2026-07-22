@@ -11,7 +11,7 @@ and be read constantly; a log grows forever and is read rarely, and it was buryi
 lost — every shipped item keeps a one-line record here with a link to its full account there.
 
 **⛔ Item IDs are STABLE TAGS — never renumber, never re-letter, never reuse.** The letters and numbers
-(A0-A3, B-P, P1-P3, R1-R9, and the rest) were assigned as work was found, so they do **not** run
+(A0-A4, B-P, P1-P3, R1-R9, and the rest) were assigned as work was found, so they do **not** run
 alphabetically top-to-bottom — they are content-addresses referenced from commit messages, memory files,
 the workflow-review prompt, and `CHANGELOG.md`. Regrouping an item does not change its ID. This is the
 Protocol 49 retirement discipline (retire in place, never renumber) applied to queue IDs. A future session
@@ -32,13 +32,16 @@ wholesale, and the load path (`sanitizeImportedContainer` + `migrateState`) pass
 so a new plain field round-trips losslessly; the only residual silent-drop is the **Firestore
 serialization boundary** (undefined-strip / nested-array-reject / doc-size), exactly what needs the real
 emulator. A non-emulator round-trip substitute would pass for any field and catch nothing, so none was
-shipped. Net: A3's grip on the 2.8.5 release is **reduced, not eliminated** — an owner call (marked ⚠️
-below). **Same-day continuation:** the owner chose the **interim modeled guard**, now shipped —
-`scripts/cloud-serialization-check.js` (`npm run cloud-check`), self-deriving from the real `state` literal,
-red-then-green proven, opt-in for now with a recommendation to promote it into the gate (it needs no
-emulator); the real emulator test stays open (⚠️) pending a JDK. No `APP_VERSION` / `CACHE_NAME` bump (no
-served file changed — `js/core/state.js` was touched only by a probe reverted byte-identical). Earlier
-passes — the QUEUE.md header-mangle fix,
+shipped. **Owner decision (same day): build the modeled guard NOW, no JDK — and A3 is CLEARED as a release
+blocker.** Shipped `scripts/cloud-serialization-check.js` (`npm run cloud-check`): self-derives the field
+set from the real `state` literal, flags Firestore-hostile values (`undefined` / nested arrays / oversize),
+red-then-green proven on the real literal (caught both a planted `[[1,2]]` and an `undefined`), opt-in with
+a built-in positive control and NO silent-skip path. The premise correction (state stored WHOLESALE +
+pass-through loads → a forgotten field-mapping **cannot** silently drop data) drops the true emulator test
+from release-blocker to the **optional post-2.8.5 item A4** (needs a JDK/JRE 11+ + dev-only
+`firebase-tools`). **A3 was the last thing gating 2.8.5; it is now resolved — nothing data-safety blocks the
+ship.** Cache bumped r55→r56 (the precached `CHANGELOG.md` changed); no `APP_VERSION` bump (Under-the-Hood,
+not user-visible). Earlier passes — the QUEUE.md header-mangle fix,
 the seven- and six-decision recording passes, the cross-cutting **EXECUTION SEQUENCE** — are in the
 running history chain in
 [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
@@ -62,10 +65,12 @@ running history chain in
   R10's remediation** (fix the trusted layer → fix the guards that under-check → route Architecture by
   section; none of it gates the release) and **adopted a knowledge-graph / retrieval-topology spec (new item
   R11)** off the same audit.
-- **What's genuinely left before the `dev → main` release:** the near-term data-safety item **A3** (cloud
-  round-trip test) plus a short tail of small leftovers. The end-of-round review/synthesis deliverables
-  (F done; **G**, H, D, I) and the governance process work (R5-R7) can land around the release, not
-  before it.
+- **What's genuinely left before the `dev → main` release:** ~~the near-term data-safety item **A3**~~ **—
+  A3 is now RESOLVED (2026-07-21):** its modeled cloud-serialization guard shipped (`npm run cloud-check`)
+  and the premise correction dropped the emulator test to the optional post-release item **A4**, so **no
+  data-safety item now gates 2.8.5** — only a short tail of small leftovers remains. The end-of-round
+  review/synthesis deliverables (F done; **G**, H, D, I) and the governance process work (R5-R7) can land
+  around the release, not before it.
 - **Then 2.9.0** — the big one: gameplay systems, ambient world life, and the "it's a real operating
   system" round. Its hardening gate (which burns down the baselined architecture debt) sits BEFORE the OS
   services that would otherwise multiply it.
@@ -82,7 +87,8 @@ running history chain in
   SAME day, owner's call):** **R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas
   built in.** The one-line why: fix the docs every session is forced to read FIRST, then build the graph that
   actually helps sessions (the owner judges its session-help worth more than a faster release), then A3 and
-  ship — and keep the Atlas IN 2.9.0 so it maps a system that isn't about to change under it. It is an
+  ship — **A3 is now done** (modeled guard shipped; emulator test demoted to optional A4), so the ship is
+  clear of it — and keep the Atlas IN 2.9.0 so it maps a system that isn't about to change under it. It is an
   **overlay** on the readiness groups below, not a re-filing. Full reasoning in **"The execution SEQUENCE"**
   just below. The correction it is built on: **most "museum stuff" helps HUMANS, not sessions.**
 
@@ -127,8 +133,11 @@ the Atlas's assurance view (I).** The order below is built on that distinction.
    pre-approved as his (the graph's session-help over release speed). **It still must NOT move above step 1:**
    the graph is built to detect drift in exactly the trusted-layer files R10 fixes, so those fixes stay first.
 
-3. **Then A3, then SHIP 2.8.5 → [A3].** A3 (the cloud round-trip test) remains the near-term data-safety
-   blocker on the release — it is still the only thing gating the ship. **The reasoning that still stands:**
+3. **Then A3, then SHIP 2.8.5 → [A3].** ✅ **A3 is DONE (2026-07-21) — the ship is no longer gated by it.**
+   The modeled cloud-serialization guard shipped (`npm run cloud-check`) and the premise correction (the code
+   stores state WHOLESALE with pass-through loads, so a forgotten field-mapping cannot silently drop data)
+   demoted the real emulator test to the **optional** post-release item **A4**. So this step is cleared;
+   nothing data-safety gates the ship. **The reasoning that still stands for shipping soon:**
    shipping gives the museum a real released version to PIN to (unblocking publication P2), and it lets the
    Atlas get built against a stable released baseline instead of a moving `dev`. **The recorded COST of moving
    R11 up:** that museum-pin benefit is now **deferred slightly** — it is a cost of the owner's choice, not a
@@ -184,8 +193,9 @@ unchanged.
 
 Everything in the 2.8.5 blocks above has shipped. This block is the rest of the near-term work. The old
 discovery-order groups (Group 1 data-safety → Group 4 deliverables) are retired in favour of grouping the
-**open** items by what actually determines when they can run. Only the near-term data-safety item (**A3**)
-plus the small fixes gate the `dev → main` release; the deliverables and the governance process work can
+**open** items by what actually determines when they can run. The near-term data-safety item (**A3**) is now
+**resolved** (2026-07-21 — modeled guard shipped, emulator test demoted to optional **A4**), so **only the
+small fixes** remain before the `dev → main` release; the deliverables and the governance process work can
 land around it.
 
 _Placed 2026-07-18 from two external AI reviews (`planning/2.8.5/audits/ATLAS_ECOSYSTEM_REVIEW.md` + the
@@ -239,7 +249,13 @@ _End-of-round deliverable foundation:_
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
-### A3. ⚠️ CLOUD ROUND-TRIP TEST — interim guard SHIPPED; emulator test still blocked on JDK (2026-07-21)
+### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED, release-cleared; real-emulator test re-filed as A4 (2026-07-21)
+
+> **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5.** The
+> self-deriving modeled guard (`npm run cloud-check`) is the shipped resolution; see **RESOLUTION** at the
+> foot of this entry. The true emulator-backed test is **re-filed as the optional post-2.8.5 item A4** —
+> _not_ a blocker — because the premise correction below shows the silent-data-loss failure A3 was scoped
+> to catch **cannot occur by design**. The original spec is preserved verbatim beneath for the record.
 
 **What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
 suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
@@ -333,42 +349,71 @@ hard-environmental and one about the code itself:
    coverage (hardcoded fixture + hand-listed fields; real `sanitizeImportedContainer` + `migrateState` in a
    `vm`) and is unchanged.
 
-**The one honest interim option (owner decision — not shipped unilaterally).** A self-deriving guard that is
-runnable **without** the emulator: enumerate every field on a fully-populated live `state` and assert each
-value obeys the documented Firestore constraints (no `undefined`, no directly-nested arrays, within size). It
-is self-deriving (new field covered automatically) and red-then-green-able, but it **models** Firestore's
-rules rather than verifying against Firestore, and does not cover real type coercion, security rules, App
-Check, or network. Whether that interim guard is wanted — versus installing the JDK for the real emulator
-test, versus shipping 2.8.5 without A3 given the reduced risk this correction reveals — is an **owner call**.
-
-**✅ UPDATE (2026-07-21, same day) — owner chose the interim guard; it is SHIPPED.**
+**✅ RESOLUTION (owner decision 2026-07-21) — the modeled guard is SHIPPED and A3 is release-cleared.**
 `scripts/cloud-serialization-check.js` (`npm run cloud-check`). It self-derives the field set by extracting
 and evaluating the **real** `let state = { … }` initializer from `js/core/state.js` in a `vm` sandbox (the
 same extract-and-run technique as Suite 46.17), builds the `robco_v8` write payload, and recursively flags
 any value Firestore would silently strip (`undefined`) or reject (directly-nested array `[[…]]`), plus a
-soft 1 MB doc-size check. A new field added to that literal is scanned automatically — no hand-typed list, so
-it does not rot the way 46.17's list does. A built-in **positive control** scans a known-hostile fixture on
-every run and fails if the scanner doesn't flag it, so the guard can't silently become a green-that-lies
-no-op. **Red-then-green proven** on the real shipped literal: a planted `[[1,2]]` field made it FAIL (exit 1,
-correct path reported), removing it made it PASS (exit 0); `state.js` left byte-identical to HEAD.
+soft 1 MB doc-size check. **A new field added to that literal is scanned automatically — no hand-typed list**,
+so it does not rot the way 46.17's list does (the one anti-pattern this item forbids). A built-in
+**positive control** scans a known-hostile fixture on every run and fails if the scanner doesn't flag it, so
+the guard can never silently degrade into a green-that-lies no-op.
 
-- **Placement — opt-in / un-gated for now** (owner's stated preference). It has **zero external dependency**
-  (pure Node `vm`), so it is safe to run anywhere — nothing like the JVM barrier that kept the emulator test
-  out. **Recommendation:** promote it into the normal gate (`scripts/gate.js`), because a modeled guard that
-  runs catches regressions and an opt-in one nobody runs does not; left opt-in only because that was the
-  explicit instruction. One word from the owner flips it.
-- **What it still does NOT do, and why A3 stays open (⚠️, not ✅):** it **models** Firestore's write rules
-  rather than verifying against a real Firestore, and it sees the field **shape**, not every runtime value —
-  so it cannot catch a field that is safe by default but gets populated with a hostile value at play time,
-  nor real type coercion / security rules / App Check / network. Those need the **JDK-backed emulator test**,
-  which remains the real A3 deliverable, still blocked on the owner installing a JDK/JRE 11+ (then
-  `npm i -D firebase-tools`, dev-only). This interim guard **reduces** the residual risk; it does not close it.
+- **Red-then-green PROVEN on the real shipped literal** (Protocol 13/42). Planting `_a3Probe: [[1,2]]` and
+  `lvlUndef: undefined` in the actual `state` made it FAIL (exit 1) and it named BOTH —
+  `campaigns.FNV._a3Probe[0] → directly-nested array` and `campaigns.FNV.lvlUndef → undefined stripped`;
+  removing them made it PASS (exit 0). `js/core/state.js` was left byte-identical to HEAD.
+- **Placement — opt-in / un-gated initially** (owner's directive, same discipline as the knowledge graph).
+  Run it explicitly with `npm run cloud-check`. It has **zero external dependency** (pure Node `vm`), so it
+  is safe to promote into `scripts/gate.js` whenever wanted — recommended, since a modeled guard that runs
+  catches regressions and an opt-in one nobody runs does not.
+- **No silent skip (the green-that-lied guard).** The script has **no conditional-skip path** — it always
+  runs and always asserts. If extraction of the state literal ever fails, it **FAILS LOUDLY** (the
+  anti-vacuous check refuses to let an empty derived state pass as clean), never silently green.
+- **What it MODELS, not verifies (state the limit so no one over-trusts it).** It encodes Firestore's
+  documented write constraints (no `undefined`, no directly-nested arrays, ~1 MB doc cap) **in our own
+  code** and checks the state **shape** against them. It does **not** run real Firestore, so it does not
+  cover real type coercion, deployed security rules, App Check, network, or a field that is safe by default
+  but gets a hostile value only at runtime. Those constraints are stable and documented, but this reduces
+  the residual risk — it does not eliminate it. The real-Firestore verification is item **A4** (optional).
 
-**Does A3 still block the 2.8.5 release?** Reduced, not eliminated. The correction shows the _dangerous
-silent_ failure A3 feared (a forgotten mapping) **cannot occur** in the current wholesale-storage design; the
-residual risk is narrower (a field holding a Firestore-hostile value type). Recommend the owner decide whether
-that narrower risk still gates the ship. **Does NOT cover, in any form built or proposed here:** real
-Firebase, App Check, deployed security rules, or genuine network behaviour (as the spec already disclaimed).
+**Why A3 dropped from RELEASE BLOCKER to release-cleared — the premise correction (the most valuable
+finding).** A3 was scoped to catch "a field added to `state` but missed in the cloud **sync mapping**
+silently never syncs." Established from the code (block 2 above): **there is no field-by-field sync
+mapping.** `cloud.js` stores the campaign **WHOLESALE as a blob** (`robco_v8: payload.robco_v8`) and the
+load path passes unknown fields **through** (`sanitizeImportedContainer`'s `Object.assign` copy +
+`migrateState`'s in-place defaulting). So the forgotten-field-mapping data-loss A3 existed to catch
+**cannot occur by design** — a new field round-trips losslessly through the app's own code. The only
+residual silent-drop is the Firestore **serialization boundary**, which the modeled guard above now covers
+for the shape and which A4 will verify against real Firestore. That is why the emulator test is an
+**optional post-release upgrade, not a blocker**, and why **A3 is the last thing that was gating 2.8.5 and
+is now cleared.**
+
+### A4. ⬜ (OPTIONAL, post-2.8.5) Real-Firestore round-trip — verify the model against the emulator
+
+**What it is.** The upgrade of A3's modeled guard from _modelled_ to _verified_: a save→sync→load round-trip
+run against the **Firebase local emulator suite** (real Firestore + Auth SDK write/read), asserting
+field-level fidelity driven from the live field list — the thing A3 originally described. It replaces the
+modeled Firestore constraints (`cloud-check`) with the real database's actual behaviour, so it also catches
+real type coercion (timestamps, number ranges) and true document-size rejection that a model can only
+approximate.
+
+**Explicitly NOT a release blocker (owner decision 2026-07-21).** The premise correction (see A3) removed
+the silent-data-loss risk this was scoped for; the modeled guard (A3) covers the residual shape risk. So
+this is a _confidence upgrade_, run when convenient after 2.8.5 — never gating a ship.
+
+**What it needs — recorded honestly.** A **JDK/JRE 11+** on the machine that runs it (the Firestore/Auth
+emulators are Java processes — confirmed absent on the owner's machine 2026-07-21, which is why this is
+deferred), plus **`firebase-tools` as a DEV-ONLY** dependency (`npm i -D firebase-tools`) — must never enter
+`sw.js`'s precache set or ship to users, runs fully offline at the gate.
+
+**What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
+run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
+
+**Done means:** with a JDK present, a real-SDK round-trip against the emulator asserts every save-envelope
+field survives equal, driven from the live field list (not a hardcoded one), proven red-then-green by
+dropping a field; `firebase-tools` dev-only with nothing added to the served set. Until then, A3's
+`npm run cloud-check` is the standing guard and this stays optional.
 
 ### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
 
@@ -520,8 +565,9 @@ everything else is recorded, ranked by consequence, with each finding's home or 
 
 **⭐ THE SEQUENCE for working R10's findings — Dispatch sequenced it, owner's instruction (2026-07-21):
 _"you need to sequence everything not me."_** The ordering reasoning is the valuable part, so it is recorded,
-not just the order. **NONE of this blocks the release — 2.8.5 is blocked only by A3; everything in R10 is
-process debt, not shipping debt.** The stated plan: do steps one and two, ship 2.8.5, then do step three.
+not just the order. **NONE of this blocks the release — and A3 (the last data-safety gate) is now RESOLVED
+(2026-07-21), so nothing here blocks 2.8.5; everything in R10 is process debt, not shipping debt.** The
+stated plan: do steps one and two, ship 2.8.5, then do step three.
 
 1. **FIRST — fix the trusted layer.** The stale facts in `ARCHITECTURE.md` (finding B) and the ones the R2
    restructure copied into `rules/state-and-save.md` (finding B-critical), plus the remaining false/overclaimed
@@ -813,8 +859,9 @@ commit, Protocol 27):**
 
 - Branch discipline (Protocol 43) → GitHub branch-protection settings, not just prose.
 - The redirect-auth ban (`linkWithRedirect`/`signInWithRedirect`, Protocol 30) → a lint rule.
-- The state-field checklist → a schema round-trip test. **Flag:** may already be substantially covered once
-  **A3** (the cloud round-trip test above) ships — check for overlap at plan time (Protocol 22).
+- The state-field checklist → a schema round-trip test. **Flag:** partially covered now that **A3**'s modeled
+  cloud-serialization guard (`npm run cloud-check`) has shipped, and it would be more fully covered by the
+  optional emulator test **A4** — check for overlap at plan time (Protocol 22).
 - Render-layering (Protocol 23) → AST/lint boundary rules, once the baselined debt is burned down. Today's
   static scanner (Suite 236) is a step in this direction; full enforcement waits on the native ES-modules
   migration (bundled with 3.0).
