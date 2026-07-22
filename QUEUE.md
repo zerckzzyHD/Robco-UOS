@@ -991,6 +991,71 @@ new schema decided here; this only fixes what the museum is FOR so future design
 work, P6, any future exhibit) inherit the right center of gravity instead of defaulting to "release notes with
 pictures."
 
+**⭐ THE CONTENT DIRECTION — eight facets that REALIZE the thesis, owner-approved (2026-07-21, "fold all in,
+including the rec at the end").** The thesis above says what the museum's centerpiece IS; these are not a
+second, competing list — they are that centerpiece made concrete, eight different lenses on the same
+failure → lesson → measure → improvement arc. **Recorded as content-direction + reasoning + sourcing only —
+NOT designed, NOT built; a future museum-content build session inherits this instead of re-deriving it or
+narrowing back to "app history."**
+
+1. **Lifecycle, not just current state (the owner's lead point).** Every protocol / guard / test / rule shown
+   with its full arc: born (from what failure) → converted (prose → enforcement, or narrowed) → retired (risk
+   gone). A RETIRED rule shown next to "why it was safe to remove" teaches as much as an active one, and it is
+   the counter-story to "the escape-ratchet only ever grows" — the project learning to CUT weight is a
+   maturity milestone, not a deletion. **Raw material:** the retirement rule (Protocol 49 / R2), the trim
+   stages (R3, R5, R6, R7), converted protocols, and every protocol/suite retired in place (Protocols 15, 2a,
+   never renumbered — see "RETIRED PROTOCOLS" in this file's own rulebook half, `CLAUDE.md`).
+2. **The connection graph as centerpiece.** Failure → guard → protocol → test → commit, linked and walkable:
+   click a bug, see the guard; click the guard, see the protocol it enforces and the incident that birthed it.
+   This is the "visual of how everything connects" the owner has raised repeatedly. **Raw material /
+   relationship — cross-referenced, not restated:** the Atlas (**item I**) computes the CURRENT web of guards;
+   the knowledge graph (**R11**) shows the knowledge layer's own connections. Same causal-web story two other
+   items already compute from different angles — the museum is where it becomes clickable for a human. This
+   is the same "link, don't fuse" relationship the thesis's own Atlas cross-reference (above) and R11's
+   `claims_scope_over` design already establish; this facet is where that graph surfaces for a person instead
+   of a session.
+3. **The "green that lied" room.** The project's hardest-won lesson: checks that passed while meaning
+   nothing — the cache guard comparing the wrong branch, tests asserting source text rather than behavior, the
+   fake level-up popup, the museum's own "Operators 3" miscount, the header mangle passing the formatter, the
+   redirect-ledger's 22% rename undercount. A room specifically about things that looked fine and weren't is
+   the most teachable content in the archive — it is the exact failure mode the whole apparatus exists to
+   fight. **Raw material:** the bug room's own records (`bugs/*/record.md`), `QUEUE_LOG.md`, the audits filed
+   under `_RobCo-Archive/audits/`, and orchestrator memory.
+4. **Every protocol next to its origin incident.** "Written in response to a real bug" is true of nearly every
+   protocol in `CLAUDE.md` — surface WHICH bug. A protocol alone is a rule; a protocol beside the failure that
+   created it is a lesson. **Raw material:** the bug room's records, `QUEUE_LOG.md`, and orchestrator memory
+   (the same sourcing as facet 3, read for a different cut — origin-incident-per-protocol rather than
+   false-green-per-check).
+5. **The cost / honesty layer.** Generalize the bug museum's "what the guard costs" to the whole museum — show
+   the PRICE of the discipline too: the ceremony, the false starts, the things that turned out to be
+   over-engineering and got trimmed. Honesty about cost is what makes the museum credible rather than a brag.
+   **Raw material:** the trim stages (R3, R5-R7) and the "no guard warranted" decisions on file (e.g. facet 6's
+   restraint cases).
+6. **The reversals and the restraint.** Not every failure produced a guard — some were "we consciously chose
+   NOT to guard this," with reasoning. Showing where the project chose restraint is as honest as showing where
+   it added armor. **Raw material:** the header-fragility not-to-guard decision, the deliberately un-gated
+   knowledge graph (**R11**, "Deliberately left un-gated... until it demonstrably catches real drift"), the P3
+   "current-by-absence" logic fix (R10 finding H, corrected above under P3), and the conversation → queue gap
+   marked honestly unenforceable (Protocol 50(c)).
+7. **The maturity curve.** Generalize the growth chart from lines-of-code to _measures of discipline over
+   time_ — added vs. retired — so the shape itself tells the arc: early chaos → incidents → apparatus growing
+   → learning to cut. **Raw material:** the existing growth-chart generator (the museum's strip-chart growth
+   page), the protocol/suite history, and the trim stages (R3, R5-R7).
+8. **Provenance made visible.** Every fact links to the commit that proves it (the bug records already do
+   this) — make it a STATED, visible property of the museum itself: "nothing here is narrated; everything is
+   generated and sourced." That is what separates the museum from a hype page. **Raw material:** the bug
+   records' existing provenance fields and the generator's existing source-linking (`museum/generate.mjs`).
+
+**⚠ THE GOVERNING CONSTRAINT every one of the eight operates under — the caution the owner explicitly folded
+in, not an afterthought: record everything, EXHIBIT the arcs that taught something.** The risk of
+"EVERYTHING" (the thesis's own word) is exhaustive-but-unreadable. The bug museum's own curation principle —
+`exhibited` is a DISPLAY judgment, every record still reaches the underlying corpus regardless (the same
+distinction Protocol 50's P4 already draws for bug records: "Record always. Curate ruthlessly.") — governs
+the WHOLE museum at this larger scale, not just the bug room. Without that curation signal, the walls fill
+with hundreds of routine fixes and the handful that actually taught something disappear into the noise. So
+this is not a suggestion sitting beside the eight facets — it is the constraint each one is built to operate
+under: comprehensive record, curated exhibit.
+
 - **Trigger: release-pinned, not pinned to `dev`.** `museum/release-pin.json` records the shipped release
   tag; advanced only by `node museum/generate.mjs --release`, and it refuses to pin a tag that doesn't
   exist.
