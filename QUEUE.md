@@ -19,21 +19,23 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-21** — a Protocol 50 recording pass, one decision: the QUEUE.md header-mangle
-hazard (self-caught, commits `8dc9d5f` → `89bc6a5`) — root cause verified by reproduction, not assumed
-(Protocol 27): `prettier --write` left both the correct and the mangled header **byte-identical to their
-input**, so this was never a Prettier reformat side effect — it was a hand-authoring slip inside one
-dense, heavily-nested paragraph that stayed syntactically valid markdown while being factually wrong, so
-the gate's format check had nothing to catch. Full decision record (no guard / fix the structural class /
-revisit condition) lives in **R10**, filed under step 1 (the trusted-layer doc fixes), since that step
-was already scheduled to touch this file. **The structural fix rides in this same pass:** this header no
-longer wraps in one giant single-underscore `_..._` italic span — the construct that let an underscored
-identifier collide with the italic markers in the first place; verified clean against Prettier
-(`--check` passes, `--write` makes no change) with `APP_VERSION` and `CACHE_NAME` rendering correctly
-below. No `APP_VERSION` / `CACHE_NAME` bump otherwise (no served file changed). The pass before — the
-cross-cutting **EXECUTION SEQUENCE** (R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with
-the Atlas built in, revised same-day by the owner) plus the archive-audit filing convention — and earlier
-passes are in the running history chain in
+**Last updated: 2026-07-21** — an **A3 build attempt** that hit a feasibility wall and surfaced a premise
+correction; built nothing, recorded both in **A3** in place (Protocol 50). **(1)** The Firebase emulator
+**cannot run here** — the Firestore/Auth emulators are Java processes and there is **no JVM** on the
+machine (`java` absent, `JAVA_HOME` unset, no JDK/JRE/JBR anywhere, `firebase-tools` not installed), so the
+emulator-backed round-trip could not be run or verified, and A3's own red-then-green Hard rule forbids
+shipping a cloud-safety test green-but-unrun. **Unblock:** owner installs a **JDK/JRE 11+** (a system
+install, not a dev npm dep) then `npm i -D firebase-tools` (dev-only, never precached). **(2) Premise
+correction:** the "field added to `state` but missed in the cloud **sync mapping**" failure A3 was written
+to catch **does not exist in the current code** — `cloud.js` stores the whole `robco_v8` container
+wholesale, and the load path (`sanitizeImportedContainer` + `migrateState`) passes unknown fields through,
+so a new plain field round-trips losslessly; the only residual silent-drop is the **Firestore
+serialization boundary** (undefined-strip / nested-array-reject / doc-size), exactly what needs the real
+emulator. A non-emulator round-trip substitute would pass for any field and catch nothing, so none was
+shipped. Net: A3's grip on the 2.8.5 release is **reduced, not eliminated** — an owner call (marked ⚠️
+below). No `APP_VERSION` / `CACHE_NAME` bump (docs only). Earlier passes — the QUEUE.md header-mangle fix,
+the seven- and six-decision recording passes, the cross-cutting **EXECUTION SEQUENCE** — are in the
+running history chain in
 [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
 
 ---
@@ -232,7 +234,7 @@ _End-of-round deliverable foundation:_
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
-### A3. ⬜ CLOUD ROUND-TRIP TEST — prove every field survives sync, against the Firebase emulator
+### A3. ⚠️ CLOUD ROUND-TRIP TEST — BLOCKED ON TOOLING (no JVM) + premise correction (2026-07-21)
 
 **What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
 suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
@@ -293,6 +295,52 @@ sync mapping and it must fail.
 save-envelope field present and equal, is driven from the live field list rather than a hardcoded one, has
 been proven to fail when a field is dropped, and `firebase-tools` is a dev-only dependency with nothing
 added to the served set.
+
+**🚧 BUILD ATTEMPT — feasibility wall + premise correction (2026-07-21, Dispatch/Opus).** The spec above
+is preserved verbatim; this note records what was found when building was attempted. Two blockers, one
+hard-environmental and one about the code itself:
+
+1. **The emulator genuinely cannot run in the current environment — HARD WALL.** The Firestore **and** Auth
+   emulators (via `firebase-tools`) are **Java** processes; they need a JVM. Checked and confirmed absent:
+   `java` not on PATH, `JAVA_HOME` unset, no JDK/JRE under `Program Files`, no bundled JBR in any IDE/SDK,
+   and `firebase-tools` is not installed. So the emulator-backed round-trip **could not be run or verified
+   here**, and per the item's own **Hard rule** (red-then-green on the real artifact) an un-runnable
+   cloud-safety test must not be shipped as green — it would be "a green that lied." **What the owner must
+   set up to unblock:** install a **JDK/JRE (11+)** on the machine that runs the gate, then
+   `npm i -D firebase-tools` (dev-only — must never enter `sw.js`'s precache set or ship to users). A JDK is
+   a **system install**, beyond a dev-only npm dependency, so it is deliberately left for the owner rather
+   than done silently by a session.
+
+2. **⚠ PREMISE CORRECTION — the failure mode A3 was written to catch does not exist in the current code.**
+   A3 assumes "a field added to `state` but missed in the **cloud sync mapping** silently never syncs." There
+   is **no field-by-field cloud sync mapping**. `cloud.js` stores the **entire `robco_v8` container wholesale**
+   (`_buildSavePayload` → `robco_v8: payload.robco_v8`; `_uploadSaveDoc`/`overwriteCloudSave` write it whole).
+   The load path runs `sanitizeImportedContainer` (starts from `Object.assign({}, s)` — unknown fields **pass
+   through**) then `migrateState` (mutates in place, defaults missing fields, deletes only **named** legacy
+   keys — unknown fields **pass through**). So a newly-added plain state field **round-trips losslessly through
+   this project's own code**; there is no mapping to forget. The **only** place a new field can silently fail
+   to sync is the **Firestore serialization boundary**: `undefined` values silently stripped, directly-nested
+   arrays rejected (the whole write throws), `Date`/`Map`/class-instance coercion, and the 1 MB doc-size cap.
+   That boundary is exactly the layer that needs the **real emulator** — a pure-JS round-trip cannot observe it.
+   **Consequence:** a non-emulator "round-trip" test built on the real save-build + real load sanitize/migrate
+   would pass for **any** new field (the code loses nothing there), so shipping it as "the A3 test" would be
+   theater — it would catch nothing. It was therefore **not shipped**. Suite 46.17 remains the closest existing
+   coverage (hardcoded fixture + hand-listed fields; real `sanitizeImportedContainer` + `migrateState` in a
+   `vm`) and is unchanged.
+
+**The one honest interim option (owner decision — not shipped unilaterally).** A self-deriving guard that is
+runnable **without** the emulator: enumerate every field on a fully-populated live `state` and assert each
+value obeys the documented Firestore constraints (no `undefined`, no directly-nested arrays, within size). It
+is self-deriving (new field covered automatically) and red-then-green-able, but it **models** Firestore's
+rules rather than verifying against Firestore, and does not cover real type coercion, security rules, App
+Check, or network. Whether that interim guard is wanted — versus installing the JDK for the real emulator
+test, versus shipping 2.8.5 without A3 given the reduced risk this correction reveals — is an **owner call**.
+
+**Does A3 still block the 2.8.5 release?** Reduced, not eliminated. The correction shows the _dangerous
+silent_ failure A3 feared (a forgotten mapping) **cannot occur** in the current wholesale-storage design; the
+residual risk is narrower (a field holding a Firestore-hostile value type). Recommend the owner decide whether
+that narrower risk still gates the ship. **Does NOT cover, in any form built or proposed here:** real
+Firebase, App Check, deployed security rules, or genuine network behaviour (as the spec already disclaimed).
 
 ### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
 
