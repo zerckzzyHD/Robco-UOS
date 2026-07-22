@@ -674,6 +674,49 @@ install strip (shipped above) plus the changelog and do nothing more. **Earn-con
 owner picks 1, 2, or 3; if (1) or (2), it becomes a small build unit. Recorded per Protocol 50 so the
 infeasibility reasoning does not evaporate (the achievements-rule-out cautionary case).
 
+**⭐ REFINED REQUIREMENT (owner, 2026-07-22) — whatever surface is chosen must GUIDE, not just tell: deep-link
+to the install button AND survive an update reboot.** The nudge/tip must not merely say "reinstall" — tapping
+it must get the user to the site and point them **straight at the install affordance** (the Task 2 install
+strip). So Tasks 1 and 2 connect: the surface deep-links to the install button. **The hard part is reboot
+persistence:** opening the site can trigger a service-worker update ("REBOOT TERMINAL" → reload), and after
+that reload the user must STILL be landed on / pointed at the install button — they must not lose their place.
+
+**Worked mechanics (buildable, verified against the code):**
+
+- **Entry signal = a hash that fits the existing deep-link grammar: `#go=install`.** The update path reloads
+  via `location.reload()` (see `_triggerUpdate()` in `index.html` — `SKIP_WAITING` → `controllerchange` →
+  reload), and `location.reload()` **preserves the URL hash**, so the signal survives the reboot for free.
+- **Durable arm = a persistent `MetaStore` flag** (e.g. `robco_pending_install_highlight`) set when the user
+  taps the surface, re-checked on every boot, and **cleared only once the strip has actually been
+  highlighted** — belt-and-suspenders over the hash so the arm survives even if the hash is lost.
+- **Apply the highlight WHEN the strip appears, not at a fixed boot moment.** `beforeinstallprompt` fires
+  asynchronously (a second or two after load, sometimes not at all), so the arm is checked inside
+  `_showInstallBanner()`: when set, scroll the strip into view + pulse it, then clear the flag. After the
+  reboot reload, `beforeinstallprompt` re-fires, the strip re-appears, and the still-set flag re-triggers the
+  highlight — this is exactly what makes it survive the update reboot.
+
+**⚠ Wrinkles that do NOT paper over — the honest limits:**
+
+1. **There is NO install button inside the installed PWA.** `beforeinstallprompt` fires ONLY in a browser
+   tab, never in the installed standalone app — so a stale-install user sitting IN their portrait-locked PWA
+   has nothing to deep-link to _there_. The deep-link-to-install flow is real but works only in the **browser**
+   context.
+2. **A same-origin link from inside the PWA opens IN the PWA (Android scope-match), not a fresh browser tab —
+   and re-adding to home screen must happen from the browser.** Neither can be forced programmatically. So the
+   hop "installed PWA → browser" is the one step that **genuinely cannot be automated**; give the clearest
+   possible written instruction for it instead: _"remove the app from your home screen, open the site in your
+   browser, then tap INSTALL"_ — and `#go=install` does the highlight once they are in the browser.
+3. **The real fix needs a REMOVE first, not just a re-add** — a baked-in portrait manifest is not guaranteed
+   to refresh by re-adding over the top; remove → reopen in browser → reinstall is the reliable sequence
+   (matches the owner's confirmed experience).
+
+**So what is deliverable:** "land the user on the highlighted install button **in the browser**, surviving the
+update reboot" — fully buildable and independent of the stale-detection question, so it applies to whichever
+surface (1/2/3) the owner picks. **What is NOT automatable:** forcing the OS to open a browser from inside the
+installed PWA — that stays a written instruction. The `#go=install` + reboot-persist mechanism is
+decision-independent and could be built ahead of the surface choice if the owner wants; the surface itself
+still waits on the owner picking 1/2/3 (spec-lock, Protocol 8).
+
 ### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
 
 **What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
