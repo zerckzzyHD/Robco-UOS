@@ -392,6 +392,11 @@ a Protocol 50 violation on the same day Protocol 50 shipped. The automated queue
 it, and couldn't: it flags `type: project` memories the queue doesn't reference, so it catches memory↔queue
 drift, not **conversation↔queue** drift.
 
+**R11 cross-reference (2026-07-21).** The knowledge-graph minimum version (R11) ships deliberately un-gated —
+whether/when it should earn veto power (a Suite, a hook) is exactly the kind of process question this review
+should rule on, and the graph itself doubles as evidence for the reviewers here. See R11's own note; not
+resolved in either place yet.
+
 **Done means:** a verdict on the workflow with concrete, checkable findings, run against the current
 (refreshed) process; synthesized into a committed claim-ledger file; with DeepSeek's dissent preserved and
 answered rather than averaged away.
@@ -713,6 +718,10 @@ is generated on demand at `library/knowledge-graph.json` (gitignored, never comm
 every run via `node scripts/knowledge-graph.js`). **Deliberately left un-gated** — no Suite, no git hook (owner
 decision, Protocol 50) — until it demonstrably catches real drift over time, per the spec's own stopping rule.
 `claims_checked_by`/`invokes` and the topology/query-answerer consumers remain out of scope, as designed.
+
+**⬜ Gating decision deferred to G (2026-07-21).** Whether/when this un-gated drift-detector earns veto power
+(a Suite, a hook) is a process question left for item G (the blind workflow review) to rule on — the graph is
+also usable as evidence for G's reviewers. Not resolved here; do not gate R11 without G's ruling.
 
 ## ⚠️ Blocked on an owner decision
 
@@ -1382,6 +1391,50 @@ so it does not collide with P1's in-flight path-URL change.
 **Done means:** every generated document page carries a generated structural breadcrumb AND an in-page
 browser-history back control that works from `file://`; a reader reaching a doc from a room, gallery, or search
 can return to their origin without the browser's own back button.
+
+### P6. ⬜ AI-collaboration as a museum exhibit — DESIGN-INTENT ONLY, owner-approved (new, 2026-07-21)
+
+**What it is.** Not a document page — an EXHIBIT. The museum should tell the story of how RobCo is actually
+built, and the multi-AI collaboration is a headline part of that story: the Dispatch orchestrator handing
+work across **Fable** (design), **Opus** (diagnose/plan/audit), **Sonnet** (implement) — Protocol 8's
+three-model workflow — plus the **blind external reviews** (GPT-5.6 Sol, Gemini 3.1 Pro) used for
+workflow/architecture audits. Ties to the already-parked idea of "AI-collaboration rooms" — **checked this
+session; that concept was not yet present anywhere in this file**, so this entry is the first record of it,
+not an extension of an existing one.
+
+**The new fact that prompted recording this now (owner, 2026-07-21).** Gemini now holds a STANDING "Review
+Mode" in its own memory: handed a structured RobCo prompt, it becomes an independent technical critic and
+does not implement. This turns the multi-AI review from an ad-hoc thing sessions re-explain each time into a
+real **standing capability** with the external-reviewer seat pre-configured — a standing, repeatable part of
+the process is what makes it exhibit-worthy rather than a one-off anecdote.
+
+**Why an EXHIBIT and not just a doc page.** The underlying material already lives in orchestrator memory
+(`external-ai-prompt-delivery.md`) and renders automatically as a museum document page, so the raw fact is
+already technically reachable. But a buried doc page is not the same as the story being VISIBLE — the ask is
+for the collaboration itself to be a first-class, browsable part of the museum's front-facing narrative (an
+"AI-collaboration room"), with the memory file as its source material rather than its presentation. Recorded
+as **design-intent, owner-approved — NOT yet designed or built.**
+
+**PUBLIC/PRIVATE boundary — recorded now so a future publication pass does not leak it.** The
+review-WORKFLOW story (roster, roles, Review Mode, the blind-review mechanics) is publishable material for
+the future public exhibit (P2). The owner's PERSONAL context — his NCLEX study-guide work, held in
+`owner-context-beyond-robco.md` — is NOT publishable and stays private. This is exactly the boundary the
+pre-publication memory audit-and-split (already a P2 prerequisite) exists to enforce; this entry names the
+specific leak risk so that split session knows to check for it.
+
+**Cross-references (G and R11 are NOT rewritten — link only).** The same multi-AI review capability is both
+an exhibit SUBJECT here and the actual MECHANISM item **G** (the blind workflow review) uses to review the
+project. **R11** (the knowledge graph) is evidence-infrastructure for G — see R11's own gating-deferred note
+and G's own R11 cross-reference, both added alongside this entry.
+
+**Where it sits.** Museum sub-program (P), design-only, alongside P2/P3. Needs nothing new to design later;
+if it links to the memory-derived doc page it should follow P1 (stable document identity), and it inherits
+the same PUBLIC/PRIVATE boundary P2's memory split already has to resolve.
+
+**Done means (when eventually designed/built):** a dedicated AI-collaboration exhibit exists in the museum,
+sourced from orchestrator memory (not hand-curated), telling the Fable/Opus/Sonnet + blind-external-review
+story with Gemini's Review Mode as evidence it's a standing capability; the owner's personal context stays
+excluded by the same boundary P2's memory split enforces.
 
 ---
 
