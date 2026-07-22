@@ -29,6 +29,14 @@ hand** — pushing one would make `release.yml` see the tag already exists and s
 owner: the real-device installed-PWA update check (Android). Owed to Dispatch: the post-release ritual
 (archive sync + museum regeneration).
 
+**Also 2026-07-22 — a Protocol 50 recording pass (no build, recording only):** six owner-approved decisions
+folded into their existing items — **P4** bug records move to **find-time** (OPEN → IN-FLIGHT → SEALED; an
+editable issues-board explicitly declined); **P** gains the museum-wide **curation law** (capture everything,
+exhibit a curated subset) and its ONE exemption, the **Visual Web "Magnum Opus"** (complete-but-navigable);
+**P2** gains three verified **intent-vs-reality publication blockers** + the serve-and-look audit lesson;
+**R5** gains the reinforced **branch-protection** candidate (PRs rejected); and a new item **Q** records the
+**planning-folder hygiene** standing rule + the owed cleanup task.
+
 **Prior update — 2026-07-21:** an **A3 build attempt** that hit a feasibility wall and surfaced a premise
 correction; built nothing, recorded both in **A3** in place (Protocol 50). **(1)** The Firebase emulator
 **cannot run here** — the Firestore/Auth emulators are Java processes and there is **no JVM** on the
@@ -93,7 +101,12 @@ running history chain in
   stale comment) — **committed to the archive but still UNPUSHED** — and left a design regression for Fable
   (gallery mats) plus a real "couldn't check actual pixels" gap. The **external-second** review (design note
   e), reproducibility (P1), **contextual-return nav (P5)**, and publication (P2, post-release) are the
-  remaining museum work.
+  remaining museum work. **Two governing principles were recorded 2026-07-22 (owner):** CURATION is the
+  museum-wide law — **capture everything, exhibit a curated subset** — with the **Visual Web (the "Magnum
+  Opus") its ONE exemption** (complete-but-navigable, not curated); both under P. **And three
+  intent-vs-reality publication blockers were verified** (images escape the served site, captures are
+  working-tree not release-pinned, exhibit is incomplete) — the **release-pinned capture pipeline is the next
+  museum build**, and the next audit must serve-and-look, not check on-disk (under P2).
 - **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21; R11 moved before the ship the
   SAME day, owner's call):** **R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas
   built in.** The one-line why: fix the docs every session is forced to read FIRST, then build the graph that
@@ -572,6 +585,50 @@ substitution/guard machinery.
 in full. **Done means (public view, later):** a separate generated page shows only opt-in-marked items,
 defaults to omitting anything unmarked, and reuses P2's machinery.
 
+### Q. ⬜ Planning-folder hygiene — a standing rule + an owed cleanup task (owner, 2026-07-22)
+
+**What it is.** A new standing rule the owner set: the app repo's `planning/` should hold **only CURRENT-use
+working docs**. Old-version planning (e.g. the 2.6.0 folder) should be **DELETED from the app repo** once it
+has served its use, because the archive hosts every planning doc permanently. This keeps the live `planning/`
+tree lean and current instead of accumulating every past round's audits, slates, and mockups. Recorded per
+Protocol 50 because it was decided in conversation and lived only there.
+
+**⛔ TWO HARD CONSTRAINTS — both non-negotiable, recorded as the rule's own guardrails:**
+
+- **NEVER delete a planning file from the app repo unless it is CONFIRMED present in the archive first.**
+  Save-sacred applied to planning docs: a planning doc is **real work**, and losing one to
+  delete-before-backup is unacceptable. The sequence is **confirm in archive → then delete** — never the
+  reverse, never on assumption.
+- **NEVER delete anything still needed FORWARD.** Anything **2.9.0 (or later) still depends on stays**,
+  regardless of which version-folder it happens to sit in. **"Served its use" means DONE, not merely "belongs
+  to a shipped version."** When in doubt, **KEEP** — the failure direction of keeping a stale doc is trivial;
+  the failure direction of deleting a still-needed one is not.
+
+**WHY it's safe (the mechanism, verified against `sync.ps1`, 2026-07-22).** The Protocol 48 sync mirrors
+`planning/` into the archive **ADDITIVELY** (`Add-Dir`, never a purging mirror): once a planning file is
+captured it is **never removed** from the archive even after it disappears locally, and the sync regenerates
+**`ARCHIVE_RETAINED.md`** every run listing exactly the planning files kept in the backup that are no longer
+present in the source — so the retained set is **visible, not something to trust blindly**. That is what makes
+local deletion recoverable. **Contrast (also verified):** `memory/` is **MIRRORED** (`Mirror-Dir` /MIR — a
+deletion propagates), but a deleted memory is still recoverable from the archive's **git history**. So planning
+deletions are additively retained; memory deletions are history-recoverable. Either way nothing is truly lost —
+which is the precondition that makes this hygiene rule safe to apply at all.
+
+**Where this rule belongs eventually.** In the **rules layer** — the deploy/backup area, alongside **Protocol
+48** (the archive-backup protocol) — not left as a queue entry forever. Recorded here now (Protocol 50); its
+earn-condition for a rules-layer home is the next docs/rules pass that touches Protocol 48 or the backup
+notes. (It is also a natural **R5** prose→enforcement candidate later — a build-time check could refuse to
+delete a `planning/` path not yet confirmed in the archive — but that is not required for the rule to stand.)
+
+**⬜ THE CLEANUP TASK OWED.** Concretely: **confirm each old-version planning file is present in the archive,
+then remove it from the app repo.** **⚠ Run it when NOTHING ELSE is touching the app repo (concurrency —
+Protocol 12):** a junk/cleanup sweep during a concurrent session has already deleted a live session's scratch
+files once (recorded under G), so this deletion pass must have the app repo to itself.
+
+**Done means:** the app repo's `planning/` holds only current-use docs; every old-version planning file
+removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
+standing rule has a home in the rules/deploy-backup layer.
+
 ### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
 
 **What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
@@ -875,7 +932,19 @@ check, then its prose shrinks to one line plus a pointer at that check.
 **Candidates on file (GPT's table, unchanged — each needs re-verification against current code before any
 commit, Protocol 27):**
 
-- Branch discipline (Protocol 43) → GitHub branch-protection settings, not just prose.
+- Branch discipline (Protocol 43) → GitHub branch-protection settings, not just prose. **⭐ Reinforced +
+  pull-forward-able on its own (owner, 2026-07-22).** Make GitHub **ENFORCE** "main is release-only" — block
+  direct pushes to `main`, require CI-passed — instead of it being a prose rule held by discipline (today
+  Protocol 43 is convention only; a mis-aimed `git push origin main` would land straight on production). Low
+  overhead (a settings config, not code), and it catches exactly the bad push the branch model exists to
+  prevent, so it does **not** need to wait for the owner's formal Stage-2 call — it can be pulled forward on
+  its own. **⚠ Must be configured to match the ACTUAL deploy path so it does NOT block releases:** the real
+  release is a `dev → main --no-ff` merge plus the manual `workflow_dispatch` deploy run against `main` — the
+  protection rules must permit that exact flow (e.g. required-status-checks + the merge, not an all-pushes
+  block that would also stop the release merge). **A full PR workflow was considered and REJECTED (owner):**
+  it is team machinery that adds phone-unfriendly ceremony to a lean solo workflow, and the review value it
+  would add is **already covered** by the Protocol 8 diff-first audit + owner review — so **only branch
+  protection is worth adopting**, not PRs.
 - The redirect-auth ban (`linkWithRedirect`/`signInWithRedirect`, Protocol 30) → a lint rule.
 - The state-field checklist → a schema round-trip test. **Flag:** partially covered now that **A3**'s modeled
   cloud-serialization guard (`npm run cloud-check`) has shipped, and it would be more fully covered by the
@@ -1210,6 +1279,38 @@ with hundreds of routine fixes and the handful that actually taught something di
 this is not a suggestion sitting beside the eight facets — it is the constraint each one is built to operate
 under: comprehensive record, curated exhibit.
 
+**⭐⭐ CURATION IS THE MUSEUM-WIDE OPERATING PRINCIPLE (owner, 2026-07-22) — the governing law over every
+exhibit, not just the bug room.** Owner, verbatim: _"A museum doesn't display everything at once, it curates a
+list of display items… We're truly trying to build a museum."_ Stated as the one principle every exhibit
+obeys: **CAPTURE EVERYTHING (the collection) → EXHIBIT A CURATED SUBSET (the display).** The full collection is
+recorded and reachable; the walls show only the pieces that tell a story. **This is what makes it a museum
+rather than a data dump** — the reason the distinction is load-bearing rather than stylistic. It is the same
+one-source-two-views split already ruled for the queue view (**L**) and the AI-facing extract (**P3**), and
+the same "record always, curate ruthlessly" the bug records (**P4**) already draw — generalized here to the
+WHOLE museum. **Design consequence, recorded so a build session inherits it:** the generators build the full
+COLLECTION; the exhibits CURATE what is shown. **The failure to guard against, named explicitly:** a build
+session that dumps the whole collection onto the walls has built a **list, not a museum** — the precise thing
+this principle forbids. (This is the same governing intent as the "record everything, EXHIBIT the arcs"
+constraint just above; recorded again in the owner's own museum framing so the principle is unmistakable and
+survives any future restructure that might drop the prose above.)
+
+**⭐ THE ONE EXCEPTION — the Visual Web is EXEMPT from the curation law; it is the Magnum Opus (owner,
+2026-07-22).** Owner, verbatim: _"the visual web is the only thing that doesn't need to follow the curation
+law. It's the Magnum Opus."_ The Visual Web (facet 2's cross-reference; the parked Gource-aesthetic capstone
+in `planning/2.8.5/plans/MUSEUM_MASTER_PLAN.md` §18) is the ONE exhibit that shows **EVERYTHING connected** —
+totality is its whole point, so the curate-a-subset rule does not bind it. **⚠ THE HONEST WRINKLE, recorded so
+it is resolved at build time rather than discovered then:** "show everything" appears to collide with the
+already-recorded **legibility gate** — both external reviewers warned that a graph of everything-vs-everything
+is an unreadable hairball, and the AUDIENCE+VISUAL block above raises that same clarity veto to a lay-audience
+bar. **The resolution:** "no curation" means **nothing is left OUT of the DATA** — every node and edge is in
+the web; legibility comes from **NAVIGABLE RENDERING** (a primary layer plus drill-down / zoom / filter),
+**NOT** from omitting nodes. So the Visual Web is **complete-but-navigable**, where every other exhibit is
+**complete-collection-but-curated-display**. That is the whole distinction, and it dissolves the apparent
+collision: the curation law removes things from the WALL; the Visual Web keeps everything in the DATA and
+manages density through interaction instead. **Cross-reference, not restatement:** the Visual Web's own spec
+lives at `MUSEUM_MASTER_PLAN.md` §18 (Atlas Part 2); this entry only records that it is the exemption to the
+curation law and why the exemption is legible — it does not re-spec the render.
+
 **⭐⭐ AUDIENCE + VISUAL — a governing block over the thesis and all eight facets, recorded 2026-07-21 (owner
 requirements, folded in per Protocol 50).** The thesis says WHAT the museum's centerpiece is; the eight
 facets above say HOW that centerpiece is realized. This block says WHO it is for and WHAT IT MUST LOOK LIKE
@@ -1519,6 +1620,39 @@ a fourth is in flight.
   with the private archive unreachable.
 - **The owner is owed a step-by-step publication guide when this is actually attempted.**
 
+**⭐ INTENT-VS-REALITY PUBLICATION BLOCKERS — three, verified by Dispatch against the archive (2026-07-22).**
+The intent-vs-reality exhibit is not publication-ready; three concrete blockers, each recorded with its fix and
+its reasoning so a publication pass does not discover them at exposure time:
+
+- **(a) IMAGES ESCAPE THE SITE — a real blocker.** The exhibit references its images **OUTSIDE** `museum/site/`
+  (the INTENT captures at `../../planning/...`, the SHIPPED captures at `../design/...`); **none are copied into
+  `museum/site/`**. So they render when the raw files are opened off the full archive on disk, but **BREAK when
+  the museum is served from its own root or published as the standalone exhibit** — the images simply aren't in
+  the bundle. This is the same self-containment hazard already noted above ("thousands of references point at
+  mockup images living in `planning/`"), now confirmed present in the intent-vs-reality exhibit specifically.
+  **FIX:** the generator must **COPY the exhibit images into `museum/site/assets/`** and reference them with
+  **in-site paths**. **⭐ Record the FALSE-GREEN (a green-that-lied INSIDE the museum):** the museum's own link
+  check **passed** — because it resolves paths **ON DISK**, and "resolves on disk" ≠ "works when served." A
+  check that validates against the disk layout the museum will never be served from is exactly the class of
+  lying-green this project keeps being burned by; the served-vs-disk distinction is the lesson.
+- **(b) SHIPPED captures are working-tree, not release-pinned.** The "reality" screenshots are from the Fable
+  design pass, **not captured from the pinned release** (the exhibit's own face already admits this — see the
+  "deliberately unfinished, and the page says so" note under P above). Closing it needs a **release-pinned
+  capture PIPELINE**, which the exhibit's own notice says was never built. **This pipeline is the next build —
+  owner greenlit it, plan-first** (design/plan before implementing, per the workflow).
+- **(c) The exhibit is INCOMPLETE — only 2 pairs, of many real mockups.** Per the museum-wide curation
+  principle (above): the **pipeline captures the full COLLECTION** (every panel, both games, phone widths); the
+  **exhibit CURATES the telling pairs**. So "complete" here means a **complete collection, curated display** —
+  not two proof-of-concept pairs standing in for the whole.
+
+**⭐ THE AUDIT LESSON — the NEXT museum audit must SERVE-AND-LOOK, and check COMPLETENESS, and run AFTER the
+fixes (2026-07-22).** The previous Claude audit (design note e, under P) **missed all of the above** because its
+screenshots timed out, so it fell back to checking **on-disk** — the exact reason blocker (a)'s false-green
+survived. So the next audit MUST **render the SERVED pages and look** (not check on-disk), and MUST check
+**COMPLETENESS** (is each exhibit fully populated, or a proof-of-concept stub?), not only correctness. And it
+must run **AFTER these fixes land, not before** — auditing the known-broken state proves nothing. This tightens
+design note e's "Claude first, external second" plan with a concrete method requirement.
+
 **P3. ⬜ Museum as an AI-facing resource — DESIGN ONLY, do not build (new, 2026-07-21, owner's idea).** The
 museum shouldn't just be a thing humans browse; a session should get use out of it the way it gets use out
 of the library. **The library describes what the code IS (current state); the museum records what was
@@ -1607,12 +1741,14 @@ path that's still being actively changed.
 difference from the committed `museum/site/`, and the coverage gaps above are stated in the workflow's own
 comments.
 
-### P4. ⬜ The bug-record obligation — DESIGN DECIDED (owner, 2026-07-21), do not build yet
+### P4. ⬜ The bug-record obligation — DESIGN DECIDED (owner, 2026-07-21; SHARPENED to find-time 2026-07-22), do not build yet
 
-**What it is.** The rule that a fixed defect leaves a durable **record** — the raw material the museum's bug
-room (P) and the AI-facing extract (P3) are built from. Its shape was decided in conversation tonight, over
+**What it is.** The rule that a defect leaves a durable **record** — the raw material the museum's bug
+room (P) and the AI-facing extract (P3) are built from. Its shape was decided in conversation over
 three rounds of the owner sharpening it, and is recorded here per Protocol 50 because it lived only in that
-conversation.
+conversation. **The 2026-07-22 sharpening (below) moved the trigger from FIX-time to FIND-time:** a record is
+opened the moment a bug is FOUND and completed when it is fixed — the base rule "a defect leaves a record"
+is unchanged; WHEN the record starts is what moved.
 
 - **Purpose is KNOWLEDGE CAPTURE FOR SESSIONS, not filling an exhibit.** The consequence is the whole point:
   **record a defect that TAUGHT something even if it is visually dull** — an exhibit-first framing would skip
@@ -1636,14 +1772,39 @@ conversation.
   indistinguishable from one that has silently stopped running** — the exact failure mode of the growth chart
   and the inert cache guard this project has already been burned by.
 
+**⭐ SHARPENED 2026-07-22 (owner) — a record is written at FIND-time (OPEN), and the FIX completes it.** The
+prior design above wrote the record at fix-time (a defect fix carries its record in the same commit). The
+owner moved the trigger earlier: **a FIND writes the record immediately, in state OPEN; the FIX completes it**
+— the guard it produced, the cost, the provenance, and the flip to **SEALED** (museum-eligible). A record
+therefore advances through a small lifecycle as it is worked: **OPEN → IN-FLIGHT → SEALED.**
+
+- **Why the trigger moved (record the reasoning, not just the outcome).** Two gains. (1) A found bug is
+  **tracked and visible from the moment it is spotted**, so it cannot be lost in the gap between finding and
+  fixing — the exact interval where "I'll write it up when I fix it" quietly drops the record. (2) It makes
+  the museum's amber **"in-flight" specimens LIVE** — an actual current state of open work — instead of a
+  fix-time snapshot that only ever shows already-closed bugs.
+- **The fix-time push nudge STAYS as the backstop.** Moving the trigger to find-time does not remove the
+  existing pre-push nudge (P4's "ONE line folded into the existing nudge" above): a commit that looks like a
+  defect fix but carries no record is still named. Find-time OPEN is the new front door; the fix-time nudge is
+  the safety net for anything that skipped it. Net new mechanisms remain **ZERO** — the lifecycle is fields on
+  the existing record, not a new surface.
+- **⛔ NO generated issues-style board / view — the owner explicitly DECLINED it (2026-07-22).** Recorded so a
+  future session does not build it thinking it was approved: the **records stay the single source**; a
+  GitHub-Issues-style board of open/in-flight bugs was considered and **rejected as unneeded**. IF such a view
+  is ever wanted, the hard rule is that it must be **generated ONE-DIRECTIONALLY from the records** (the same
+  one-source-many-views discipline as L and P3) — **never real, editable GitHub Issues**, which would be a
+  second authoring surface that drifts from the records. For now: do not build any board.
+
 **Where it sits.** It is the input side of P (bug room) and P3 (extract), and its enforcement rides the
 Protocol 48/50 pre-push nudge that already exists — so it depends on nothing new and is buildable whenever the
 museum records get their first-class schema. **Design only for now; do not build.**
 
-**Done means (when built):** a fixed-defect commit that carries no record is named by the existing pre-push
-nudge; every record — dull or not — reaches the AI extract; `exhibited` controls only display; museum
-regeneration runs after the release tag and never blocks a release; and the nudge speaks on success as well as
-failure.
+**Done means (when built):** a found defect opens a record (state OPEN) that advances OPEN → IN-FLIGHT →
+SEALED as it is worked; a fixed-defect commit that carries no record is named by the existing pre-push nudge
+(the find-time backstop); every record — dull or not — reaches the AI extract; `exhibited` controls only
+display; the amber "in-flight" specimens reflect live open work rather than a fix-time snapshot; museum
+regeneration runs after the release tag and never blocks a release; the nudge speaks on success as well as
+failure; and no editable issues-board is built (records stay the single source).
 
 **⚠ Record-count correction (2026-07-21): the bug room holds 10 records, NOT 11.** Verified directly on disk —
 `bugs/*/record.md` = **10** (`ai-inventory-overwrite`, `crlf-page-rename`, `cross-game-registry-leak`,
