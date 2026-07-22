@@ -1005,15 +1005,28 @@ narrowing back to "app history."**
    maturity milestone, not a deletion. **Raw material:** the retirement rule (Protocol 49 / R2), the trim
    stages (R3, R5, R6, R7), converted protocols, and every protocol/suite retired in place (Protocols 15, 2a,
    never renumbered — see "RETIRED PROTOCOLS" in this file's own rulebook half, `CLAUDE.md`).
-2. **The connection graph as centerpiece.** Failure → guard → protocol → test → commit, linked and walkable:
-   click a bug, see the guard; click the guard, see the protocol it enforces and the incident that birthed it.
-   This is the "visual of how everything connects" the owner has raised repeatedly. **Raw material /
-   relationship — cross-referenced, not restated:** the Atlas (**item I**) computes the CURRENT web of guards;
-   the knowledge graph (**R11**) shows the knowledge layer's own connections. Same causal-web story two other
-   items already compute from different angles — the museum is where it becomes clickable for a human. This
-   is the same "link, don't fuse" relationship the thesis's own Atlas cross-reference (above) and R11's
-   `claims_scope_over` design already establish; this facet is where that graph surfaces for a person instead
-   of a session.
+2. **The connection graph as centerpiece — ONE GRAPH, MANY VIEWS, broader than the failure arc alone
+   (broadened by the owner, 2026-07-21).** Owner, verbatim: _"not even just 'The failure → guard → protocol
+   →' but like how the Atlas and the archive connect, how the skill and the rules and architecture connect.
+   how all of those connect to help the AI."_ Failure → guard → protocol → test → commit (click a bug, see the
+   guard; click the guard, see the protocol it enforces and the incident that birthed it) is **ONE layer** of
+   the web, not the whole of it. A **second layer** is the knowledge architecture ITSELF connecting to serve
+   the AI: the routing chain (skill → `CLAUDE.md` → the retrieval map → `rules/*.md` → `ARCHITECTURE.md`) and
+   artifact-to-artifact relationships (Atlas ↔ archive, `memory/` ↔ museum, library ↔ code, queue ↔ log). A
+   **third layer** is the app's own structure. This is the **"ONE GRAPH, MANY VIEWS"** principle — already the
+   core of the Atlas / Visual Web design (item I's own design note (b): "link via a stable identifier
+   scheme... do NOT merge into one shared graph," the same discipline applied here as many layers of one web,
+   not one flattened graph). **R11 (the knowledge graph, built 2026-07-21) is the FIRST BUILT SLICE of exactly
+   the AI-serving layer** — it already derives `routes_to`/`claims_scope_over` across skill → contract →
+   notes → architecture and surfaces where routing and claimed scope disagree (drift). **Raw material /
+   relationship — cross-referenced, not restated:** the Atlas (**item I**) computes the current web of guards;
+   the knowledge graph (**R11**) is the AI-serving layer's first built data source; the **parked "Visual
+   Web"** — the Gource-aesthetic capstone render (radial layout, generated SVG+CSS, the FEELING not the tool)
+   — lives in `planning/2.8.5/plans/MUSEUM_MASTER_PLAN.md` §18 and is the endgame render the owner
+   re-confirmed today as the thing that ties these layers together; spec lives there, not restated here. Same
+   "link, don't fuse" relationship the thesis's own Atlas cross-reference (above) already establishes — the
+   museum is where all three layers become walkable for a human, the Visual Web is the eventual unifying
+   render, and R11 is the first proof the AI-serving layer is itself real and computable.
 3. **The "green that lied" room.** The project's hardest-won lesson: checks that passed while meaning
    nothing — the cache guard comparing the wrong branch, tests asserting source text rather than behavior, the
    fake level-up popup, the museum's own "Operators 3" miscount, the header mangle passing the formatter, the
