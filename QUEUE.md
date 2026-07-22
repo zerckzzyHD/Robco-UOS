@@ -33,7 +33,12 @@ so a new plain field round-trips losslessly; the only residual silent-drop is th
 serialization boundary** (undefined-strip / nested-array-reject / doc-size), exactly what needs the real
 emulator. A non-emulator round-trip substitute would pass for any field and catch nothing, so none was
 shipped. Net: A3's grip on the 2.8.5 release is **reduced, not eliminated** — an owner call (marked ⚠️
-below). No `APP_VERSION` / `CACHE_NAME` bump (docs only). Earlier passes — the QUEUE.md header-mangle fix,
+below). **Same-day continuation:** the owner chose the **interim modeled guard**, now shipped —
+`scripts/cloud-serialization-check.js` (`npm run cloud-check`), self-deriving from the real `state` literal,
+red-then-green proven, opt-in for now with a recommendation to promote it into the gate (it needs no
+emulator); the real emulator test stays open (⚠️) pending a JDK. No `APP_VERSION` / `CACHE_NAME` bump (no
+served file changed — `js/core/state.js` was touched only by a probe reverted byte-identical). Earlier
+passes — the QUEUE.md header-mangle fix,
 the seven- and six-decision recording passes, the cross-cutting **EXECUTION SEQUENCE** — are in the
 running history chain in
 [`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
@@ -234,7 +239,7 @@ _End-of-round deliverable foundation:_
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
-### A3. ⚠️ CLOUD ROUND-TRIP TEST — BLOCKED ON TOOLING (no JVM) + premise correction (2026-07-21)
+### A3. ⚠️ CLOUD ROUND-TRIP TEST — interim guard SHIPPED; emulator test still blocked on JDK (2026-07-21)
 
 **What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
 suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
@@ -335,6 +340,29 @@ is self-deriving (new field covered automatically) and red-then-green-able, but 
 rules rather than verifying against Firestore, and does not cover real type coercion, security rules, App
 Check, or network. Whether that interim guard is wanted — versus installing the JDK for the real emulator
 test, versus shipping 2.8.5 without A3 given the reduced risk this correction reveals — is an **owner call**.
+
+**✅ UPDATE (2026-07-21, same day) — owner chose the interim guard; it is SHIPPED.**
+`scripts/cloud-serialization-check.js` (`npm run cloud-check`). It self-derives the field set by extracting
+and evaluating the **real** `let state = { … }` initializer from `js/core/state.js` in a `vm` sandbox (the
+same extract-and-run technique as Suite 46.17), builds the `robco_v8` write payload, and recursively flags
+any value Firestore would silently strip (`undefined`) or reject (directly-nested array `[[…]]`), plus a
+soft 1 MB doc-size check. A new field added to that literal is scanned automatically — no hand-typed list, so
+it does not rot the way 46.17's list does. A built-in **positive control** scans a known-hostile fixture on
+every run and fails if the scanner doesn't flag it, so the guard can't silently become a green-that-lies
+no-op. **Red-then-green proven** on the real shipped literal: a planted `[[1,2]]` field made it FAIL (exit 1,
+correct path reported), removing it made it PASS (exit 0); `state.js` left byte-identical to HEAD.
+
+- **Placement — opt-in / un-gated for now** (owner's stated preference). It has **zero external dependency**
+  (pure Node `vm`), so it is safe to run anywhere — nothing like the JVM barrier that kept the emulator test
+  out. **Recommendation:** promote it into the normal gate (`scripts/gate.js`), because a modeled guard that
+  runs catches regressions and an opt-in one nobody runs does not; left opt-in only because that was the
+  explicit instruction. One word from the owner flips it.
+- **What it still does NOT do, and why A3 stays open (⚠️, not ✅):** it **models** Firestore's write rules
+  rather than verifying against a real Firestore, and it sees the field **shape**, not every runtime value —
+  so it cannot catch a field that is safe by default but gets populated with a hostile value at play time,
+  nor real type coercion / security rules / App Check / network. Those need the **JDK-backed emulator test**,
+  which remains the real A3 deliverable, still blocked on the owner installing a JDK/JRE 11+ (then
+  `npm i -D firebase-tools`, dev-only). This interim guard **reduces** the residual risk; it does not close it.
 
 **Does A3 still block the 2.8.5 release?** Reduced, not eliminated. The correction shows the _dangerous
 silent_ failure A3 feared (a forgotten mapping) **cannot occur** in the current wholesale-storage design; the

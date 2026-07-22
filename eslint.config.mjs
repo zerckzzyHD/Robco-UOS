@@ -71,6 +71,7 @@ export default [
         module: 'readonly',
         __dirname: 'readonly',
         process: 'readonly',
+        Buffer: 'readonly',
         // Project cross-file globals (shared via <script> tags)
         state: 'writable',
         APP_VERSION: 'readonly',

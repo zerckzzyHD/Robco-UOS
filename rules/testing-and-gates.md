@@ -73,6 +73,21 @@ Any new **ambient, conditional, time-gated, view-once, or otherwise hard-to-repr
 
 ---
 
+## Opt-in guard — cloud serialization (`npm run cloud-check`)
+
+`scripts/cloud-serialization-check.js` is the **interim** stand-in for QUEUE.md item A3 (the real
+emulator-backed cloud round-trip test, still blocked on a JDK — see A3). It is **opt-in / un-gated**
+today and needs no emulator/JVM: pure Node `vm`. It **self-derives** the field set by extracting and
+evaluating the real `let state = { … }` literal from `js/core/state.js` (the same technique as Suite
+46.17), builds the `robco_v8` cloud write payload, and flags any value Firestore would silently strip
+(`undefined`) or reject (a directly-nested array `[[…]]`), plus a soft 1 MB doc-size check. A field
+added to that literal is scanned automatically — **do not** replace this with a hand-typed field list
+(the exact rot A3 exists to prevent). A built-in positive control fails the run if the scanner stops
+flagging known-hostile values, so it can't become a silent no-op. It **models** Firestore's write rules
+rather than verifying against a real Firestore, and sees the field _shape_, not runtime values — so it
+reduces the A3 risk without closing it. Safe to promote into `scripts/gate.js` whenever wanted (it has
+zero external dependency); left opt-in only per the owner's 2026-07-21 instruction.
+
 ## Related notes
 
 - Rendering verification (Playwright render-check): `rules/ui-and-mobile.md` (Protocol 10)
