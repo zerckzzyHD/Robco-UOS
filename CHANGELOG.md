@@ -1,8 +1,8 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r1 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r2 -->
 
 ---
 
-## [v2.8.5] — Foundations & Fidelity<!-- Date: 2026-07-22 | Cache: robco-terminal-v2.8.5-r1 -->
+## [v2.8.5] — Foundations & Fidelity<!-- Date: 2026-07-22 | Cache: robco-terminal-v2.8.5-r2 -->
 
 ### Added
 
