@@ -19,11 +19,13 @@
  * canonical Node runner. (This file intentionally carries no reference to the
  * deleted mirror — Suite 50.6 / 128.5 guard that it stays single-runner.)
  *
- * Steps (full; --fast runs 1-4 + the fast boot smoke; --iter takes its own path):
+ * Steps (full; --fast runs 1-4b + the fast boot smoke; --iter takes its own path):
  *   1. ESLint (--max-warnings 0)
  *   2. Prettier format check
  *   3. Boot-chain preflight (index.html/sw.js/disk/docs/test.html consistency)
  *   4. Persistence audit — Node runner
+ *   4b. Cloud-serialization guard (QUEUE.md A3 — models Firestore write rules
+ *      against the live state literal; pure Node, so it runs on fast + full)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -330,6 +332,17 @@ run('Boot-chain preflight', 'node scripts/check-boot-chain.js');
 // The single canonical runner. (2.8.5 U-B3: the second mirror runner + parity
 // check were removed — Protocol 15 retired. See the header comment for why.)
 run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
+
+// ── 4b. Cloud-serialization guard (QUEUE.md item A3) ──────────────────────────
+// Models Firestore's write constraints against the live `state` literal, so a
+// field defaulted to a Firestore-hostile value (undefined / directly-nested
+// array / oversize) is caught before it can silently fail to sync. Pure Node
+// `vm`, ZERO external dependency (no browser, no emulator, no network) — the
+// same class as the boot-chain preflight above, so it runs on BOTH gate:fast
+// (commit) and gate (push). Self-derives its field set from js/core/state.js
+// and fails LOUDLY on extraction failure (anti-vacuous) and on a broken
+// positive control — so gating it can never weaken it into a green-that-lies.
+run('Cloud-serialization guard (A3, modeled)', 'node scripts/cloud-serialization-check.js');
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so

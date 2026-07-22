@@ -5258,6 +5258,22 @@ header('Suite 50 — Gate Parity Guards (Protocol 36)');
     /--fast/.test(bootSmokeSrc50) && /const FAST/.test(bootSmokeSrc50),
     'tests/boot-smoke.mjs supports a --fast commit-smoke mode (cheap functional-paint signal for the commit gate — U1)'
   );
+
+  // 50.13  the cloud-serialization guard (QUEUE.md A3) runs on BOTH boundaries.
+  //         Wired 2026-07-21 ("wire it") into the pure-Node section that runs
+  //         UNCONDITIONALLY — before the `if (fast)` boot smoke — so it fires on
+  //         gate:fast (commit) AND gate (push), the same class as the boot-chain
+  //         preflight. This guard locks it against silent removal and against
+  //         accidental demotion into the browser-only `if (!fast)` push block,
+  //         where it would stop running at commit (Protocol 20/36b escape-ratchet).
+  {
+    const cloudIdx50 = gateSrc50.indexOf('cloud-serialization-check.js');
+    const fastSmokeIdx50 = gateSrc50.indexOf('boot-smoke.mjs --fast');
+    assert(
+      cloudIdx50 !== -1 && fastSmokeIdx50 !== -1 && cloudIdx50 < fastSmokeIdx50,
+      'scripts/gate.js invokes the cloud-serialization guard (cloud-serialization-check.js) in the shared pure-Node section (before the fast boot smoke), so it runs on both the fast commit gate and the full push gate (QUEUE.md A3 — modeled guard promoted from opt-in into the gate)'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

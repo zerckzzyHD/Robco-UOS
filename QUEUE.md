@@ -35,8 +35,9 @@ emulator. A non-emulator round-trip substitute would pass for any field and catc
 shipped. **Owner decision (same day): build the modeled guard NOW, no JDK — and A3 is CLEARED as a release
 blocker.** Shipped `scripts/cloud-serialization-check.js` (`npm run cloud-check`): self-derives the field
 set from the real `state` literal, flags Firestore-hostile values (`undefined` / nested arrays / oversize),
-red-then-green proven on the real literal (caught both a planted `[[1,2]]` and an `undefined`), opt-in with
-a built-in positive control and NO silent-skip path. The premise correction (state stored WHOLESALE +
+red-then-green proven on the real literal (caught both a planted `[[1,2]]` and an `undefined`), with
+a built-in positive control and NO silent-skip path; now WIRED INTO THE GATE (step 4b, fast+full) later the
+same day per the owner's "wire it" — see A3. The premise correction (state stored WHOLESALE +
 pass-through loads → a forgotten field-mapping **cannot** silently drop data) drops the true emulator test
 from release-blocker to the **optional post-2.8.5 item A4** (needs a JDK/JRE 11+ + dev-only
 `firebase-tools`). **A3 was the last thing gating 2.8.5; it is now resolved — nothing data-safety blocks the
@@ -249,11 +250,13 @@ _End-of-round deliverable foundation:_
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
-### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED, release-cleared; real-emulator test re-filed as A4 (2026-07-21)
+### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED + NOW GATED; real-emulator test re-filed as A4 (2026-07-21)
 
-> **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5.** The
-> self-deriving modeled guard (`npm run cloud-check`) is the shipped resolution; see **RESOLUTION** at the
-> foot of this entry. The true emulator-backed test is **re-filed as the optional post-2.8.5 item A4** —
+> **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5, and its
+> modeled guard is now WIRED INTO THE GATE (no longer opt-in).** The self-deriving modeled guard
+> (`npm run cloud-check`) is the shipped resolution; it now runs automatically as gate step 4b on both the
+> fast (commit) and full (push) gate — see **RESOLUTION** and the **Placement** bullet at the foot of this
+> entry. The true emulator-backed test is **re-filed as the optional post-2.8.5 item A4** —
 > _not_ a blocker — because the premise correction below shows the silent-data-loss failure A3 was scoped
 > to catch **cannot occur by design**. The original spec is preserved verbatim beneath for the record.
 
@@ -363,10 +366,15 @@ the guard can never silently degrade into a green-that-lies no-op.
   `lvlUndef: undefined` in the actual `state` made it FAIL (exit 1) and it named BOTH —
   `campaigns.FNV._a3Probe[0] → directly-nested array` and `campaigns.FNV.lvlUndef → undefined stripped`;
   removing them made it PASS (exit 0). `js/core/state.js` was left byte-identical to HEAD.
-- **Placement — opt-in / un-gated initially** (owner's directive, same discipline as the knowledge graph).
-  Run it explicitly with `npm run cloud-check`. It has **zero external dependency** (pure Node `vm`), so it
-  is safe to promote into `scripts/gate.js` whenever wanted — recommended, since a modeled guard that runs
-  catches regressions and an opt-in one nobody runs does not.
+- **Placement — ✅ NOW GATED (2026-07-21, owner's directive "wire it").** Promoted from opt-in into
+  `scripts/gate.js` as step **4b**, in the pure-Node section that runs on **BOTH** `gate:fast` (commit) and
+  `gate` (push) — the same class as the boot-chain preflight (step 3), which is also cheap, static, and
+  browser-free. It stays runnable standalone via `npm run cloud-check` too. Rationale for fast/commit-gate
+  placement: it reads only the `state` literal (no browser, no emulator, no network), so it costs
+  ~nothing and belongs where the other cheap static guards run; a modeled guard that runs on every commit
+  catches regressions, an opt-in one nobody runs does not. The anti-vacuous property is unchanged by
+  gating — it still fails LOUDLY on extraction failure and on a broken positive control, so the gate can
+  never turn it into a green-that-lies no-op. Confirmed the full gate still passes with it wired.
 - **No silent skip (the green-that-lied guard).** The script has **no conditional-skip path** — it always
   runs and always asserts. If extraction of the state literal ever fails, it **FAILS LOUDLY** (the
   anti-vacuous check refuses to let an empty derived state pass as clean), never silently green.
