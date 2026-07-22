@@ -1069,6 +1069,47 @@ with hundreds of routine fixes and the handful that actually taught something di
 this is not a suggestion sitting beside the eight facets — it is the constraint each one is built to operate
 under: comprehensive record, curated exhibit.
 
+**⭐⭐ AUDIENCE + VISUAL — a governing block over the thesis and all eight facets, recorded 2026-07-21 (owner
+requirements, folded in per Protocol 50).** The thesis says WHAT the museum's centerpiece is; the eight
+facets above say HOW that centerpiece is realized. This block says WHO it is for and WHAT IT MUST LOOK LIKE
+getting there — every facet, and any future exhibit built from them, is built INSIDE these four constraints,
+not around them.
+
+1. **PRIMARY PUBLIC AUDIENCE = EVERYDAY, NON-TECHNICAL VISITORS.** Owner, verbatim: _"it's a 'museum' at the
+   end of the day. where everyday people go and visit. everyday people need to understand it as well."_ Every
+   top-level exhibit must be legible to someone who has never seen the code and isn't an engineer; technical
+   depth stays reachable via drill-down, but the SURFACE layer teaches a layperson, not a reviewer. **Why the
+   thesis already supports this, rather than fighting it:** the failure → lesson → measure → improvement arc
+   (the thesis's own centerpiece, above) is a STORY — "something broke → here's what it taught → here's the
+   guard so it can't recur" is legible to anyone, where a raw dependency graph or a protocol number by itself
+   is not. The lay-audience requirement and the thesis's own arc framing are the same choice seen from two
+   sides — recorded here so a future session treats "make it accessible" as the thesis's natural expression,
+   not a tax levied against it.
+2. **VISUALS ARE THE DRAW, not decoration.** Owner, verbatim: _"museums draw everyday people in with good
+   visuals so remember that too"_ and _"I want some crazy looking visuals. animated visuals preferably but
+   whatever we can do is fine."_ Good visuals are the functional HOOK that pulls a visitor in before they've
+   read a word — THEN the visitor reads and learns. Record the ambition at full strength: striking, animated
+   visuals, achieved within the hard constraints already binding this project (no build step, free tier,
+   offline-capable, phone-first) — animated SVG/CSS/canvas, and the Gource-aesthetic "living web"
+   (pulse/dim/organic motion) already scoped as the parked Visual Web capstone (facet 2's cross-reference,
+   `planning/2.8.5/plans/MUSEUM_MASTER_PLAN.md` §18) — never heavy video or an added framework, the same line
+   that already ruled out running Gource itself.
+3. **THE CLARITY VETO GOVERNS, now generalized to a LAY-AUDIENCE bar.** Spectacle never beats a visitor's
+   understanding — a visual that is impressive but confusing has failed, full stop. This RAISES the bar
+   already standing on the museum's own Direction B identity work (below — "the CLARITY VETO still binds ...
+   'in theme but not confusing'") and on the parked Visual Web capstone (item I / facet 2 above) from "an
+   engineer or reviewer can read it" to "a random non-technical visitor gets it" — a strictly higher bar over
+   the SAME gate, not a new one. Cross-referenced, not restated: the Visual Web's own spec lives at
+   `MUSEUM_MASTER_PLAN.md` §18; this entry only raises who that gate is judged against.
+4. **THREE audiences, do not conflate (record so a build session keeps them separate).** This block governs
+   one of three. The PUBLIC museum audience (this block: lay-legible + spectacle-as-hook) is not the whole
+   picture — the other two are already on file and must not be blurred into it. The AI-facing extract (**P3**)
+   needs raw, compact, provenance-tagged data off the internal manifest, never the styled HTML a human reads.
+   The owner (design note (d), above) needs phone-first visual navigation to CURRENT decisions, which the
+   museum's release-pinned history deliberately does not carry. These three have genuinely opposed needs — a
+   layperson wants a story, an agent wants structured facts, the owner wants what's current — and this
+   AUDIENCE + VISUAL block governs only the first.
+
 - **Trigger: release-pinned, not pinned to `dev`.** `museum/release-pin.json` records the shipped release
   tag; advanced only by `node museum/generate.mjs --release`, and it refuses to pin a tag that doesn't
   exist.
