@@ -629,6 +629,51 @@ files once (recorded under G), so this deletion pass must have the app repo to i
 removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
 standing rule has a home in the rules/deploy-backup layer.
 
+### S. ⚠ PWA install discoverability (SHIPPED) + the stale-install rotation nudge (open — owner to choose)
+
+**Context (2026-07-22).** 2.8.5 fixed the manifest so the FO3 Pip-Boy landscape screen is reachable
+(`orientation: portrait` → `any`). But Android bakes the manifest into an **already-installed** PWA and never
+refreshes it, so anyone who installed **before 2.8.5** stays portrait-locked — rotation is dead for them until
+they remove-and-re-add the app. The owner hit this and confirmed a fresh install fixes it; his brother (the
+priority user) will hit the identical thing and won't read a changelog. Two pieces came out of this:
+
+**✅ Install discoverability — SHIPPED to `dev` (Task 2, in `[Unreleased]`).** The install action used to live
+only as a hidden button buried in the Module Bay → Security & Configuration → SVC TRAY, surfaced only once the
+browser fired `beforeinstallprompt`, so it was effectively undiscoverable. Added a slim, in-theme, **dismissible
+top strip** (`#installBannerTemplate` → `_showInstallBanner()`, `js/ui/ui-core-modulebay.js`) that offers a
+one-tap INSTALL. It is **fail-safe and non-naggy by construction**: it renders ONLY on the real
+`beforeinstallprompt` signal, ONLY when not already installed, and ONLY when not previously dismissed
+(`robco_install_prompt_dismissed`, a `META_MANIFEST` device pref — the dismissal remembers, Protocol UI-6). It
+reuses the existing `installPwa()` action (Protocol 22) and keeps the SVC TRAY button as the permanent home
+(Protocol 25 — a surface added, not a control relocated). Never appears inside the installed PWA. Guarded by
+Suite 243 (inert-template + all three gates + persistence) and added to Suite 217.5's banner allowlist.
+Because the strip surfaces the install/reinstall path, it **also** partially serves the stale-install case
+below (a reinstall is now one discoverable tap away).
+
+**⏭️ The stale-install rotation nudge — DELIBERATELY NOT BUILT; detection is not reliable (Task 1 finding,
+owner to decide the alternative).** The ask was an in-app nudge telling a user on a **stale portrait-locked
+install** to reinstall to unlock rotation. **Feasibility finding, recorded so it is not re-attempted blind: a
+stale-locked install cannot be reliably distinguished from a fresh install without a common false-positive.**
+While the phone is held in portrait, `matchMedia('(orientation: landscape)')` is false in BOTH the stale-locked
+case and the ordinary held-in-portrait case — there is no passive signal that separates them. The only
+distinguishing observation needs the device physically rotated to landscape while the viewport stays portrait,
+which requires the accelerometer (`DeviceOrientationEvent`) — and that **misfires for the very common
+"OS auto-rotate turned OFF" population**: on a _fresh_ install with auto-rotate off, the accelerometer reads
+landscape while the viewport stays portrait, so an accelerometer-based detector would wrongly tell those users
+to reinstall (which would not help them). A nudge that fires for people who don't need it is worse than no
+nudge, so **none was shipped** (per the brief: err toward not-annoying-the-many). The reinstall guidance today
+lives only in the 2.8.5 changelog (Fixed entry) — which the brother won't read.
+
+**⬜ OPEN — the owner chooses the least-annoying alternative.** Options, ordered by recommendation:
+(1) a **one-time, dismissible tip** shown only to installed-PWA users the first time they open an FO3 campaign,
+worded conditionally ("if rotation isn't unlocking the Pip-Boy landscape view, your installed app predates the
+fix — remove it and re-add it") — reliably targetable (installed-PWA + FO3-active are both detectable) and
+low-noise since it's one-time and only reaches installed users; (2) a passive, discoverable HELP/FAQ line with
+the same guidance and **no** proactive surfacing (zero noise, lower reach); (3) rely on the now-discoverable
+install strip (shipped above) plus the changelog and do nothing more. **Earn-condition for closing S:** the
+owner picks 1, 2, or 3; if (1) or (2), it becomes a small build unit. Recorded per Protocol 50 so the
+infeasibility reasoning does not evaporate (the achievements-rule-out cautionary case).
+
 ### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
 
 **What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
@@ -2072,8 +2117,39 @@ an original drawing, never a trace.
 **Two big immersion additions folded in here:** an **emergent CRT "condition"** (the screen develops
 character/wear — must be toggleable off) and the **hacking minigame** — the iconic RobCo word-guess hack
 (seeded puzzle, likeness scoring, attempts and lockout, fully offline). The payoff of a successful hack is
-that it **unlocks the Diagnostic Shell** — already built and shipped; the minigame is the diegetic gate in
-front of it, the one piece not yet built.
+that it **unlocks the Diagnostic Shell**; the minigame is the diegetic gate in front of it, the one piece
+not yet built.
+
+> **⚠ THE DIAGNOSTIC SHELL IS PROD-STRIPPED, NOT DELETED — read this before building the minigame (recorded
+> 2026-07-22, Protocol 50; supersedes the earlier "already built and shipped" wording, which was misleading).**
+> The Diagnostic Shell (`js/dev/test-console.js`, ~204 KB) is **fully present in the repo source** and ships
+> in the **Cloudflare staging build** (`scripts/cf-staging-build.mjs` deliberately keeps it) — but it is
+> **removed from the public production bundle** at deploy time by **`scripts/prod-strip-devshell.mjs`** (run
+> from `.github/workflows/deploy.yml`; guarded by Suite 149). The strip deletes the file, its `<script>` tag,
+> and its `sw.js` precache entry, then hard-asserts self-consistency. This is **correct for now** — players
+> should not have a raw dev/cheat console — but it is **temporary**: the shell is the intended **payoff** of
+> this minigame, so a future session must NOT mistake "absent from the prod bundle" for "deleted / cut from the
+> project."
+>
+> **The seam already exists in code, and it is currently moot on prod — that is the exact trap to reconcile.**
+> There is a built **MINIGAME-UNLOCK SEAM**: `robco_dsh_minigame_unlocked` (a device pref in `META_MANIFEST`,
+> `js/core/state.js`) which `_devConsoleUnlocked()` (`test-console.js`) reads on a production build as an
+> alternate "the shell exists" signal, and `_shellTier()` still hard-pins production to the restrictive
+> `prod` tier so no cheat/reset/raw-internal tool can ever leak (leak-proof by construction). **But that seam
+> can never fire on the actual public build today, because `prod-strip-devshell.mjs` removes the whole
+> `test-console.js` file — so the flag-reading code isn't even shipped to prod.** The strip and the seam
+> therefore **contradict each other right now**, harmlessly (the shell is simply unreachable on prod), and
+> reconciling them is precisely the minigame's job.
+>
+> **So the minigame unit's real task is a STRIP→GATE conversion, not "build a console."** When the hack ships:
+> stop removing the shell from the production bundle and instead ship it **present-but-locked**, then have a
+> successful hack flip the existing `robco_dsh_minigame_unlocked` seam to reveal it (still `prod`-tier only).
+> That is what turns the temporary prod-strip into a permanent minigame-gated unlock. Weigh the ~204 KB the
+> prod build currently saves against shipping it locked — that download-size tradeoff is the one real design
+> question the conversion has to answer. **Done for the shell half means:** the prod bundle carries the shell
+> locked (not stripped), the minigame flips the seam to unlock it, `_shellTier()` stays `prod`-only on
+> production, and the prod-strip is either retired or repurposed — decided deliberately, in place, per
+> Protocol 49.
 
 **Deliberately NOT in this set:** the **holotape archive / audio logs** is dropped (too many, a feature few
 would use). A **survival / hardcore tracker** is set aside as a possible standalone future. An **achievements

@@ -74,6 +74,11 @@ const META_MANIFEST = {
   robco_last_seen_version: { type: 'string', default: '', owner: 'ui-audio.js' },
   robco_feature_flags: { type: 'json', default: '{}', owner: 'cloud.js' },
   robco_sw_installed: { type: 'bool', default: false, owner: 'index.html' },
+  // Install-discoverability strip: once the user installs the PWA or dismisses
+  // the strip, this remembers so it never reappears (Protocol UI-6). A device
+  // pref, never campaign state (Protocol 23) — install state is a property of
+  // this browser/device, not of any save.
+  robco_install_prompt_dismissed: { type: 'bool', default: false, owner: 'ui-core-modulebay.js' },
   robco_bay_opened: { type: 'bool', default: false, owner: 'ui-core.js' },
   robco_bay_view: { type: 'string', default: 'bay', owner: 'ui-core.js' },
   robco_bezel_subsystem: { type: 'string', default: 'operator', owner: 'ui-core.js' },

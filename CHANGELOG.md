@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r3 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r4 -->
+
+### Added
+
+- Installing the terminal as an app on your phone or desktop is now easy to find. When your browser supports it, a slim banner appears across the top offering a one-tap INSTALL — which runs the terminal fullscreen and offline, like a real app, instead of a browser tab. It only shows when installing is genuinely possible and you haven't installed yet, and tapping its ✕ dismisses it for good so it never nags. The original installer button under Security & Configuration is still there if you dismiss the banner and change your mind later. The installed app itself never shows the banner.
 
 ---
 

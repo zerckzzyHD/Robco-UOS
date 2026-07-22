@@ -2173,6 +2173,70 @@ button.mode-pill--overseer:hover {
   text-shadow: none;
 }
 
+/* Install-discoverability strip — cloned from #installBannerTemplate
+   (index.html) by _showInstallBanner() (js/ui/ui-core-modulebay.js) ONLY when
+   the browser fires beforeinstallprompt, the app is not already installed, and
+   the user has not dismissed it (MetaStore robco_install_prompt_dismissed).
+   Same fixed-top, tap-target-safe geometry as .update-banner / .storage-
+   warning-banner above (Protocol 22 reuse), but phosphor-green — it is an
+   INVITATION, not an amber warning — and it carries an explicit INSTALL action
+   plus a dismiss control instead of the tap-anywhere-to-dismiss shape. Child
+   classes are deliberately named ib-* (not *-banner) so only the container
+   trips the Suite 217 banner-selector allowlist. */
+.install-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: var(--robco-dark);
+  border-bottom: 1px solid var(--robco-green);
+  color: var(--robco-green);
+  padding: 8px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  min-height: 44px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: bold;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-shadow: none;
+}
+.install-banner .ib-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+}
+.install-banner .ib-go,
+.install-banner .ib-x {
+  /* override the global button { width: 100% } (Protocol UI-5 exception) */
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.install-banner .ib-go {
+  background: var(--robco-green);
+  color: #000;
+  border: none;
+}
+.install-banner .ib-x {
+  background: transparent;
+  color: var(--robco-green);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+  padding: 6px 10px;
+}
+
 /* ─── Phase 2b Utility Classes ─────────────────────────────────── */
 
 /* Empty-state message shown when a list has no items */

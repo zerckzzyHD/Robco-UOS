@@ -184,6 +184,41 @@
         <span id="readFaultBannerMsg"></span>
       </div>
     </template>
+    <template id="installBannerTemplate">
+      <!-- INSTALL DISCOVERABILITY STRIP (owner: the install action was buried in
+           the Module Bay SVC TRAY and never seen). Cloned into the DOM by
+           _showInstallBanner() (js/ui/ui-core-modulebay.js) ONLY when the
+           browser fires beforeinstallprompt (i.e. the app is genuinely
+           installable), the app is NOT already installed, and the user has not
+           dismissed it before (MetaStore robco_install_prompt_dismissed —
+           Protocol UI-6, the dismissal remembers). beforeinstallprompt never
+           fires inside the installed standalone PWA, so this strip can only
+           ever appear in a browsable tab. It is an ADDITIONAL surface for the
+           SAME installPwa() action — the permanent home stays the SVC TRAY
+           #btnInstallPwa button (Protocol 25 — adds a discoverable entry point,
+           never relocates the control). Same inert-<template> pattern as the
+           banners above (WU-E2), so it can never render on its own.
+           Game-agnostic copy (Protocol 38). -->
+      <div
+        id="installBanner"
+        class="install-banner"
+        role="region"
+        aria-label="Install this terminal to your home screen"
+      >
+        <span class="ib-msg"
+          >&gt; INSTALL TERMINAL TO YOUR HOME SCREEN &mdash; RUNS OFFLINE, FULLSCREEN</span
+        >
+        <button type="button" id="installBannerBtn" class="ib-go">&#9660; INSTALL</button>
+        <button
+          type="button"
+          id="installBannerDismiss"
+          class="ib-x"
+          aria-label="Dismiss the install prompt"
+        >
+          &#10005;
+        </button>
+      </div>
+    </template>
 
     <!-- ════════════════════════════════════════════════════════════════════
          DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay

@@ -854,13 +854,84 @@ function onCampaignModeChange(checked) {
 }
 
 // ── PWA INSTALL PROMPT ───────────────────────────────────────────────────────
+// The browser fires beforeinstallprompt only in a browsable tab that is
+// genuinely installable — never inside the already-installed standalone PWA —
+// and only after its own engagement heuristics. deferredPrompt is that saved
+// event, replayed when the user actually chooses to install (installPwa()).
 let deferredPrompt;
+
+// Discoverability surface (owner: the install action was buried in the Module
+// Bay SVC TRAY and never found). The strip is an ADDITIONAL entry point to the
+// SAME installPwa() action — the SVC TRAY #btnInstallPwa button stays the
+// permanent home (Protocol 25 — add a surface, do not relocate the control).
+const INSTALL_DISMISS_KEY = 'robco_install_prompt_dismissed';
+
+// True once the app is running as an installed PWA (any platform). Belt-and-
+// suspenders only — beforeinstallprompt does not fire in standalone anyway —
+// so the strip can never appear inside the installed app.
+function _isStandaloneInstalled() {
+  try {
+    return (
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+function _removeInstallBanner() {
+  const b = document.getElementById('installBanner');
+  if (b && b.parentNode) b.parentNode.removeChild(b);
+}
+window._removeInstallBanner = _removeInstallBanner;
+
+// Surfaces the discoverable install strip. Fail-safe to hidden: shows nothing
+// unless the app is genuinely installable, is not already installed, and has
+// not been dismissed before (Protocol UI-6 — the dismissal remembers on
+// reload). Wraps the clone in try/catch so a discoverability surface can never
+// break boot.
+function _showInstallBanner() {
+  try {
+    if (!deferredPrompt) return; // not installable → no surface
+    if (_isStandaloneInstalled()) return; // already installed
+    if (typeof MetaStore !== 'undefined' && MetaStore.get(INSTALL_DISMISS_KEY) === 'true') return;
+    if (document.getElementById('installBanner')) return; // already shown
+    const tpl = document.getElementById('installBannerTemplate');
+    if (!tpl || !tpl.content) return;
+    document.body.appendChild(tpl.content.cloneNode(true));
+    const go = document.getElementById('installBannerBtn');
+    if (go) go.addEventListener('click', installPwa);
+    const x = document.getElementById('installBannerDismiss');
+    if (x) {
+      x.addEventListener('click', () => {
+        if (typeof MetaStore !== 'undefined') MetaStore.set(INSTALL_DISMISS_KEY, 'true');
+        _removeInstallBanner();
+      });
+    }
+  } catch (_) {
+    /* a discoverability surface must never break boot */
+  }
+}
+window._showInstallBanner = _showInstallBanner;
+
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
   if (document.getElementById('btnInstallPwa')) {
     document.getElementById('btnInstallPwa').style.display = 'block';
   }
+  _showInstallBanner();
+});
+
+// Once installed, retire BOTH surfaces and remember it, so the strip never
+// returns on a later browser-tab visit from the same device.
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  if (typeof MetaStore !== 'undefined') MetaStore.set(INSTALL_DISMISS_KEY, 'true');
+  _removeInstallBanner();
+  const b = document.getElementById('btnInstallPwa');
+  if (b) b.style.display = 'none';
 });
 
 async function installPwa() {
@@ -868,7 +939,9 @@ async function installPwa() {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
-      document.getElementById('btnInstallPwa').style.display = 'none';
+      const b = document.getElementById('btnInstallPwa');
+      if (b) b.style.display = 'none';
+      _removeInstallBanner();
     }
     deferredPrompt = null;
   }
