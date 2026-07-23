@@ -12,6 +12,12 @@
 library/*
 !library/MANIFEST.txt
 
+# Generated PRIVATE phone-readable queue view (queue item L). The generator
+# (scripts/queue-view.js) is tracked; its HTML output is regenerated on demand
+# (npm run queue-view) and never committed — generation-over-maintenance, and it
+# is not served/precached so there is no cache concern.
+queue-view/
+
 # Dependencies
 node_modules/
 

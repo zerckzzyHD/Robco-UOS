@@ -51543,6 +51543,133 @@ header('Suite 245 — release receipt served-truth compare core (CLAIM M)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 246 — Private phone-readable QUEUE view generator (queue item L)
+//
+//  Locks the parser + renderer of scripts/queue-view.js: it must correctly
+//  extract items + statuses from the REAL QUEUE.md, render markdown without
+//  leaking raw syntax (the double-backtick + wrapped-bold bugs found during
+//  verification — Protocol 42), and be deterministic (same source → same HTML).
+// ══════════════════════════════════════════════════════════════
+header('Suite 246 — private phone-readable QUEUE view (item L)');
+{
+  const QV = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+  const queueSrc246 = fs.readFileSync(path.join(ROOT, 'QUEUE.md'), 'utf8');
+  const model246 = QV.parseQueue(queueSrc246);
+  const items246 = model246.blocks.filter(b => b.type === 'item');
+  const byId = id => items246.find(b => b.id === id);
+
+  // ── Parser: real QUEUE.md yields a title + a non-trivial block set ──
+  assert(
+    /Build Queue/.test(model246.title) && model246.blocks.length >= 20,
+    '246.1: parseQueue extracts the H1 title and a non-trivial ordered block set from the real QUEUE.md'
+  );
+  assert(items246.length >= 15, '246.2: at least 15 ### items parsed from QUEUE.md');
+
+  // ── Item IDs are extracted (letters+optional digits) ──
+  // These are all genuine ### headings in QUEUE.md. (P1/P2/P3 are **bold**
+  // sub-notes inside P's body, not ### items, so they render within P's card —
+  // the view faithfully reflects the source structure.)
+  assert(
+    ['G', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'D'].every(id => byId(id)),
+    '246.3: known ### item IDs (G, L, A3, R5, R10, P, C1, D) are all parsed from their headings'
+  );
+
+  // ── Status detection maps the five glyphs correctly (from live QUEUE.md) ──
+  assert(
+    QV.detectStatus('### G. ✅ done') === 'done' &&
+      QV.detectStatus('### R5. ⏭️ ready') === 'ready' &&
+      QV.detectStatus('### B. 🔄 active') === 'active' &&
+      QV.detectStatus('### R6. ⚠️ blocked') === 'blocked' &&
+      QV.detectStatus('### L. ⬜ todo') === 'todo' &&
+      QV.detectStatus('no glyph here') === 'none',
+    '246.4: detectStatus maps ✅→done ⏭️→ready 🔄→active ⚠️→blocked ⬜→todo (and none)'
+  );
+  // The parser assigns real statuses from the live headings — assert the
+  // distribution is sane (decoupled from any single item, which can change
+  // status as work lands): the live queue always has done + active + todo items.
+  const statusSet246 = new Set(items246.map(b => b.status));
+  assert(
+    ['done', 'active', 'todo'].every(s => statusSet246.has(s)) && !statusSet246.has(undefined),
+    '246.5: parsed items carry real statuses from their headings — done + active + todo all present'
+  );
+
+  // ── parseHeading splits id/status/title; title strips the leading glyph ──
+  const ph246 = QV.parseHeading('A3. ✅ CLOUD SERIALIZATION GUARD — shipped');
+  assert(
+    ph246.id === 'A3' && ph246.status === 'done' && /^CLOUD SERIALIZATION GUARD/.test(ph246.title),
+    '246.6: parseHeading returns {id, status, title} with the leading status glyph stripped from the title'
+  );
+
+  // ── Markdown render is leak-free — the Protocol-42 bugs stay fixed ──
+  let starLeaks246 = 0;
+  for (const b of model246.blocks) {
+    if (QV.mdToHtml(b.body).includes('**')) starLeaks246++;
+  }
+  assert(
+    starLeaks246 === 0,
+    '246.7: no block renders a raw "**" — bold spanning wrapped list/blockquote lines and double-backtick code spans are handled (regression: the leaks found during verification)'
+  );
+  // Targeted red-then-green: a DOUBLE-backtick code span containing backticks,
+  // with bold AFTER it, renders the code AND the bold — never swallowing one
+  // into the other (the exact corruption that leaked `**`).
+  const dbl246 = QV.mdToHtml(['mistyped `` `APP_VERSION` `` and then **bold word** here.']);
+  assert(
+    /<code>`APP_VERSION`<\/code>/.test(dbl246) &&
+      /<strong>bold word<\/strong>/.test(dbl246) &&
+      !dbl246.includes('**'),
+    '246.8: a double-backtick code span (code containing backticks) followed by bold renders BOTH correctly — no leak'
+  );
+  // Bold that wraps across two lines of one list item is not split.
+  const wrap246 = QV.mdToHtml(['- start **bold that', '  wraps across a line** end']);
+  assert(
+    /<strong>bold that wraps across a line<\/strong>/.test(wrap246) && !wrap246.includes('**'),
+    '246.9: bold spanning a wrapped list-item continuation line renders as one <strong> (no split, no leak)'
+  );
+  // Bold spanning two blockquote lines is not split either.
+  const bq246 = QV.mdToHtml(['> **STATUS: open', '> across two lines** done']);
+  assert(
+    /<strong>STATUS: open/.test(bq246) && !bq246.includes('**'),
+    '246.10: bold spanning two blockquote lines renders as one <strong> (blockquote accumulate-then-inline)'
+  );
+
+  // ── titleText strips markdown for display labels ──
+  assert(
+    QV.titleText('Shipped (accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md))') ===
+      'Shipped (accounts → QUEUE_LOG.md)',
+    '246.11: titleText renders a heading link/code to a clean plain label (no raw [..](..) or backticks)'
+  );
+
+  // ── Determinism: same source → byte-identical HTML ──
+  const h1 = QV.renderHtml(QV.parseQueue(queueSrc246), 'abc12345');
+  const h2 = QV.renderHtml(QV.parseQueue(queueSrc246), 'abc12345');
+  assert(
+    h1 === h2,
+    '246.12: renderHtml is deterministic — same QUEUE.md + hash → byte-identical HTML'
+  );
+  // The rendered page is a self-contained offline HTML doc (no external refs).
+  assert(
+    /^<!doctype html>/i.test(h1) &&
+      h1.includes('<style>') &&
+      h1.includes('<script>') &&
+      !/<link\b/i.test(h1) &&
+      !/src\s*=\s*["']https?:/i.test(h1),
+    '246.13: output is a single self-contained offline HTML doc (inline CSS+JS, no external <link>/remote <script>)'
+  );
+
+  // ── Wiring: npm script + gitignored output (not served/precached) ──
+  const pkg246 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg246.scripts['queue-view'] === 'node scripts/queue-view.js',
+    '246.14: package.json exposes `npm run queue-view`'
+  );
+  const gi246 = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
+  assert(
+    /^queue-view\/$/m.test(gi246),
+    '246.15: the generated output dir (queue-view/) is gitignored — generator tracked, HTML regenerated on demand'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

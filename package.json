@@ -18,7 +18,8 @@
     "rollback": "sh scripts/rollback.sh",
     "a11y": "node tests/a11y-check.mjs",
     "cloud-check": "node scripts/cloud-serialization-check.js",
-    "release-receipt": "node scripts/release-receipt.js"
+    "release-receipt": "node scripts/release-receipt.js",
+    "queue-view": "node scripts/queue-view.js"
   },
   "repository": {
     "type": "git",

@@ -607,7 +607,21 @@ deliberate — it critiques internal orchestration).
   claim-ledger + verbatim sources live under `planning/audits/G_workflow_review/` (archive-preserved). **G is
   done.**
 
-### L. ⬜ A generated, private HTML view of THIS queue — plus a deferred, opt-in player-facing view
+### L. 🔄 A generated, private HTML view of THIS queue — PRIVATE VIEW BUILT (2026-07-23); player-facing view still deferred
+
+**✅ PRIVATE VIEW BUILT (2026-07-23).** `scripts/queue-view.js` (`npm run queue-view`) parses `QUEUE.md`
+and emits a single self-contained, offline, phone-first HTML page to the gitignored `queue-view/`
+(generator tracked, HTML regenerated on demand — the same generation-over-maintenance discipline as
+`library/`; not served/precached, so no cache concern). It renders the queue **unfiltered / in full**
+(the private owner view — ONE SOURCE, `QUEUE.md` stays the source of truth). Phone-first UX: a sticky
+**status filter** (⏭️/🔄/⚠️/⬜ shown, ✅ hidden by default), **collapsible items** (tap to expand full
+reasoning) with prominent stable **ID badges**, long section prose behind a **"context" toggle**, a
+**section jump-nav**, and a **"what's next" band** surfacing the active/ready work at the top.
+**Deterministic** (same `QUEUE.md` → byte-identical HTML), **rendered and verified at 360px** (no
+horizontal overflow, filter/collapse/nav all work), and guarded by **Suite 246** (parser + markdown-render
+
+- determinism, incl. red-then-green locks for the double-backtick and wrapped-bold render bugs found during
+  verification). **⛔ The player-facing opt-in view is NOT built** — L's own ruling defers it (below).
 
 **What it is.** `QUEUE.md` is the file the owner steers the project from — generate an HTML view of it that
 reads comfortably on a phone. _(Note: this restructure and the new [`QUEUE_LOG.md`](QUEUE_LOG.md) split
@@ -635,9 +649,10 @@ building, and building it twice would be wasteful (Protocol 22).
 **What it depends on.** Nothing, for the private view. The player-facing view depends on P2's
 substitution/guard machinery.
 
-**Done means (private view):** a generated HTML page, readable on a phone, reflects the current `QUEUE.md`
-in full. **Done means (public view, later):** a separate generated page shows only opt-in-marked items,
-defaults to omitting anything unmarked, and reuses P2's machinery.
+**Done means (private view): ✅ MET (2026-07-23)** — a generated HTML page, readable on a phone, reflects
+the current `QUEUE.md` in full (`npm run queue-view` → `queue-view/queue-view.html`). **Done means (public
+view, later — STILL DEFERRED):** a separate generated page shows only opt-in-marked items, defaults to
+omitting anything unmarked, and reuses P2's machinery.
 
 ### Q. ⬜ Planning-folder hygiene — a standing rule + an owed cleanup task (owner, 2026-07-22)
 
