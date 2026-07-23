@@ -494,7 +494,7 @@ plumbing rather than inventing it twice.
 **Done means:** the catalog's per-suite content is regenerated from the runner and gate-checked against its
 committed copy; no human hand-edits it again.
 
-### G. ⬜ The blind workflow review
+### G. ✅ The blind workflow review — FULLY RESOLVED (2026-07-23)
 
 **What it is.** A blind (independent, no-peeking-at-the-answer) review of the Dispatch three-model workflow
 — is Fable/Opus/Sonnet actually pulling its weight, are the hand-offs clean, where does the process leak
@@ -594,11 +594,18 @@ deliberate — it critiques internal orchestration).
   not a parallel build — see that item's note + R5's deploy-protocol candidate. Cache `-r8 → -r9` (CHANGELOG
   touched); `APP_VERSION` unchanged. **With this, all three (a) confirmed+cheap fixes are done** (CLAIM
   A/C/D gate-lint scoping, the (b) governance bundle, and now the release receipt).
-- ⬜ **Still open — only the owner-decisions remain** (from the ledger's §4(c)): the spare-laptop
-  adopt-vs-defer split (owner → **DEFERRED**: fix isolation in software first, laptop only ever an optional
-  notifier/accelerator, never the gate); the report-cadence relaxation (batching clean green reports vs
-  Protocol 9's "every time" — **pending owner**); and the DeepSeek roster (owner → **occasional witness, not
-  a standing stage**). No build work left in G beyond what the owner rules on.
+- ✅ **The owner-decisions — ALL SETTLED (2026-07-23). Item G is now FULLY RESOLVED.** The three §4(c)
+  calls are decided and recorded: (1) **spare laptop → DEFERRED / parked** (fix isolation in software first —
+  done via CLAIM A/C/D; the laptop is only ever an optional notifier/accelerator on a clean checkout, never
+  the gate); (2) **DeepSeek → occasional witness, not a standing stage** (blind hostile-witness for a specific
+  review, never a required leg); (3) **report cadence → ADOPTED** and codified into **Protocol 9** (immediate
+  proactive report for completions / owner-decisions / anomalies; routine all-green intermediate landings
+  batch into the next check-in; **batched ≠ dropped ≠ compressed** — cross-referenced to the anti-compression
+  discipline so it can't be read as license to summarize-down). **Nothing left in G**: all (a) confirmed+cheap
+  fixes shipped (gate-lint scoping A/C/D, release receipt M), the (b) governance bundle shipped (Protocol 51,
+  36(b) causal-response bar, memory-restore runbook), and all three owner-decisions settled. The committed
+  claim-ledger + verbatim sources live under `planning/audits/G_workflow_review/` (archive-preserved). **G is
+  done.**
 
 ### L. ⬜ A generated, private HTML view of THIS queue — plus a deferred, opt-in player-facing view
 

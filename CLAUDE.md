@@ -299,6 +299,14 @@ When work is run via Dispatch, never finish a task or complete a git push silent
 
 Because the Dispatch user typically cannot view the code or repo directly and reads on a phone, any push that changes user-facing behavior must be reported with an explicit "it's live — here's what changed and exactly how to test it" message: a one-line summary first, then short scannable prose (no walls of text, no code dumps or file paths) and the exact steps to test it — not just a commit summary.
 
+**Report cadence (owner-approved, 2026-07-22 — "go with recs").** Not every intermediate landing needs its own phone buzz during a long run — but nothing is ever lost:
+
+- **Immediate, proactive report** for a **completion**, anything needing an **owner decision**, or any **anomaly / failure**. These fire the moment they happen — they never wait.
+- **Routine, all-green intermediate landings BATCH into the owner's next check-in.** A mid-marathon green step — a clean commit/push with nothing to decide and nothing wrong — is grouped and delivered at the next natural check-in instead of firing a standalone message each time, to cut phone noise during marathons.
+- ⛔ **BATCHED ≠ DROPPED, and BATCHED ≠ COMPRESSED.** Batching changes only **WHEN** a routine green step is surfaced (grouped at the next check-in) — never **whether** it is reported, and never **how completely**. Every landing is still delivered **in full** when surfaced: every finding, deviation, and result relayed in the same scannable plain-English style, never shrunk into a reassuring summary. This composes with the Protocol 8 discipline that *a session's account of its work is a claim* and with the standing "report in full" rule (poll to idle, relay every finding/refusal/deviation) — summarizing-down is a known past failure and stays forbidden.
+
+This **refines** the "every time, no exceptions" rule above rather than loosening it: the no-exceptions guarantee is on reporting **completeness**, not on message **count**. A routine green step may wait for the next check-in; a completion, a decision point, or a failure never waits; and nothing is ever dropped or compressed.
+
 ---
 
 ## Protocol 12 — No Concurrent Pushes
