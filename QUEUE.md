@@ -1323,12 +1323,12 @@ source rather than hand-authored.
 
 _These items (P, P1, P2, P3, J) form one tightly-coupled sub-program with internal dependencies that
 readiness buckets would fragment, so they are kept together: **P is built and its capture pipeline +
-reproducibility work have LANDED in the sibling archive repo (only the `file://` click-test remains under
-P1); P2 (publication) is post-release — the curation decision is MADE (Option B) and the `--public` staging
-tree builds self-contained, leaving the expose sequence + pre-public gates; and P3/J both depend on P1.**
-None gates the `dev → main` release._
+reproducibility work have LANDED in the sibling archive repo (P1 is now FULLY CLOSED); P2 (publication) is
+post-release and BUILD-COMPLETE — curation decided (B), the `--public` tree is self-contained +
+publication-quality, and the publish safety machinery is built + proven, leaving only the owner's turnkey
+expose checklist; and P3/J both depend on P1.** None gates the `dev → main` release._
 
-### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility + `--public` staging tree LANDED; publication down to the expose sequence)
+### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility + `--public` tree + publish safety machinery LANDED; publication down to the owner's turnkey expose)
 
 **What it is.** The private archive repo (Protocol 48's `_RobCo-Archive`) turned into a browsable **museum**
 of the project's history — an index, a timeline, per-version "rooms," file lists, counts, and mockup
@@ -1701,24 +1701,33 @@ never-touch-git-config rule), **reverted it immediately** and confirmed it was n
 itself writing a `§` comment tag referencing a bug record that does not exist** (`cef158f`) and **removed it
 rather than fabricating a record** to justify the reference.
 
-**⚠ The BLOCKER on external access — an open owner-decision.** GPT's connector returned **404 on the private
-archive** because the GitHub App's repo allow-list excludes it. Granting access is a one-time reversible
-settings change — **but the archive contains `memory/`**, which is precisely why museum publication (P2) was
-gated on a memory audit-and-split. Three options were put to the owner:
+**⭐ DE-GATE CLARIFICATION (2026-07-23) — the memory audit-and-split does NOT gate museum PUBLICATION.** The
+public tree is **generated output only**: no memory ever enters it, and the name-substitution guard (below)
+scans the emitted tree clean before exposure. So publication does **not** wait on the memory split. The
+memory-split remains the prerequisite for exactly ONE thing: granting an external auditor **archive** access
+(the optional second-pass external audit), because the archive itself contains `memory/`. It is therefore
+**decoupled from publish** and is an owner decision on the **external-audit path alone**, not a publish blocker.
+(This corrects the earlier framing that treated the split as a shared publication + audit prerequisite.)
+
+**⚠ The BLOCKER on external ARCHIVE access — an open owner-decision (audit path only, per the de-gate above).**
+GPT's connector returned **404 on the private archive** because the GitHub App's repo allow-list excludes it.
+Granting access is a one-time reversible settings change — **but the archive contains `memory/`**, which is why
+the external audit is gated on a memory audit-and-split. Three options were put to the owner:
 
 1. Grant access to the **whole archive** — best audit, but **memory is exposed**.
-2. **★ Do the memory split FIRST, then grant access (Dispatch's recommendation)** — it is _already_ a queued
-   publication prerequisite (P2), so it is work needed anyway, pulled forward; it unblocks the audit **and**
-   publication together.
+2. **★ Do the memory split FIRST, then grant access (Dispatch's recommendation)** — the split is worth doing
+   anyway (a clean separation of the reference memory from the archive), and it unblocks the external audit
+   without exposing memory.
 3. A **scoped throwaway repo** with just `museum/`, `bugs/` and the generator — fastest, no exposure, **but**
    GPT then cannot check how the museum relates to the archive it is built from, and _that relationship is
    where the bugs have been_.
 
-**Awaiting the owner's call between these three; do not proceed with external access until then.**
+**Awaiting the owner's call between these three; do not proceed with external ARCHIVE access until then. This
+does not hold up publication** (de-gate above).
 
-**P1. 🔄 Museum reproducibility — a sub-program, now all but complete (2026-07-23).** The fixes have shipped to
-the archive's `main`; **the ONLY open item is the `file://` redirect click-test** (last bullet). Everything
-else below is done and committed.
+**P1. ✅ Museum reproducibility — a sub-program, now FULLY CLOSED (2026-07-23).** All fixes have shipped to the
+archive's `main`, and the last open item — the `file://` redirect click-test — has now **PASSED**. Everything
+below is done and committed.
 
 - **✅ Shipped — the CRLF/LF page-renaming bug (`2f4848c`, `5bc7137`, `aa15e9a`).** The machine's SYSTEM git
   config has `core.autocrlf=true`, so a fresh clone checked out every text file as CRLF while the generator
@@ -1772,13 +1781,13 @@ else below is done and committed.
   caught loudly by the build-time git-diff check; a genuine deletion is distinguishable from an unrecorded
   rename by its own ledger entry.
 
-- **⬜ The outstanding `file://` redirect click-test (new, 2026-07-20) — THE SOLE REMAINING P1 ITEM.** The
-  redirect stubs were verified over HTTP but **nothing yet opens a stub over `file://` and asserts it
-  navigates.** Small, but "opens correctly from
-  disk" is the entire reason HTML stubs were chosen over a host-specific `_redirects` file. Close it with a
-  real `file://` open-and-click pass once a session has a controllable browser, before or alongside P2.
+- **✅ DONE (2026-07-23) — the `file://` redirect click-test PASSED.** A redirect stub opened over a real
+  `file://` location **navigated to the correct target** (both assertions green). This was P1's sole remaining
+  item; it is now closed. "Opens correctly from disk" — the entire reason HTML stubs were chosen over a
+  host-specific `_redirects` file — is now verified by a real open-and-click pass, not assumed from the HTTP
+  check alone.
 
-**P2. ⬜ Museum publication — not yet exposed; the curation decision is MADE (Option B) and the `--public` staging tree BUILDS self-contained. What remains is the expose sequence + the pre-public gates (below).**
+**P2. ⬜ Museum publication — not yet exposed, but BUILD-COMPLETE: curation decided (B), the `--public` staging tree is self-contained + publication-quality (serve-and-look re-audit passed), and the name-sub + secret-scan safety machinery is built and proven. What remains is the owner's turnkey expose checklist (below).**
 
 - **Timing, locked:** after the 2.8.5 release, before 2.9.0.
 - **A brand-new public repo, `Robco-Exhibit`, built from generated output only.** The private archive can
@@ -1833,10 +1842,11 @@ screenshots timed out, so it fell back to checking **on-disk** — the exact rea
 survived. So the next audit MUST **render the SERVED pages and look** (not check on-disk), and MUST check
 **COMPLETENESS** (is each exhibit fully populated, or a proof-of-concept stub?), not only correctness. And it
 must run **AFTER these fixes land, not before** — auditing the known-broken state proves nothing. This tightens
-design note e's "Claude first, external second" plan with a concrete method requirement. **The precondition is
-now MET (2026-07-23):** the three blockers above are fixed and the `--public` staging tree builds
-self-contained, so this serve-and-look + completeness re-audit is now runnable **on the public tree** — it is
-one of the pre-public gates in the rewritten P2 path below.
+design note e's "Claude first, external second" plan with a concrete method requirement. **✅ DONE (2026-07-23):**
+the three blockers were fixed and the `--public` staging tree built self-contained, so this serve-and-look +
+completeness re-audit **ran on the public tree and PASSED** — every public page rendered at phone widths and
+viewed, all exhibits complete + correct, no overflow/contrast/invisible-card issues → publication-quality (see
+the P2 build-chain record below). The **external second** audit is a separate, decoupled path (design note e).
 
 **⭐ THE MUSEUM-WIDE GALLERY ESCAPE — CURATION DECISION MADE: OPTION B (owner, 2026-07-23), and the `--public`
 build variant is now BUILT.** The blocker (verified by Dispatch 2026-07-23): the room galleries embed **429
@@ -1869,35 +1879,51 @@ version **rooms ship PUBLIC-minus-grids** (structure and prose public, image gri
 a **`museum/public/` staging subtree first** (staged, then substituted + scanned, then exposed — never
 generated straight into a public remote).
 
-**⭐ P2's TRUE REMAINING PATH (rewritten 2026-07-23, now that the curation decision is made (B) and the
-`--public` staging tree builds self-contained).** The self-containment problem is solved; what remains is the
-EXPOSE sequence plus the pre-public gates still owed.
+**✅ Neutralised-affordance copy fixed (archive commit `7776a07`).** The public-minus-grids rooms no longer
+show dead buttons where a private gallery used to link: each neutralised affordance now reads as an
+**intentional note** — e.g. _"N images — held in the private archive"_ — so a public visitor sees a deliberate
+curatorial statement, not a broken control.
 
-**The EXPOSE steps (the actual publication mechanics), in order:**
+**✅ Serve-and-look re-audit PASSED → PUBLICATION-QUALITY (2026-07-23).** Every public page was **rendered at
+phone widths and actually viewed** (the serve-and-look method the audit-lesson block demands, not an on-disk
+check): all exhibits **complete and correct**, with **no overflow, contrast, or invisible-card issues**. The
+`--public` tree is publication-quality as it stands.
 
-1. **Name-substitution + secret scan over the whole `museum/public/` tree.** Substitute the owner's real name →
-   `zerckzzy` throughout, behind a **fail-closed guard** (any residual real-name match aborts), plus a
-   credential / token-pattern scan across the entire tree — run **after** substitution, on the exact tree that
-   will be exposed.
-2. **Stand up the `Robco-Exhibit` PUBLIC repo** (the private archive can **never** be made public — its git
-   history retains `memory/` regardless of any later deletion) and **push the substituted + scanned tree** to it.
-3. **Cloudflare Pages, never GitHub Pages** (the origin reasoning above — a GitHub project site would share the
-   live app's browser origin + localStorage), following the **verify-private-then-expose** sequence: push to a
-   private target, verify there, expose only that same already-verified commit.
+**✅ PUBLISH SAFETY MACHINERY BUILT (archive commit `a0aebcd`).** `node museum/generate.mjs --publish-prep
+--real-name="<X>"` emits the **gitignored, transient `museum/.publish-out/`** with **parameterized
+name-substitution** — the real name is supplied at runtime and **never committed** — plus a **fail-closed
+raw-byte guard** (catches the real name even hidden inside image bytes, not just text) and a
+**credential/token scanner**. Every guard is **fail-closed**: on any hit it **aborts and emits nothing**.
+Proven **red-then-green** with a fake name + a planted fake secret (neither ever committed).
 
-**The pre-public gates still owed (must land BEFORE exposure):**
+**⭐ P2's TURNKEY OWNER EXPOSE CHECKLIST (rewritten 2026-07-23 — the build + safety machinery are done; what's
+left is the owner running the expose).** The self-containment problem is solved, the tree is
+publication-quality, and the name-sub + secret-scan safety is built and proven. The remaining path is a short,
+mechanical checklist:
 
-- **Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — a public exhibit
-  is the wrong place to discover the visuals are flat.
-- **A serve-and-look completeness re-audit ON THE PUBLIC TREE, AFTER those fixes** (the audit-lesson method
-  above) — render the SERVED `museum/public/` pages and look; check completeness, not on-disk.
-- **The external second audit** (design note e's "Claude first, external second" — worth buying only after the
-  internal serve-and-look pass).
-- **The memory audit-and-split** — a **hard P2 prerequisite** that also **unblocks external archive access** (the
-  archive holds `memory/`, which is exactly why external access is gated); the owner's access-option call (the
-  three options under design note e above) is **still open**.
+1. **Run `--publish-prep` with the real name at runtime** — `node museum/generate.mjs --publish-prep
+--real-name="<real name>"` — which emits the substituted, scanned, fail-closed `museum/.publish-out/` tree
+   (the real name lives only in that command, never on disk or in git).
+2. **Review `museum/.publish-out/`** — eyeball the emitted tree that will actually be exposed.
+3. **Create the `Robco-Exhibit` PUBLIC repo** — the private archive can **never** be made public (its git
+   history retains `memory/` regardless of any later deletion), so publication is always a fresh public repo
+   built from emitted output only.
+4. **Push the emitted tree** to `Robco-Exhibit`.
+5. **Wire Cloudflare Pages** (never GitHub Pages — the origin reasoning above: a GitHub project site would share
+   the live app's browser origin + localStorage).
+6. **Verify-private-then-expose** — verify the pushed commit privately, then expose that same already-verified
+   commit publicly.
 
-**Minor / non-blocking:** the `file://` redirect click-test (P1's sole remaining item).
+**The owner does steps 5–6 (Cloudflare + go-live) himself, targeting tomorrow/Saturday.**
+
+**Pre-public design polish still owed (not an expose blocker, but wanted before it looks finished):** the
+**Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — a public exhibit
+is the wrong place to discover the visuals are flat.
+
+**Off the publish path (decoupled — see the de-gate clarification under design note e):** the **external second
+audit** and the **memory audit-and-split** it needs are the **external-audit path only**, NOT a publication
+gate — the public tree carries no memory and the name-sub guard scans it clean. The owner's archive-access call
+is still open, but it does not hold up going live.
 
 **P3. ⬜ Museum as an AI-facing resource — DESIGN ONLY, do not build (new, 2026-07-21, owner's idea).** The
 museum shouldn't just be a thing humans browse; a session should get use out of it the way it gets use out
@@ -1956,11 +1982,12 @@ CLEARED (2026-07-20)** — see the App Check entry in "Closed / off the board" b
 
 **Done means (P core, met):** a generator produces the museum from the archive's structure, its first run
 backfilled all shipped versions plus the graveyard, each release gets one frozen hand-written account, and
-the whole thing is a release-time ritual that can never block a release. **Done means (P1, all but met):** a
-fresh clone regenerates the museum byte-identical, with old hash addresses still resolving — landed and
-committed; only the `file://` click-test is left. **Done means (P2, not yet exposed — curation
-decided (B), `--public` staging tree builds self-contained, down to the expose sequence + pre-public gates):**
-`Robco-Exhibit` is live and correct on Cloudflare Pages, verified before exposure.
+the whole thing is a release-time ritual that can never block a release. **Done means (P1, ✅ MET):** a fresh
+clone regenerates the museum byte-identical, with old hash addresses still resolving — landed and committed,
+and the `file://` click-test has passed; P1 is fully closed. **Done means (P2, not yet exposed —
+build-complete: curation decided (B), `--public` tree self-contained + publication-quality, publish safety
+machinery built + proven, down to the owner's turnkey expose checklist):** `Robco-Exhibit` is live and correct
+on Cloudflare Pages, verified before exposure.
 
 ### J. ⬜ Museum reproducibility CI — turn three sessions' hand-proof into a standing gate (depends on P1)
 
