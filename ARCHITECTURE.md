@@ -2123,7 +2123,7 @@ owner-declined and out of scope for this unit.
 
 **Cascade-order placement (Protocol 42):** the whole density block is deliberately placed at the
 true end of the CSS cascade — in `css/99-mobile.css`, the last-loaded stylesheet (2.8.5 U-A2 split
-`terminal.css` into order-prefixed files; `99-mobile.css` must stay last), after every one of its
+the single monolithic terminal stylesheet into order-prefixed `css/NN-*.css` files; `css/99-mobile.css` must stay last), after every one of its
 own selectors' earlier, unconditional base rule. CSS resolves equal-specificity ties by source
 order, so an override block placed _before_ its own base rule would be silently beaten by it — a real
 footgun caught before shipping. Living at the end of the cascade guarantees the block always wins the

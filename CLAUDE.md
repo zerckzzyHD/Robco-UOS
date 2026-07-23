@@ -27,18 +27,25 @@ Read this file, then read **only** the notes whose surface you are touching.
 | If you are touching… | Also read |
 | -------------------- | --------- |
 | `js/core/state.js` · `js/core/idb.js` · `js/core/runtime.js` · `js/services/api-import.js` · any new/changed field on `state`, the save envelope, `migrateState()`, or the durability shadow | `rules/state-and-save.md` |
-| `sw.js` · `index.html` · `manifest.json` · icons · `css/` · `js/` (any **served/precached** file) · `.github/workflows/` · any push that reaches a live site | `rules/deploy-and-cache.md` |
-| `js/services/cloud.js` · `js/ui/ui-account.js` · `firestore.rules` · any sign-in flow · any cloud read/write · **any new feature doing network or external I/O** | `rules/auth-and-cloud.md` |
+| `sw.js` · `index.html` · `manifest.json` · icons · `css/` · `js/` (any **served/precached** file) · `.github/workflows/` · `scripts/cf-staging-build.mjs` · any push that reaches a live site | `rules/deploy-and-cache.md` |
+| `js/services/cloud.js` · `js/ui/ui-account.js` · `firestore.rules` · `firebase.json` · any sign-in flow · any cloud read/write · **any new feature doing network or external I/O** | `rules/auth-and-cloud.md` |
 | `index.html` · `css/` · `js/ui/` · any change a user can see | `rules/ui-and-mobile.md` |
 | `js/ui/ui-audio.js` · the `AudioSettings` cache · the Audio Systems panel · any new sound | `rules/audio.md` |
 | `js/data/` · the `GAME_DEFS` block · the `GAME_FILES` manifest · any per-game branch · any Fallout fact entering the app | `rules/game-data.md` |
 | `js/services/api.js` · `js/services/api-directive.js` · `js/services/api-import.js` · `js/services/api-router.js` · the Tri-Node schema | `rules/ai-contract.md` |
 | any `<script>` tag or boot-order change · any file split/add/move/rename/delete · `repomix.config.json` · any file with non-ASCII characters | `rules/file-layout.md` |
-| `tests/` · `scripts/` · `js/dev/test-console.js` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
-| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · `QUEUE.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
+| `tests/` · `scripts/` (except `scripts/cf-staging-build.mjs` → deploy) · `js/dev/test-console.js` · `.github/workflows/` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
+| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · `QUEUE.md` · `QUEUE_LOG.md` · `skill/SKILL.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
 
 Touching several surfaces means reading several notes. When in doubt, read the note — they are
 short by construction.
+
+**This map is the SOLE authority on which note governs a surface.** There is no second routing
+document. Each note also carries a "Load this when touching" header for the reader who opens the
+note directly, but that header is a convenience mirror, not an independent source of truth: where a
+header and this map disagree, **this map wins**. A guard keeps them honest — every concrete path a
+note's header claims must be routed to that note by its row here (Suite 220.15), so a surface can
+never be governed by a note the map does not point at.
 
 ---
 

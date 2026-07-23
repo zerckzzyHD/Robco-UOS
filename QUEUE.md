@@ -788,6 +788,35 @@ and guarded by Suite **46.26** (asserts the Cloud Push section prescribes `addDo
 `setDoc(firestore,…)` call nor the `state: stateObj` field; proven red against the old text). **Factual
 correction only — the file was not restructured.**
 
+**✅ STEP 2 DONE (2026-07-23, this pass) — the guards that overstate their coverage are fixed. Findings C
+(Suite-220 half) and D closed.** The reason step 1's stale facts sat invisible under a green gate is now
+removed:
+
+- **Finding C (Suite 220 half) — CLOSED.** Suite **220** was extended to see what it was blind to.
+  **220.2b** validates backticked **nested** repo paths (`js/services/api-import.js`, `assets/…`, `.github/…`;
+  wildcard-family `*` tokens excluded), **220.2c** validates backticked **exact bare code filenames**
+  (`.js`/`.mjs`/`.css` only, so gitignored `library/` docs and `planning/` `.html` mockups can never
+  false-fail), and **220.2d** is their empty-parse self-integrity guard. Scope held strictly to nested paths +
+  bare filenames — existence only, **NOT** a prose-truth / semantic checker (the recorded direction).
+  **Proven red-then-green** (Protocol 13/42): a planted nonexistent nested path (`js/services/api-imprt.js`)
+  and bare filename (`api-imprt.js`) both fired RED; removing them restored GREEN. **And it caught a real one
+  on introduction** — `terminal.css`, the pre-U-A2 monolithic stylesheet (split into `css/NN-*.css`), was still
+  named as a **live file** in `rules/ui-and-mobile.md`; fixed in the same commit (Protocol 42), with the one
+  historical mention in `ARCHITECTURE.md` reworded to prose. (The skill-overclaim half of C was already fixed
+  in step 1; not redone.)
+- **Finding D — CLOSED.** The retrieval map is now the **sole** scope authority (stated in place in
+  `CLAUDE.md`), and all five routing gaps are fixed: `.github/workflows/` added to the **testing** row (it is
+  co-governed with deploy); `scripts/cf-staging-build.mjs` added to the **deploy** row and carved out of the
+  broad `scripts/` → testing routing; `firebase.json` added to the **auth** row; `QUEUE_LOG.md` **and**
+  `skill/SKILL.md` added to the **documentation** row (skill/SKILL.md now routes somewhere). New Suite **220.15**
+  is the narrow parity check 220.14 lacked: every concrete path a note's "Load this when touching" header claims
+  must be **routed to that note by its map row** (header ⊆ row; locators and parenthetical asides stripped so
+  only real scope claims are checked). Proven to catch a gap (removing `firebase.json` from the auth row fires
+  RED). **No second routing document** was created.
+
+**Still owed in R10 — STEP 3 only** (route `ARCHITECTURE.md` by section instead of universally, finding A),
+plus the ride-along/gated items (F is done; G low; H/I gated on P3 / the Atlas; L is an owner decision).
+
 **⬜ RECORDED, ranked by consequence — the knowledge-architecture defects (high-priority doc-currency + one
 enforcement gap; none gate the `dev → main` release, all belong to the next governance pass / R5 conversion
 thread).**
@@ -819,8 +848,9 @@ thread).**
   make Architecture **task-retrieved by section** — route surfaces to Architecture anchors from the existing
   retrieval map / scoped notes; **explicitly NOT another summary document**; a Suite 220-style check can verify
   the named anchors exist.
-- **Finding C — Suite 220 does far less than Protocol 45 advertises, which is why B/B-critical passed a green
-  gate.** Suite **220.2**'s regex matches **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
+- **Finding C — ✅ CLOSED (skill-half in step 1; Suite-220 half in step 2, 2026-07-23). Suite 220 did far less
+  than Protocol 45 advertised, which is why B/B-critical passed a green gate.** Suite **220.2**'s regex matched
+  **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
   it cannot see bare filenames (`api.js`), nested paths (`js/services/api-import.js`), function ownership, or
   prose — so the stale `api.js` ownership claims are invisible to it. And `skill/SKILL.md` **overclaims** the
   canonical files are "canonical and current by construction (the gate guards them)" — **still present at
@@ -828,14 +858,15 @@ thread).**
   (finding E).** Direction: correct the SKILL claim first (say _partially_ mechanically checked, source wins);
   extend 220.2 only for unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT**
   attempt a prose-truth checker. Belongs to steps one (skill claim) and two (Suite 220) of the sequence above.
-- **Finding D — the retrieval map has concrete gaps against the notes' own declared scopes.**
-  `.github/workflows/` routes only to the deploy note though the testing note also governs it;
-  `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sends it to testing;
-  `firebase.json` is in the auth note's load header but missing from its map row; `QUEUE_LOG.md` is absent from
-  the documentation row despite that note defining its append-only contract; `skill/SKILL.md` routes nowhere.
-  Suite **220.14** only proves every note is _named_ in the map, not that every relevant path _reaches_ the note
-  claiming it. Direction: make the map the **sole** scope authority, fix the rows, add a narrow parity check
-  (each note's "load this when" header ⇄ its map row). No second routing document.
+- **Finding D — ✅ CLOSED (step 2, 2026-07-23). The retrieval map had concrete gaps against the notes' own
+  declared scopes.** `.github/workflows/` routed only to the deploy note though the testing note also governs it
+  (→ added to testing row); `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sent it
+  to testing (→ added to deploy row, carved out of testing's `scripts/`); `firebase.json` was in the auth note's
+  load header but missing from its map row (→ added); `QUEUE_LOG.md` was absent from the documentation row
+  despite that note defining its append-only contract (→ added); `skill/SKILL.md` routed nowhere (→ added to the
+  documentation row + that note's header). Suite **220.14** only proved every note is _named_ in the map, not
+  that every relevant path _reaches_ the note claiming it — closed by new **Suite 220.15** (header ⊆ row parity).
+  The map is now stated as the **sole** scope authority in `CLAUDE.md`. No second routing document.
 - **Finding E — `skill/SKILL.md` FALSE statement is now ✅ FIXED (`21c78f7`); its library-fallback half is
   still open.** The false gate claim ("the full gate must pass on every commit/push") was **corrected at
   `21c78f7`** — the skill now reads _"the FAST gate runs at commit, the FULL gate (browser checks too) at

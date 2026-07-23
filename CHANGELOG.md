@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r6 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r7 -->
+
+### Under the Hood
+
+- Tightened the terminal's own internal documentation self-check so it catches a class of stale reference it used to miss. The automated check that keeps the developer docs honest now verifies every code file a rule note or architecture page names — whether it's spelled out as a full folder path or just a bare filename — against the files that actually exist, and it cross-checks the map that says "which rule note covers which part of the code" against each note's own "read me when you touch this" header so the two can never quietly disagree. Turning it on immediately shook out one genuinely stale reference — a stylesheet that had been broken up into several smaller files but was still written about as if it were a single file — which was corrected in the same change. No effect on anything you see or do in the app.
 
 ---
 

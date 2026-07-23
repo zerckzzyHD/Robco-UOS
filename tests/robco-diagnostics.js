@@ -43231,6 +43231,15 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  220.11 (r-review Defect-4) guards that the ARCHITECTURE.md File Map
 //  carries no hardcoded byte/KB sizes. 220.12 (r-review) guards that
 //  CLAUDE.md's gate block pushes to dev, not main (Protocol 43).
+//  220.2b/220.2c/220.2d (R10 finding C) close 220.2's blind spots: 220.2b
+//  validates backticked NESTED repo paths, 220.2c validates backticked EXACT
+//  bare code filenames (.js/.mjs/.css) — the pair that let stale api.js
+//  ownership pass a green gate, and that on introduction caught terminal.css
+//  named as a live file after the U-A2 CSS split — and 220.2d is their
+//  empty-parse self-integrity guard. 220.15 (R10 finding D) is the
+//  retrieval-map ⇄ note-header parity check: every concrete path a note's
+//  "Load this when touching" header claims must be routed to that note by its
+//  map row (header ⊆ row), closing the gap 220.14 left (named ≠ reachable).
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 220 — Documentation reference integrity (doc-drift guard)');
@@ -43335,6 +43344,107 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       missingPath.size === 0,
       '220.2: every explicit js/ css/ tests/ scripts/ file path in the docs exists on disk (allowlist: js/ui.js — guarded MUST-NOT-EXIST, Suite 56)' +
         (missingPath.size ? ' — DRIFT: ' + [...missingPath].join(', ') : '')
+    );
+  }
+
+  // ── 220.2b  every backticked NESTED repo path in the docs exists on disk ──
+  // R10 finding C (2026-07-23). 220.2 above matches SINGLE-SEGMENT paths only
+  // (topdir/name.ext) — it is blind to a nested path like
+  // `js/services/api-import.js`, which is exactly why the R2 restructure could
+  // relocate stale `api.js` ownership claims into the trusted layer and still
+  // pass a green gate (findings B / B-critical). This closes the nested half:
+  // any backticked path under a tracked top dir with ≥2 segments and a code
+  // extension must resolve on disk. Scope is deliberately narrow (Protocol 45,
+  // zero-false-positives): only inside backticks, only tracked code top dirs,
+  // NOT a prose-truth / ownership checker. Wildcard-family tokens
+  // (`js/ui/ui-render*.js`) contain `*`, which is outside the character class,
+  // so they never match — they denote a file family in prose, not a literal
+  // path. gitignored trees (library/, planning/) are intentionally excluded —
+  // library/ pointers are validated against the manifest by 220.7.
+  const NESTED_ALLOW_220 = new Set([
+    // (empty) — no doc currently names a nested MUST-NOT-EXIST path. Add here,
+    // with a one-line WHY, only if a doc must reference a deleted nested path.
+  ]);
+  let nestedSeen220 = 0;
+  {
+    const nestedRe =
+      /`((?:js|css|tests|scripts|assets|\.github)\/[A-Za-z0-9_./-]+\.(?:js|mjs|css|html|json))`/g;
+    const missingNested = new Set();
+    let m;
+    while ((m = nestedRe.exec(docBlob220))) {
+      const p = m[1];
+      if (p.split('/').length < 3) continue; // single-segment — 220.2's job
+      nestedSeen220++;
+      if (!NESTED_ALLOW_220.has(p) && !fs.existsSync(path.join(ROOT, p))) missingNested.add(p);
+    }
+    assert(
+      missingNested.size === 0,
+      '220.2b: every backticked NESTED repo path (js/…/…, css/…/…, scripts/…/…, assets/…/…, .github/…/…) in the docs exists on disk — closes the nested-path blind spot that let stale api.js ownership drift pass 220.2' +
+        (missingNested.size ? ' — MISSING: ' + [...missingNested].join(', ') : '')
+    );
+  }
+
+  // ── 220.2c  every backticked EXACT bare code filename resolves to a real file ──
+  // R10 finding C (2026-07-23), the bare-filename half. A doc that names a bare
+  // code filename as a file-ownership claim (e.g. "`autoImportState()` in
+  // `api.js`") is invisible to 220.2 (no slash) — so a reference to a filename
+  // that no longer exists anywhere in the tree slips the gate. This resolves
+  // every backticked bare code filename against the real tracked tree, and it
+  // works: on introduction it caught `terminal.css` — the pre-U-A2 monolithic
+  // stylesheet split into `css/NN-*.css` — still named as a LIVE file in
+  // rules/ui-and-mobile.md (fixed in the same commit, Protocol 42).
+  // Scope is deliberately restricted to .js / .mjs / .css — the extensions
+  // where a bare backticked filename is a code-ownership claim. .html and .json
+  // are excluded ON PURPOSE: a bare .html in the docs is almost always either
+  // an always-present root file (`index.html`) or a gitignored `planning/`
+  // mockup (`nv-machine-mockup.html`) that is absent on CI — negligible catch
+  // value, real false-positive risk. Tracked nested .html/.json ARE still
+  // covered, by 220.2b. Not a semantic/prose checker — existence only (the
+  // recorded direction for finding C).
+  const BARE_ALLOW_220 = new Set([
+    // (empty) — every bare .js/.mjs/.css filename the docs name currently
+    // resolves. Add a MUST-NOT-EXIST bare filename here with a one-line WHY.
+  ]);
+  {
+    // Basename index of real .js/.mjs/.css files: walk the tracked code trees + root.
+    const codeExt220 = /\.(?:js|mjs|css)$/;
+    const realBasenames220 = new Set();
+    const walk220c = dir => {
+      if (!fs.existsSync(dir)) return;
+      for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (ent.name === 'node_modules' || ent.name.startsWith('.')) continue;
+        const abs = path.join(dir, ent.name);
+        if (ent.isDirectory()) walk220c(abs);
+        else if (codeExt220.test(ent.name)) realBasenames220.add(ent.name);
+      }
+    };
+    for (const d of ['js', 'css', 'tests', 'scripts', 'assets']) walk220c(path.join(ROOT, d));
+    for (const ent of fs.readdirSync(ROOT, { withFileTypes: true })) {
+      if (!ent.isDirectory() && codeExt220.test(ent.name)) realBasenames220.add(ent.name);
+    }
+    const bareRe = /`([A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*\.(?:js|mjs|css))`/g;
+    const missingBare = new Set();
+    let bareSeen220 = 0;
+    let m;
+    while ((m = bareRe.exec(docBlob220))) {
+      const f = m[1];
+      if (f.includes('/')) continue; // nested — 220.2 / 220.2b handle it
+      bareSeen220++;
+      if (!BARE_ALLOW_220.has(f) && !realBasenames220.has(f)) missingBare.add(f);
+    }
+    assert(
+      missingBare.size === 0,
+      '220.2c: every backticked bare code filename (name.js/.mjs/.css) in the docs resolves to a real file in the tracked tree — closes the bare-filename blind spot in 220.2' +
+        (missingBare.size ? ' — UNRESOLVED: ' + [...missingBare].join(', ') : '')
+    );
+    // 220.2d  self-integrity: the nested + bare scanners actually matched real
+    //   references, so 220.2b/220.2c can never pass on a silent empty parse
+    //   (the same trap 220.6 guards for the load-order block). If a future doc
+    //   restructure strips every backticked code path, that is itself drift.
+    assert(
+      nestedSeen220 >= 5 && bareSeen220 >= 3,
+      '220.2d: the 220.2b/220.2c scanners saw a non-trivial number of backticked code paths (nested ≥5, bare ≥3) — prevents 220.2b/220.2c passing on an empty parse' +
+        ` — saw nested=${nestedSeen220}, bare=${bareSeen220}`
     );
   }
 
@@ -43757,6 +43867,118 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
             : '') +
           (phantom220.length ? ' — NAMED but absent: ' + phantom220.join(', ') : '') +
           (onDisk220.size < 5 ? ' — rules/ looks empty or missing' : '')
+      );
+    }
+
+    // 220.15  R10 finding D (2026-07-23): the retrieval map ⇄ note-header parity
+    //   check. 220.14 only proves every note is NAMED in the map; it does NOT
+    //   prove that every path a note claims scope over actually REACHES that note
+    //   through the map. A note whose "Load this when touching" header claims a
+    //   surface the map row does not route to it is a rule a session will not
+    //   retrieve when it touches that surface — the exact "written is not
+    //   retrieved" failure the R2 restructure exists to prevent, and the gap the
+    //   audit found for firebase.json (auth), .github/workflows/ (testing) and
+    //   scripts/cf-staging-build.mjs (deploy).
+    //
+    //   Direction: HEADER ⊆ ROW. Every concrete path a note's header claims must
+    //   appear in that note's retrieval-map row. (The reverse — a row naming a
+    //   path the header omits — is fine: a surface may be co-governed, and the
+    //   map is the SOLE authority, so a row is allowed to be a superset.)
+    //
+    //   Zero-false-positives discipline (Protocol 45): a "concrete path" is a
+    //   backticked token that is a real path shape (has a "/" or a known file
+    //   extension), is NOT a function call ("(" ) or a wildcard family ("*"),
+    //   and is NOT a mere LOCATOR — a header often names another note's file to
+    //   say where something lives ("the `GAME_DEFS` block in `js/core/state.js`",
+    //   "the `AudioSettings` cache in `ui-core.js`"). Locators are dropped two
+    //   ways before extraction: parenthesised asides are stripped, and any
+    //   "… in `path`" tail is stripped. What survives is the note's own
+    //   scope claim, which is what must be routable.
+    {
+      const isPathTok220 = t =>
+        !t.includes('(') &&
+        !t.includes('*') &&
+        /^[A-Za-z0-9_./-]+$/.test(t) &&
+        (t.includes('/') || /\.(?:js|mjs|json|md|css|html|rules)$/.test(t));
+
+      // The retrieval-map section only (NOT the Reference Pointer Index, which
+      // also names rules/*.md files in its own table). Slice between the two
+      // headings so a pointer-index row can never be mistaken for a map row.
+      const claudeSrc220 = docText220['CLAUDE.md'];
+      const mapSecM = /## Retrieval map[\s\S]*?(?=\n## )/.exec(claudeSrc220);
+      const mapSection220 = mapSecM ? mapSecM[0] : '';
+
+      // Extract each note's header scope-claim tokens (the blockquote paragraph
+      // that starts at "Load this when touching:" and ends at the first blank
+      // ">" line — deliberately excluding the "Universal rules live in CLAUDE.md"
+      // paragraph that follows it).
+      const headerTokens220 = noteRel => {
+        const src = docText220[noteRel];
+        const lines = src.split(/\r?\n/);
+        let i = lines.findIndex(l => /Load this when touching:/.test(l));
+        if (i < 0) return null;
+        const buf = [];
+        for (; i < lines.length; i++) {
+          const raw = lines[i];
+          if (!/^>/.test(raw)) break;
+          const body = raw.replace(/^>\s?/, '');
+          if (body.trim() === '') break; // blank blockquote line ends the paragraph
+          buf.push(body);
+        }
+        let text = buf.join(' ').replace(/\*\*Load this when touching:\*\*/, '');
+        const out = new Set();
+        for (let seg of text.split('·')) {
+          seg = seg.replace(/\([^)]*\)/g, ''); // drop parenthetical asides
+          seg = seg.replace(/\bin\s+`[^`]+`/g, ''); // drop "… in `path`" locators
+          for (const m of seg.matchAll(/`([^`]+)`/g)) {
+            if (isPathTok220(m[1])) out.add(m[1]);
+          }
+        }
+        return out;
+      };
+
+      // Extract a note's retrieval-map row first-cell tokens.
+      const rowTokens220 = noteRel => {
+        const rowRe = new RegExp(
+          '^\\|(.*)\\|[^|]*`' + noteRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '`[^|]*\\|\\s*$',
+          'm'
+        );
+        const m = rowRe.exec(mapSection220);
+        if (!m) return null;
+        const out = new Set();
+        for (const b of m[1].matchAll(/`([^`]+)`/g)) {
+          if (isPathTok220(b[1])) out.add(b[1]);
+        }
+        return out;
+      };
+
+      const parityFailures = [];
+      let parityChecked = 0;
+      for (const noteRel of ruleNoteFiles()) {
+        const hdr = headerTokens220(noteRel);
+        const row = rowTokens220(noteRel);
+        if (hdr === null) {
+          parityFailures.push(`${noteRel}: no "Load this when touching" header found`);
+          continue;
+        }
+        if (row === null) {
+          parityFailures.push(`${noteRel}: no retrieval-map row found`);
+          continue;
+        }
+        parityChecked++;
+        const missing = [...hdr].filter(t => !row.has(t));
+        if (missing.length) {
+          parityFailures.push(
+            `${noteRel}: header claims [${missing.join(', ')}] not routed by its map row`
+          );
+        }
+      }
+
+      assert(
+        parityFailures.length === 0 && parityChecked >= 5,
+        '220.15: every rules/*.md note’s "Load this when touching" header agrees with its retrieval-map row — every concrete path the header claims is routed to that note by the map (header ⊆ row)' +
+          (parityFailures.length ? ' — MISMATCH: ' + parityFailures.join('; ') : '') +
+          (parityChecked < 5 ? ` — only ${parityChecked} notes parsed (parser regression?)` : '')
       );
     }
   }
