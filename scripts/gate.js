@@ -42,6 +42,10 @@ const { spawnSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+// The git-tracked ESLint manifest (G-review CLAIM A/C/D). Replaces `eslint .`
+// so an untracked scratch file from a concurrent session sharing the checkout
+// can never fail an unrelated push. See scripts/gate-lint-manifest.js.
+const { trackedLintFiles } = require('./gate-lint-manifest.js');
 
 const ROOT = path.join(__dirname, '..');
 const fast = process.argv.includes('--fast');
@@ -269,6 +273,43 @@ function changedLintFiles() {
   }
 }
 
+// ── ESLint over the git-tracked manifest (G-review CLAIM A/C/D) ───────────────
+// The commit/push gate must lint the files being committed/pushed — the git
+// index — NOT `eslint .` across the whole working directory, so a concurrent
+// session's untracked scratch file cannot fail an unrelated gate run. The manifest
+// is every tracked js/mjs/cjs file (staged-new included; staged-deleted/absent
+// excluded); ESLint still applies its own config `ignores` under --no-warn-ignored,
+// so the linted set is identical to `eslint .` minus untracked files. --max-warnings
+// 0 is preserved. Chunked so a very large manifest can never overrun the OS
+// command-line length limit (each chunk is its own `run()`, so a failure in any
+// chunk fails the gate exactly like the single old invocation did). If git is
+// unavailable, fall back to a whole-directory lint — never silently weaker.
+function runEslintTracked() {
+  const files = trackedLintFiles(ROOT);
+  if (files === null) {
+    run(
+      'ESLint (--max-warnings 0, whole-dir fallback — git unavailable)',
+      'npx eslint . --max-warnings 0'
+    );
+    return;
+  }
+  if (files.length === 0) {
+    console.log('\n[gate] ESLint — no tracked lintable files (nothing to lint).');
+    return;
+  }
+  const CHUNK = 120; // keep each shell command well under OS cmd-line limits
+  const chunks = [];
+  for (let i = 0; i < files.length; i += CHUNK) chunks.push(files.slice(i, i + CHUNK));
+  chunks.forEach((chunk, idx) => {
+    const fileArgs = chunk.map(f => `"${f}"`).join(' ');
+    const label =
+      `ESLint (tracked manifest, --max-warnings 0` +
+      (chunks.length > 1 ? `, batch ${idx + 1}/${chunks.length}` : '') +
+      `) — ${files.length} tracked file(s)`;
+    run(label, `npx eslint ${fileArgs} --max-warnings 0 --no-warn-ignored`);
+  });
+}
+
 // ── Iteration pre-check (--iter, audit #3) ────────────────────────────────────
 // A deliberately-thin, fast inner-loop check. It is OPT-IN and is never invoked
 // by a git hook or CI, so it can never stand in for the commit gate (gate:fast)
@@ -287,7 +328,8 @@ if (iter) {
       `npx eslint ${fileArgs} --max-warnings 0 --no-warn-ignored`
     );
   } else {
-    run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
+    // No changed files → lint the git-tracked manifest, not `eslint .` (CLAIM A/C/D).
+    runEslintTracked();
   }
 
   run('Prettier (format check)', 'npx prettier --check .');
@@ -316,8 +358,11 @@ try {
   /* never let evidence cleanup abort the gate */
 }
 
-// ── 1. ESLint ─────────────────────────────────────────────────────────────────
-run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0');
+// ── 1. ESLint (git-tracked manifest, CLAIM A/C/D) ─────────────────────────────
+// Runs on BOTH the fast (commit) and full (push) gate — this line is above the
+// `if (fast)` split. Lints the git index (what's being committed/pushed), never
+// `eslint .`, so a concurrent session's untracked file cannot fail this gate.
+runEslintTracked();
 
 // ── 2. Prettier ───────────────────────────────────────────────────────────────
 run('Prettier (format check)', 'npx prettier --check .');

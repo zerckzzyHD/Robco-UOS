@@ -51266,6 +51266,137 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 244 — Gate lint is scoped to the git-tracked manifest
+//  (G-review CLAIM A/C/D — the cross-session `eslint .` collision)
+//
+//  Locks the fix for the single most-flagged finding of the G blind workflow
+//  review: the pre-commit/pre-push gate linted `eslint .` (the WHOLE working
+//  directory), so an untracked scratch file from a concurrent session sharing
+//  the checkout could fail an unrelated push. The gate now lints the git index
+//  (scripts/gate-lint-manifest.js). This suite proves BOTH directions and pins
+//  the wiring so the collision class cannot silently return.
+// ══════════════════════════════════════════════════════════════
+header('Suite 244 — gate lint scoped to git-tracked manifest (CLAIM A/C/D)');
+{
+  const { manifestFromLsFiles, trackedLintFiles, LINTABLE_RE } = require(
+    path.join(ROOT, 'scripts', 'gate-lint-manifest.js')
+  );
+  const gateSrc244 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+
+  // ── Pure-core scoping semantics (manifestFromLsFiles) ──
+  // Model a `git ls-files` output. An untracked file NEVER appears in ls-files,
+  // so "excluded because untracked" is modeled by simply not listing it.
+  const lsOut244 = [
+    'js/core/state.js', // tracked + lintable + exists  → IN
+    'scripts/gate.js', // tracked + lintable + exists   → IN
+    'js/core/state.js', // duplicate (unmerged entry)    → deduped
+    'js/data/deleted.js', // tracked but removed on disk → OUT (existsFn=false)
+    'README.md', // non-lintable extension              → OUT
+    'node_modules/eslint/x.js', // node_modules          → OUT
+    'css/theme.css', // non-lintable                     → OUT
+  ].join('\n');
+  const existing244 = new Set(['js/core/state.js', 'scripts/gate.js']);
+  const manifest244 = manifestFromLsFiles(lsOut244, f => existing244.has(f));
+
+  assert(
+    manifest244.includes('js/core/state.js') && manifest244.includes('scripts/gate.js'),
+    '244.1: manifest INCLUDES tracked, lintable, existing files (coverage preserved)'
+  );
+  assert(
+    !manifest244.includes('__concurrent_scratch__.js'),
+    '244.2: a file absent from `git ls-files` (an untracked scratch file) is NEVER in the manifest — the collision fix'
+  );
+  assert(
+    !manifest244.includes('js/data/deleted.js'),
+    '244.3: a tracked-but-deleted path (in ls-files, gone on disk) is dropped — eslint is never handed a nonexistent path'
+  );
+  assert(
+    !manifest244.includes('README.md') && !manifest244.includes('css/theme.css'),
+    '244.4: non-lintable extensions are excluded (only js/mjs/cjs, matching the flat-config default)'
+  );
+  assert(
+    !manifest244.some(f => f.includes('node_modules/')),
+    '244.5: node_modules paths are excluded'
+  );
+  assert(
+    manifest244.filter(f => f === 'js/core/state.js').length === 1,
+    '244.6: duplicate ls-files entries (conflict/unmerged) are de-duplicated'
+  );
+  assert(
+    LINTABLE_RE.test('a.js') &&
+      LINTABLE_RE.test('a.mjs') &&
+      LINTABLE_RE.test('a.cjs') &&
+      !LINTABLE_RE.test('a.ts') &&
+      !LINTABLE_RE.test('a.json'),
+    '244.7: LINTABLE_RE targets exactly js/mjs/cjs'
+  );
+
+  // ── Real-repo wiring + the live red/green proof (trackedLintFiles) ──
+  const realManifest244 = trackedLintFiles(ROOT);
+  assert(
+    Array.isArray(realManifest244) && realManifest244.length > 0,
+    '244.8: trackedLintFiles(ROOT) returns a non-empty manifest from real git'
+  );
+  assert(
+    Array.isArray(realManifest244) &&
+      realManifest244.every(f => LINTABLE_RE.test(f) && fs.existsSync(path.join(ROOT, f))),
+    '244.9: every real manifest entry is lintable AND exists on disk (no nonexistent paths handed to eslint)'
+  );
+  // The live proof of DIRECTION 1: drop an untracked lint-failing scratch file
+  // into the repo and assert the manifest still excludes it. Wrapped in
+  // try/finally so the probe is ALWAYS removed (never left for Suite 98 to flag,
+  // never left dirtying the tree) even if an assert throws.
+  const probeRel244 = '__lint_scope_probe__.js';
+  const probeAbs244 = path.join(ROOT, probeRel244);
+  try {
+    fs.writeFileSync(probeAbs244, 'var broken = ;\n', 'utf8'); // untracked + lint-failing
+    const withProbe244 = trackedLintFiles(ROOT);
+    assert(
+      Array.isArray(withProbe244) && !withProbe244.includes(probeRel244),
+      '244.10: a freshly-created UNTRACKED lint-failing file is absent from the live manifest (concurrent-scratch cannot enter the gate)'
+    );
+  } finally {
+    try {
+      fs.rmSync(probeAbs244, { force: true });
+    } catch {
+      /* probe cleanup must never break the suite */
+    }
+  }
+  assert(
+    !fs.existsSync(probeAbs244),
+    '244.11: the Suite-244 probe file was cleaned up (no junk left at root)'
+  );
+
+  // ── Static wiring: the gate must ROUTE through the manifest, and the old
+  //    whole-directory `eslint .` call site must be GONE from the real gate. ──
+  guards(gateSrc244, [
+    [
+      /require\(['"]\.\/gate-lint-manifest\.js['"]\)/,
+      '244.12: gate.js imports the tracked-manifest module',
+    ],
+    [/function runEslintTracked\(/, '244.13: gate.js defines runEslintTracked()'],
+    // The pre-iter/main gate line that used to be `run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0')`
+    // must no longer exist — that exact vulnerable invocation is what the review flagged.
+    [
+      `run('ESLint (--max-warnings 0)', 'npx eslint . --max-warnings 0')`,
+      '244.14: the old unconditional `eslint .` gate lint is REMOVED',
+      NEG,
+    ],
+  ]);
+  // runEslintTracked() must actually be CALLED on the real gate path (not just
+  // defined). It is called twice: the --iter no-change fallback and the main gate.
+  assert(
+    (gateSrc244.match(/runEslintTracked\(\)/g) || []).length >= 2,
+    '244.15: runEslintTracked() is invoked on both gate paths (main gate + --iter fallback)'
+  );
+  // The only surviving `eslint .` is the documented git-unavailable fail-safe.
+  assert(
+    /whole-dir fallback — git unavailable/.test(gateSrc244),
+    '244.16: the sole remaining `eslint .` is the labeled git-unavailable fail-safe (never silently weaker)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

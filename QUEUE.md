@@ -553,6 +553,34 @@ resolved in either place yet.
 (refreshed) process; synthesized into a committed claim-ledger file; with DeepSeek's dissent preserved and
 answered rather than averaged away.
 
+**REVIEW RUN + REMEDIATION UNDER WAY (2026-07-23).** All four sources are in
+(`planning/audits/G_workflow_review/sources/` — GPT-5.6 Sol verbatim, Gemini 3.1 Pro, DeepSeek witness,
+Claude/Dispatch), and the committed claim-ledger is built and repo-verified:
+`planning/audits/G_workflow_review/CLAIM_LEDGER.md` (source-owned IDs, a disposition for every finding,
+`file:line` evidence pointers, the spare-laptop dissent preserved as an owner-decision, and the
+known-limitation — Dispatch is structurally the transcriber on this platform — labeled unsolved). NOTE:
+the whole `G_workflow_review/` folder is under gitignored `planning/`, so it is durably preserved via the
+Protocol 48 archive sync, not committed to the public repo (the ledger's own privacy placement is
+deliberate — it critiques internal orchestration).
+
+- ✅ **CLAIM A/C/D — CLOSED (the #1 confirmed+cheap+high-value fix).** The gate lint no longer runs
+  `eslint .` over the whole working directory; it lints the **git-tracked manifest** (the files actually
+  being committed/pushed) via `scripts/gate-lint-manifest.js`, on both the fast (commit) and full (push)
+  gate. A concurrent session's untracked scratch file can no longer fail an unrelated push. Proven
+  red-then-green (untracked scratch present → gate PASSES; a tracked lint error still FAILS) and locked by
+  **Suite 244**. Protocol 41's deletion clause is rewritten concurrency-safe: delete only files THIS session
+  created; surface all other untracked files, never delete while another run may be live. Cache `-r7 → -r8`;
+  `APP_VERSION` unchanged.
+- ⬜ **Still open — the remaining ranked G actions** (from the ledger's §4, not yet built): the
+  **"Dispatch proposals are hypotheses" rule** (codify + edge-enforce — the cheapest governance change,
+  unanimous across all four sources); the **post-deploy release receipt** (verify the served production hash
+  / SW-update matches the pushed commit — CLAIM M confirmed: `deploy.yml` has no post-deploy verification);
+  the **escape-ratchet creation-time filter** (CLAIM Q — Protocol 36b still adds a guard for _every_ escape
+  with no cost/FP threshold); the **structural dissent block** (grep-able, orchestrator-surfaced verbatim —
+  light variant, not blanket transcript archiving); and the **orchestrator-memory restore/rehydrate runbook**
+  (CLAIM V — the _backup_ is solid via `sync.ps1`, but no documented restore path exists). The
+  spare-laptop adopt-vs-defer split stays an **owner-decision**.
+
 ### L. ⬜ A generated, private HTML view of THIS queue — plus a deferred, opt-in player-facing view
 
 **What it is.** `QUEUE.md` is the file the owner steers the project from — generate an HTML view of it that

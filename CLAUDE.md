@@ -321,7 +321,9 @@ Treat model usage as a budget — and the burden of efficiency is on the orchest
 
 At the end of **every** task, sweep the project directory for leftover/junk files and remove them — **before** the final commit.
 
-**Sweep for:**
+**Concurrency safety — delete only what THIS session created (G-review CLAIM D, 2026-07-23).** A sweep runs on a shared checkout where **another session may be live**. So the sweep may **automatically delete only files this session itself created**. Any **other** untracked file — anything this session did not create — is **SURFACED in the report, never deleted**, while another run may be live. When in doubt about which session created a file, treat it as not-yours and surface it. This closes the real incident the G blind workflow review flagged: a cleanup sweep deleting a *concurrent* session's live scratch files. An isolated task worktree may be disposed only after its owning run reaches a terminal state — there is no value in an aggressive in-place deletion of files a live sibling session still needs. (The mirror of the `eslint .` concurrency fix — CLAIM A/C/D — which scopes the gate lint to the git-tracked manifest so a sibling's untracked file can't fail an unrelated gate.)
+
+**Sweep for** (subject to the concurrency-safety rule above — surface, don't delete, anything this session did not create):
 
 - Stray scratch / repro / one-off scripts (e.g. `repro.*`, `_diag*`, ad-hoc harnesses).
 - Temp / generated junk: `*.bak`, `*.old`, `*.tmp`, `*.orig`, `*.log`, `*.zip`, `*~`, `*.swp`/`*.swo`, OS files (`.DS_Store`, `Thumbs.db`, `desktop.ini`).
