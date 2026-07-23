@@ -17,7 +17,8 @@
     "prepare": "node scripts/install-hooks.js",
     "rollback": "sh scripts/rollback.sh",
     "a11y": "node tests/a11y-check.mjs",
-    "cloud-check": "node scripts/cloud-serialization-check.js"
+    "cloud-check": "node scripts/cloud-serialization-check.js",
+    "release-receipt": "node scripts/release-receipt.js"
   },
   "repository": {
     "type": "git",

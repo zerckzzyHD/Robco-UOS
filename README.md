@@ -320,6 +320,7 @@ This is a **static site** — no build step to run it.
 
 - **Production:** GitHub Pages at **https://zerckzzyHD.github.io/Robco-UOS/**, built from `main` and **release-gated** — it publishes only on a version release.
 - **Staging:** a private Cloudflare Pages build from `dev` (`robco-uos-dev.pages.dev`) for real-device testing, auto-deployed on every dev push and stamped as a DEV BUILD.
+- **Post-deploy release receipt:** `npm run release-receipt` — a manual after-a-deploy check (not a gate step) that fetches the LIVE site and confirms the served version + cache stamp match the deployed commit, so a silently-failed update ("pushed ≠ live") is caught loudly instead of leaving users on stale code. It names the parts only a real device can confirm (installed-PWA upgrade, save survival, auth) and leaves those to you.
 
 ---
 

@@ -51397,6 +51397,152 @@ header('Suite 244 — gate lint scoped to git-tracked manifest (CLAIM A/C/D)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 245 — Release receipt: served-truth compare core (G-review CLAIM M)
+//
+//  Locks the pure heart of scripts/release-receipt.js — the "pushed ≠ live"
+//  check that a MISMATCH between the prod-served build and the deployed commit
+//  must FAIL (the silent-stale-SW class, our worst-ever bug). The NETWORK fetch
+//  is a manual post-deploy command, not a gate step (the code isn't live at push
+//  time and the gate has no guaranteed network); but the compare/extract core is
+//  pure and gate-tested here, red-then-green. This is the FOUNDATION the 2.9.0
+//  hardening-gate "Post-deploy TRUTH" item extends (Protocol 22).
+// ══════════════════════════════════════════════════════════════
+header('Suite 245 — release receipt served-truth compare core (CLAIM M)');
+{
+  const RR = require(path.join(ROOT, 'scripts', 'release-receipt.js'));
+  const rrSrc245 = fs.readFileSync(path.join(ROOT, 'scripts', 'release-receipt.js'), 'utf8');
+  const pkg245 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+
+  // ── Extractors pull the real markers, and only the real markers ──
+  assert(
+    RR.extractCacheName("const CACHE_NAME = 'robco-terminal-v2.8.5-r8';") ===
+      'robco-terminal-v2.8.5-r8',
+    '245.1: extractCacheName pulls the CACHE_NAME literal from sw.js text'
+  );
+  assert(
+    RR.extractAppVersion("const APP_VERSION = '2.8.5';") === '2.8.5',
+    '245.2: extractAppVersion pulls the APP_VERSION literal from state.js text'
+  );
+  assert(
+    RR.extractCacheName('no cache name here') === null &&
+      RR.extractAppVersion('no version here') === null,
+    '245.3: extractors return null when the marker is absent (never a bogus value)'
+  );
+  // The extractors must agree with the REAL repo files, so the check compares
+  // like-for-like (self-integrity: a drift in the marker shape would break this).
+  assert(
+    RR.extractCacheName(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8')) !== null &&
+      RR.extractAppVersion(fs.readFileSync(path.join(ROOT, 'js', 'core', 'state.js'), 'utf8')) !==
+        null,
+    '245.4: both extractors resolve against the real sw.js + js/core/state.js (marker shapes are current)'
+  );
+
+  // ── The compare core: GREEN when served == expected ──
+  const green245 = RR.compareReceipt({
+    servedCache: 'robco-terminal-v2.8.5-r8',
+    servedVersion: '2.8.5',
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+  });
+  assert(
+    green245.ok === true && green245.mismatches.length === 0,
+    '245.5: [GREEN] served CACHE_NAME + APP_VERSION both match expected → ok:true (prod is serving the pushed build)'
+  );
+
+  // ── RED: a stale served CACHE_NAME must FAIL (the exact silent-stale-SW class) ──
+  const redCache245 = RR.compareReceipt({
+    servedCache: 'robco-terminal-v2.8.5-r7', // prod stuck one rev behind
+    servedVersion: '2.8.5',
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+  });
+  assert(
+    redCache245.ok === false &&
+      redCache245.cacheMatch === false &&
+      redCache245.mismatches.length === 1,
+    '245.6: [RED] a stale served CACHE_NAME (prod one rev behind) → ok:false — the silent-stale-SW class is caught'
+  );
+
+  // ── RED: a mismatched APP_VERSION must FAIL ──
+  const redVer245 = RR.compareReceipt({
+    servedCache: 'robco-terminal-v2.8.5-r8',
+    servedVersion: '2.8.4', // prod serving an older build
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+  });
+  assert(
+    redVer245.ok === false && redVer245.versionMatch === false,
+    '245.7: [RED] a mismatched served APP_VERSION → ok:false (prod serving an older build)'
+  );
+
+  // ── RED: a marker that could not be extracted (null) is a FAIL, never a pass ──
+  const redNull245 = RR.compareReceipt({
+    servedCache: null,
+    servedVersion: '2.8.5',
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+  });
+  assert(
+    redNull245.ok === false,
+    '245.8: [RED] a served value that could not be extracted (null) → ok:false — an unconfirmable served build never silently passes'
+  );
+
+  // ── The receipt text carries the verdict AND the owner-only authority boundary ──
+  const receiptGreen245 = RR.buildReceipt({
+    tag: 'v2.8.5',
+    commit: 'abc1234',
+    url: 'https://example/',
+    servedCache: 'robco-terminal-v2.8.5-r8',
+    servedVersion: '2.8.5',
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+    result: green245,
+  });
+  const receiptRed245 = RR.buildReceipt({
+    tag: 'v2.8.5',
+    commit: 'abc1234',
+    url: 'https://example/',
+    servedCache: 'robco-terminal-v2.8.5-r7',
+    servedVersion: '2.8.5',
+    expectedCache: 'robco-terminal-v2.8.5-r8',
+    expectedVersion: '2.8.5',
+    result: redCache245,
+  });
+  assert(
+    /LIVE/.test(receiptGreen245) && /MISMATCH/.test(receiptRed245),
+    '245.9: the receipt states LIVE on a match and MISMATCH on a mismatch (a clear owner verdict)'
+  );
+  assert(
+    /real device/i.test(receiptGreen245) &&
+      /save/i.test(receiptGreen245) &&
+      /auth/i.test(receiptGreen245),
+    '245.10: the receipt names the owner-only real-device checks (PWA upgrade, save survival, auth) — the authority boundary this check cannot fake'
+  );
+
+  // ── Wiring: it is a MANUAL command, deliberately NOT a blocking gate step ──
+  assert(
+    pkg245.scripts['release-receipt'] === 'node scripts/release-receipt.js',
+    '245.11: package.json exposes `npm run release-receipt` (the manual post-deploy command)'
+  );
+  const gateSrc245 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+  const preCommit245 = fs.readFileSync(path.join(ROOT, 'scripts', 'pre-commit'), 'utf8');
+  const prePush245 = fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8');
+  assert(
+    !/release-receipt/.test(gateSrc245) &&
+      !/release-receipt/.test(preCommit245) &&
+      !/release-receipt/.test(prePush245),
+    '245.12: release-receipt is NOT wired into the gate or the commit/push hooks (post-deploy + needs network — correctly a manual command, not a blocking gate step)'
+  );
+  // The require above ran the module WITHOUT triggering its CLI/network path — a
+  // require.main===module guard. If that guard regressed, requiring it here would
+  // have attempted a live fetch. Prove the guard is present in source.
+  assert(
+    /require\.main\s*===\s*module/.test(rrSrc245),
+    '245.13: the network/CLI path is guarded by require.main===module (so importing the pure core never fetches)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

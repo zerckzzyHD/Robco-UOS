@@ -583,11 +583,22 @@ deliberate — it critiques internal orchestration).
   **`rules/memory-restore.md`** is the new fresh-Dispatch rehydrate runbook (Protocol 48's restore
   complement — CLAIM V), wired into the retrieval map + pointer index. No cache bump / no `APP_VERSION`
   change (internal governance docs, not served); no CHANGELOG entry (not user-facing).
-- ⬜ **Still open — the remaining ranked G actions** (from the ledger's §4): the **(a) post-deploy release
-  receipt** (verify the served production hash / SW-update matches the pushed commit — CLAIM M confirmed:
-  `deploy.yml` has no post-deploy verification); and the **owner-decisions** — the spare-laptop
-  adopt-vs-defer split, the report-cadence relaxation (batching clean green reports vs Protocol 9's "every
-  time"), and the DeepSeek-roster confirmation. The (b) bundle above is done.
+- ✅ **The (a) "now" bucket — CLOSED (2026-07-23).** The last (a) item, the **post-deploy release receipt**
+  (CLAIM M — "pushed ≠ live"), shipped as `scripts/release-receipt.js` / `npm run release-receipt`: it
+  fetches the LIVE prod build and asserts the served `CACHE_NAME` (sw.js) + `APP_VERSION` (js/core/state.js)
+  match the deployed commit; a mismatch FAILS loudly (the silent-stale-SW class). It is a **manual
+  post-deploy command, not a gate step** — the code isn't live at push time and the gate has no guaranteed
+  network — but its pure compare/extract core is gate-tested red-then-green (**Suite 245**). The receipt
+  names the owner-only real-device checks (installed-PWA upgrade, save survival, auth) and leaves them to the
+  owner. Built as the **FOUNDATION** the 2.9.0 hardening-gate "Post-deploy TRUTH" item extends (Protocol 22),
+  not a parallel build — see that item's note + R5's deploy-protocol candidate. Cache `-r8 → -r9` (CHANGELOG
+  touched); `APP_VERSION` unchanged. **With this, all three (a) confirmed+cheap fixes are done** (CLAIM
+  A/C/D gate-lint scoping, the (b) governance bundle, and now the release receipt).
+- ⬜ **Still open — only the owner-decisions remain** (from the ledger's §4(c)): the spare-laptop
+  adopt-vs-defer split (owner → **DEFERRED**: fix isolation in software first, laptop only ever an optional
+  notifier/accelerator, never the gate); the report-cadence relaxation (batching clean green reports vs
+  Protocol 9's "every time" — **pending owner**); and the DeepSeek roster (owner → **occasional witness, not
+  a standing stage**). No build work left in G beyond what the owner rules on.
 
 ### L. ⬜ A generated, private HTML view of THIS queue — plus a deferred, opt-in player-facing view
 
@@ -1096,6 +1107,11 @@ commit, Protocol 27):**
 - AI-response handling → runtime schema validation + malformed-response behavioral tests.
 - The deploy protocol → a post-deploy version/SW/offline smoke. **Flag:** very likely the _same_ work as
   the 2.9.0 hardening gate's "post-deploy TRUTH" item — resolve which one builds it before starting either.
+  **UPDATE (2026-07-23):** the served-truth _foundation_ now exists — `scripts/release-receipt.js` (G item,
+  CLAIM M) fetches the live prod build and compares served `CACHE_NAME` + `APP_VERSION` against the deployed
+  commit. This candidate's remaining scope is the _behavioral_ half (SW actually installed/activated + an
+  offline smoke), which is exactly the 2.9.0 "Post-deploy TRUTH" item — so both should **extend** the receipt
+  (Protocol 22), not rebuild the served-hash compare.
 
 **The gate this stage was waiting on.** R2 (the rules restructure) had to be USED for real work first.
 **Dispatch's read: that gate now appears satisfied** — the restructure has been retrieving correctly and
@@ -2106,6 +2122,17 @@ to install because `sw.js` precached an `index.html` that redirects, so "REBOOT 
 users sat on stale code **under a green gate.** The hardening gate turns that one already-proven failure mode
 into an automated post-deploy check — and when it catches a service-worker install/update failure, the
 **user** must be shown it, not just a log.
+
+**Build on the release-receipt FOUNDATION (Protocol 22, 2026-07-23).** The served-truth half already
+exists — `scripts/release-receipt.js` (`npm run release-receipt`, the G-review CLAIM M item) fetches the
+live prod build and asserts the served `CACHE_NAME` + `APP_VERSION` match the deployed commit, with a pure
+compare core gate-tested red-then-green (Suite 245). It is deliberately a **manual post-deploy command**
+(the code isn't live at push time; the gate has no guaranteed network). This item **extends** it — do NOT
+re-implement the served-hash compare. What it adds on top: (1) proving the service worker actually
+**installed/activated** (behavioral, not just "the file is served"); (2) an **offline** reload smoke; and
+(3) the load-bearing new part — **surfacing an install/update failure to the USER in-app**, not just a log.
+The receipt owns the "is prod serving the pushed bytes?" question; this item owns "did the SW update land,
+and if not, does the user find out?"
 
 **⭐ Why the order is load-bearing (VERIFIED CORRECT — do not reorder).** Every headline OS feature is a new
 service that renders. Build the services first and each one lands on the debt and **multiplies it**. Burn the
