@@ -571,15 +571,23 @@ deliberate — it critiques internal orchestration).
   **Suite 244**. Protocol 41's deletion clause is rewritten concurrency-safe: delete only files THIS session
   created; surface all other untracked files, never delete while another run may be live. Cache `-r7 → -r8`;
   `APP_VERSION` unchanged.
-- ⬜ **Still open — the remaining ranked G actions** (from the ledger's §4, not yet built): the
-  **"Dispatch proposals are hypotheses" rule** (codify + edge-enforce — the cheapest governance change,
-  unanimous across all four sources); the **post-deploy release receipt** (verify the served production hash
-  / SW-update matches the pushed commit — CLAIM M confirmed: `deploy.yml` has no post-deploy verification);
-  the **escape-ratchet creation-time filter** (CLAIM Q — Protocol 36b still adds a guard for _every_ escape
-  with no cost/FP threshold); the **structural dissent block** (grep-able, orchestrator-surfaced verbatim —
-  light variant, not blanket transcript archiving); and the **orchestrator-memory restore/rehydrate runbook**
-  (CLAIM V — the _backup_ is solid via `sync.ps1`, but no documented restore path exists). The
-  spare-laptop adopt-vs-defer split stays an **owner-decision**.
+- ✅ **The (b) governance bundle — CLOSED (2026-07-23).** The rules-layer changes from the ledger's §4(b)
+  are landed in `CLAUDE.md` + `rules/`: **Protocol 51** codifies the Dispatch authority boundary in three
+  clauses — (a) proposals-are-hypotheses (edge-enforced: a repo-aware session records accept/change/reject
+  for each Dispatch-origin hypothesis before implementing), (b) memory-is-a-locator-not-evidence, and
+  (c) the grep-able `### DISSENT` block Dispatch must surface rather than smooth away. **Protocol 36(b)** is
+  rewritten as a causal-response bar (permanent enforcement only when the failure can realistically recur,
+  at the correct layer, zero false positives, tests the shipped artifact, cheaper than the recurrence — a
+  new guard's record must name incident/why-not-the-direct-fix/enforcement-point/FP-analysis/cost/retire
+  condition), keeping Protocol 49 as the complement and Protocol 13/42 as the demonstrated-recurrence cases.
+  **`rules/memory-restore.md`** is the new fresh-Dispatch rehydrate runbook (Protocol 48's restore
+  complement — CLAIM V), wired into the retrieval map + pointer index. No cache bump / no `APP_VERSION`
+  change (internal governance docs, not served); no CHANGELOG entry (not user-facing).
+- ⬜ **Still open — the remaining ranked G actions** (from the ledger's §4): the **(a) post-deploy release
+  receipt** (verify the served production hash / SW-update matches the pushed commit — CLAIM M confirmed:
+  `deploy.yml` has no post-deploy verification); and the **owner-decisions** — the spare-laptop
+  adopt-vs-defer split, the report-cadence relaxation (batching clean green reports vs Protocol 9's "every
+  time"), and the DeepSeek-roster confirmation. The (b) bundle above is done.
 
 ### L. ⬜ A generated, private HTML view of THIS queue — plus a deferred, opt-in player-facing view
 

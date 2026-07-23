@@ -36,6 +36,7 @@ Read this file, then read **only** the notes whose surface you are touching.
 | any `<script>` tag or boot-order change · any file split/add/move/rename/delete · `repomix.config.json` · any file with non-ASCII characters | `rules/file-layout.md` |
 | `tests/` · `scripts/` (except `scripts/cf-staging-build.mjs` → deploy) · `js/dev/test-console.js` · `.github/workflows/` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
 | `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · `QUEUE.md` · `QUEUE_LOG.md` · `skill/SKILL.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
+| the private-archive **restore / rehydrate** path — recovering the orchestrator's memory or the queue after a machine loss, or bringing a fresh Dispatch up to state (Protocol 48's complement) | `rules/memory-restore.md` |
 
 Touching several surfaces means reading several notes. When in doubt, read the note — they are
 short by construction.
@@ -75,6 +76,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **The standing prompt kit** — the reusable prompt set (`RobCo_Prompt_Library.md`) and the engineering playbook it holds models to (`RobCo_Engineering_Playbook.md`) | `library/PROMPT_LIBRARY/` (gitignored, local-only; moved here from `planning/_standing/` at R4 because these are standing tools, not frozen planning snapshots — see the backup consequence in `rules/docs-and-library.md`) |
 | **Script load order / boot chain** | `rules/file-layout.md` (machine-checked against `index.html`) |
 | **The 3-class library maintenance model** (LIVE / GENERATED / ARCHIVE) and the doc-maintenance rule | `rules/docs-and-library.md` |
+| **Recover memory + queue after a machine loss** — the fresh-Dispatch rehydrate runbook (Protocol 48 backs the data up; this restores it) | `rules/memory-restore.md` |
 | **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
 | **Plain-English release history** | `CHANGELOG.md` |
 
@@ -170,9 +172,11 @@ A flaw, gap, or footgun discovered **while testing or verifying** — not only o
 
 **(a) GATE PARITY:** The local gate is split at the commit/push boundary. The pre-commit hook runs the FAST subset (`npm run gate:fast`: lint, format, the Node test runner) to keep commits quick (~5–8 s). The pre-push hook runs the FULL gate (`npm run gate`, adds Playwright boot-smoke + render-check) before anything reaches origin. CI also runs `npm run gate` — parity holds at the push boundary, which is the only boundary CI observes. The local gate can never be a weaker promise than CI at that boundary.
 
-**(b) ESCAPE-RATCHET:** Any failure that escapes a layer gets a check added AT that layer in the SAME fix — a production bug becomes a regression test; anything that passed the local gate but failed CI gets that check pulled into `npm run gate` / the hook so the whole class is caught locally next time. Every escape permanently tightens the gate.
+**(b) ESCAPE-RATCHET — a causal response, not a reflexive new guard (revised via the G review, 2026-07-23):** Any failure that escapes a layer always gets a **causal response** in the SAME fix — the failure is understood and its class addressed. But **permanent enforcement** (a new gate check, hook, or suite) is added **only when ALL of** these hold: the failure can realistically **recur**; the check sits at the **correct layer**; it has **zero false positives**; it tests the **shipped artifact** (not a synthetic stand-in); and it **costs less to maintain than the recurrence risk**. **Prefer extending an existing check, or eliminating the failure class outright, over creating a new global mechanism.** When a new guard IS warranted, its record must name: the real incident; why the direct fix alone does not remove recurrence; the enforcement point; a false-positive analysis; the marginal runtime + maintenance cost; and the condition under which it can be retired (Protocol 49). The deleted skill-pointer guards are the calibration case: a synthetic demonstration was **not** enough to justify permanent machinery.
 
-**Why:** This is what makes the gate self-improving — defects ratchet the net finer instead of recurring.
+This does not weaken the two cases where recurrence is already demonstrated: **Protocol 13** (a fixed bug gets a guarding regression test in the same commit) and **Protocol 42** (a flaw surfaced during testing/verification gets locked in the same commit) still apply in full — a failure that actually occurred clears the "realistically recur" bar by definition, so a targeted regression test is presumptively warranted. The bar mainly disciplines **new global mechanisms** beyond that targeted test — the reflexive "every escape adds a check" is what changes, not the duty to lock a real defect.
+
+**Why:** This keeps the gate self-improving **without** letting it accrete low-value machinery — defects ratchet the net finer, but only where a permanent check earns its keep. Protocol 49 (the Retirement Rule) is the complement that removes guards whose risk is gone; together they make the gate's weight track real risk in **both** directions instead of only ever growing.
 
 ---
 
@@ -455,6 +459,44 @@ to drop a decision never push.** Proven the day 50 shipped: the DeepSeek roster 
 automated backstop** — stated here rather than given a guard that pretends, because building a
 conversation-scraping check would be exactly the "guard that pretends" Protocol 49 warns against. Do not
 add one. The rule in (a) stands; adherence is the mechanism.
+
+---
+
+## Protocol 51 — Dispatch Authority Boundary (proposals are hypotheses · memory is a locator · dissent is surfaced)
+
+Three clauses, one principle: **Dispatch's authority is bounded, and its outputs are claims until
+verified.** This is the governance bundle the G blind workflow review earned — and it was earned by
+two real anti-pattern incidents Dispatch's own designs produced (a **parallel claim-ledger** and a
+**hand-maintained manifest**), each caught only because a repo-aware session pushed back. Enforced at
+the **edge** — the brief template, the planning output, and the independent audit — **not** by a new
+bespoke code guard: a semantic guard would only prove that headings exist, never that a hypothesis was
+actually tested.
+
+**(a) Proposals are hypotheses.** Dispatch may bind owner-stated outcomes, constraints, and decisions.
+Any **mechanism, architecture, repository fact, path, or work status ORIGINATING from Dispatch is a
+hypothesis until verified** against the repository, queue, or other primary source. A repo-aware
+planning/implementation session must record whether it **ACCEPTED, CHANGED, or REJECTED** each material
+Dispatch-origin hypothesis **before implementing**.
+
+**(b) Memory is a locator, not evidence.** Orchestrator/Dispatch memory is a **locator and historical
+aid, never evidence of current repository state** — resolve paths, casing, queue status, hashes, and
+"live" claims **deterministically** (read the repo/queue/git) before reporting them. A memory that names
+a file, flag, or status is a pointer to check, not a fact to repeat. (This is the same discipline the
+memory-instruction preamble states — "verify it still exists before recommending it" — raised to a
+standing authority-boundary for Dispatch's own reporting.)
+
+**(c) Dissent is surfaced, never smoothed.** When a planning/implementation/audit session **rejects a
+Dispatch design or contradicts a prior claim**, it records that in a grep-able `### DISSENT` block in its
+own output, and **Dispatch must surface such blocks to the owner** rather than paraphrasing them away.
+The record of a disagreement is owned by the session that raised it, in a form Dispatch cannot quietly
+soften — this is the structural anti-burial mechanism the whole review turns on. (The platform limit
+noted in the G ledger still applies: Dispatch is structurally the transcriber here, so this reduces the
+asymmetry, it does not eliminate it — the verbatim originals still live in the owner-visible log.)
+
+**Why:** Dispatch consolidates scattered owner input and dispatches the work, so it is structurally
+positioned to (i) turn its own misreading into a perfectly-executed wrong spec, (ii) report a stale
+memory as current fact, and (iii) bury a sub-session's dissent in paraphrase. (a)/(b)/(c) close each in
+turn — at the edge, where a session with real code access is the enforcer, not Dispatch policing itself.
 
 ---
 
