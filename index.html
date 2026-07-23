@@ -219,6 +219,57 @@
         </button>
       </div>
     </template>
+    <template id="fo3ReinstallTipTemplate">
+      <!-- OPTION-1 GUIDED FO3 REINSTALL TIP (owner, 2026-07-22). Cloned into the
+           DOM by _maybeShowReinstallTip() (js/ui/ui-core-modulebay.js) ONLY when
+           the app is running as the installed standalone PWA, the active game is
+           Fallout 3, and it has not been seen before (MetaStore
+           robco_fo3_reinstall_tip_seen — shows exactly once, Protocol UI-6).
+           Never in a browser tab, never for New Vegas, never twice. Its wording
+           is CONDITIONAL because a stale portrait-locked install cannot be
+           reliably distinguished from a fresh one (see QUEUE item S) — it says
+           "if it won't rotate", it never asserts a fault. The remove-app and
+           open-in-browser steps are WRITTEN, not automated: a same-origin link
+           from inside a PWA opens in the PWA, and re-adding to the home screen
+           must happen from the browser — neither can be forced. COPY SITE LINK
+           copies the ./#go=install deep-link so the browser lands on the
+           highlighted INSTALL strip (routeLaunchShortcut() -> _armInstallHighlight()).
+           Same inert-<template> pattern as the banners above (WU-E2).
+           Game-agnostic shell; the FO3 copy is intentional (this tip is FO3-only
+           by its render gate). -->
+      <div
+        id="fo3ReinstallTip"
+        class="fo3-reinstall-tip"
+        role="region"
+        aria-label="Pip-Boy rotation help"
+      >
+        <button
+          type="button"
+          id="fo3ReinstallTipDismiss"
+          class="frt-x"
+          aria-label="Dismiss this tip"
+        >
+          &#10005;
+        </button>
+        <div class="frt-title">&#8635; ROTATE FOR THE PIP-BOY SCREEN</div>
+        <p class="frt-body">
+          Turn your phone sideways during a Fallout 3 campaign for the full Pip-Boy 3000 landscape
+          display.
+        </p>
+        <p class="frt-body frt-cond">
+          Won't rotate? Your installed app predates the fix &mdash; reinstall to unlock it:
+        </p>
+        <ol class="frt-steps">
+          <li>Remove this app from your home screen.</li>
+          <li>Reopen the site in your browser (not this app).</li>
+          <li>Tap INSTALL to reinstall &mdash; you'll be taken straight to it.</li>
+        </ol>
+        <div class="frt-actions">
+          <button type="button" id="fo3ReinstallTipCopy" class="frt-go">COPY SITE LINK</button>
+          <button type="button" id="fo3ReinstallTipOk" class="frt-ok">GOT IT</button>
+        </div>
+      </div>
+    </template>
 
     <!-- ════════════════════════════════════════════════════════════════════
          DIAGNOSTIC SHELL (Step 2 · Phase 2, Diagnostic Shell U2: mobile overlay

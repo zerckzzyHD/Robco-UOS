@@ -909,11 +909,131 @@ function _showInstallBanner() {
         _removeInstallBanner();
       });
     }
+    // Deep-link highlight: if the user arrived from the FO3 reinstall tip's
+    // ./#go=install link, draw the eye to the strip they were sent here for.
+    _applyPendingInstallHighlight();
   } catch (_) {
     /* a discoverability surface must never break boot */
   }
 }
 window._showInstallBanner = _showInstallBanner;
+
+// ── #go=install DEEP-LINK HIGHLIGHT (reboot-persistent) ──────────────────────
+// The FO3 reinstall tip (installed PWA) copies a ./#go=install link. When that
+// link is opened in a BROWSER, the #go= router (ui-core-nav.js) calls
+// _armInstallHighlight() below, which sets a DURABLE MetaStore arm. The arm — not
+// the URL hash (the router strips the hash on arrival) — is what
+// survives the service-worker "REBOOT TERMINAL" update reload: it is re-checked
+// every time the strip appears (_showInstallBanner runs on each beforeinstallprompt,
+// including the one re-fired after the reboot), and cleared once the highlight
+// has fired so it pulses exactly once.
+const INSTALL_HIGHLIGHT_ARM_KEY = 'robco_pending_install_highlight';
+
+function _applyPendingInstallHighlight() {
+  try {
+    if (typeof MetaStore === 'undefined') return;
+    if (MetaStore.get(INSTALL_HIGHLIGHT_ARM_KEY) !== 'true') return;
+    const b = document.getElementById('installBanner');
+    if (!b) return; // strip not present yet — re-checked when it appears
+    b.classList.add('highlight');
+    if (typeof b.scrollIntoView === 'function') b.scrollIntoView({ block: 'start' });
+    MetaStore.set(INSTALL_HIGHLIGHT_ARM_KEY, 'false'); // fire exactly once
+  } catch (_) {
+    /* the highlight is a nicety — it must never break boot */
+  }
+}
+window._applyPendingInstallHighlight = _applyPendingInstallHighlight;
+
+// Arm the reboot-persistent install-strip highlight. Called from the #go=install
+// deep-link route (ui-core-nav.js). Also tries an immediate apply in case the
+// strip is already on screen; otherwise the arm waits for _showInstallBanner().
+function _armInstallHighlight() {
+  try {
+    if (typeof MetaStore !== 'undefined') MetaStore.set(INSTALL_HIGHLIGHT_ARM_KEY, 'true');
+    _applyPendingInstallHighlight();
+  } catch (_) {
+    /* never break the deep-link route */
+  }
+}
+window._armInstallHighlight = _armInstallHighlight;
+
+// ── OPTION-1 GUIDED FO3 REINSTALL TIP ────────────────────────────────────────
+// The one-time, conditional, installed-PWA + FO3-only tip that guides a user on
+// a stale portrait-locked install to reinstall (owner decision, 2026-07-22).
+// Reliable stale-install DETECTION is not possible (QUEUE item S), so the tip
+// never asserts a fault — it says "if it won't rotate" and is scoped to the
+// population that could plausibly be affected (installed PWA + FO3 active),
+// shown exactly once.
+const FO3_TIP_SEEN_KEY = 'robco_fo3_reinstall_tip_seen';
+
+function _dismissReinstallTip() {
+  if (typeof MetaStore !== 'undefined') MetaStore.set(FO3_TIP_SEEN_KEY, 'true');
+  const t = document.getElementById('fo3ReinstallTip');
+  if (t && t.parentNode) t.parentNode.removeChild(t);
+}
+window._dismissReinstallTip = _dismissReinstallTip;
+
+function _maybeShowReinstallTip() {
+  try {
+    // Fail-safe to hidden on every gate:
+    if (!_isStandaloneInstalled()) return; // browser tab → never (only the installed PWA has the stale-manifest problem)
+    if (typeof getGameContext !== 'function') return; // context accessor absent → fail safe
+    if (getGameContext() !== 'FO3') return; // New Vegas → never
+    if (typeof MetaStore !== 'undefined' && MetaStore.get(FO3_TIP_SEEN_KEY) === 'true') return; // already seen → never twice
+    if (document.getElementById('fo3ReinstallTip')) return; // already shown this load
+    const tpl = document.getElementById('fo3ReinstallTipTemplate');
+    if (!tpl || !tpl.content) return;
+    document.body.appendChild(tpl.content.cloneNode(true));
+
+    const x = document.getElementById('fo3ReinstallTipDismiss');
+    if (x) x.addEventListener('click', _dismissReinstallTip);
+    const ok = document.getElementById('fo3ReinstallTipOk');
+    if (ok) ok.addEventListener('click', _dismissReinstallTip);
+    const copy = document.getElementById('fo3ReinstallTipCopy');
+    if (copy) {
+      copy.addEventListener('click', () => {
+        // Copy the ./#go=install deep-link. Opened in a BROWSER it lands the
+        // user on the highlighted INSTALL strip (surviving the update reboot).
+        // We cannot open the browser for them from inside the PWA — hence the
+        // written steps above — so a copyable link is the honest bridge.
+        const url = location.origin + location.pathname + '#go=install';
+        // Always reveal the URL synchronously as the reliable fallback — the
+        // Clipboard API can silently hang or be denied without document focus,
+        // so the link must never depend on the auto-copy succeeding (Protocol 42).
+        let shown = document.getElementById('frtLinkShown');
+        if (!shown) {
+          shown = document.createElement('div');
+          shown.id = 'frtLinkShown';
+          shown.className = 'frt-link';
+          shown.setAttribute('aria-label', 'Reinstall link — copy this into your browser');
+          const actions = copy.parentNode;
+          if (actions && actions.parentNode)
+            actions.parentNode.insertBefore(shown, actions.nextSibling);
+        }
+        shown.textContent = url;
+        // Best-effort auto-copy for the common case (a focused real-device tap).
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(
+              () => {
+                copy.textContent = 'LINK COPIED';
+              },
+              () => {}
+            );
+          }
+        } catch (_) {
+          /* clipboard blocked — the revealed URL above is the fallback */
+        }
+      });
+    }
+    // Showing it counts as seen — it never nags again even if the user closes
+    // the app without tapping GOT IT (owner requirement: never twice).
+    if (typeof MetaStore !== 'undefined') MetaStore.set(FO3_TIP_SEEN_KEY, 'true');
+  } catch (_) {
+    /* a one-time tip must never break boot */
+  }
+}
+window._maybeShowReinstallTip = _maybeShowReinstallTip;
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();

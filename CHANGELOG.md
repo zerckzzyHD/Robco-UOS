@@ -1,8 +1,9 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r4 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r5 -->
 
 ### Added
 
 - Installing the terminal as an app on your phone or desktop is now easy to find. When your browser supports it, a slim banner appears across the top offering a one-tap INSTALL — which runs the terminal fullscreen and offline, like a real app, instead of a browser tab. It only shows when installing is genuinely possible and you haven't installed yet, and tapping its ✕ dismisses it for good so it never nags. The original installer button under Security & Configuration is still there if you dismiss the banner and change your mind later. The installed app itself never shows the banner.
+- If you installed the app to your home screen before the Fallout 3 Pip-Boy rotation fix shipped, the terminal now helps you recover it. A one-time tip appears — only inside the installed app, only during a Fallout 3 campaign — reminding you to rotate sideways for the Pip-Boy landscape screen, and, if it won't rotate, walking you through the reinstall that fixes it: remove the app, reopen the site in your browser, and tap INSTALL. It gives you a COPY SITE LINK button so that when you reopen in your browser you're taken straight to the highlighted INSTALL button — and that highlight survives the "Reboot Terminal" update step, so you never lose your place mid-reinstall. The tip is shown once and never nags, and it never appears in a browser tab or in New Vegas.
 
 ---
 

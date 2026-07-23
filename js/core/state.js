@@ -79,6 +79,19 @@ const META_MANIFEST = {
   // pref, never campaign state (Protocol 23) — install state is a property of
   // this browser/device, not of any save.
   robco_install_prompt_dismissed: { type: 'bool', default: false, owner: 'ui-core-modulebay.js' },
+  // Option-1 guided FO3 reinstall tip (owner, 2026-07-22): the one-time,
+  // installed-PWA-only, FO3-only tip that guides a user on a stale portrait-
+  // locked install to reinstall. Set the first time the tip is shown so it
+  // shows exactly once (Protocol UI-6). A device pref, never campaign state
+  // (Protocol 23) — install/rotation state is a property of this device.
+  robco_fo3_reinstall_tip_seen: { type: 'bool', default: false, owner: 'ui-core-modulebay.js' },
+  // Reboot-persistent arm for the #go=install deep-link: set when the user acts
+  // on the reinstall tip (via the copied ./#go=install link), re-checked on boot
+  // inside _showInstallBanner(), and cleared once the install strip has been
+  // highlighted. Durable via localStorage so it survives the service-worker
+  // update reboot (the routeLaunchShortcut() hash is stripped on arrival, so the
+  // arm — not the hash — is what carries the intent across the reload). Device pref.
+  robco_pending_install_highlight: { type: 'bool', default: false, owner: 'ui-core-modulebay.js' },
   robco_bay_opened: { type: 'bool', default: false, owner: 'ui-core.js' },
   robco_bay_view: { type: 'string', default: 'bay', owner: 'ui-core.js' },
   robco_bezel_subsystem: { type: 'string', default: 'operator', owner: 'ui-core.js' },

@@ -2237,6 +2237,142 @@ button.mode-pill--overseer:hover {
   padding: 6px 10px;
 }
 
+/* Deep-link highlight (#go=install): a brief phosphor pulse drawing the eye to
+   the install strip when the user arrives from the FO3 reinstall tip. Plain
+   `animation:` (never `transition:` alone) so the global prefers-reduced-motion
+   block — which zeroes animation-duration/iteration-count on * — neutralizes it
+   to a static resting frame automatically (Protocol UI-9), no bespoke carve-out. */
+.install-banner.highlight {
+  animation: install-highlight-pulse 1.1s ease-in-out 3;
+}
+@keyframes install-highlight-pulse {
+  0%,
+  100% {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 16px 3px rgba(var(--robco-green-rgb), 0.85);
+    background: rgba(var(--robco-green-rgb), 0.12);
+  }
+}
+
+/* OPTION-1 GUIDED FO3 REINSTALL TIP — cloned from #fo3ReinstallTipTemplate
+   (index.html) by _maybeShowReinstallTip() (js/ui/ui-core-modulebay.js) ONLY
+   inside the installed PWA, only for FO3, only once. A fixed-top dismissible
+   card (taller than the one-line banners because it carries the reinstall
+   steps). Named frt-*/
+fo3-reinstall-tip
+  (no 'banner' substring)
+  so
+  it
+  does
+  not
+  trip
+  the
+  Suite
+  217
+  banner
+  allowlist
+  —
+  it
+  is
+  a
+  guided
+  tip,
+not a banner. */ .fo3-reinstall-tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10001;
+  background: var(--robco-dark);
+  border-bottom: 2px solid var(--robco-green);
+  color: var(--robco-green);
+  padding: 12px 44px 12px 14px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  max-height: 80vh;
+  overflow-y: auto;
+  text-shadow: none;
+}
+.fo3-reinstall-tip .frt-title {
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.fo3-reinstall-tip .frt-body {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+.fo3-reinstall-tip .frt-cond {
+  color: var(--robco-alert);
+}
+.fo3-reinstall-tip .frt-steps {
+  margin: 6px 0 6px 18px;
+  padding: 0;
+  line-height: 1.5;
+}
+.fo3-reinstall-tip .frt-steps li {
+  margin: 2px 0;
+}
+.fo3-reinstall-tip .frt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fo3-reinstall-tip .frt-go,
+.fo3-reinstall-tip .frt-ok {
+  /* override the global button { width: 100% } (Protocol UI-5 exception) */
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fo3-reinstall-tip .frt-go {
+  background: var(--robco-green);
+  color: #000;
+  border: none;
+}
+.fo3-reinstall-tip .frt-ok {
+  background: transparent;
+  color: var(--robco-green);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.5);
+}
+.fo3-reinstall-tip .frt-link {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px dashed rgba(var(--robco-green-rgb), 0.5);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+.fo3-reinstall-tip .frt-x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: auto;
+  min-height: 28px;
+  min-width: 28px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--robco-green);
+  border: 1px solid rgba(var(--robco-green-rgb), 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 /* ─── Phase 2b Utility Classes ─────────────────────────────────── */
 
 /* Empty-state message shown when a list has no items */

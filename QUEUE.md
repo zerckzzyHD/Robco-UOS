@@ -629,7 +629,7 @@ files once (recorded under G), so this deletion pass must have the app repo to i
 removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
 standing rule has a home in the rules/deploy-backup layer.
 
-### S. ⚠ PWA install discoverability (SHIPPED) + the stale-install rotation nudge (open — owner to choose)
+### S. ✅ PWA install discoverability + the guided FO3 reinstall flow (Option 1 — BUILT & shipped to `dev`)
 
 **Context (2026-07-22).** 2.8.5 fixed the manifest so the FO3 Pip-Boy landscape screen is reachable
 (`orientation: portrait` → `any`). But Android bakes the manifest into an **already-installed** PWA and never
@@ -650,10 +650,10 @@ Suite 243 (inert-template + all three gates + persistence) and added to Suite 21
 Because the strip surfaces the install/reinstall path, it **also** partially serves the stale-install case
 below (a reinstall is now one discoverable tap away).
 
-**⏭️ The stale-install rotation nudge — DELIBERATELY NOT BUILT; detection is not reliable (Task 1 finding,
-owner to decide the alternative).** The ask was an in-app nudge telling a user on a **stale portrait-locked
-install** to reinstall to unlock rotation. **Feasibility finding, recorded so it is not re-attempted blind: a
-stale-locked install cannot be reliably distinguished from a fresh install without a common false-positive.**
+**🔒 Why it is a CONDITIONAL tip, not an auto-firing "you're on a stale install" nudge — the detection
+finding that shaped the design (recorded so it is not re-attempted blind).** An auto-firing nudge was
+deliberately NOT built, because **a stale-locked install cannot be reliably distinguished from a fresh install
+without a common false-positive.**
 While the phone is held in portrait, `matchMedia('(orientation: landscape)')` is false in BOTH the stale-locked
 case and the ordinary held-in-portrait case — there is no passive signal that separates them. The only
 distinguishing observation needs the device physically rotated to landscape while the viewport stays portrait,
@@ -661,61 +661,47 @@ which requires the accelerometer (`DeviceOrientationEvent`) — and that **misfi
 "OS auto-rotate turned OFF" population**: on a _fresh_ install with auto-rotate off, the accelerometer reads
 landscape while the viewport stays portrait, so an accelerometer-based detector would wrongly tell those users
 to reinstall (which would not help them). A nudge that fires for people who don't need it is worse than no
-nudge, so **none was shipped** (per the brief: err toward not-annoying-the-many). The reinstall guidance today
-lives only in the 2.8.5 changelog (Fixed entry) — which the brother won't read.
+nudge — so the surface never asserts a fault; it says "if it won't rotate" and is scoped to the population that
+could plausibly be affected. (No web API exposes the OS auto-rotate toggle, so that false positive cannot be
+filtered — the reason the accelerometer route is out.)
 
-**⬜ OPEN — the owner chooses the least-annoying alternative.** Options, ordered by recommendation:
-(1) a **one-time, dismissible tip** shown only to installed-PWA users the first time they open an FO3 campaign,
-worded conditionally ("if rotation isn't unlocking the Pip-Boy landscape view, your installed app predates the
-fix — remove it and re-add it") — reliably targetable (installed-PWA + FO3-active are both detectable) and
-low-noise since it's one-time and only reaches installed users; (2) a passive, discoverable HELP/FAQ line with
-the same guidance and **no** proactive surfacing (zero noise, lower reach); (3) rely on the now-discoverable
-install strip (shipped above) plus the changelog and do nothing more. **Earn-condition for closing S:** the
-owner picks 1, 2, or 3; if (1) or (2), it becomes a small build unit. Recorded per Protocol 50 so the
-infeasibility reasoning does not evaporate (the achievements-rule-out cautionary case).
+**✅ BUILT — Option 1, the guided one-time conditional tip + deep-link + reboot-persistent highlight (owner
+chose Option 1 on 2026-07-22; shipped to `dev` the same day).** The owner picked the one-time tip over the
+passive HELP line (2) or doing nothing (3), because his non-technical brother must _discover_ he needs to
+reinstall and a passive option he'd never find is too weak — balanced against the tip being engineered to not
+annoy the many. What shipped:
 
-**⭐ REFINED REQUIREMENT (owner, 2026-07-22) — whatever surface is chosen must GUIDE, not just tell: deep-link
-to the install button AND survive an update reboot.** The nudge/tip must not merely say "reinstall" — tapping
-it must get the user to the site and point them **straight at the install affordance** (the Task 2 install
-strip). So Tasks 1 and 2 connect: the surface deep-links to the install button. **The hard part is reboot
-persistence:** opening the site can trigger a service-worker update ("REBOOT TERMINAL" → reload), and after
-that reload the user must STILL be landed on / pointed at the install button — they must not lose their place.
+- **The tip** (`#fo3ReinstallTipTemplate` → `_maybeShowReinstallTip()`, `js/ui/ui-core-modulebay.js`): a small,
+  dismissible, in-theme card shown **once**, and ONLY when all three gates pass — running as the installed
+  standalone PWA (`_isStandaloneInstalled()`), the active game is FO3 (`getGameContext() === 'FO3'`), and it
+  has not been seen (`robco_fo3_reinstall_tip_seen`, a `META_MANIFEST` device pref). Never in a browser tab,
+  never for New Vegas, never twice (marked seen on show, not only on dismiss). Conditional wording
+  ("Won't rotate? … reinstall to unlock it") + the three written steps (remove → reopen in browser → INSTALL)
+  - a **COPY SITE LINK** button that copies the `./#go=install` deep-link.
+- **The deep-link + reboot-persistent highlight** (`SHORTCUT_ROUTES.install` in `ui-core-nav.js` →
+  `_armInstallHighlight()`; applied by `_applyPendingInstallHighlight()` inside `_showInstallBanner()`). Opening
+  `./#go=install` in a browser sets the **durable `robco_pending_install_highlight` arm**; when the install
+  strip appears it pulses (a plain, reduced-motion-safe animation — Protocol UI-9) and the arm clears so it
+  fires exactly once. **The arm — not the hash — is what survives the "REBOOT TERMINAL" update reload**, because
+  `routeLaunchShortcut()` strips the `#go=` hash on arrival (existing behaviour, unchanged per Protocol 25); the
+  arm is set before any reboot and re-checked when the strip re-appears after it. Guarded by Suite 243.9–243.16
+  (inert template, all-three gates, seen-on-show, route-arms-highlight, both prefs registered, fires-once,
+  reduced-motion-safe, boot-order), the fail-safe gate proven red-then-green.
 
-**Worked mechanics (buildable, verified against the code):**
+**⚠ The honest limits, unchanged — walked in words where the mechanism can't (owner-accepted):**
 
-- **Entry signal = a hash that fits the existing deep-link grammar: `#go=install`.** The update path reloads
-  via `location.reload()` (see `_triggerUpdate()` in `index.html` — `SKIP_WAITING` → `controllerchange` →
-  reload), and `location.reload()` **preserves the URL hash**, so the signal survives the reboot for free.
-- **Durable arm = a persistent `MetaStore` flag** (e.g. `robco_pending_install_highlight`) set when the user
-  taps the surface, re-checked on every boot, and **cleared only once the strip has actually been
-  highlighted** — belt-and-suspenders over the hash so the arm survives even if the hash is lost.
-- **Apply the highlight WHEN the strip appears, not at a fixed boot moment.** `beforeinstallprompt` fires
-  asynchronously (a second or two after load, sometimes not at all), so the arm is checked inside
-  `_showInstallBanner()`: when set, scroll the strip into view + pulse it, then clear the flag. After the
-  reboot reload, `beforeinstallprompt` re-fires, the strip re-appears, and the still-set flag re-triggers the
-  highlight — this is exactly what makes it survive the update reboot.
+1. **There is NO install button inside the installed PWA** — `beforeinstallprompt` fires ONLY in a browser tab.
+   So the tip (which lives in the installed PWA) can't deep-link to a strip _there_; it hands off to the browser
+   via the copied link, and the highlight fires once they're in the browser.
+2. **The PWA→browser hop cannot be automated** — a same-origin link from inside the PWA opens in the PWA, and
+   re-adding to home screen must happen from the browser. This is the step left as a **written instruction**
+   (remove → reopen in browser → INSTALL). We did not fake automation we can't do.
+3. **The real fix needs a REMOVE first**, not just a re-add — reflected as step 1 of the written instructions.
 
-**⚠ Wrinkles that do NOT paper over — the honest limits:**
-
-1. **There is NO install button inside the installed PWA.** `beforeinstallprompt` fires ONLY in a browser
-   tab, never in the installed standalone app — so a stale-install user sitting IN their portrait-locked PWA
-   has nothing to deep-link to _there_. The deep-link-to-install flow is real but works only in the **browser**
-   context.
-2. **A same-origin link from inside the PWA opens IN the PWA (Android scope-match), not a fresh browser tab —
-   and re-adding to home screen must happen from the browser.** Neither can be forced programmatically. So the
-   hop "installed PWA → browser" is the one step that **genuinely cannot be automated**; give the clearest
-   possible written instruction for it instead: _"remove the app from your home screen, open the site in your
-   browser, then tap INSTALL"_ — and `#go=install` does the highlight once they are in the browser.
-3. **The real fix needs a REMOVE first, not just a re-add** — a baked-in portrait manifest is not guaranteed
-   to refresh by re-adding over the top; remove → reopen in browser → reinstall is the reliable sequence
-   (matches the owner's confirmed experience).
-
-**So what is deliverable:** "land the user on the highlighted install button **in the browser**, surviving the
-update reboot" — fully buildable and independent of the stale-detection question, so it applies to whichever
-surface (1/2/3) the owner picks. **What is NOT automatable:** forcing the OS to open a browser from inside the
-installed PWA — that stays a written instruction. The `#go=install` + reboot-persist mechanism is
-decision-independent and could be built ahead of the surface choice if the owner wants; the surface itself
-still waits on the owner picking 1/2/3 (spec-lock, Protocol 8).
+**Status: S is essentially closed.** The discoverable install strip (Task 2) and the guided Option-1 flow are
+both shipped to `dev`. The only thing NOT automatable (the OS opening a browser from inside the PWA) is
+covered by the written steps, as the owner accepted. Nothing here is on production yet — ship timing is the
+owner's call.
 
 ### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
 

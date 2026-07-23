@@ -50961,6 +50961,86 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       /id="btnInstallPwa"/.test(htmlSource243),
     '243.8: the strip wires the existing installPwa() (Protocol 22) and the SVC TRAY #btnInstallPwa button is kept (Protocol 25 — surface added, control not relocated)'
   );
+
+  // ── Option-1 guided FO3 reinstall tip + #go=install deep-link highlight ──
+
+  // 243.9  the reinstall tip markup lives INSIDE #fo3ReinstallTipTemplate (inert
+  //         <template> — never renders on its own, WU-E2 pattern).
+  assert(
+    /<template id="fo3ReinstallTipTemplate">[\s\S]*?class="fo3-reinstall-tip"[\s\S]*?<\/template>/.test(
+      htmlSource243
+    ) && (htmlSource243.match(/class="fo3-reinstall-tip"/g) || []).length === 1,
+    '243.9: the FO3 reinstall tip markup is wrapped in #fo3ReinstallTipTemplate exactly once (disabled-by-default — never renders on its own)'
+  );
+
+  // 243.10  fail-safe gate: _maybeShowReinstallTip() checks ALL THREE conditions
+  //          — installed standalone PWA, active game is FO3, and not-seen. Any
+  //          one missing is the regression (browser-tab leak / NV leak / re-nag).
+  {
+    const fn243b = (bay243.match(/function _maybeShowReinstallTip\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /_isStandaloneInstalled\(\)/.test(fn243b) &&
+        /getGameContext\(\) !== 'FO3'/.test(fn243b) &&
+        /(robco_fo3_reinstall_tip_seen|FO3_TIP_SEEN_KEY)/.test(fn243b),
+      '243.10: _maybeShowReinstallTip() fail-safes to hidden — gated on installed-PWA + FO3 + not-seen (never a browser tab, never New Vegas, never twice)'
+    );
+  }
+
+  // 243.11  the tip is marked SEEN when shown (owner: never twice) — the seen key
+  //          is written inside the show function, not only on an explicit dismiss.
+  {
+    const fn243b = (bay243.match(/function _maybeShowReinstallTip\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /MetaStore\.set\(FO3_TIP_SEEN_KEY, 'true'\)/.test(fn243b),
+      '243.11: showing the reinstall tip sets robco_fo3_reinstall_tip_seen (it shows exactly once even if the user never taps GOT IT)'
+    );
+  }
+
+  // 243.12  `install` is an allow-listed #go= route and it arms the highlight
+  //          (the deep-link that lands the user on the strip).
+  assert(
+    /install:\s*\(\)\s*=>\s*\{[\s\S]*?_armInstallHighlight\(\)/.test(bay243),
+    '243.12: SHORTCUT_ROUTES.install arms the reboot-persistent install-strip highlight (#go=install deep-link)'
+  );
+
+  // 243.13  both new keys are registered DEVICE prefs in META_MANIFEST
+  //          (Protocol 23 — install/rotation state is a device property).
+  assert(
+    /robco_fo3_reinstall_tip_seen:\s*\{[^}]*type:\s*'bool'/.test(state243) &&
+      /robco_pending_install_highlight:\s*\{[^}]*type:\s*'bool'/.test(state243),
+    '243.13: robco_fo3_reinstall_tip_seen + robco_pending_install_highlight are registered device prefs (Protocol 23)'
+  );
+
+  // 243.14  reboot-persistence: _showInstallBanner() applies the pending
+  //          highlight, and _applyPendingInstallHighlight() clears the durable
+  //          arm after firing so it pulses exactly once (survives the update
+  //          reboot via the MetaStore arm, not the stripped hash).
+  {
+    const showFn243 = (bay243.match(/function _showInstallBanner\([\s\S]*?\n\}/) || [''])[0] || '';
+    const applyFn243 =
+      (bay243.match(/function _applyPendingInstallHighlight\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /_applyPendingInstallHighlight\(\)/.test(showFn243) &&
+        /MetaStore\.get\(INSTALL_HIGHLIGHT_ARM_KEY\)\s*!==\s*'true'/.test(applyFn243) &&
+        /MetaStore\.set\(INSTALL_HIGHLIGHT_ARM_KEY, 'false'\)/.test(applyFn243),
+      '243.14: the install strip applies + clears the reboot-persistent highlight arm (fires exactly once; survives the update reboot via MetaStore, not the stripped #go= hash)'
+    );
+  }
+
+  // 243.15  the highlight is a PLAIN animation (reduced-motion-safe per Protocol
+  //          UI-9 — the global prefers-reduced-motion block neutralizes it).
+  assert(
+    /\.install-banner\.highlight\s*\{[^}]*animation:/.test(cssSource243) &&
+      /@keyframes install-highlight-pulse/.test(cssSource243),
+    '243.15: the deep-link highlight is a plain animation + keyframes (Protocol UI-9 reduced-motion-safe, no bespoke carve-out)'
+  );
+
+  // 243.16  boot invokes the tip AFTER routeLaunchShortcut() so a #go= deep-link
+  //          isn't clobbered, and only via the guarded typeof call.
+  assert(
+    /routeLaunchShortcut\(\);[\s\S]{0,400}?_maybeShowReinstallTip\(\)/.test(bay243),
+    '243.16: window.onload calls _maybeShowReinstallTip() after routeLaunchShortcut() (deep-link routing runs first)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

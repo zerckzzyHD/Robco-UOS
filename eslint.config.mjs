@@ -489,6 +489,11 @@ export default [
         _wireKeyboardShortcuts: 'readonly',
         _wireInputHistoryNav: 'readonly',
         routeLaunchShortcut: 'readonly',
+        // Install-discoverability + guided FO3 reinstall flow (defined in
+        // ui-core-modulebay.js; _armInstallHighlight called from ui-core-nav.js's
+        // SHORTCUT_ROUTES.install, _maybeShowReinstallTip from ui-core.js onload).
+        _armInstallHighlight: 'readonly',
+        _maybeShowReinstallTip: 'readonly',
         renderSkills: 'readonly',
         _syncBioHarnessZones: 'readonly',
         updateKarmaUI: 'readonly',
