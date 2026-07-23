@@ -1324,10 +1324,11 @@ source rather than hand-authored.
 _These items (P, P1, P2, P3, J) form one tightly-coupled sub-program with internal dependencies that
 readiness buckets would fragment, so they are kept together: **P is built and its capture pipeline +
 reproducibility work have LANDED in the sibling archive repo (only the `file://` click-test remains under
-P1); P2 (publication) is post-release and now gated on ONE open owner curation decision; and P3/J both
-depend on P1.** None gates the `dev → main` release._
+P1); P2 (publication) is post-release — the curation decision is MADE (Option B) and the `--public` staging
+tree builds self-contained, leaving the expose sequence + pre-public gates; and P3/J both depend on P1.**
+None gates the `dev → main` release._
 
-### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility LANDED; publication gated on one owner curation decision)
+### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility + `--public` staging tree LANDED; publication down to the expose sequence)
 
 **What it is.** The private archive repo (Protocol 48's `_RobCo-Archive`) turned into a browsable **museum**
 of the project's history — an index, a timeline, per-version "rooms," file lists, counts, and mockup
@@ -1777,7 +1778,7 @@ else below is done and committed.
   disk" is the entire reason HTML stubs were chosen over a host-specific `_redirects` file. Close it with a
   real `file://` open-and-click pass once a session has a controllable browser, before or alongside P2.
 
-**P2. ⬜ Museum publication — owner-decided this session, not yet built; now gated on ONE open owner curation decision (the gallery escape, below).**
+**P2. ⬜ Museum publication — not yet exposed; the curation decision is MADE (Option B) and the `--public` staging tree BUILDS self-contained. What remains is the expose sequence + the pre-public gates (below).**
 
 - **Timing, locked:** after the 2.8.5 release, before 2.9.0.
 - **A brand-new public repo, `Robco-Exhibit`, built from generated output only.** The private archive can
@@ -1791,9 +1792,12 @@ else below is done and committed.
   substitution.
 - **A verified-then-exposed sequence, not verify-after-push.** Push the exact commit to a private target
   first, verify it there, and only expose that same already-verified commit publicly.
-- **The output is not self-contained** — thousands of references inside `museum/site/` point at mockup images
-  living in `planning/`. Validating links only proves something once the public tree is generated standalone
-  with the private archive unreachable.
+- **✅ Self-containment SOLVED for the public path (2026-07-23).** The full `museum/site/` tree is not
+  self-contained (thousands of references point at mockup images living outside it), which is exactly why link
+  validation must run on the standalone public tree with the private archive unreachable — and the new
+  `--public` variant (below) does precisely that: it stages a self-contained `museum/public/` subtree and
+  `assertPublicSelfContained` verifies it full-tree (360 refs / 0 broken). The principle stands; the public
+  path now satisfies it.
 - **The owner is owed a step-by-step publication guide when this is actually attempted.**
 
 **⭐ INTENT-VS-REALITY PUBLICATION BLOCKERS — all THREE now CLOSED (verified by Dispatch against the archive:
@@ -1830,48 +1834,70 @@ survived. So the next audit MUST **render the SERVED pages and look** (not check
 **COMPLETENESS** (is each exhibit fully populated, or a proof-of-concept stub?), not only correctness. And it
 must run **AFTER these fixes land, not before** — auditing the known-broken state proves nothing. This tightens
 design note e's "Claude first, external second" plan with a concrete method requirement. **The precondition is
-now MET (2026-07-23):** the three blockers above are fixed, so this serve-and-look + completeness re-audit is
-now runnable — it is step 3 of the rewritten P2 path below.
+now MET (2026-07-23):** the three blockers above are fixed and the `--public` staging tree builds
+self-contained, so this serve-and-look + completeness re-audit is now runnable **on the public tree** — it is
+one of the pre-public gates in the rewritten P2 path below.
 
-**⭐ THE REAL REMAINING PUBLICATION BLOCKER — an OPEN OWNER CURATION DECISION (the museum-wide gallery escape,
-verified by Dispatch 2026-07-23).** With the three intent-vs-reality blockers closed, the one blocker left
-before publication is a curation decision only the owner can make. The room galleries embed **429 images /
-172 MB** pointing at **archive originals** — fine locally (the full archive is on disk), but they **break in a
-standalone public tree** (those images aren't bundled). **It breaks NOTHING today** — the public exhibit repo
-(`Robco-Exhibit`) does not exist yet — so this is a decision to settle before publication, not a live defect.
-Three options are on the table, awaiting the owner:
+**⭐ THE MUSEUM-WIDE GALLERY ESCAPE — CURATION DECISION MADE: OPTION B (owner, 2026-07-23), and the `--public`
+build variant is now BUILT.** The blocker (verified by Dispatch 2026-07-23): the room galleries embed **429
+images / 172 MB** pointing at **archive originals** — fine locally (the full archive is on disk), but they
+**break in a standalone public tree** (those images aren't bundled). It broke **NOTHING** at the time (the
+public exhibit repo doesn't exist yet), so it was always a decision to settle before publication, not a live
+defect. The three options that were on the table, with the outcome:
 
 - **A — bundle all 172 MB.** Every gallery works publicly, but this **violates the curation law** (the walls
-  become a data dump, not a curated display) and bloats the public repo.
-- **★ B — bundle only exhibited/curated assets; public galleries stay private-archive-only (Dispatch's
-  recommendation).** The public exhibit shows the curated pieces; the full room galleries remain a
-  private-archive affordance. Honors the curation law; smallest public footprint.
-- **C — bundle thumbnails + link originals out.** Public galleries show thumbnails; full-size originals link to
-  an external location.
+  become a data dump, not a curated display) and bloats the public repo. **Rejected.**
+- **✅ B — CHOSEN (owner, 2026-07-23).** Bundle only the exhibited/curated assets self-contained; the raw room
+  galleries (429 imgs / 172 MB) stay **PRIVATE-archive-only**. The public exhibit shows the curated pieces; the
+  full room galleries remain a private-archive affordance. Honors the curation law; smallest public footprint
+  (Dispatch's recommendation, now the owner's decision).
+- **C — bundle thumbnails + link originals out.** **Rejected.**
 
-**⛔ Record so a build session does not foreclose the decision:** a build session must **NOT pre-commit an
-exhibit-asset naming scheme ahead of this owner call** — the chosen option (A/B/C) determines which assets get
-in-site names and which do not, so naming them first would bake in an answer the owner has not given.
+**✅ THE `--public` BUILD VARIANT IS BUILT (archive commit `7d7b7a2`).** `museum/publish.mjs` +
+`node museum/generate.mjs --public` produce a **`museum/public/` staging subtree (754 files / 35 MB, no 172 MB
+galleries)**. **INCLUDES:** the intent-vs-reality + bugs exhibits + `assets/{intent,reality,bugs}`, shared
+chrome, all **285 doc pages + redirect stubs**, the version rooms **public-minus-their-image-grids** (each
+gallery link neutralised to a "held in private archive" span), and the **28 prototype `.html` pages bundled
+public** at `assets/prototypes/`. **EXCLUDES / NEUTRALISES:** the 20 raw `gallery-*.html` (private) + 297
+out-of-site anchors, rewritten to `.mz-private` spans. **A full-tree served-link check
+(`assertPublicSelfContained`) reports 360 refs / 0 broken**, with an independent cross-check of 4399 refs / 0
+out-of-tree; **reproducible** (two runs byte-identical); and **ritual-not-gate** (a normal build never touches
+`museum/public`).
 
-**⭐ P2's TRUE REMAINING PATH (rewritten 2026-07-23, now that the capture pipeline + reproducibility have
-landed and the intent-vs-reality blockers are closed).** In order:
+**The three owner sub-decisions this locked in (2026-07-23):** (1) the **prototypes ship PUBLIC**; (2) the
+version **rooms ship PUBLIC-minus-grids** (structure and prose public, image grids private); (3) output goes to
+a **`museum/public/` staging subtree first** (staged, then substituted + scanned, then exposed — never
+generated straight into a public remote).
 
-1. **Resolve the gallery-escape curation decision above** (A / B / C) → apply the chosen public bundling, and
-   **extend the served-render assertion (`assertServedImages`) to `bugs.html` and any curated gallery page** so
-   served-truth coverage matches the exhibit surface, not just the intent-vs-reality captures.
-2. **Memory audit-and-split** — a **hard P2 prerequisite** that also **unblocks the external audit** (the
-   archive holds `memory/`, which is exactly why external access is gated); the owner's access-option call (the
-   three options under design note e above) is still open.
-3. **Serve-and-look + completeness re-audit AFTER the fixes** (the audit-lesson method above) — render the
-   SERVED pages and look, check completeness, not on-disk.
-4. **External second audit** (design note e's "Claude first, external second" — worth buying only after the
-   internal serve-and-look pass).
-5. **P2 publish mechanics** — the `Robco-Exhibit` repo, Cloudflare Pages (never GitHub Pages, the origin
-   reasoning above), the name-substitution **fail-closed** guard, and the **verify-private-then-expose**
-   sequence.
-6. **Minor / carried:** the `file://` click-test (P1's sole remaining item); and the **Fable Direction-B design
-   execution + the gallery-mats fix** (both recorded above under P) **before public** — a public exhibit is the
-   wrong place to discover the visuals are flat.
+**⭐ P2's TRUE REMAINING PATH (rewritten 2026-07-23, now that the curation decision is made (B) and the
+`--public` staging tree builds self-contained).** The self-containment problem is solved; what remains is the
+EXPOSE sequence plus the pre-public gates still owed.
+
+**The EXPOSE steps (the actual publication mechanics), in order:**
+
+1. **Name-substitution + secret scan over the whole `museum/public/` tree.** Substitute the owner's real name →
+   `zerckzzy` throughout, behind a **fail-closed guard** (any residual real-name match aborts), plus a
+   credential / token-pattern scan across the entire tree — run **after** substitution, on the exact tree that
+   will be exposed.
+2. **Stand up the `Robco-Exhibit` PUBLIC repo** (the private archive can **never** be made public — its git
+   history retains `memory/` regardless of any later deletion) and **push the substituted + scanned tree** to it.
+3. **Cloudflare Pages, never GitHub Pages** (the origin reasoning above — a GitHub project site would share the
+   live app's browser origin + localStorage), following the **verify-private-then-expose** sequence: push to a
+   private target, verify there, expose only that same already-verified commit.
+
+**The pre-public gates still owed (must land BEFORE exposure):**
+
+- **Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — a public exhibit
+  is the wrong place to discover the visuals are flat.
+- **A serve-and-look completeness re-audit ON THE PUBLIC TREE, AFTER those fixes** (the audit-lesson method
+  above) — render the SERVED `museum/public/` pages and look; check completeness, not on-disk.
+- **The external second audit** (design note e's "Claude first, external second" — worth buying only after the
+  internal serve-and-look pass).
+- **The memory audit-and-split** — a **hard P2 prerequisite** that also **unblocks external archive access** (the
+  archive holds `memory/`, which is exactly why external access is gated); the owner's access-option call (the
+  three options under design note e above) is **still open**.
+
+**Minor / non-blocking:** the `file://` redirect click-test (P1's sole remaining item).
 
 **P3. ⬜ Museum as an AI-facing resource — DESIGN ONLY, do not build (new, 2026-07-21, owner's idea).** The
 museum shouldn't just be a thing humans browse; a session should get use out of it the way it gets use out
@@ -1932,9 +1958,9 @@ CLEARED (2026-07-20)** — see the App Check entry in "Closed / off the board" b
 backfilled all shipped versions plus the graveyard, each release gets one frozen hand-written account, and
 the whole thing is a release-time ritual that can never block a release. **Done means (P1, all but met):** a
 fresh clone regenerates the museum byte-identical, with old hash addresses still resolving — landed and
-committed; only the `file://` click-test is left. **Done means (P2, not started — gated on the owner
-gallery-escape curation decision):** `Robco-Exhibit` is live and correct on Cloudflare Pages, verified before
-exposure.
+committed; only the `file://` click-test is left. **Done means (P2, not yet exposed — curation
+decided (B), `--public` staging tree builds self-contained, down to the expose sequence + pre-public gates):**
+`Robco-Exhibit` is live and correct on Cloudflare Pages, verified before exposure.
 
 ### J. ⬜ Museum reproducibility CI — turn three sessions' hand-proof into a standing gate (depends on P1)
 
