@@ -1322,10 +1322,12 @@ source rather than hand-authored.
 ## 🔄 The Museum sub-program (a coupled cluster — kept together deliberately)
 
 _These items (P, P1, P2, P3, J) form one tightly-coupled sub-program with internal dependencies that
-readiness buckets would fragment, so they are kept together: **P/P1 is in flight in the sibling archive
-repo, P2 is post-release, and P3/J both depend on P1.** None gates the `dev → main` release._
+readiness buckets would fragment, so they are kept together: **P is built and its capture pipeline +
+reproducibility work have LANDED in the sibling archive repo (only the `file://` click-test remains under
+P1); P2 (publication) is post-release and now gated on ONE open owner curation decision; and P3/J both
+depend on P1.** None gates the `dev → main` release._
 
-### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT; reproducibility sub-program in flight, publication still ahead)
+### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility LANDED; publication gated on one owner curation decision)
 
 **What it is.** The private archive repo (Protocol 48's `_RobCo-Archive`) turned into a browsable **museum**
 of the project's history — an index, a timeline, per-version "rooms," file lists, counts, and mockup
@@ -1577,9 +1579,13 @@ manifest walk, so none of this can leak into the built museum.
    bare-clone-to-fresh-clone regeneration matched exactly. **Two things to record from the landing:**
    - **It found and fixed a real bug on the way in:** `bugs/` records were falling into "unclassified" and
      tripping the lobby's own integrity report — the museum was about to raise a **false alarm about itself**.
-   - **One item is deliberately unfinished, and the page says so on its face:** the intent-vs-reality "reality"
-     captures are still **working-tree screenshots, not release-pinned** — the page states this rather than
-     pretending otherwise.
+   - **✅ RESOLVED (2026-07-23) — the capture pipeline is now BUILT and the reality captures are
+     release-pinned.** At the landing this was deliberately unfinished (working-tree screenshots, page stating
+     so on its face); it is now closed. `museum/capture.mjs` + `museum/reality-captures.json` +
+     `museum/accounts/capture-fixtures/{fnv,fo3}.json` + a `--capture` build flag produce **20 captures pinned
+     to `v2.8.5` (commit `06e51801`)**, reproducibly (a normal build stages from the committed PNGs, launching
+     no browser), with a real served-render check (`assertServedImages` over a localhost origin, **6 exhibited /
+     0 broken**). See the intent-vs-reality blockers under P2 — all three now closed.
 
    _(Prior design-exploration context, now resolved:)_ that session was told
    plainly that "the light version is the right answer and here is the proof" is an acceptable outcome, and
@@ -1650,10 +1656,10 @@ repo's planning folder** and would wrongly duplicate archive-only audits there. 
 that path and now **renders inside the museum under STANDING** (the classifier was taught to recognise
 `audits/`). Recorded here so the convention is discoverable from the app repo's queue, not only in the archive.
 
-**✅ FIXED and committed to the archive — three commits, verified STILL UNPUSHED on archive `main` as of this
-recording** (`e1fa0ab` five self-audit fixes → `a5bfe4d` regenerate → `cef158f` drop a dangling § anchor;
-`origin/main` is behind by all three — the fix session's work has not reached the private remote yet, worth a
-push so a machine loss can't take it):
+**✅ FIXED, committed, AND PUSHED to the archive — three commits, verified on archive `origin/main` (2026-07-23)**
+(`e1fa0ab` five self-audit fixes → `a5bfe4d` regenerate → `cef158f` drop a dangling § anchor; all three have
+now reached the private remote — the earlier "still unpushed" note is cleared, a machine loss can no longer
+take this work):
 
 - **The lobby's "Operators 3" stat** counted author _emails_, so it split the owner across two GitHub addresses
   and counted dependabot as a person — while sitting beside a masthead reading "one operator." Fixed to count
@@ -1680,8 +1686,10 @@ push so a machine loss can't take it):
   confirmed how the museum actually _looks_.
 - **The `file://` auto-redirect is still unverified** (already queued as P1's `file://` click-test; the audit
   **confirms it remains open**).
-- **The committed museum is STALE against the current archive** — a regeneration would change ~307 pages. **By
-  design** (release-cadence regeneration), but recorded: what you open today does not show current content.
+- **✅ CLEARED (2026-07-23, `da5d82b`) — the committed museum was STALE against its inputs (7 syncs behind);
+  now regenerated to match HEAD.** It had been ~307 pages behind by design (release-cadence regeneration), but
+  the drift was reconciled: regenerated to match the current archive HEAD, and **two successive regens came
+  out byte-identical** (reproducibility holding). What you open now shows current content.
 - **⚠ The audit's own caveat, which MUST survive:** a Claude session auditing Claude sessions **shares their
   blind spots**, so its clean findings are **WEAK evidence** — exactly why (e)'s plan puts external review
   second. The planned external pass is still warranted.
@@ -1707,8 +1715,9 @@ gated on a memory audit-and-split. Three options were put to the owner:
 
 **Awaiting the owner's call between these three; do not proceed with external access until then.**
 
-**P1. 🔄 Museum reproducibility — a sub-program.** Three sessions have shipped fixes to the archive's `main`;
-a fourth is in flight.
+**P1. 🔄 Museum reproducibility — a sub-program, now all but complete (2026-07-23).** The fixes have shipped to
+the archive's `main`; **the ONLY open item is the `file://` redirect click-test** (last bullet). Everything
+else below is done and committed.
 
 - **✅ Shipped — the CRLF/LF page-renaming bug (`2f4848c`, `5bc7137`, `aa15e9a`).** The machine's SYSTEM git
   config has `core.autocrlf=true`, so a fresh clone checked out every text file as CRLF while the generator
@@ -1718,23 +1727,25 @@ a fourth is in flight.
 - **✅ Shipped — the README.txt leak (`76c1970`).** `generate.mjs` walked the filesystem directly, so a
   gitignored `README.txt` got picked up and published anyway. Fixed by walking `git ls-files` instead of
   disk. Artifact count corrected 705 → 704.
-- **🔄 IN FLIGHT (archive session `local_68504e25`, resumed after hitting the session limit).** Uncommitted
-  changes sit in the archive's working tree as of `main` at `76c1970` — **no commit exists for this yet.**
-  The work: replace content-hash doc-page URLs with **path-based** ones so an address is stable across
-  content edits. Two things ride along:
-  - **A redirect ledger, mined once from this repo's own git history, because the window to do it is
-    closing.** Across every commit that touched `museum/site/docs/*.html`, **306 distinct hash-named pages
-    have existed; 62 no longer exist** and are recoverable only by walking history. A normal build then
-    writes an HTML redirect stub at each recorded old address (chosen over Cloudflare's native `_redirects`
-    so the museum stays openable straight off disk).
+- **✅ SHIPPED + COMMITTED — path-based doc-page URLs.** Content-hash doc-page URLs were replaced with
+  **path-based** ones so an address is stable across content edits (the earlier "in flight, no commit yet"
+  state is cleared — it is done and committed). Two things rode along, both landed:
+  - **✅ A redirect ledger, mined once from this repo's own git history** — **389 entries**, with a build-time
+    **stub-drop guard that alarms if more than 50% of stubs vanish** in a regeneration (so a valid-but-gutted
+    ledger is caught, not silently accepted). A normal build writes an HTML redirect stub at each recorded old
+    address (chosen over Cloudflare's native `_redirects` so the museum stays openable straight off disk).
   - **A thumbnail-render-nondeterminism finding, sidestepped rather than root-caused.** ~11–13 of 28
-    thumbnail PNGs come out with differing bytes on every fresh regeneration (suspected Chromium PNG
+    thumbnail PNGs came out with differing bytes on every fresh regeneration (suspected Chromium PNG
     re-encode jitter). The fix reuses the previous build's committed thumbnail whenever one exists.
 
-- **⬜ Rename permanence — an explicit alias map + a build-time vanished-path check (new, 2026-07-20).** The
-  path-based-URL work fixes addresses moving on a content EDIT; it deliberately left alone what happens when
-  a document is later RENAMED. The owner asked whether to widen it. **Answer: yes, but not by the obvious
-  route.**
+- **✅ DONE (with one coarseness caveat recorded) — rename permanence: an explicit alias map + a build-time
+  vanished-path check (shipped 2026-07-23).** The alias-map is in place and the build-time vanished-path check
+  is **PRESENT** — the caveat worth recording is that the check is **coarse: a bulk >50% alarm, not a per-path
+  assertion**, so a small handful of individually-vanished paths would not trip it. Good enough for
+  pre-publication (a broken internal link is cheap before publication); a per-path tightening can follow if it
+  ever earns its keep. The design and reasoning below stand as the record of WHY it was built this way. The
+  path-based-URL work fixed addresses moving on a content EDIT; this handles a document later being RENAMED.
+  The owner asked whether to widen it. **Answer: yes, but not by the obvious route.**
 
   **Why NOT automatic rename detection — direct evidence from this same repo.** The in-flight session's own
   redirect-ledger mining recovered only 305 of 389 historical addresses by walking git history, because
@@ -1760,12 +1771,13 @@ a fourth is in flight.
   caught loudly by the build-time git-diff check; a genuine deletion is distinguishable from an unrecorded
   rename by its own ledger entry.
 
-- **⬜ The outstanding `file://` redirect click-test (new, 2026-07-20).** The redirect stubs were verified
-  over HTTP but never actually clicked open from a real `file://` location. Small, but "opens correctly from
+- **⬜ The outstanding `file://` redirect click-test (new, 2026-07-20) — THE SOLE REMAINING P1 ITEM.** The
+  redirect stubs were verified over HTTP but **nothing yet opens a stub over `file://` and asserts it
+  navigates.** Small, but "opens correctly from
   disk" is the entire reason HTML stubs were chosen over a host-specific `_redirects` file. Close it with a
   real `file://` open-and-click pass once a session has a controllable browser, before or alongside P2.
 
-**P2. ⬜ Museum publication — owner-decided this session, not yet built.**
+**P2. ⬜ Museum publication — owner-decided this session, not yet built; now gated on ONE open owner curation decision (the gallery escape, below).**
 
 - **Timing, locked:** after the 2.8.5 release, before 2.9.0.
 - **A brand-new public repo, `Robco-Exhibit`, built from generated output only.** The private archive can
@@ -1784,30 +1796,32 @@ a fourth is in flight.
   with the private archive unreachable.
 - **The owner is owed a step-by-step publication guide when this is actually attempted.**
 
-**⭐ INTENT-VS-REALITY PUBLICATION BLOCKERS — three, verified by Dispatch against the archive (2026-07-22).**
-The intent-vs-reality exhibit is not publication-ready; three concrete blockers, each recorded with its fix and
-its reasoning so a publication pass does not discover them at exposure time:
+**⭐ INTENT-VS-REALITY PUBLICATION BLOCKERS — all THREE now CLOSED (verified by Dispatch against the archive:
+raised 2026-07-22, resolved 2026-07-23).** Each is recorded with its fix and its reasoning so the LESSON
+survives even though the blocker is gone:
 
-- **(a) IMAGES ESCAPE THE SITE — a real blocker.** The exhibit references its images **OUTSIDE** `museum/site/`
-  (the INTENT captures at `../../planning/...`, the SHIPPED captures at `../design/...`); **none are copied into
-  `museum/site/`**. So they render when the raw files are opened off the full archive on disk, but **BREAK when
-  the museum is served from its own root or published as the standalone exhibit** — the images simply aren't in
-  the bundle. This is the same self-containment hazard already noted above ("thousands of references point at
-  mockup images living in `planning/`"), now confirmed present in the intent-vs-reality exhibit specifically.
-  **FIX:** the generator must **COPY the exhibit images into `museum/site/assets/`** and reference them with
-  **in-site paths**. **⭐ Record the FALSE-GREEN (a green-that-lied INSIDE the museum):** the museum's own link
-  check **passed** — because it resolves paths **ON DISK**, and "resolves on disk" ≠ "works when served." A
-  check that validates against the disk layout the museum will never be served from is exactly the class of
-  lying-green this project keeps being burned by; the served-vs-disk distinction is the lesson.
-- **(b) SHIPPED captures are working-tree, not release-pinned.** The "reality" screenshots are from the Fable
-  design pass, **not captured from the pinned release** (the exhibit's own face already admits this — see the
-  "deliberately unfinished, and the page says so" note under P above). Closing it needs a **release-pinned
-  capture PIPELINE**, which the exhibit's own notice says was never built. **This pipeline is the next build —
-  owner greenlit it, plan-first** (design/plan before implementing, per the workflow).
-- **(c) The exhibit is INCOMPLETE — only 2 pairs, of many real mockups.** Per the museum-wide curation
-  principle (above): the **pipeline captures the full COLLECTION** (every panel, both games, phone widths); the
-  **exhibit CURATES the telling pairs**. So "complete" here means a **complete collection, curated display** —
-  not two proof-of-concept pairs standing in for the whole.
+- **✅ (a) FIXED — images no longer escape the site.** The exhibit images are now **bundled in-site**
+  (`assets/reality/`, `assets/intent/`) with **zero `../../` escaping paths** — so they render when the museum
+  is served from its own root or published standalone, not only off the full archive on disk. The original
+  blocker: the exhibit referenced images OUTSIDE `museum/site/` (INTENT at `../../planning/...`, SHIPPED at
+  `../design/...`), none copied in, so they broke when served. **⭐ Record the FALSE-GREEN lesson (a
+  green-that-lied INSIDE the museum), which MUST survive the fix:** the museum's own link check had **passed** —
+  because it resolved paths **ON DISK**, and "resolves on disk" ≠ "works when served." A check that validates
+  against the disk layout the museum will never be served from is exactly the class of lying-green this project
+  keeps being burned by; the served-vs-disk distinction is the lesson, and the new capture pipeline's
+  `assertServedImages` (over a localhost origin) is the guard that answers it.
+- **✅ (b) FIXED — captures are release-pinned, not working-tree.** The "reality" captures are now pinned to
+  **`v2.8.5` (commit `06e51801`)** via the built capture pipeline (`museum/capture.mjs` +
+  `museum/reality-captures.json` + `museum/accounts/capture-fixtures/{fnv,fo3}.json` + the `--capture` flag),
+  reproducibly (a normal build stages from the committed PNGs, launching no browser). The original blocker was
+  that the screenshots came from the Fable design pass, not the pinned release, and the pipeline "was never
+  built" — it is now built and working.
+- **✅ (c) RESOLVED — a finished CURATION DECISION, not an incomplete stub.** The exhibit is **3 curated pairs,
+  owner-finalized 2026-07-22** (Settings and Databank/FO3 were **deliberately cut**, with **hand-written
+  divergence notes**). The earlier "only ~2 proof-of-concept pairs, of many" reading was wrong: this is the
+  museum-wide curation principle correctly applied — the **pipeline captures the full COLLECTION** (every panel,
+  both games, phone widths), the **exhibit CURATES the telling pairs**. "Complete" here means **complete
+  collection, curated display**, and that curation is a finished owner decision, not a stub awaiting more pairs.
 
 **⭐ THE AUDIT LESSON — the NEXT museum audit must SERVE-AND-LOOK, and check COMPLETENESS, and run AFTER the
 fixes (2026-07-22).** The previous Claude audit (design note e, under P) **missed all of the above** because its
@@ -1815,7 +1829,49 @@ screenshots timed out, so it fell back to checking **on-disk** — the exact rea
 survived. So the next audit MUST **render the SERVED pages and look** (not check on-disk), and MUST check
 **COMPLETENESS** (is each exhibit fully populated, or a proof-of-concept stub?), not only correctness. And it
 must run **AFTER these fixes land, not before** — auditing the known-broken state proves nothing. This tightens
-design note e's "Claude first, external second" plan with a concrete method requirement.
+design note e's "Claude first, external second" plan with a concrete method requirement. **The precondition is
+now MET (2026-07-23):** the three blockers above are fixed, so this serve-and-look + completeness re-audit is
+now runnable — it is step 3 of the rewritten P2 path below.
+
+**⭐ THE REAL REMAINING PUBLICATION BLOCKER — an OPEN OWNER CURATION DECISION (the museum-wide gallery escape,
+verified by Dispatch 2026-07-23).** With the three intent-vs-reality blockers closed, the one blocker left
+before publication is a curation decision only the owner can make. The room galleries embed **429 images /
+172 MB** pointing at **archive originals** — fine locally (the full archive is on disk), but they **break in a
+standalone public tree** (those images aren't bundled). **It breaks NOTHING today** — the public exhibit repo
+(`Robco-Exhibit`) does not exist yet — so this is a decision to settle before publication, not a live defect.
+Three options are on the table, awaiting the owner:
+
+- **A — bundle all 172 MB.** Every gallery works publicly, but this **violates the curation law** (the walls
+  become a data dump, not a curated display) and bloats the public repo.
+- **★ B — bundle only exhibited/curated assets; public galleries stay private-archive-only (Dispatch's
+  recommendation).** The public exhibit shows the curated pieces; the full room galleries remain a
+  private-archive affordance. Honors the curation law; smallest public footprint.
+- **C — bundle thumbnails + link originals out.** Public galleries show thumbnails; full-size originals link to
+  an external location.
+
+**⛔ Record so a build session does not foreclose the decision:** a build session must **NOT pre-commit an
+exhibit-asset naming scheme ahead of this owner call** — the chosen option (A/B/C) determines which assets get
+in-site names and which do not, so naming them first would bake in an answer the owner has not given.
+
+**⭐ P2's TRUE REMAINING PATH (rewritten 2026-07-23, now that the capture pipeline + reproducibility have
+landed and the intent-vs-reality blockers are closed).** In order:
+
+1. **Resolve the gallery-escape curation decision above** (A / B / C) → apply the chosen public bundling, and
+   **extend the served-render assertion (`assertServedImages`) to `bugs.html` and any curated gallery page** so
+   served-truth coverage matches the exhibit surface, not just the intent-vs-reality captures.
+2. **Memory audit-and-split** — a **hard P2 prerequisite** that also **unblocks the external audit** (the
+   archive holds `memory/`, which is exactly why external access is gated); the owner's access-option call (the
+   three options under design note e above) is still open.
+3. **Serve-and-look + completeness re-audit AFTER the fixes** (the audit-lesson method above) — render the
+   SERVED pages and look, check completeness, not on-disk.
+4. **External second audit** (design note e's "Claude first, external second" — worth buying only after the
+   internal serve-and-look pass).
+5. **P2 publish mechanics** — the `Robco-Exhibit` repo, Cloudflare Pages (never GitHub Pages, the origin
+   reasoning above), the name-substitution **fail-closed** guard, and the **verify-private-then-expose**
+   sequence.
+6. **Minor / carried:** the `file://` click-test (P1's sole remaining item); and the **Fable Direction-B design
+   execution + the gallery-mats fix** (both recorded above under P) **before public** — a public exhibit is the
+   wrong place to discover the visuals are flat.
 
 **P3. ⬜ Museum as an AI-facing resource — DESIGN ONLY, do not build (new, 2026-07-21, owner's idea).** The
 museum shouldn't just be a thing humans browse; a session should get use out of it the way it gets use out
@@ -1867,16 +1923,18 @@ manifest, every entry resolves to a status derived from an explicit link graph w
 non-current entry ships without its `why`, and a session reading it cannot mistake a buried past-state fact
 for current guidance.
 
-**What P depends on.** The archive repo and its folder structure (exists, Protocol 48). P1
-(reproducibility), the rename-permanence work, and the `file://` click-test should finish, and ideally J
-(below) should exist and pass, before P2 is attempted. ✅ **The App Check debug-token blocker on
-publication is CLEARED (2026-07-20)** — see the App Check entry in "Closed / off the board" below.
+**What P depends on.** The archive repo and its folder structure (exists, Protocol 48). P1 (reproducibility)
+and the rename-permanence work are **done**; only the `file://` click-test remains, and ideally J (below)
+should exist and pass, before P2 is attempted. ✅ **The App Check debug-token blocker on publication is
+CLEARED (2026-07-20)** — see the App Check entry in "Closed / off the board" below.
 
 **Done means (P core, met):** a generator produces the museum from the archive's structure, its first run
 backfilled all shipped versions plus the graveyard, each release gets one frozen hand-written account, and
-the whole thing is a release-time ritual that can never block a release. **Done means (P1, in flight):** a
-fresh clone regenerates the museum byte-identical, with old hash addresses still resolving. **Done means
-(P2, not started):** `Robco-Exhibit` is live and correct on Cloudflare Pages, verified before exposure.
+the whole thing is a release-time ritual that can never block a release. **Done means (P1, all but met):** a
+fresh clone regenerates the museum byte-identical, with old hash addresses still resolving — landed and
+committed; only the `file://` click-test is left. **Done means (P2, not started — gated on the owner
+gallery-escape curation decision):** `Robco-Exhibit` is live and correct on Cloudflare Pages, verified before
+exposure.
 
 ### J. ⬜ Museum reproducibility CI — turn three sessions' hand-proof into a standing gate (depends on P1)
 
