@@ -42844,11 +42844,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       // SAVE_INTEGRITY_PASS: same inert-<template> pattern as .update-banner/
       // .fo3-warning-banner above (WU-E2), reviewed at that same bar — see 217.7b.
       '.storage-warning-banner',
+      // Install-discoverability strip (owner): same inert-<template> + fail-safe
+      // gating pattern (beforeinstallprompt + not-standalone + not-dismissed).
+      // Its ib-* child classes are named to NOT trip this allowlist on purpose;
+      // only the container is a banner. Reviewed + guarded by Suite 243.
+      '.install-banner',
     ]);
     const unknown217 = [...bannerSelectors217].filter(s => !known217.has(s));
     assert(
       bannerSelectors217.size > 0 && unknown217.length === 0,
-      '217.5: every "*banner*" CSS selector is one of the five known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner/.storage-warning-banner) — no new full-width banner-style popup introduced' +
+      '217.5: every "*banner*" CSS selector is one of the six known, already-reviewed elements (.fo3-warning-banner/#dshEnvBanner/.update-banner/.rng-banner/.storage-warning-banner/.install-banner) — no new full-width banner-style popup introduced' +
         (unknown217.length ? ' — unexpected: ' + unknown217.join(', ') : '')
     );
   }
@@ -50866,6 +50871,176 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
   } finally {
     fs.rmSync(fixtureBase242, { recursive: true, force: true });
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 243 — Install-discoverability strip (owner: install action was
+//  buried in the Module Bay SVC TRAY). Locks the two invariants that keep it
+//  from ever becoming naggy or leaking into the installed app:
+//    (1) it is an INERT <template> (WU-E2), never rendered on its own; and
+//    (2) _showInstallBanner() fail-safes to hidden — it renders only on the
+//        beforeinstallprompt signal, only when NOT already installed, and only
+//        when NOT dismissed before (the dismissal remembers — Protocol UI-6).
+//  A refactor that dropped any one of those guards would either show the strip
+//  inside the installed PWA or re-show it after a dismiss — the exact "naggy"
+//  regression this suite exists to catch.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 243 — install-discoverability strip (fail-safe, non-naggy)');
+  const htmlSource243 = htmlSource;
+  const cssSource243 = readCss();
+  const bay243 = readGroup('ui-core');
+  const state243 = readFile('js/core/state.js');
+
+  // 243.1  the strip markup lives INSIDE #installBannerTemplate (inert <template>
+  //         — the browser parses but never renders it on its own).
+  assert(
+    /<template id="installBannerTemplate">[\s\S]*?class="install-banner"[\s\S]*?<\/template>/.test(
+      htmlSource243
+    ),
+    '243.1: .install-banner markup is wrapped in #installBannerTemplate (disabled-by-default — a <template> never renders on its own)'
+  );
+
+  // 243.2  the .install-banner appears EXACTLY once and only inside its template
+  //         (no active, pre-rendered strip anywhere in the document).
+  assert(
+    (htmlSource243.match(/class="install-banner"/g) || []).length === 1,
+    '243.2: .install-banner appears exactly once (only inside its <template> — no rendered strip outside it)'
+  );
+
+  // 243.3  the .install-banner CSS rule is present (style not orphaned).
+  assert(
+    /\.install-banner\s*\{/.test(cssSource243),
+    '243.3: .install-banner CSS rule exists in the stylesheet'
+  );
+
+  // 243.4  fail-safe gate: _showInstallBanner() checks ALL THREE conditions
+  //         before it will render — installable (deferredPrompt), not already
+  //         installed (_isStandaloneInstalled), and not dismissed
+  //         (robco_install_prompt_dismissed). Missing any one is the regression.
+  {
+    const fn243 = (bay243.match(/function _showInstallBanner\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /if \(!deferredPrompt\) return/.test(fn243) &&
+        /_isStandaloneInstalled\(\)/.test(fn243) &&
+        /robco_install_prompt_dismissed|INSTALL_DISMISS_KEY/.test(fn243),
+      '243.4: _showInstallBanner() fail-safes to hidden — gated on deferredPrompt + not-standalone + not-dismissed (all three present)'
+    );
+  }
+
+  // 243.5  the strip only appears via the beforeinstallprompt signal — the
+  //         handler is the single caller of _showInstallBanner(). (Guarantees
+  //         it can never be shown speculatively at boot.)
+  assert(
+    /addEventListener\('beforeinstallprompt'[\s\S]*?_showInstallBanner\(\)/.test(bay243),
+    '243.5: _showInstallBanner() is invoked from the beforeinstallprompt handler (never rendered speculatively at boot)'
+  );
+
+  // 243.6  dismissal + install both PERSIST (Protocol UI-6): the dismiss control
+  //         and the appinstalled handler each write the remember-key, so the
+  //         strip never nags after either action.
+  assert(
+    /MetaStore\.set\(INSTALL_DISMISS_KEY, 'true'\)/.test(bay243) &&
+      /addEventListener\('appinstalled'/.test(bay243),
+    "243.6: dismissing the strip and installing both set robco_install_prompt_dismissed='true' (Protocol UI-6 — it never returns after either)"
+  );
+
+  // 243.7  the remember-key is a registered DEVICE pref in META_MANIFEST
+  //         (Protocol 23 boundary — install state is a device property, never
+  //         campaign state).
+  assert(
+    /robco_install_prompt_dismissed:\s*\{[^}]*type:\s*'bool'/.test(state243),
+    '243.7: robco_install_prompt_dismissed is registered in META_MANIFEST as a device pref (Protocol 23)'
+  );
+
+  // 243.8  Protocol 22 — the strip reuses the EXISTING installPwa() action, not
+  //         a forked install path. The SVC TRAY button (#btnInstallPwa) is kept
+  //         as the permanent home (Protocol 25 — added a surface, not relocated).
+  assert(
+    /go\.addEventListener\('click', installPwa\)/.test(bay243) &&
+      /id="btnInstallPwa"/.test(htmlSource243),
+    '243.8: the strip wires the existing installPwa() (Protocol 22) and the SVC TRAY #btnInstallPwa button is kept (Protocol 25 — surface added, control not relocated)'
+  );
+
+  // ── Option-1 guided FO3 reinstall tip + #go=install deep-link highlight ──
+
+  // 243.9  the reinstall tip markup lives INSIDE #fo3ReinstallTipTemplate (inert
+  //         <template> — never renders on its own, WU-E2 pattern).
+  assert(
+    /<template id="fo3ReinstallTipTemplate">[\s\S]*?class="fo3-reinstall-tip"[\s\S]*?<\/template>/.test(
+      htmlSource243
+    ) && (htmlSource243.match(/class="fo3-reinstall-tip"/g) || []).length === 1,
+    '243.9: the FO3 reinstall tip markup is wrapped in #fo3ReinstallTipTemplate exactly once (disabled-by-default — never renders on its own)'
+  );
+
+  // 243.10  fail-safe gate: _maybeShowReinstallTip() checks ALL THREE conditions
+  //          — installed standalone PWA, active game is FO3, and not-seen. Any
+  //          one missing is the regression (browser-tab leak / NV leak / re-nag).
+  {
+    const fn243b = (bay243.match(/function _maybeShowReinstallTip\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /_isStandaloneInstalled\(\)/.test(fn243b) &&
+        /getGameContext\(\) !== 'FO3'/.test(fn243b) &&
+        /(robco_fo3_reinstall_tip_seen|FO3_TIP_SEEN_KEY)/.test(fn243b),
+      '243.10: _maybeShowReinstallTip() fail-safes to hidden — gated on installed-PWA + FO3 + not-seen (never a browser tab, never New Vegas, never twice)'
+    );
+  }
+
+  // 243.11  the tip is marked SEEN when shown (owner: never twice) — the seen key
+  //          is written inside the show function, not only on an explicit dismiss.
+  {
+    const fn243b = (bay243.match(/function _maybeShowReinstallTip\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /MetaStore\.set\(FO3_TIP_SEEN_KEY, 'true'\)/.test(fn243b),
+      '243.11: showing the reinstall tip sets robco_fo3_reinstall_tip_seen (it shows exactly once even if the user never taps GOT IT)'
+    );
+  }
+
+  // 243.12  `install` is an allow-listed #go= route and it arms the highlight
+  //          (the deep-link that lands the user on the strip).
+  assert(
+    /install:\s*\(\)\s*=>\s*\{[\s\S]*?_armInstallHighlight\(\)/.test(bay243),
+    '243.12: SHORTCUT_ROUTES.install arms the reboot-persistent install-strip highlight (#go=install deep-link)'
+  );
+
+  // 243.13  both new keys are registered DEVICE prefs in META_MANIFEST
+  //          (Protocol 23 — install/rotation state is a device property).
+  assert(
+    /robco_fo3_reinstall_tip_seen:\s*\{[^}]*type:\s*'bool'/.test(state243) &&
+      /robco_pending_install_highlight:\s*\{[^}]*type:\s*'bool'/.test(state243),
+    '243.13: robco_fo3_reinstall_tip_seen + robco_pending_install_highlight are registered device prefs (Protocol 23)'
+  );
+
+  // 243.14  reboot-persistence: _showInstallBanner() applies the pending
+  //          highlight, and _applyPendingInstallHighlight() clears the durable
+  //          arm after firing so it pulses exactly once (survives the update
+  //          reboot via the MetaStore arm, not the stripped hash).
+  {
+    const showFn243 = (bay243.match(/function _showInstallBanner\([\s\S]*?\n\}/) || [''])[0] || '';
+    const applyFn243 =
+      (bay243.match(/function _applyPendingInstallHighlight\([\s\S]*?\n\}/) || [''])[0] || '';
+    assert(
+      /_applyPendingInstallHighlight\(\)/.test(showFn243) &&
+        /MetaStore\.get\(INSTALL_HIGHLIGHT_ARM_KEY\)\s*!==\s*'true'/.test(applyFn243) &&
+        /MetaStore\.set\(INSTALL_HIGHLIGHT_ARM_KEY, 'false'\)/.test(applyFn243),
+      '243.14: the install strip applies + clears the reboot-persistent highlight arm (fires exactly once; survives the update reboot via MetaStore, not the stripped #go= hash)'
+    );
+  }
+
+  // 243.15  the highlight is a PLAIN animation (reduced-motion-safe per Protocol
+  //          UI-9 — the global prefers-reduced-motion block neutralizes it).
+  assert(
+    /\.install-banner\.highlight\s*\{[^}]*animation:/.test(cssSource243) &&
+      /@keyframes install-highlight-pulse/.test(cssSource243),
+    '243.15: the deep-link highlight is a plain animation + keyframes (Protocol UI-9 reduced-motion-safe, no bespoke carve-out)'
+  );
+
+  // 243.16  boot invokes the tip AFTER routeLaunchShortcut() so a #go= deep-link
+  //          isn't clobbered, and only via the guarded typeof call.
+  assert(
+    /routeLaunchShortcut\(\);[\s\S]{0,400}?_maybeShowReinstallTip\(\)/.test(bay243),
+    '243.16: window.onload calls _maybeShowReinstallTip() after routeLaunchShortcut() (deep-link routing runs first)'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

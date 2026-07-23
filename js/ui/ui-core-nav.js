@@ -768,6 +768,16 @@ const SHORTCUT_ROUTES = {
   data: () => switchTab('data'),
   settings: () => switchTab('settings'),
   new: () => wipeTerminal(),
+  // Deep-link from the FO3 reinstall tip. Arms the reboot-persistent highlight
+  // on the install strip (a durable MetaStore flag applied when the strip
+  // appears — see _armInstallHighlight()/_showInstallBanner() in
+  // ui-core-modulebay.js). beforeinstallprompt fires ONLY in a browser tab, so
+  // inside the installed PWA this is a harmless no-op highlight (by design — the
+  // reinstall tip is what surfaces there instead). The strip is fixed-top, so no
+  // tab switch is needed to reveal it.
+  install: () => {
+    if (typeof _armInstallHighlight === 'function') _armInstallHighlight();
+  },
 };
 function routeLaunchShortcut() {
   let raw;

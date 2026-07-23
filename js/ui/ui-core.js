@@ -1591,6 +1591,7 @@ window.onload = async function () {
     _wireInputHistoryNav();
     _wireUnloadFlush();
     routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+    if (typeof _maybeShowReinstallTip === 'function') _maybeShowReinstallTip(); // Option-1 FO3 reinstall tip (installed PWA + FO3 + once), after routeLaunchShortcut so #go= isn't clobbered
   } catch (e) {
     console.error('[RobCo] boot failed:', e);
   }
