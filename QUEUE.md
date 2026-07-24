@@ -420,7 +420,7 @@ for the shape and which A4 will verify against real Firestore. That is why the e
 **optional post-release upgrade, not a blocker**, and why **A3 is the last thing that was gating 2.8.5 and
 is now cleared.**
 
-### A4. ⬜ (OPTIONAL, post-2.8.5) Real-Firestore round-trip — verify the model against the emulator
+### A4. ⏭️ (OPTIONAL, post-2.8.5) Real-Firestore round-trip — verify the model against the emulator — JDK BLOCKER CLEARED (2026-07-23), now actionable
 
 **What it is.** The upgrade of A3's modeled guard from _modelled_ to _verified_: a save→sync→load round-trip
 run against the **Firebase local emulator suite** (real Firestore + Auth SDK write/read), asserting
@@ -433,18 +433,21 @@ approximate.
 the silent-data-loss risk this was scoped for; the modeled guard (A3) covers the residual shape risk. So
 this is a _confidence upgrade_, run when convenient after 2.8.5 — never gating a ship.
 
-**What it needs — recorded honestly.** A **JDK/JRE 11+** on the machine that runs it (the Firestore/Auth
-emulators are Java processes — confirmed absent on the owner's machine 2026-07-21, which is why this is
-deferred), plus **`firebase-tools` as a DEV-ONLY** dependency (`npm i -D firebase-tools`) — must never enter
-`sw.js`'s precache set or ship to users, runs fully offline at the gate.
+**What it needs — recorded honestly. ✅ The JDK blocker is now CLEARED (2026-07-23).** A **JDK/JRE 11+** on
+the machine that runs it (the Firestore/Auth emulators are Java processes) was **confirmed absent 2026-07-21**,
+which is why this was deferred — but the **owner confirmed 2026-07-23 that a JDK (version 25) is now
+installed**, so the hard environmental blocker is gone. The **only remaining setup is `firebase-tools` as a
+DEV-ONLY** dependency (`npm i -D firebase-tools`) — which must never enter `sw.js`'s precache set or ship to
+users, and runs fully offline at the gate.
 
 **What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
 run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
 
-**Done means:** with a JDK present, a real-SDK round-trip against the emulator asserts every save-envelope
-field survives equal, driven from the live field list (not a hardcoded one), proven red-then-green by
-dropping a field; `firebase-tools` dev-only with nothing added to the served set. Until then, A3's
-`npm run cloud-check` is the standing guard and this stays optional.
+**Done means:** the JDK is now present, so this is **actionable** (only `npm i -D firebase-tools` remains to
+set up) — a real-SDK round-trip against the emulator asserts every save-envelope field survives equal, driven
+from the live field list (not a hardcoded one), proven red-then-green by dropping a field; `firebase-tools`
+dev-only with nothing added to the served set. Until it lands, A3's `npm run cloud-check` is the standing
+guard, and this stays **optional — never a release blocker** (owner decision 2026-07-21, unchanged).
 
 ### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
 
@@ -1419,6 +1422,19 @@ narrowing back to "app history."**
    "link, don't fuse" relationship the thesis's own Atlas cross-reference (above) already establishes — the
    museum is where all three layers become walkable for a human, the Visual Web is the eventual unifying
    render, and R11 is the first proof the AI-serving layer is itself real and computable.
+
+   **⭐ FLOATED, NOT COMMITTED — Obsidian graph view as a low-effort Visual-Web prototype (owner floated
+   2026-07-23).** The orchestrator memory files already use `[[wikilinks]]` (Obsidian-native), so pointing
+   Obsidian at the private archive's `memory/` + `bugs/` + `graveyard/` + `audits/` yields a **free graph
+   view** for near-zero effort — usable both as a **navigation tool** for the owner AND as a **cheap prototype
+   of the Visual-Web aesthetic** to feel out before the generated version is built. **⛔ Keep LOCAL / PRIVATE**
+   — the archive can never be public (its git history retains `memory/`). Steal the **visual + graph layer
+   ONLY, NOT the "auto-ingest / notes link themselves" behavior** — auto-linking conflicts with memory's
+   deliberate curation (memory "holds no fact you can look up"; the graph must never start dragging in
+   everything). The **clarity veto still governs** — a legible graph beats 3D spectacle. **Recorded as a
+   FLOATED candidate, not a queued commitment:** no build, no design decided here; captured so the idea isn't
+   lost.
+
 3. **The "green that lied" room.** The project's hardest-won lesson: checks that passed while meaning
    nothing — the cache guard comparing the wrong branch, tests asserting source text rather than behavior, the
    fake level-up popup, the museum's own "Operators 3" miscount, the header mangle passing the formatter, the
