@@ -24,7 +24,7 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 **A full CRT terminal emulation that turns a browser tab into a living Pip-Boy companion —**
 **a physical RobCo device that reacts to your character's condition, with two Wastelands, an offline native toolset, and an AI Director that's optional, not required.**
 
-[Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
+[Live Demo](https://zerckzzyHD.github.io/Robco-UOS/) · [Museum](#-the-museum) · [Features](#-features) · [Architecture](#-architecture) · [Getting Started](#-getting-started) · [Development](#-development) · [Project History](#-project-history)
 
 **Current version: 2.8.5 — "Foundations & Fidelity"**
 
@@ -43,6 +43,14 @@ It began as a Google Gemini Gem (a chat preset) and grew into a complete applica
 ### Two games, one engine
 
 Both games are first-class and fully data-driven. A single `GAME_DEFS` table plus per-game data files (`reg_nv`/`reg_fo3`, `db_nv`/`db_fo3`) drive everything — factions, skills, registries, databases, collectibles, theming, identity. New Vegas and Fallout 3 each get their own registries, bestiary, item data, default terminal colour, boot identity, and save-manager banner. Adding a future Fallout title is a data drop-in (a `GAME_DEFS` entry + its two data files), not a code rewrite.
+
+---
+
+## 🏛 The Museum
+
+There's a companion site that tells the _other_ story — not what the app does, but **how it was built and kept correct**: the workflow, the failures that turned into guards, the protocols and gates, and the reasoning behind each one. It's **generated from the project's own archive** (nothing hand-narrated) and browsable like an exhibit.
+
+**Live:** [robco-exhibit.pages.dev](https://robco-exhibit.pages.dev/) · **Source:** [zerckzzyHD/Robco-Exhibit](https://github.com/zerckzzyHD/Robco-Exhibit)
 
 ---
 
