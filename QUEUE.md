@@ -69,6 +69,11 @@ running history chain in
 
 ## Where we are right now (the real 5-second version)
 
+- **⏸ STATUS — DEVELOPMENT IS PAUSING (2026-07-24).** The owner's Claude subscription ends **~2026-07-25** and
+  he is **holding off renewing** until after an apartment application settles. The **museum publication was the
+  last milestone shipped** (P2 ✅ — live at https://robco-exhibit.pages.dev/). **On resume:** read the
+  `museum-publish-internal-docs-leak` memory **and this queue** to pick the thread back up. Nothing is
+  mid-flight or broken — this is a clean pause at a shipped milestone.
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
 - **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
@@ -94,19 +99,18 @@ running history chain in
   system" round. Its hardening gate (which burns down the baselined architecture debt) sits BEFORE the OS
   services that would otherwise multiply it.
 - **Then 3.0** — Fallout 4 as a real playable third game, bundled with the native ES-modules migration.
-- **The Museum is BUILT, its "Records Office Dark" visual identity has LANDED, and the Claude-first AUDIT has
-  now RUN.** (Bezel removed, vault-directory lobby, strip-chart growth, intent-vs-reality exhibit, bug room
-  wired to `bugs/*/record.md` — **10 records, not 11**; it fixed a real self-referential bug on the way in.)
-  The audit fixed **five self-audit defects** (operators stat, unclassified, redirect ledger, growth prose, a
-  stale comment) — **committed to the archive but still UNPUSHED** — and left a design regression for Fable
-  (gallery mats) plus a real "couldn't check actual pixels" gap. The **external-second** review (design note
-  e), reproducibility (P1), **contextual-return nav (P5)**, and publication (P2, post-release) are the
-  remaining museum work. **Two governing principles were recorded 2026-07-22 (owner):** CURATION is the
-  museum-wide law — **capture everything, exhibit a curated subset** — with the **Visual Web (the "Magnum
-  Opus") its ONE exemption** (complete-but-navigable, not curated); both under P. **And three
-  intent-vs-reality publication blockers were verified** (images escape the served site, captures are
-  working-tree not release-pinned, exhibit is incomplete) — the **release-pinned capture pipeline is the next
-  museum build**, and the next audit must serve-and-look, not check on-disk (under P2).
+- **✅ The Museum is PUBLISHED & LIVE (2026-07-24) at https://robco-exhibit.pages.dev/ (P2 done).** "Records
+  Office Dark" identity landed; the Claude-first audit ran and its **five self-audit defects are fixed AND
+  pushed** to the archive; the capture pipeline + reproducibility (P1) landed; the **three intent-vs-reality
+  blockers are all CLOSED** (images bundled in-site, captures release-pinned, exhibit a finished 3-pair
+  curation); the `--public` self-contained tree was name-scrubbed, verified zero-leak, and exposed via a fresh
+  public repo (`Robco-Exhibit`, zero archive history) on Cloudflare Pages. **Remaining museum work is all
+  POST-launch / parked:** the **external-second** review (design note e), **contextual-return nav (P5)**, the
+  **AI-collaboration exhibit (P6)**, and the new parked follow-ups **P7** (origin-overview exhibit), **P8**
+  (story-material synthesis audit), **P9** (intent-vs-reality curation/photo fix) — plus the Fable Direction-B
+  - gallery-mats design polish. **The two governing principles recorded 2026-07-22 (owner) stand:** CURATION is
+    the museum-wide law — **capture everything, exhibit a curated subset** — with the **Visual Web (the "Magnum
+    Opus") its ONE exemption** (complete-but-navigable, not curated); both under P.
 - **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21; R11 moved before the ship the
   SAME day, owner's call):** **R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas
   built in.** The one-line why: fix the docs every session is forced to read FIRST, then build the graph that
@@ -438,7 +442,11 @@ the machine that runs it (the Firestore/Auth emulators are Java processes) was *
 which is why this was deferred — but the **owner confirmed 2026-07-23 that a JDK (version 25) is now
 installed**, so the hard environmental blocker is gone. The **only remaining setup is `firebase-tools` as a
 DEV-ONLY** dependency (`npm i -D firebase-tools`) — which must never enter `sw.js`'s precache set or ship to
-users, and runs fully offline at the gate.
+users, and runs fully offline at the gate. **⚠ Half-installed as of 2026-07-24:** `firebase-tools@^15.24.0`
+is present in the app repo's `package.json` + `package-lock.json` but those changes are **uncommitted in the
+working tree** (they landed while other work was in flight and were deliberately left unstaged). On resume,
+finish this deliberately: decide whether to commit the dev-dependency (it is dev-only, never served) as the
+first step of actually building A4.
 
 **What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
 run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
@@ -624,7 +632,10 @@ reasoning) with prominent stable **ID badges**, long section prose behind a **"c
 horizontal overflow, filter/collapse/nav all work), and guarded by **Suite 246** (parser + markdown-render
 
 - determinism, incl. red-then-green locks for the double-backtick and wrapped-bold render bugs found during
-  verification). **⛔ The player-facing opt-in view is NOT built** — L's own ruling defers it (below).
+  verification). **⏳ Awaiting the owner's own phone eyeball:** the 360px verification was done by Dispatch
+  against the rendered DOM (no horizontal overflow, filter/collapse/nav all work) — the owner has **not yet
+  opened it on his actual phone** and given the "yes this reads right" sign-off, which is why L stays 🔄 rather
+  than ✅. **⛔ The player-facing opt-in view is NOT built** — L's own ruling defers it (below).
 
 **What it is.** `QUEUE.md` is the file the owner steers the project from — generate an HTML view of it that
 reads comfortably on a phone. _(Note: this restructure and the new [`QUEUE_LOG.md`](QUEUE_LOG.md) split
@@ -1818,7 +1829,15 @@ below is done and committed.
   host-specific `_redirects` file — is now verified by a real open-and-click pass, not assumed from the HTTP
   check alone.
 
-**P2. ⬜ Museum publication — not yet exposed, but BUILD-COMPLETE: curation decided (B), the `--public` staging tree is self-contained + publication-quality (serve-and-look re-audit passed), and the name-sub + secret-scan safety machinery is built and proven. What remains is the owner's turnkey expose checklist (below).**
+**P2. ✅ Museum publication — PUBLISHED & LIVE (2026-07-24). The full build-complete → expose path is done; everything below is kept intact as the record of HOW it shipped.**
+
+**✅ PUBLISHED & LIVE (2026-07-24).** The museum is public at **https://robco-exhibit.pages.dev/** (Cloudflare
+Pages), served from a **brand-new public repo `github.com/zerckzzyHD/Robco-Exhibit`** built from generated
+output only — **zero archive history** (the private archive was never made public). The exposed tree was
+**name-scrubbed and verified zero-leak** and **alias-authored** (exhibit commit `2fc7b14`). The Exhibit repo's
+GitHub **About (description + homepage) is set**, and the **Robco-UOS README has a Museum section** linking the
+site + repo (app-repo commit `1f0ed7c`). The turnkey checklist below was executed end-to-end. **On resume,
+read the `museum-publish-internal-docs-leak` memory** for the publication lesson to carry forward.
 
 - **Timing, locked:** after the 2.8.5 release, before 2.9.0.
 - **A brand-new public repo, `Robco-Exhibit`, built from generated output only.** The private archive can
@@ -1945,11 +1964,14 @@ mechanical checklist:
 6. **Verify-private-then-expose** — verify the pushed commit privately, then expose that same already-verified
    commit publicly.
 
-**The owner does steps 5–6 (Cloudflare + go-live) himself, targeting tomorrow/Saturday.**
+**✅ DONE (2026-07-24) — all six steps executed; the owner ran the Cloudflare + go-live himself.** Live at
+https://robco-exhibit.pages.dev/.
 
-**Pre-public design polish still owed (not an expose blocker, but wanted before it looks finished):** the
-**Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — a public exhibit
-is the wrong place to discover the visuals are flat.
+**Pre-public design polish still owed (NOT an expose blocker — the site is already live; wanted for polish):**
+the **Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — and the
+**intent-vs-reality curation/photo fix** now filed as its own follow-up below (the live Load-Cell Weigh Bridge
+pair doesn't foreground the detail its caption describes). A public exhibit is the wrong place to discover the
+visuals are flat — these are the post-launch polish pass.
 
 **Off the publish path (decoupled — see the de-gate clarification under design note e):** the **external second
 audit** and the **memory audit-and-split** it needs are the **external-audit path only**, NOT a publication
@@ -2190,6 +2212,52 @@ the same PUBLIC/PRIVATE boundary P2's memory split already has to resolve.
 sourced from orchestrator memory (not hand-curated), telling the Fable/Opus/Sonnet + blind-external-review
 story with Gemini's Review Mode as evidence it's a standing capability; the owner's personal context stays
 excluded by the same boundary P2's memory split enforces.
+
+### P7. ⬜ Origin-overview exhibit — the beginnings + the pivot as a turning-point centerpiece (PARKED, not started; owner floated 2026-07-24)
+
+**What it is.** A museum exhibit telling the project's ORIGIN arc: the **beginnings** (it started as
+`GEM-Website`, living on OneDrive) → **the pivot** (moved to `C:\Dev`, and the toolchain switched from
+Antigravity to Claude Desktop — after which **development time dropped hard**, i.e. the project got much
+faster). The pivot is the **turning-point narrative** — the single "everything changed here" beat the origin
+story pivots around, not a flat timeline.
+
+**Why it's exhibit-worthy.** It's the human "how did this even start" that the release-history exhibits don't
+carry, and it pairs naturally with the museum's failure→lesson→improvement thesis (the pivot IS an
+improvement arc at the tooling level). **Recorded as a parked candidate — not designed, not built.**
+
+### P8. ⬜ Story-material synthesis audit — gather/organize EVERY story beat the museum can draw from (PARKED, not started; owner, 2026-07-24)
+
+**What it is.** A pass that **gathers, organizes, and synthesizes literally every story beat** the museum
+could ever draw from, into one curatable corpus, so the owner curates the exhibits from the FULL material
+rather than whatever a session happens to remember. **Scope (owner's words): "literally everything story-wise,
+no lookup-able PII."** Sources to sweep: orchestrator **memory**, `planning/`, the **bug→guard** records, the
+**graveyard**, the archive **audits**, **`QUEUE_LOG.md`**, and every **protocol's origin incident**.
+
+**Explicit beats to fold in (named so they aren't lost):**
+
+- The **OneDrive/Antigravity pivot** (the P7 origin arc — the two are related; P8 is the corpus, P7 is one
+  exhibit drawn from it).
+- The **wrong-tool incident**: a git/deploy task was launched as a **sandboxed Dispatch** session that
+  **couldn't push** (no network route / no `gh` / no Chromium), had to be **re-routed to an on-machine Code
+  session**, and the lesson **became a rule** (know the execution tier before dispatching git/deploy work).
+- The **development PAUSE** for the **apartment move / subscription frugality** (see the STATUS note up top) —
+  an honest "the project stopped for real-life reasons" beat.
+
+**Why it's the enabling prerequisite.** Curation ("capture everything, exhibit a curated subset") only works
+if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
+task. **Recorded as a parked candidate — not started.**
+
+### P9. ⬜ Intent-vs-reality curation/photo fix — the live Load-Cell Weigh Bridge pair (PARKED, curation polish; owner, 2026-07-24)
+
+**What it is.** A **curation polish** on the now-LIVE intent-vs-reality exhibit: the **Load-Cell Weigh Bridge**
+pair shows **full-screen mockups that don't foreground the load-cell detail the caption describes** — the
+images render fine and the site is self-contained (this is **not** a broken-image or self-containment defect),
+but the **pairing/framing just doesn't sell the comparison** the caption promises. Fix by re-curating /
+re-framing the pair (a tighter crop or a better-matched shot) so the exhibited detail matches the words.
+
+**Why it's parked, not urgent.** The site is already public and correct; this is post-launch polish, filed
+alongside the Fable Direction-B + gallery-mats polish under P2's "pre-public design polish" (now post-public).
+**Recorded as a parked follow-up — not started.**
 
 ---
 
