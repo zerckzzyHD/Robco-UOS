@@ -51027,12 +51027,22 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
   const fixtureMemDir242 = path.join(fixtureBase242, 'guidA', 'guidB', 'agent', 'memory');
   try {
     fs.mkdirSync(fixtureMemDir242, { recursive: true });
+    // The fixture descriptions MUST use invented nonsense tokens that can never
+    // appear in the real QUEUE.md — the drift-check matches a memory's distinctive
+    // description tokens (substring) against QUEUE.md, and treats 3 hits as
+    // "referenced." The original "telemetry dashboard rewrite" wording scored 2/8
+    // by chance and later flipped to 3/8 when the real "Vital Telemetry" museum
+    // exhibit pair name legitimately entered QUEUE.md (2026-07-24), silently
+    // breaking 242.9 (Protocol 42: fixed here rather than distorting real content).
+    // Purely-invented tokens keep both the RED (unqueued → flagged) and the
+    // EXEMPT (excluded only by its flag, NOT by coincidental reference) honest,
+    // independent of whatever words QUEUE.md accumulates.
     fs.writeFileSync(
       path.join(fixtureMemDir242, 'unqueued.md'),
       [
         '---',
         'name: fake-unqueued-plan-242',
-        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, discussed but never written down anywhere else.',
+        'description: Zorptronic flangewidget vortexlattice snorfleplane quuxbeam glyphrasterizer calibrothingy blimflarnery grintwaddle plonktastic.',
         'metadata:',
         '  type: project',
         '---',
@@ -51046,7 +51056,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       [
         '---',
         'name: fake-exempt-plan-242',
-        'description: A speculative telemetry dashboard rewrite using WebGL shaders for particle rendering, deliberately marked not queue-worthy.',
+        'description: Wibblesprocket thrumbolic quaffnizzle plundercog snarfwidget frobnistcalibrator gleamsprong hodgepodgery zibblenaut, deliberately marked not queue-worthy.',
         'metadata:',
         '  type: project',
         '  queue_status: not-applicable',

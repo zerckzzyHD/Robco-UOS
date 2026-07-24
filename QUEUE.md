@@ -69,11 +69,15 @@ running history chain in
 
 ## Where we are right now (the real 5-second version)
 
-- **⏸ STATUS — DEVELOPMENT IS PAUSING (2026-07-24).** The owner's Claude subscription ends **~2026-07-25** and
-  he is **holding off renewing** until after an apartment application settles. The **museum publication was the
-  last milestone shipped** (P2 ✅ — live at https://robco-exhibit.pages.dev/). **On resume:** read the
-  `museum-publish-internal-docs-leak` memory **and this queue** to pick the thread back up. Nothing is
-  mid-flight or broken — this is a clean pause at a shipped milestone.
+- **⏸ STATUS — DEVELOPMENT IS PAUSING for a LONG gap (2026-07-24).** The owner's Claude subscription ends
+  **~2026-07-25** and he is **holding off renewing** until after an apartment move settles — expect a
+  **multi-week gap (renewal ~next month)**, so a returning session is coming back **cold** and should treat
+  anything time-sensitive as stale until re-checked. The **museum publication was the last milestone shipped**
+  (P2 ✅ — live at https://robco-exhibit.pages.dev/). **On resume:** read the `museum-publish-internal-docs-leak`
+  memory **and this queue** to pick the thread back up. Nothing is mid-flight or broken — this is a clean pause
+  at a shipped milestone. **The clearest first-thing-back items are pre-diagnosed and ready:** A4 (finish the
+  `firebase-tools` half-install), L (owner's own phone eyeball of the queue view), and P9 (the intent-photo
+  framing crop).
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
 - **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
@@ -107,7 +111,7 @@ running history chain in
   public repo (`Robco-Exhibit`, zero archive history) on Cloudflare Pages. **Remaining museum work is all
   POST-launch / parked:** the **external-second** review (design note e), **contextual-return nav (P5)**, the
   **AI-collaboration exhibit (P6)**, and the new parked follow-ups **P7** (origin-overview exhibit), **P8**
-  (story-material synthesis audit), **P9** (intent-vs-reality curation/photo fix) — plus the Fable Direction-B
+  (story-material synthesis audit), **P9** (intent-vs-reality framing fix — pre-diagnosed) — plus the Fable Direction-B
   - gallery-mats design polish. **The two governing principles recorded 2026-07-22 (owner) stand:** CURATION is
     the museum-wide law — **capture everything, exhibit a curated subset** — with the **Visual Web (the "Magnum
     Opus") its ONE exemption** (complete-but-navigable, not curated); both under P.
@@ -1969,9 +1973,10 @@ https://robco-exhibit.pages.dev/.
 
 **Pre-public design polish still owed (NOT an expose blocker — the site is already live; wanted for polish):**
 the **Fable Direction-B design execution + the gallery-mats fix** (both recorded above under P) — and the
-**intent-vs-reality curation/photo fix** now filed as its own follow-up below (the live Load-Cell Weigh Bridge
-pair doesn't foreground the detail its caption describes). A public exhibit is the wrong place to discover the
-visuals are flat — these are the post-launch polish pass.
+**intent-vs-reality FRAMING fix (P9, pre-diagnosed)**: the three live pairs each show the full console screen
+while their captions call out one element, so the comparison doesn't pop; the fix is a per-pair crop (see P9
+for the full diagnosis). A public exhibit is the wrong place to discover the visuals are flat — these are the
+post-launch polish pass.
 
 **Off the publish path (decoupled — see the de-gate clarification under design note e):** the **external second
 audit** and the **memory audit-and-split** it needs are the **external-audit path only**, NOT a publication
@@ -2247,17 +2252,32 @@ no lookup-able PII."** Sources to sweep: orchestrator **memory**, `planning/`, t
 if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
 task. **Recorded as a parked candidate — not started.**
 
-### P9. ⬜ Intent-vs-reality curation/photo fix — the live Load-Cell Weigh Bridge pair (PARKED, curation polish; owner, 2026-07-24)
+### P9. ⬜ Intent-vs-reality FRAMING fix — crop each pair to the element that changed (PARKED, PRE-DIAGNOSED; owner, 2026-07-24)
 
-**What it is.** A **curation polish** on the now-LIVE intent-vs-reality exhibit: the **Load-Cell Weigh Bridge**
-pair shows **full-screen mockups that don't foreground the load-cell detail the caption describes** — the
-images render fine and the site is self-contained (this is **not** a broken-image or self-containment defect),
-but the **pairing/framing just doesn't sell the comparison** the caption promises. Fix by re-curating /
-re-framing the pair (a tighter crop or a better-matched shot) so the exhibited detail matches the words.
+**What it is.** A **framing fix** on the now-LIVE intent-vs-reality exhibit so its "here's exactly what changed"
+comparison actually pops. (Header was "curation/photo fix" — sharpened to FRAMING after the diagnosis below.)
 
-**Why it's parked, not urgent.** The site is already public and correct; this is post-launch polish, filed
-alongside the Fable Direction-B + gallery-mats polish under P2's "pre-public design polish" (now post-public).
-**Recorded as a parked follow-up — not started.**
+**⭐ PRE-DIAGNOSED (Dispatch, 2026-07-24) — recorded so a future session does NOT re-diagnose from scratch.**
+Dispatch investigated the live exhibit + `museum/accounts/intent-pairs.json`. Verdict: **the pairing, the
+images, and the captions are all CORRECT — nothing is broken or mismatched.** The three pairs — **PL.I
+Operations / Load-Cell Weigh Bridge**, **PL.II Operator / Vital Telemetry**, **PL.III Chassis / Hour Meters** —
+use the **right design mockups** (`planning/2.8.0/mockups/{operations,nv-machine,chassis-core}-412.png`, bundled
+to `assets/intent/`) matched to the **right release-pinned captures** (`fnv-{operations,operator,chassis}-412`
+from `reality-captures.json`, in `assets/reality/`), each with its hand-written divergence note. Images render
+fine and the site is self-contained — this is **NOT** a broken-image or self-containment defect.
+
+**The real issue is FRAMING, not content.** Both sides of every pair show the **FULL console screen**, while
+each caption calls out **one specific element** (the load-cell dial / the vitals block / the hour-meters). So
+the eye can't find the thing the words describe, and the "exactly what changed" comparison doesn't sell.
+
+**The fix, and its true size.** **Crop each pair down to the element that changed** so the exhibited detail
+matches its caption. This is **per-pair design / image work — NOT a small tweak** (three crops, each judged
+against its caption), which is exactly why it was **deliberately PARKED (owner's call, 2026-07-24) rather than
+rushed into the subscription lapse.**
+
+**Status.** The site is already public and correct; this is post-launch polish, filed alongside the Fable
+Direction-B + gallery-mats polish (P2's "pre-public design polish", now post-public). **Recorded as the
+pre-diagnosed, FIRST-THING-BACK museum fix — not started.**
 
 ---
 
