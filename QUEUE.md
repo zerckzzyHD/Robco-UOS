@@ -1450,6 +1450,25 @@ narrowing back to "app history."**
    FLOATED candidate, not a queued commitment:** no build, no design decided here; captured so the idea isn't
    lost.
 
+   **⭐ THE CONNECTIONS MAP — the concrete inventory + the plan to unify it (owner, 2026-07-25; part of this
+   facet).** Recorded so the connection-layer builds from what EXISTS, not a wish:
+   - **ALREADY BUILT (the edges that exist today):** **R11** (the knowledge graph — `routes_to` /
+     `claims_scope_over` across skill → `CLAUDE.md` → retrieval map → `rules/*.md` → `ARCHITECTURE.md`, with
+     drift surfaced as data); **bug ↔ guard** (each bug record links to the guard it produced); **protocol ↔
+     origin-bug** (each protocol born from a real bug); **provenance** (every fact links to its commit); the
+     **retrieval map** (file → rule-note); and the artifact relationships (**queue ↔ log, `memory/` ↔ museum,
+     library ↔ code, archive ↔ app**).
+   - **PLANNED to complete the web:** the **Atlas (item I)** — guards → tests assurance; **⭐ the
+     stable-identifier scheme (R10 finding I)** — the identity contract that lets these separate graphs
+     REFERENCE each other with durable IDs, the **KEY enabler** and the literal "link, don't fuse" mechanism;
+     **P3**'s supersession / rejection links; **R11's topology + query-answerer** views; and the **Visual Web
+     (the Magnum Opus)** — the unifying render.
+   - **THE PLAN-TO-CONNECT (record it plainly):** the pieces exist today as **SEPARATE graphs**; the unifying
+     move is **(1) stable IDs (R10 finding I) → (2) each graph references the others via those IDs → (3) the
+     Visual Web renders the union.** This **IS** facet 2's own "ONE GRAPH, MANY VIEWS / link, don't fuse,"
+     now with a concrete build order. **Design-intent only — not built; the real inventory that feeds it is
+     P8's connection map (Part A scope expansion).**
+
 3. **The "green that lied" room.** The project's hardest-won lesson: checks that passed while meaning
    nothing — the cache guard comparing the wrong branch, tests asserting source text rather than behavior, the
    fake level-up popup, the museum's own "Operators 3" miscount, the header mangle passing the formatter, the
@@ -1651,6 +1670,20 @@ dark instrument windows.
 - **The right vehicle was a FABLE design pass, already run** for this identity comparison; execution against
   Direction B should still happen **BEFORE publication (P2)**, not after — a public exhibit is the wrong place
   to discover the visuals are flat.
+
+**⭐ Design direction — archive-native navigation + fluid motion (NEW museum design note, owner 2026-07-25).**
+The current room-nav uses RobCo/terminal **"keycap" buttons** — a **terminal-language holdover that fights the
+archive aesthetic** the museum deliberately chose. The direction: **break to ARCHIVE-NATIVE navigation** —
+**catalog cards / filing drawers that pull-slide open**, a card that **expands smoothly INTO its room** rather
+than a hard page jump. **KEEP the Records Office Dark identity** (this is not a re-theme); change the
+**EXPERIENCE to fluid / smooth** — real **motion BETWEEN rooms** (cross-fades / slides, so it feels like
+walking a hall), with **ambient motion as the draw**. **Possibly a continuous "archive floor"** the visitor
+**pans / scrolls** rather than discrete gated rooms — which also **sets up the Visual Web's living-surface
+feel** (facet 2). **Rails (unchanged, load-bearing):** the **clarity veto governs** (fluid ≠ confusing),
+**mobile-first**, **no build step, animated SVG/CSS only**. **How it gets designed:** the actual look is a
+**FABLE design pass fed by P8's structure/room map** (the audit's layout blueprint, Part A) — **NOT a GPT
+critique** (GPT can't see the private material the map is built from). **Design-intent capture only — not
+built.**
 
 **⬜ Design note (d) — the museum as FRONT DOOR: endorsed with hard limits, and THREE audiences not two
 (knowledge-architecture audit R10, findings J + K, 2026-07-21).** The museum **can** be the human front door to
@@ -2230,7 +2263,7 @@ story pivots around, not a flat timeline.
 carry, and it pairs naturally with the museum's failure→lesson→improvement thesis (the pivot IS an
 improvement arc at the tooling level). **Recorded as a parked candidate — not designed, not built.**
 
-### P8. ⬜ Story-material synthesis audit — gather/organize EVERY story beat the museum can draw from (PARKED, not started; owner, 2026-07-24)
+### P8. ⬜ Story-material + STRUCTURE synthesis audit — the story corpus AND the room/structure/connection map (PARKED, not started; owner, 2026-07-24, scope-expanded 2026-07-25)
 
 **What it is.** A pass that **gathers, organizes, and synthesizes literally every story beat** the museum
 could ever draw from, into one curatable corpus, so the owner curates the exhibits from the FULL material
@@ -2278,9 +2311,24 @@ project.** The ONE deliberate omission is **SCALE** (the 1,000-agent swarm): a s
 principled, not accidental.** **Owner's words, preserved:** _"all these guides are out there yet we've already
 done it all without a guide — just me and you."_
 
+**⭐ SCOPE EXPANSION (owner, 2026-07-25) — the audit is ALSO the layout blueprint, not just story content.**
+Beyond the story corpus, this audit must **catalog every existing museum ROOM + the whole site structure** —
+what each room holds and **how they connect** — so its output **doubles as the layout blueprint for a
+redesign** (feeding the archive-native nav design direction + the Fable pass under P), and must **map the
+CONNECTIONS** (the facet-2 connections map, Part C) so the connection-layer / Visual Web builds from a **real
+inventory** rather than a guess. **TWO OUTPUTS, then:** (1) the **story corpus** for curation; (2) the **room +
+structure + connection map** for the layout redesign and the Visual Web.
+
+**⚠ Run it as a CLAUDE session — NOT a GPT copy-paste.** The audit **must read the PRIVATE archive** (memory,
+`bugs/`, graveyard, audits, AND the built museum's own room/structure) to be real; GPT has **no access to that
+private material**, so a GPT pass would be inventing from a summary. A Claude session that can actually read
+the archive is the only honest way to run it — the same "Claude first, because it can EXECUTE / read the
+private material" reasoning as design note (e).
+
 **Why it's the enabling prerequisite.** Curation ("capture everything, exhibit a curated subset") only works
 if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
-task. **Recorded as a parked candidate — not started.**
+task — and now the **structure inventory** the redesign + Visual Web both need. **Recorded as a parked
+candidate — not started.**
 
 ### P9. ⬜ Intent-vs-reality FRAMING fix — crop each pair to the element that changed (PARKED, PRE-DIAGNOSED; owner, 2026-07-24)
 
