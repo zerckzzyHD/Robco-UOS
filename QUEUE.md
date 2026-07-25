@@ -2247,6 +2247,36 @@ no lookup-able PII."** Sources to sweep: orchestrator **memory**, `planning/`, t
   session**, and the lesson **became a rule** (know the execution tier before dispatching git/deploy work).
 - The **development PAUSE** for the **apartment move / subscription frugality** (see the STATUS note up top) —
   an honest "the project stopped for real-life reasons" beat.
+- The **independent-convergence arc** — a 2026 wave of external guides now teaches, as novel technique, the
+  multi-agent architecture RobCo had ALREADY built without a guide. (Full source map + thesis in the ⭐ block
+  directly below.)
+
+**⭐ A MUSEUM ARC — RobCo independently converged on (and on verification, EXCEEDS) the architecture the 2026
+guides now teach (owner observation, 2026-07-25).** A wave of external write-ups describes as _novel technique_
+the multi-agent architecture this solo, free-tier project had already built without a guide. Recorded as story
+material — **CITE + MAP the titles; NEVER dump external copyrighted content into the museum** (at most a short
+attributed quote; the mapping is ours):
+
+- **"Loop Engineering"** (qibaz, X, Jul 2026) → RobCo already has it: the **plan → implement → gate → audit
+  ratchet loop** plus the **self-improving gate** as the verification harness — the exact ingredient the
+  article says most people skip.
+- **"Graph Engineering"** (an 11-page synthesis of Karpathy's autoresearch ratchet-loop + AgentHub's "the DAG
+  IS the graph" + Anthropic's Knowledge-Graph cookbook; X, Jul 2026) → its staged path is **"one measured loop
+  → typed knowledge graph → graph-grounded swarm,"** where the graph externalizes shared facts / provenance /
+  cross-session memory and the evaluator checks claims against graph edges ("triple not found" beats "seems
+  off"). RobCo already has: **R11** (independently-derived typed edges; drift surfaces as data), the
+  **provenance discipline** (every fact links to its commit), **"green is scoped evidence, not proof,"** the
+  persistent **memory / queue / archive as the cross-session shared brain**, **git-worktree per-session
+  isolation**, and **`CLAUDE.md` / rules / protocols as the "program.md that programs the program."**
+- The earlier **second-brain / visual-brain / "the last prompt you'll write"** threads — same pattern, same
+  convergence.
+
+**The thesis point (why this is a museum ARC, not just a note).** RobCo **independently converged on** — and on
+the **verification harness, EXCEEDS** — the architecture these guides now teach, as a **solo, free-tier
+project.** The ONE deliberate omission is **SCALE** (the 1,000-agent swarm): a solo / free-tier / owner-control
+**choice, NOT a gap.** This is direct evidence for the self-maintaining-system thesis — **the discipline was
+principled, not accidental.** **Owner's words, preserved:** _"all these guides are out there yet we've already
+done it all without a guide — just me and you."_
 
 **Why it's the enabling prerequisite.** Curation ("capture everything, exhibit a curated subset") only works
 if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
