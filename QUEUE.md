@@ -2761,9 +2761,10 @@ including the release. Analysis only.
 
 ---
 
-# Unversioned — the standing rule (drawer holds ONE item)
+# Unversioned — the standing rule (the versionless drawer)
 
-_This section is the home of a standing queue convention, and currently of one genuinely-unversioned item._
+_This section is the home of a standing queue convention, and currently of two genuinely-unversioned items —
+each carrying its own explicit earn-condition, which is the drawer being used correctly (not a vague pile)._
 
 **THE RULE — nothing gets recorded without either a home or an explicit stated condition that would earn it
 one.** A version/section IS a home; so is being bound to a named item. When an entry has neither yet, it MUST
@@ -2803,6 +2804,40 @@ why this new item, carrying its own earn-condition, is the drawer being _used co
 - **Wire manual inventory changes into the event log** → **2.9.0**, bound to the inventory-panel rebuild +
   Terminal Record consolidation — its stated condition ("a pass that establishes native no-AI logging") was
   met there.
+
+### T. ⬜ Autonomous triggers / scheduled loops — opt-in, capped, owner-controlled (PARKED, design-intent only; owner, 2026-07-24)
+
+**What.** Give RobCo the one "loop-engineering" ingredient it lacks (the loop-engineering article, 2026-07-21;
+and the G-review "you are the cron job / no completion event" finding): a way for work to **START without the
+owner's message** — a **schedule (clock)** or an **event** — so recurring chores run on their own instead of
+waiting for a "yo."
+
+**Why.** Reduce the owner's babysitting of routine maintenance; let his limited attention + budget go to
+**decisions, not busywork.** Owner's framing, verbatim: _"just for making things easier on me sometimes — we
+wouldn't do it all the time."_
+
+**Scope + the guardrails that make it safe (LOAD-BEARING — the whole reason it's OK to build later):**
+
+- **OPT-IN per chore**, never blanket autonomy.
+- **SAFE / report / prep tasks ONLY by default** — e.g. an overnight health check (run the full gate, report
+  only if red), museum regen + the post-sync ritual (archive sync), queue-drift / stale-doc flagging,
+  refreshing the phone queue view (**L**) each morning, a "session finished" notification. **⛔ Consequential
+  actions (ship, deploy, delete, design/roadmap decisions) STILL require the owner's explicit go** — the
+  trigger does the legwork and PREPARES; the owner approves anything that matters. This preserves the same
+  player-control / owner-approval principle the rest of the project already runs on.
+- **CAPPED** — a spend limit, a single scheduled window, and a max-iteration cap, so it can never burn the
+  budget (the article's own "economics" caveat — and the exact reason the owner is pausing right now).
+
+**Feasibility (honest).** This environment already has a scheduling mechanism (a `schedule` skill /
+scheduled-tasks), so this is **buildable, not hypothetical.** ⚠ Real constraints to record: it only fires when
+the owner's machine (the **Ally**) is **ON**; it **consumes usage** (why the cap + selectivity matter); and an
+always-on runner ties to the **deferred spare-laptop idea** (the G-review owner-decision).
+
+**Earn-condition / status (why it sits in the drawer).** It has no version because it is **opt-in,
+activate-on-demand infrastructure**, not a release feature — it may never "ship" as a version; it gets turned
+on **selectively, per-chore, if/when the owner wants it.** The concrete condition to start ANY of it: **an
+explicit owner go for a specific chore**, with budget/subscription headroom. **PARKED — never start without
+that explicit go; NOT now (budget + subscription pausing).**
 
 Future unversioned items land here under the same rule, or they don't get recorded at all.
 
