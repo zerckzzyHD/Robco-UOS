@@ -51579,9 +51579,13 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   // These are all genuine ### headings in QUEUE.md. (P1/P2/P3 are **bold**
   // sub-notes inside P's body, not ### items, so they render within P's card —
   // the view faithfully reflects the source structure.)
+  // NOTE: this list hardcodes specific item IDs, which is fragile — an item
+  // closing/moving to QUEUE_LOG.md (as H did) breaks this fixture. A sturdier
+  // fix (asserting against a dynamically-sampled set of live ### ids rather
+  // than named ones) is left as a future task, not built here.
   assert(
-    ['H', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'D'].every(id => byId(id)),
-    '246.3: known ### item IDs (H, L, A3, R5, R10, P, C1, D) are all parsed from their headings'
+    ['R11', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'D'].every(id => byId(id)),
+    '246.3: known ### item IDs (R11, L, A3, R5, R10, P, C1, D) are all parsed from their headings'
   );
 
   // ── Status detection maps the five glyphs correctly (from live QUEUE.md) ──

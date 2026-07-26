@@ -34,7 +34,7 @@ _An AI-powered tactical companion terminal for Fallout: New Vegas **and** Fallou
 
 ## What Is This?
 
-RobCo U.O.S. is a standalone, browser-native web application that acts as a real-time tactical companion for **Fallout: New Vegas** and **Fallout 3** playthroughs. It tracks your character, inventory, factions, quests, and world state inside a fully immersive CRT terminal, and — when you want it — connects to the Google Gemini API to act as an AI game master that narrates your adventure and updates your sheet through strict, validated JSON.
+RobCo U.O.S. is a standalone, browser-native web application that acts as a real-time tactical companion for **Fallout: New Vegas** and **Fallout 3** playthroughs. It tracks your character, inventory, factions, quests, and world state inside a fully immersive CRT terminal, and — when you want it — connects to the Google Gemini API to act as an AI game master that narrates your adventure and updates your sheet through a strict, validated [Tri-Node JSON contract](#-the-ai-director-optional).
 
 It began as a Google Gemini Gem (a chat preset) and grew into a complete application with its own state engine, save system, cloud sync, procedural audio, and PWA install support.
 
@@ -42,7 +42,7 @@ It began as a Google Gemini Gem (a chat preset) and grew into a complete applica
 
 ### Two games, one engine
 
-Both games are first-class and fully data-driven. A single `GAME_DEFS` table plus per-game data files (`reg_nv`/`reg_fo3`, `db_nv`/`db_fo3`) drive everything — factions, skills, registries, databases, collectibles, theming, identity. New Vegas and Fallout 3 each get their own registries, bestiary, item data, default terminal colour, boot identity, and save-manager banner. Adding a future Fallout title is a data drop-in (a `GAME_DEFS` entry + its two data files), not a code rewrite.
+Both games are first-class and fully data-driven. A single `GAME_DEFS` table plus per-game data files (`reg_nv`/`reg_fo3`, `db_nv`/`db_fo3`) drive everything — factions, skills, registries, databases, collectibles, theming, identity. New Vegas and Fallout 3 each get their own registries, bestiary, item data, default terminal colour, boot identity, and save-manager banner. Adding a future Fallout title is a data drop-in (a `GAME_DEFS` entry + its two data files), not a code rewrite — see [Per-game data system](#per-game-data-system) below for how it's wired.
 
 ---
 
@@ -118,6 +118,8 @@ Nine capabilities, each with a graceful fallback when the device/browser doesn't
 | **Resilience**         | Bounded auto-retry with backoff, clear auth-error messaging, prompt-injection hardening, input caps                                                                                                                                                                 |
 | **Fully optional**     | The six native tools and the whole UI work with no key and no network                                                                                                                                                                                               |
 
+Full outbound/inbound request lifecycle: [ARCHITECTURE.md § AI Integration Pipeline](ARCHITECTURE.md#ai-integration-pipeline).
+
 ### 💾 Saves & Cloud
 
 - **Auto-save** (debounced localStorage), **A/B/C slots**, **file export/import** with version migration, **rolling backups** with FNV-1a checksums.
@@ -125,7 +127,7 @@ Nine capabilities, each with a graceful fallback when the device/browser doesn't
 - **Save version history** — each slot retains up to 5 prior revisions in IndexedDB (riding its headroom, never the localStorage ceiling); view and restore any earlier version from the saves list. Restoring is confirm-gated and takes a rolling backup first; if IndexedDB is unavailable the feature is simply not offered and save/load is unchanged.
 - **Full backup bundle** — a one-file "EXPORT FULL BACKUP" of your entire history (live campaign + all slots with their version rings + rolling backups + chat + playstyle), version-stamped and checksummed. IMPORT SAVE auto-detects a bundle and restores it — confirm-gated, integrity-checked (a bad or edited file is refused with no partial apply), and a rolling backup of your current state is taken first. Campaign/save data only — device preferences are never included (the two-store boundary holds).
 - **Read-side fail-loud save integrity (Layer 3)** — a save that can't be read at boot is **quarantined whole, never deleted**: the exact bytes are preserved (localStorage + a durable IndexedDB copy), a READ FAULT banner announces it every boot until resolved, and a QUARANTINED RECORD row in the saves list offers EXPORT (recover the raw data) and confirm-gated PURGE. A detected storage **eviction** (the browser reclaimed local data while the cold-storage boot marker survived) gets its own banner — gated behind a strict signature so a new visitor never sees a false alarm. Slot saves that only ONE of the two stores accepted post a once-per-session degraded-write notice instead of reporting plain success.
-- **Cloud sync** via Firebase Firestore — additive writes only (never a blind overwrite), confirm-gated destructive actions, Google sign-in (popup-only), anonymous boot, and a Gemini-key sync option.
+- **Cloud sync** via Firebase Firestore — additive writes only (never a blind overwrite), confirm-gated destructive actions, Google sign-in (popup-only), anonymous boot, and a Gemini-key sync option. Full save/load/sync mechanics: [ARCHITECTURE.md § Persistence Lifecycle](ARCHITECTURE.md#persistence-lifecycle).
 - **Offline cloud-push queue** — a manual "Save to Cloud" pressed while offline (or that fails on network) is queued device-locally and flushed automatically on reconnect. Retry-only: it _never_ auto-pushes on a state change — cloud sync stays a manual button. Bounded + contentHash-deduped (no duplicate cloud saves), uid-scoped, kill-switch-gated, and fully fail-safe (no IndexedDB / flag off → the button behaves exactly as before).
 - **Remote kill-switch** — a fail-open feature-flag config that can disable a networked feature remotely, always defaulting to last-known-good / features-enabled so it can never black-screen the app.
 
@@ -347,7 +349,7 @@ npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node r
 
 ### Quality Gate
 
-Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes, and the test count is kept in sync across every doc in the same commit.
+Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes. No test count is tracked anywhere — the runner's exit status is the only signal that matters (`CLAUDE.md`, Protocol 2a).
 
 ### Commit Workflow (dev-branch model)
 
@@ -364,32 +366,9 @@ git push origin dev # pre-push: full gate (+ Playwright + a11y + test.html)
 
 ## 📜 Project History
 
-<details>
-<summary><b>Full Evolution Timeline</b></summary>
+For the full history — how this went from a Google Gemini chat preset to a two-game physical RobCo terminal, the failures that turned into guards, and the reasoning behind each protocol — see [the Museum](https://robco-exhibit.pages.dev/) ([source](https://github.com/zerckzzyHD/Robco-Exhibit)). It's generated from the project's own archive, not hand-narrated.
 
-### Phase 1 — The Gemini Gem (v1.0 – v1.3)
-
-Began as a **Google Gemini Gem** — a system prompt that turned the Gemini chat into a Fallout: New Vegas game master, with all state tracked in the AI's context window via ASCII art.
-
-### Phase 2 — The Web Application (v1.4 – v1.5)
-
-Evolved into a standalone browser app: state offloaded to JavaScript, native Gemini API integration, the Tri-Node JSON contract, a modular file split, and PWA integration.
-
-### Phase 3 — The Living Machine (v1.6)
-
-Procedural audio, CRT visual effects, the 14-faction network, the save envelope + cloud sync, the quest log, and the wiki-sourced Fallout Data Registry + combat database.
-
-### Phase 4 — Two Wastelands & Self-Reliance (v2.0 – v2.7)
-
-The browser-native era: a second game (**Fallout 3**) added as a first-class, fully data-driven context; the six heavy tools (VATS, TRADE, THREAT, CONSULT, BIO-SCAN, LOOT) converted to **offline native calculators**; nine device capabilities; per-game theming + identity; a comprehensive accessibility pass; cloud auth + a remote kill-switch; a hardened PWA auto-update flow; and a self-improving test gate.
-
-### Phase 5 — The Physical Machine (v2.8)
-
-The device made physical: the whole UI reframed as a reactive RobCo terminal — an illuminated bezel subsystem selector in place of the tab bar, hardware-styled OPERATOR / OPERATIONS / DATABANK / CHASSIS screens, a living Director Uplink, and a reactive power core with tactile feedback animations across the terminal. Deeper offline self-reliance (native item **USE**, TERMINAL-mode stat edits, native GPS/PERKS/level-up, travel-here), on-device **Visual Upload OCR** with an AI-vision fallback, ceremony moments, tighter mobile density, and a staging-only Diagnostic Shell.
-
-</details>
-
-### Current State (v2.8.5)
+## Current State (v2.8.5)
 
 A **production-quality, two-game browser application** with:
 

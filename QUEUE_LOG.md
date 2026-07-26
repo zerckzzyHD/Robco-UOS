@@ -1003,6 +1003,35 @@ never updated after the fact:** the same day, this landed on `main` as the `v2.8
 verbatim. The only thing NOT automatable (the OS opening a browser from inside the PWA) is covered by the
 written steps, as the owner accepted. **S is fully shipped, on production, nothing left open.**
 
+<a id="h"></a>
+
+### H. ✅ CLOSED — the optional system-model review (owner-approved verdict, 2026-07-26)
+
+**Status: CLOSED, not run.** Ruled redundant rather than deferred further — the standing obligation H
+itself carried ("after G completes, Dispatch owes the owner an explicit yes/no on whether H is still worth
+running, with reasons") is discharged here.
+
+**What it was.** An OPTIONAL external review of the project's system MODEL (its representation of itself —
+the brain dump, the library, the docs a session actually reads to build its model of the project), kept
+small and question-scoped. It was never run; it sat DEFERRED pending G's results from 2026-07-21.
+
+**The verdict, and why.** H is redundant with two reviews that between them already cover what H asked:
+
+- **G** (the blind workflow review, [account](QUEUE_LOG.md#g)) — reviews the **PROCESS**: is the
+  three-model workflow pulling its weight, are the hand-offs clean, where does it leak.
+- **R10** (the external knowledge-architecture audit) — examined the **representation/retrieval layer**
+  itself: how the docs are structured, cross-referenced, and retrieved. This is the half of H's question
+  ("is your model of yourself accurate") that G's process focus does not reach, and R10 already covers it.
+
+**The one sliver H uniquely covered — raw brain-dump accuracy against the live codebase — is judged
+low-value post-2.8.5 re-baseline**: the brain dump was re-pinned against a clean, current commit at R4
+(2026-07-20), so a fresh accuracy pass over material that was just re-baselined returns little a session
+reading the code directly wouldn't already catch (per this repo's own standing rule that code beats
+documentation — Protocol 3).
+
+**Done means:** a yes/no on running H, with reasons, recorded and owner-approved. **✅ MET — no, not worth
+running; closed.**
+
 ---
 
 # Appendix — the original running "Last updated" header, verbatim

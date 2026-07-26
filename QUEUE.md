@@ -282,6 +282,10 @@ _End-of-round deliverable foundation:_
   shipped, all three owner-decisions settled). **⚠ One open thread survives: the R11 knowledge-graph gating
   question this review was asked to rule on was never actually addressed** — see R11 and the account below. →
   [account](QUEUE_LOG.md#g)
+- **H** ✅ CLOSED (owner-approved verdict, 2026-07-26) — the optional system-model review is redundant with
+  **G** (process, 3 reviewers) + **R10** (the knowledge-architecture audit, which examined the
+  representation/retrieval layer); the one sliver H uniquely covered — raw brain-dump accuracy — is
+  low-value post-2.8.5 re-baseline. → [account](QUEUE_LOG.md#h)
 
 _PWA / install UX:_
 
@@ -1010,37 +1014,6 @@ costly" — a judgment call replacing an automatic one.
 predicting which failures recur, and this project's own incident record is full of failures nobody
 predicted would recur until they did. Not marked ready to plan; each bullet needs the owner's explicit
 call, not a session's judgment substituting for it.
-
-### H. ⬜ DEFERRED pending G's results — the optional system-model review (owner-gated)
-
-**Status (decided 2026-07-21): DEFERRED PENDING G'S RESULTS — not dropped.** When H was written, the
-workflow-review prompt had no sections auditing the orchestrator, the multi-model hand-off, or the context
-sources; item **F** added exactly those. H asked "is your model of yourself accurate"; **G now asks that
-directly — with more evidence and three reviewers.** So Dispatch's assessment, which the owner accepted, is
-that H is now **largely redundant with G**.
-
-**The counter-argument, recorded so it isn't lost — they are NOT identical.** G reviews the **PROCESS** (is
-the three-model workflow pulling its weight, are the hand-offs clean, where does it leak). H reviews the
-**REPRESENTATION** — the brain dump, the library, the docs a session actually reads to build its model of the
-project. That is a real distinction, and it is why H is deferred rather than closed.
-
-**The standing obligation (written here, not remembered).** After **G completes**, Dispatch owes the owner an
-explicit **yes/no on whether H is still worth running, with reasons** — did G's process review leave the
-representation genuinely unexamined, or cover enough of it that a separate H would be ceremony? This
-obligation lives in H's own entry rather than in the orchestrator's memory on purpose: promises kept only in
-memory are exactly the failure this project spent all night (Protocol 50) fixing.
-
-**What it is (unchanged).** An OPTIONAL external review of the project's system MODEL (its representation of
-itself), kept **small and question-scoped** (a large-context review degrades and tends to adopt your own
-errors rather than catch them).
-
-**What it depends on.** G's results first (the deferral above), then a **portable brief generated fresh from
-the now-pinned brain dump** (the §20 spec in the brain dump) — that foundation is available now. It is **not**
-a standing doc: generated fresh each time so it's always accurate because it's always new.
-
-**Done means (if run):** a small, question-scoped external pass returns findings in the required claim →
-provenance → falsification format — OR Dispatch's post-G recommendation is that it isn't worth running, with
-reasons recorded.
 
 ## ⬜ Blocked on another item
 
