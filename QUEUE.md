@@ -278,6 +278,17 @@ _End-of-round deliverable foundation:_
 
 - **F** ✅ The four process refreshes — the standing workflow-review prompt brought fully current (the input
   G reviews). → [account](QUEUE_LOG.md#f)
+- **G** ✅ The blind workflow review — FULLY RESOLVED (claim-ledger built + verified, all (a)/(b) fixes
+  shipped, all three owner-decisions settled). **⚠ One open thread survives: the R11 knowledge-graph gating
+  question this review was asked to rule on was never actually addressed** — see R11 and the account below. →
+  [account](QUEUE_LOG.md#g)
+
+_PWA / install UX:_
+
+- **S** ✅ PWA install discoverability + the guided FO3 reinstall flow (Option 1) — shipped to `dev`
+  2026-07-22 **and confirmed on PRODUCTION the same day** via the `v2.8.5-r6` hotfix merge to `main`
+  (corrects the file's prior "nothing on production yet" note, which was never updated after the hotfix
+  landed). → [account](QUEUE_LOG.md#s)
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
@@ -509,119 +520,6 @@ plumbing rather than inventing it twice.
 **Done means:** the catalog's per-suite content is regenerated from the runner and gate-checked against its
 committed copy; no human hand-edits it again.
 
-### G. ✅ The blind workflow review — FULLY RESOLVED (2026-07-23)
-
-**What it is.** A blind (independent, no-peeking-at-the-answer) review of the Dispatch three-model workflow
-— is Fable/Opus/Sonnet actually pulling its weight, are the hand-offs clean, where does the process leak
-or waste.
-
-**What it depends on.** The four refreshes (F, now ✅) — that's the whole reason F sits in front of it.
-
-**New evidence for this review (2026-07-21).** A concrete session-management failure nothing in the documented
-process anticipated: **concurrent sessions can fail each other's gates through the shared working directory**
-(the full pre-push gate runs `npx eslint .` over the whole tree, so a concurrent session's untracked scratch
-file failed another session's push while its commit had passed), and a Protocol 41 junk sweep **deleted a live
-concurrent session's scratch files**. It **complicates the worktree-isolation claim** the workflow prompt
-asserts. Recorded in `planning/_standing/WORKFLOW_REVIEW_PROMPT.md` §7 for the review to attack.
-
-**The model roster — decided 2026-07-20, recorded here per Protocol 50 because it had lived only in
-conversation.** The review still goes blind to **GPT-5.6 Sol** and **Gemini 3.1 Pro Extended**
-independently, then Dispatch synthesizes. Added for this ONE review: **DeepSeek as a third WITNESS, not a
-third judge** (GPT's framing, endorsed) — its value is only realized if its dissent is preserved and
-answered, never smoothed into consensus. Hard rules on it, none negotiable:
-
-- **Free, hosted chat/app only — never the token-billed API.** A free hosted service can change terms or
-  vanish, so it is **never a required gate**, only ever an extra witness.
-- **Not run locally** — the Ally can't host anything worth hosting, and the local-model slot was already
-  tested and rejected (ripgrep beat a local model on both speed and accuracy; see the workflow prompt §13).
-- **Privacy fence:** DeepSeek's free tier retains inputs and may train on them, processed in China — so it
-  gets the **workflow description ONLY**, never repo contents, archive/memory, keys, or museum internals.
-  The send-time cut strips §14 and anything repo-identifying from the prompt.
-
-**The claim-ledger artifact — GPT's proposal, with the owner-approved amendment.** GPT proposed a ledger of
-unique claims, disagreements, supporting evidence, evidence-needed-from-the-repo, and status. **The
-amendment the owner approved: it must be a COMMITTED FILE IN THE REPO, not held in Dispatch's context** —
-otherwise it is exactly the unchecked-summary problem GPT's own asymmetry question identifies, and it dies
-the moment Dispatch's context ends.
-
-**A rejected proposal, kept as a calibration specimen.** Gemini proposed replacing Dispatch itself with
-DeepSeek-V3-as-dispatcher on speed/cost grounds. Rejected: it described a workflow the owner doesn't have,
-priced the argument in API tokens when the constraint was _staying free_, and hallucinated unrelated
-context. It's the clean specimen of the failure this review must guard against — a confident, well-written
-answer to a question nobody asked — and is carried into the prompt (§16) as a worked example.
-**Model-version caution:** cited DeepSeek figures are past the orchestrator's knowledge cutoff and are
-vendor claims; the owner verifies the current free offering himself before relying on any advertised
-capability.
-
-**Honest note on how these decisions reached this file (Protocol 50 in its own mirror).** The DeepSeek
-roster call and the claim-ledger amendment were both made _in conversation_ and sat unrecorded for hours —
-a Protocol 50 violation on the same day Protocol 50 shipped. The automated queue-drift nudge did not catch
-it, and couldn't: it flags `type: project` memories the queue doesn't reference, so it catches memory↔queue
-drift, not **conversation↔queue** drift.
-
-**R11 cross-reference (2026-07-21).** The knowledge-graph minimum version (R11) ships deliberately un-gated —
-whether/when it should earn veto power (a Suite, a hook) is exactly the kind of process question this review
-should rule on, and the graph itself doubles as evidence for the reviewers here. See R11's own note; not
-resolved in either place yet.
-
-**Done means:** a verdict on the workflow with concrete, checkable findings, run against the current
-(refreshed) process; synthesized into a committed claim-ledger file; with DeepSeek's dissent preserved and
-answered rather than averaged away.
-
-**REVIEW RUN + REMEDIATION UNDER WAY (2026-07-23).** All four sources are in
-(`planning/audits/G_workflow_review/sources/` — GPT-5.6 Sol verbatim, Gemini 3.1 Pro, DeepSeek witness,
-Claude/Dispatch), and the committed claim-ledger is built and repo-verified:
-`planning/audits/G_workflow_review/CLAIM_LEDGER.md` (source-owned IDs, a disposition for every finding,
-`file:line` evidence pointers, the spare-laptop dissent preserved as an owner-decision, and the
-known-limitation — Dispatch is structurally the transcriber on this platform — labeled unsolved). NOTE:
-the whole `G_workflow_review/` folder is under gitignored `planning/`, so it is durably preserved via the
-Protocol 48 archive sync, not committed to the public repo (the ledger's own privacy placement is
-deliberate — it critiques internal orchestration).
-
-- ✅ **CLAIM A/C/D — CLOSED (the #1 confirmed+cheap+high-value fix).** The gate lint no longer runs
-  `eslint .` over the whole working directory; it lints the **git-tracked manifest** (the files actually
-  being committed/pushed) via `scripts/gate-lint-manifest.js`, on both the fast (commit) and full (push)
-  gate. A concurrent session's untracked scratch file can no longer fail an unrelated push. Proven
-  red-then-green (untracked scratch present → gate PASSES; a tracked lint error still FAILS) and locked by
-  **Suite 244**. Protocol 41's deletion clause is rewritten concurrency-safe: delete only files THIS session
-  created; surface all other untracked files, never delete while another run may be live. Cache `-r7 → -r8`;
-  `APP_VERSION` unchanged.
-- ✅ **The (b) governance bundle — CLOSED (2026-07-23).** The rules-layer changes from the ledger's §4(b)
-  are landed in `CLAUDE.md` + `rules/`: **Protocol 51** codifies the Dispatch authority boundary in three
-  clauses — (a) proposals-are-hypotheses (edge-enforced: a repo-aware session records accept/change/reject
-  for each Dispatch-origin hypothesis before implementing), (b) memory-is-a-locator-not-evidence, and
-  (c) the grep-able `### DISSENT` block Dispatch must surface rather than smooth away. **Protocol 36(b)** is
-  rewritten as a causal-response bar (permanent enforcement only when the failure can realistically recur,
-  at the correct layer, zero false positives, tests the shipped artifact, cheaper than the recurrence — a
-  new guard's record must name incident/why-not-the-direct-fix/enforcement-point/FP-analysis/cost/retire
-  condition), keeping Protocol 49 as the complement and Protocol 13/42 as the demonstrated-recurrence cases.
-  **`rules/memory-restore.md`** is the new fresh-Dispatch rehydrate runbook (Protocol 48's restore
-  complement — CLAIM V), wired into the retrieval map + pointer index. No cache bump / no `APP_VERSION`
-  change (internal governance docs, not served); no CHANGELOG entry (not user-facing).
-- ✅ **The (a) "now" bucket — CLOSED (2026-07-23).** The last (a) item, the **post-deploy release receipt**
-  (CLAIM M — "pushed ≠ live"), shipped as `scripts/release-receipt.js` / `npm run release-receipt`: it
-  fetches the LIVE prod build and asserts the served `CACHE_NAME` (sw.js) + `APP_VERSION` (js/core/state.js)
-  match the deployed commit; a mismatch FAILS loudly (the silent-stale-SW class). It is a **manual
-  post-deploy command, not a gate step** — the code isn't live at push time and the gate has no guaranteed
-  network — but its pure compare/extract core is gate-tested red-then-green (**Suite 245**). The receipt
-  names the owner-only real-device checks (installed-PWA upgrade, save survival, auth) and leaves them to the
-  owner. Built as the **FOUNDATION** the 2.9.0 hardening-gate "Post-deploy TRUTH" item extends (Protocol 22),
-  not a parallel build — see that item's note + R5's deploy-protocol candidate. Cache `-r8 → -r9` (CHANGELOG
-  touched); `APP_VERSION` unchanged. **With this, all three (a) confirmed+cheap fixes are done** (CLAIM
-  A/C/D gate-lint scoping, the (b) governance bundle, and now the release receipt).
-- ✅ **The owner-decisions — ALL SETTLED (2026-07-23). Item G is now FULLY RESOLVED.** The three §4(c)
-  calls are decided and recorded: (1) **spare laptop → DEFERRED / parked** (fix isolation in software first —
-  done via CLAIM A/C/D; the laptop is only ever an optional notifier/accelerator on a clean checkout, never
-  the gate); (2) **DeepSeek → occasional witness, not a standing stage** (blind hostile-witness for a specific
-  review, never a required leg); (3) **report cadence → ADOPTED** and codified into **Protocol 9** (immediate
-  proactive report for completions / owner-decisions / anomalies; routine all-green intermediate landings
-  batch into the next check-in; **batched ≠ dropped ≠ compressed** — cross-referenced to the anti-compression
-  discipline so it can't be read as license to summarize-down). **Nothing left in G**: all (a) confirmed+cheap
-  fixes shipped (gate-lint scoping A/C/D, release receipt M), the (b) governance bundle shipped (Protocol 51,
-  36(b) causal-response bar, memory-restore runbook), and all three owner-decisions settled. The committed
-  claim-ledger + verbatim sources live under `planning/audits/G_workflow_review/` (archive-preserved). **G is
-  done.**
-
 ### L. 🔄 A generated, private HTML view of THIS queue — PRIVATE VIEW BUILT (2026-07-23); player-facing view still deferred
 
 **✅ PRIVATE VIEW BUILT (2026-07-23).** `scripts/queue-view.js` (`npm run queue-view`) parses `QUEUE.md`
@@ -715,80 +613,6 @@ files once (recorded under G), so this deletion pass must have the app repo to i
 **Done means:** the app repo's `planning/` holds only current-use docs; every old-version planning file
 removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
 standing rule has a home in the rules/deploy-backup layer.
-
-### S. ✅ PWA install discoverability + the guided FO3 reinstall flow (Option 1 — BUILT & shipped to `dev`)
-
-**Context (2026-07-22).** 2.8.5 fixed the manifest so the FO3 Pip-Boy landscape screen is reachable
-(`orientation: portrait` → `any`). But Android bakes the manifest into an **already-installed** PWA and never
-refreshes it, so anyone who installed **before 2.8.5** stays portrait-locked — rotation is dead for them until
-they remove-and-re-add the app. The owner hit this and confirmed a fresh install fixes it; his brother (the
-priority user) will hit the identical thing and won't read a changelog. Two pieces came out of this:
-
-**✅ Install discoverability — SHIPPED to `dev` (Task 2, in `[Unreleased]`).** The install action used to live
-only as a hidden button buried in the Module Bay → Security & Configuration → SVC TRAY, surfaced only once the
-browser fired `beforeinstallprompt`, so it was effectively undiscoverable. Added a slim, in-theme, **dismissible
-top strip** (`#installBannerTemplate` → `_showInstallBanner()`, `js/ui/ui-core-modulebay.js`) that offers a
-one-tap INSTALL. It is **fail-safe and non-naggy by construction**: it renders ONLY on the real
-`beforeinstallprompt` signal, ONLY when not already installed, and ONLY when not previously dismissed
-(`robco_install_prompt_dismissed`, a `META_MANIFEST` device pref — the dismissal remembers, Protocol UI-6). It
-reuses the existing `installPwa()` action (Protocol 22) and keeps the SVC TRAY button as the permanent home
-(Protocol 25 — a surface added, not a control relocated). Never appears inside the installed PWA. Guarded by
-Suite 243 (inert-template + all three gates + persistence) and added to Suite 217.5's banner allowlist.
-Because the strip surfaces the install/reinstall path, it **also** partially serves the stale-install case
-below (a reinstall is now one discoverable tap away).
-
-**🔒 Why it is a CONDITIONAL tip, not an auto-firing "you're on a stale install" nudge — the detection
-finding that shaped the design (recorded so it is not re-attempted blind).** An auto-firing nudge was
-deliberately NOT built, because **a stale-locked install cannot be reliably distinguished from a fresh install
-without a common false-positive.**
-While the phone is held in portrait, `matchMedia('(orientation: landscape)')` is false in BOTH the stale-locked
-case and the ordinary held-in-portrait case — there is no passive signal that separates them. The only
-distinguishing observation needs the device physically rotated to landscape while the viewport stays portrait,
-which requires the accelerometer (`DeviceOrientationEvent`) — and that **misfires for the very common
-"OS auto-rotate turned OFF" population**: on a _fresh_ install with auto-rotate off, the accelerometer reads
-landscape while the viewport stays portrait, so an accelerometer-based detector would wrongly tell those users
-to reinstall (which would not help them). A nudge that fires for people who don't need it is worse than no
-nudge — so the surface never asserts a fault; it says "if it won't rotate" and is scoped to the population that
-could plausibly be affected. (No web API exposes the OS auto-rotate toggle, so that false positive cannot be
-filtered — the reason the accelerometer route is out.)
-
-**✅ BUILT — Option 1, the guided one-time conditional tip + deep-link + reboot-persistent highlight (owner
-chose Option 1 on 2026-07-22; shipped to `dev` the same day).** The owner picked the one-time tip over the
-passive HELP line (2) or doing nothing (3), because his non-technical brother must _discover_ he needs to
-reinstall and a passive option he'd never find is too weak — balanced against the tip being engineered to not
-annoy the many. What shipped:
-
-- **The tip** (`#fo3ReinstallTipTemplate` → `_maybeShowReinstallTip()`, `js/ui/ui-core-modulebay.js`): a small,
-  dismissible, in-theme card shown **once**, and ONLY when all three gates pass — running as the installed
-  standalone PWA (`_isStandaloneInstalled()`), the active game is FO3 (`getGameContext() === 'FO3'`), and it
-  has not been seen (`robco_fo3_reinstall_tip_seen`, a `META_MANIFEST` device pref). Never in a browser tab,
-  never for New Vegas, never twice (marked seen on show, not only on dismiss). Conditional wording
-  ("Won't rotate? … reinstall to unlock it") + the three written steps (remove → reopen in browser → INSTALL)
-  - a **COPY SITE LINK** button that copies the `./#go=install` deep-link.
-- **The deep-link + reboot-persistent highlight** (`SHORTCUT_ROUTES.install` in `ui-core-nav.js` →
-  `_armInstallHighlight()`; applied by `_applyPendingInstallHighlight()` inside `_showInstallBanner()`). Opening
-  `./#go=install` in a browser sets the **durable `robco_pending_install_highlight` arm**; when the install
-  strip appears it pulses (a plain, reduced-motion-safe animation — Protocol UI-9) and the arm clears so it
-  fires exactly once. **The arm — not the hash — is what survives the "REBOOT TERMINAL" update reload**, because
-  `routeLaunchShortcut()` strips the `#go=` hash on arrival (existing behaviour, unchanged per Protocol 25); the
-  arm is set before any reboot and re-checked when the strip re-appears after it. Guarded by Suite 243.9–243.16
-  (inert template, all-three gates, seen-on-show, route-arms-highlight, both prefs registered, fires-once,
-  reduced-motion-safe, boot-order), the fail-safe gate proven red-then-green.
-
-**⚠ The honest limits, unchanged — walked in words where the mechanism can't (owner-accepted):**
-
-1. **There is NO install button inside the installed PWA** — `beforeinstallprompt` fires ONLY in a browser tab.
-   So the tip (which lives in the installed PWA) can't deep-link to a strip _there_; it hands off to the browser
-   via the copied link, and the highlight fires once they're in the browser.
-2. **The PWA→browser hop cannot be automated** — a same-origin link from inside the PWA opens in the PWA, and
-   re-adding to home screen must happen from the browser. This is the step left as a **written instruction**
-   (remove → reopen in browser → INSTALL). We did not fake automation we can't do.
-3. **The real fix needs a REMOVE first**, not just a re-add — reflected as step 1 of the written instructions.
-
-**Status: S is essentially closed.** The discoverable install strip (Task 2) and the guided Option-1 flow are
-both shipped to `dev`. The only thing NOT automatable (the OS opening a browser from inside the PWA) is
-covered by the written steps, as the owner accepted. Nothing here is on production yet — ship timing is the
-owner's call.
 
 ### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
 
@@ -1108,9 +932,13 @@ every run via `node scripts/knowledge-graph.js`). **Deliberately left un-gated**
 decision, Protocol 50) — until it demonstrably catches real drift over time, per the spec's own stopping rule.
 `claims_checked_by`/`invokes` and the topology/query-answerer consumers remain out of scope, as designed.
 
-**⬜ Gating decision deferred to G (2026-07-21).** Whether/when this un-gated drift-detector earns veto power
-(a Suite, a hook) is a process question left for item G (the blind workflow review) to rule on — the graph is
-also usable as evidence for G's reviewers. Not resolved here; do not gate R11 without G's ruling.
+**⬜ Gating decision — STILL UNRESOLVED even though G is now closed (verified 2026-07-26 against the
+committed claim-ledger).** Whether/when this un-gated drift-detector earns veto power (a Suite, a hook) was
+left for item G (the blind workflow review) to rule on. **G finished (2026-07-23) and never actually ruled on
+this** — `planning/audits/G_workflow_review/CLAIM_LEDGER.md` addresses only the ledger's own gating (a
+different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verification. R11 stays un-gated —
+its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
+settled it.
 
 ## ⚠️ Blocked on an owner decision
 
