@@ -28,7 +28,7 @@ jobs:
           ref: dev
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           # Single source of truth for the Node version (see .nvmrc / ci.yml).
           node-version-file: .nvmrc
