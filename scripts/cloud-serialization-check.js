@@ -20,8 +20,18 @@
 // localStorage before any cloud write, so Date/Map/class instances can never
 // appear and are deliberately NOT modeled). The rules modeled:
 //
-//   • undefined field value        → Firestore silently STRIPS it (silent loss)
-//   • directly-nested array [[…]]   → Firestore REJECTS the whole write (throws)
+//   • undefined field value        → Firestore REJECTS the whole write (throws) —
+//                                      corrected 2026-07-26 against the real local
+//                                      emulator (QUEUE.md item A4,
+//                                      scripts/emulator-round-trip-check.js); the
+//                                      Web SDK does NOT silently strip it by default
+//                                      (that requires opting in to
+//                                      `ignoreUndefinedProperties`, which cloud.js
+//                                      does not set) — it throws client-side before
+//                                      any network call. Flagging it as hostile here
+//                                      is still the correct call either way.
+//   • directly-nested array [[…]]   → Firestore REJECTS the whole write (throws) —
+//                                      confirmed against the real emulator by A4
 //   • function / symbol / bigint    → not serializable (belt-and-suspenders;
 //                                      unreachable from JSON state, but free to check)
 //   • document > ~1 MB              → Firestore rejects the write (soft size warning)
@@ -40,8 +50,10 @@
 //     populated with a nested array at play time. Catching that needs the real
 //     emulator + real data. This guard sees the shape, not every runtime value.
 //   • Firestore's exact type coercions (timestamp precision, number ranges) —
-//     only the real emulator observes those. That is why A3 stays open for the
-//     JDK-backed emulator test; this reduces the risk, it does not close A3.
+//     only the real emulator observes those. QUEUE.md item A4
+//     (scripts/emulator-round-trip-check.js, `npm run test:emulator`) is the
+//     real-emulator verification of this model; this guard reduces the risk
+//     between A4 runs, it does not replace A4.
 //
 // PLACEMENT. Opt-in / un-gated for now (owner's call, 2026-07-21): run it with
 //   npm run cloud-check
@@ -75,7 +87,7 @@ function findFirestoreHostileValues(root) {
     if (val === undefined) {
       hits.push({
         path: p || '(root)',
-        reason: 'undefined — Firestore silently strips this field',
+        reason: 'undefined — Firestore REJECTS the write (verified against the real emulator, A4)',
       });
       return;
     }
@@ -168,6 +180,18 @@ function buildWritePayload(defaultState) {
     campaigns: { FNV: defaultState },
   };
 }
+
+// ── Reusable exports (Protocol 22 — extend, don't fork a second extractor) ──
+// QUEUE.md item A4 (the real-emulator round-trip) reuses deriveDefaultState()/
+// buildWritePayload() verbatim so both the modeled guard and the real-emulator
+// verification are driven from the SAME self-derived field set — never two
+// independently hand-maintained extractors that could drift apart.
+module.exports = {
+  deriveDefaultState,
+  buildWritePayload,
+  findFirestoreHostileValues,
+  STATE_SRC,
+};
 
 function main() {
   const problems = [];
@@ -262,8 +286,8 @@ function main() {
     console.log(
       '    (Models Firestore write rules only; does NOT cover real Firebase / App Check /'
     );
-    console.log('     security rules / network / runtime-only values. A3 stays open for the');
-    console.log('     JDK-backed emulator test — see QUEUE.md item A3.)');
+    console.log('     security rules / network / runtime-only values. Run `npm run test:emulator`');
+    console.log('     (QUEUE.md item A4) for the real-emulator verification of this model.)');
     process.exit(0);
   } else {
     console.log('  ✗ FAIL:');
@@ -272,4 +296,7 @@ function main() {
   }
 }
 
-main();
+// Only run as a CLI check when invoked directly — required as a module (A4's
+// emulator script) must be able to reuse the exports above without triggering
+// this script's own process.exit().
+if (require.main === module) main();

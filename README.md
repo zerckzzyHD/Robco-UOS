@@ -345,6 +345,10 @@ npm run dev         # Vite dev server
 npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
 npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
+npm run cloud-check   # A3 — modeled cloud-serialization guard against the live state literal; also runs as gate step 4b
+npm run test:emulator # A4 — OPTIONAL real-Firebase-emulator round-trip (save→sync→load); needs a JDK/JRE 11+ installed
+                       # on your machine + the firebase-tools/firebase dev deps (already in package.json); NOT a gate
+                       # step — confirmation upgrade over cloud-check, run on demand (QUEUE.md item A4)
 ```
 
 ### Quality Gate

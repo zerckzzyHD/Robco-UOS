@@ -19,7 +19,24 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-22** — **2.8.5 "Foundations & Fidelity" is SHIPPED to production.** The
+**Last updated: 2026-07-26** — **A4 is DONE — the real-Firebase-emulator round-trip is built and
+red-then-green PROVEN.** With the JDK blocker cleared (2026-07-23) and `firebase-tools` committed as a
+dev-only dependency, A4 upgrades A3's modeled cloud-serialization guard from _modelled_ to _verified_:
+`scripts/emulator-round-trip-check.js` (`npm run test:emulator`) runs the real Firebase client SDK against
+the local Firestore + Auth emulator, self-derives the save payload from the live `state` literal (reusing
+A3's extractor, Protocol 22), writes it via the real additive `addDoc()` path, reads it back, and asserts
+field-level fidelity. **Red-then-green proven against the real emulator, both directions:** a clean payload
+round-trips every field equal; a planted directly-nested array and a planted `undefined` field each
+correctly make the write fail. **A genuine finding, not just a confidence upgrade:** the real emulator
+showed A3's model was wrong about the mechanism — an `undefined` field does not get silently stripped by
+Firestore, it makes the **whole write throw** (the Web SDK rejects it client-side by default, since
+`cloud.js` never sets `ignoreUndefinedProperties`) — safer than modeled, but the modeled guard's comments
+said otherwise, so they're corrected in the same pass. Standalone only (`npm run test:emulator`), **not**
+wired into `scripts/gate.js` — needs a JDK + firebase-tools that the normal gate/CI can't assume, and A4 was
+never a release blocker (owner decision 2026-07-21, unchanged). Full account in **A4** below; A3's record
+also updated to point at it.
+
+**Prior update — 2026-07-22** — **2.8.5 "Foundations & Fidelity" is SHIPPED to production.** The
 `dev → main` release merge was performed with `--no-ff` (a fast-forward makes the tip shared with `dev`,
 which makes GitHub Pages reject the production deploy — recorded lesson), the release workflow
 auto-created the `v2.8.5` tag on CI-green `main` and deployed to GitHub Pages. `APP_VERSION` 2.8.0→2.8.5,
@@ -296,15 +313,22 @@ _PWA / install UX:_
 
 ## ⏭️ Ready now — no blocker; plan/build whenever
 
-### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED + NOW GATED; real-emulator test re-filed as A4 (2026-07-21)
+### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED + NOW GATED; real-emulator verification now exists as A4 (2026-07-26)
 
 > **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5, and its
 > modeled guard is now WIRED INTO THE GATE (no longer opt-in).** The self-deriving modeled guard
 > (`npm run cloud-check`) is the shipped resolution; it now runs automatically as gate step 4b on both the
 > fast (commit) and full (push) gate — see **RESOLUTION** and the **Placement** bullet at the foot of this
-> entry. The true emulator-backed test is **re-filed as the optional post-2.8.5 item A4** —
+> entry. The true emulator-backed test was **re-filed as the optional post-2.8.5 item A4** —
 > _not_ a blocker — because the premise correction below shows the silent-data-loss failure A3 was scoped
 > to catch **cannot occur by design**. The original spec is preserved verbatim beneath for the record.
+>
+> **✅ UPDATE (2026-07-26): A4 is now BUILT and red-then-green PROVEN against the real emulator** (see A4
+> below). It found the modeled guard's `undefined`-handling comment was wrong about the mechanism — real
+> Firestore **rejects** the write outright rather than silently stripping the field — corrected in this
+> same pass in `scripts/cloud-serialization-check.js`. The guard's PASS/FAIL behavior was unaffected (an
+> undefined field was already flagged as hostile either way); only the doc comments describing _why_ were
+> wrong, and are now accurate.
 
 **What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
 suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
@@ -439,11 +463,11 @@ load path passes unknown fields **through** (`sanitizeImportedContainer`'s `Obje
 `migrateState`'s in-place defaulting). So the forgotten-field-mapping data-loss A3 existed to catch
 **cannot occur by design** — a new field round-trips losslessly through the app's own code. The only
 residual silent-drop is the Firestore **serialization boundary**, which the modeled guard above now covers
-for the shape and which A4 will verify against real Firestore. That is why the emulator test is an
-**optional post-release upgrade, not a blocker**, and why **A3 is the last thing that was gating 2.8.5 and
-is now cleared.**
+for the shape and which A4 now verifies against the real emulator (built 2026-07-26, see A4 below). That is
+why the emulator test was an **optional post-release upgrade, not a blocker**, and why **A3 is the last
+thing that was gating 2.8.5 and is now cleared.**
 
-### A4. ⏭️ (OPTIONAL, post-2.8.5) Real-Firestore round-trip — verify the model against the emulator — JDK BLOCKER CLEARED (2026-07-23), now actionable
+### A4. ✅ Real-Firestore round-trip — BUILT + red-then-green PROVEN against the real emulator (2026-07-26)
 
 **What it is.** The upgrade of A3's modeled guard from _modelled_ to _verified_: a save→sync→load round-trip
 run against the **Firebase local emulator suite** (real Firestore + Auth SDK write/read), asserting
@@ -470,11 +494,23 @@ first step of actually building A4.
 **What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
 run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
 
-**Done means:** the JDK is now present, so this is **actionable** (only `npm i -D firebase-tools` remains to
-set up) — a real-SDK round-trip against the emulator asserts every save-envelope field survives equal, driven
-from the live field list (not a hardcoded one), proven red-then-green by dropping a field; `firebase-tools`
-dev-only with nothing added to the served set. Until it lands, A3's `npm run cloud-check` is the standing
-guard, and this stays **optional — never a release blocker** (owner decision 2026-07-21, unchanged).
+**Done means (original spec):** the JDK is now present, so this is **actionable** (only `npm i -D
+firebase-tools` remains to set up) — a real-SDK round-trip against the emulator asserts every save-envelope
+field survives equal, driven from the live field list (not a hardcoded one), proven red-then-green by
+dropping a field; `firebase-tools` dev-only with nothing added to the served set. Until it lands, A3's `npm
+run cloud-check` is the standing guard, and this stays **optional — never a release blocker** (owner
+decision 2026-07-21, unchanged).
+
+**✅ RESOLUTION (2026-07-26) — built, wired standalone, proven red-then-green against the REAL emulator.**
+
+- **The dev dependency landed.** `firebase-tools@^15.24.0` (already staged) was committed, plus `firebase@12.15.0` — pinned EXACT (no `^`) to match the version `js/services/cloud.js` imports from the gstatic CDN, so the Node-side round-trip exercises the identical SDK build the browser runs, not a drifting one. Both are dev-only; `package.json`/`package-lock.json` are not in `scripts/cache-bump-guard.js`'s served-file regex and `node_modules/` is gitignored, so neither touches the served/precached set — confirmed by re-running the cache-bump guard after staging.
+- **`firebase.json` gained an `emulators` block** (Firestore :8090, Auth :9099, UI disabled) alongside the existing `firestore.rules`/`firestore.indexes.json` config — config-only, not a served file, no cache bump needed for that file itself.
+- **`scripts/emulator-round-trip-check.js`** is the new script (`npm run test:emulator`, which runs it via `firebase emulators:exec --project demo-robco-uos-test --only firestore,auth "…"` — the `demo-` project prefix is the Firebase CLI's own guarantee that the emulator never touches the real `nv-overlord` project or any network beyond localhost, regardless of what `.firebaserc` declares as default). It **reuses** A3's extractor rather than forking a second one (Protocol 22): `scripts/cloud-serialization-check.js` now exports `deriveDefaultState()`/`buildWritePayload()` (guarded by `require.main === module` so its own CLI behaviour is unchanged), and the new script imports them, signs in anonymously against the Auth emulator, and writes the derived `robco_v8` payload inside a full save envelope via the real SDK's `addDoc()` — the same additive call `_uploadSaveDoc()` makes (Protocol 34) — then reads it back and diffs every field.
+- **Red-then-green PROVEN against the REAL emulator, both directions, three assertions per run:** (1) the clean, self-derived payload round-trips with every field equal — PASS; (2) a planted directly-nested array (`_a4Probe: [[1,2]]`) makes the real write throw (`"Nested arrays are not supported"`) — correctly caught; (3) a planted `undefined` field (`_a4Probe: undefined`) makes the real write throw (`"Unsupported field value: undefined"`) — correctly caught. No "field dropped from the sync mapping" red case, deliberately: A3's own 2026-07-21 premise correction established that failure mode cannot occur by design (wholesale-blob write, unknown fields pass through), so testing for it would be testing something that isn't real — the script's header states this explicitly.
+- **A genuine cross-check finding, not just a rubber stamp.** The real emulator run surfaced that A3's model had the _mechanism_ wrong: it described an `undefined` field as something Firestore "silently STRIPS," but the real Web SDK (with `cloud.js`'s actual settings — no `ignoreUndefinedProperties`) **rejects the whole write outright**, client-side, before any network call — louder and safer than modeled, but still a documentation error. Corrected in the same commit, in `cloud-serialization-check.js`'s comments and console output, with the date and the A4 script named as the source of truth. This is exactly the class of thing A4 exists to catch that a model alone cannot.
+- **A real harness bug was found and fixed while building this (Protocol 42).** The first run failed the CLEAN payload too, with Firestore rejecting plain fields as "a custom Object/Array object." Root cause: `deriveDefaultState()` runs the real `state.js` literal inside a `vm` sandbox — a separate V8 realm — and the SDK's plain-object/array validation is realm-sensitive, so a naive `Array.prototype.map()`-based clone (which preserves the source array's realm via species construction) still produced foreign-realm arrays. **Investigated and classified: harness-only** — the browser runs everything in one realm, so this cross-realm mismatch cannot occur in the shipped app; only this test's own vm-based derivation technique created it. Fixed by rebuilding `deepClone()` to construct fresh objects/arrays in the current realm at every level (no `.map()`), with the reasoning recorded in the script's own header comment so it can't silently regress. The fix itself IS the locking coverage — this script's every run re-proves the clone is realm-clean, which is exactly the Protocol 42 "still add a test" bar for a harness-only finding.
+- **Standalone, NOT gated** (as the original spec + owner's 2026-07-21 "never a release blocker" both required): wired as `npm run test:emulator`, absent from `scripts/gate.js`. Documented in the script's own header comment and in `README.md`'s Available Scripts list (needs a JDK/JRE 11+ + the two dev deps, already in `package.json`). `npm run cloud-check` (A3) remains the gated guard, unchanged, still running on every commit/push.
+- **Full gate confirmed still green** with these changes in place (no gate step added or removed).
 
 ### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
 
