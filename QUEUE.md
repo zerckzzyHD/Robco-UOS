@@ -19,7 +19,12 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
+**Last updated: 2026-07-27** — **New item U queued — the generate-vs-hand-maintain audit**
+(owner-requested), the generalization of D: find every remaining hand-maintained artifact that should
+instead be GENERATED, judged one-by-one against the zero-false-positive bar, output as a triaged list
+with the clear wins queued as their own bounded follow-ups. See **U** below.
+
+**Prior update — 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
 `library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
 (`scripts/generate-test-catalog.js`, `npm run test-catalog` / `test-catalog:check`), never hand-typed —
 the gitignored-`library/` gate-diff tension resolved the same way Protocol 46 resolved it for
@@ -1004,6 +1009,43 @@ this** — `planning/audits/G_workflow_review/CLAIM_LEDGER.md` addresses only th
 different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verification. R11 stays un-gated —
 its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
 settled it.
+
+### U. ⬜ The generate-vs-hand-maintain audit — the generalization of D (owner-requested, 2026-07-27)
+
+**What it is.** A focused ANALYSIS audit that finds every remaining HAND-MAINTAINED artifact in the project
+that should instead be GENERATED — the generalization of **D** (Protocol 47, the TEST_CATALOG generator) and
+the `library/MANIFEST.txt` gate (Protocol 46). The project's own ethos, stated plainly: **generate what a
+script can compute.** Hand-maintenance drifts — the retired test-count bookkeeping (Protocol 2a) and the
+now-generated TEST_CATALOG are the two precedents already on file, one a removal, one a replacement.
+
+**Method.** Survey the repo and docs for candidates — e.g. `CLAUDE.md`'s retrieval map, `library/CODE_MAP.md`,
+`README.md`'s feature tables / Current-State section, `ARCHITECTURE.md`'s Table of Contents, the Atlas's
+planned inputs (item I), and any other count/table/list a session currently hand-types. For **each**
+candidate, judge exactly one question: **is it computable from source with ZERO false positives?**
+
+- **YES** → generate it and gate-diff it against the on-disk/committed copy, the same shape as D (Protocol 47) and Protocol 46's `library/MANIFEST.txt` fix — implement as a bounded follow-up.
+- **NO** (it needs human judgment, or can't be expressed as a clean mechanical rule) → leave it
+  hand-maintained and **record WHY**, explicitly. A "no" is a real, load-bearing answer here — this is the
+  same zero-false-positive bar Protocol 36b/45 already hold every gate guard to: a scanner that flags
+  ordinary prose or judgment calls gets ignored, then weakened, then it is dead. Do not force a candidate
+  into GENERATED-class just because generation is the fashionable answer.
+
+**Output.** A triaged list — candidate → computable? (yes/no) → verdict + one-line why — followed by
+implementing the clear wins as their own bounded follow-up items (not bundled into this one). **This is an
+analysis pass, NOT an auto-convert-everything task** — the audit's job is to separate the two, not to
+generate-ify the whole project on the spot.
+
+**Relates to.** **D** (the audit's own precedent and template — `scripts/generate-test-catalog.js`'s
+extraction + gate-diff shape is directly reusable for any other YES candidate); **I**, the Atlas (its
+generated assurance view is exactly this ethos applied to the test suite's structure, and shares the "which
+of the Atlas's 8 views can be computed with zero false positives" question); the standing "generate over
+maintain" discipline recorded in `rules/docs-and-library.md`'s 3-class library model.
+
+**What it depends on.** Nothing — it is pure analysis over the current repo/docs, so it can run whenever.
+
+**Done means:** the triaged candidate list exists (candidate → computable? → verdict + why), and every YES
+verdict has its own follow-up item queued (not built inline here) so this audit stays a scoping pass rather
+than silently growing into the implementation work itself.
 
 ## ⚠️ Blocked on an owner decision
 
