@@ -52196,6 +52196,236 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 251 — library/CODE_MAP.md generated sections (Protocol 53,
+//  QUEUE.md item U, GENERATE-vs-hand-maintain audit candidates #6/#7/#8)
+//  Verifies scripts/generate-code-map.js's three extractors against the REAL
+//  source (DIAGNOSTIC_SHELL_TOOLS vm-eval, the nine ui-render-*.js function
+//  inventories, the RobcoEvents.emit(...) name scan), the marker-block replace
+//  helper, that package.json/gate.js wire the commands, and the --check CLI's
+//  three-way behavior (absent/current/stale) against a throwaway HYBRID-doc
+//  skeleton — never the developer's own library/CODE_MAP.md. Unlike Suite 250's
+//  ARCHITECTURE.md target (a single committed, always-present file), this doc is
+//  gitignored AND hybrid (only 3 of its sections are generated), so the fixture
+//  must seed a minimal skeleton with all 3 marker pairs before "current" can be
+//  proven — the same absent→pass / present-and-stale→fail shape as Suite 247's
+//  TEST_CATALOG.md, plus a missing-marker structural-error path Suite 247/250
+//  don't need (their targets are never hybrid).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 251 — library/CODE_MAP.md generated sections (Protocol 53)');
+
+  const genPath251 = path.join(ROOT, 'scripts', 'generate-code-map.js');
+  assert(fs.existsSync(genPath251), '251.1: scripts/generate-code-map.js exists on disk');
+
+  delete require.cache[genPath251];
+  const GEN251 = require(genPath251);
+
+  // 251.2  DIAGNOSTIC_SHELL_TOOLS vm-eval against the REAL js/dev/test-console.js —
+  // non-trivial, and every entry carries the fields the table generator reads.
+  const testConsoleSrc251 = readGroup('test-console');
+  const tools251 = GEN251.extractDiagnosticShellTools(testConsoleSrc251);
+  assert(
+    Array.isArray(tools251) &&
+      tools251.length >= 100 &&
+      tools251.every(
+        t =>
+          typeof t.id === 'string' && typeof t.label === 'string' && typeof t.category === 'string'
+      ),
+    `251.2: extractDiagnosticShellTools() parses a large tool list (saw ${tools251 ? tools251.length : 0}) from the real DIAGNOSTIC_SHELL_TOOLS array, every entry carrying id/label/category`
+  );
+
+  // 251.3  Every ui-render-*.js sibling in RENDER_FILE_PANELS parses a non-empty
+  // top-level function list from the REAL file on disk.
+  const renderEntries251 = GEN251.extractRenderFileFunctions();
+  assert(
+    renderEntries251.length === GEN251.RENDER_FILE_PANELS.length &&
+      renderEntries251.every(e => e.fns.length > 0) &&
+      renderEntries251.some(
+        e => e.file === 'ui-render-inventory.js' && e.fns.includes('renderInventory')
+      ),
+    `251.3: extractRenderFileFunctions() parses a non-empty function list for all ${GEN251.RENDER_FILE_PANELS.length} ui-render-*.js siblings, including the known renderInventory() entry`
+  );
+
+  // 251.4  RobcoEvents.emit(...) name scan against the REAL js/ tree finds the
+  // known event set and excludes js/dev/test-console.js's replay surface by
+  // construction — proven by reading the extractor's own source for the literal
+  // exclusion (not just trusting the count), since the excluded file only ever
+  // RE-emits names the real emitters already produce (excluding it can never
+  // shrink the observed set, so a count-only proof can't distinguish "excluded"
+  // from "coincidentally redundant").
+  const eventNames251 = GEN251.extractEmittedEventNames();
+  const genSrc251 = fs.readFileSync(genPath251, 'utf8');
+  assert(
+    eventNames251.length >= 15 &&
+      ['level.up', 'limb.state', 'runtime.state', 'data.write'].every(n =>
+        eventNames251.includes(n)
+      ) &&
+      eventNames251.join(',') === [...eventNames251].sort().join(',') &&
+      genSrc251.includes("entry.name === 'test-console.js'"),
+    `251.4: extractEmittedEventNames() finds a sorted, de-duplicated event-name set (saw ${eventNames251.length}) including known names, and the extractor's own source excludes js/dev/test-console.js's replay surface by name`
+  );
+
+  // 251.5  The three block builders render the expected shape for synthetic
+  // input — tier/destructive/triggers formatting, and the "no triggers" fallback.
+  const diagBlock251 = GEN251.buildDiagnosticShellBlock([
+    { id: 'x', label: 'X TOOL', category: 'env', tier: 'prod', destructive: false, triggers: [] },
+    {
+      id: 'y',
+      label: 'Y TOOL',
+      category: 'env',
+      tier: 'staging',
+      destructive: true,
+      triggers: ['a.b'],
+    },
+  ]);
+  assert(
+    /\| `x` \| X TOOL \| prod \| no \| _none_ \|/.test(diagBlock251) &&
+      /\| `y` \| Y TOOL \| staging \| yes \| `a\.b` \|/.test(diagBlock251),
+    '251.5a: buildDiagnosticShellBlock() renders destructive as yes/no and an empty triggers array as the explicit "_none_" fallback, never a blank cell'
+  );
+  const renderBlock251 = GEN251.buildRenderPipelineBlock([
+    { file: 'ui-render-x.js', panel: 'X Panel', fns: ['fnA', 'fnB'] },
+  ]);
+  assert(
+    renderBlock251 === ' - `js/ui/ui-render-x.js` — X Panel: `fnA`, `fnB`',
+    "251.5b: buildRenderPipelineBlock() renders one backtick-joined bullet line per file, matching the doc's existing hand-authored convention"
+  );
+  const eventBlock251 = GEN251.buildEventBusBlock(['a.b', 'c.d']);
+  assert(
+    eventBlock251.startsWith('- **Emitted event names** (2, generated') &&
+      eventBlock251.endsWith('`a.b`, `c.d`'),
+    '251.5c: buildEventBusBlock() renders a count-prefixed, backtick-joined name list'
+  );
+
+  // 251.6  applyBetweenMarkers()/buildUpdatedDoc(): replaces content between an
+  // existing marker pair; returns null when a marker is missing (a real
+  // structural error, never silently ignored).
+  const skeleton251 = 'before\n<!-- X:BEGIN -->\nold\n<!-- X:END -->\nafter';
+  const replaced251 = GEN251.applyBetweenMarkers(
+    skeleton251,
+    ['<!-- X:BEGIN -->', '<!-- X:END -->'],
+    'new'
+  );
+  assert(
+    replaced251 === 'before\n<!-- X:BEGIN -->\nnew\n<!-- X:END -->\nafter',
+    '251.6a: applyBetweenMarkers() replaces exactly the content between an existing marker pair, leaving the rest of the doc untouched'
+  );
+  assert(
+    GEN251.applyBetweenMarkers('no markers here', ['<!-- X:BEGIN -->', '<!-- X:END -->'], 'new') ===
+      null,
+    '251.6b: applyBetweenMarkers() returns null (never a corrupted partial doc) when the marker pair is absent'
+  );
+  const { updated: missingUpdated251, missing: missingKey251 } = GEN251.buildUpdatedDoc(
+    'no markers at all',
+    {
+      diagnosticShell: 'a',
+      renderPipeline: 'b',
+      eventBus: 'c',
+    }
+  );
+  assert(
+    missingUpdated251 === null && missingKey251 === 'diagnosticShell',
+    '251.6c: buildUpdatedDoc() names the FIRST missing marker key rather than failing silently or ambiguously'
+  );
+
+  // 251.7  package.json wires both the regenerate and the gate-check commands.
+  const pkg251 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg251.scripts['code-map'] === 'node scripts/generate-code-map.js' &&
+      pkg251.scripts['code-map:check'] === 'node scripts/generate-code-map.js --check',
+    '251.7: package.json exposes both `npm run code-map` (regenerate) and `npm run code-map:check` (gate-diff)'
+  );
+
+  // 251.8  scripts/gate.js runs the check on both the fast and full gate (above
+  // the fast/full split, same placement as the Protocol 47/52 checks it sits beside).
+  const gateSrc251 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+  const idxCheck251 = gateSrc251.indexOf('generate-code-map.js --check');
+  const idxFastSplit251 = gateSrc251.indexOf('if (fast) {');
+  assert(
+    idxCheck251 !== -1 && idxCheck251 < idxFastSplit251,
+    '251.8: scripts/gate.js runs `generate-code-map.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
+  );
+
+  // 251.9  The --check CLI, exercised as a REAL child process against
+  // ROBCO_CODE_MAP_OUTPUT (a throwaway tmp copy — see the script's OUTPUT_PATH
+  // override): absent → exit 0; a seeded 3-marker skeleton regenerated → exit 0;
+  // a stray hand-edit inside a generated block → exit 1; a skeleton missing a
+  // marker pair → exit 1 (structural error, distinct from ordinary drift).
+  const os251 = require('os');
+  const { spawnSync: spawnSync251 } = require('child_process');
+  const tmpDir251 = fs.mkdtempSync(path.join(os251.tmpdir(), 'robco-code-map-251-'));
+  const tmpOut251 = path.join(tmpDir251, 'CODE_MAP.md');
+  try {
+    const runCheck251 = () =>
+      spawnSync251(process.execPath, [genPath251, '--check'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: Object.assign({}, process.env, { ROBCO_CODE_MAP_OUTPUT: tmpOut251 }),
+      });
+    const runGenerate251 = () =>
+      spawnSync251(process.execPath, [genPath251], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: Object.assign({}, process.env, { ROBCO_CODE_MAP_OUTPUT: tmpOut251 }),
+      });
+
+    const rAbsent251 = runCheck251();
+    assert(
+      rAbsent251.status === 0 && /is absent/.test(rAbsent251.stdout),
+      '251.9a: --check exits 0 when the (overridden) output path is absent — the clean-checkout / no-local-library fail-safe'
+    );
+
+    const skeletonDoc251 =
+      '# Fixture\n\n## Diagnostic Shell\n\n<!-- DIAGNOSTIC_SHELL_TABLE:BEGIN -->\n<!-- DIAGNOSTIC_SHELL_TABLE:END -->\n\n## Render Pipeline\n\n<!-- RENDER_PIPELINE_FILES:BEGIN -->\n<!-- RENDER_PIPELINE_FILES:END -->\n\n## Event Bus\n\n<!-- EVENT_BUS_NAMES:BEGIN -->\n<!-- EVENT_BUS_NAMES:END -->\n';
+    fs.writeFileSync(tmpOut251, skeletonDoc251, 'utf8');
+    const rGenerate251 = runGenerate251();
+    assert(
+      rGenerate251.status === 0,
+      '251.9b (setup): generating against a freshly-seeded 3-marker skeleton exits 0'
+    );
+
+    const rCurrent251 = runCheck251();
+    assert(
+      rCurrent251.status === 0 && /generated sections are current/.test(rCurrent251.stdout),
+      '251.9c: --check exits 0 immediately after a fresh regenerate (idempotent — regenerate then check agree)'
+    );
+
+    const currentDoc251 = fs.readFileSync(tmpOut251, 'utf8');
+    fs.writeFileSync(
+      tmpOut251,
+      currentDoc251.replace(
+        '<!-- EVENT_BUS_NAMES:END -->',
+        'stray hand-edit\n<!-- EVENT_BUS_NAMES:END -->'
+      ),
+      'utf8'
+    );
+    const rStale251 = runCheck251();
+    assert(
+      rStale251.status === 1 && /GENERATED sections are STALE/.test(rStale251.stderr),
+      '251.9d: --check exits 1 when a generated section has drifted from what the extractors would currently produce — a real drift is never silently accepted'
+    );
+
+    // Missing-marker structural error: a skeleton lacking one marker pair entirely
+    // must fail loudly and NAME which one, both in regenerate mode and --check mode
+    // — never silently skip the section or write a corrupted partial doc.
+    fs.writeFileSync(
+      tmpOut251,
+      skeletonDoc251.replace('<!-- EVENT_BUS_NAMES:BEGIN -->\n<!-- EVENT_BUS_NAMES:END -->\n', ''),
+      'utf8'
+    );
+    const rMissingMarker251 = runGenerate251();
+    assert(
+      rMissingMarker251.status === 1 &&
+        rMissingMarker251.stderr.includes('EVENT_BUS_NAMES:BEGIN') &&
+        rMissingMarker251.stderr.includes('marker pair'),
+      '251.9e: regenerating against a skeleton missing a marker pair fails loudly and names the missing marker, rather than silently writing a partial doc'
+    );
+  } finally {
+    fs.rmSync(tmpDir251, { recursive: true, force: true });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

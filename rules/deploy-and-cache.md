@@ -10,7 +10,7 @@
 
 ## Protocol 1 — Service Worker Cache Bump
 
-Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **served to or pre-cached by users**: `index.html`, `sw.js`, `manifest.json`, `icon.png` (or any icon file), or anything under `css/` or `js/`. Doc-only, config-only (`.github/`, `scripts/`), and test-only commits do **not** require a bump.
+Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **served to or pre-cached by users**: `index.html`, `sw.js`, `manifest.json`, `CHANGELOG.md` (the in-app changelog viewer fetches it at runtime — Protocol 21), `icon.png` (or any icon file), or anything under `css/` or `js/`. Doc-only, config-only (`.github/`, `scripts/`), and test-only commits do **not** require a bump — `CHANGELOG.md` is the one doc-looking exception, because unlike every other `.md` file it IS served. This list is enforced mechanically, not just stated here: `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier is the actual gate check, and it already includes `CHANGELOG.md` — this prose is kept in sync with that regex, not the other way around.
 
 **Format:** `'robco-terminal-v{APP_VERSION}-r{N}'`
 

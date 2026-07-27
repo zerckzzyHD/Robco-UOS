@@ -31,6 +31,9 @@
  *      library/ file is absent)
  *   4d. Architecture TOC currency (Protocol 52 — ARCHITECTURE.md's Table of Contents vs
  *      its own headings/anchors; pure Node, runs on fast + full)
+ *   4e. Code-map generated sections currency (Protocol 53 — library/CODE_MAP.md's Diagnostic
+ *      Shell table / Render Pipeline lists / Event Bus names vs their live sources; pure Node,
+ *      runs on fast + full, no-op where the gitignored library/ file is absent)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -412,6 +415,18 @@ run('Test-catalog currency (Protocol 47)', 'node scripts/generate-test-catalog.j
 // TEST_CATALOG.md, ARCHITECTURE.md is committed (not gitignored) — no absence fail-safe needed;
 // --check simply fails on any drift.
 run('Architecture TOC currency (Protocol 52)', 'node scripts/generate-architecture-toc.js --check');
+
+// ── 4e. Code-map generated sections currency (Protocol 53, QUEUE.md item U) ──────
+// library/CODE_MAP.md is a HYBRID doc — most of it is hand-written, but its Diagnostic
+// Shell registry table, Render Pipeline per-file function lists, and Event Bus emitted-
+// event-name list are GENERATED from source between committed marker pairs. Pure Node,
+// zero external dependency, runs on BOTH gate:fast and gate. Fail-safe on the
+// gitignored-library/ tension exactly like Protocol 47: absent → exit 0 (nothing to
+// diff against on a clean checkout or a machine without the local-only library/ tree).
+run(
+  'Code-map generated sections currency (Protocol 53)',
+  'node scripts/generate-code-map.js --check'
+);
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so

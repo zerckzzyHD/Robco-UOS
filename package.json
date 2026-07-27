@@ -24,7 +24,9 @@
     "test-catalog": "node scripts/generate-test-catalog.js",
     "test-catalog:check": "node scripts/generate-test-catalog.js --check",
     "architecture-toc": "node scripts/generate-architecture-toc.js",
-    "architecture-toc:check": "node scripts/generate-architecture-toc.js --check"
+    "architecture-toc:check": "node scripts/generate-architecture-toc.js --check",
+    "code-map": "node scripts/generate-code-map.js",
+    "code-map:check": "node scripts/generate-code-map.js --check"
   },
   "repository": {
     "type": "git",

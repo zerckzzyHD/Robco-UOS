@@ -1068,14 +1068,28 @@ bookkeeping overhead:
   **Protocol 52** in `rules/docs-and-library.md`. Also completed **Live Drift #3**: stripped the ~20 leftover
   `Suite N (…, X tests)` count fragments from `ARCHITECTURE.md` that the Protocol 2a retirement (R3) had
   missed everywhere else.
+- **2026-07-27 — batch 3 (Protocol 53, Suite 251).** Landed candidates **#6/#7/#8**:
+  `library/CODE_MAP.md`'s Diagnostic Shell registry table, Render Pipeline per-file function
+  lists, and Event Bus emitted-event-name list are now GENERATED (`scripts/generate-code-map.js`,
+  `npm run code-map` / `code-map:check`, gate-wired both fast+full, Suite 251) — see **Protocol 53**
+  in `rules/docs-and-library.md`. Unlike Protocol 47/52's targets, `library/CODE_MAP.md` is both
+  gitignored AND a hybrid doc (only these 3 sections are generated; the Two-Store Boundary,
+  Registry, panel-wiring checklist, Audio categorization, and Boot Lifecycle "why" notes stay
+  hand-maintained per the audit's own KEEP list), so the generator combines Protocol 47's
+  absent→pass/stale→fail gate-diff with Protocol 52's marker-delimited hybrid-section shape. Also
+  fixed two housekeeping items found in passing: deleted a leftover untracked scratch file
+  (`queue_log_anchors.txt`, repo root) the owner had already authorized removing, and corrected
+  `rules/deploy-and-cache.md`'s Protocol 1 prose to name `CHANGELOG.md` as a served/precached file
+  (it already was per `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier — the prose just never
+  said so).
 - **Remaining backlog (optional, low-priority per the audit's own ranked list) — not yet built.** Candidates
-  **#2** (File Map reverse-completeness), **#6/#7/#8** (`library/CODE_MAP.md` generated tables), **#10**
-  (`CHANGELOG.md` category-ordering assertion), **#12** (README css-file-count assertion), **#13** (delete
-  README's third load-order copy — the audit's own dissent note flags this as an owner judgment call, not
-  resolved unilaterally), and **#14** (README version-header vs `CHANGELOG.md` assertion). Each is a real but
-  lower-value/lower-urgency gap per the audit's own ranking — good backlog filler, not worth its own dedicated
-  session. **Earn-condition:** pick up whenever a session is already touching the relevant file for another
-  reason, or the owner explicitly asks for a "batch 3."
+  **#2** (File Map reverse-completeness), **#10** (`CHANGELOG.md` category-ordering assertion), **#12**
+  (README css-file-count assertion), **#13** (delete README's third load-order copy — the audit's own
+  dissent note flags this as an owner judgment call, not resolved unilaterally), and **#14** (README
+  version-header vs `CHANGELOG.md` assertion). Each is a real but lower-value/lower-urgency gap per the
+  audit's own ranking — good backlog filler, not worth its own dedicated session. **Earn-condition:**
+  pick up whenever a session is already touching the relevant file for another reason, or the owner
+  explicitly asks for a "batch 4."
 
 ## ⚠️ Blocked on an owner decision
 

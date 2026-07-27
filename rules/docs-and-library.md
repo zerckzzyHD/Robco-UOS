@@ -183,6 +183,76 @@ exit 1) against a throwaway copy (`ROBCO_ARCHITECTURE_MD_PATH`) so the developer
 
 ---
 
+## Protocol 53 — Generated Code Map Sections (a HYBRID doc, not a fully-generated one)
+
+**Shipped 2026-07-27 (QUEUE.md item U, candidates #6/#7/#8).** `library/CODE_MAP.md` is mostly
+**LIVE** (hand-written conceptual invariants — the Two-Store Boundary, the Registry, the
+panel-wiring checklist, the Audio categorization, the Boot Lifecycle "why" notes — see the
+3-class model below and the audit's own KEEP list), but three of its sub-sections are pure
+mechanical transforms of a live source array/grep. `scripts/generate-code-map.js` regenerates
+**only those three**, between committed marker pairs, and leaves everything else in the file
+byte-identical — a **committed file can carry a GENERATED subsection without the whole file
+needing to be gitignored OR fully generated**, the same "hybrid doc" shape Protocol 52 already
+established in miniature for `ARCHITECTURE.md`'s Table of Contents, applied here to a doc that
+is itself gitignored (`library/CODE_MAP.md`), so this protocol combines Protocol 47's
+absent→pass / present-and-stale→fail gate-diff shape with Protocol 52's hybrid-section marker
+convention:
+
+1. **`DIAGNOSTIC_SHELL_TABLE`** — every `DIAGNOSTIC_SHELL_TOOLS` entry (`js/dev/test-console.js`),
+   live vm-evaluated (the same technique Suite 212's `_evalRealTools()` already established for
+   the Protocol 44 cross-reference guard — reused here rather than a second extractor, Protocol
+   22), grouped by category, one markdown table per category with id/label/tier/destructive/
+   triggers columns.
+2. **`RENDER_PIPELINE_FILES`** — every top-level `function` in each of the nine
+   `js/ui/ui-render-*.js` siblings, via `^function `. The panel-NAME mapping (e.g.
+   `ui-render-inventory.js` → "Cargo Manifest & Ammo") is a small curated table inside the
+   generator script itself (`RENDER_FILE_PANELS`) — a judgment call, not derivable from source —
+   while the per-file **function list** is fully generated.
+3. **`EVENT_BUS_NAMES`** — every `RobcoEvents.emit('<name>', …)` string literal across
+   `js/**/*.js`, excluding `js/dev/test-console.js` (a replay surface that re-fires every event
+   on demand for the Diagnostic Shell, per Protocol 44 — not a canonical emitter; counting its
+   call sites would just echo the real list back, never add to it).
+
+**Why these three and not the rest of the file.** The audit
+(`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`, candidates #6/#7/#8) judged each against
+the same zero-false-positive bar every GENERATE candidate is held to: a live array or a stable
+grep, with no human judgment needed to decide what belongs in the list. Everything else in
+`library/CODE_MAP.md` — the Two-Store Boundary, the Registry, the panel-wiring checklist, the
+Audio Model's start/stop-pair **categorization** (ambient loop vs. one-shot vs. haptic is a
+judgment call even though the pairs themselves are grep-able), the Boot Lifecycle's "why" prose
+— failed that bar on purpose and stays hand-maintained; forcing those into GENERATED-class would
+be machinery in search of a problem (QUEUE.md item U's own stated principle).
+
+**The gitignored-`library/` gate-diff, resolved exactly like Protocol 47.** `library/CODE_MAP.md`
+does not exist on a clean CI checkout, so `--check` treats **absence** as success (nothing to
+diff against) and **presence-and-drift** as a real failure — same fail-safe shape as Protocol 47's
+`library/TEST_CATALOG.md` and Protocol 46's `library/MANIFEST.txt` before it.
+
+**The missing-marker case is a structural error, distinct from ordinary drift.** Because this doc
+is hybrid (not fully generated), the script can be pointed at a doc that has lost one of its three
+marker pairs entirely (a hand-edit that deleted a marker comment, or a doc that predates this
+protocol). That is a real authoring mistake, not routine staleness — the script refuses to write a
+silently-partial doc and instead fails loudly, naming exactly which marker pair is missing.
+
+**Usage:** `npm run code-map` regenerates the three blocks in place; `npm run code-map:check`
+verifies they're current without writing (wired into `scripts/gate.js`, both `gate:fast` and
+`gate`, pure Node with zero external dependency). Regeneration is a **deliberate step**, never
+automatic — same "flag, never auto-fix" posture as Protocol 41's cleanup sweep and every other
+GENERATED-class check in this file.
+
+**Regression coverage:** Suite 251 (`tests/robco-diagnostics.js`) proves all three extractors
+against the real source (the vm-eval'd tool array, the nine render-file function lists, the
+event-name scan — including a source-level proof that `test-console.js` is excluded by name, not
+merely coincidentally absent from the result), the three block builders' rendering shape
+(destructive yes/no, the `_none_` fallback, backtick-joined lists), the marker-replace helper
+(including the null-return path for an absent marker), that `package.json`/`scripts/gate.js` wire
+the commands, and exercises the real `--check`/regenerate CLI end-to-end (absent → exit 0,
+current → exit 0, stale → exit 1, missing-marker → exit 1 naming the marker) against a throwaway
+3-marker skeleton (`ROBCO_CODE_MAP_OUTPUT`) so the developer's own `library/CODE_MAP.md` is never
+touched by the test itself.
+
+---
+
 ## The 3-class library maintenance model (2.8.5 U-B1)
 
 Every doc under `library/` and `planning/` falls into exactly one of three classes, and the class dictates how it's kept current:
