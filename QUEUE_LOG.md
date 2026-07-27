@@ -1034,6 +1034,63 @@ running; closed.**
 
 ---
 
+<a id="d"></a>
+
+### D. ✅ THE TEST_CATALOG GENERATOR — Protocol 47 shipped, the GENERATED class fulfilled (2026-07-27)
+
+**What it is.** `library/TEST_CATALOG.md` was GENERATED-class **in intent** since the 2.8.5 U-B1 relocation
+but hand-synced in practice, and drifted twice. This item builds the generator that produces its per-suite
+content directly from the test runner and gate-diffs it against the local copy — the first real instance of
+"generate what a script can compute," and the plumbing the Atlas (item I) reuses directly.
+
+**Shipped:**
+
+- **`scripts/generate-test-catalog.js`.** Parses every `header('…')` call in `tests/robco-diagnostics.js` as
+  a suite boundary. A suite whose header is re-emitted later (a deferred async proof re-announcing itself
+  before its result line — Suites 76/137/196/207/220/228, etc.) is captured once, at its first occurrence.
+  For that occurrence, the nearest contiguous run of `//`-comment lines immediately above it is captured
+  **verbatim** as the suite's narration — the runner's own build history, written when the suite landed. A
+  suite with no such comment gets an honest "no header comment on file" note rather than a fabricated one.
+  Both the numbered "Suite N —" convention (180 suites) and the legacy unnumbered suites that predate it
+  (74 suites, e.g. "Parser sanity") are captured — 254 suites total, replacing a hand-written file that had
+  degenerated into a handful of multi-thousand-character prose paragraphs.
+- **The gitignored-`library/` gate-diff, resolved the same way Protocol 46 resolved it for
+  `library/MANIFEST.txt`.** `library/TEST_CATALOG.md` never existed in git at all (only `MANIFEST.txt` is
+  the committed exception to the `library/*` gitignore) — so "diff against the committed copy" was never
+  literally possible. `--check` treats **absence** as success (a clean CI checkout, or any machine without
+  the local `library/` tree, has nothing to diff against and can never fail here) and **presence-and-drift**
+  as a real failure. `scripts/gate.js` runs `npm run test-catalog:check` on **both** `gate:fast` and the full
+  `gate` (pure Node, zero external dependency, same placement as the A3 cloud-serialization guard) —
+  harmless everywhere the file is absent, load-bearing on the one machine (the owner's) where it exists to
+  drift.
+- **No test COUNT anywhere**, consistent with Protocol 2a's retirement — only qualitative per-suite content
+  is generated.
+- **Suite 247** (Node runner) proves the real extraction against the real runner file: a large,
+  de-duplicated parse; both title conventions captured; a re-emitted header de-duplicated to its first
+  occurrence; a suite with real narration (58) captures it verbatim while a genuinely bare suite (170) gets
+  the honest fallback; and the real `--check` CLI end-to-end (absent → exit 0, current → exit 0, stale →
+  exit 1) against a throwaway path (`ROBCO_TEST_CATALOG_OUTPUT`, added to the generator so the test never
+  touches the developer's own local file).
+- **Suite 220's Protocol 47 forward-reference retired in the same commit (Protocol 42).** Protocol 47 was
+  named by number in `CLAUDE.md`'s 3-class library model before its heading existed, and Suite 220.9/220.10
+  carried it as the one sanctioned allowlisted forward-reference. Landing the real heading
+  (`rules/docs-and-library.md`) meant `REF_ALLOW_220` had to empty in the same commit (Protocol 49 — retiring
+  a forward-reference removes its allowlist entry, not just its "reserved" prose) — which would otherwise
+  have broken 220.10's old assertion (pinned to Protocol 47 specifically having nothing left to allowlist).
+  Found while verifying this change, so fixed here rather than worked around: 220.10 now proves the
+  allowlist-note formatter's honesty against a **synthetic** hit, decoupled from whether any real
+  forward-reference exists in the docs at a given moment — arguably better regression coverage than the
+  original, which would have silently gone stale the moment its one real example resolved.
+
+**Why it doesn't hand-maintain a preamble either.** The generated file's own header stamps the commit,
+branch, and (git-derived, not wall-clock) generation date — the same discipline the old hand-written
+BASELINE PIN followed, but now produced by the script instead of a session remembering to update it.
+
+**Done means:** met. `library/TEST_CATALOG.md`'s per-suite content is regenerated from the runner and
+gate-checked against the local copy; no human hand-edits it again.
+
+---
+
 # Appendix — the original running "Last updated" header, verbatim
 
 _Preserved exactly as it last stood on line 8 of `QUEUE.md` before the split, so no word of the running history is lost._

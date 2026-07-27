@@ -75,12 +75,65 @@ The Reference Pointer Index and `library/CODE_MAP.md` only stay trustworthy if t
 
 ---
 
+## Protocol 47 — Generated Test Catalog (the GENERATED class fulfilled)
+
+**Shipped 2026-07-27 (QUEUE.md item D).** `library/TEST_CATALOG.md` is produced by
+`scripts/generate-test-catalog.js` directly from the suite headers in
+`tests/robco-diagnostics.js` — it is **never hand-maintained again**. This is the first real
+instance of the GENERATED class the 3-class model below describes, and the "generate what a
+script can compute" plumbing the Atlas (QUEUE.md item I) reuses.
+
+**What it extracts.** Every `header('…')` call in the runner is a suite boundary. A suite whose
+header is re-emitted later (a deferred async proof re-announcing itself before its result line,
+e.g. Suites 76/137/196/207/220/228) is captured once, at its first occurrence. For that
+occurrence, the nearest contiguous run of `//`-comment lines immediately above it — the
+runner's own build narration, written when the suite landed — is captured **verbatim** as the
+suite's description. A suite with no such comment gets an honest "no header comment on file"
+note, never a fabricated one. **No test COUNT is generated or tracked** — only qualitative
+per-suite content, consistent with Protocol 2a's retirement.
+
+**Usage:** `npm run test-catalog` regenerates the file; `npm run test-catalog:check` verifies it's
+current without writing (used by the gate). Regeneration is a **deliberate step**, never
+automatic — the gate only checks and fails, asking the developer to re-run the generator, the
+same "flag, never auto-fix" posture as Protocol 41's cleanup sweep.
+
+**The gitignored-`library/` gate-diff, resolved.** `library/` is gitignored, so a naive
+"diff against the committed copy" cannot run on a clean CI checkout — there is no committed copy;
+`library/TEST_CATALOG.md` never existed in git at all (only `library/MANIFEST.txt` is the
+committed exception, Protocol 46). The resolution mirrors Protocol 46's own fix for exactly this
+tension: `--check` treats **absence** as success (nothing to diff against — a machine with no
+local `library/` tree sees no difference at all, so CI can never fail here) and treats
+**presence-and-drift** as a real failure. `scripts/gate.js` runs `test-catalog:check` on **both**
+`gate:fast` and the full `gate` (pure Node, no external dependency, same placement as the A3
+cloud-serialization guard) — harmless everywhere the file is absent, and load-bearing on the one
+machine (the owner's) where it exists to drift.
+
+**Regression coverage:** **Suite 247** requires the real extraction to parse a large,
+de-duplicated suite list (both the numbered "Suite N —" convention and the suites that predate
+it), proves de-duplication of a re-emitted header, proves a genuinely bare suite gets the honest
+fallback rather than an invented one, and exercises the real `--check` CLI end-to-end (absent →
+exit 0, current → exit 0, stale → exit 1) against a throwaway output path
+(`ROBCO_TEST_CATALOG_OUTPUT`) so the developer's own local file is never touched by the test
+itself.
+
+**Suite 220's forward-reference retired in the same commit.** Protocol 47 was named by number in
+this file's 3-class model (below) before this heading existed — Suite 220.9's `REF_ALLOW_220`
+carried it as the one sanctioned forward-reference, and 220.10 proved the report disclosed it
+honestly. Both are updated here: `REF_ALLOW_220` is now empty (Protocol 49 — retiring a
+forward-reference removes its allowlist entry, not just its "reserved" prose), and 220.10 was
+re-targeted to prove the reporting formatter's honesty against a **synthetic** allowlist hit
+instead of a real one — the old version would otherwise have failed the moment this heading
+landed, for having nothing left to allowlist, which is exactly the kind of flaw Protocol 42 says
+to fix in the same commit it's found in rather than work around.
+
+---
+
 ## The 3-class library maintenance model (2.8.5 U-B1)
 
 Every doc under `library/` and `planning/` falls into exactly one of three classes, and the class dictates how it's kept current:
 
-- **LIVE** — actively maintained, gate-guarded where possible: `library/BRAIN_DUMP.md`, `library/TEST_CATALOG.md` (today — see GENERATED below), `library/CODE_MAP.md`, `QUEUE.md`, the Reference Pointer Index in `CLAUDE.md`, and the `rules/*.md` subsystem notes. A stale LIVE doc is worse than no doc at all — it makes a session confidently wrong. Update in the same commit whenever something it describes stops being true.
-- **GENERATED** — never hand-maintained; produced from source by a script and diffed against the committed copy in the gate (Protocol 47). `library/TEST_CATALOG.md` is GENERATED-class **in intent** but is still hand-maintained **today** — 2.8.5 U-B1 only relocated its content out of `CLAUDE.md`'s tail; the generator itself is a separate, later unit and is explicitly out of scope here. Until that unit lands, maintain its per-suite CONTENT by hand like a LIVE doc. It carries no test count — Protocol 2a is retired.
+- **LIVE** — actively maintained, gate-guarded where possible: `library/BRAIN_DUMP.md`, `library/CODE_MAP.md`, `QUEUE.md`, the Reference Pointer Index in `CLAUDE.md`, and the `rules/*.md` subsystem notes. A stale LIVE doc is worse than no doc at all — it makes a session confidently wrong. Update in the same commit whenever something it describes stops being true.
+- **GENERATED** — never hand-maintained; produced from source by a script and diffed against the on-disk copy in the gate. `library/TEST_CATALOG.md` **is** this class now (Protocol 47, above, shipped 2026-07-27) — it carries no test count (Protocol 2a is retired) and is regenerated by `npm run test-catalog`, never hand-edited.
 - **ARCHIVE** — frozen point-in-time snapshots: the audits, plans, mockups, and slates under `planning/`, **plus the tracked root-level `QUEUE_LOG.md`** (the shipped-work reasoning archive split out of `QUEUE.md` at the 2026-07-21 restructure — append-only; a shipped item's full account moves there under a stable `<a id>` anchor while `QUEUE.md` keeps the one-liner + link). These carry a "snapshot as of DATE — not current truth" framing and are never updated to track current code; their reasoning is reused as historical input, never trusted as current fact. The pre-2.8.0 audits (`planning/2.8.0/audits/CODE_QUALITY_AUDIT.md`, `planning/2.8.0/audits/PERFORMANCE_AUDIT.md`, `planning/2.8.0/audits/ACCESSIBILITY_AUDIT.md`, `planning/2.8.0/audits/TEST_STRENGTH_AUDIT.md`, `planning/2.8.0/audits/TOKEN_USAGE_AUDIT.md`, `planning/2.8.0/audits/UI_CONSISTENCY_AUDIT.md`, `planning/2.8.0/audits/CLOUD_AUDIT.md`, `planning/2.8.0/audits/FILE_AUDIT.md`) are ARCHIVE-class — they audited a codebase roughly 30% smaller than today's; do not trust their measurements or reuse their proposals without re-verifying against current code. (They live under `2.8.0/` because they were the analysis phase that PRODUCED the 2.8.0 overhaul — the version whose work they were part of — even though they measure the earlier v2.6.0/v2.7.0 code.)
 
 **Doc-maintenance rule (LIVE docs):**

@@ -186,7 +186,10 @@ This does not weaken the two cases where recurrence is already demonstrated: **P
 
 ## Protocol 49 — The Retirement Rule (the counterpart to the escape-ratchet)
 
-_(Protocol 47 is reserved for the future GENERATED test-catalog generator; 48 is the backup protocol. This is the next free number.)_
+_(Protocol 47 — the GENERATED test-catalog generator — shipped 2026-07-27 and is defined in
+`rules/docs-and-library.md`, not here; 48 is the backup protocol below. This numbering note is
+kept for continuity — it explains why 48/49 sit where they do — even though 47 is no longer
+"reserved.")_
 
 **A guard or rule may be retired when the risk it covers no longer exists, or was never real.** Retiring it means **removing its enforcement too, not just its prose** — a rule whose text is deleted but whose gate check survives is worse than either, because the check now enforces something no session can read or reason about.
 
@@ -360,7 +363,9 @@ At the end of **every** task, sweep the project directory for leftover/junk file
 
 ## Protocol 48 — Back Up the Local-Only Artifacts
 
-_(Protocol 47 is reserved for the future GENERATED test-catalog generator referenced in the 3-class library model — see `rules/docs-and-library.md`. This is the next free number.)_
+_(Protocol 47 — the GENERATED test-catalog generator referenced in the 3-class library model —
+shipped 2026-07-27; its heading now lives in `rules/docs-and-library.md`. This numbering note is
+kept for continuity, same as the twin note under Protocol 49 above.)_
 
 Three classes of artifact exist **only on the owner's local machine** and are **not on GitHub**: `library/` (the local-only Claude reference docs — brain dump, code map, test catalog, manifest), `planning/` (the whole gitignored build-queue tree — plans, audits, slates, mockups), and the orchestrator's persistent **memory** folder (the agent's `memory/` under the Claude session store). The public repo gitignores all three, so **a machine loss destroys them with no recovery path** — they exist nowhere else.
 

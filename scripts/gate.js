@@ -26,6 +26,9 @@
  *   4. Persistence audit — Node runner
  *   4b. Cloud-serialization guard (QUEUE.md A3 — models Firestore write rules
  *      against the live state literal; pure Node, so it runs on fast + full)
+ *   4c. Test-catalog currency (Protocol 47 — library/TEST_CATALOG.md vs the runner's
+ *      own suite headers; pure Node, runs on fast + full, no-op where the gitignored
+ *      library/ file is absent)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -388,6 +391,16 @@ run('Persistence audit (Node)', 'node tests/robco-diagnostics.js');
 // and fails LOUDLY on extraction failure (anti-vacuous) and on a broken
 // positive control — so gating it can never weaken it into a green-that-lies.
 run('Cloud-serialization guard (A3, modeled)', 'node scripts/cloud-serialization-check.js');
+
+// ── 4c. Test-catalog currency (Protocol 47, QUEUE.md item D) ──────────────────
+// library/TEST_CATALOG.md is GENERATED from tests/robco-diagnostics.js's own suite
+// headers — this fails the gate if the local copy has drifted from what the generator
+// would produce right now. Pure Node, zero external dependency, so it runs on
+// BOTH gate:fast and gate like the two static checks above. Fail-safe on the
+// gitignored-library/ tension: library/TEST_CATALOG.md is absent on a clean CI checkout
+// (and on any machine without the local-only library/ tree), and the script exits 0 in
+// that case — there is nothing to diff against there, so this step can never fail CI.
+run('Test-catalog currency (Protocol 47)', 'node scripts/generate-test-catalog.js --check');
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so

@@ -16,8 +16,11 @@ A large behavioural + static-invariant suite in the single canonical Node runner
 `tests/robco-diagnostics.js`, run by the pre-commit hook (via `npm run gate:fast`) and CI. (The
 former PowerShell mirror `tests/robco-diagnostics.ps1` was deleted in 2.8.5 U-B3 and Protocol 15
 — runner parity — retired; the mirror caught nothing the Node runner cannot, at ~13× the cost.)
-Full per-suite catalog — every suite's coverage, every work-unit's build narration — lives in
-`library/TEST_CATALOG.md` (gitignored, local-only, read on demand).
+Full per-suite catalog — every suite's title + the runner's own header-comment narration — lives
+in `library/TEST_CATALOG.md` (gitignored, local-only). It is **generated**, not hand-maintained
+(Protocol 47, `rules/docs-and-library.md`): `npm run test-catalog` regenerates it and
+`npm run test-catalog:check` (wired into `scripts/gate.js`) fails the gate if it drifts from what
+the runner would currently produce.
 
 **No test COUNT is tracked anywhere** — Protocol 2a is retired. The runner's exit status is the
 signal.

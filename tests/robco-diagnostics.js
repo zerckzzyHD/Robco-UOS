@@ -43646,10 +43646,12 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // split and every piece must resolve.
   //
   // ZERO FALSE POSITIVES is the bar (Protocol 45 discipline): only the literal
-  // token Protocol[s] <id> counts as a reference, and REF_ALLOW_220 carries the
-  // one intentional forward-reference — the not-yet-authored catalog
-  // generator+diff protocol, named by number in CLAUDE.md's 3-class library
-  // model before its heading exists. Remove that entry when the heading lands.
+  // token Protocol[s] <id> counts as a reference, and REF_ALLOW_220 exists for any
+  // intentional forward-reference — a protocol named by number before its heading
+  // is authored. It is currently empty: its one occupant, Protocol 47 (the
+  // catalog generator+diff), landed a real heading in rules/docs-and-library.md
+  // when the generator shipped (2026-07-27), so the entry was removed in the same
+  // commit rather than left stale (Protocol 49).
   {
     // Scan set: the load-bearing docs + all js + all tests (mirrors the file
     // set Suite 220 reads, widened to QUEUE.md and tests/ per the
@@ -43705,11 +43707,16 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       }
     }
 
-    // The one sanctioned forward-reference: a planned protocol named by number
-    // in CLAUDE.md's 3-class library model before its heading is authored (the
-    // GENERATED-class catalog generator+diff). Naming a not-yet-created protocol
-    // is intentional, not drift — delete this entry when its heading lands.
-    const REF_ALLOW_220 = new Set(['47']);
+    // No forward-reference is currently allowlisted — Protocol 47 (the one entry this
+    // set ever held, the not-yet-authored catalog generator+diff) landed a real heading
+    // in rules/docs-and-library.md when the generator shipped, so it now resolves
+    // directly via definedNum220 and the exception was removed in the same commit
+    // (Protocol 49: retiring a forward-reference removes its allowlist entry, not just
+    // the "reserved" prose). Left as a live Set, not deleted outright, so a genuine
+    // future forward-reference has somewhere to go — 220.10 below proves the
+    // reporting logic honestly discloses one the moment this set is ever non-empty
+    // again, using a synthetic entry rather than depending on a real one existing.
+    const REF_ALLOW_220 = new Set();
 
     const protoRefRe220 = /\bProtocols?\s+((?:UI-)?\d+[a-z]?(?:\s*\/\s*(?:UI-)?\d+[a-z]?)*)/gi;
     const danglingRef220 = new Map(); // token → Set(files it appears in)
@@ -43759,14 +43766,18 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     );
     // Defect-2 fix (r-review): report the allowlisted forward-references EXPLICITLY
     // rather than letting a blanket "every reference resolves" claim quietly absorb
-    // them. A reference on the allowlist did NOT resolve to a real heading — it was
-    // deliberately excused because its heading is not authored yet (Protocol 47, the
-    // reserved catalog generator). Saying so keeps the pass honest about what it
-    // actually verified vs. what it waived.
-    const allowlistNote220 = allowlistedHits220.size
-      ? ' — ALLOWLISTED forward-reference(s), reserved and NOT verified as resolving: ' +
-        [...allowlistedHits220].sort((a, b) => Number(a) - Number(b)).join(', ')
-      : ' — no allowlisted exceptions were applied';
+    // them — a reference on the allowlist did NOT resolve to a real heading, it was
+    // deliberately excused. Saying so keeps the pass honest about what it actually
+    // verified vs. what it waived. Factored into a named function (not inlined) so
+    // 220.10 below can prove its honesty against a SYNTHETIC allowlist hit, decoupled
+    // from whether a real forward-reference happens to exist in the docs right now.
+    function formatAllowlistNote220(hits) {
+      return hits.size
+        ? ' — ALLOWLISTED forward-reference(s), reserved and NOT verified as resolving: ' +
+            [...hits].sort((a, b) => Number(a) - Number(b)).join(', ')
+        : ' — no allowlisted exceptions were applied';
+    }
+    const allowlistNote220 = formatAllowlistNote220(allowlistedHits220);
     assert(
       defineParseOk220 && danglingRef220.size === 0,
       '220.9: every "Protocol N" reference across the docs + js/ + tests/ either resolves to a real heading in CLAUDE.md OR is an explicitly allowlisted forward-reference (compound headings 29/30/31 & 32/33/35 define each number; sub-parts like 36b/2a resolve by base)' +
@@ -43775,17 +43786,25 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         (!defineParseOk220 ? ' — DEFINED-set parse looks empty/wrong (self-integrity failed)' : '')
     );
 
-    // 220.10  Defect-2 regression (r-review): the 220.9 report must not overstate.
-    //   Protocol 47 is referenced by number in CLAUDE.md's 3-class library model but
-    //   has no heading yet (reserved) — so it MUST show up as an applied allowlist
-    //   exception, and the report string MUST name it explicitly rather than folding
-    //   it into a blanket "every reference resolves." This is the exact overstatement
-    //   the review flagged; the test fails if the report reverts to hiding it.
+    // 220.10  Defect-2 regression (r-review), re-targeted (Protocol 47 fulfillment,
+    //   2026-07-27): this used to pin its proof to Protocol 47 specifically — the
+    //   one real forward-reference on file at the time. That coupling was itself a
+    //   latent bug: the moment Protocol 47 got a real heading (this commit), the old
+    //   assertion would fail simply because there was nothing left to allowlist,
+    //   with no general regression coverage surviving its retirement. Found while
+    //   verifying THIS change (Protocol 42 — a flaw surfaced during
+    //   testing/verification is fixed in the same commit, not worked around). Fixed
+    //   by proving the formatter's honesty directly against a SYNTHETIC hit, so the
+    //   regression guard no longer depends on a real forward-reference existing —
+    //   REF_ALLOW_220 can be empty forever and this still proves the report would
+    //   disclose an exception the moment one is ever added again.
+    const syntheticNote220 = formatAllowlistNote220(new Set(['999']));
+    const emptyNote220 = formatAllowlistNote220(new Set());
     assert(
-      allowlistedHits220.has('47') &&
-        /ALLOWLISTED/.test(allowlistNote220) &&
-        /\b47\b/.test(allowlistNote220),
-      '220.10: the 220.9 report names its allowlisted forward-reference(s) explicitly (Protocol 47, reserved) instead of overstating that every reference resolves'
+      /ALLOWLISTED/.test(syntheticNote220) &&
+        /\b999\b/.test(syntheticNote220) &&
+        /no allowlisted exceptions were applied/.test(emptyNote220),
+      '220.10: the allowlist-note formatter names every allowlisted forward-reference explicitly (synthetic proof — independent of whether a real forward-reference currently exists) and reports "no exceptions" when the allowlist is empty, so the 220.9 report can never quietly absorb a future waived reference into a blanket pass'
     );
 
     // 220.11  Defect-4 regression (r-review): ARCHITECTURE.md's File Map must carry
@@ -51646,12 +51665,14 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   // sub-notes inside P's body, not ### items, so they render within P's card —
   // the view faithfully reflects the source structure.)
   // NOTE: this list hardcodes specific item IDs, which is fragile — an item
-  // closing/moving to QUEUE_LOG.md (as H did) breaks this fixture. A sturdier
-  // fix (asserting against a dynamically-sampled set of live ### ids rather
-  // than named ones) is left as a future task, not built here.
+  // closing/moving to QUEUE_LOG.md (as H did, and as D did at Protocol 47's
+  // shipment — swapped for Q here for exactly that reason) breaks this
+  // fixture. A sturdier fix (asserting against a dynamically-sampled set of
+  // live ### ids rather than named ones) is left as a future task, not built
+  // here.
   assert(
-    ['R11', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'D'].every(id => byId(id)),
-    '246.3: known ### item IDs (R11, L, A3, R5, R10, P, C1, D) are all parsed from their headings'
+    ['R11', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'Q'].every(id => byId(id)),
+    '246.3: known ### item IDs (R11, L, A3, R5, R10, P, C1, Q) are all parsed from their headings'
   );
 
   // ── Status detection maps the five glyphs correctly (from live QUEUE.md) ──
@@ -51747,6 +51768,141 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
     /^queue-view\/$/m.test(gi246),
     '246.15: the generated output dir (queue-view/) is gitignored — generator tracked, HTML regenerated on demand'
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 247 — TEST_CATALOG generator (Protocol 47, QUEUE.md item D)
+//  Verifies scripts/generate-test-catalog.js actually parses the REAL
+//  runner file into a non-trivial, de-duplicated, ordered suite list
+//  (both the numbered "Suite N —" convention and the legacy unnumbered
+//  suites that predate it), that a suite lacking a header comment gets
+//  an honest "no narration" note rather than a fabricated one, and that
+//  the --check/gitignored-library fail-safe behaves exactly like
+//  Protocol 46's library/MANIFEST.txt precedent: absent → pass silently,
+//  present-and-stale → fail loudly. Requiring the module (not shelling
+//  out) keeps this fast and lets it assert on the real parsed structure.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 247 — TEST_CATALOG generator (Protocol 47)');
+
+  const genPath247 = path.join(ROOT, 'scripts', 'generate-test-catalog.js');
+  assert(fs.existsSync(genPath247), '247.1: scripts/generate-test-catalog.js exists on disk');
+
+  delete require.cache[genPath247];
+  const GEN = require(genPath247);
+  const runnerSrc247 = fs.readFileSync(path.join(ROOT, 'tests', 'robco-diagnostics.js'), 'utf8');
+  const suites247 = GEN.extractSuites(runnerSrc247);
+
+  // 247.2  Non-trivial, de-duplicated parse (self-integrity — the same anti-vacuous
+  // bar the generator itself enforces via MIN_EXPECTED_SUITES before it will write).
+  const keys247 = suites247.map(s => (s.number != null ? 'S' + s.number : s.title));
+  assert(
+    suites247.length >= 200 && new Set(keys247).size === suites247.length,
+    `247.2: extractSuites() parses a large, de-duplicated suite list from the real runner (saw ${suites247.length})`
+  );
+
+  // 247.3  Both suite title conventions are captured: the numbered "Suite N — …"
+  // form AND the legacy unnumbered suites that predate that convention.
+  assert(
+    suites247.some(s => s.number === 220 && /Documentation reference integrity/.test(s.title)) &&
+      suites247.some(s => s.number === null && s.title === 'Parser sanity'),
+    '247.3: both the numbered "Suite N — Title" convention and the legacy unnumbered suites (e.g. "Parser sanity") are captured'
+  );
+
+  // 247.4  A re-announced suite (an async proof re-emits its own header later in the
+  // file, e.g. Suite 137/220/228) is captured exactly ONCE — the first occurrence —
+  // not once per re-emit.
+  const s220Count247 = suites247.filter(s => s.number === 220).length;
+  assert(
+    s220Count247 === 1,
+    '247.4: a suite whose header is re-emitted later (e.g. Suite 220, re-announced before RESULTS) is de-duplicated to its first occurrence'
+  );
+
+  // 247.5  A suite with a real preceding comment block gets that narration verbatim
+  // (not empty); a suite genuinely lacking one (Suite 170, confirmed bare in the
+  // runner — no header comment above it) gets the honest fallback, not a fabrication.
+  const s58_247 = suites247.find(s => s.number === 58);
+  const s170_247 = suites247.find(s => s.number === 170);
+  assert(
+    s58_247 && /ERROR_LOG_KEY/.test(s58_247.description) && s170_247 && s170_247.description === '',
+    '247.5: a suite with a header comment captures it verbatim (Suite 58 names ERROR_LOG_KEY); a genuinely bare suite (Suite 170) parses to an empty description rather than an invented one'
+  );
+
+  // 247.6  buildMarkdown() renders the honest-fallback text for an empty description,
+  // never a blank section (which would be indistinguishable from a parser bug).
+  const md247 = GEN.buildMarkdown([{ number: 1, title: 'Suite 1 — X', description: '' }], {
+    shortHash: 'abc',
+    hash: 'abc0000',
+    branch: 'dev',
+    date: '2026-01-01',
+  });
+  assert(
+    /no header comment on file for this suite/.test(md247),
+    '247.6: buildMarkdown() renders an explicit "no header comment" note for a suite with no narration, never a silently blank section'
+  );
+
+  // 247.7  package.json wires both the regenerate and the gate-check commands.
+  const pkg247 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg247.scripts['test-catalog'] === 'node scripts/generate-test-catalog.js' &&
+      pkg247.scripts['test-catalog:check'] === 'node scripts/generate-test-catalog.js --check',
+    '247.7: package.json exposes both `npm run test-catalog` (regenerate) and `npm run test-catalog:check` (gate-diff)'
+  );
+
+  // 247.8  scripts/gate.js actually runs the check on both the fast and full gate
+  // (it sits above the `if (fast)` split, same placement as the A3 cloud guard).
+  const gateSrc247 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+  const idxCheck247 = gateSrc247.indexOf('generate-test-catalog.js --check');
+  const idxFastSplit247 = gateSrc247.indexOf('if (fast) {');
+  assert(
+    idxCheck247 !== -1 && idxCheck247 < idxFastSplit247,
+    '247.8: scripts/gate.js runs `generate-test-catalog.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
+  );
+
+  // 247.9  The --check CLI is fail-safe on the gitignored-library/ tension: absent →
+  // exit 0 (never fails a clean CI checkout, same shape as Protocol 46's
+  // library/MANIFEST.txt precedent); present-and-current → exit 0; present-and-stale →
+  // exit 1 (a real drift is never silently accepted). Exercised as a REAL child
+  // process against ROBCO_TEST_CATALOG_OUTPUT (a throwaway tmp path — see the script's
+  // OUTPUT_PATH override), so this proves actual CLI behavior, never touching the
+  // developer's own local library/TEST_CATALOG.md.
+  const os247 = require('os');
+  const { spawnSync: spawnSync247 } = require('child_process');
+  const tmpDir247 = fs.mkdtempSync(path.join(os247.tmpdir(), 'robco-catalog-247-'));
+  const tmpOut247 = path.join(tmpDir247, 'TEST_CATALOG.md');
+  try {
+    const runCheck247 = () =>
+      spawnSync247(process.execPath, [genPath247, '--check'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: Object.assign({}, process.env, { ROBCO_TEST_CATALOG_OUTPUT: tmpOut247 }),
+      });
+
+    const rAbsent247 = runCheck247();
+    assert(
+      rAbsent247.status === 0 && /is absent/.test(rAbsent247.stdout),
+      '247.9a: --check exits 0 when the (overridden) output path is absent — the clean-checkout / no-local-library fail-safe'
+    );
+
+    spawnSync247(process.execPath, [genPath247], {
+      cwd: ROOT,
+      env: Object.assign({}, process.env, { ROBCO_TEST_CATALOG_OUTPUT: tmpOut247 }),
+    });
+    const rCurrent247 = runCheck247();
+    assert(
+      rCurrent247.status === 0 && /is current/.test(rCurrent247.stdout),
+      '247.9b: --check exits 0 immediately after a fresh regenerate (idempotent — regenerate then check agree)'
+    );
+
+    fs.appendFileSync(tmpOut247, '\nstray hand-edit\n');
+    const rStale247 = runCheck247();
+    assert(
+      rStale247.status === 1 && /is STALE/.test(rStale247.stderr),
+      '247.9c: --check exits 1 when the on-disk copy has drifted from what the runner would currently produce — a real drift is never silently accepted'
+    );
+  } finally {
+    fs.rmSync(tmpDir247, { recursive: true, force: true });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

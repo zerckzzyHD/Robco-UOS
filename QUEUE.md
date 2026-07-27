@@ -19,7 +19,15 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-26** — **A4 is DONE — the real-Firebase-emulator round-trip is built and
+**Last updated: 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
+`library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
+(`scripts/generate-test-catalog.js`, `npm run test-catalog` / `test-catalog:check`), never hand-typed —
+the gitignored-`library/` gate-diff tension resolved the same way Protocol 46 resolved it for
+`library/MANIFEST.txt` (absent → pass, present-and-stale → fail). Wired into `scripts/gate.js` on both
+`gate:fast` and `gate`; Suite 247 proves the real extraction end-to-end. The Atlas (item I) reuses this
+plumbing directly. Full account in [QUEUE_LOG.md#d](QUEUE_LOG.md#d).
+
+**Prior update — 2026-07-26** — **A4 is DONE — the real-Firebase-emulator round-trip is built and
 red-then-green PROVEN.** With the JDK blocker cleared (2026-07-23) and `firebase-tools` committed as a
 dev-only dependency, A4 upgrades A3's modeled cloud-serialization guard from _modelled_ to _verified_:
 `scripts/emulator-round-trip-check.js` (`npm run test:emulator`) runs the real Firebase client SDK against
@@ -203,8 +211,8 @@ the Atlas's assurance view (I).** The order below is built on that distinction.
 
 **Gated items that ride their dependency, NOT this order:** **P3** (AI-facing museum extract) helps sessions
 and can move up, but is gated on the "current-by-absence" supersession-logic fix (recorded under P3 / R10
-finding H) — it lands after that fix, not before. **The Atlas [I] depends on D** (the TEST_CATALOG generator),
-unchanged.
+finding H) — it lands after that fix, not before. **The Atlas [I] depended on D** (the TEST_CATALOG
+generator) — **D shipped 2026-07-27** (Protocol 47), so that dependency is now cleared.
 
 ---
 
@@ -275,6 +283,9 @@ _Governance restructure:_
 - **R9** ✅ The skill made a POINTER, not a copy — the fourth context source stops being a second source of
   truth. **The owner has re-installed the skill (confirmed 2026-07-21), so R9's outstanding manual step is now
   closed** — and it also carries the `21c78f7` gate-claim correction (R10 finding E). → [account](QUEUE_LOG.md#r9)
+- **D** ✅ The TEST_CATALOG generator (Protocol 47) — `library/TEST_CATALOG.md` is now GENERATED from the
+  runner's own suite headers, never hand-typed; the Atlas (item I) reuses this plumbing directly. →
+  [account](QUEUE_LOG.md#d)
 
 _Small residual fixes:_
 
@@ -537,28 +548,6 @@ fuller synthetic-DOM harness (event dispatch and a mount pipeline), which is a h
 
 **Done means:** the remaining deferred render-path suites execute the real render and assert the result,
 matching the behavioral bar the rest of U3 set.
-
-### D. ⬜ The TEST_CATALOG generator — REDUCED SCOPE after R1 (pairs with the Atlas, item I)
-
-**What it is.** `library/TEST_CATALOG.md` is GENERATED-class **in intent** but hand-synced **today**, and
-it drifted twice. This builds the generator that produces it from the test runner and gate-diffs it
-against the committed copy.
-
-**⚠ Scope reduced by R1.** R1 deleted the whole test-count bookkeeping, so the "stop hand-syncing the
-COUNT" half of this item's original rationale is gone. What's left is generating the per-suite **content**
-(each suite's coverage narration) — which is exactly what the ATLAS assurance view (I) consumes. So D is
-now the first concrete instance of "generate what a script can compute" and the plumbing the Atlas reuses.
-
-**What it depends on.** The runner (exists) and R1 (done). The one genuine gate is a **design decision, not
-a missing foundation**: `library/` is gitignored, so a naive gate-diff can't run on a clean CI checkout —
-resolve that (the same tension the doc-integrity guards already navigate) and the generator is
-straightforward.
-
-**Why it sits here.** Best done just before the Atlas so they share the "generation over maintenance"
-plumbing rather than inventing it twice.
-
-**Done means:** the catalog's per-suite content is regenerated from the runner and gate-checked against its
-committed copy; no human hand-edits it again.
 
 ### L. 🔄 A generated, private HTML view of THIS queue — PRIVATE VIEW BUILT (2026-07-23); player-facing view still deferred
 
@@ -1159,7 +1148,7 @@ path preserved at boot.
 > list virtualization is re-sequenced into the 2.9.0 inventory-panel foundation and built once, there. (The
 > one genuine mis-ordering the 2026-07-18 evaluation found.)
 
-### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph (depends on D)
+### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph (D shipped — dependency cleared)
 
 **What it is.** The synthesis deliverable from the ecosystem cross-review
 (`planning/2.8.5/audits/ATLAS_ECOSYSTEM_SYNTHESIS.md`): a single generated representation of the whole
@@ -1169,8 +1158,9 @@ governing rule: **generate everything a script can compute; hand-maintain only t
 
 **What it depends on.** (1) The **pinned baseline** (available now: the R4 pin). (2) The
 **architecture-conformance scanner** (shipped, Suite 236) and a cheap **dependency-structure matrix**. (3)
-The **TEST_CATALOG generator** (D) — same "generate, don't maintain" plumbing, which is why D is best done
-just before this.
+The **TEST_CATALOG generator** (D) — ✅ **shipped 2026-07-27** (Protocol 47); the same "generate, don't
+maintain" plumbing (`scripts/generate-test-catalog.js`'s extraction + gate-diff shape) is directly reusable
+here.
 
 **Why it's last.** It's the capstone that represents the finished round, and it wants the round finished and
 pinned to represent it honestly.
