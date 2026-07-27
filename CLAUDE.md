@@ -1,7 +1,11 @@
 # RobCo U.O.S. — Agent Rules
 
 > Every rule here was formalized from a real bug or established by the project owner.
-> Follow this document first, `ARCHITECTURE.md` second.
+> Follow this document first, `ARCHITECTURE.md` second — **task-retrieved by section, not
+> wholesale** (R10 Step 3): each `rules/*.md` note below points at the specific
+> `ARCHITECTURE.md` anchor(s) for its surface in its own "Related notes"; read those, not
+> the whole 3,500-line file. `ARCHITECTURE.md`'s own Table of Contents is the routing index
+> if a surface has no note pointing at it yet.
 
 **How this rulebook is structured (2.8.5 roadmap item R2).** *Written is not the same as
 retrieved.* A rule only works if it is loaded for the task at hand, current, unambiguous, and
@@ -60,7 +64,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) — the QUEUE only; full accounts of shipped/ruled-out work live in `QUEUE_LOG.md` (repo root, append-only archive) |
 | **Canonical protocol & gate rules** | this file (the universal contract) + `rules/*.md` (the subsystem notes) |
 | **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
-| **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/services/api-directive.js` builds the directive and owns `getSystemDirective()`; `js/services/api-import.js` owns `autoImportState()`; `js/services/api.js` is the network-layer hub only) — rules in `rules/ai-contract.md`, design rationale in `ARCHITECTURE.md` |
+| **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/services/api-directive.js` builds the directive and owns `getSystemDirective()`; `js/services/api-import.js` owns `autoImportState()`; `js/services/api.js` is the network-layer hub only) — rules in `rules/ai-contract.md`, design rationale in `ARCHITECTURE.md#ai-integration-pipeline` |
 | **Boot lifecycle** — `window.onload`'s call order, the boot-phase functions, the event-bus subscriber wiring order | `library/CODE_MAP.md` § Boot Lifecycle (`js/ui/ui-core*.js` — the `ui-core.js` hub + the 2.8.5 U-A1 split family; `loadUI()` lives in the hub) |
 | **State shape** — `let state = {…}`, `GAME_DEFS`, `migrateState()`, the save envelope | `library/CODE_MAP.md` § State (`js/core/state.js`) |
 | **Event bus** — `RobcoEvents`, every emitted event name, every subscriber-wiring function and which file owns it | `library/CODE_MAP.md` § Event Bus |
@@ -77,7 +81,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | **Script load order / boot chain** | `rules/file-layout.md` (machine-checked against `index.html`) |
 | **The 3-class library maintenance model** (LIVE / GENERATED / ARCHIVE) and the doc-maintenance rule | `rules/docs-and-library.md` |
 | **Recover memory + queue after a machine loss** — the fresh-Dispatch rehydrate runbook (Protocol 48 backs the data up; this restores it) | `rules/memory-restore.md` |
-| **Architecture deep-dive** (canonical design decisions) | `ARCHITECTURE.md` |
+| **Architecture deep-dive, BY SECTION** (canonical design decisions — R10 Step 3: task-retrieved, never read wholesale) | The relevant `rules/*.md` note's "Related notes" section names the exact section anchor(s) for that surface. No note covers your surface yet, or you want the full picture? `ARCHITECTURE.md`'s own Table of Contents lists all 39 sections with their stable anchors. |
 | **Plain-English release history** | `CHANGELOG.md` |
 
 > Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `library/CODE_MAP.md` is derived directly from source (Protocol 46) and is a snapshot too — a session that finds it disagreeing with the code trusts the code and should flag the drift.

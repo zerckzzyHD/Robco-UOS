@@ -43981,6 +43981,72 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
           (parityChecked < 5 ? ` — only ${parityChecked} notes parsed (parser regression?)` : '')
       );
     }
+
+    // 220.16  R10 finding A / Step 3 (2026-07-26): ARCHITECTURE.md anchor
+    //   integrity. Step 3 made ARCHITECTURE.md task-retrieved BY SECTION
+    //   (stable `<a id="…">` anchors, routed to from CLAUDE.md and every
+    //   rules/*.md note's own "Related notes") instead of read wholesale.
+    //   That routing is only real if the anchors it points at actually
+    //   exist — a renamed/removed section must not silently orphan a
+    //   reference and send a session to nothing (the exact "written is not
+    //   retrieved" failure R10 finding A named). Two things are asserted:
+    //   (a) every `ARCHITECTURE.md#slug` reference anywhere in CLAUDE.md or
+    //   a rules/*.md note resolves to a real `<a id="slug">` in
+    //   ARCHITECTURE.md; (b) every in-file `](#slug)` link inside
+    //   ARCHITECTURE.md itself (the Table of Contents plus inline
+    //   cross-references) also resolves. A minimum-anchor-count floor
+    //   guards against the extraction itself silently finding nothing.
+    {
+      const archSrc220 = docText220['ARCHITECTURE.md'];
+      const archAnchors220 = new Set(
+        [...archSrc220.matchAll(/<a id="([a-z0-9-]+)">/g)].map(m => m[1])
+      );
+
+      const externalRefFailures = [];
+      let externalRefsChecked = 0;
+      for (const d of DOC_FILES_220) {
+        if (d === 'ARCHITECTURE.md') continue;
+        for (const m of docText220[d].matchAll(/ARCHITECTURE\.md#([a-z0-9-]+)/g)) {
+          externalRefsChecked++;
+          if (!archAnchors220.has(m[1])) {
+            externalRefFailures.push(`${d} references ARCHITECTURE.md#${m[1]}, no such anchor`);
+          }
+        }
+      }
+
+      const internalLinkFailures = [];
+      let internalLinksChecked = 0;
+      for (const m of archSrc220.matchAll(/]\(#([a-z0-9-]+)\)/g)) {
+        internalLinksChecked++;
+        if (!archAnchors220.has(m[1])) {
+          internalLinkFailures.push(`ARCHITECTURE.md internal link to #${m[1]}, no such anchor`);
+        }
+      }
+
+      assert(
+        archAnchors220.size >= 30 &&
+          externalRefFailures.length === 0 &&
+          internalLinkFailures.length === 0 &&
+          externalRefsChecked >= 5 &&
+          internalLinksChecked >= 30,
+        '220.16: every ARCHITECTURE.md#slug reference from CLAUDE.md/rules/*.md, and every in-file ](#slug) link inside ARCHITECTURE.md, resolves to a real <a id> anchor (R10 Step 3 routing cannot silently rot)' +
+          (archAnchors220.size < 30
+            ? ` — only ${archAnchors220.size} anchors found (extraction regression?)`
+            : '') +
+          (externalRefsChecked < 5
+            ? ` — only ${externalRefsChecked} external refs found (extraction regression?)`
+            : '') +
+          (internalLinksChecked < 30
+            ? ` — only ${internalLinksChecked} internal links found (extraction regression?)`
+            : '') +
+          (externalRefFailures.length
+            ? ' — DANGLING EXTERNAL: ' + externalRefFailures.join('; ')
+            : '') +
+          (internalLinkFailures.length
+            ? ' — DANGLING INTERNAL: ' + internalLinkFailures.join('; ')
+            : '')
+      );
+    }
   }
 }
 

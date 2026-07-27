@@ -654,7 +654,7 @@ files once (recorded under G), so this deletion pass must have the app repo to i
 removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
 standing rule has a home in the rules/deploy-backup layer.
 
-### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — 2 defects FIXED, the rest recorded
+### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — all 3 sequenced steps DONE (2026-07-26); only finding L (owner decision) and finding G (cosmetic) remain
 
 **What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
 project **stores, retrieves and connects what it knows about itself** — the retrieval chain, the scoped
@@ -765,8 +765,47 @@ removed:
   only real scope claims are checked). Proven to catch a gap (removing `firebase.json` from the auth row fires
   RED). **No second routing document** was created.
 
-**Still owed in R10 — STEP 3 only** (route `ARCHITECTURE.md` by section instead of universally, finding A),
-plus the ride-along/gated items (F is done; G low; H/I gated on P3 / the Atlas; L is an owner decision).
+**✅ STEP 3 DONE (2026-07-26) — Finding A closed. `ARCHITECTURE.md` is now task-retrieved BY
+SECTION, not read wholesale.** All 39 `##` sections got a stable, hand-curated `<a id="…">`
+anchor (decoupled from heading prose, so a reword can't silently break a link — the QUEUE_LOG
+`<a id>` pattern applied here for the same reason). Two `###` subsections that are independently
+link-referenced (Cloud Push/Pull, the OS Event Bus) got their own anchors too. **Routed from
+both places finding A named:** every `rules/*.md` note whose surface has real
+`ARCHITECTURE.md` content now names the exact anchor(s) in its own "Related notes" section
+(`state-and-save.md`, `deploy-and-cache.md`, `auth-and-cloud.md`, `ui-and-mobile.md`,
+`audio.md`, `game-data.md`, `ai-contract.md`, `file-layout.md` — 8 of the 10 notes; the other
+two, `testing-and-gates.md` and `docs-and-library.md`, have no dedicated `ARCHITECTURE.md`
+section to point at); `CLAUDE.md`'s own "read `ARCHITECTURE.md` second" line and its Reference
+Pointer Index row were rewritten to say by-section, pointing a session with no matching note at
+the file's own (now-complete) Table of Contents. **Explicitly not a second summary document** —
+the anchors and the pointers are the whole change; no new file was created. **Guarded — new
+Suite 220.16**, proven red-then-green (renaming one anchor made both an external `rules/*.md`
+reference AND an internal `](#…)` link fire red; restoring it went green): every
+`ARCHITECTURE.md#slug` reference from `CLAUDE.md`/`rules/*.md` and every in-file link inside
+`ARCHITECTURE.md` itself must resolve to a real anchor, so this routing can't silently rot the
+way the pre-existing Table of Contents already had (it listed 19 of the file's 39 sections,
+using GitHub's fragile auto-slug on headings with nested parentheticals — both bugs fixed as
+part of this pass, since they were found while rebuilding the TOC).
+
+**Also finding B's remaining half — the operational checklists/runbooks, relocated
+conservatively.** Five duplicated obligation-checklists (the two state-field checklists, the
+audio-source checklist, the UI-panel checklist, the registry-autocomplete checklist, and the
+Service Worker Cache Protocol's rule/format/guard) are now a short **rationale/invariant**
+paragraph in `ARCHITECTURE.md` linking to the already-canonical, already-more-current version
+in the owning `rules/*.md` note (verified each rules/*.md checklist was equal-or-more-complete
+before relocating — nothing was lost, and the cache-protocol's Format+Examples table, which
+`rules/deploy-and-cache.md` didn't yet carry, was moved there first, additively, per Protocol 22
+"extend before creating"). **`## Hotfix Rollback (Protocol 16)` was deliberately left alone** —
+CLAUDE.md's own Protocol 16 text already explicitly delegates the runbook to this exact section
+(`runbook in ARCHITECTURE.md § "Hotfix Rollback"`), so it is not a duplicate to relocate; it got
+an anchor for routing and nothing else. **Nothing flagged as ambiguous** — every relocation
+target was an unambiguous, already-existing, already-more-current canonical home.
+
+**R10's three-step sequence is now fully executed.** What's left is not sequence work: **Finding
+G** (LOW, a redundant-not-duplicate App Check mention — cosmetic, earns its slot on the next
+queue-touch pass, not gating anything); **Findings H/I** (gated on P3 / the Atlas, unchanged);
+**Finding L** (the external-control-plane-state ledger question — still an open owner decision,
+unchanged, not something this pass could resolve).
 
 **⬜ RECORDED, ranked by consequence — the knowledge-architecture defects (high-priority doc-currency + one
 enforcement gap; none gate the `dev → main` release, all belong to the next governance pass / R5 conversion
@@ -782,23 +821,20 @@ thread).**
   and `git log`: all four lines were authored by the restructure commit **`eac54ba`**. CLAUDE.md's own pointer
   index is _correct_ — so the restructure copied the drift into the subsystem note while the index it sat beside
   was right, violating "each fact in exactly one place" and Protocol 3. **Why it survived the gate → finding C.**
-- **Finding B — `ARCHITECTURE.md` is doing two jobs and carries current-looking errors** (beyond the Defect-2
-  `setDoc`, which is fixed). Its header says rules live elsewhere, yet it holds the cache protocol, the rollback
-  runbook, and the state/audio/UI change checklists. Stale specifics confirmed: the **File Map (line 104)**, the
-  **`### Inbound (autoImportState in api.js)` heading (line ~2594)**, and the **state checklist (lines
-  2183-2191)** all still credit `api.js` with the directive + import (the doc is internally inconsistent —
-  lines 354-356 attribute them correctly); the **cache section (line ~3393)** claims a _strict monotonic-rev_
-  guard that the real guard **deliberately dropped** in favour of "differ from HEAD"; the state checklist names
-  the single `ui-render.js`. Direction (record, don't build): Architecture owns stable rationale/invariants;
-  rules own obligations; the code map + source own current locations — remove the operational checklists in
-  favour of links.
-- **Finding A — the blanket-retrieval problem MOVED rather than being solved.** CLAUDE.md (**501 lines /
-  ~57 KB**) tells every session to then read `ARCHITECTURE.md` (**3,462 lines / ~348 KB**), loaded **wholesale**
-  — it has an internal TOC but nothing routes a session to a _section_. So >400 KB of universal material still
-  loads before task code; the scoped-notes win is real but the retrieval chain partly defeats it. Direction:
-  make Architecture **task-retrieved by section** — route surfaces to Architecture anchors from the existing
-  retrieval map / scoped notes; **explicitly NOT another summary document**; a Suite 220-style check can verify
-  the named anchors exist.
+- **Finding B — ✅ FULLY CLOSED (stale facts at Step 1, 2026-07-21; the operational-checklists direction
+  at Step 3, 2026-07-26).** `ARCHITECTURE.md` was doing two jobs and carried current-looking errors: the
+  stale `api.js` attributions (File Map, the Inbound heading, the state checklist) and the monotonic-rev
+  cache claim were corrected at Step 1. The direction this finding recorded — "remove the operational
+  checklists in favour of links; Architecture owns rationale/invariants, rules own obligations" — is now
+  built: the cache protocol, the two state-field checklists, the audio-source checklist, the UI-panel
+  checklist, and the autocomplete checklist are all short rationale paragraphs linking to their canonical
+  `rules/*.md` home. Full account under R10's own Step 3 entry above.
+- **Finding A — ✅ CLOSED (Step 3, 2026-07-26).** The blanket-retrieval problem — CLAUDE.md sent every
+  session to read the whole `ARCHITECTURE.md` (**3,462 lines / ~348 KB**) wholesale, with a TOC but no
+  routing to a _section_ — is fixed: 39 stable `<a id>` section anchors, `rules/*.md` notes and
+  `CLAUDE.md` routed to the specific anchors for their surface, no second summary document, and Suite
+  **220.16** verifies the named anchors exist (red-then-green proven). Full account under R10's own
+  Step 3 entry above.
 - **Finding C — ✅ CLOSED (skill-half in step 1; Suite-220 half in step 2, 2026-07-23). Suite 220 did far less
   than Protocol 45 advertised, which is why B/B-critical passed a green gate.** Suite **220.2**'s regex matched
   **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);

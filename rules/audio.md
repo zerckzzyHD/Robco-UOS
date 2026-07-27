@@ -35,3 +35,4 @@
 - A new audio toggle is also a device preference that must survive reload:
   **Protocol UI-6** — in `rules/ui-and-mobile.md`.
 - Per-game audio flavor rides `GAME_DEFS[ctx].identity`: `rules/game-data.md` (Protocol 38).
+- Design rationale (R10 Step 3, task-retrieved by section): `ARCHITECTURE.md#audio-system`.

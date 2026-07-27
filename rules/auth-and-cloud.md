@@ -68,3 +68,5 @@ _(Formerly three separate protocols. All three numbers are retained as labeled p
 - The state fields riding the save container: `rules/state-and-save.md` (Protocol 4)
 - Deploy/cache mechanics for a cloud-touching push: `rules/deploy-and-cache.md`
 - Restoring a broken live site: **Protocol 16** — in `CLAUDE.md`, universal.
+- Design rationale (R10 Step 3, task-retrieved by section): the additive upload shape is
+  `ARCHITECTURE.md#cloud-push`; the load/sanitize/migrate path is `ARCHITECTURE.md#cloud-pull`.

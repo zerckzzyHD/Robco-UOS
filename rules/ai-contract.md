@@ -13,7 +13,9 @@
 **Tri-Node JSON schema** — `narrative`, `state`, `modal`. The AI is locked to
 `responseMimeType: 'application/json'`; it cannot produce freeform text. The directive builders,
 the router grammar, and the import path are mapped in `library/CODE_MAP.md` § AI Contract; the
-design rationale is in `ARCHITECTURE.md`.
+design rationale (R10 Step 3, task-retrieved by section) is `ARCHITECTURE.md#ai-integration-pipeline`
+for the outbound/inbound contract and `ARCHITECTURE.md#command-line-mode` for the offline
+native-command router.
 
 ---
 

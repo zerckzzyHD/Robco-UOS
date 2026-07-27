@@ -60,3 +60,8 @@ save container automatically; confirm the sanitizer covers it) or **dedicated do
 - AI → state import contract: `rules/ai-contract.md` (Protocols 14, 24)
 - Cloud write safety: `rules/auth-and-cloud.md` (Protocols 34, 32/33/35)
 - Test-harness obligations: `rules/testing-and-gates.md` (Protocols 13, 20, 40, 44)
+- Design rationale (R10 Step 3, task-retrieved by section — not the whole 348KB file):
+  the `state` object shape is `ARCHITECTURE.md#state-architecture`; the save/load/export/
+  import flow and the durability mirror are `ARCHITECTURE.md#persistence-lifecycle`; the
+  save/sync contract table is `ARCHITECTURE.md#save-load-sync-contract`; the Terminal
+  Record event log is `ARCHITECTURE.md#terminal-record`.

@@ -51,3 +51,7 @@ state** — a Protocol 23 boundary, in `CLAUDE.md`. Adding a registry-backed aut
 - Per-game design facets in the UI: `rules/ui-and-mobile.md` (Protocols UI-7, UI-9, UI-10)
 - Boot order and where `GAME_FILES` sits: `rules/file-layout.md`
 - The AI as typist, never authority, for durable state: `rules/ai-contract.md` (Protocol 24)
+- Design rationale (R10 Step 3, task-retrieved by section): the registry itself is
+  `ARCHITECTURE.md#fallout-data-registry`; the parity/reserved-column ledger is
+  `ARCHITECTURE.md#per-game-data-parity`; the `identity` design-data block is
+  `ARCHITECTURE.md#per-game-identity-block`.

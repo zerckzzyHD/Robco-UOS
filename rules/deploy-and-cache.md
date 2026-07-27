@@ -17,6 +17,12 @@ Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **se
 - `N` starts at 1 for each new `APP_VERSION`.
 - Increment `N` whenever a **served-file commit** is pushed.
 
+| Scenario                     | Before      | After       |
+| ---------------------------- | ----------- | ----------- |
+| New version released         | `v1.6.5-r3` | `v1.6.6-r1` |
+| UI tweak within same version | `v1.6.5-r1` | `v1.6.5-r2` |
+| Second UI tweak same version | `v1.6.5-r2` | `v1.6.5-r3` |
+
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping only when served files change keeps the signal meaningful and avoids spurious update prompts on doc-only or CI-only pushes.
 
 **Automated guard:** The pre-commit hook delegates to `scripts/cache-bump-guard.js` (Node, so it is testable behaviourally — Suite 30). If any staged file is in that served/precached set, the guard requires the staged `CACHE_NAME` to **differ from this branch's own HEAD value** (`git show HEAD:sw.js`). This "must differ from HEAD" invariant is **branch-agnostic** — it holds identically on `dev`, `main`, and any future branch, because it never compares against another branch. (This replaced the earlier monotonic-rev check, which compared against `origin/main` and was therefore inert on `dev`, where the local rev is always ahead of the release-only `main` — the guard passed unconditionally no matter what was staged.) If the HEAD baseline is unreachable (fresh repo, or `sw.js` not yet committed), the guard **warns and passes** (fail-safe — a missing baseline never blocks a commit). Non-served commits (doc-only, CI, tests) skip the cache check entirely.
@@ -60,3 +66,6 @@ The worked example is the in-app changelog viewer — Protocol 21, in `rules/doc
   `rules/auth-and-cloud.md`. Prefer the flag over `git revert` when the break is contained.
 - Branch model (`dev` working, `main` release-only): **Protocol 43** — in `CLAUDE.md`.
 - UI render verification at 360/412/desktop: **Protocol 10** — in `rules/ui-and-mobile.md`.
+- Design rationale (R10 Step 3, task-retrieved by section): the cache-first mechanism and
+  its origin incident are `ARCHITECTURE.md#service-worker-cache-protocol`; the rollback
+  runbook's own script/commands are `ARCHITECTURE.md#hotfix-rollback`.

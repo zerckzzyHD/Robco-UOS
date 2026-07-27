@@ -191,3 +191,8 @@ Any AI/Director-facing presence surface is a **reskin over the existing chat pip
 - Audio toggles inside UI panels: `rules/audio.md` (Protocol 7)
 - Device preferences vs campaign state: `rules/state-and-save.md`
 - Static class/markup contract guards: `rules/testing-and-gates.md` (Protocol 20)
+- Design rationale (R10 Step 3, task-retrieved by section): the render pipeline is
+  `ARCHITECTURE.md#ui-rendering-pipeline`; the bezel/nav chrome is
+  `ARCHITECTURE.md#bezel-chrome-nav`; the registry autocomplete UI is
+  `ARCHITECTURE.md#registry-autocomplete`; the per-screen hardware dressing passes are
+  `ARCHITECTURE.md#operator-screen`, `#operations-screen`, `#databank-screen`.

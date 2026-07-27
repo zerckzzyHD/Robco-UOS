@@ -91,3 +91,6 @@ commit to update **`library/CODE_MAP.md`** and the Reference Pointer Index (**Pr
 - Doc-reference and load-order gate guards: `rules/docs-and-library.md` (Protocols 45, 46)
 - Boot-order guard suites: `rules/testing-and-gates.md`
 - The per-game file manifest: `rules/game-data.md` (Protocol 38)
+- Design rationale (R10 Step 3, task-retrieved by section): the full repo layout is
+  `ARCHITECTURE.md#file-map`; the load-order narrative (why database → state → registry →
+  ui → api → cloud) is `ARCHITECTURE.md#script-load-order`.

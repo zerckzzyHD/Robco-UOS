@@ -292,7 +292,7 @@ Global-scope `<script>` tags load in strict order (per-game db/reg pair is chose
 31. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
 ```
 
-`ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries, and add-a-field/audio/panel checklists).
+`ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries) — task-retrieved by section (R10 Step 3), not read wholesale. The current add-a-field/audio/panel checklists live in `rules/*.md`.
 
 ---
 
@@ -406,11 +406,11 @@ A **production-quality, two-game browser application** with:
 
 ## 🗂 Additional Documentation
 
-| Document                           | Description                                                                                   |
-| ---------------------------------- | --------------------------------------------------------------------------------------------- |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System dependency map, persistence lifecycle, audio chain, boundaries, and add-a-X checklists |
-| [PRIVACY.md](PRIVACY.md)           | Plain-English privacy policy — what is stored, where, and how to delete it                    |
-| [CHANGELOG.md](CHANGELOG.md)       | Full version history (also read by the in-app FIRMWARE REVISION LOG viewer)                   |
+| Document                           | Description                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System dependency map, persistence lifecycle, audio chain, boundaries — rationale, task-retrieved by section |
+| [PRIVACY.md](PRIVACY.md)           | Plain-English privacy policy — what is stored, where, and how to delete it                                   |
+| [CHANGELOG.md](CHANGELOG.md)       | Full version history (also read by the in-app FIRMWARE REVISION LOG viewer)                                  |
 
 ---
 

@@ -12,32 +12,58 @@
 
 ---
 
+<a id="table-of-contents"></a>
+
 ## Table of Contents
+
+> **Every entry below is a stable `<a id>` anchor** (R10 finding A / Step 3) — the anchor
+> text never changes even if the heading prose above it is reworded, so a link into this
+> doc from `CLAUDE.md` or a `rules/*.md` note can't silently rot. This list was regenerated
+> from the real heading set (previously 19 entries, drifted 20 headings out of date) — trust
+> this list over any stale copy elsewhere (Protocol 3).
 
 1. [Project Philosophy](#project-philosophy)
 2. [File Map](#file-map)
-3. [Script Load Order & Globals](#script-load-order--globals)
-   3a. [Per-Game Identity Block](#per-game-identity-block-game_defsctxidentity--design-overhaul-do-k)
-   3b. [Bezel Chrome + Subsystem Nav](#bezel-chrome--subsystem-nav-indexhtml--csstermincalcss--jsui-corejs--design-overhaul-do-n)
-   3c. [Director Uplink — the Living Overseer](#director-uplink--the-living-overseer-jsui-corejs--jsapijs--csstermincalcss--design-overhaul-do-o)
-4. [State Architecture](#state-architecture)
-5. [Persistence Lifecycle](#persistence-lifecycle)
-6. [Save/Load/Sync Contract](#saveloadsync-contract)
-7. [AI Integration Pipeline](#ai-integration-pipeline)
-8. [Audio System](#audio-system)
-9. [UI Rendering Pipeline](#ui-rendering-pipeline)
-10. [Time System](#time-system)
-11. [Faction System](#faction-system)
-12. [Undo System](#undo-system)
-13. [Settings & localStorage Keys](#settings--localstorage-keys)
-14. [System Dependency Map](#system-dependency-map)
-15. [Historical Lessons](#historical-lessons)
-16. [Service Worker Cache Protocol](#service-worker-cache-protocol)
-17. [Adding a New State Field (Checklist)](#adding-a-new-state-field-checklist)
-18. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source-checklist)
-19. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel-checklist)
+3. [Script Load Order & Globals](#script-load-order)
+4. [Ambient Runtime](#ambient-runtime)
+5. [Developer Console / Diagnostic Shell](#diagnostic-shell)
+6. [Fallout Data Registry](#fallout-data-registry)
+7. [Per-Game Data Parity & Reserved-Column Ledger](#per-game-data-parity)
+8. [Per-Game Identity Block](#per-game-identity-block)
+9. [Bezel Chrome + Subsystem Nav](#bezel-chrome-nav)
+10. [Director Uplink — the Living Overseer](#director-uplink)
+11. [CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE](#chassis)
+12. [OPERATOR Screen Hardware Dressing](#operator-screen)
+13. [OPERATIONS Screen Hardware Dressing](#operations-screen)
+14. [DATABANK Screen Hardware Dressing](#databank-screen)
+15. [Ceremony Moments Wave 1](#ceremony-moments)
+16. [Mobile Density Standard, Tier-1](#mobile-density-standard)
+17. [State Architecture](#state-architecture)
+18. [CAMPG Tab System](#campg-tab-system)
+19. [Registry Autocomplete System](#registry-autocomplete)
+20. [Persistence Lifecycle](#persistence-lifecycle)
+21. [Save/Load/Sync Contract](#save-load-sync-contract)
+22. [Terminal Record](#terminal-record)
+23. [AI Integration Pipeline](#ai-integration-pipeline)
+24. [Command-Line MODE](#command-line-mode)
+25. [Audio System](#audio-system)
+26. [UI Rendering Pipeline](#ui-rendering-pipeline)
+27. [Time System](#time-system)
+28. [Faction System](#faction-system)
+29. [Undo System](#undo-system)
+30. [World Map](#world-map)
+31. [Settings & localStorage Keys](#settings-localstorage-keys)
+32. [System Dependency Map](#system-dependency-map)
+33. [Historical Lessons](#historical-lessons)
+34. [Service Worker Cache Protocol](#service-worker-cache-protocol)
+35. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
+36. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
+37. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
+38. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
 
 ---
+
+<a id="project-philosophy"></a>
 
 ## Project Philosophy
 
@@ -48,6 +74,8 @@
 - **Browser-native.** No build step, no framework, no bundler for production. Vanilla HTML/CSS/JS with `<script>` tags.
 
 ---
+
+<a id="file-map"></a>
 
 ## File Map
 
@@ -132,6 +160,8 @@
 ```
 
 ---
+
+<a id="script-load-order"></a>
 
 ## Script Load Order & Globals
 
@@ -456,6 +486,8 @@ its exports to `window.*` for the other scripts to call.
 
 ---
 
+<a id="ambient-runtime"></a>
+
 ## Ambient Runtime (`js/core/runtime.js` — Step 2 · Phase 2 · A1)
 
 `window.AmbientRuntime` is the OS-level lifecycle substrate for everything atmospheric: it owns **one canonical terminal state**, runs **one heartbeat**, and hosts an **observer registry**. Every ambient consumer (timers, UPLINK, hardware choreography, the attract/standby experiences) subscribes here rather than re-implementing its own tick or its own immersion-dial check.
@@ -517,6 +549,8 @@ ON`) fixes this: it is hidden by default and shown **only** via the SAME `body.r
 **Read-only observer introspection.** `AmbientRuntime.listObservers()` returns a plain-data snapshot of every registered observer (`{id, states, tier, cadenceMs}` only — never the `onTick`/`onEnter`/`onExit` closures), for tooling that needs to inspect what's wired without touching the registry. Consumed by the Test Console below.
 
 ---
+
+<a id="diagnostic-shell"></a>
 
 ## Developer Console / Diagnostic Shell (`js/dev/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)
 
@@ -583,6 +617,8 @@ Guarded by Suite 215 (Node runner, 16 tests: the U4b registry/synthesis-path/nat
 
 ---
 
+<a id="fallout-data-registry"></a>
+
 ## Fallout Data Registry (`js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js`)
 
 Added in v1.6.5. Read-only canonical Fallout reference data for autocomplete and future validation. The registry is now split: `js/data/registry-core.js` holds the read-only search engine (`FALLOUT_REGISTRY` accessor + `registrySearch()`), and the per-game data lives in `js/data/reg_nv.js` (FNV) and `js/data/reg_fo3.js` (FO3) — the active data file is chosen by the `GAME_FILES` manifest in `index.html`.
@@ -648,6 +684,8 @@ const FALLOUT_REGISTRY = {
 | Keywords         | Deferred                                                                |
 
 ---
+
+<a id="per-game-data-parity"></a>
 
 ## Per-Game Data Parity & Reserved-Column Ledger (Step 2 Phase 0 U11)
 
@@ -740,6 +778,8 @@ not just planned, by the DO-K unit below** — `GAME_DEFS.FO4` now exists with `
 
 ---
 
+<a id="per-game-identity-block"></a>
+
 ## Per-Game Identity Block (`GAME_DEFS[ctx].identity` — Design Overhaul DO-K)
 
 The Design Overhaul's keystone unit (`planning/2.8.0/plans/DESIGN_OVERHAUL_BUILD_PLAN.md`, DO-K, built first
@@ -821,6 +861,8 @@ write sites.
 **Extraction-pass finding — the per-game abstraction, measured against two real machines (`planning/2.8.5/audits/SKIN_ARCHITECTURE_EXTRACTION.md`).** Once both machines were built (NV = salvaged desk terminal, FO3 = Pip-Boy 3000), the owed post-FO3 measurement graded the abstraction from the actual code, and it held well: **FO3's entire divergence from NV is a pure CSS override layer** — ~2,100 lines in ONE `[data-game='FO3']`-gated file (`css/60-fo3-pipboy.css`, ~13% of all CSS, ~96% inside a single `@media(orientation:landscape)` block), plus ~5 `identity` data fields and 3 inert-for-NV wrapper divs (`#fo3TopStrip`/`#fo3SubtabRail`/`#fo3BoardScroll`). **The render/state/api/cloud pipeline has zero game-name branches** — per-game behavior flows entirely through `getIdentity()` data (22 call sites) and shared render functions; there is no forked renderer (`renderXxxFO3()` does not exist) and NV is the un-gated default skin. **The one strained seam:** the Pip-Boy shell is keyed to the GAME (`[data-game='FO3']`), not the MACHINE FAMILY — and `identity.machine` / `structuralMode` (and `material`) are **declared but read by zero lines of code today**, the deliberately-anticipated hook for a machine-family root attribute. That seam is the single scoped pre-3.0 "machine-family skin re-key" (re-key the ~278 shell selectors to `[data-machine='pipboy']` and wire the dead fields onto `<html>`), so FO3 and FO4 (Pip-Boy 3000 Mk IV) share one body. The sanctioned N-game rule this establishes: **chrome selectors should key off the machine family (`data-machine`), while flavour keys off `[data-game]`** — the FO3-era `[data-game]` shell gate is a two-game convenience, not the intended N-game pattern. The reskin/data half of a new game remains a clean file-drop (`GAME_FILES` manifest + data files + `designOnly` flip); only the re-body half needs that one re-key, and only if the new game takes the Pip-Boy body.
 
 ---
+
+<a id="bezel-chrome-nav"></a>
 
 ## Bezel Chrome + Subsystem Nav (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul DO-N)
 
@@ -1023,6 +1065,8 @@ all 7 keycaps render pixel-identical widths, no label wraps or is ellipsis-clipp
 horizontal overflow, and the active keycap's pressed-in look (r120) is untouched. Cache r121.
 
 ---
+
+<a id="director-uplink"></a>
 
 ## Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/` (order-prefixed files) — Design Overhaul DO-O)
 
@@ -1239,6 +1283,8 @@ custom property that falls back to `--bezel-wire`; the save-menu button sets it 
 
 ---
 
+<a id="chassis"></a>
+
 ## CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)
 
 Rebuilds the CHASSIS `[5]` tab from one flat SYSTEM STATUS panel into three real
@@ -1444,6 +1490,8 @@ resolving its own correct tier value. Suite 195.1/195.2 (and the reworked
 future edit reverts to the bare, cascade-dead selector.
 
 ---
+
+<a id="operator-screen"></a>
 
 ## OPERATOR Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)
 
@@ -1682,6 +1730,8 @@ fader drag, skeleton-zone click, RAD clamp, tempo dial drag/arrow-keys) verified
 
 ---
 
+<a id="operations-screen"></a>
+
 ## OPERATIONS Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)
 
 The INV tab's five panels (BACKPACK INVENTORY, COLLECTIBLES, CRAFTING, TRADE, SQUAD STATUS) are
@@ -1913,6 +1963,8 @@ Protocol 17 tap-target floor, and the bezel-telemetry SEIZED flag.
 
 ---
 
+<a id="databank-screen"></a>
+
 ## DATABANK Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)
 
 The DATA/CAMPG tab's six panels (WORLD MAP, QUEST LOG, DATABANK search, CAMPAIGN NOTES, CAMPAIGN LOG,
@@ -2036,6 +2088,8 @@ and the game-agnostic guard (no hardcoded FNV/FO3/region literal in the new rend
 
 ---
 
+<a id="ceremony-moments"></a>
+
 ## Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/` (order-prefixed files) — Suite 208)
 
 Five small transition/ceremony beats picked from `planning/2.8.0/slates/CEREMONY_MOMENTS_SLATE.md`'s Tier-1
@@ -2095,6 +2149,8 @@ invariant, boot-integrity (the `_bootActive` window / `onComplete` / three-flavo
 
 ---
 
+<a id="mobile-density-standard"></a>
+
 ## Mobile Density Standard, Tier-1 (`css/` (order-prefixed files) — planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md §2/§3)
 
 Owner-approved Tier-1 mobile spacing tightening. The plan measured every board's spacing (padding,
@@ -2136,6 +2192,8 @@ untouched floor-bearing children (`.pk-x`, `.vu-track`, `.composer-input`), the 
 placement after every base rule, and the no-desktop-gate-leak guard.
 
 ---
+
+<a id="state-architecture"></a>
 
 ## State Architecture
 
@@ -2183,18 +2241,16 @@ let state = {
 
 ### Adding a New Field
 
-Adding a new top-level key to `state` requires changes in **4 files**. The pre-commit
-persistence audit will block the commit if any step is missed:
-
-1. **state.js** — Add the field to `let state = { ... }` with its default value
-2. **state.js** — Add migration in `migrateState()` for older saves: `if (!s.newField) s.newField = default;`
-3. **api-import.js** — Add import handling in `autoImportState()` so AI responses update the field
-4. _(If applicable)_ **ui-render-\*.js** (the per-panel render family) — Add rendering in the appropriate `render*()` function
-
-The pre-commit gate (`tests/robco-diagnostics.js`, the Node runner) auto-discovers all keys
-in `state.js` and verifies that every key appears in `autoImportState()`.
+Every new top-level key needs a minimum-4-file change (state default, migration, AI-import
+handling, and cloud-sync path) — the pre-commit persistence audit blocks the commit if any
+step is missed, and it auto-discovers every key in `state.js` to verify it against
+`autoImportState()`. **The full checklist is Protocol 4, in `rules/state-and-save.md`** — this is the invariant
+(why 4 files, and why the gate can enforce it); the rules note owns the current
+step-by-step list.
 
 ---
+
+<a id="campg-tab-system"></a>
 
 ## CAMPG Tab System
 
@@ -2257,6 +2313,8 @@ The campaign lifecycle **config** controls live in `#campaignConfigPanel`
 
 ---
 
+<a id="registry-autocomplete"></a>
+
 ## Registry Autocomplete System
 
 Added in v1.6.5. A singleton autocomplete panel (`#acPanel`) wired to text inputs in `ui-saves.js`.
@@ -2279,12 +2337,17 @@ initRegistryAutocomplete()  ← called once in window.onload
 
 ### Adding a new autocomplete-backed input
 
-1. Add `<input type="text" id="newXxxName" ...>` in **index.html**
-2. In `initRegistryAutocomplete()` in **ui-saves.js**, add: `wireInput('newXxxName', 'category');`
-3. If the category is new, add it to `FALLOUT_REGISTRY` in the per-game data files (**reg_nv.js** / **reg_fo3.js**)
-4. If it has an add action, create `addXxx()` in the appropriate **ui-render-\*.js** panel file mirroring `addPerk()` (which lives in **ui-render-character.js**)
+An input is wired, not styled — `wireInput()` in `initRegistryAutocomplete()`, the per-game
+`FALLOUT_REGISTRY` categories, and the `addX`/`delX`/`toggleX` CRUD naming convention are the
+real wiring points. **The current, authoritative step list is Protocol 6, in
+`rules/ui-and-mobile.md`** (which points at `library/CODE_MAP.md § Registry` for the
+derived-from-source detail) — kept there rather than duplicated here because a hand-written
+copy of this exact list already went stale once (it named `ui-render.js` after the render
+layer split into the `ui-render-*.js` family).
 
 ---
+
+<a id="persistence-lifecycle"></a>
 
 ## Persistence Lifecycle
 
@@ -2463,6 +2526,8 @@ helper-throw-on-valid-save lock) and the `LAYER3` sections of
 the eviction false-positive family, both degraded modes); six `SAVE
 INTEGRITY` Diagnostic Shell tools (Protocol 44).
 
+<a id="cloud-push"></a>
+
 ### Cloud Push (saveCurrentToCloud → \_uploadSaveDoc in cloud.js)
 
 Cloud saves are **additive** — never a blind `setDoc` that would overwrite (Protocol 34: a
@@ -2492,6 +2557,8 @@ An existing save is modified in place by id with `updateDoc` (rename/overwrite),
 dedicated `secrets/gemini` key doc — never a campaign save. See `rules/auth-and-cloud.md`
 (Protocol 34) for the rule.
 
+<a id="cloud-pull"></a>
+
 ### Cloud Pull (loadCloudSave in cloud.js)
 
 ```
@@ -2513,6 +2580,8 @@ Load calls: migrateState() → state merge → restoreChatHistory → loadUI
 
 ---
 
+<a id="save-load-sync-contract"></a>
+
 ## Save/Load/Sync Contract
 
 **Every persistence path must:**
@@ -2525,6 +2594,8 @@ Load calls: migrateState() → state merge → restoreChatHistory → loadUI
 6. Never silently drop unknown fields (spread operator preserves them)
 
 ---
+
+<a id="terminal-record"></a>
 
 ## Terminal Record (P4 — structured event log)
 
@@ -2557,6 +2628,8 @@ Suite 113 RETIRED-macro list). **Cloud-sync path:** serialized-whole via the cam
 container (`robco_v8`) — eventLog rides the save/export/rolling-backup/cloud push and
 is coerced by `sanitizeImportedContainer()` → `migrateState()` on pull (Protocol 34);
 no dedicated Firestore doc.
+
+<a id="ai-integration-pipeline"></a>
 
 ## AI Integration Pipeline
 
@@ -2731,6 +2804,8 @@ edits can never disagree on a clamp. No new `state` field — Protocol 4's 4-fil
 
 ---
 
+<a id="command-line-mode"></a>
+
 ## Command-Line MODE (`js/services/api.js` + `js/ui/ui-core.js` — Step 2 · Phase 2 · B1)
 
 A single mode pill (`#modePill`, in the Comm-Link input toolbar) chooses which of two
@@ -2800,6 +2875,8 @@ MetaStore-backed via `getInputMode()`/`setInputMode()`/`otherInputMode()` in
 
 ---
 
+<a id="audio-system"></a>
+
 ## Audio System
 
 ### Architecture
@@ -2860,6 +2937,8 @@ preventing redundant oscillator creation on every keystroke.
 
 ---
 
+<a id="ui-rendering-pipeline"></a>
+
 ## UI Rendering Pipeline
 
 ### Entry Point: `loadUI()` (ui-core.js)
@@ -2909,6 +2988,8 @@ not `+=` loop) for O(n) performance instead of O(n²).
 
 ---
 
+<a id="time-system"></a>
+
 ## Time System
 
 ```
@@ -2924,6 +3005,8 @@ UI: 3 separate inputs (Day/Hour/Min) with onTimeInputChanged()
 ```
 
 ---
+
+<a id="faction-system"></a>
 
 ## Faction System
 
@@ -3012,7 +3095,7 @@ Any change is auto-appended to `state.campaign_notes` via `_logCampaignEvent()`
 
 As of Step 2 (v2.8.0) Phase 0 U8, `_logCampaignEvent()` is also the target of
 auto-log subscribers on the OS Event Bus (see below) for level-ups, collectible
-acquisitions, crafts, trades, and sleeps — see [OS Event Bus](#os-event-bus-robcoevents).
+acquisitions, crafts, trades, and sleeps — see [OS Event Bus](#os-event-bus).
 
 ### Consequence Triggers (#4)
 
@@ -3024,6 +3107,8 @@ Prior to Step 2 U7 this iterated a hardcoded FNV-only key array
 (`['ncr','legion','house','bos','boomers','khans']`), so FO3 campaigns never
 triggered the alert — a Protocol 38 leak, fixed by reading the game-agnostic
 registry instead.
+
+<a id="os-event-bus"></a>
 
 ### OS Event Bus (RobcoEvents)
 
@@ -3053,7 +3138,7 @@ by a `state.js` auto-log subscriber that writes to `state.campaign_notes` via
 
 **Subscriber-wiring constraint:** `ui-audio.js`, `ui-core.js`, and `api.js` are
 static `<script>` tags that can execute **before** `state.js` — which is
-injected dynamically, context-conditionally (see [Script Load Order](#script-load-order--globals))
+injected dynamically, context-conditionally (see [Script Load Order](#script-load-order))
 — has finished loading, so a bare top-level `RobcoEvents.on(...)` call in any of
 those three files can throw `"RobcoEvents is not defined"`. Every cross-file
 subscriber registration is therefore wrapped in a named `_wire*EventBusSubscribers()`
@@ -3064,6 +3149,8 @@ they run inside the same script that defines `RobcoEvents`, so no cross-file
 ordering hazard applies.
 
 ---
+
+<a id="undo-system"></a>
 
 ## Undo System
 
@@ -3088,6 +3175,8 @@ loadUI();
 The undo button appears after every sync and hides after use.
 
 ---
+
+<a id="world-map"></a>
 
 ## World Map (G6)
 
@@ -3124,6 +3213,8 @@ The grid highlights **only zones with score ≥ 50** to prevent coincidental sub
 `mapView` is excluded from `getSystemDirective()` — it is a client-side UI preference that the AI has no reason to set or read.
 
 ---
+
+<a id="settings-localstorage-keys"></a>
 
 ## Settings & localStorage Keys
 
@@ -3210,6 +3301,8 @@ These keys are campaign or cloud-sync data and are deliberately excluded from `M
 
 ---
 
+<a id="system-dependency-map"></a>
+
 ## System Dependency Map
 
 ```mermaid
@@ -3263,6 +3356,8 @@ graph TD
    both the cache and the toggle functions.
 
 ---
+
+<a id="historical-lessons"></a>
 
 ## Historical Lessons
 
@@ -3357,52 +3452,21 @@ layout-independent fallback (viewport width, a CSS media query, or a resize obse
 
 ---
 
+<a id="service-worker-cache-protocol"></a>
+
 ## Service Worker Cache Protocol
 
-> **⚠ This applies to any commit that stages a served/precached file** (index.html, sw.js, manifest.json, icon\*.png, css/, js/). Doc-, config-, and test-only commits are exempt.
+The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has visited the site, their browser serves files from the SW cache — not the network. The **only** mechanism that forces an update is changing `CACHE_NAME`. Forgetting to bump it means cached users **silently run the old UI** until they manually clear their browser cache — they will never see the "REBOOT TERMINAL" update prompt.
 
-The Service Worker (`sw.js`) uses a **cache-first** strategy. Once a user has visited the site, their browser serves files from the SW cache — not the network. The **only** mechanism that forces an update is changing `CACHE_NAME`.
-
-### The Rule
-
-**Bump `CACHE_NAME` in `sw.js` whenever a commit stages a served/precached file.** Doc-only, config-only, and test-only commits do not require a bump. The following always qualify and must never ship without a bump:
-
-- `index.html` (any UI change, new panel, new button, layout tweak)
-- `css/` (order-prefixed files) (any style change)
-- `js/*.js` (any logic change the user will see or interact with)
-- `sw.js` itself
-
-### Format
-
-```
-'robco-terminal-v{APP_VERSION}-r{N}'
-```
-
-- `APP_VERSION` matches the current `APP_VERSION` in `state.js`
-- `N` is a monotonically increasing integer, starting at 1 for each new `APP_VERSION`
-- Increment `N` whenever a served-file commit is pushed
-
-**Examples:**
-
-| Scenario                     | Before      | After       |
-| ---------------------------- | ----------- | ----------- |
-| New version released         | `v1.6.5-r3` | `v1.6.6-r1` |
-| UI tweak within same version | `v1.6.5-r1` | `v1.6.5-r2` |
-| Second UI tweak same version | `v1.6.5-r2` | `v1.6.5-r3` |
-
-### Why It Matters
-
-Forgetting to bump means cached users **silently run the old UI** until they manually clear their browser cache — they will never see the "REBOOT TERMINAL" update prompt.
-
-### Automated Guard
-
-The pre-commit hook (`scripts/cache-bump-guard.js`) enforces this conditionally: it first checks whether any staged file matches the served/precached set (`SERVED_RE` — `index.html`, `sw.js`, `manifest.json`, `CHANGELOG.md`, `assets/`, `css/`, `js/`). If matched, it requires only that the staged `CACHE_NAME` **differ** from this branch's own HEAD value — it does **not** verify a monotonic increase (the old branch-relative arithmetic was dropped because on `dev`, always many revs ahead of release-only `main`, "local N > main N" was unconditionally true and the guard was inert; the branch-agnostic "must differ from HEAD" holds on any branch). Incrementing the `-rN` suffix is the naming convention to follow, but the guard's invariant is difference from HEAD, not ordering. Non-served commits (doc-only, CI, tests) skip the check. If HEAD's `sw.js` is unreachable (fresh repo / sw.js not yet committed), the guard warns and passes, validating format only — a missing baseline never blocks.
+**The rule, the format, and the automated guard are Protocol 1, in `rules/deploy-and-cache.md`** (R10 Step 3 — this file owns the invariant/rationale above; the rules note owns the current bump-when-and-how obligation and the guard's actual behavior, so it never drifts from the classifier the way this section once did).
 
 ### Historical Note
 
 This protocol was formalized in v1.6.5 after the perk panel (`addPerk()` + `#newPerkName`) was deployed within an existing `1.6.5` cache name, causing the feature to be invisible to cached users.
 
 ---
+
+<a id="hotfix-rollback"></a>
 
 ## Hotfix Rollback (Protocol 16)
 
@@ -3428,50 +3492,40 @@ The script stages `git revert --no-commit`, increments `CACHE_NAME` to a new rev
 
 ---
 
+<a id="adding-a-new-state-field"></a>
+
 ## Adding a New State Field (Checklist)
 
-- [ ] Add field to `let state = { ... }` in **state.js** with default value
-- [ ] Add migration in `migrateState()` in **state.js**: `if (!s.field) s.field = default;`
-- [ ] Add import handling in `autoImportState()` in **api-import.js**
-- [ ] If the AI should return it: update `getSystemDirective()` schema in **api-directive.js**
-- [ ] If it needs UI: add `render*()` function in the appropriate **ui-render-\*.js** panel file and call it from `loadUI()` in **ui-core.js**
-- [ ] If it needs a panel: add `<details class="panel">` in **index.html**
-- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix (e.g. `-r1` → `-r2`)
-- [ ] Run `npm run lint` — no new errors
-- [ ] Run `npm run format` — clean formatting
-- [ ] `git commit` — pre-commit hook runs the CACHE_NAME guard first (only if a served file is staged; skipped for doc/CI/test-only commits), then the persistence audit
-- [ ] **Update ARCHITECTURE.md** — version header, any new sections relevant to the change
-- [ ] **Update CHANGELOG.md** — add entry under the current version block
-- [ ] **Update README.md** — Current State section, feature tables if applicable
+Touches **state.js**, **api-import.js**, and — if the field needs UI or the AI should return
+it — **api-directive.js** and a **ui-render-\*.js** panel, plus the standing `CACHE_NAME` /
+lint / format / docs gate steps every served-file commit carries. **The current, authoritative
+checklist is Protocol 4, in `rules/state-and-save.md`** — kept in exactly one place because
+this section and the [State Architecture](#state-architecture) mini-checklist above had drifted
+out of sync with each other before this pass (R10 finding B).
 
 ---
+
+<a id="adding-a-new-audio-source"></a>
 
 ## Adding a New Audio Source (Checklist)
 
-- [ ] Create function in **ui-audio.js** using the existing `audioCtx`
-- [ ] Add `if (AudioSettings.masterMute) return;` as the first line
-- [ ] Add a specific mute check: `if (AudioSettings.<key>) return;`
-- [ ] Add the mute key to `AudioSettings` initialization in **ui-core.js**
-- [ ] Add a checkbox toggle in **index.html** (in the Audio Systems panel)
-- [ ] Add the localStorage key to `toggleAudio()`'s `keyMap` in **ui-audio.js**
-- [ ] Add the localStorage key to `toggleMasterMute()`'s un-mute logic
-- [ ] Add the new localStorage key to the [Settings table](#settings--localstorage-keys)
-- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
-- [ ] **Update ARCHITECTURE.md** — add to AudioSettings table and Audio System section
-- [ ] **Update CHANGELOG.md** and **README.md**
+Touches **ui-audio.js** (the mute-guard pattern), the `AudioSettings` init block in
+**ui-core.js**, and the [Settings table](#settings-localstorage-keys) below, plus the standing
+`CACHE_NAME` / docs gate steps. **The current, authoritative checklist is Protocol 7, in
+`rules/audio.md`.**
 
 ---
 
+<a id="adding-a-new-ui-panel"></a>
+
 ## Adding a New UI Panel (Checklist)
 
-- [ ] Add `<details class="panel">` block in **index.html**
-- [ ] Create `render*()` function in the appropriate **ui-render-\*.js** panel file
-- [ ] Call `render*()` from `loadUI()` in **ui-core.js**
-- [ ] If it shows a count: add to `_updatePanelBadges()` in **ui-core.js**
-- [ ] If AI changes should auto-expand it: add to `expandPanelForCategory()` map in **ui-core.js**
-- [ ] If it has a text input for adding items: call `wireInput()` in `initRegistryAutocomplete()`
-- [ ] **Bump `CACHE_NAME` in `sw.js`** — increment `-rN` suffix
-- [ ] Panel memory (#35) works automatically via the `details.panel` selector
-- [ ] Keyboard shortcut (#15) works automatically for the first 6 panels
-- [ ] **Update ARCHITECTURE.md** — add to UI Rendering Pipeline table
-- [ ] **Update CHANGELOG.md** and **README.md**
+**A new panel is wired into every panel-wiring point, not just rendered** — the render-pipeline
+fan-out, the badge map (`_updatePanelBadges()`), the AI auto-expand map
+(`expandPanelForCategory()`), and the autocomplete wiring, each in **ui-core.js**. **The
+current, authoritative list of those points is Protocol 5, in `rules/ui-and-mobile.md`**, which
+points at `library/CODE_MAP.md § Render Pipeline → "Panel wiring points"` — derived from source
+rather than transcribed here, because a hand-written copy of this exact checklist already went
+stale once (it named the pre-split `ui-render.js`, R10 finding B). Panel memory and the
+keyboard-shortcut wiring both work automatically via the `details.panel` selector and existing
+shortcut plumbing — no extra step needed for either.
