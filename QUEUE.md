@@ -17,9 +17,31 @@ the workflow-review prompt, and `CHANGELOG.md`. Regrouping an item does not chan
 Protocol 49 retirement discipline (retire in place, never renumber) applied to queue IDs. A future session
 that "tidies" these breaks every external reference — do not.
 
+**Note for whoever assigns the next ID (2026-07-27): the single letters are now EXHAUSTED** — A-Z are all
+spoken for, with **V/W/X/Y/Z** taken in this pass. New work takes a **family prefix** instead, the way
+**R1-R11**, **P1-P14** and the new **CP1-CP5** already do. A family prefix is better anyway: it says what an
+item belongs to, and it never runs out.
+
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **Item L's private view is now owner-confirmed.** The owner opened the
+**Last updated: 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
+top priority (owner's explicit call), and the museum sits directly under it.** A long work session produced
+more than the queue could hold, so this pass folds all of it in and re-orders the board. **New at the top —
+a whole new program (CP1-CP5):** the empirical spike campaign that must prove or kill hook-based containment
+before anything is built, the staged build gated on it, an immediate-mitigations track that needs no control
+layer at all, the broader sync audit, and the laptop-witness inventory. **⚠ Everything in that program is
+PROPOSED / PLANNED / gated — nothing of it is built or operating; it is written that way deliberately.**
+**The museum moved up** out of the 2.8.5 tail into its own top-level section, gaining five new items:
+**P10** (⭐ drop the hardcoded 10-stop tab bar and redo the nav — the "no 11th slot" constraint is VOID),
+**P11** (the Visual Web build on P8's structure), **P12** (the Article Room), **P13** (⚠ a SECURITY scan-list
+gap P8 found) and **P14** (the live museum is stale — the republish). **Shipped this session and moved to the
+log:** **V** (the archive-sync repair — a silent-push-failure fixed), **W** (archive/museum organization
+fixes), **X** (the Exhibit folder relocated into `!RobCo`) and **P8**'s completed account. **A3/A4 stay in
+this file on purpose** — a test fixture pins them here; the reason is recorded in the shipped list below.
+**Two owner wrap-up asks are now tracked:** **Y** (the memory-for-the-story reconciliation) and
+**Z** (the evidence-grounded workflow explanation). The ordering overlay below is rewritten to match.
+
+**Prior update — 2026-07-27** — **Item L's private view is now owner-confirmed.** The owner opened the
 generated `queue-view/queue-view.html` on his own phone and confirmed it reads right ("it looks good",
 2026-07-27) — the sign-off L's private half was waiting on (Dispatch's own 360px verification had already
 passed). L's private-view account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l); L stays open, narrowed to only
@@ -112,15 +134,20 @@ running history chain in
 
 ## Where we are right now (the real 5-second version)
 
-- **⏸ STATUS — DEVELOPMENT IS PAUSING for a LONG gap (2026-07-24).** The owner's Claude subscription ends
-  **~2026-07-25** and he is **holding off renewing** until after an apartment move settles — expect a
-  **multi-week gap (renewal ~next month)**, so a returning session is coming back **cold** and should treat
-  anything time-sensitive as stale until re-checked. The **museum publication was the last milestone shipped**
-  (P2 ✅ — live at https://robco-exhibit.pages.dev/). **On resume:** read the `museum-publish-internal-docs-leak`
-  memory **and this queue** to pick the thread back up. Nothing is mid-flight or broken — this is a clean pause
-  at a shipped milestone. **The clearest first-thing-back items are pre-diagnosed and ready:** A4 (finish the
-  `firebase-tools` half-install), L (owner's own phone eyeball of the queue view), and P9 (the intent-photo
-  framing crop).
+- **▶ STATUS — DEVELOPMENT IS ACTIVE AGAIN (2026-07-27).** The pause held for two days, not the expected
+  multi-week gap: the owner bought a one-month Pro stint on 2026-07-25 and is **back on Max 5x as of
+  2026-07-27**, so the budget scrimping that shaped 2026-07-26/27 no longer applies. **This supersedes the
+  earlier "development is pausing for a long gap" note** (recorded 2026-07-24, correct when written). The
+  three items that note called first-thing-back all landed: **A4** ✅ (built and emulator-proven 2026-07-26),
+  **L** ✅ (owner-confirmed on his phone 2026-07-27), and **P9** — still open, now sitting with the other
+  museum polish. **Nothing is mid-flight or broken.** ⚠ The tier is not permanent; re-confirm if the owner
+  mentions a change.
+- **⭐ THE TOP PRIORITY IS NOW THE WORKFLOW / CONTROL PLANE (owner's explicit call, 2026-07-27)** — the
+  program at **CP1-CP5**, directly below. The honest framing, and the reason it outranks feature work: the
+  project's real bottleneck was never a missing agentic technique, it is the **control plane** — no completion
+  event, no cancel, ghost/duplicate launches, no durable job ledger, no usage warning until a session hits the
+  cap mid-run. **⚠ None of it is built.** CP1 (the empirical spike campaign) exists to prove or KILL the
+  hook-based approach before a line of it is written.
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
 - **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
@@ -151,13 +178,18 @@ running history chain in
   pushed** to the archive; the capture pipeline + reproducibility (P1) landed; the **three intent-vs-reality
   blockers are all CLOSED** (images bundled in-site, captures release-pinned, exhibit a finished 3-pair
   curation); the `--public` self-contained tree was name-scrubbed, verified zero-leak, and exposed via a fresh
-  public repo (`Robco-Exhibit`, zero archive history) on Cloudflare Pages. **Remaining museum work is all
-  POST-launch / parked:** the **external-second** review (design note e), **contextual-return nav (P5)**, the
-  **AI-collaboration exhibit (P6)**, and the new parked follow-ups **P7** (origin-overview exhibit), **P8**
-  (story-material synthesis audit), **P9** (intent-vs-reality framing fix — pre-diagnosed) — plus the Fable Direction-B
-  - gallery-mats design polish. **The two governing principles recorded 2026-07-22 (owner) stand:** CURATION is
-    the museum-wide law — **capture everything, exhibit a curated subset** — with the **Visual Web (the "Magnum
-    Opus") its ONE exemption** (complete-but-navigable, not curated); both under P.
+  public repo (`Robco-Exhibit`, zero archive history) on Cloudflare Pages. **⚠ The LIVE site is now STALE
+  against its source** (published 2026-07-24; the archive has moved since) — "finish the museum" ends with a
+  republish (**P14**), and **P13** is a hard security precondition on it. **P8 ✅ SHIPPED 2026-07-27** — the
+  story corpus (146 canonical arcs) and the structure/connection map are filed in the archive and are the
+  input to **P11**, the Visual Web build. **Remaining museum work:** **P10** (⭐ drop the 10-stop tab bar,
+  redo the nav), **P11** (Visual Web), **P12** (Article Room), **P13**/**P14** (security scan + republish),
+  the **external-second** review (design note e), **contextual-return nav (P5)**, the **AI-collaboration
+  exhibit (P6)**, **P7** (origin-overview exhibit), **P9** (intent-vs-reality framing fix — pre-diagnosed),
+  plus the Fable Direction-B + gallery-mats design polish. **The two governing principles recorded
+  2026-07-22 (owner) stand:** CURATION is the museum-wide law — **capture everything, exhibit a curated
+  subset** — with the **Visual Web (the "Magnum Opus") its ONE exemption** (complete-but-navigable, not
+  curated); both under P.
 - **⭐ The cross-cutting EXECUTION ORDER is now recorded (decided 2026-07-21; R11 moved before the ship the
   SAME day, owner's call):** **R10 doc-fixes → R11 knowledge graph → A3 → ship 2.8.5 → 2.9.0 with the Atlas
   built in.** The one-line why: fix the docs every session is forced to read FIRST, then build the graph that
@@ -172,7 +204,34 @@ _Everything shipped is summarized below with a link to its full account in
 
 ---
 
-## ⭐ The execution SEQUENCE (decided 2026-07-21 — the owner asked Dispatch to sequence, then approved: "go with recs")
+## ⭐ The execution ORDER — CURRENT (owner's call, 2026-07-27)
+
+**Three bands, top to bottom. This is the live ordering; the 2026-07-21 sequence below it is kept in place
+as the record of the round it governed (Protocol 50 (a-date) — a revision carries its own date rather than
+overwriting the original).**
+
+1. **⭐ FIRST — the WORKFLOW / CONTROL-PLANE program → [CP1-CP5].** The owner's explicit call. **The one
+   actionable next step is CP1**, the empirical spike campaign — it needs owner hands-on time and it exists
+   to prove or **kill** the hook-based approach before anything is built. **CP3 (immediate mitigations) can
+   run in parallel and needs no control layer at all**, which is exactly why it is separated out: if the
+   spikes come back negative, CP3 still ships. **Why it goes first:** every other item on this board is
+   dispatched THROUGH the control plane, so its defects tax all of them — the same "fix what bleeds every
+   session first" reasoning that put R10's trusted-layer fixes at the head of the 2026-07-21 order.
+2. **THEN the MUSEUM → [P, P5-P14].** The build order inside it is P8's own: **P10** (the nav is now free to
+   change) → **P11 Stage 0** (`arcs.json`, the curated edge layer — the one genuinely new data artifact) →
+   the arc spine → the coverage view → the Visual Web. **P13 → P14** (the security scan-list fix, then the
+   republish) closes the loop on a live site that is currently stale.
+3. **THEN everything else** — the 2.8.5 tail (B, L, Q, R10's residue, R11's gating call, R5-R7, C1, I), then
+   2.9.0. **Item I (the Atlas) explicitly RIDES P11's graph renderer** — it is the same "one derivation,
+   many views" plumbing, and building a second one would be the Protocol 22 parallel-implementation trap.
+
+**What is deliberately NOT in this order:** nothing was retired or de-scoped to make room. The bands are a
+priority overlay on the readiness groups below, exactly as the 2026-07-21 sequence was — the filing is
+unchanged.
+
+---
+
+## The execution SEQUENCE of the 2.8.5 round (decided 2026-07-21 — the owner asked Dispatch to sequence, then approved: "go with recs"; steps 1-3 are now DONE, kept for its reasoning)
 
 **This is a cross-cutting ORDER laid over the readiness groups below — it does NOT re-file anything.** Each
 step points at its existing item; the readiness grouping (Ready now / Blocked on owner / Blocked on another
@@ -234,998 +293,197 @@ generator) — **D shipped 2026-07-27** (Protocol 47), so that dependency is now
 
 ---
 
-# ✅ Shipped milestones (full accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md))
+# ⭐ TOP PRIORITY — the WORKFLOW / CONTROL-PLANE program (CP1-CP5, new 2026-07-27)
 
-- **✅ 2.8.0 — "The Physical Machine"** (live on prod). The New Vegas hardware overhaul: every subsystem
-  re-dressed as a bespoke instrument, the offline native terminals, the 159-tool Diagnostic Shell, the
-  ambient runtime, and the foundations (event bus, two-store boundary, AI-directive + boot
-  decompositions). → [full account](QUEUE_LOG.md#v280)
-- **✅ Brain dump** (shipped, maintained from here on). The deep Claude-facing reconstruction of the whole
-  project so every session starts accurate. → [full account](QUEUE_LOG.md#braindump)
-- **✅ 2.8.5 item 1 — the code + test health spine.** Readability refactor, the library/token split, and
-  the full U1–U12 health round — capped by Protocol 23 enforcement (Suite 236; debt baselined at 20
-  render→save + 26 service→view + 0 registry). → [full account](QUEUE_LOG.md#u1)
-- **✅ 2.8.5 item 2 — perf / accessibility / bundle-size** (folded into U1–U12; accessibility driven 40→0).
-  → [full account](QUEUE_LOG.md#u2)
-- **✅ 2.8.5 item 3 — brain-dump re-baseline** on the clean codebase. → [full account](QUEUE_LOG.md#u3doc)
-- **✅ 2.8.5 item 4 — Fallout 3 Pip-Boy device skin** (COMPLETE: U0-U9 + bottom-dock occlusion fix + the
-  skin-architecture extraction pass). MANIFEST density deferred to pre-3.0. →
-  [full account](QUEUE_LOG.md#fo3)
-- **✅ 2.8.5 item 5 — save integrity Layers 1–2** (semantic survival test + `persist()` request). →
-  [full account](QUEUE_LOG.md#saveintegrity)
-- **✅ Data-provenance program** — both games re-sourced to `fallout.wiki` and guarded; the FO3 karma engine
-  rebuilt. → [full account](QUEUE_LOG.md#dataprovenance)
-- **✅ Save integrity — Layer 3** (read-side fail-loud: quarantine-not-delete, READ FAULT / EVICTION
-  banners). → [full account](QUEUE_LOG.md#saveintegrityl3)
-- **✅ UI truthfulness fixes** — three flows that reported success on a failed operation, corrected. →
-  [full account](QUEUE_LOG.md#uitruthfulness)
-- **✅ 2.8.5 item 6 — legacy / schematic per-game layout** (SHIPPED 2026-07-20; Suite 241 parity check). →
-  [full account](QUEUE_LOG.md#schematic)
+> **⛔ READ THIS BEFORE ANY LINE BELOW. NOTHING IN THIS PROGRAM IS BUILT.** Every mechanism named here —
+> hooks, leases, ledgers, wrappers, notifications, termination, worktree routing — is **PROPOSED or PLANNED**,
+> and the load-bearing ones are **gated on CP1's spikes actually firing them**. A future session must not read
+> this section as a description of something that operates. It is a design under test. Where a claim has been
+> mechanism-supported but never executed, it says so.
+
+**Where this came from — the arc, recorded because it IS the story (2026-07-27).** Over one heavy work day
+the phone-facing orchestrator (Dispatch) kept hitting its own control-plane limits, and instead of papering
+over them the owner had it turn the project's self-maintaining-system discipline on **itself**:
+
+1. **The symptom pile.** Ghost / duplicate launches; plain-text-invisible-on-mobile (recurred 3+ times in one
+   session — the operator kept using a channel the owner cannot see); no completion notification (poll-only);
+   no cancel or interrupt; sessions idling on backgrounded pushes; no durable job ledger; no usage-cap warning
+   until a session hit the cap mid-run.
+2. **The register.** A raw problem list, then a structured 12-problem evidence register with a 9-field schema.
+3. **The GPT↔Claude convergence.** GPT (relayed by the owner over the manual copy-paste bus) critiqued it
+   twice — collapsed the 12 into ~5 root capabilities, promoted the missing **job ledger** and **usage
+   visibility** to first-class, corrected the concurrency framing (**the colliding resource is the working
+   tree + the push + the archive sync, not "the repo"**), and reframed the essential missing control as
+   **emergency-stop, not mid-run steering**.
+4. **The feasibility audit.** A read-only Opus session found the local substrate far richer than assumed: the
+   Dispatch-session → CLI-session → OS-process correlation chain already exists and is platform-written;
+   durable session / transcript / error / branch / cost / usage data is already on disk; project hooks
+   **appear** to load. It proposed a single job-lease as the smallest intervention.
+5. **⭐ GPT's adversarial correction — the part that must survive.** It caught the overreach squarely:
+   **"proven" was used for mechanisms that were never executed**; **one lease cannot cover four distinct lock
+   domains**; what a lease buys is **at-most-one-WRITER containment, NOT exactly-once** (ghost launches still
+   fire and still burn usage); and **lease revocation is write-quarantine, not cancel**. It issued a 10-point
+   re-grade and a three-level challenge (mitigations / containment / full control plane) that CP1-CP3 are
+   built directly on.
+6. **[OPEN] the empirical spike → CP1.** The agreed next move is a small bounded spike campaign that actually
+   fires the mechanisms, to move the load-bearing claims from _mechanism-supported_ to _empirically proven_
+   **before any real build**.
+
+**Why this is the top priority, stated plainly.** Every item on this board is dispatched through this channel,
+so its defects tax all of them; and the honest read already on file (2026-07-25) is that RobCo's real
+bottleneck was **never a missing agentic technique** — it is the control plane plus the owner's time. **This
+is also prime museum material** (the self-maintaining system turned on its own orchestrator, with a live
+multi-model collaboration and its dissent preserved) — it feeds **P8**'s orchestration-channel and
+review-and-convergence groups and the **P6** AI-collaboration exhibit when it concludes.
+
+### CP1. ⏭️ The empirical SPIKE CAMPAIGN — prove or KILL the hook-based containment before building (PROPOSED; the next actionable control-plane step)
+
+**What it is.** A small, bounded, throwaway campaign — **spikes S0-S11 in the design's own numbering** (these
+are spike labels, _not_ queue item IDs; item **S** is the unrelated shipped PWA-install work) — that actually
+**executes** the mechanisms the feasibility audit could only read. Its purpose is **falsification, not
+construction**: a negative result is a full success, because it kills a design before it is built.
+
+**What each probe must answer (the ten named so far):**
+
+- **Launch routing** — does a launch actually land where the record says it does?
+- **SessionStart delivery** — does a SessionStart hook fire, and does its payload reach the session?
+- **PreToolUse denial** — can a PreToolUse hook actually DENY a tool call, or only observe it?
+- **Tool + sub-agent coverage** — do hooks cover sub-agent tool calls, or is that a hole?
+- **Fail-open / fail-closed characterization** — when the hook errors, times out, or is absent, what happens?
+  **This is the single most load-bearing unknown**: a containment layer that fails OPEN is decoration.
+- **Phone-notification delivery** — does a completion notification actually reach the owner's phone?
+- **Scheduled-task-across-sleep** — does a scheduled task survive the Ally sleeping, and when does it fire?
+- **Verified process-tree termination** — can a process tree be killed and the kill **verified**, not assumed?
+- **Worktree routing** — can a session be routed into its own worktree reliably?
+- **Intent handshake** — can a session's declared intent be captured before it acts?
+
+**⚠ What it needs from the OWNER — this is the gating cost, not a technicality.** Several probes cannot be
+run by a session alone: **closing sessions to create a genuinely quiesced window**, **being away from the
+machine for the notification test**, and **letting the Ally sleep** for the scheduled-task probe. It also
+needs the **CP5 laptop inventory** before the topology probes mean anything.
+
+**Hard rules.** Throwaway artifacts only — nothing lands in either repo's operating path. Every claim the
+campaign produces is labelled **executed** or **mechanism-supported**, never blurred; the whole campaign
+exists because that distinction was blurred once already.
+
+**Done means:** each probe above has a recorded, dated result with the evidence attached; every CP2 claim
+that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
+whether hook-based containment is viable at all.
+
+### CP2. ⬜ The STAGED control-plane build — six stages, each gated on the one before (PLANNED; gated on CP1)
+
+**What it is.** The build, if and only if CP1 says the substrate supports it. Deliberately staged so that
+**every stage is independently useful and independently abandonable** — the project's standing
+evidence-gate discipline (build the simpler thing, see whether it is used, then earn the harder one).
+
+1. **Passive observation** — adapters plus an **append-only ledger**, strictly **read-only**. Nothing is
+   blocked, denied or killed. This is the stage that turns "we think this happens" into data.
+2. **Controlled push / sync wrappers** — the first stage that touches a real operation, aimed at the
+   collision GPT correctly identified: the **working tree, the push, and the archive sync**.
+3. **Containment** — hooks plus **separate L1/L2/L3 leases** (one lease cannot cover four lock domains — GPT's
+   correction, adopted) plus **write quarantine**. ⚠ Record what this does and does not buy: **at-most-one
+   writer, NOT exactly-once.** Ghost launches still fire and still burn usage; containment does not stop them.
+4. **Scheduled reconciliation + notifications** — the completion event the workflow has never had, plus a
+   periodic reconcile so a dropped job is noticed rather than forgotten.
+5. **Verified termination** — ⚠ **proposal-only, and it stays proposal-only until CP1's termination probe
+   returns evidence.** Lease revocation is **write-quarantine, not cancel** — do not let a later session
+   conflate the two.
+6. **Optional: worktrees / mobile** — only if the earlier stages are actually being used.
+
+**⛔ The ledger lives OUTSIDE both repos** — `%LOCALAPPDATA%\robco-control\`. It is operational state, not
+project history: putting it in the app repo would make it a served-file and cache-bump concern, and putting
+it in the archive would entangle the backup with the thing being backed up.
+
+**Done means:** each stage shipped only after its gate passed, with its own recorded evidence; the ledger is
+outside both repos; and every capability claim in this entry reads _executed_, not _mechanism-supported_.
+
+### CP3. ⏭️ IMMEDIATE MITIGATIONS — fixable now, with NO control layer at all (PROPOSED; independent of CP1/CP2)
+
+**What it is.** The subset of the problem register that needs no new machinery, separated out on purpose:
+**if CP1 comes back negative and CP2 is never built, every item here still ships.** That independence is the
+whole reason it is its own item rather than CP2's first stage.
+
+- **A completion-evidence contract.** A session's report must carry **test / commit / push / origin hashes**
+  — the evidence, not the narration. This is the standing rule _"a session's account of its work is a claim,
+  not evidence"_ (Protocol 8) given a concrete required form.
+- **FORMALIZE sync-before-synthesis as a protocol — ✅ owner-approved (2026-07-27), not yet written.** The
+  rule: the local-only artifacts are synced **before** a session synthesizes from them, so a synthesis pass
+  never reasons off a stale archive. It earns its protocol number on the next rules-layer pass; until then
+  it is a recorded decision, not an enforced rule — **say so rather than implying it is live.**
+- **The mobile-reporting discipline.** The plain-text-invisible-on-mobile failure recurred 3+ times in a
+  single session because the operator kept using a channel the owner literally cannot see on his phone.
+- **A usage early-warning relay** off `plan-usage-history.json`, so the cap is known **before** a session hits
+  it mid-run rather than after.
+- **A pre-push + sync LOCK FALLBACK** — the containment that does not depend on hooks firing at all, so there
+  is still a collision guard **if CP1 shows hooks are unreliable**.
+
+**Done means:** each mitigation is either shipped (with its evidence) or explicitly declined with a reason;
+none of them waits on CP1.
+
+### CP4. ⬜ The broader SYNC AUDIT — coverage, timing and enforcement across all three sync surfaces (owner-requested, 2026-07-27)
+
+**What it is.** The owner asked for the **U-analog for replication**: item **U** asked "what is hand-maintained
+that should be generated?" across the docs; this asks the same shape of question about **everything this
+project replicates** — what is actually covered, when it runs, and what enforces it. Three surfaces, and they
+have never been audited against each other:
+
+1. **The archive sync** (`sync.ps1` → the private archive) — freshly hardened at **V**, which is precisely why
+   the audit is worth running now rather than later: one surface has just been examined closely and the other
+   two have not.
+2. **The main-site path** — the deploy, the **service-worker cache** (Protocol 1), and the in-app **cloud
+   sync** (Protocol 34). Three replication mechanisms with three different failure modes, all user-visible.
+3. **The museum → public exhibit publish** — the `--public` staging tree, the name-substitution guard, and
+   the exposure step. **P13 is a live finding of exactly the class this audit is meant to enumerate** (a
+   scan-list gap), which is the argument for doing the audit rather than fixing findings one at a time.
+
+**The question for each:** what is covered, what is NOT, when does it run, and what would actually FAIL if it
+silently stopped working? The recurring failure class this project already has on file — a guard that was
+**inert for weeks**, a sync that reported "Done" while pushing nothing (**V**) — is the reason "it exists" is
+not an answer.
+
+**Done means:** a written per-surface coverage/timing/enforcement table with the gaps named, each gap either
+fixed, queued with an ID, or explicitly accepted with a reason.
+
+### CP5. ⬜ Laptop-witness inventory → then the deployment-topology decision (PROPOSED; CP1 partly depends on it)
+
+**What it is.** A short, concrete inventory of the spare laptop before any decision about its role, because
+the topology decision is unanswerable without it: **OS**; **uptime** (is it actually on?); **network relation
+to the Ally**; **node / git present**; **GitHub auth scope**; **whether to clone the private archive onto it**
+(⛔ the archive's git history retains `memory/` — this is a privacy decision, not a convenience one); **disk**;
+and **willingness to place a read-only PAT** on it.
+
+**⭐ The recommendation, recorded so the decision starts from it: begin with the laptop as an independent
+WITNESS, not a controller.** A witness observes and reports (did the push land? is the archive current? did
+the scheduled job fire?) and can be wrong without breaking anything. A controller that is wrong takes actions
+on a repo. Witness-first also directly answers the failure that started this whole arc — **nobody was
+watching** — at a fraction of the risk. Promotion to controller is a later, separately-argued decision.
+
+**Done means:** the inventory is answered item by item, the archive-clone privacy call is made explicitly, and
+the witness-vs-controller decision is recorded with its date and reasoning.
 
 ---
 
-# 2.8.5 tail — the open work (grouped by readiness)
-
-Everything in the 2.8.5 blocks above has shipped. This block is the rest of the near-term work. The old
-discovery-order groups (Group 1 data-safety → Group 4 deliverables) are retired in favour of grouping the
-**open** items by what actually determines when they can run. The near-term data-safety item (**A3**) is now
-**resolved** (2026-07-21 — modeled guard shipped, emulator test demoted to optional **A4**), so **only the
-small fixes** remain before the `dev → main` release; the deliverables and the governance process work can
-land around it.
-
-_Placed 2026-07-18 from two external AI reviews (`planning/2.8.5/audits/ATLAS_ECOSYSTEM_REVIEW.md` + the
-synthesis). Each item was checked against the real code before it earned its slot._
-
-## ✅ Shipped this round (one line each → full account in [`QUEUE_LOG.md`](QUEUE_LOG.md))
-
-_Data safety:_
-
-- **A0** ✅ AI inventory-overwrite guard — an AI turn can no longer silently delete natively-held items
-  (reconcile-not-overwrite, widened to every AI full-replace field). → [account](QUEUE_LOG.md#a0)
-- **A1** ✅ Live-save durability — the live `robco_v8` container now has an IndexedDB recovery shadow. →
-  [account](QUEUE_LOG.md#a1)
-- **A2** ✅ Save-integrity Layer 3 write-side — a quota-failed migration write is distinguished from real
-  corruption. → [account](QUEUE_LOG.md#a2)
-
-_Governance restructure:_
-
-- **R1** ✅ Deleted the test-count bookkeeping — retired Protocol 2a. → [account](QUEUE_LOG.md#r1)
-- **R2** ✅ Rules restructure — short universal contract + path-scoped `rules/*.md` notes + the retirement
-  rule (Protocol 49). → [account](QUEUE_LOG.md#r2)
-- **R3** ✅ First staged trim — one reversible cut on top of the restructure (incl. `RULES.md` deleted, the
-  `// N tests` comments stripped). → [account](QUEUE_LOG.md#r3)
-- **R4** ✅ The re-pin pass — all five local-only artifacts stamped to one commit; found and fixed real
-  drift. → [account](QUEUE_LOG.md#r4)
-- **R8** ✅ Queue-drift reconciliation — Protocol 50 + `scripts/queue-drift-check.js` pre-push nudge (Suite
-  242). → [account](QUEUE_LOG.md#r8)
-- **R9** ✅ The skill made a POINTER, not a copy — the fourth context source stops being a second source of
-  truth. **The owner has re-installed the skill (confirmed 2026-07-21), so R9's outstanding manual step is now
-  closed** — and it also carries the `21c78f7` gate-claim correction (R10 finding E). → [account](QUEUE_LOG.md#r9)
-- **D** ✅ The TEST_CATALOG generator (Protocol 47) — `library/TEST_CATALOG.md` is now GENERATED from the
-  runner's own suite headers, never hand-typed; the Atlas (item I) reuses this plumbing directly. →
-  [account](QUEUE_LOG.md#d)
-- **U** ✅ The generate-vs-hand-maintain audit (the generalization of D) — every actionable GENERATE
-  candidate from the triaged audit shipped across four dated batches (Suites 248-252, Protocols 52/53, plus
-  the owner-decided deletion of README's third script load-order copy). → [account](QUEUE_LOG.md#u)
-
-_Small residual fixes:_
-
-- **E** ✅ Dead RECIPES.CSV tables removed from both game databases. → [account](QUEUE_LOG.md#e)
-- **M** ✅ Map renderer boxed-grid residue — re-audited, already clean, nothing to remove. →
-  [account](QUEUE_LOG.md#m)
-- **K** ✅ Backup script single-shell dependency — closed, plus a shrink-guard added while verifying. →
-  [account](QUEUE_LOG.md#k)
-- **O** ✅ Test-artifacts folder self-cleaning — "files present ⇒ last run failed" is now a true signal. →
-  [account](QUEUE_LOG.md#o)
-
-_Non-gating near-term unit:_
-
-- **N** ✅ AI / Overseer pass, Findings 2–8 (both batches) — the AI experience catching up to the terminal
-  being the primary surface. → [account](QUEUE_LOG.md#n)
-
-_End-of-round deliverable foundation:_
-
-- **F** ✅ The four process refreshes — the standing workflow-review prompt brought fully current (the input
-  G reviews). → [account](QUEUE_LOG.md#f)
-- **G** ✅ The blind workflow review — FULLY RESOLVED (claim-ledger built + verified, all (a)/(b) fixes
-  shipped, all three owner-decisions settled). **⚠ One open thread survives: the R11 knowledge-graph gating
-  question this review was asked to rule on was never actually addressed** — see R11 and the account below. →
-  [account](QUEUE_LOG.md#g)
-- **H** ✅ CLOSED (owner-approved verdict, 2026-07-26) — the optional system-model review is redundant with
-  **G** (process, 3 reviewers) + **R10** (the knowledge-architecture audit, which examined the
-  representation/retrieval layer); the one sliver H uniquely covered — raw brain-dump accuracy — is
-  low-value post-2.8.5 re-baseline. → [account](QUEUE_LOG.md#h)
-
-_PWA / install UX:_
-
-- **S** ✅ PWA install discoverability + the guided FO3 reinstall flow (Option 1) — shipped to `dev`
-  2026-07-22 **and confirmed on PRODUCTION the same day** via the `v2.8.5-r6` hotfix merge to `main`
-  (corrects the file's prior "nothing on production yet" note, which was never updated after the hotfix
-  landed). → [account](QUEUE_LOG.md#s)
-
-## ⏭️ Ready now — no blocker; plan/build whenever
-
-### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED + NOW GATED; real-emulator verification now exists as A4 (2026-07-26)
-
-> **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5, and its
-> modeled guard is now WIRED INTO THE GATE (no longer opt-in).** The self-deriving modeled guard
-> (`npm run cloud-check`) is the shipped resolution; it now runs automatically as gate step 4b on both the
-> fast (commit) and full (push) gate — see **RESOLUTION** and the **Placement** bullet at the foot of this
-> entry. The true emulator-backed test was **re-filed as the optional post-2.8.5 item A4** —
-> _not_ a blocker — because the premise correction below shows the silent-data-loss failure A3 was scoped
-> to catch **cannot occur by design**. The original spec is preserved verbatim beneath for the record.
->
-> **✅ UPDATE (2026-07-26): A4 is now BUILT and red-then-green PROVEN against the real emulator** (see A4
-> below). It found the modeled guard's `undefined`-handling comment was wrong about the mechanism — real
-> Firestore **rejects** the write outright rather than silently stripping the field — corrected in this
-> same pass in `scripts/cloud-serialization-check.js`. The guard's PASS/FAIL behavior was unaffected (an
-> undefined field was already flagged as hostile either way); only the doc comments describing _why_ were
-> wrong, and are now accurate.
-
-**What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
-suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
-after the round trip. The point is not "the write returned success" — it is that a field which stops being
-carried across gets caught. **A new field added to `state` without being added to the sync mapping must
-FAIL this test.** That failure mode is the whole reason the item exists.
-
-**The gap, established from the code on 2026-07-20 — not assumed.** Nothing in the gate exercises cloud
-sync end to end:
-
-- `tests/boot-smoke.mjs` (its `isExpectedNoise()` allowlist) explicitly swallows Firebase Auth, Firestore
-  and remote-config network failures as _"known noise that is NOT a bug"_ — correct for a credential-less,
-  network-less test box, but it means the browser tests boot the app, watch every cloud call fail, and
-  discard the errors. The gate stays green.
-- Suite **46.17** is the closest thing that exists, and it is genuinely good — it evaluates the **real**
-  `sanitizeImportedContainer()` + `migrateState()` in a `vm` sandbox and proves the Phase-6 fields and
-  faction reputation survive byte-stable. But it feeds them a **hardcoded fixture** and asserts a
-  **hand-listed set of field names**. A field added to `state` tomorrow is simply not in that list, so
-  46.17 goes green while the field silently never syncs.
-- The rest of Suite 46 is presence-grepping — real Protocol 34 value, but it proves the source is spelled
-  right, not that a save survives.
-
-So: **a field that silently stopped syncing would pass every check this project has.** The 2.8.0 cloud
-audit already ranked this exact shape — **CC-RT-1 · [HIGH]** — as its highest-value gap
-(`planning/2.8.0/audits/CLOUD_AUDIT.md`).
-
-**Correcting the record: this does NOT need paid infrastructure.** The **local emulator suite** runs
-Firestore and Auth on the developer's own machine — free, offline, no credentials, and **no App Check
-involvement at all**. The bug class lives in **this project's own field-mapping code**, not in Google's
-servers.
-
-**What it buys over 46.17.** A real SDK write/read instead of a sandboxed function call — so it also
-catches the things that only bite at the serialization boundary (`undefined` stripped, nested arrays
-rejected, timestamps coerced, document-size limits). And driven from the live field list rather than a
-hand-typed one, so it fails on the field nobody remembered.
-
-**The natural extension.** This is the guard that makes **Protocol 34** _enforced rather than written_.
-
-**Honest cost note — a new dev dependency.** It introduces `firebase-tools` as a **DEV-ONLY** dependency.
-That brushes against this project's no-new-dependencies instinct and is stated rather than hidden. Nothing
-ships to users; it runs fully offline; it only runs at the gate. Weigh it at plan stage against a lighter
-fake-Firestore shim (which would cover the mapping bug but not the serialization boundary).
-
-**Honest scope note — what this does NOT cover.** The emulator does **not** test real Firebase, App Check,
-production security rules as deployed, or genuine network behaviour. It covers the **mapping** bug — which
-is the dangerous, silent one.
-
-**Why it belongs in the data-safety bracket.** Alongside A0/A1/A2 by kind: those made the LOCAL save safe
-against AI overwrite, eviction and false quarantine; this is the same class of failure on the cloud path.
-It fixes a structural bias worth naming — **the gate is dense where verification is cheap and empty where
-it's expensive, which is backwards from risk.** Sync is the most dangerous thing the app does and it has
-zero end-to-end coverage.
-
-**Hard rule.** Protocol 13/42: the test must be demonstrated **red-then-green** — remove a field from the
-sync mapping and it must fail.
-
-**Done means:** a save→sync→load round-trip runs against the local emulator in the gate, asserts every
-save-envelope field present and equal, is driven from the live field list rather than a hardcoded one, has
-been proven to fail when a field is dropped, and `firebase-tools` is a dev-only dependency with nothing
-added to the served set.
-
-**🚧 BUILD ATTEMPT — feasibility wall + premise correction (2026-07-21, Dispatch/Opus).** The spec above
-is preserved verbatim; this note records what was found when building was attempted. Two blockers, one
-hard-environmental and one about the code itself:
-
-1. **The emulator genuinely cannot run in the current environment — HARD WALL.** The Firestore **and** Auth
-   emulators (via `firebase-tools`) are **Java** processes; they need a JVM. Checked and confirmed absent:
-   `java` not on PATH, `JAVA_HOME` unset, no JDK/JRE under `Program Files`, no bundled JBR in any IDE/SDK,
-   and `firebase-tools` is not installed. So the emulator-backed round-trip **could not be run or verified
-   here**, and per the item's own **Hard rule** (red-then-green on the real artifact) an un-runnable
-   cloud-safety test must not be shipped as green — it would be "a green that lied." **What the owner must
-   set up to unblock:** install a **JDK/JRE (11+)** on the machine that runs the gate, then
-   `npm i -D firebase-tools` (dev-only — must never enter `sw.js`'s precache set or ship to users). A JDK is
-   a **system install**, beyond a dev-only npm dependency, so it is deliberately left for the owner rather
-   than done silently by a session.
-
-2. **⚠ PREMISE CORRECTION — the failure mode A3 was written to catch does not exist in the current code.**
-   A3 assumes "a field added to `state` but missed in the **cloud sync mapping** silently never syncs." There
-   is **no field-by-field cloud sync mapping**. `cloud.js` stores the **entire `robco_v8` container wholesale**
-   (`_buildSavePayload` → `robco_v8: payload.robco_v8`; `_uploadSaveDoc`/`overwriteCloudSave` write it whole).
-   The load path runs `sanitizeImportedContainer` (starts from `Object.assign({}, s)` — unknown fields **pass
-   through**) then `migrateState` (mutates in place, defaults missing fields, deletes only **named** legacy
-   keys — unknown fields **pass through**). So a newly-added plain state field **round-trips losslessly through
-   this project's own code**; there is no mapping to forget. The **only** place a new field can silently fail
-   to sync is the **Firestore serialization boundary**: `undefined` values silently stripped, directly-nested
-   arrays rejected (the whole write throws), `Date`/`Map`/class-instance coercion, and the 1 MB doc-size cap.
-   That boundary is exactly the layer that needs the **real emulator** — a pure-JS round-trip cannot observe it.
-   **Consequence:** a non-emulator "round-trip" test built on the real save-build + real load sanitize/migrate
-   would pass for **any** new field (the code loses nothing there), so shipping it as "the A3 test" would be
-   theater — it would catch nothing. It was therefore **not shipped**. Suite 46.17 remains the closest existing
-   coverage (hardcoded fixture + hand-listed fields; real `sanitizeImportedContainer` + `migrateState` in a
-   `vm`) and is unchanged.
-
-**✅ RESOLUTION (owner decision 2026-07-21) — the modeled guard is SHIPPED and A3 is release-cleared.**
-`scripts/cloud-serialization-check.js` (`npm run cloud-check`). It self-derives the field set by extracting
-and evaluating the **real** `let state = { … }` initializer from `js/core/state.js` in a `vm` sandbox (the
-same extract-and-run technique as Suite 46.17), builds the `robco_v8` write payload, and recursively flags
-any value Firestore would silently strip (`undefined`) or reject (directly-nested array `[[…]]`), plus a
-soft 1 MB doc-size check. **A new field added to that literal is scanned automatically — no hand-typed list**,
-so it does not rot the way 46.17's list does (the one anti-pattern this item forbids). A built-in
-**positive control** scans a known-hostile fixture on every run and fails if the scanner doesn't flag it, so
-the guard can never silently degrade into a green-that-lies no-op.
-
-- **Red-then-green PROVEN on the real shipped literal** (Protocol 13/42). Planting `_a3Probe: [[1,2]]` and
-  `lvlUndef: undefined` in the actual `state` made it FAIL (exit 1) and it named BOTH —
-  `campaigns.FNV._a3Probe[0] → directly-nested array` and `campaigns.FNV.lvlUndef → undefined stripped`;
-  removing them made it PASS (exit 0). `js/core/state.js` was left byte-identical to HEAD.
-- **Placement — ✅ NOW GATED (2026-07-21, owner's directive "wire it").** Promoted from opt-in into
-  `scripts/gate.js` as step **4b**, in the pure-Node section that runs on **BOTH** `gate:fast` (commit) and
-  `gate` (push) — the same class as the boot-chain preflight (step 3), which is also cheap, static, and
-  browser-free. It stays runnable standalone via `npm run cloud-check` too. Rationale for fast/commit-gate
-  placement: it reads only the `state` literal (no browser, no emulator, no network), so it costs
-  ~nothing and belongs where the other cheap static guards run; a modeled guard that runs on every commit
-  catches regressions, an opt-in one nobody runs does not. The anti-vacuous property is unchanged by
-  gating — it still fails LOUDLY on extraction failure and on a broken positive control, so the gate can
-  never turn it into a green-that-lies no-op. Confirmed the full gate still passes with it wired.
-- **No silent skip (the green-that-lied guard).** The script has **no conditional-skip path** — it always
-  runs and always asserts. If extraction of the state literal ever fails, it **FAILS LOUDLY** (the
-  anti-vacuous check refuses to let an empty derived state pass as clean), never silently green.
-- **What it MODELS, not verifies (state the limit so no one over-trusts it).** It encodes Firestore's
-  documented write constraints (no `undefined`, no directly-nested arrays, ~1 MB doc cap) **in our own
-  code** and checks the state **shape** against them. It does **not** run real Firestore, so it does not
-  cover real type coercion, deployed security rules, App Check, network, or a field that is safe by default
-  but gets a hostile value only at runtime. Those constraints are stable and documented, but this reduces
-  the residual risk — it does not eliminate it. The real-Firestore verification is item **A4** (optional).
-
-**Why A3 dropped from RELEASE BLOCKER to release-cleared — the premise correction (the most valuable
-finding).** A3 was scoped to catch "a field added to `state` but missed in the cloud **sync mapping**
-silently never syncs." Established from the code (block 2 above): **there is no field-by-field sync
-mapping.** `cloud.js` stores the campaign **WHOLESALE as a blob** (`robco_v8: payload.robco_v8`) and the
-load path passes unknown fields **through** (`sanitizeImportedContainer`'s `Object.assign` copy +
-`migrateState`'s in-place defaulting). So the forgotten-field-mapping data-loss A3 existed to catch
-**cannot occur by design** — a new field round-trips losslessly through the app's own code. The only
-residual silent-drop is the Firestore **serialization boundary**, which the modeled guard above now covers
-for the shape and which A4 now verifies against the real emulator (built 2026-07-26, see A4 below). That is
-why the emulator test was an **optional post-release upgrade, not a blocker**, and why **A3 is the last
-thing that was gating 2.8.5 and is now cleared.**
-
-### A4. ✅ Real-Firestore round-trip — BUILT + red-then-green PROVEN against the real emulator (2026-07-26)
-
-**What it is.** The upgrade of A3's modeled guard from _modelled_ to _verified_: a save→sync→load round-trip
-run against the **Firebase local emulator suite** (real Firestore + Auth SDK write/read), asserting
-field-level fidelity driven from the live field list — the thing A3 originally described. It replaces the
-modeled Firestore constraints (`cloud-check`) with the real database's actual behaviour, so it also catches
-real type coercion (timestamps, number ranges) and true document-size rejection that a model can only
-approximate.
-
-**Explicitly NOT a release blocker (owner decision 2026-07-21).** The premise correction (see A3) removed
-the silent-data-loss risk this was scoped for; the modeled guard (A3) covers the residual shape risk. So
-this is a _confidence upgrade_, run when convenient after 2.8.5 — never gating a ship.
-
-**What it needs — recorded honestly. ✅ The JDK blocker is now CLEARED (2026-07-23).** A **JDK/JRE 11+** on
-the machine that runs it (the Firestore/Auth emulators are Java processes) was **confirmed absent 2026-07-21**,
-which is why this was deferred — but the **owner confirmed 2026-07-23 that a JDK (version 25) is now
-installed**, so the hard environmental blocker is gone. The **only remaining setup is `firebase-tools` as a
-DEV-ONLY** dependency (`npm i -D firebase-tools`) — which must never enter `sw.js`'s precache set or ship to
-users, and runs fully offline at the gate. **⚠ Half-installed as of 2026-07-24:** `firebase-tools@^15.24.0`
-is present in the app repo's `package.json` + `package-lock.json` but those changes are **uncommitted in the
-working tree** (they landed while other work was in flight and were deliberately left unstaged). On resume,
-finish this deliberately: decide whether to commit the dev-dependency (it is dev-only, never served) as the
-first step of actually building A4.
-
-**What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
-run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
-
-**Done means (original spec):** the JDK is now present, so this is **actionable** (only `npm i -D
-firebase-tools` remains to set up) — a real-SDK round-trip against the emulator asserts every save-envelope
-field survives equal, driven from the live field list (not a hardcoded one), proven red-then-green by
-dropping a field; `firebase-tools` dev-only with nothing added to the served set. Until it lands, A3's `npm
-run cloud-check` is the standing guard, and this stays **optional — never a release blocker** (owner
-decision 2026-07-21, unchanged).
-
-**✅ RESOLUTION (2026-07-26) — built, wired standalone, proven red-then-green against the REAL emulator.**
-
-- **The dev dependency landed.** `firebase-tools@^15.24.0` (already staged) was committed, plus `firebase@12.15.0` — pinned EXACT (no `^`) to match the version `js/services/cloud.js` imports from the gstatic CDN, so the Node-side round-trip exercises the identical SDK build the browser runs, not a drifting one. Both are dev-only; `package.json`/`package-lock.json` are not in `scripts/cache-bump-guard.js`'s served-file regex and `node_modules/` is gitignored, so neither touches the served/precached set — confirmed by re-running the cache-bump guard after staging.
-- **`firebase.json` gained an `emulators` block** (Firestore :8090, Auth :9099, UI disabled) alongside the existing `firestore.rules`/`firestore.indexes.json` config — config-only, not a served file, no cache bump needed for that file itself.
-- **`scripts/emulator-round-trip-check.js`** is the new script (`npm run test:emulator`, which runs it via `firebase emulators:exec --project demo-robco-uos-test --only firestore,auth "…"` — the `demo-` project prefix is the Firebase CLI's own guarantee that the emulator never touches the real `nv-overlord` project or any network beyond localhost, regardless of what `.firebaserc` declares as default). It **reuses** A3's extractor rather than forking a second one (Protocol 22): `scripts/cloud-serialization-check.js` now exports `deriveDefaultState()`/`buildWritePayload()` (guarded by `require.main === module` so its own CLI behaviour is unchanged), and the new script imports them, signs in anonymously against the Auth emulator, and writes the derived `robco_v8` payload inside a full save envelope via the real SDK's `addDoc()` — the same additive call `_uploadSaveDoc()` makes (Protocol 34) — then reads it back and diffs every field.
-- **Red-then-green PROVEN against the REAL emulator, both directions, three assertions per run:** (1) the clean, self-derived payload round-trips with every field equal — PASS; (2) a planted directly-nested array (`_a4Probe: [[1,2]]`) makes the real write throw (`"Nested arrays are not supported"`) — correctly caught; (3) a planted `undefined` field (`_a4Probe: undefined`) makes the real write throw (`"Unsupported field value: undefined"`) — correctly caught. No "field dropped from the sync mapping" red case, deliberately: A3's own 2026-07-21 premise correction established that failure mode cannot occur by design (wholesale-blob write, unknown fields pass through), so testing for it would be testing something that isn't real — the script's header states this explicitly.
-- **A genuine cross-check finding, not just a rubber stamp.** The real emulator run surfaced that A3's model had the _mechanism_ wrong: it described an `undefined` field as something Firestore "silently STRIPS," but the real Web SDK (with `cloud.js`'s actual settings — no `ignoreUndefinedProperties`) **rejects the whole write outright**, client-side, before any network call — louder and safer than modeled, but still a documentation error. Corrected in the same commit, in `cloud-serialization-check.js`'s comments and console output, with the date and the A4 script named as the source of truth. This is exactly the class of thing A4 exists to catch that a model alone cannot.
-- **A real harness bug was found and fixed while building this (Protocol 42).** The first run failed the CLEAN payload too, with Firestore rejecting plain fields as "a custom Object/Array object." Root cause: `deriveDefaultState()` runs the real `state.js` literal inside a `vm` sandbox — a separate V8 realm — and the SDK's plain-object/array validation is realm-sensitive, so a naive `Array.prototype.map()`-based clone (which preserves the source array's realm via species construction) still produced foreign-realm arrays. **Investigated and classified: harness-only** — the browser runs everything in one realm, so this cross-realm mismatch cannot occur in the shipped app; only this test's own vm-based derivation technique created it. Fixed by rebuilding `deepClone()` to construct fresh objects/arrays in the current realm at every level (no `.map()`), with the reasoning recorded in the script's own header comment so it can't silently regress. The fix itself IS the locking coverage — this script's every run re-proves the clone is realm-clean, which is exactly the Protocol 42 "still add a test" bar for a harness-only finding.
-- **Standalone, NOT gated** (as the original spec + owner's 2026-07-21 "never a release blocker" both required): wired as `npm run test:emulator`, absent from `scripts/gate.js`. Documented in the script's own header comment and in `README.md`'s Available Scripts list (needs a JDK/JRE 11+ + the two dev deps, already in `package.json`). `npm run cloud-check` (A3) remains the gated guard, unchanged, still running on every commit/push.
-- **Full gate confirmed still green** with these changes in place (no gate step added or removed).
-
-### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
-
-**What it is.** One slice of the U3 static→behavioral conversion round was deferred: converting the
-render-harness-dependent suites to actually drive the render path rather than grep it. The rest of U3's six
-slices shipped; this is the one left on the bench.
-
-**The deferral is now traced to its source, so the slice is a known list rather than a vague bucket.** It
-came out of the U3 slice-6 commit (`7030103`), whose body reads: _"DEFER 163.12 (renderSavesList per-game
-filter) — needs a DOM render harness or a source extraction (served-file change); kept its verbatim-filter
-static guard, flagged for a render-harness slice."_ The wider hit-list is `TEST_STRENGTH_U2.md`'s CONVERT
-ledger: **163.12** (`renderSavesList` per-game filter), **226.11** (inventory detail-pane mutator wiring),
-**179.4** (`renderCartDeck` escaping), and **210.7 / 211.4** (Diagnostic Shell filter-before-DOM-insertion).
-
-**✅ Landed this pass — 179.4**, chosen because it was the one making a SAFETY claim it could not actually
-prove. `renderCartDeck()` is now executed in a `vm` sandbox against a hostile `GAME_DEFS` fixture, and the
-assertions read the markup it really produced; new **179.4b** proves a `<img src=x onerror=…>` label is
-escaped. Red-then-green verified.
-
-**⬜ Still on the bench, and why each one is more than a copy of the above.** **163.12** may not be
-`vm`-extractable without editing shipped JS, which turns a test-only change into a Protocol 1
-cache-bumping one — a scoping decision worth making deliberately. **226.11** and **210.7/211.4** need a
-fuller synthetic-DOM harness (event dispatch and a mount pipeline), which is a harness-building unit.
-
-**Done means:** the remaining deferred render-path suites execute the real render and assert the result,
-matching the behavioral bar the rest of U3 set.
-
-### L. ⬜ Player-facing public view of the queue — PRIVATE VIEW SHIPPED & OWNER-CONFIRMED (2026-07-27); public view still deferred (post-P2)
-
-**✅ Private view: SHIPPED and OWNER-CONFIRMED.** Built 2026-07-23 (`npm run queue-view` →
-`queue-view/queue-view.html`, guarded by Suite 246). The owner opened the generated page on his own phone
-and confirmed it reads right ("it looks good", 2026-07-27) — the one thing that had kept this half at 🔄
-(Dispatch's own 360px DOM verification had already passed; this was the missing human eyeball). Full build
-account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l). **⛔ The player-facing opt-in view is NOT built** — L's
-own ruling defers it (below); this is now the only work remaining under item L.
-
-**The ruling — ONE SOURCE, TWO GENERATED VIEWS** (still governs the open half): `QUEUE.md` stays the single
-source of truth; two separate generated views read from it:
-
-- A private view, for the owner — ✅ shipped and confirmed, above.
-- A player-facing view, for the live site's already-queued "upcoming updates" feature — generated later,
-  from **only** items explicitly marked public in this file. **The marking must be opt-in, never opt-out**
-  — a forgotten mark means a player silently misses an update (the safe failure direction), rather than
-  internal reasoning silently leaking to players (which isn't). Same fail-closed shape as the museum's
-  name-substitution guard (P2, in the museum sub-program below).
-
-**Why the two views are not merged into one document.** This file's value is that it records rejected
-options, hazards, and reasoning — not just current status. A single merged document either leaks that
-reasoning to players or gets sanitized until it stops being useful internally.
-
-**Sequencing.** The player-facing view is deliberately left until **after** the museum publication work
-(P2) — it needs the same substitution-and-fail-closed-guard machinery P2 is building, and building it twice
-would be wasteful (Protocol 22).
-
-**What it depends on.** P2's substitution/guard machinery.
-
-**Done means (public view, still deferred):** a separate generated page shows only opt-in-marked items,
-defaults to omitting anything unmarked, and reuses P2's machinery.
-
-### Q. ⬜ Planning-folder hygiene — a standing rule + an owed cleanup task (owner, 2026-07-22)
-
-**What it is.** A new standing rule the owner set: the app repo's `planning/` should hold **only CURRENT-use
-working docs**. Old-version planning (e.g. the 2.6.0 folder) should be **DELETED from the app repo** once it
-has served its use, because the archive hosts every planning doc permanently. This keeps the live `planning/`
-tree lean and current instead of accumulating every past round's audits, slates, and mockups. Recorded per
-Protocol 50 because it was decided in conversation and lived only there.
-
-**⛔ TWO HARD CONSTRAINTS — both non-negotiable, recorded as the rule's own guardrails:**
-
-- **NEVER delete a planning file from the app repo unless it is CONFIRMED present in the archive first.**
-  Save-sacred applied to planning docs: a planning doc is **real work**, and losing one to
-  delete-before-backup is unacceptable. The sequence is **confirm in archive → then delete** — never the
-  reverse, never on assumption.
-- **NEVER delete anything still needed FORWARD.** Anything **2.9.0 (or later) still depends on stays**,
-  regardless of which version-folder it happens to sit in. **"Served its use" means DONE, not merely "belongs
-  to a shipped version."** When in doubt, **KEEP** — the failure direction of keeping a stale doc is trivial;
-  the failure direction of deleting a still-needed one is not.
-
-**WHY it's safe (the mechanism, verified against `sync.ps1`, 2026-07-22).** The Protocol 48 sync mirrors
-`planning/` into the archive **ADDITIVELY** (`Add-Dir`, never a purging mirror): once a planning file is
-captured it is **never removed** from the archive even after it disappears locally, and the sync regenerates
-**`ARCHIVE_RETAINED.md`** every run listing exactly the planning files kept in the backup that are no longer
-present in the source — so the retained set is **visible, not something to trust blindly**. That is what makes
-local deletion recoverable. **Contrast (also verified):** `memory/` is **MIRRORED** (`Mirror-Dir` /MIR — a
-deletion propagates), but a deleted memory is still recoverable from the archive's **git history**. So planning
-deletions are additively retained; memory deletions are history-recoverable. Either way nothing is truly lost —
-which is the precondition that makes this hygiene rule safe to apply at all.
-
-**Where this rule belongs eventually.** In the **rules layer** — the deploy/backup area, alongside **Protocol
-48** (the archive-backup protocol) — not left as a queue entry forever. Recorded here now (Protocol 50); its
-earn-condition for a rules-layer home is the next docs/rules pass that touches Protocol 48 or the backup
-notes. (It is also a natural **R5** prose→enforcement candidate later — a build-time check could refuse to
-delete a `planning/` path not yet confirmed in the archive — but that is not required for the rule to stand.)
-
-**⬜ THE CLEANUP TASK OWED.** Concretely: **confirm each old-version planning file is present in the archive,
-then remove it from the app repo.** **⚠ Run it when NOTHING ELSE is touching the app repo (concurrency —
-Protocol 12):** a junk/cleanup sweep during a concurrent session has already deleted a live session's scratch
-files once (recorded under G), so this deletion pass must have the app repo to itself.
-
-**Done means:** the app repo's `planning/` holds only current-use docs; every old-version planning file
-removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
-standing rule has a home in the rules/deploy-backup layer.
-
-### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — all 3 sequenced steps DONE (2026-07-26); only finding L (owner decision) and finding G (cosmetic) remain
-
-**What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
-project **stores, retrieves and connects what it knows about itself** — the retrieval chain, the scoped
-notes, the doc/gate/skill layers. It read the real files and cited paths/lines. This entry is the Protocol 50
-landing record: **every claim was re-verified against the current files before being written here** (the audit
-read one commit; a claim is only recorded as fact once checked). Two live defects were fixed in the same pass;
-everything else is recorded, ranked by consequence, with each finding's home or earn-condition stated.
-
-**⭐ THE SEQUENCE for working R10's findings — Dispatch sequenced it, owner's instruction (2026-07-21):
-_"you need to sequence everything not me."_** The ordering reasoning is the valuable part, so it is recorded,
-not just the order. **NONE of this blocks the release — and A3 (the last data-safety gate) is now RESOLVED
-(2026-07-21), so nothing here blocks 2.8.5; everything in R10 is process debt, not shipping debt.** The
-stated plan: do steps one and two, ship 2.8.5, then do step three.
-
-1. **FIRST — fix the trusted layer.** The stale facts in `ARCHITECTURE.md` (finding B) and the ones the R2
-   restructure copied into `rules/state-and-save.md` (finding B-critical), plus the remaining false/overclaimed
-   statements in the skill (findings C skill-overclaim + E library-fallback). **Why first:** these bleed
-   _continuously_ — every session that runs before they're fixed inherits wrong facts and generates work.
-   Nothing else in R10 costs anything per-session. This goes first purely on **bleed rate**. **Also riding
-   here (landed 2026-07-21, self-caught, not from the audit):** the QUEUE.md header-mangle structural fix —
-   full record below, in the ranked findings list.
-2. **SECOND — fix the guards that overstate their coverage.** Suite 220 checking less than Protocol 45
-   advertises (finding C), and the retrieval map's routing gaps (finding D). **Why second:** these are _why_
-   step one's problem stayed invisible — stale references sat under a passing check. Fixing them second means
-   step one's fix stays fixed instead of silently rotting again.
-3. **THIRD — route `ARCHITECTURE.md` by section instead of universally** (finding A). **Why third, not first
-   (load-bearing):** step one REMOVES the operational checklists and runbooks from that file, which shrinks the
-   problem before it is solved. Routing-by-section first would mean building section routing for content about
-   to be deleted.
-4. **RIDING ALONG wherever convenient:** the rollback script contradicting Protocol 43's branch model
-   (finding F) and the duplicate App Check entry (finding G) — both small and independent. Note: F only bites
-   during an outage, which is exactly when ambiguity is most expensive, so it should not sit indefinitely.
-5. **GATED on other work, not on effort:** the P3 supersession-logic fix (finding H) must land **before the
-   museum-for-AI extract (P3) is built**, not before anything else. The stable-identifier scheme (item I) is
-   needed **before the Atlas and museum link to each other**, which is **after 2.8.5**.
-
-**✅ STEP 1 — the doc trusted-layer fact-corrections DONE (2026-07-21, this pass).** Findings **B** and
-**B-critical** closed against source: every stale `api.js` attribution of the moved symbols corrected to its
-real home (`getSystemDirective`→`api-directive.js`, `autoImportState`/`sanitizeImportedContainer`→`api-import.js`;
-`api.js` keeps `transmitMessage`/`fetchAuthorizedModels`) in `ARCHITECTURE.md` (File Map + the 3 missing split
-files added, Inbound heading, both state checklists, the event-bus table) and in `rules/state-and-save.md`
-Protocol 4 checklist + `rules/ui-and-mobile.md` Protocol 10 — **this closes the "R2 restructure relocated stale
-facts into the new trusted layer" hole (finding B-critical)**; the single-`ui-render.js` render-layer refs
-corrected to the `ui-render-*.js` family in every actionable checklist; the cache-guard description
-(`ARCHITECTURE.md` ~3393) rewritten to match `scripts/cache-bump-guard.js` as it really is (differ-from-HEAD,
-not monotonic; the current `SERVED_RE` set). Defect-2 (`setDoc`→`addDoc`) confirmed still correct. **Still owed
-in step 1 (out of THIS brief's doc-only scope):** the `skill/SKILL.md` overclaim (finding C skill-half) and the
-CLAUDE.md library-fallback sentence (finding E second half).
-
-**✅ STEP 1 NOW FULLY CLOSED (2026-07-21, a later pass).** The two owed pieces above landed: `skill/SKILL.md`'s
-"canonical and current by construction" overclaim (finding C skill-half) rewritten to "canonical source of truth
-but only partially mechanically checked — where a doc and the code disagree, the code wins"; the CLAUDE.md
-library-fallback sentence added (finding E second half — absent `library/` targets: fall back to source, don't
-infer). **Finding F (rollback ↔ branch model) rode along in the same pass:** reconciled dev-first (owner's call,
-NO direct-`main` exception) across `scripts/rollback.sh`, the `ARCHITECTURE.md` runbook, and Protocol 16 — the
-accepted latency-vs-integrity tradeoff recorded in-place. **⚠ Skill re-install owed:** `skill/SKILL.md` is a
-read-only installed artifact, so the owner must RE-INSTALL it (Settings › Capabilities) for the fix to reach his
-sessions — his second re-install today.
-
-**✅ FIXED this pass — Defect-1 (shipped `8d14073`): the cache-bump guard's classifier was blind to real precached files.**
-`sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
-`scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing
-`assets/icon.png`, `assets/ocr/eng.traineddata.gz`, or `CHANGELOG.md` needed **no cache bump**, and cached
-users silently kept the stale copy **under a fully green gate** — the exact failure class Protocol 1 exists to
-prevent, and one this queue already records happening (the staging-SW stale-`index.html` incident, 2.9.0
-hardening gate). **Proven red on a real path** (staging `assets/icon.png` printed `[SKIP]` and exited 0), then
-fixed: `SERVED_RE` now covers `assets/`, `CHANGELOG.md`, `css/`, `js/`, and the root files. **Guarded two
-ways:** new Suite **30.3e** (behavioral — runs the real guard against a staged `assets/icon.png` and proves it
-now FAILS without a bump, PASSES with one) and Suite **30.3f** (the one the audit specifically asked for — it
-parses `SERVED_RE` straight out of the guard and **every path `sw.js` actually precaches**, and fails if the
-classifier misses any; when run against the old classifier it named all six uncovered paths). A guard that
-tested one hard-coded filename is exactly how this stayed hidden — 30.3f tests **agreement with the real
-precache list**, so it can't drift again.
-
-**✅ FIXED this pass — Defect-2 (shipped `8d14073`): `ARCHITECTURE.md` prescribed a save-destroying cloud write.** Its Cloud Push
-section showed `setDoc(firestore, { … state: stateObj … })` — a whole-document overwrite — while the real
-`js/services/cloud.js` uses **additive `addDoc`** into a `saves` collection with a `contentHash` dedup, and
-Protocol 34 states plainly that a blind `setDoc` would clobber a campaign with no recovery. A session building
-from the canonical architecture doc would have implemented the clobbering version — a data-loss instruction
-inside a canonical document. Corrected to the real additive shape (matched against `cloud.js` line-by-line),
-and guarded by Suite **46.26** (asserts the Cloud Push section prescribes `addDoc` and carries neither the
-`setDoc(firestore,…)` call nor the `state: stateObj` field; proven red against the old text). **Factual
-correction only — the file was not restructured.**
-
-**✅ STEP 2 DONE (2026-07-23, this pass) — the guards that overstate their coverage are fixed. Findings C
-(Suite-220 half) and D closed.** The reason step 1's stale facts sat invisible under a green gate is now
-removed:
-
-- **Finding C (Suite 220 half) — CLOSED.** Suite **220** was extended to see what it was blind to.
-  **220.2b** validates backticked **nested** repo paths (`js/services/api-import.js`, `assets/…`, `.github/…`;
-  wildcard-family `*` tokens excluded), **220.2c** validates backticked **exact bare code filenames**
-  (`.js`/`.mjs`/`.css` only, so gitignored `library/` docs and `planning/` `.html` mockups can never
-  false-fail), and **220.2d** is their empty-parse self-integrity guard. Scope held strictly to nested paths +
-  bare filenames — existence only, **NOT** a prose-truth / semantic checker (the recorded direction).
-  **Proven red-then-green** (Protocol 13/42): a planted nonexistent nested path (`js/services/api-imprt.js`)
-  and bare filename (`api-imprt.js`) both fired RED; removing them restored GREEN. **And it caught a real one
-  on introduction** — `terminal.css`, the pre-U-A2 monolithic stylesheet (split into `css/NN-*.css`), was still
-  named as a **live file** in `rules/ui-and-mobile.md`; fixed in the same commit (Protocol 42), with the one
-  historical mention in `ARCHITECTURE.md` reworded to prose. (The skill-overclaim half of C was already fixed
-  in step 1; not redone.)
-- **Finding D — CLOSED.** The retrieval map is now the **sole** scope authority (stated in place in
-  `CLAUDE.md`), and all five routing gaps are fixed: `.github/workflows/` added to the **testing** row (it is
-  co-governed with deploy); `scripts/cf-staging-build.mjs` added to the **deploy** row and carved out of the
-  broad `scripts/` → testing routing; `firebase.json` added to the **auth** row; `QUEUE_LOG.md` **and**
-  `skill/SKILL.md` added to the **documentation** row (skill/SKILL.md now routes somewhere). New Suite **220.15**
-  is the narrow parity check 220.14 lacked: every concrete path a note's "Load this when touching" header claims
-  must be **routed to that note by its map row** (header ⊆ row; locators and parenthetical asides stripped so
-  only real scope claims are checked). Proven to catch a gap (removing `firebase.json` from the auth row fires
-  RED). **No second routing document** was created.
-
-**✅ STEP 3 DONE (2026-07-26) — Finding A closed. `ARCHITECTURE.md` is now task-retrieved BY
-SECTION, not read wholesale.** All 39 `##` sections got a stable, hand-curated `<a id="…">`
-anchor (decoupled from heading prose, so a reword can't silently break a link — the QUEUE_LOG
-`<a id>` pattern applied here for the same reason). Two `###` subsections that are independently
-link-referenced (Cloud Push/Pull, the OS Event Bus) got their own anchors too. **Routed from
-both places finding A named:** every `rules/*.md` note whose surface has real
-`ARCHITECTURE.md` content now names the exact anchor(s) in its own "Related notes" section
-(`state-and-save.md`, `deploy-and-cache.md`, `auth-and-cloud.md`, `ui-and-mobile.md`,
-`audio.md`, `game-data.md`, `ai-contract.md`, `file-layout.md` — 8 of the 10 notes; the other
-two, `testing-and-gates.md` and `docs-and-library.md`, have no dedicated `ARCHITECTURE.md`
-section to point at); `CLAUDE.md`'s own "read `ARCHITECTURE.md` second" line and its Reference
-Pointer Index row were rewritten to say by-section, pointing a session with no matching note at
-the file's own (now-complete) Table of Contents. **Explicitly not a second summary document** —
-the anchors and the pointers are the whole change; no new file was created. **Guarded — new
-Suite 220.16**, proven red-then-green (renaming one anchor made both an external `rules/*.md`
-reference AND an internal `](#…)` link fire red; restoring it went green): every
-`ARCHITECTURE.md#slug` reference from `CLAUDE.md`/`rules/*.md` and every in-file link inside
-`ARCHITECTURE.md` itself must resolve to a real anchor, so this routing can't silently rot the
-way the pre-existing Table of Contents already had (it listed 19 of the file's 39 sections,
-using GitHub's fragile auto-slug on headings with nested parentheticals — both bugs fixed as
-part of this pass, since they were found while rebuilding the TOC).
-
-**Also finding B's remaining half — the operational checklists/runbooks, relocated
-conservatively.** Five duplicated obligation-checklists (the two state-field checklists, the
-audio-source checklist, the UI-panel checklist, the registry-autocomplete checklist, and the
-Service Worker Cache Protocol's rule/format/guard) are now a short **rationale/invariant**
-paragraph in `ARCHITECTURE.md` linking to the already-canonical, already-more-current version
-in the owning `rules/*.md` note (verified each rules/*.md checklist was equal-or-more-complete
-before relocating — nothing was lost, and the cache-protocol's Format+Examples table, which
-`rules/deploy-and-cache.md` didn't yet carry, was moved there first, additively, per Protocol 22
-"extend before creating"). **`## Hotfix Rollback (Protocol 16)` was deliberately left alone** —
-CLAUDE.md's own Protocol 16 text already explicitly delegates the runbook to this exact section
-(`runbook in ARCHITECTURE.md § "Hotfix Rollback"`), so it is not a duplicate to relocate; it got
-an anchor for routing and nothing else. **Nothing flagged as ambiguous** — every relocation
-target was an unambiguous, already-existing, already-more-current canonical home.
-
-**R10's three-step sequence is now fully executed.** What's left is not sequence work: **Finding
-G** (LOW, a redundant-not-duplicate App Check mention — cosmetic, earns its slot on the next
-queue-touch pass, not gating anything); **Findings H/I** (gated on P3 / the Atlas, unchanged);
-**Finding L** (the external-control-plane-state ledger question — still an open owner decision,
-unchanged, not something this pass could resolve).
-
-**⬜ RECORDED, ranked by consequence — the knowledge-architecture defects (high-priority doc-currency + one
-enforcement gap; none gate the `dev → main` release, all belong to the next governance pass / R5 conversion
-thread).**
-
-- **⭐ Finding B-critical — the retrieval redesign relocated STALE knowledge into the new trusted layer. This
-  is the sharpest evidence yet for the project's own recurring failure class, and it happened inside the fix
-  for it.** `rules/state-and-save.md` — the note R2 created so sessions load _only_ the relevant, current
-  rules — carries stale file-ownership facts in its Protocol 4 checklist: **line 17** puts `autoImportState()`
-  in `api.js`, **line 18** puts `sanitizeImportedContainer()` in `api.js` (both live in **`api-import.js`**),
-  **line 20** puts `getSystemDirective()` in `api.js` (lives in **`api-directive.js`**), and **line 21** names a
-  single **`ui-render.js`** (split into the `ui-render-*.js` family at U-A4). Verified directly against source
-  and `git log`: all four lines were authored by the restructure commit **`eac54ba`**. CLAUDE.md's own pointer
-  index is _correct_ — so the restructure copied the drift into the subsystem note while the index it sat beside
-  was right, violating "each fact in exactly one place" and Protocol 3. **Why it survived the gate → finding C.**
-- **Finding B — ✅ FULLY CLOSED (stale facts at Step 1, 2026-07-21; the operational-checklists direction
-  at Step 3, 2026-07-26).** `ARCHITECTURE.md` was doing two jobs and carried current-looking errors: the
-  stale `api.js` attributions (File Map, the Inbound heading, the state checklist) and the monotonic-rev
-  cache claim were corrected at Step 1. The direction this finding recorded — "remove the operational
-  checklists in favour of links; Architecture owns rationale/invariants, rules own obligations" — is now
-  built: the cache protocol, the two state-field checklists, the audio-source checklist, the UI-panel
-  checklist, and the autocomplete checklist are all short rationale paragraphs linking to their canonical
-  `rules/*.md` home. Full account under R10's own Step 3 entry above.
-- **Finding A — ✅ CLOSED (Step 3, 2026-07-26).** The blanket-retrieval problem — CLAUDE.md sent every
-  session to read the whole `ARCHITECTURE.md` (**3,462 lines / ~348 KB**) wholesale, with a TOC but no
-  routing to a _section_ — is fixed: 39 stable `<a id>` section anchors, `rules/*.md` notes and
-  `CLAUDE.md` routed to the specific anchors for their surface, no second summary document, and Suite
-  **220.16** verifies the named anchors exist (red-then-green proven). Full account under R10's own
-  Step 3 entry above.
-- **Finding C — ✅ CLOSED (skill-half in step 1; Suite-220 half in step 2, 2026-07-23). Suite 220 did far less
-  than Protocol 45 advertised, which is why B/B-critical passed a green gate.** Suite **220.2**'s regex matched
-  **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
-  it cannot see bare filenames (`api.js`), nested paths (`js/services/api-import.js`), function ownership, or
-  prose — so the stale `api.js` ownership claims are invisible to it. And `skill/SKILL.md` **overclaims** the
-  canonical files are "canonical and current by construction (the gate guards them)" — **still present at
-  line 19 (verified 2026-07-21); NOT fixed by `21c78f7`, which only corrected the separate gate falsehood
-  (finding E).** Direction: correct the SKILL claim first (say _partially_ mechanically checked, source wins);
-  extend 220.2 only for unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT**
-  attempt a prose-truth checker. Belongs to steps one (skill claim) and two (Suite 220) of the sequence above.
-- **Finding D — ✅ CLOSED (step 2, 2026-07-23). The retrieval map had concrete gaps against the notes' own
-  declared scopes.** `.github/workflows/` routed only to the deploy note though the testing note also governs it
-  (→ added to testing row); `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sent it
-  to testing (→ added to deploy row, carved out of testing's `scripts/`); `firebase.json` was in the auth note's
-  load header but missing from its map row (→ added); `QUEUE_LOG.md` was absent from the documentation row
-  despite that note defining its append-only contract (→ added); `skill/SKILL.md` routed nowhere (→ added to the
-  documentation row + that note's header). Suite **220.14** only proved every note is _named_ in the map, not
-  that every relevant path _reaches_ the note claiming it — closed by new **Suite 220.15** (header ⊆ row parity).
-  The map is now stated as the **sole** scope authority in `CLAUDE.md`. No second routing document.
-- **Finding E — `skill/SKILL.md` FALSE statement is now ✅ FIXED (`21c78f7`); its library-fallback half is
-  still open.** The false gate claim ("the full gate must pass on every commit/push") was **corrected at
-  `21c78f7`** — the skill now reads _"the FAST gate runs at commit, the FULL gate (browser checks too) at
-  push"_ (verified against the tracked source), matching `scripts/pre-commit` → `gate:fast` / `scripts/pre-push`
-  → `gate`. Because the skill is installed read-only, a re-install was owed after the fix landed — **and the
-  owner has re-installed and confirmed it (2026-07-21)**, so this is closed (owner-confirmed control-plane
-  state, not repo-verifiable — the finding-L category). **Still open — the second half of E:** CLAUDE.md tells
-  sessions to read gitignored `library/` files, but a clean checkout has only `library/MANIFEST.txt`. Add a
-  one-sentence fallback: **if a local-only library target is absent, do not infer its contents — fall back to
-  source and report the missing context.** Belongs to step one of the sequence above.
-- **Finding F — the rollback path contradicts the branch model.** `scripts/rollback.sh` (and
-  `ARCHITECTURE.md`'s rollback runbook, line ~3408) both instruct `git push origin main`, while Protocol 43
-  says all work goes through `dev` and `main` receives only release merges — a contradiction that surfaces
-  during an outage, when ambiguity costs most. **Honest nuance (from verification):** a live-site hotfix is
-  arguably the one legitimate case where `main` IS the target, since production deploys from `main` and
-  Protocol 16 is restore-first — so this may be an intentional emergency exception the docs simply never
-  reconcile. Direction (owner call): explicitly choose an emergency-direct-`main` exception **or** a dev-first
-  rollback, and make script + protocol + runbook agree.
-- **Finding G — LOW, one redundancy.** App Check is closed in **two** places in this file (the 2.9.0-round
-  section, line ~872, and the "Closed / off the board" list, line ~1253). **Verification correction to the
-  audit:** they are **paraphrases, not identical text**, both linking `QUEUE_LOG.md#appcheck` — redundant, not a
-  copy-paste. Cleanup only; earns its slot on the next queue-touch pass. **Recorded clean:** the audit's other
-  G claim checked out in the good direction — **all `QUEUE_LOG.md#…` anchor links resolve, no orphans** (the
-  queue/log split verified clean, spot-checked across `#v280`, `#u1`, `#r2`, `#appcheck`, `#f`, and the
-  heading-derived `#update-history--the-running-last-updated-chain`).
-- **Self-caught, NOT from the audit — the QUEUE.md header-mangle hazard (found and fixed 2026-07-21,
-  commits `8dc9d5f` → `89bc6a5`).** A recording pass hand-authoring a new paragraph into the giant
-  single-underscore-italic `_Last updated: …_` header mistyped `` `APP_VERSION` `` as `` `APP*VERSION` ``
-  and broke the italic close; caught by eye and fixed the same day. **Root cause verified by reproduction
-  (Protocol 27), and it is NOT what the fix commit's own message claimed:** `npx prettier --write` run
-  against both the correct and the mangled header text left each byte-for-byte **unchanged**, and
-  `--check` passed both — Prettier never reformatted this content, so "Prettier's reformat corrupted it"
-  is wrong. The real mechanism: Prettier is a formatter, not a fact-checker, and it did its job — the
-  actual hazard is structural. The header is one dense paragraph mixing bold, code spans, and links, all
-  wrapped in a single outer `_..._` italic span; a human or AI hand-composing a new entry into that block
-  can mistype a markup character (an underscore as an asterisk, a stray backslash-escape) and the result
-  stays syntactically valid markdown, so nothing in the gate catches it. **Owner decision (2026-07-21),
-  three parts, all approved together:** **(1) no guard** — a hand-maintained "known identifiers survive
-  intact" checker is the exact Protocol 2a anti-pattern the project already retired, and this project's
-  standing bar requires a real _recurring_ consequential failure before a guard earns its existence; one
-  self-caught occurrence in a non-served planning file does not clear it. **(2) fix the structural
-  trigger, not the instance** — the hazard is the giant single-italic construct, not any specific
-  identifier, so removing the outer `_..._` wrapper makes the whole fragility class disappear with no
-  list to maintain and no guard to rot; **done in this same pass** (rides with step 1 above, since step 1
-  was already scheduled to touch this file) — the header no longer wraps the "Last updated" note in one
-  italic span, verified clean against Prettier and rendering `APP_VERSION`/`CACHE_NAME` correctly. **(3)
-  the not-to-guard choice is recorded on purpose, with its revisit condition** — "consciously chose not to
-  guard, here's when we'd revisit" is a different, stronger claim than silently doing nothing: if a giant
-  single-italic block mangles a second time anywhere in this repo's docs, that is a recurrence and it
-  earns a guard then.
-
-**⚠ RECORDED as an OPEN owner-decision — Finding L: the missing category (verified external control-plane
-state).** Facts essential to the project but derivable from **neither repo**: which skill version is actually
-installed, branch-protection state, which commit is _actually_ deployed to prod/staging, Cloudflare project +
-secret presence (not values), App Check enforcement state, GitHub Pages source config, the live service-worker
-cache version. These currently **leak into queue prose and historical logs** (the App Check and skill-install
-entries are the evidence). The auditor proposes a hand-maintained section in a library doc with a
-`last_verified` field. **Dispatch objects, and records the disagreement rather than resolving it:** that is a
-hand-maintained ledger of facts about a _moving_ world — the exact pattern this project keeps getting burned by
-(test counts, architecture file sizes, the growth chart, the inert cache guard). Dispatch's position: **derive
-what can be derived, mark honestly-unknown what cannot, and do not build a table someone must remember to
-update.** This is left for the owner to settle — not a settled design. Earn-condition: a decision from the
-owner on derive-vs-ledger before any implementation.
-
-**✅ RECORDED — what the audit found CLEAN (evidence the restructure landed).** All ten scoped rule files exist
-and are referenced; protocol headings are defined exactly once; the **tiered gate is genuinely real**
-(`scripts/pre-commit` = cache-guard + secret-scan + `gate:fast`; `scripts/pre-push` = full `gate` + the
-non-blocking nudges; CI runs full `gate`); Protocol 34's additive-cloud-write assertions, Protocol 40's browser
-test, Protocol 44's diagnostic-trigger checks, and the Protocol 48/50 pre-push nudges are all wired and passing;
-the queue/log split preserved every anchor; no meaningful orphaned system document exists.
-
-**Cross-references (findings folded into the items they belong to, per Protocol 50 "write plans where they
-live"):** Finding **H** (the P3 supersession logic defect) is recorded in **P3**; Finding **I** (the durable
-stable-identifier scheme) in **item I, design note (b)**; Findings **J/K** (museum as front door; three
-audiences) in **P**; and tonight's owner decision on the **bug-record obligation** in **P4**.
-
-**Done means:** the two fixes are shipped and guarded (done); each recorded finding is either fixed in a later
-governance pass or explicitly owner-decided (L, F); and no future session re-derives these from scratch because
-the reasoning — not just the findings — lives here.
-
-### R11. 🔄 The knowledge-graph / retrieval-topology — MINIMUM VERSION BUILT (2026-07-21), un-gated pending proof-of-drift
-
-**What it is.** A generated map of how this project's knowledge layer connects — the skill, `CLAUDE.md`, the
-`rules/*.md` notes, `ARCHITECTURE.md`, the library, the queue and its log, memory, the museum, the Atlas — and
-how each routes to / claims scope over / is checked by the others. **It grew directly out of R10:** the owner
-asked for a visual map of how everything connects, GPT-5.6 Sol (second pass, repo-aware) specified the data
-model, and Dispatch amended it. **The full specification lives in
-[`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md`](planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md)** (recorded per
-Protocol 50, referenced here rather than pasted).
-
-**The core ruling — build a RETRIEVAL TOPOLOGY first, not a universal graph of every project fact.** Protocols,
-suites, guards, queue items, museum history and Atlas assurance can join the same schema later, but their
-derivation is less uniform and including them prematurely risks _"a polished graph that lies."_
-
-**The three load-bearing ideas (must survive verbatim in substance — full text in the spec):**
-
-- **`routes_to` and `claims_scope_over` are two INDEPENDENTLY DERIVED edges** — one from `CLAUDE.md`'s
-  retrieval-map rows, one from each note's "load this when touching" header. The gap **emerges when the two
-  derivations disagree**, which is far harder to fool than a checker written to look for a known problem. (This
-  is R10 finding D, found mechanically.)
-- **`claims_checked_by` and `invokes` are SEPARATE edges** — a protocol _naming_ Suite 30 and something
-  _running_ Suite 30 are different facts. **The cache-guard defect is the proof:** protocol, script, hook and
-  suite all named each other and the classifier still missed every icon path. **Naming is not running.**
-- **Every extractor reports records seen / emitted / unparsed / parser status.** If the retrieval-map heading is
-  renamed and the parser returns zero routes, the graph must say **"route extraction failed"**, NOT render ten
-  orphaned notes as if the project collapsed — the silent-empty-parse failure of this whole week, designed out
-  at the data layer.
-
-**Also adopted:** node states `observed / declared / manifested / unavailable`; baseline-local keys for most
-nodes with cross-release identity ONLY for protocol + queue IDs (which already have no-reuse contracts); a file
-rename shown as remove+add, never inferred by git similarity (this project measured that heuristic undercounting
-by 22%); and the public projection built FROM PUBLIC SOURCES PLUS GENERIC PLACEHOLDERS, fail-closed by
-construction rather than by redaction.
-
-**⭐ Dispatch's amendment, owner-endorsed — ONE derivation, THREE renderings.** GPT designed a diagnostic
-instrument; the owner asked for a picture; the owner then corrected that there is a **third** consumer that may
-matter most. Same "one source, N views" ruling already made for `QUEUE.md`/L and the museum/P3, extended to
-three: **(1) a TOPOLOGY view** (human, visual — a **Fable design job**), **(2) a DIAGNOSTICS view** (human,
-plain — selectors, dangling edges, parser status; stays plain), and **(3) ⭐⭐ a machine-readable answer for
-SESSIONS** — a session touching `.github/workflows/` asks _"what governs this path?"_ and gets the note the map
-routes it to AND the note that claims it AND the fact that they disagree; a session asking _"is this guarded?"_
-gets _"named, invoked, and here's what its classifier actually reaches"_ rather than protocol prose; and the
-node-states let a session know `library/CODE_MAP.md` is declared-but-unreadable on a clean checkout so it does
-not infer the contents. **The owner's correction (_"we don't just need visuals, whatever helps the AI too ya
-know?"_) is why this is placed as infrastructure, the R2-restructure category — not post-2.8.5 visualisation
-decoration.**
-
-**Its own stopping rule.** Build the retrieval topology first; extend to protocols / guards / museum / Atlas
-**ONLY if the first map is actually used** to find or prevent drift. If it becomes wallpaper, stop.
-
-**Honest cost.** Even GPT's "minimum" version needs a real parser — AST detection for suite definitions, glob
-expansion against the tracked tree, boundary-accurate block parsing. **A session or two, not an afternoon.**
-
-**Where it sits.** Infrastructure, near-term — **does NOT gate the `dev → main` release** (process debt like the
-rest of R10), but placed as infrastructure rather than decoration per the owner's third-consumer correction. It
-**shares the schema with the Atlas (item I)** — link, don't fuse; item I's stable-identifier scheme (design note
-b) is the identity contract this graph's cross-release keys obey — and with **P3** (same provenance /
-fail-closed-on-unknown discipline).
-
-**Done means (when eventually built):** one derivation feeds the three views above; the two retrieval edges are
-derived independently and their disagreements surface as data; declared-vs-invoked coverage is diffed; every
-extractor reports parser status so a silent empty parse can never masquerade as an empty project; and a session
-can query "what governs this path / is this guarded" and get the map _plus its known defects_.
-
-**Minimum version BUILT (2026-07-21) — [`scripts/knowledge-graph.js`](scripts/knowledge-graph.js).** The
-DIAGNOSTICS-view data layer only (topology view and query answerer remain future consumers, per §10 of the
-plan): `routes_to` and `claims_scope_over` derived independently, diffed, and proven against six real drift
-gaps already present in the shipped files; every extractor reports records-seen/emitted/unparsed/status; a
-missing or reworded source fails loud (`empty_parse`/`broken`), never a silent empty-but-healthy graph. Output
-is generated on demand at `library/knowledge-graph.json` (gitignored, never committed — regenerated fresh
-every run via `node scripts/knowledge-graph.js`). **Deliberately left un-gated** — no Suite, no git hook (owner
-decision, Protocol 50) — until it demonstrably catches real drift over time, per the spec's own stopping rule.
-`claims_checked_by`/`invokes` and the topology/query-answerer consumers remain out of scope, as designed.
-
-**⬜ Gating decision — STILL UNRESOLVED even though G is now closed (verified 2026-07-26 against the
-committed claim-ledger).** Whether/when this un-gated drift-detector earns veto power (a Suite, a hook) was
-left for item G (the blind workflow review) to rule on. **G finished (2026-07-23) and never actually ruled on
-this** — `planning/audits/G_workflow_review/CLAIM_LEDGER.md` addresses only the ledger's own gating (a
-different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verification. R11 stays un-gated —
-its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
-settled it.
-
-## ⚠️ Blocked on an owner decision
-
-### R5. ⏭️ STAGE 2 — Convert prose into enforcement (waits on the owner formally calling it)
-
-**What it is.** The highest-value of the three remaining staged-trim steps flagged at R3, and really a
-conversion rather than a cut. The principle: a rule an agent must remember costs something every session
-it's loaded; a guard that fails loudly is free and can never be skipped. Every mechanisable rule becomes a
-check, then its prose shrinks to one line plus a pointer at that check.
-
-**Candidates on file (GPT's table, unchanged — each needs re-verification against current code before any
-commit, Protocol 27):**
-
-- Branch discipline (Protocol 43) → GitHub branch-protection settings, not just prose. **⭐ Reinforced +
-  pull-forward-able on its own (owner, 2026-07-22).** Make GitHub **ENFORCE** "main is release-only" — block
-  direct pushes to `main`, require CI-passed — instead of it being a prose rule held by discipline (today
-  Protocol 43 is convention only; a mis-aimed `git push origin main` would land straight on production). Low
-  overhead (a settings config, not code), and it catches exactly the bad push the branch model exists to
-  prevent, so it does **not** need to wait for the owner's formal Stage-2 call — it can be pulled forward on
-  its own. **⚠ Must be configured to match the ACTUAL deploy path so it does NOT block releases:** the real
-  release is a `dev → main --no-ff` merge plus the manual `workflow_dispatch` deploy run against `main` — the
-  protection rules must permit that exact flow (e.g. required-status-checks + the merge, not an all-pushes
-  block that would also stop the release merge). **A full PR workflow was considered and REJECTED (owner):**
-  it is team machinery that adds phone-unfriendly ceremony to a lean solo workflow, and the review value it
-  would add is **already covered** by the Protocol 8 diff-first audit + owner review — so **only branch
-  protection is worth adopting**, not PRs.
-- The redirect-auth ban (`linkWithRedirect`/`signInWithRedirect`, Protocol 30) → a lint rule.
-- The state-field checklist → a schema round-trip test. **Flag:** partially covered now that **A3**'s modeled
-  cloud-serialization guard (`npm run cloud-check`) has shipped, and it would be more fully covered by the
-  optional emulator test **A4** — check for overlap at plan time (Protocol 22).
-- Render-layering (Protocol 23) → AST/lint boundary rules, once the baselined debt is burned down. Today's
-  static scanner (Suite 236) is a step in this direction; full enforcement waits on the native ES-modules
-  migration (bundled with 3.0).
-- AI-response handling → runtime schema validation + malformed-response behavioral tests.
-- The deploy protocol → a post-deploy version/SW/offline smoke. **Flag:** very likely the _same_ work as
-  the 2.9.0 hardening gate's "post-deploy TRUTH" item — resolve which one builds it before starting either.
-  **UPDATE (2026-07-23):** the served-truth _foundation_ now exists — `scripts/release-receipt.js` (G item,
-  CLAIM M) fetches the live prod build and compares served `CACHE_NAME` + `APP_VERSION` against the deployed
-  commit. This candidate's remaining scope is the _behavioral_ half (SW actually installed/activated + an
-  offline smoke), which is exactly the 2.9.0 "Post-deploy TRUTH" item — so both should **extend** the receipt
-  (Protocol 22), not rebuild the served-hash compare.
-
-**The gate this stage was waiting on.** R2 (the rules restructure) had to be USED for real work first.
-**Dispatch's read: that gate now appears satisfied** — the restructure has been retrieving correctly and
-pulling real weight across many sessions this week. Recorded honestly: this is Dispatch's assessment, not
-something the owner has formally called yet.
-
-**Status: ready to plan, not started — waiting on the owner to formally call Stage 2.**
-
-### R6. ⚠️ STAGE 3 — Narrow the universal ratchets (CONTENTIOUS — owner must weigh in; NOT ready)
-
-**What it is.** The cut that costs something real, unlike Stage 2's conversions. Today every escaped bug,
-every CSS invariant, every harness flaw permanently **enlarges** the gate (Protocol 36b). GPT's proposal:
-shift from "add a guarding test for every escape, always" to "add one when recurrence would actually be
-costly" — a judgment call replacing an automatic one.
-
-**Also on the table, same stage:**
-
-- The per-commit documentation rule (Protocol 2) — loosening how often or how much waters this down.
-- The changelog grammar rule (Protocol 21) — possibly relaxed.
-- The universal-requirement framing of the UI-verification protocol — narrowed from every change to a
-  risk-scoped subset. **This is the one item GPT itself withdrew from its own cut list** (see the keep-case
-  under R7) — listed only so a future pass doesn't independently reach for it.
-- Moving the UI-presentation rules (the `Protocol UI-*` family) out of the constitution into design docs,
-  since they encode presentation taste rather than catastrophic knowledge.
-
-**Why this one waits for the owner, explicitly.** This changes how much SAFETY the process buys per commit
-— the escape-ratchet exists because "add a test when recurrence would be costly" requires correctly
-predicting which failures recur, and this project's own incident record is full of failures nobody
-predicted would recur until they did. Not marked ready to plan; each bullet needs the owner's explicit
-call, not a session's judgment substituting for it.
-
-## ⬜ Blocked on another item
-
-### R7. ⬜ STAGE 4 — The expensive machinery (capability calls, not doc cleanup)
-
-**What it is.** Unlike R5/R6 (rulebook prose), this stage cuts actual running infrastructure — each item
-needs its own argument, not a shared one:
-
-- **The Diagnostic Shell's scope (159 tools).** Weight GPT's rejection of this LOWER — GPT did not know the
-  Diagnostic Shell is on the owner's own roadmap as a real in-fiction user-facing feature (the
-  hacking-minigame's unlock target, 2.9.0 — see "The OS round proper" below).
-- **The duplicate Windows CI leg.** Real cost, but this is precisely the class of guard this project has
-  already been burned by cutting once (a Linux-only CI runner was a real production mistake here).
-- **Nightly runs.**
-- **The browser test page (`tests/test.html`).** Already has its own retirement analysis on file —
-  Protocol 40 kept it deliberately as a self-consistency check. Re-litigating it should start from that
-  reasoning, not from zero.
-- **Per-step failure-evidence packaging** (U4's CI screenshot/console/log capture).
-
-**Status: not started, not ready — each item needs its own cost/benefit case before it's even plannable.**
-Per Protocol 49, retiring any of them means removing the actual enforcement, not just the prose.
-
-**Keep-cases across R5-R7 — recorded so they are not re-litigated in any future trim pass:**
-
-- **The architecture-conformance baseline** (Suite 236) — already a formal Protocol 49 keep-case; its risk
-  stays live until the native ES-modules migration (bundled with 3.0) makes layering structural.
-- **The real-device auth rules** (Protocols 29-31) — a real production regression is on file (the r54
-  regression).
-- **UTF-8 source integrity** (Protocol 39) — a real corruption incident with a commit hash on file.
-- **Cloud write safety** (Protocol 34) — failure here is unrecoverable data loss; the entire data-safety
-  chain above exists because this class of failure actually happened once.
-- **The cache-bump guard** (Protocol 1) — failure is silent and user-visible (a stale build or black
-  screen).
-- **The dispatch-decision protocol** (Protocol 12, No Concurrent Pushes) — the owner already overruled this
-  exact cut at R3.
-- **"Actually render and exercise UI changes"** — GPT **itself withdrew** this from its own cut list,
-  because it addresses a real, named AI failure mode: an agent reasoning confidently from CSS text without
-  ever looking at the rendered result.
-
-**What R5-R7 depend on.** R5 needs nothing new (its gate is met per Dispatch's read). R6 needs the owner's
-explicit call on each bullet. R7's items are independent of each other and of R5/R6 — any one can be argued
-on its own schedule. **None of R5-R7 gates the `dev → main` release** — it's process debt.
-
-### C1. ⚠️ Gate the cloud warm-up (one of the two deferred U8 perf wins) — NOT DONE, needs re-scoping
-
-**⚠ NOT DONE — deliberately, and it needs re-scoping before anyone attempts it (verified 2026-07-19).** The
-queue described this as "a small, self-contained win." Reading U8's own commit (`49a37cc`) and `cloud.js`
-says otherwise; the deferred item is _"Defer the eager Firebase/cloud boot chain until cloud features are
-used."_ Two hard blockers, both concrete:
-
-**(a) It is an auth-path change, and Protocol 29 makes real-device verification a condition of "done."** The
-chain being deferred is `initializeAppCheck` → `getAuth` → `onAuthStateChanged` → the Protocol-31-guarded
-`signInAnonymously`. Protocol 29 says an auth change is not done until verified on a real mobile device in
-both a browser tab and the installed PWA. No session without a phone in hand can close it.
-
-**(b) It collides head-on with Protocol 33.** `cloud.js` calls `loadRemoteConfig()` at boot, which is the
-remote kill-switch read. Deferring the boot chain until "cloud features are used" would mean a player who
-never touches cloud features never reads the flag doc — so a kill switch flipped to disable a broken
-feature would never reach them. Any real version has to keep the flag read at boot while deferring only the
-auth/App Check/Firestore weight — a genuinely larger change than "warm up lazily."
-
-**Also worth stating plainly: the measured payoff is small.** U8 found the chain "runs in the BACKGROUND
-and never gates READY," with FCP already ~73 ms. Re-scoped, it belongs with the 2.9.0 hardening gate's
-boot-isolation work, not as a near-term one-liner.
-
-**Done means (C1):** the cloud connection is warmed lazily, measured before/after — the flag read and LKG
-path preserved at boot.
-
-> **C2 — virtualize long lists — MOVED to 2.9.0.** The 2.9.0 inventory-panel rebuild also virtualizes long
-> lists as its stated foundation. Doing it twice would be a Protocol 22 parallel-implementation trap, so
-> list virtualization is re-sequenced into the 2.9.0 inventory-panel foundation and built once, there. (The
-> one genuine mis-ordering the 2026-07-18 evaluation found.)
-
-### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph (D shipped — dependency cleared)
-
-**What it is.** The synthesis deliverable from the ecosystem cross-review
-(`planning/2.8.5/audits/ATLAS_ECOSYSTEM_SYNTHESIS.md`): a single generated representation of the whole
-system, offering **8 views over one graph** — and, load-bearing, the **assurance view is one of those
-eight** (generated FROM the test suite's structure so it can never drift from what's actually guarded). The
-governing rule: **generate everything a script can compute; hand-maintain only the un-derivable WHY.**
-
-**What it depends on.** (1) The **pinned baseline** (available now: the R4 pin). (2) The
-**architecture-conformance scanner** (shipped, Suite 236) and a cheap **dependency-structure matrix**. (3)
-The **TEST_CATALOG generator** (D) — ✅ **shipped 2026-07-27** (Protocol 47); the same "generate, don't
-maintain" plumbing (`scripts/generate-test-catalog.js`'s extraction + gate-diff shape) is directly reusable
-here.
-
-**Why it's last.** It's the capstone that represents the finished round, and it wants the round finished and
-pinned to represent it honestly.
-
-**⬜ Design note (a) — enumerate the eight views NOW; that's cheap scoping, not implementation
-(2026-07-21).** This entry says "8 views over one graph" but only ever NAMES two (assurance, dependency) — the
-other six are a number standing in for a specification. Enumerating the eight — each view plus the one
-question it answers — is a cheap scoping step worth doing NOW, independent of everything else. **Explicitly
-NOT the implementation:** do not spec how they're built. The round is unfinished, 2.9.0 will change much of
-what the Atlas maps, and this entry's own "why it's last" wants the round finished so the Atlas represents
-something real. Scope it, don't spec it.
-
-**⬜ Design note (b) — LINK the Atlas, library and museum; do NOT fuse them (owner: "link not fuse",
-2026-07-21).** All three share one principle — generate what a script can compute, hand-maintain only the
-un-derivable WHY — but cover different corpora and time axes: **library = current-state prose, Atlas =
-current-state structure, museum = history.** The valuable connection: **the Atlas's assurance view and the
-museum's bug room are the same relationship from opposite ends** — the Atlas answers "what guards this?", the
-museum answers "why does this guard exist?" (always some specific bug that escaped). Walking it both ways
-answers "why is this here", otherwise unanswerable without having been present. **RULING: link via a stable
-identifier scheme** (files, protocols, suites, queue items) so each references the others WITHOUT any owning
-the others — do NOT merge into one shared graph. Three things that reference each other can each fail alone;
-one merged thing fails everywhere. The scheme is already half-present: the skill and rules cite protocol
-numbers, and queue items have stable IDs the restructure just protected. (The AI-facing read side is P3's
-spec — the raw archive / internal manifest, never the ~190MB generated HTML nor the name-substituted public
-tree; not restated here.)
-
-**⭐ Sharpened by the knowledge-architecture audit (R10, finding I, 2026-07-21) — the ruling stands, but the
-naive version of it breaks: file paths are LOCATORS, not IDENTITIES.** This project already has the evidence —
-its own archive-rename work measured git's content-similarity rename detection **undercounting by ~22%, and
-failing silently** (recorded under P1). So a durable link scheme needs, concretely: **namespaced immutable IDs**
-(`incident:0042`, `protocol:1`, `guard:cache-bump`, `queue:R9`) kept **separate from an evidence locator**
-(repo + commit + path); IDs that **survive** label / path / display-name changes; **no reuse after retirement**;
-**retirement tombstones** carrying status and an optional `superseded_by` (deleting the _enforcement_ must never
-delete the _identity_ — the Protocol 49 discipline, made structural); **baseline-aware relations** ("prevented
-this at release X" ≠ "active now"); **one owner per relation** with inverses generated, not hand-written; and
-**validation that lives in the Atlas / museum / extract generators, NOT in the app's release gate** (linking
-metadata must never be able to block a release). **What breaks it, recorded so it isn't re-invented:** deriving
-IDs from paths / headings / slugs; reusing retired numbers; deleting IDs on retirement; treating a _moving_
-branch URL as historical evidence; public sanitisation changing IDs instead of only display labels; and
-treating a missing reference as "retired" or "current" instead of **"unknown."**
-
-**⬜ Design note (c) — share the museum's renderer, keep publication separate (owner: "part of the museum on
-the user end", 2026-07-21).** Yes to sharing the museum's generator plumbing — renderer, navigation, search,
-styling, pinning discipline — rather than building a second browsable site. BUT the Atlas maps where the
-architecture is violated and what isn't covered by tests: a fair description of an **attack map** for a live
-app with cloud sync and auth. So the Atlas lives on the **PRIVATE side by default**, using the same
-private-source-vs-published-output split P2 already designs. The one genuine difference to record: the museum
-is pinned to **RELEASES** (history, deliberately frozen); the Atlas is pinned to a **CURRENT BASELINE** and
-marks itself **degraded** when the repo moves off it. Same pinning idea, opposite intent — **share a renderer,
-never share a cadence.** (Design only — build nothing here.)
-
-**Done means:** one generated Atlas, pinned to a baseline, with 8 views (assurance among them) computed from
-source rather than hand-authored.
-
-## 🔄 The Museum sub-program (a coupled cluster — kept together deliberately)
-
-_These items (P, P1, P2, P3, J) form one tightly-coupled sub-program with internal dependencies that
-readiness buckets would fragment, so they are kept together: **P is built and its capture pipeline +
-reproducibility work have LANDED in the sibling archive repo (P1 is now FULLY CLOSED); P2 (publication) is
-post-release and BUILD-COMPLETE — curation decided (B), the `--public` tree is self-contained +
-publication-quality, and the publish safety machinery is built + proven, leaving only the owner's turnkey
-expose checklist; and P3/J both depend on P1.** None gates the `dev → main` release._
+# 🔄 THE MUSEUM PROGRAM (a coupled cluster — kept together deliberately)
+
+_These items (P, P1-P14, J) form one tightly-coupled sub-program with internal dependencies that readiness
+buckets would fragment, so they are kept together — and as of 2026-07-27 they sit **directly under the
+control-plane program** rather than buried in the 2.8.5 tail, because the museum is the second priority band
+and was never really 2.8.5 work. **State of play: P is built; P1 is FULLY CLOSED; P2 is PUBLISHED and LIVE
+(2026-07-24) — but the live site is now STALE against its source, which is P14; P8 ✅ SHIPPED 2026-07-27 and
+is the blueprint P11 builds on; P3/J both depend on P1.** None of it gates the `dev → main` release._
+
+**⭐ The build order inside this program (P8's own recommendation, adopted 2026-07-27):** **P10** (the nav is
+free to change now) → **P11 Stage 0** (`arcs.json` — the one genuinely new data artifact) → the arc spine →
+the coverage view → the Visual Web; with **P13 → P14** (security scan-list fix, then the republish) closing
+the loop on the live site, and **P5/P6/P7/P9/P12** plus the Fable design polish landing as content passes
+alongside.
+
+**✅ P8 — the story-material + STRUCTURE synthesis audit — SHIPPED 2026-07-27.** Both deliverables are filed
+in the archive (`audits/museum/2026-07-27_P8-story-corpus.md` — **146 canonical arcs** de-duplicated from 175
+raw findings across 15 groups, with a PII firewall; and
+`audits/museum/2026-07-27_P8-structure-and-connection-map.md` — the full room/page/nav inventory plus the
+node/edge schema, a superset of `library/knowledge-graph.json`). Run as a Claude session because the material
+is private, exactly as the item required. → [full account](QUEUE_LOG.md#p8)
 
 ### P. 🔄 THE MUSEUM — a generated, browsable history of the project (BUILT + capture pipeline + reproducibility + `--public` tree + publish safety machinery LANDED; publication down to the owner's turnkey expose)
 
@@ -2129,73 +1387,6 @@ story pivots around, not a flat timeline.
 carry, and it pairs naturally with the museum's failure→lesson→improvement thesis (the pivot IS an
 improvement arc at the tooling level). **Recorded as a parked candidate — not designed, not built.**
 
-### P8. ⬜ Story-material + STRUCTURE synthesis audit — the story corpus AND the room/structure/connection map (PARKED, not started; owner, 2026-07-24, scope-expanded 2026-07-25)
-
-**What it is.** A pass that **gathers, organizes, and synthesizes literally every story beat** the museum
-could ever draw from, into one curatable corpus, so the owner curates the exhibits from the FULL material
-rather than whatever a session happens to remember. **Scope (owner's words): "literally everything story-wise,
-no lookup-able PII."** Sources to sweep: orchestrator **memory**, `planning/`, the **bug→guard** records, the
-**graveyard**, the archive **audits**, **`QUEUE_LOG.md`**, and every **protocol's origin incident**.
-
-**Explicit beats to fold in (named so they aren't lost):**
-
-- The **OneDrive/Antigravity pivot** (the P7 origin arc — the two are related; P8 is the corpus, P7 is one
-  exhibit drawn from it).
-- The **wrong-tool incident**: a git/deploy task was launched as a **sandboxed Dispatch** session that
-  **couldn't push** (no network route / no `gh` / no Chromium), had to be **re-routed to an on-machine Code
-  session**, and the lesson **became a rule** (know the execution tier before dispatching git/deploy work).
-- The **development PAUSE** for the **apartment move / subscription frugality** (see the STATUS note up top) —
-  an honest "the project stopped for real-life reasons" beat.
-- The **independent-convergence arc** — a 2026 wave of external guides now teaches, as novel technique, the
-  multi-agent architecture RobCo had ALREADY built without a guide. (Full source map + thesis in the ⭐ block
-  directly below.)
-
-**⭐ A MUSEUM ARC — RobCo independently converged on (and on verification, EXCEEDS) the architecture the 2026
-guides now teach (owner observation, 2026-07-25).** A wave of external write-ups describes as _novel technique_
-the multi-agent architecture this solo, free-tier project had already built without a guide. Recorded as story
-material — **CITE + MAP the titles; NEVER dump external copyrighted content into the museum** (at most a short
-attributed quote; the mapping is ours):
-
-- **"Loop Engineering"** (qibaz, X, Jul 2026) → RobCo already has it: the **plan → implement → gate → audit
-  ratchet loop** plus the **self-improving gate** as the verification harness — the exact ingredient the
-  article says most people skip.
-- **"Graph Engineering"** (an 11-page synthesis of Karpathy's autoresearch ratchet-loop + AgentHub's "the DAG
-  IS the graph" + Anthropic's Knowledge-Graph cookbook; X, Jul 2026) → its staged path is **"one measured loop
-  → typed knowledge graph → graph-grounded swarm,"** where the graph externalizes shared facts / provenance /
-  cross-session memory and the evaluator checks claims against graph edges ("triple not found" beats "seems
-  off"). RobCo already has: **R11** (independently-derived typed edges; drift surfaces as data), the
-  **provenance discipline** (every fact links to its commit), **"green is scoped evidence, not proof,"** the
-  persistent **memory / queue / archive as the cross-session shared brain**, **git-worktree per-session
-  isolation**, and **`CLAUDE.md` / rules / protocols as the "program.md that programs the program."**
-- The earlier **second-brain / visual-brain / "the last prompt you'll write"** threads — same pattern, same
-  convergence.
-
-**The thesis point (why this is a museum ARC, not just a note).** RobCo **independently converged on** — and on
-the **verification harness, EXCEEDS** — the architecture these guides now teach, as a **solo, free-tier
-project.** The ONE deliberate omission is **SCALE** (the 1,000-agent swarm): a solo / free-tier / owner-control
-**choice, NOT a gap.** This is direct evidence for the self-maintaining-system thesis — **the discipline was
-principled, not accidental.** **Owner's words, preserved:** _"all these guides are out there yet we've already
-done it all without a guide — just me and you."_
-
-**⭐ SCOPE EXPANSION (owner, 2026-07-25) — the audit is ALSO the layout blueprint, not just story content.**
-Beyond the story corpus, this audit must **catalog every existing museum ROOM + the whole site structure** —
-what each room holds and **how they connect** — so its output **doubles as the layout blueprint for a
-redesign** (feeding the archive-native nav design direction + the Fable pass under P), and must **map the
-CONNECTIONS** (the facet-2 connections map, Part C) so the connection-layer / Visual Web builds from a **real
-inventory** rather than a guess. **TWO OUTPUTS, then:** (1) the **story corpus** for curation; (2) the **room +
-structure + connection map** for the layout redesign and the Visual Web.
-
-**⚠ Run it as a CLAUDE session — NOT a GPT copy-paste.** The audit **must read the PRIVATE archive** (memory,
-`bugs/`, graveyard, audits, AND the built museum's own room/structure) to be real; GPT has **no access to that
-private material**, so a GPT pass would be inventing from a summary. A Claude session that can actually read
-the archive is the only honest way to run it — the same "Claude first, because it can EXECUTE / read the
-private material" reasoning as design note (e).
-
-**Why it's the enabling prerequisite.** Curation ("capture everything, exhibit a curated subset") only works
-if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
-task — and now the **structure inventory** the redesign + Visual Web both need. **Recorded as a parked
-candidate — not started.**
-
 ### P9. ⬜ Intent-vs-reality FRAMING fix — crop each pair to the element that changed (PARKED, PRE-DIAGNOSED; owner, 2026-07-24)
 
 **What it is.** A **framing fix** on the now-LIVE intent-vs-reality exhibit so its "here's exactly what changed"
@@ -2222,6 +1413,1296 @@ rushed into the subscription lapse.**
 **Status.** The site is already public and correct; this is post-launch polish, filed alongside the Fable
 Direction-B + gallery-mats polish (P2's "pre-public design polish", now post-public). **Recorded as the
 pre-diagnosed, FIRST-THING-BACK museum fix — not started.**
+
+### P10. ⭐⏭️ REMOVE the hardcoded 10-stop keypad tab bar and redo the nav — the "no 11th slot" constraint is VOID (owner, 2026-07-27, emphasized twice)
+
+**⛔ CAPTURE THIS EXPLICITLY SO IT CANNOT BE LOST — it dissolves a constraint another document still states as
+hard.** The museum's global nav is **ten hardcoded stops on a keypad conceit** (LOBBY · 2.5.0 · 2.6.0 · 2.8.0 ·
+2.8.5 · STANDING · BUGS · INTENT · GRAVEYARD · SEARCH), with grids tuned to 4/5/10 columns at three
+breakpoints. **P8's structure map records that as a hard constraint** — _"NAV has no free slot… there is no
+eleventh key"_ — and lists "the eleventh nav key" as an open owner decision.
+
+**The owner's answer, verbatim (2026-07-27):** _"we can get rid of the hardcoded 10 stop tabs. that was from
+RobCo theme copy I believe but we changed directions since then."_
+
+**So the constraint was never a design decision at all — it is leftover RobCo-terminal theme copy from before
+the museum took on its own Records Office Dark identity** (no bezel, not fully in-theme). **The "no 11th slot"
+limit is therefore VOID**, and one of the two open build decisions P8 surfaced is resolved in favour of _the
+nav is free to change_. (The other — motion as **exhibit** behaviour rather than **container** behaviour —
+still stands open; the identity README's own sentence is the permission slip, and it must be quoted to the
+owner rather than assumed.)
+
+**⏳ OWED: a follow-up discussion with the owner.** He asked to _"get back to me immediately after we finish
+the gpt/dispatch thing"_ — i.e. after the control-plane feasibility thread (**CP1**). The discussion decides
+**what replaces the ten stops**, and how the new nav interacts with the Visual Web and the arc-spine /
+coverage-view rooms **P11** adds. Do not design it unilaterally first.
+
+**Two things to fix while the nav is open, both already on file:** **Growth is currently unreachable from the
+nav bar** (its only inbound edge is the lobby's Fig. 1 card), and the archive-native navigation direction
+already recorded under **P** — catalog cards / filing drawers that pull-slide open, a card expanding INTO its
+room, real motion between rooms — is the design intent this rebuild should carry. **Rails, unchanged:** the
+clarity veto governs, mobile-first, no build step, animated SVG/CSS only, and every nav target stays a real
+`<a href>` (middle-click / open-in-new-tab / copy-link must keep working, and navigation must cost zero
+script).
+
+**Done means:** the ten hardcoded stops are gone, the replacement nav is owner-agreed rather than
+session-invented, growth is reachable from it, and P8's "no eleventh key" constraint is struck at its source
+rather than left contradicting this entry.
+
+### P11. ⬜ The VISUAL WEB build on P8's structure — arcs.json → arc spine → coverage view → the radial web (the Magnum Opus; P8 shipped, so this is now buildable)
+
+**What it is.** The museum's capstone, now with a real blueprint under it: **P8's structure/connection map is
+its input**, and that map is explicitly a **superset of `library/knowledge-graph.json`** — the shipped R11
+graph (27 nodes / 166 edges) is schema version 1.x and this is 2.0.0. **Protocol 22 governs: EXTEND R11, do
+not fork it.** Every existing node kind, edge type and observation state survives unchanged; the superset only
+adds (14 new node kinds, 21 new edge types, projected ≈1,450 nodes / ≈2,200 edges).
+
+**⭐ The single most important structural finding, recorded so nobody starts at the wrong end: the Visual Web
+is a DATA problem, not a rendering problem.** The museum today is a **star topology** — lobby plus tab bar out
+to each room, and essentially nothing else. There is **no room→room edge, no doc→doc edge, and one single
+cross-room content edge in the entire site**. Every real relationship this project has — which bug produced
+which guard, which lesson drove which protocol — currently lives in **prose**. **Building the renderer first
+would produce a beautiful picture of a star.**
+
+**The four stages, each independently useful and independently abandonable (P8's own recommended order):**
+
+- **Stage 0 — `arcs.json`, the curated edge layer (the prerequisite; no visual).** Land the 146 canonical arcs
+  as structured data at `museum/accounts/arcs.json`, each with its incident, measure, sources, date, room and
+  `visibility` — the same checked-in-JSON precedent as `intent-pairs.json`. **This is the ONLY genuinely new
+  data artifact the whole capstone requires; everything else is parsing.**
+- **Stage 1 — the ARC SPINE (the first visual).** One generated page rendering only _arc → incident → measure
+  → improvement_ for the ~146 arcs, grouped by the corpus's fifteen themes. **Not a graph — a strip**, in the
+  growth tape's idiom: legible, scrollable, phone-first, every arc linking to its evidence. It is the museum's
+  thesis rendered directly, lay-legible by construction, and it proves the arc data before any layout
+  algorithm exists.
+- **Stage 2 — the COVERAGE VIEW (already owner-approved and designed, still unbuilt).** Three columns — **rule
+  → what enforces it → what proves the enforcement works** — with blanks left **visibly blank**. Two pieces of
+  hard evidence already justify it: a batch of rules with **zero** enforcement, and a guard that was **inert
+  for weeks**. _"Has a guard" and "is actually protected" are different columns._
+- **Stage 3 — the VISUAL WEB itself (the capstone).** Only after 1 and 2 exist **and have been used**. A
+  **radial, generation-time layout** — nodes radiating from a centre, organic branching, opacity by age or
+  activity, colour by kind, hover/tap pulse in pure CSS. **Cluster-first with drill-down, NEVER all ~1,450
+  nodes at once** — the default view is the ~15 theme clusters plus room nodes, perhaps 40 visible nodes.
+
+**⛔ Hard constraints, all already enforced elsewhere in the generator — none of them is aspirational.** No
+build step, no libraries, no CDN, no D3, no force-graph, no WASM (`buildGrowthTape()` is the trusted
+precedent: hand-assembled SVG with explicit coordinate math). **Layout is computed at generation time and
+emitted as static coordinates** — a browser-side force simulation needs a library, produces different pixels
+per run (breaking byte-identical reproducibility) and burns phone CPU. **Determinism has teeth**: seeded and
+fixed-precision, or the double-fresh-clone check fails. 900px max-width, 360px floor, offline `file://`, no
+`fetch()` ever. WCAG 2.1 AA, with a **non-visual equivalent** for the graph and keyboard-reachable nodes. Page
+weight is a stated value — state the cost, defer, or shard. **Ritual, not gate** — it never blocks a release
+or a sync.
+
+**⚠ The legibility gate has NOT expired, and the audience bar is now higher, not lower.** Both external
+reviewers independently called a graph of everything-vs-everything an unreadable hairball, the recorded
+judgement is explicit that the objection does not expire with time, and the primary visitor is a
+**non-technical person**. **At ~1,450 nodes an all-nodes-at-once render is a KNOWN-FAILED design — do not
+build it.** This is what the curation exemption actually means: the Visual Web is
+**complete-but-navigable** (nothing left out of the DATA; density managed by interaction), where every other
+exhibit is complete-collection-but-curated-display.
+
+**⛔ Visibility is fail-closed BY CONSTRUCTION.** Every node carries a `visibility` field that **defaults to
+`private`**; a node becomes public only when an extractor reading a **public** source emits it as public.
+**There is no scrub step, because a scrub step is a discipline and disciplines fail** — a private node in a
+public build is **not emitted at all**, and its edges terminate in a generic `private:<kind>` placeholder so
+the graph's shape survives without its contents. A node whose visibility cannot be determined **fails closed**.
+And a schema-level guarantee, not a filter: **there is no `person` node kind — only `role`** (owner, fable,
+opus, sonnet, gpt, gemini, deepseek). No human identity ever enters this graph.
+
+**⭐ One derivation, THREE renderings (unchanged, owner-endorsed):** the **topology** view (human, visual — a
+Fable design job), the **diagnostics** view (plain, no design pass — dangling edges, parser status), and the
+**machine-readable answer for SESSIONS**, which the owner corrected is arguably the highest-value of the three
+(_"we don't just need visuals, whatever helps the AI too ya know?"_). A **DSM (dependency-structure matrix)**
+is a companion view, not a replacement.
+
+**When Fable gets involved: between Stage 1 and Stage 3**, once the arc data is real and the cluster-first
+legibility strategy is settled. **⚠ Have the brief checked against the identity ruling before it is sent** —
+an entire design pass has already been lost to a brief that asserted the opposite of what the owner had ruled.
+And brief the Gource **feeling**, never the tool: real-time animated playback of history does **not** transfer,
+and running Gource itself was rejected on scale and cost — do not re-propose it.
+
+**Cross-references, not restatements.** **Item I (the Atlas) rides this graph renderer** — same plumbing, and a
+second one would be the Protocol 22 parallel-implementation trap. **R11** is the shipped 1.x graph this
+extends. **P10** frees the nav this needs an entry point in.
+
+**Done means:** `arcs.json` exists and is generated-from/checked-against the corpus; the arc spine and coverage
+view are built, shipped and actually used; and the radial web renders cluster-first at 360px, deterministically,
+with fail-closed visibility and a non-visual equivalent.
+
+### P12. ⬜ The ARTICLE ROOM — pair each external guide with the RobCo measure that already embodies it (owner, 2026-07-25)
+
+**What it is.** A museum room that pairs **each external 2026 guide** with **the RobCo measure that already
+embodies it** — evidence for the museum's self-maintaining-system thesis that **the discipline was principled,
+not lucky**. The observation behind it, the owner verbatim: _"all these guides are out there yet we've already
+done it all without a guide — just me and you."_
+
+**The pairings on file (cite and map — never dump the source):**
+
+- **"Loop Engineering"** → RobCo's **plan → implement → gate → audit ratchet loop** plus the **self-improving
+  gate** as the verification harness — the exact ingredient the article says most people skip.
+- **"Graph Engineering"** (the synthesis of the autoresearch ratchet-loop + "the DAG IS the graph" + the
+  Knowledge-Graph cookbook) → **R11**'s independently-derived typed edges with drift surfacing as data, the
+  **provenance discipline** (every fact links to its commit), **"green is scoped evidence, not proof,"** the
+  memory / queue / archive as a cross-session brain, per-session worktree isolation, and `CLAUDE.md` + the
+  rules as _the program that programs the program_.
+- The **second-brain / visual-brain** threads → the same pattern.
+
+**⛔ COPYRIGHT RAIL, non-negotiable:** cite and map — **never dump external copyrighted content into the
+museum**. At most a short attributed quote; **the mapping is ours, the article is theirs.**
+
+**⭐ Name the ONE deliberate omission in the room itself — it is the honest part.** The **swarm** (the
+thousand-agent scale these guides sell) is **absent by choice, not by gap**: solo, free-tier, owner-control —
+and parallel agents on one repo produced the exact gate-collision this project already recorded. **Scale was
+correctly declined, not missed.** A room that claims convergence without naming its omission is a brag; one
+that names it is evidence.
+
+**Where it sits.** A museum content/exhibit pass — it draws on **P8**'s corpus (the
+independent-convergence arc is already a beat in it) and inherits **P**'s curation law and lay-audience bar.
+Design-intent recorded; **not designed, not built.**
+
+**Done means:** a room exists pairing each cited guide with its RobCo counterpart, sourced and attributed, with
+the swarm omission stated in the room's own copy — and no external content reproduced.
+
+### P13. ⚠️⏭️ SECURITY — add `planning/2.8.0/plans/DEPLOY_STAGING_PLAN.md` to the publish name/PII scan list (P8 finding, 2026-07-27)
+
+**What it is — and why it is a security item rather than a chore.** P8's corpus, while mapping where the
+archive retains real identity, found a **live, lookup-able email address in
+`planning/2.8.0/plans/DEPLOY_STAGING_PLAN.md`** (three occurrences, as the single identity in a proposed Zero
+Trust allow-policy). **That file had not previously been scanned.** The file exists in **both** the app repo's
+`planning/` tree and the archive's mirror of it.
+
+**Why it must be handled BEFORE any republish (P14), not after.** The museum has already come within one owner
+question of publishing internal document pages with the owner's identifiers baked into page **addresses** and
+the **search index** — and the guard in place scanned only for the exact string it was handed: it never saw
+the username inside a path, nor the email it was never given. A "publication-quality" audit the day before had
+checked the exhibit pages only, and passed. **Redaction-after-ingest has already failed here once.**
+
+**The mechanism is safe to exhibit; the VALUE must not be.** The Zero Trust allow-policy design is legitimate
+museum material — it is the identity inside it that cannot ship.
+
+**The direction, and it is structural rather than procedural:** the public projection is **built from public
+sources plus generic placeholders — never by ingesting private data and redacting it.** Fail-closed by
+construction. Adding this one path to a scan list is the immediate fix; the standing fix is that a
+**new** unscanned file must not be able to reach a public build in the first place. **CP4 (the sync audit) is
+the right place to ask how many more of these there are** — this is one finding of exactly the class it is
+meant to enumerate.
+
+**Done means:** the file is scrubbed or otherwise handled, it is covered by the publish scan list, the scan is
+proven red-then-green against the real value (never committing it), and no republish has occurred before that
+is true.
+
+### P14. ⬜ The live public museum is STALE against its source — the republish that ends "finish the museum" (2026-07-27)
+
+**What it is.** The public exhibit at **https://robco-exhibit.pages.dev/** was published **2026-07-24** and has
+not been regenerated since; the archive has moved under it (the P8 audit, the archive organization fixes at
+**W**, and everything since). **The site is therefore stale against its own source right now** — recorded
+plainly rather than left as an assumption that it is current.
+
+**The sequence, and none of it is new machinery — it is the existing turnkey path re-run:** regenerate →
+`--public` staging tree → `--publish-prep` with the real name supplied **at runtime** (never committed) →
+review the emitted tree → verify privately → expose that same already-verified commit.
+
+**⛔ P13 is a HARD PRECONDITION.** Do not republish until the scan-list gap is closed — a republish is exactly
+the action that would carry the finding live.
+
+**Why it is filed as its own item rather than a footnote.** "Finish the museum" **ends with a republish**;
+without an item, the museum work would keep landing in the archive while the public site silently drifts
+further from it, which is the same class of gap as a green check that means nothing.
+
+**Done means:** P13 is closed, the site is regenerated from the current archive, verified privately, exposed,
+and the live URL confirmed serving the new build.
+
+---
+
+# ✅ Shipped milestones (full accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md))
+
+- **✅ 2.8.0 — "The Physical Machine"** (live on prod). The New Vegas hardware overhaul: every subsystem
+  re-dressed as a bespoke instrument, the offline native terminals, the 159-tool Diagnostic Shell, the
+  ambient runtime, and the foundations (event bus, two-store boundary, AI-directive + boot
+  decompositions). → [full account](QUEUE_LOG.md#v280)
+- **✅ Brain dump** (shipped, maintained from here on). The deep Claude-facing reconstruction of the whole
+  project so every session starts accurate. → [full account](QUEUE_LOG.md#braindump)
+- **✅ 2.8.5 item 1 — the code + test health spine.** Readability refactor, the library/token split, and
+  the full U1–U12 health round — capped by Protocol 23 enforcement (Suite 236; debt baselined at 20
+  render→save + 26 service→view + 0 registry). → [full account](QUEUE_LOG.md#u1)
+- **✅ 2.8.5 item 2 — perf / accessibility / bundle-size** (folded into U1–U12; accessibility driven 40→0).
+  → [full account](QUEUE_LOG.md#u2)
+- **✅ 2.8.5 item 3 — brain-dump re-baseline** on the clean codebase. → [full account](QUEUE_LOG.md#u3doc)
+- **✅ 2.8.5 item 4 — Fallout 3 Pip-Boy device skin** (COMPLETE: U0-U9 + bottom-dock occlusion fix + the
+  skin-architecture extraction pass). MANIFEST density deferred to pre-3.0. →
+  [full account](QUEUE_LOG.md#fo3)
+- **✅ 2.8.5 item 5 — save integrity Layers 1–2** (semantic survival test + `persist()` request). →
+  [full account](QUEUE_LOG.md#saveintegrity)
+- **✅ Data-provenance program** — both games re-sourced to `fallout.wiki` and guarded; the FO3 karma engine
+  rebuilt. → [full account](QUEUE_LOG.md#dataprovenance)
+- **✅ Save integrity — Layer 3** (read-side fail-loud: quarantine-not-delete, READ FAULT / EVICTION
+  banners). → [full account](QUEUE_LOG.md#saveintegrityl3)
+- **✅ UI truthfulness fixes** — three flows that reported success on a failed operation, corrected. →
+  [full account](QUEUE_LOG.md#uitruthfulness)
+- **✅ 2.8.5 item 6 — legacy / schematic per-game layout** (SHIPPED 2026-07-20; Suite 241 parity check). →
+  [full account](QUEUE_LOG.md#schematic)
+
+---
+
+# 2.8.5 tail — the open work (grouped by readiness)
+
+Everything in the 2.8.5 blocks above has shipped. This block is the rest of the near-term work. The old
+discovery-order groups (Group 1 data-safety → Group 4 deliverables) are retired in favour of grouping the
+**open** items by what actually determines when they can run. The near-term data-safety item (**A3**) is now
+**resolved** (2026-07-21 — modeled guard shipped, emulator test demoted to optional **A4**), so **only the
+small fixes** remain before the `dev → main` release; the deliverables and the governance process work can
+land around it.
+
+_Placed 2026-07-18 from two external AI reviews (`planning/2.8.5/audits/ATLAS_ECOSYSTEM_REVIEW.md` + the
+synthesis). Each item was checked against the real code before it earned its slot._
+
+## ✅ Shipped this round (one line each → full account in [`QUEUE_LOG.md`](QUEUE_LOG.md))
+
+_Data safety:_
+
+- **A0** ✅ AI inventory-overwrite guard — an AI turn can no longer silently delete natively-held items
+  (reconcile-not-overwrite, widened to every AI full-replace field). → [account](QUEUE_LOG.md#a0)
+- **A1** ✅ Live-save durability — the live `robco_v8` container now has an IndexedDB recovery shadow. →
+  [account](QUEUE_LOG.md#a1)
+- **A2** ✅ Save-integrity Layer 3 write-side — a quota-failed migration write is distinguished from real
+  corruption. → [account](QUEUE_LOG.md#a2)
+- **A3** ✅ Cloud serialization guard (`npm run cloud-check`) and **A4** ✅ the real-Firestore emulator
+  round-trip are both shipped, but their **full accounts still sit in this file** rather than in the log —
+  **deliberately, and the reason is worth recording.** Suite **246.3** hardcodes `A3` as an item ID it expects
+  to parse out of `QUEUE.md`, and **246.5** requires at least one **done**-status `###` item to exist here; so
+  moving those two accounts to the log — which is what this file's own ahead-only contract says should happen
+  — turns the gate red. The fix belongs in `tests/`, and the suite's own comment already flags the fixture as
+  fragile and names the sturdier fix (sample live IDs instead of naming them). **Recorded rather than worked
+  around:** the queue cannot fully honour its ahead-only rule until that fixture stops pinning a specific
+  shipped item. See **A3** and **A4** below.
+
+_Governance restructure:_
+
+- **R1** ✅ Deleted the test-count bookkeeping — retired Protocol 2a. → [account](QUEUE_LOG.md#r1)
+- **R2** ✅ Rules restructure — short universal contract + path-scoped `rules/*.md` notes + the retirement
+  rule (Protocol 49). → [account](QUEUE_LOG.md#r2)
+- **R3** ✅ First staged trim — one reversible cut on top of the restructure (incl. `RULES.md` deleted, the
+  `// N tests` comments stripped). → [account](QUEUE_LOG.md#r3)
+- **R4** ✅ The re-pin pass — all five local-only artifacts stamped to one commit; found and fixed real
+  drift. → [account](QUEUE_LOG.md#r4)
+- **R8** ✅ Queue-drift reconciliation — Protocol 50 + `scripts/queue-drift-check.js` pre-push nudge (Suite
+  242). → [account](QUEUE_LOG.md#r8)
+- **R9** ✅ The skill made a POINTER, not a copy — the fourth context source stops being a second source of
+  truth. **The owner has re-installed the skill (confirmed 2026-07-21), so R9's outstanding manual step is now
+  closed** — and it also carries the `21c78f7` gate-claim correction (R10 finding E). → [account](QUEUE_LOG.md#r9)
+- **D** ✅ The TEST_CATALOG generator (Protocol 47) — `library/TEST_CATALOG.md` is now GENERATED from the
+  runner's own suite headers, never hand-typed; the Atlas (item I) reuses this plumbing directly. →
+  [account](QUEUE_LOG.md#d)
+- **U** ✅ The generate-vs-hand-maintain audit (the generalization of D) — every actionable GENERATE
+  candidate from the triaged audit shipped across four dated batches (Suites 248-252, Protocols 52/53, plus
+  the owner-decided deletion of README's third script load-order copy). → [account](QUEUE_LOG.md#u)
+
+_Small residual fixes:_
+
+- **E** ✅ Dead RECIPES.CSV tables removed from both game databases. → [account](QUEUE_LOG.md#e)
+- **M** ✅ Map renderer boxed-grid residue — re-audited, already clean, nothing to remove. →
+  [account](QUEUE_LOG.md#m)
+- **K** ✅ Backup script single-shell dependency — closed, plus a shrink-guard added while verifying. →
+  [account](QUEUE_LOG.md#k)
+- **O** ✅ Test-artifacts folder self-cleaning — "files present ⇒ last run failed" is now a true signal. →
+  [account](QUEUE_LOG.md#o)
+
+_Non-gating near-term unit:_
+
+- **N** ✅ AI / Overseer pass, Findings 2–8 (both batches) — the AI experience catching up to the terminal
+  being the primary surface. → [account](QUEUE_LOG.md#n)
+
+_End-of-round deliverable foundation:_
+
+- **F** ✅ The four process refreshes — the standing workflow-review prompt brought fully current (the input
+  G reviews). → [account](QUEUE_LOG.md#f)
+- **G** ✅ The blind workflow review — FULLY RESOLVED (claim-ledger built + verified, all (a)/(b) fixes
+  shipped, all three owner-decisions settled). **⚠ One open thread survives: the R11 knowledge-graph gating
+  question this review was asked to rule on was never actually addressed** — see R11 and the account below. →
+  [account](QUEUE_LOG.md#g)
+- **H** ✅ CLOSED (owner-approved verdict, 2026-07-26) — the optional system-model review is redundant with
+  **G** (process, 3 reviewers) + **R10** (the knowledge-architecture audit, which examined the
+  representation/retrieval layer); the one sliver H uniquely covered — raw brain-dump accuracy — is
+  low-value post-2.8.5 re-baseline. → [account](QUEUE_LOG.md#h)
+
+_PWA / install UX:_
+
+- **S** ✅ PWA install discoverability + the guided FO3 reinstall flow (Option 1) — shipped to `dev`
+  2026-07-22 **and confirmed on PRODUCTION the same day** via the `v2.8.5-r6` hotfix merge to `main`
+  (corrects the file's prior "nothing on production yet" note, which was never updated after the hotfix
+  landed). → [account](QUEUE_LOG.md#s)
+
+_Archive & backup infrastructure (shipped 2026-07-27, in the sibling archive repo — new IDs, assigned when
+the work was folded in):_
+
+- **V** ✅ The archive-sync repair — `sync.ps1` was reporting **"Done" on a push that had been REJECTED**
+  (PowerShell 5.1 does not fail on a native exit code), so the only backup of `library/`, `planning/` and
+  memory could silently protect nothing. Fixed with an exit-checked git wrapper, locks held outside git in
+  `try/finally`, a content digest over every source, foreign-commit refusal, and real remote verification —
+  **including on the no-op path**, which a follow-up closed after an independent audit found it could still
+  exit 0 without asking the remote anything. 13 tests green on **both** PowerShell 5.1 and 7.6.4. →
+  [account](QUEUE_LOG.md#v)
+- **W** ✅ Archive/museum organization fixes — a `classify()` fall-through drove UNCLASSIFIED 5 → 0, the
+  catch-alls were made loud, and a deterministic, idempotent, dry-run `--check` FILING REPORT was added; plus
+  README count fixes and a preserved-then-removed `README.txt`. Double-fresh reproducibility check passed. →
+  [account](QUEUE_LOG.md#w)
+- **X** ✅ The Exhibit folder relocated into the project family — now `C:\Dev\!RobCo\!RobCo-Exhibit` (was
+  `C:\Dev\!RobCo-Exhibit`). **GitHub and Cloudflare are unaffected: both bind to the repo, not the path.** →
+  [account](QUEUE_LOG.md#x)
+
+_Museum:_
+
+- **P8** ✅ The story-material + STRUCTURE synthesis audit — 146 canonical arcs plus the full room/structure/
+  connection map, filed in the archive; the blueprint **P11** builds on. → [account](QUEUE_LOG.md#p8)
+
+## ⏭️ Ready now — no blocker; plan/build whenever
+
+### Y. ⏭️ The memory-for-the-story reconciliation pass (owner wrap-up ask, 2026-07-27)
+
+**What it is.** A reconciliation pass over the orchestrator memory store **for the story** — the owner's own
+framing during the control-plane arc: _"ensure all of this is in memory for the story… whenever it's
+convenient."_ Memory is where a great deal of the project's reasoning actually lives, and **P8's corpus read
+126 memory files in full** to build its 146 arcs — so the two are now coupled: what memory holds determines
+what the museum can ever tell.
+
+**What the pass does.** Walk the memory store against **P8's corpus** and reconcile in both directions: story
+material that exists only in a conversation or a running session and never became a memory (it is lost the
+moment the session ends); memories that are now stale, superseded, or contradicted by the repo; and memories
+that hold a fact the repo already records, which by the memory store's own standing rule should not be there
+at all. **The control-plane arc (CP1-CP5) is the live example** — its own memory note says plainly that it is
+_a locator, not the record_, and that it must be enriched as the thread closes.
+
+**⛔ The PII rail is not optional.** P8 documents exactly which memory files carry the owner's real name,
+username, email and profile paths. **This pass must not move any of that value toward anything public**, and
+the standing rule holds: the public projection is built from public sources plus placeholders, never by
+ingesting private data and redacting it.
+
+**Why it is Ready-now rather than parked.** It needs no build, no owner decision, and it is cheapest while
+the session that produced the material is still recent — the exact "write it where it lives before it decays"
+reasoning behind Protocol 50.
+
+**Done means:** every arc P8 named has its durable record; stale or superseded memories are corrected or
+deleted; the control-plane arc's note is enriched to match where the thread actually ended; and nothing
+private moved outward.
+
+### Z. ⏭️ A comprehensive, evidence-grounded explanation of the workflow (owner wrap-up ask, 2026-07-27)
+
+**What it is.** The owner asked for a full explanation of **how this project is actually built** — the
+Dispatch orchestration, the Fable/Opus/Sonnet hand-off, the gates, the protocols, the archive, the external
+reviews, and how they connect. Not a pitch and not a re-statement of the rulebook: **an explanation, grounded
+in evidence.**
+
+**The bar, and it is the whole point: EVIDENCE-GROUNDED.** Every claim about what the workflow does must
+point at the thing that proves it — a protocol, a suite, a script, a commit, a recorded incident — and where
+something is **aspirational, partial, or unenforced, it must say so.** This project's own standing rules make
+that non-negotiable: _a session's account of its work is a claim, not evidence_, and _green is scoped
+evidence, not proof_. **An explanation that describes the workflow as it is supposed to work would be the
+exact failure mode the workflow exists to prevent** — and the control-plane arc (CP1-CP5) is a live case of
+Dispatch overstating what was proven, caught by an outside reviewer.
+
+**What it must include to be honest.** The control-plane gaps as they actually stand (**CP1-CP5** — proposed,
+not built), the guards that were found inert, the rules with no enforcement, and the reversals — beside the
+things that genuinely work. **The failure→lesson→measure arc is the natural spine**, which is the same shape
+**P8**'s corpus already assembled and the museum's own thesis.
+
+**Where it goes.** Deliverable form is the owner's call — it plausibly feeds the **museum's process wing**
+(**P6**/**P12**), but it is written for him first. **Cross-reference, not duplication:** it should point at
+the corpus, the protocols and the queue rather than becoming a fifth standing source of truth that can drift.
+
+**Done means:** the owner has a plain-English explanation he can read end to end on a phone, every load-bearing
+claim in it carries its evidence, and everything unbuilt or unenforced is labelled as such.
+
+### A3. ✅ CLOUD SERIALIZATION GUARD — SHIPPED + NOW GATED; real-emulator verification now exists as A4 (2026-07-26)
+
+> **STATUS (owner decision, 2026-07-21): RESOLVED for the release — A3 no longer gates 2.8.5, and its
+> modeled guard is now WIRED INTO THE GATE (no longer opt-in).** The self-deriving modeled guard
+> (`npm run cloud-check`) is the shipped resolution; it now runs automatically as gate step 4b on both the
+> fast (commit) and full (push) gate — see **RESOLUTION** and the **Placement** bullet at the foot of this
+> entry. The true emulator-backed test was **re-filed as the optional post-2.8.5 item A4** —
+> _not_ a blocker — because the premise correction below shows the silent-data-loss failure A3 was scoped
+> to catch **cannot occur by design**. The original spec is preserved verbatim beneath for the record.
+>
+> **✅ UPDATE (2026-07-26): A4 is now BUILT and red-then-green PROVEN against the real emulator** (see A4
+> below). It found the modeled guard's `undefined`-handling comment was wrong about the mechanism — real
+> Firestore **rejects** the write outright rather than silently stripping the field — corrected in this
+> same pass in `scripts/cloud-serialization-check.js`. The guard's PASS/FAIL behavior was unaffected (an
+> undefined field was already flagged as hostile either way); only the doc comments describing _why_ were
+> wrong, and are now accurate.
+
+**What it is.** A save → sync → load round-trip test that runs against the **Firebase local emulator
+suite**, asserting **field-level fidelity**: every field on the save envelope must be present and equal
+after the round trip. The point is not "the write returned success" — it is that a field which stops being
+carried across gets caught. **A new field added to `state` without being added to the sync mapping must
+FAIL this test.** That failure mode is the whole reason the item exists.
+
+**The gap, established from the code on 2026-07-20 — not assumed.** Nothing in the gate exercises cloud
+sync end to end:
+
+- `tests/boot-smoke.mjs` (its `isExpectedNoise()` allowlist) explicitly swallows Firebase Auth, Firestore
+  and remote-config network failures as _"known noise that is NOT a bug"_ — correct for a credential-less,
+  network-less test box, but it means the browser tests boot the app, watch every cloud call fail, and
+  discard the errors. The gate stays green.
+- Suite **46.17** is the closest thing that exists, and it is genuinely good — it evaluates the **real**
+  `sanitizeImportedContainer()` + `migrateState()` in a `vm` sandbox and proves the Phase-6 fields and
+  faction reputation survive byte-stable. But it feeds them a **hardcoded fixture** and asserts a
+  **hand-listed set of field names**. A field added to `state` tomorrow is simply not in that list, so
+  46.17 goes green while the field silently never syncs.
+- The rest of Suite 46 is presence-grepping — real Protocol 34 value, but it proves the source is spelled
+  right, not that a save survives.
+
+So: **a field that silently stopped syncing would pass every check this project has.** The 2.8.0 cloud
+audit already ranked this exact shape — **CC-RT-1 · [HIGH]** — as its highest-value gap
+(`planning/2.8.0/audits/CLOUD_AUDIT.md`).
+
+**Correcting the record: this does NOT need paid infrastructure.** The **local emulator suite** runs
+Firestore and Auth on the developer's own machine — free, offline, no credentials, and **no App Check
+involvement at all**. The bug class lives in **this project's own field-mapping code**, not in Google's
+servers.
+
+**What it buys over 46.17.** A real SDK write/read instead of a sandboxed function call — so it also
+catches the things that only bite at the serialization boundary (`undefined` stripped, nested arrays
+rejected, timestamps coerced, document-size limits). And driven from the live field list rather than a
+hand-typed one, so it fails on the field nobody remembered.
+
+**The natural extension.** This is the guard that makes **Protocol 34** _enforced rather than written_.
+
+**Honest cost note — a new dev dependency.** It introduces `firebase-tools` as a **DEV-ONLY** dependency.
+That brushes against this project's no-new-dependencies instinct and is stated rather than hidden. Nothing
+ships to users; it runs fully offline; it only runs at the gate. Weigh it at plan stage against a lighter
+fake-Firestore shim (which would cover the mapping bug but not the serialization boundary).
+
+**Honest scope note — what this does NOT cover.** The emulator does **not** test real Firebase, App Check,
+production security rules as deployed, or genuine network behaviour. It covers the **mapping** bug — which
+is the dangerous, silent one.
+
+**Why it belongs in the data-safety bracket.** Alongside A0/A1/A2 by kind: those made the LOCAL save safe
+against AI overwrite, eviction and false quarantine; this is the same class of failure on the cloud path.
+It fixes a structural bias worth naming — **the gate is dense where verification is cheap and empty where
+it's expensive, which is backwards from risk.** Sync is the most dangerous thing the app does and it has
+zero end-to-end coverage.
+
+**Hard rule.** Protocol 13/42: the test must be demonstrated **red-then-green** — remove a field from the
+sync mapping and it must fail.
+
+**Done means:** a save→sync→load round-trip runs against the local emulator in the gate, asserts every
+save-envelope field present and equal, is driven from the live field list rather than a hardcoded one, has
+been proven to fail when a field is dropped, and `firebase-tools` is a dev-only dependency with nothing
+added to the served set.
+
+**🚧 BUILD ATTEMPT — feasibility wall + premise correction (2026-07-21, Dispatch/Opus).** The spec above
+is preserved verbatim; this note records what was found when building was attempted. Two blockers, one
+hard-environmental and one about the code itself:
+
+1. **The emulator genuinely cannot run in the current environment — HARD WALL.** The Firestore **and** Auth
+   emulators (via `firebase-tools`) are **Java** processes; they need a JVM. Checked and confirmed absent:
+   `java` not on PATH, `JAVA_HOME` unset, no JDK/JRE under `Program Files`, no bundled JBR in any IDE/SDK,
+   and `firebase-tools` is not installed. So the emulator-backed round-trip **could not be run or verified
+   here**, and per the item's own **Hard rule** (red-then-green on the real artifact) an un-runnable
+   cloud-safety test must not be shipped as green — it would be "a green that lied." **What the owner must
+   set up to unblock:** install a **JDK/JRE (11+)** on the machine that runs the gate, then
+   `npm i -D firebase-tools` (dev-only — must never enter `sw.js`'s precache set or ship to users). A JDK is
+   a **system install**, beyond a dev-only npm dependency, so it is deliberately left for the owner rather
+   than done silently by a session.
+
+2. **⚠ PREMISE CORRECTION — the failure mode A3 was written to catch does not exist in the current code.**
+   A3 assumes "a field added to `state` but missed in the **cloud sync mapping** silently never syncs." There
+   is **no field-by-field cloud sync mapping**. `cloud.js` stores the **entire `robco_v8` container wholesale**
+   (`_buildSavePayload` → `robco_v8: payload.robco_v8`; `_uploadSaveDoc`/`overwriteCloudSave` write it whole).
+   The load path runs `sanitizeImportedContainer` (starts from `Object.assign({}, s)` — unknown fields **pass
+   through**) then `migrateState` (mutates in place, defaults missing fields, deletes only **named** legacy
+   keys — unknown fields **pass through**). So a newly-added plain state field **round-trips losslessly through
+   this project's own code**; there is no mapping to forget. The **only** place a new field can silently fail
+   to sync is the **Firestore serialization boundary**: `undefined` values silently stripped, directly-nested
+   arrays rejected (the whole write throws), `Date`/`Map`/class-instance coercion, and the 1 MB doc-size cap.
+   That boundary is exactly the layer that needs the **real emulator** — a pure-JS round-trip cannot observe it.
+   **Consequence:** a non-emulator "round-trip" test built on the real save-build + real load sanitize/migrate
+   would pass for **any** new field (the code loses nothing there), so shipping it as "the A3 test" would be
+   theater — it would catch nothing. It was therefore **not shipped**. Suite 46.17 remains the closest existing
+   coverage (hardcoded fixture + hand-listed fields; real `sanitizeImportedContainer` + `migrateState` in a
+   `vm`) and is unchanged.
+
+**✅ RESOLUTION (owner decision 2026-07-21) — the modeled guard is SHIPPED and A3 is release-cleared.**
+`scripts/cloud-serialization-check.js` (`npm run cloud-check`). It self-derives the field set by extracting
+and evaluating the **real** `let state = { … }` initializer from `js/core/state.js` in a `vm` sandbox (the
+same extract-and-run technique as Suite 46.17), builds the `robco_v8` write payload, and recursively flags
+any value Firestore would silently strip (`undefined`) or reject (directly-nested array `[[…]]`), plus a
+soft 1 MB doc-size check. **A new field added to that literal is scanned automatically — no hand-typed list**,
+so it does not rot the way 46.17's list does (the one anti-pattern this item forbids). A built-in
+**positive control** scans a known-hostile fixture on every run and fails if the scanner doesn't flag it, so
+the guard can never silently degrade into a green-that-lies no-op.
+
+- **Red-then-green PROVEN on the real shipped literal** (Protocol 13/42). Planting `_a3Probe: [[1,2]]` and
+  `lvlUndef: undefined` in the actual `state` made it FAIL (exit 1) and it named BOTH —
+  `campaigns.FNV._a3Probe[0] → directly-nested array` and `campaigns.FNV.lvlUndef → undefined stripped`;
+  removing them made it PASS (exit 0). `js/core/state.js` was left byte-identical to HEAD.
+- **Placement — ✅ NOW GATED (2026-07-21, owner's directive "wire it").** Promoted from opt-in into
+  `scripts/gate.js` as step **4b**, in the pure-Node section that runs on **BOTH** `gate:fast` (commit) and
+  `gate` (push) — the same class as the boot-chain preflight (step 3), which is also cheap, static, and
+  browser-free. It stays runnable standalone via `npm run cloud-check` too. Rationale for fast/commit-gate
+  placement: it reads only the `state` literal (no browser, no emulator, no network), so it costs
+  ~nothing and belongs where the other cheap static guards run; a modeled guard that runs on every commit
+  catches regressions, an opt-in one nobody runs does not. The anti-vacuous property is unchanged by
+  gating — it still fails LOUDLY on extraction failure and on a broken positive control, so the gate can
+  never turn it into a green-that-lies no-op. Confirmed the full gate still passes with it wired.
+- **No silent skip (the green-that-lied guard).** The script has **no conditional-skip path** — it always
+  runs and always asserts. If extraction of the state literal ever fails, it **FAILS LOUDLY** (the
+  anti-vacuous check refuses to let an empty derived state pass as clean), never silently green.
+- **What it MODELS, not verifies (state the limit so no one over-trusts it).** It encodes Firestore's
+  documented write constraints (no `undefined`, no directly-nested arrays, ~1 MB doc cap) **in our own
+  code** and checks the state **shape** against them. It does **not** run real Firestore, so it does not
+  cover real type coercion, deployed security rules, App Check, network, or a field that is safe by default
+  but gets a hostile value only at runtime. Those constraints are stable and documented, but this reduces
+  the residual risk — it does not eliminate it. The real-Firestore verification is item **A4** (optional).
+
+**Why A3 dropped from RELEASE BLOCKER to release-cleared — the premise correction (the most valuable
+finding).** A3 was scoped to catch "a field added to `state` but missed in the cloud **sync mapping**
+silently never syncs." Established from the code (block 2 above): **there is no field-by-field sync
+mapping.** `cloud.js` stores the campaign **WHOLESALE as a blob** (`robco_v8: payload.robco_v8`) and the
+load path passes unknown fields **through** (`sanitizeImportedContainer`'s `Object.assign` copy +
+`migrateState`'s in-place defaulting). So the forgotten-field-mapping data-loss A3 existed to catch
+**cannot occur by design** — a new field round-trips losslessly through the app's own code. The only
+residual silent-drop is the Firestore **serialization boundary**, which the modeled guard above now covers
+for the shape and which A4 now verifies against the real emulator (built 2026-07-26, see A4 below). That is
+why the emulator test was an **optional post-release upgrade, not a blocker**, and why **A3 is the last
+thing that was gating 2.8.5 and is now cleared.**
+
+### A4. ✅ Real-Firestore round-trip — BUILT + red-then-green PROVEN against the real emulator (2026-07-26)
+
+**✅ The JDK is now VERIFIED USABLE on this machine, not merely reported installed (recorded 2026-07-27).**
+The entry below carries the history honestly — `java` was confirmed **absent** 2026-07-21 (the hard wall that
+deferred this item), and the owner **said** a JDK was installed 2026-07-23. That was an owner report, not a
+verified fact. It is now verified by the strongest evidence available: **A4's run actually started the
+Firestore and Auth emulators, which are Java processes** — they could not have run at all without a working
+JVM. So the environmental blocker is closed on evidence rather than on a claim, and a future session can stop
+treating "does this machine have a JDK?" as an open question.
+
+**What it is.** The upgrade of A3's modeled guard from _modelled_ to _verified_: a save→sync→load round-trip
+run against the **Firebase local emulator suite** (real Firestore + Auth SDK write/read), asserting
+field-level fidelity driven from the live field list — the thing A3 originally described. It replaces the
+modeled Firestore constraints (`cloud-check`) with the real database's actual behaviour, so it also catches
+real type coercion (timestamps, number ranges) and true document-size rejection that a model can only
+approximate.
+
+**Explicitly NOT a release blocker (owner decision 2026-07-21).** The premise correction (see A3) removed
+the silent-data-loss risk this was scoped for; the modeled guard (A3) covers the residual shape risk. So
+this is a _confidence upgrade_, run when convenient after 2.8.5 — never gating a ship.
+
+**What it needs — recorded honestly. ✅ The JDK blocker is now CLEARED (2026-07-23).** A **JDK/JRE 11+** on
+the machine that runs it (the Firestore/Auth emulators are Java processes) was **confirmed absent 2026-07-21**,
+which is why this was deferred — but the **owner confirmed 2026-07-23 that a JDK (version 25) is now
+installed**, so the hard environmental blocker is gone. The **only remaining setup is `firebase-tools` as a
+DEV-ONLY** dependency (`npm i -D firebase-tools`) — which must never enter `sw.js`'s precache set or ship to
+users, and runs fully offline at the gate. **⚠ Half-installed as of 2026-07-24:** `firebase-tools@^15.24.0`
+is present in the app repo's `package.json` + `package-lock.json` but those changes are **uncommitted in the
+working tree** (they landed while other work was in flight and were deliberately left unstaged). On resume,
+finish this deliberately: decide whether to commit the dev-dependency (it is dev-only, never served) as the
+first step of actually building A4.
+
+**What it still would NOT cover:** real _production_ Firebase, App Check, or deployed security rules as they
+run in prod — the emulator is a local stand-in, not production. State that limit so no one over-trusts it.
+
+**Done means (original spec):** the JDK is now present, so this is **actionable** (only `npm i -D
+firebase-tools` remains to set up) — a real-SDK round-trip against the emulator asserts every save-envelope
+field survives equal, driven from the live field list (not a hardcoded one), proven red-then-green by
+dropping a field; `firebase-tools` dev-only with nothing added to the served set. Until it lands, A3's `npm
+run cloud-check` is the standing guard, and this stays **optional — never a release blocker** (owner
+decision 2026-07-21, unchanged).
+
+**✅ RESOLUTION (2026-07-26) — built, wired standalone, proven red-then-green against the REAL emulator.**
+
+- **The dev dependency landed.** `firebase-tools@^15.24.0` (already staged) was committed, plus `firebase@12.15.0` — pinned EXACT (no `^`) to match the version `js/services/cloud.js` imports from the gstatic CDN, so the Node-side round-trip exercises the identical SDK build the browser runs, not a drifting one. Both are dev-only; `package.json`/`package-lock.json` are not in `scripts/cache-bump-guard.js`'s served-file regex and `node_modules/` is gitignored, so neither touches the served/precached set — confirmed by re-running the cache-bump guard after staging.
+- **`firebase.json` gained an `emulators` block** (Firestore :8090, Auth :9099, UI disabled) alongside the existing `firestore.rules`/`firestore.indexes.json` config — config-only, not a served file, no cache bump needed for that file itself.
+- **`scripts/emulator-round-trip-check.js`** is the new script (`npm run test:emulator`, which runs it via `firebase emulators:exec --project demo-robco-uos-test --only firestore,auth "…"` — the `demo-` project prefix is the Firebase CLI's own guarantee that the emulator never touches the real `nv-overlord` project or any network beyond localhost, regardless of what `.firebaserc` declares as default). It **reuses** A3's extractor rather than forking a second one (Protocol 22): `scripts/cloud-serialization-check.js` now exports `deriveDefaultState()`/`buildWritePayload()` (guarded by `require.main === module` so its own CLI behaviour is unchanged), and the new script imports them, signs in anonymously against the Auth emulator, and writes the derived `robco_v8` payload inside a full save envelope via the real SDK's `addDoc()` — the same additive call `_uploadSaveDoc()` makes (Protocol 34) — then reads it back and diffs every field.
+- **Red-then-green PROVEN against the REAL emulator, both directions, three assertions per run:** (1) the clean, self-derived payload round-trips with every field equal — PASS; (2) a planted directly-nested array (`_a4Probe: [[1,2]]`) makes the real write throw (`"Nested arrays are not supported"`) — correctly caught; (3) a planted `undefined` field (`_a4Probe: undefined`) makes the real write throw (`"Unsupported field value: undefined"`) — correctly caught. No "field dropped from the sync mapping" red case, deliberately: A3's own 2026-07-21 premise correction established that failure mode cannot occur by design (wholesale-blob write, unknown fields pass through), so testing for it would be testing something that isn't real — the script's header states this explicitly.
+- **A genuine cross-check finding, not just a rubber stamp.** The real emulator run surfaced that A3's model had the _mechanism_ wrong: it described an `undefined` field as something Firestore "silently STRIPS," but the real Web SDK (with `cloud.js`'s actual settings — no `ignoreUndefinedProperties`) **rejects the whole write outright**, client-side, before any network call — louder and safer than modeled, but still a documentation error. Corrected in the same commit, in `cloud-serialization-check.js`'s comments and console output, with the date and the A4 script named as the source of truth. This is exactly the class of thing A4 exists to catch that a model alone cannot.
+- **A real harness bug was found and fixed while building this (Protocol 42).** The first run failed the CLEAN payload too, with Firestore rejecting plain fields as "a custom Object/Array object." Root cause: `deriveDefaultState()` runs the real `state.js` literal inside a `vm` sandbox — a separate V8 realm — and the SDK's plain-object/array validation is realm-sensitive, so a naive `Array.prototype.map()`-based clone (which preserves the source array's realm via species construction) still produced foreign-realm arrays. **Investigated and classified: harness-only** — the browser runs everything in one realm, so this cross-realm mismatch cannot occur in the shipped app; only this test's own vm-based derivation technique created it. Fixed by rebuilding `deepClone()` to construct fresh objects/arrays in the current realm at every level (no `.map()`), with the reasoning recorded in the script's own header comment so it can't silently regress. The fix itself IS the locking coverage — this script's every run re-proves the clone is realm-clean, which is exactly the Protocol 42 "still add a test" bar for a harness-only finding.
+- **Standalone, NOT gated** (as the original spec + owner's 2026-07-21 "never a release blocker" both required): wired as `npm run test:emulator`, absent from `scripts/gate.js`. Documented in the script's own header comment and in `README.md`'s Available Scripts list (needs a JDK/JRE 11+ + the two dev deps, already in `package.json`). `npm run cloud-check` (A3) remains the gated guard, unchanged, still running on every commit/push.
+- **Full gate confirmed still green** with these changes in place (no gate step added or removed).
+
+### B. 🔄 The deferred U3 render-harness test slice — ONE conversion landed, the rest scoped (2026-07-19)
+
+**What it is.** One slice of the U3 static→behavioral conversion round was deferred: converting the
+render-harness-dependent suites to actually drive the render path rather than grep it. The rest of U3's six
+slices shipped; this is the one left on the bench.
+
+**The deferral is now traced to its source, so the slice is a known list rather than a vague bucket.** It
+came out of the U3 slice-6 commit (`7030103`), whose body reads: _"DEFER 163.12 (renderSavesList per-game
+filter) — needs a DOM render harness or a source extraction (served-file change); kept its verbatim-filter
+static guard, flagged for a render-harness slice."_ The wider hit-list is `TEST_STRENGTH_U2.md`'s CONVERT
+ledger: **163.12** (`renderSavesList` per-game filter), **226.11** (inventory detail-pane mutator wiring),
+**179.4** (`renderCartDeck` escaping), and **210.7 / 211.4** (Diagnostic Shell filter-before-DOM-insertion).
+
+**✅ Landed this pass — 179.4**, chosen because it was the one making a SAFETY claim it could not actually
+prove. `renderCartDeck()` is now executed in a `vm` sandbox against a hostile `GAME_DEFS` fixture, and the
+assertions read the markup it really produced; new **179.4b** proves a `<img src=x onerror=…>` label is
+escaped. Red-then-green verified.
+
+**⬜ Still on the bench, and why each one is more than a copy of the above.** **163.12** may not be
+`vm`-extractable without editing shipped JS, which turns a test-only change into a Protocol 1
+cache-bumping one — a scoping decision worth making deliberately. **226.11** and **210.7/211.4** need a
+fuller synthetic-DOM harness (event dispatch and a mount pipeline), which is a harness-building unit.
+
+**Done means:** the remaining deferred render-path suites execute the real render and assert the result,
+matching the behavioral bar the rest of U3 set.
+
+### L. ⬜ Player-facing public view of the queue — PRIVATE VIEW SHIPPED & OWNER-CONFIRMED (2026-07-27); public view still deferred (post-P2)
+
+**✅ Private view: SHIPPED and OWNER-CONFIRMED.** Built 2026-07-23 (`npm run queue-view` →
+`queue-view/queue-view.html`, guarded by Suite 246). The owner opened the generated page on his own phone
+and confirmed it reads right ("it looks good", 2026-07-27) — the one thing that had kept this half at 🔄
+(Dispatch's own 360px DOM verification had already passed; this was the missing human eyeball). Full build
+account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l). **⛔ The player-facing opt-in view is NOT built** — L's
+own ruling defers it (below); this is now the only work remaining under item L.
+
+**The ruling — ONE SOURCE, TWO GENERATED VIEWS** (still governs the open half): `QUEUE.md` stays the single
+source of truth; two separate generated views read from it:
+
+- A private view, for the owner — ✅ shipped and confirmed, above.
+- A player-facing view, for the live site's already-queued "upcoming updates" feature — generated later,
+  from **only** items explicitly marked public in this file. **The marking must be opt-in, never opt-out**
+  — a forgotten mark means a player silently misses an update (the safe failure direction), rather than
+  internal reasoning silently leaking to players (which isn't). Same fail-closed shape as the museum's
+  name-substitution guard (P2, in the museum sub-program below).
+
+**Why the two views are not merged into one document.** This file's value is that it records rejected
+options, hazards, and reasoning — not just current status. A single merged document either leaks that
+reasoning to players or gets sanitized until it stops being useful internally.
+
+**Sequencing.** The player-facing view is deliberately left until **after** the museum publication work
+(P2) — it needs the same substitution-and-fail-closed-guard machinery P2 is building, and building it twice
+would be wasteful (Protocol 22).
+
+**What it depends on.** P2's substitution/guard machinery.
+
+**Done means (public view, still deferred):** a separate generated page shows only opt-in-marked items,
+defaults to omitting anything unmarked, and reuses P2's machinery.
+
+### Q. ⬜ Planning-folder hygiene — a standing rule + an owed cleanup task (owner, 2026-07-22)
+
+**What it is.** A new standing rule the owner set: the app repo's `planning/` should hold **only CURRENT-use
+working docs**. Old-version planning (e.g. the 2.6.0 folder) should be **DELETED from the app repo** once it
+has served its use, because the archive hosts every planning doc permanently. This keeps the live `planning/`
+tree lean and current instead of accumulating every past round's audits, slates, and mockups. Recorded per
+Protocol 50 because it was decided in conversation and lived only there.
+
+**⛔ TWO HARD CONSTRAINTS — both non-negotiable, recorded as the rule's own guardrails:**
+
+- **NEVER delete a planning file from the app repo unless it is CONFIRMED present in the archive first.**
+  Save-sacred applied to planning docs: a planning doc is **real work**, and losing one to
+  delete-before-backup is unacceptable. The sequence is **confirm in archive → then delete** — never the
+  reverse, never on assumption.
+- **NEVER delete anything still needed FORWARD.** Anything **2.9.0 (or later) still depends on stays**,
+  regardless of which version-folder it happens to sit in. **"Served its use" means DONE, not merely "belongs
+  to a shipped version."** When in doubt, **KEEP** — the failure direction of keeping a stale doc is trivial;
+  the failure direction of deleting a still-needed one is not.
+
+**WHY it's safe (the mechanism, verified against `sync.ps1`, 2026-07-22).** The Protocol 48 sync mirrors
+`planning/` into the archive **ADDITIVELY** (`Add-Dir`, never a purging mirror): once a planning file is
+captured it is **never removed** from the archive even after it disappears locally, and the sync regenerates
+**`ARCHIVE_RETAINED.md`** every run listing exactly the planning files kept in the backup that are no longer
+present in the source — so the retained set is **visible, not something to trust blindly**. That is what makes
+local deletion recoverable. **Contrast (also verified):** `memory/` is **MIRRORED** (`Mirror-Dir` /MIR — a
+deletion propagates), but a deleted memory is still recoverable from the archive's **git history**. So planning
+deletions are additively retained; memory deletions are history-recoverable. Either way nothing is truly lost —
+which is the precondition that makes this hygiene rule safe to apply at all.
+
+**Where this rule belongs eventually.** In the **rules layer** — the deploy/backup area, alongside **Protocol
+48** (the archive-backup protocol) — not left as a queue entry forever. Recorded here now (Protocol 50); its
+earn-condition for a rules-layer home is the next docs/rules pass that touches Protocol 48 or the backup
+notes. (It is also a natural **R5** prose→enforcement candidate later — a build-time check could refuse to
+delete a `planning/` path not yet confirmed in the archive — but that is not required for the rule to stand.)
+
+**⬜ THE CLEANUP TASK OWED.** Concretely: **confirm each old-version planning file is present in the archive,
+then remove it from the app repo.** **⚠ Run it when NOTHING ELSE is touching the app repo (concurrency —
+Protocol 12):** a junk/cleanup sweep during a concurrent session has already deleted a live session's scratch
+files once (recorded under G), so this deletion pass must have the app repo to itself.
+
+**Done means:** the app repo's `planning/` holds only current-use docs; every old-version planning file
+removed from it was **first confirmed present in the archive** and was **not needed by 2.9.0+**; and the
+standing rule has a home in the rules/deploy-backup layer.
+
+### R10. 🔄 The external knowledge-architecture audit (GPT-5.6 Sol, 2026-07-21) — all 3 sequenced steps DONE (2026-07-26); only finding L (owner decision) and finding G (cosmetic) remain
+
+**What it is.** An external audit (GPT-5.6 Sol, read access to `dev` at commit `2798271`) of how this
+project **stores, retrieves and connects what it knows about itself** — the retrieval chain, the scoped
+notes, the doc/gate/skill layers. It read the real files and cited paths/lines. This entry is the Protocol 50
+landing record: **every claim was re-verified against the current files before being written here** (the audit
+read one commit; a claim is only recorded as fact once checked). Two live defects were fixed in the same pass;
+everything else is recorded, ranked by consequence, with each finding's home or earn-condition stated.
+
+**⭐ THE SEQUENCE for working R10's findings — Dispatch sequenced it, owner's instruction (2026-07-21):
+_"you need to sequence everything not me."_** The ordering reasoning is the valuable part, so it is recorded,
+not just the order. **NONE of this blocks the release — and A3 (the last data-safety gate) is now RESOLVED
+(2026-07-21), so nothing here blocks 2.8.5; everything in R10 is process debt, not shipping debt.** The
+stated plan: do steps one and two, ship 2.8.5, then do step three.
+
+1. **FIRST — fix the trusted layer.** The stale facts in `ARCHITECTURE.md` (finding B) and the ones the R2
+   restructure copied into `rules/state-and-save.md` (finding B-critical), plus the remaining false/overclaimed
+   statements in the skill (findings C skill-overclaim + E library-fallback). **Why first:** these bleed
+   _continuously_ — every session that runs before they're fixed inherits wrong facts and generates work.
+   Nothing else in R10 costs anything per-session. This goes first purely on **bleed rate**. **Also riding
+   here (landed 2026-07-21, self-caught, not from the audit):** the QUEUE.md header-mangle structural fix —
+   full record below, in the ranked findings list.
+2. **SECOND — fix the guards that overstate their coverage.** Suite 220 checking less than Protocol 45
+   advertises (finding C), and the retrieval map's routing gaps (finding D). **Why second:** these are _why_
+   step one's problem stayed invisible — stale references sat under a passing check. Fixing them second means
+   step one's fix stays fixed instead of silently rotting again.
+3. **THIRD — route `ARCHITECTURE.md` by section instead of universally** (finding A). **Why third, not first
+   (load-bearing):** step one REMOVES the operational checklists and runbooks from that file, which shrinks the
+   problem before it is solved. Routing-by-section first would mean building section routing for content about
+   to be deleted.
+4. **RIDING ALONG wherever convenient:** the rollback script contradicting Protocol 43's branch model
+   (finding F) and the duplicate App Check entry (finding G) — both small and independent. Note: F only bites
+   during an outage, which is exactly when ambiguity is most expensive, so it should not sit indefinitely.
+5. **GATED on other work, not on effort:** the P3 supersession-logic fix (finding H) must land **before the
+   museum-for-AI extract (P3) is built**, not before anything else. The stable-identifier scheme (item I) is
+   needed **before the Atlas and museum link to each other**, which is **after 2.8.5**.
+
+**✅ STEP 1 — the doc trusted-layer fact-corrections DONE (2026-07-21, this pass).** Findings **B** and
+**B-critical** closed against source: every stale `api.js` attribution of the moved symbols corrected to its
+real home (`getSystemDirective`→`api-directive.js`, `autoImportState`/`sanitizeImportedContainer`→`api-import.js`;
+`api.js` keeps `transmitMessage`/`fetchAuthorizedModels`) in `ARCHITECTURE.md` (File Map + the 3 missing split
+files added, Inbound heading, both state checklists, the event-bus table) and in `rules/state-and-save.md`
+Protocol 4 checklist + `rules/ui-and-mobile.md` Protocol 10 — **this closes the "R2 restructure relocated stale
+facts into the new trusted layer" hole (finding B-critical)**; the single-`ui-render.js` render-layer refs
+corrected to the `ui-render-*.js` family in every actionable checklist; the cache-guard description
+(`ARCHITECTURE.md` ~3393) rewritten to match `scripts/cache-bump-guard.js` as it really is (differ-from-HEAD,
+not monotonic; the current `SERVED_RE` set). Defect-2 (`setDoc`→`addDoc`) confirmed still correct. **Still owed
+in step 1 (out of THIS brief's doc-only scope):** the `skill/SKILL.md` overclaim (finding C skill-half) and the
+CLAUDE.md library-fallback sentence (finding E second half).
+
+**✅ STEP 1 NOW FULLY CLOSED (2026-07-21, a later pass).** The two owed pieces above landed: `skill/SKILL.md`'s
+"canonical and current by construction" overclaim (finding C skill-half) rewritten to "canonical source of truth
+but only partially mechanically checked — where a doc and the code disagree, the code wins"; the CLAUDE.md
+library-fallback sentence added (finding E second half — absent `library/` targets: fall back to source, don't
+infer). **Finding F (rollback ↔ branch model) rode along in the same pass:** reconciled dev-first (owner's call,
+NO direct-`main` exception) across `scripts/rollback.sh`, the `ARCHITECTURE.md` runbook, and Protocol 16 — the
+accepted latency-vs-integrity tradeoff recorded in-place. **⚠ Skill re-install owed:** `skill/SKILL.md` is a
+read-only installed artifact, so the owner must RE-INSTALL it (Settings › Capabilities) for the fix to reach his
+sessions — his second re-install today.
+
+**✅ FIXED this pass — Defect-1 (shipped `8d14073`): the cache-bump guard's classifier was blind to real precached files.**
+`sw.js` precaches the `assets/*` icons (install-time `ASSETS`) and best-effort-precaches `CHANGELOG.md`, but
+`scripts/cache-bump-guard.js`'s `SERVED_RE` matched only a **root-anchored** `icon[^/]*\.png` — so changing
+`assets/icon.png`, `assets/ocr/eng.traineddata.gz`, or `CHANGELOG.md` needed **no cache bump**, and cached
+users silently kept the stale copy **under a fully green gate** — the exact failure class Protocol 1 exists to
+prevent, and one this queue already records happening (the staging-SW stale-`index.html` incident, 2.9.0
+hardening gate). **Proven red on a real path** (staging `assets/icon.png` printed `[SKIP]` and exited 0), then
+fixed: `SERVED_RE` now covers `assets/`, `CHANGELOG.md`, `css/`, `js/`, and the root files. **Guarded two
+ways:** new Suite **30.3e** (behavioral — runs the real guard against a staged `assets/icon.png` and proves it
+now FAILS without a bump, PASSES with one) and Suite **30.3f** (the one the audit specifically asked for — it
+parses `SERVED_RE` straight out of the guard and **every path `sw.js` actually precaches**, and fails if the
+classifier misses any; when run against the old classifier it named all six uncovered paths). A guard that
+tested one hard-coded filename is exactly how this stayed hidden — 30.3f tests **agreement with the real
+precache list**, so it can't drift again.
+
+**✅ FIXED this pass — Defect-2 (shipped `8d14073`): `ARCHITECTURE.md` prescribed a save-destroying cloud write.** Its Cloud Push
+section showed `setDoc(firestore, { … state: stateObj … })` — a whole-document overwrite — while the real
+`js/services/cloud.js` uses **additive `addDoc`** into a `saves` collection with a `contentHash` dedup, and
+Protocol 34 states plainly that a blind `setDoc` would clobber a campaign with no recovery. A session building
+from the canonical architecture doc would have implemented the clobbering version — a data-loss instruction
+inside a canonical document. Corrected to the real additive shape (matched against `cloud.js` line-by-line),
+and guarded by Suite **46.26** (asserts the Cloud Push section prescribes `addDoc` and carries neither the
+`setDoc(firestore,…)` call nor the `state: stateObj` field; proven red against the old text). **Factual
+correction only — the file was not restructured.**
+
+**✅ STEP 2 DONE (2026-07-23, this pass) — the guards that overstate their coverage are fixed. Findings C
+(Suite-220 half) and D closed.** The reason step 1's stale facts sat invisible under a green gate is now
+removed:
+
+- **Finding C (Suite 220 half) — CLOSED.** Suite **220** was extended to see what it was blind to.
+  **220.2b** validates backticked **nested** repo paths (`js/services/api-import.js`, `assets/…`, `.github/…`;
+  wildcard-family `*` tokens excluded), **220.2c** validates backticked **exact bare code filenames**
+  (`.js`/`.mjs`/`.css` only, so gitignored `library/` docs and `planning/` `.html` mockups can never
+  false-fail), and **220.2d** is their empty-parse self-integrity guard. Scope held strictly to nested paths +
+  bare filenames — existence only, **NOT** a prose-truth / semantic checker (the recorded direction).
+  **Proven red-then-green** (Protocol 13/42): a planted nonexistent nested path (`js/services/api-imprt.js`)
+  and bare filename (`api-imprt.js`) both fired RED; removing them restored GREEN. **And it caught a real one
+  on introduction** — `terminal.css`, the pre-U-A2 monolithic stylesheet (split into `css/NN-*.css`), was still
+  named as a **live file** in `rules/ui-and-mobile.md`; fixed in the same commit (Protocol 42), with the one
+  historical mention in `ARCHITECTURE.md` reworded to prose. (The skill-overclaim half of C was already fixed
+  in step 1; not redone.)
+- **Finding D — CLOSED.** The retrieval map is now the **sole** scope authority (stated in place in
+  `CLAUDE.md`), and all five routing gaps are fixed: `.github/workflows/` added to the **testing** row (it is
+  co-governed with deploy); `scripts/cf-staging-build.mjs` added to the **deploy** row and carved out of the
+  broad `scripts/` → testing routing; `firebase.json` added to the **auth** row; `QUEUE_LOG.md` **and**
+  `skill/SKILL.md` added to the **documentation** row (skill/SKILL.md now routes somewhere). New Suite **220.15**
+  is the narrow parity check 220.14 lacked: every concrete path a note's "Load this when touching" header claims
+  must be **routed to that note by its map row** (header ⊆ row; locators and parenthetical asides stripped so
+  only real scope claims are checked). Proven to catch a gap (removing `firebase.json` from the auth row fires
+  RED). **No second routing document** was created.
+
+**✅ STEP 3 DONE (2026-07-26) — Finding A closed. `ARCHITECTURE.md` is now task-retrieved BY
+SECTION, not read wholesale.** All 39 `##` sections got a stable, hand-curated `<a id="…">`
+anchor (decoupled from heading prose, so a reword can't silently break a link — the QUEUE_LOG
+`<a id>` pattern applied here for the same reason). Two `###` subsections that are independently
+link-referenced (Cloud Push/Pull, the OS Event Bus) got their own anchors too. **Routed from
+both places finding A named:** every `rules/*.md` note whose surface has real
+`ARCHITECTURE.md` content now names the exact anchor(s) in its own "Related notes" section
+(`state-and-save.md`, `deploy-and-cache.md`, `auth-and-cloud.md`, `ui-and-mobile.md`,
+`audio.md`, `game-data.md`, `ai-contract.md`, `file-layout.md` — 8 of the 10 notes; the other
+two, `testing-and-gates.md` and `docs-and-library.md`, have no dedicated `ARCHITECTURE.md`
+section to point at); `CLAUDE.md`'s own "read `ARCHITECTURE.md` second" line and its Reference
+Pointer Index row were rewritten to say by-section, pointing a session with no matching note at
+the file's own (now-complete) Table of Contents. **Explicitly not a second summary document** —
+the anchors and the pointers are the whole change; no new file was created. **Guarded — new
+Suite 220.16**, proven red-then-green (renaming one anchor made both an external `rules/*.md`
+reference AND an internal `](#…)` link fire red; restoring it went green): every
+`ARCHITECTURE.md#slug` reference from `CLAUDE.md`/`rules/*.md` and every in-file link inside
+`ARCHITECTURE.md` itself must resolve to a real anchor, so this routing can't silently rot the
+way the pre-existing Table of Contents already had (it listed 19 of the file's 39 sections,
+using GitHub's fragile auto-slug on headings with nested parentheticals — both bugs fixed as
+part of this pass, since they were found while rebuilding the TOC).
+
+**Also finding B's remaining half — the operational checklists/runbooks, relocated
+conservatively.** Five duplicated obligation-checklists (the two state-field checklists, the
+audio-source checklist, the UI-panel checklist, the registry-autocomplete checklist, and the
+Service Worker Cache Protocol's rule/format/guard) are now a short **rationale/invariant**
+paragraph in `ARCHITECTURE.md` linking to the already-canonical, already-more-current version
+in the owning `rules/*.md` note (verified each rules/*.md checklist was equal-or-more-complete
+before relocating — nothing was lost, and the cache-protocol's Format+Examples table, which
+`rules/deploy-and-cache.md` didn't yet carry, was moved there first, additively, per Protocol 22
+"extend before creating"). **`## Hotfix Rollback (Protocol 16)` was deliberately left alone** —
+CLAUDE.md's own Protocol 16 text already explicitly delegates the runbook to this exact section
+(`runbook in ARCHITECTURE.md § "Hotfix Rollback"`), so it is not a duplicate to relocate; it got
+an anchor for routing and nothing else. **Nothing flagged as ambiguous** — every relocation
+target was an unambiguous, already-existing, already-more-current canonical home.
+
+**R10's three-step sequence is now fully executed.** What's left is not sequence work: **Finding
+G** (LOW, a redundant-not-duplicate App Check mention — cosmetic, earns its slot on the next
+queue-touch pass, not gating anything); **Findings H/I** (gated on P3 / the Atlas, unchanged);
+**Finding L** (the external-control-plane-state ledger question — still an open owner decision,
+unchanged, not something this pass could resolve).
+
+**⬜ RECORDED, ranked by consequence — the knowledge-architecture defects (high-priority doc-currency + one
+enforcement gap; none gate the `dev → main` release, all belong to the next governance pass / R5 conversion
+thread).**
+
+- **⭐ Finding B-critical — the retrieval redesign relocated STALE knowledge into the new trusted layer. This
+  is the sharpest evidence yet for the project's own recurring failure class, and it happened inside the fix
+  for it.** `rules/state-and-save.md` — the note R2 created so sessions load _only_ the relevant, current
+  rules — carries stale file-ownership facts in its Protocol 4 checklist: **line 17** puts `autoImportState()`
+  in `api.js`, **line 18** puts `sanitizeImportedContainer()` in `api.js` (both live in **`api-import.js`**),
+  **line 20** puts `getSystemDirective()` in `api.js` (lives in **`api-directive.js`**), and **line 21** names a
+  single **`ui-render.js`** (split into the `ui-render-*.js` family at U-A4). Verified directly against source
+  and `git log`: all four lines were authored by the restructure commit **`eac54ba`**. CLAUDE.md's own pointer
+  index is _correct_ — so the restructure copied the drift into the subsystem note while the index it sat beside
+  was right, violating "each fact in exactly one place" and Protocol 3. **Why it survived the gate → finding C.**
+- **Finding B — ✅ FULLY CLOSED (stale facts at Step 1, 2026-07-21; the operational-checklists direction
+  at Step 3, 2026-07-26).** `ARCHITECTURE.md` was doing two jobs and carried current-looking errors: the
+  stale `api.js` attributions (File Map, the Inbound heading, the state checklist) and the monotonic-rev
+  cache claim were corrected at Step 1. The direction this finding recorded — "remove the operational
+  checklists in favour of links; Architecture owns rationale/invariants, rules own obligations" — is now
+  built: the cache protocol, the two state-field checklists, the audio-source checklist, the UI-panel
+  checklist, and the autocomplete checklist are all short rationale paragraphs linking to their canonical
+  `rules/*.md` home. Full account under R10's own Step 3 entry above.
+- **Finding A — ✅ CLOSED (Step 3, 2026-07-26).** The blanket-retrieval problem — CLAUDE.md sent every
+  session to read the whole `ARCHITECTURE.md` (**3,462 lines / ~348 KB**) wholesale, with a TOC but no
+  routing to a _section_ — is fixed: 39 stable `<a id>` section anchors, `rules/*.md` notes and
+  `CLAUDE.md` routed to the specific anchors for their surface, no second summary document, and Suite
+  **220.16** verifies the named anchors exist (red-then-green proven). Full account under R10's own
+  Step 3 entry above.
+- **Finding C — ✅ CLOSED (skill-half in step 1; Suite-220 half in step 2, 2026-07-23). Suite 220 did far less
+  than Protocol 45 advertised, which is why B/B-critical passed a green gate.** Suite **220.2**'s regex matched
+  **single-segment paths only** (`(js|css|tests|scripts|rules)/name.ext`);
+  it cannot see bare filenames (`api.js`), nested paths (`js/services/api-import.js`), function ownership, or
+  prose — so the stale `api.js` ownership claims are invisible to it. And `skill/SKILL.md` **overclaims** the
+  canonical files are "canonical and current by construction (the gate guards them)" — **still present at
+  line 19 (verified 2026-07-21); NOT fixed by `21c78f7`, which only corrected the separate gate falsehood
+  (finding E).** Direction: correct the SKILL claim first (say _partially_ mechanically checked, source wins);
+  extend 220.2 only for unambiguous backticked **nested** paths and **exact bare** filenames; **do NOT**
+  attempt a prose-truth checker. Belongs to steps one (skill claim) and two (Suite 220) of the sequence above.
+- **Finding D — ✅ CLOSED (step 2, 2026-07-23). The retrieval map had concrete gaps against the notes' own
+  declared scopes.** `.github/workflows/` routed only to the deploy note though the testing note also governs it
+  (→ added to testing row); `scripts/cf-staging-build.mjs` is deployment's but the broad `scripts/` row sent it
+  to testing (→ added to deploy row, carved out of testing's `scripts/`); `firebase.json` was in the auth note's
+  load header but missing from its map row (→ added); `QUEUE_LOG.md` was absent from the documentation row
+  despite that note defining its append-only contract (→ added); `skill/SKILL.md` routed nowhere (→ added to the
+  documentation row + that note's header). Suite **220.14** only proved every note is _named_ in the map, not
+  that every relevant path _reaches_ the note claiming it — closed by new **Suite 220.15** (header ⊆ row parity).
+  The map is now stated as the **sole** scope authority in `CLAUDE.md`. No second routing document.
+- **Finding E — `skill/SKILL.md` FALSE statement is now ✅ FIXED (`21c78f7`); its library-fallback half is
+  still open.** The false gate claim ("the full gate must pass on every commit/push") was **corrected at
+  `21c78f7`** — the skill now reads _"the FAST gate runs at commit, the FULL gate (browser checks too) at
+  push"_ (verified against the tracked source), matching `scripts/pre-commit` → `gate:fast` / `scripts/pre-push`
+  → `gate`. Because the skill is installed read-only, a re-install was owed after the fix landed — **and the
+  owner has re-installed and confirmed it (2026-07-21)**, so this is closed (owner-confirmed control-plane
+  state, not repo-verifiable — the finding-L category). **Still open — the second half of E:** CLAUDE.md tells
+  sessions to read gitignored `library/` files, but a clean checkout has only `library/MANIFEST.txt`. Add a
+  one-sentence fallback: **if a local-only library target is absent, do not infer its contents — fall back to
+  source and report the missing context.** Belongs to step one of the sequence above.
+- **Finding F — the rollback path contradicts the branch model.** `scripts/rollback.sh` (and
+  `ARCHITECTURE.md`'s rollback runbook, line ~3408) both instruct `git push origin main`, while Protocol 43
+  says all work goes through `dev` and `main` receives only release merges — a contradiction that surfaces
+  during an outage, when ambiguity costs most. **Honest nuance (from verification):** a live-site hotfix is
+  arguably the one legitimate case where `main` IS the target, since production deploys from `main` and
+  Protocol 16 is restore-first — so this may be an intentional emergency exception the docs simply never
+  reconcile. Direction (owner call): explicitly choose an emergency-direct-`main` exception **or** a dev-first
+  rollback, and make script + protocol + runbook agree.
+- **Finding G — LOW, one redundancy.** App Check is closed in **two** places in this file (the 2.9.0-round
+  section, line ~872, and the "Closed / off the board" list, line ~1253). **Verification correction to the
+  audit:** they are **paraphrases, not identical text**, both linking `QUEUE_LOG.md#appcheck` — redundant, not a
+  copy-paste. Cleanup only; earns its slot on the next queue-touch pass. **Recorded clean:** the audit's other
+  G claim checked out in the good direction — **all `QUEUE_LOG.md#…` anchor links resolve, no orphans** (the
+  queue/log split verified clean, spot-checked across `#v280`, `#u1`, `#r2`, `#appcheck`, `#f`, and the
+  heading-derived `#update-history--the-running-last-updated-chain`).
+- **Self-caught, NOT from the audit — the QUEUE.md header-mangle hazard (found and fixed 2026-07-21,
+  commits `8dc9d5f` → `89bc6a5`).** A recording pass hand-authoring a new paragraph into the giant
+  single-underscore-italic `_Last updated: …_` header mistyped `` `APP_VERSION` `` as `` `APP*VERSION` ``
+  and broke the italic close; caught by eye and fixed the same day. **Root cause verified by reproduction
+  (Protocol 27), and it is NOT what the fix commit's own message claimed:** `npx prettier --write` run
+  against both the correct and the mangled header text left each byte-for-byte **unchanged**, and
+  `--check` passed both — Prettier never reformatted this content, so "Prettier's reformat corrupted it"
+  is wrong. The real mechanism: Prettier is a formatter, not a fact-checker, and it did its job — the
+  actual hazard is structural. The header is one dense paragraph mixing bold, code spans, and links, all
+  wrapped in a single outer `_..._` italic span; a human or AI hand-composing a new entry into that block
+  can mistype a markup character (an underscore as an asterisk, a stray backslash-escape) and the result
+  stays syntactically valid markdown, so nothing in the gate catches it. **Owner decision (2026-07-21),
+  three parts, all approved together:** **(1) no guard** — a hand-maintained "known identifiers survive
+  intact" checker is the exact Protocol 2a anti-pattern the project already retired, and this project's
+  standing bar requires a real _recurring_ consequential failure before a guard earns its existence; one
+  self-caught occurrence in a non-served planning file does not clear it. **(2) fix the structural
+  trigger, not the instance** — the hazard is the giant single-italic construct, not any specific
+  identifier, so removing the outer `_..._` wrapper makes the whole fragility class disappear with no
+  list to maintain and no guard to rot; **done in this same pass** (rides with step 1 above, since step 1
+  was already scheduled to touch this file) — the header no longer wraps the "Last updated" note in one
+  italic span, verified clean against Prettier and rendering `APP_VERSION`/`CACHE_NAME` correctly. **(3)
+  the not-to-guard choice is recorded on purpose, with its revisit condition** — "consciously chose not to
+  guard, here's when we'd revisit" is a different, stronger claim than silently doing nothing: if a giant
+  single-italic block mangles a second time anywhere in this repo's docs, that is a recurrence and it
+  earns a guard then.
+
+**⚠ RECORDED as an OPEN owner-decision — Finding L: the missing category (verified external control-plane
+state).** Facts essential to the project but derivable from **neither repo**: which skill version is actually
+installed, branch-protection state, which commit is _actually_ deployed to prod/staging, Cloudflare project +
+secret presence (not values), App Check enforcement state, GitHub Pages source config, the live service-worker
+cache version. These currently **leak into queue prose and historical logs** (the App Check and skill-install
+entries are the evidence). The auditor proposes a hand-maintained section in a library doc with a
+`last_verified` field. **Dispatch objects, and records the disagreement rather than resolving it:** that is a
+hand-maintained ledger of facts about a _moving_ world — the exact pattern this project keeps getting burned by
+(test counts, architecture file sizes, the growth chart, the inert cache guard). Dispatch's position: **derive
+what can be derived, mark honestly-unknown what cannot, and do not build a table someone must remember to
+update.** This is left for the owner to settle — not a settled design. Earn-condition: a decision from the
+owner on derive-vs-ledger before any implementation.
+
+**✅ RECORDED — what the audit found CLEAN (evidence the restructure landed).** All ten scoped rule files exist
+and are referenced; protocol headings are defined exactly once; the **tiered gate is genuinely real**
+(`scripts/pre-commit` = cache-guard + secret-scan + `gate:fast`; `scripts/pre-push` = full `gate` + the
+non-blocking nudges; CI runs full `gate`); Protocol 34's additive-cloud-write assertions, Protocol 40's browser
+test, Protocol 44's diagnostic-trigger checks, and the Protocol 48/50 pre-push nudges are all wired and passing;
+the queue/log split preserved every anchor; no meaningful orphaned system document exists.
+
+**Cross-references (findings folded into the items they belong to, per Protocol 50 "write plans where they
+live"):** Finding **H** (the P3 supersession logic defect) is recorded in **P3**; Finding **I** (the durable
+stable-identifier scheme) in **item I, design note (b)**; Findings **J/K** (museum as front door; three
+audiences) in **P**; and tonight's owner decision on the **bug-record obligation** in **P4**.
+
+**Done means:** the two fixes are shipped and guarded (done); each recorded finding is either fixed in a later
+governance pass or explicitly owner-decided (L, F); and no future session re-derives these from scratch because
+the reasoning — not just the findings — lives here.
+
+### R11. 🔄 The knowledge-graph / retrieval-topology — MINIMUM VERSION BUILT (2026-07-21), un-gated pending proof-of-drift
+
+**What it is.** A generated map of how this project's knowledge layer connects — the skill, `CLAUDE.md`, the
+`rules/*.md` notes, `ARCHITECTURE.md`, the library, the queue and its log, memory, the museum, the Atlas — and
+how each routes to / claims scope over / is checked by the others. **It grew directly out of R10:** the owner
+asked for a visual map of how everything connects, GPT-5.6 Sol (second pass, repo-aware) specified the data
+model, and Dispatch amended it. **The full specification lives in
+[`planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md`](planning/2.8.5/plans/KNOWLEDGE_GRAPH_SPEC.md)** (recorded per
+Protocol 50, referenced here rather than pasted).
+
+**The core ruling — build a RETRIEVAL TOPOLOGY first, not a universal graph of every project fact.** Protocols,
+suites, guards, queue items, museum history and Atlas assurance can join the same schema later, but their
+derivation is less uniform and including them prematurely risks _"a polished graph that lies."_
+
+**The three load-bearing ideas (must survive verbatim in substance — full text in the spec):**
+
+- **`routes_to` and `claims_scope_over` are two INDEPENDENTLY DERIVED edges** — one from `CLAUDE.md`'s
+  retrieval-map rows, one from each note's "load this when touching" header. The gap **emerges when the two
+  derivations disagree**, which is far harder to fool than a checker written to look for a known problem. (This
+  is R10 finding D, found mechanically.)
+- **`claims_checked_by` and `invokes` are SEPARATE edges** — a protocol _naming_ Suite 30 and something
+  _running_ Suite 30 are different facts. **The cache-guard defect is the proof:** protocol, script, hook and
+  suite all named each other and the classifier still missed every icon path. **Naming is not running.**
+- **Every extractor reports records seen / emitted / unparsed / parser status.** If the retrieval-map heading is
+  renamed and the parser returns zero routes, the graph must say **"route extraction failed"**, NOT render ten
+  orphaned notes as if the project collapsed — the silent-empty-parse failure of this whole week, designed out
+  at the data layer.
+
+**Also adopted:** node states `observed / declared / manifested / unavailable`; baseline-local keys for most
+nodes with cross-release identity ONLY for protocol + queue IDs (which already have no-reuse contracts); a file
+rename shown as remove+add, never inferred by git similarity (this project measured that heuristic undercounting
+by 22%); and the public projection built FROM PUBLIC SOURCES PLUS GENERIC PLACEHOLDERS, fail-closed by
+construction rather than by redaction.
+
+**⭐ Dispatch's amendment, owner-endorsed — ONE derivation, THREE renderings.** GPT designed a diagnostic
+instrument; the owner asked for a picture; the owner then corrected that there is a **third** consumer that may
+matter most. Same "one source, N views" ruling already made for `QUEUE.md`/L and the museum/P3, extended to
+three: **(1) a TOPOLOGY view** (human, visual — a **Fable design job**), **(2) a DIAGNOSTICS view** (human,
+plain — selectors, dangling edges, parser status; stays plain), and **(3) ⭐⭐ a machine-readable answer for
+SESSIONS** — a session touching `.github/workflows/` asks _"what governs this path?"_ and gets the note the map
+routes it to AND the note that claims it AND the fact that they disagree; a session asking _"is this guarded?"_
+gets _"named, invoked, and here's what its classifier actually reaches"_ rather than protocol prose; and the
+node-states let a session know `library/CODE_MAP.md` is declared-but-unreadable on a clean checkout so it does
+not infer the contents. **The owner's correction (_"we don't just need visuals, whatever helps the AI too ya
+know?"_) is why this is placed as infrastructure, the R2-restructure category — not post-2.8.5 visualisation
+decoration.**
+
+**Its own stopping rule.** Build the retrieval topology first; extend to protocols / guards / museum / Atlas
+**ONLY if the first map is actually used** to find or prevent drift. If it becomes wallpaper, stop.
+
+**Honest cost.** Even GPT's "minimum" version needs a real parser — AST detection for suite definitions, glob
+expansion against the tracked tree, boundary-accurate block parsing. **A session or two, not an afternoon.**
+
+**Where it sits.** Infrastructure, near-term — **does NOT gate the `dev → main` release** (process debt like the
+rest of R10), but placed as infrastructure rather than decoration per the owner's third-consumer correction. It
+**shares the schema with the Atlas (item I)** — link, don't fuse; item I's stable-identifier scheme (design note
+b) is the identity contract this graph's cross-release keys obey — and with **P3** (same provenance /
+fail-closed-on-unknown discipline).
+
+**Done means (when eventually built):** one derivation feeds the three views above; the two retrieval edges are
+derived independently and their disagreements surface as data; declared-vs-invoked coverage is diffed; every
+extractor reports parser status so a silent empty parse can never masquerade as an empty project; and a session
+can query "what governs this path / is this guarded" and get the map _plus its known defects_.
+
+**Minimum version BUILT (2026-07-21) — [`scripts/knowledge-graph.js`](scripts/knowledge-graph.js).** The
+DIAGNOSTICS-view data layer only (topology view and query answerer remain future consumers, per §10 of the
+plan): `routes_to` and `claims_scope_over` derived independently, diffed, and proven against six real drift
+gaps already present in the shipped files; every extractor reports records-seen/emitted/unparsed/status; a
+missing or reworded source fails loud (`empty_parse`/`broken`), never a silent empty-but-healthy graph. Output
+is generated on demand at `library/knowledge-graph.json` (gitignored, never committed — regenerated fresh
+every run via `node scripts/knowledge-graph.js`). **Deliberately left un-gated** — no Suite, no git hook (owner
+decision, Protocol 50) — until it demonstrably catches real drift over time, per the spec's own stopping rule.
+`claims_checked_by`/`invokes` and the topology/query-answerer consumers remain out of scope, as designed.
+
+**⬜ Gating decision — STILL UNRESOLVED even though G is now closed (verified 2026-07-26 against the
+committed claim-ledger).** Whether/when this un-gated drift-detector earns veto power (a Suite, a hook) was
+left for item G (the blind workflow review) to rule on. **G finished (2026-07-23) and never actually ruled on
+this** — `planning/audits/G_workflow_review/CLAIM_LEDGER.md` addresses only the ledger's own gating (a
+different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verification. R11 stays un-gated —
+its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
+settled it.
+
+## ⚠️ Blocked on an owner decision
+
+### R5. ⏭️ STAGE 2 — Convert prose into enforcement (waits on the owner formally calling it)
+
+**What it is.** The highest-value of the three remaining staged-trim steps flagged at R3, and really a
+conversion rather than a cut. The principle: a rule an agent must remember costs something every session
+it's loaded; a guard that fails loudly is free and can never be skipped. Every mechanisable rule becomes a
+check, then its prose shrinks to one line plus a pointer at that check.
+
+**Candidates on file (GPT's table, unchanged — each needs re-verification against current code before any
+commit, Protocol 27):**
+
+- Branch discipline (Protocol 43) → GitHub branch-protection settings, not just prose. **⭐ Reinforced +
+  pull-forward-able on its own (owner, 2026-07-22).** Make GitHub **ENFORCE** "main is release-only" — block
+  direct pushes to `main`, require CI-passed — instead of it being a prose rule held by discipline (today
+  Protocol 43 is convention only; a mis-aimed `git push origin main` would land straight on production). Low
+  overhead (a settings config, not code), and it catches exactly the bad push the branch model exists to
+  prevent, so it does **not** need to wait for the owner's formal Stage-2 call — it can be pulled forward on
+  its own. **⚠ Must be configured to match the ACTUAL deploy path so it does NOT block releases:** the real
+  release is a `dev → main --no-ff` merge plus the manual `workflow_dispatch` deploy run against `main` — the
+  protection rules must permit that exact flow (e.g. required-status-checks + the merge, not an all-pushes
+  block that would also stop the release merge). **A full PR workflow was considered and REJECTED (owner):**
+  it is team machinery that adds phone-unfriendly ceremony to a lean solo workflow, and the review value it
+  would add is **already covered** by the Protocol 8 diff-first audit + owner review — so **only branch
+  protection is worth adopting**, not PRs.
+- The redirect-auth ban (`linkWithRedirect`/`signInWithRedirect`, Protocol 30) → a lint rule.
+- The state-field checklist → a schema round-trip test. **Flag:** partially covered now that **A3**'s modeled
+  cloud-serialization guard (`npm run cloud-check`) has shipped, and it would be more fully covered by the
+  optional emulator test **A4** — check for overlap at plan time (Protocol 22).
+- Render-layering (Protocol 23) → AST/lint boundary rules, once the baselined debt is burned down. Today's
+  static scanner (Suite 236) is a step in this direction; full enforcement waits on the native ES-modules
+  migration (bundled with 3.0).
+- AI-response handling → runtime schema validation + malformed-response behavioral tests.
+- The deploy protocol → a post-deploy version/SW/offline smoke. **Flag:** very likely the _same_ work as
+  the 2.9.0 hardening gate's "post-deploy TRUTH" item — resolve which one builds it before starting either.
+  **UPDATE (2026-07-23):** the served-truth _foundation_ now exists — `scripts/release-receipt.js` (G item,
+  CLAIM M) fetches the live prod build and compares served `CACHE_NAME` + `APP_VERSION` against the deployed
+  commit. This candidate's remaining scope is the _behavioral_ half (SW actually installed/activated + an
+  offline smoke), which is exactly the 2.9.0 "Post-deploy TRUTH" item — so both should **extend** the receipt
+  (Protocol 22), not rebuild the served-hash compare.
+
+**The gate this stage was waiting on.** R2 (the rules restructure) had to be USED for real work first.
+**Dispatch's read: that gate now appears satisfied** — the restructure has been retrieving correctly and
+pulling real weight across many sessions this week. Recorded honestly: this is Dispatch's assessment, not
+something the owner has formally called yet.
+
+**Status: ready to plan, not started — waiting on the owner to formally call Stage 2.**
+
+### R6. ⚠️ STAGE 3 — Narrow the universal ratchets (CONTENTIOUS — owner must weigh in; NOT ready)
+
+**What it is.** The cut that costs something real, unlike Stage 2's conversions. Today every escaped bug,
+every CSS invariant, every harness flaw permanently **enlarges** the gate (Protocol 36b). GPT's proposal:
+shift from "add a guarding test for every escape, always" to "add one when recurrence would actually be
+costly" — a judgment call replacing an automatic one.
+
+**Also on the table, same stage:**
+
+- The per-commit documentation rule (Protocol 2) — loosening how often or how much waters this down.
+- The changelog grammar rule (Protocol 21) — possibly relaxed.
+- The universal-requirement framing of the UI-verification protocol — narrowed from every change to a
+  risk-scoped subset. **This is the one item GPT itself withdrew from its own cut list** (see the keep-case
+  under R7) — listed only so a future pass doesn't independently reach for it.
+- Moving the UI-presentation rules (the `Protocol UI-*` family) out of the constitution into design docs,
+  since they encode presentation taste rather than catastrophic knowledge.
+
+**Why this one waits for the owner, explicitly.** This changes how much SAFETY the process buys per commit
+— the escape-ratchet exists because "add a test when recurrence would be costly" requires correctly
+predicting which failures recur, and this project's own incident record is full of failures nobody
+predicted would recur until they did. Not marked ready to plan; each bullet needs the owner's explicit
+call, not a session's judgment substituting for it.
+
+## ⬜ Blocked on another item
+
+### R7. ⬜ STAGE 4 — The expensive machinery (capability calls, not doc cleanup)
+
+**What it is.** Unlike R5/R6 (rulebook prose), this stage cuts actual running infrastructure — each item
+needs its own argument, not a shared one:
+
+- **The Diagnostic Shell's scope (159 tools).** Weight GPT's rejection of this LOWER — GPT did not know the
+  Diagnostic Shell is on the owner's own roadmap as a real in-fiction user-facing feature (the
+  hacking-minigame's unlock target, 2.9.0 — see "The OS round proper" below).
+- **The duplicate Windows CI leg.** Real cost, but this is precisely the class of guard this project has
+  already been burned by cutting once (a Linux-only CI runner was a real production mistake here).
+- **Nightly runs.**
+- **The browser test page (`tests/test.html`).** Already has its own retirement analysis on file —
+  Protocol 40 kept it deliberately as a self-consistency check. Re-litigating it should start from that
+  reasoning, not from zero.
+- **Per-step failure-evidence packaging** (U4's CI screenshot/console/log capture).
+
+**Status: not started, not ready — each item needs its own cost/benefit case before it's even plannable.**
+Per Protocol 49, retiring any of them means removing the actual enforcement, not just the prose.
+
+**Keep-cases across R5-R7 — recorded so they are not re-litigated in any future trim pass:**
+
+- **The architecture-conformance baseline** (Suite 236) — already a formal Protocol 49 keep-case; its risk
+  stays live until the native ES-modules migration (bundled with 3.0) makes layering structural.
+- **The real-device auth rules** (Protocols 29-31) — a real production regression is on file (the r54
+  regression).
+- **UTF-8 source integrity** (Protocol 39) — a real corruption incident with a commit hash on file.
+- **Cloud write safety** (Protocol 34) — failure here is unrecoverable data loss; the entire data-safety
+  chain above exists because this class of failure actually happened once.
+- **The cache-bump guard** (Protocol 1) — failure is silent and user-visible (a stale build or black
+  screen).
+- **The dispatch-decision protocol** (Protocol 12, No Concurrent Pushes) — the owner already overruled this
+  exact cut at R3.
+- **"Actually render and exercise UI changes"** — GPT **itself withdrew** this from its own cut list,
+  because it addresses a real, named AI failure mode: an agent reasoning confidently from CSS text without
+  ever looking at the rendered result.
+
+**What R5-R7 depend on.** R5 needs nothing new (its gate is met per Dispatch's read). R6 needs the owner's
+explicit call on each bullet. R7's items are independent of each other and of R5/R6 — any one can be argued
+on its own schedule. **None of R5-R7 gates the `dev → main` release** — it's process debt.
+
+### C1. ⚠️ Gate the cloud warm-up (one of the two deferred U8 perf wins) — NOT DONE, needs re-scoping
+
+**⚠ NOT DONE — deliberately, and it needs re-scoping before anyone attempts it (verified 2026-07-19).** The
+queue described this as "a small, self-contained win." Reading U8's own commit (`49a37cc`) and `cloud.js`
+says otherwise; the deferred item is _"Defer the eager Firebase/cloud boot chain until cloud features are
+used."_ Two hard blockers, both concrete:
+
+**(a) It is an auth-path change, and Protocol 29 makes real-device verification a condition of "done."** The
+chain being deferred is `initializeAppCheck` → `getAuth` → `onAuthStateChanged` → the Protocol-31-guarded
+`signInAnonymously`. Protocol 29 says an auth change is not done until verified on a real mobile device in
+both a browser tab and the installed PWA. No session without a phone in hand can close it.
+
+**(b) It collides head-on with Protocol 33.** `cloud.js` calls `loadRemoteConfig()` at boot, which is the
+remote kill-switch read. Deferring the boot chain until "cloud features are used" would mean a player who
+never touches cloud features never reads the flag doc — so a kill switch flipped to disable a broken
+feature would never reach them. Any real version has to keep the flag read at boot while deferring only the
+auth/App Check/Firestore weight — a genuinely larger change than "warm up lazily."
+
+**Also worth stating plainly: the measured payoff is small.** U8 found the chain "runs in the BACKGROUND
+and never gates READY," with FCP already ~73 ms. Re-scoped, it belongs with the 2.9.0 hardening gate's
+boot-isolation work, not as a near-term one-liner.
+
+**Done means (C1):** the cloud connection is warmed lazily, measured before/after — the flag read and LKG
+path preserved at boot.
+
+> **C2 — virtualize long lists — MOVED to 2.9.0.** The 2.9.0 inventory-panel rebuild also virtualizes long
+> lists as its stated foundation. Doing it twice would be a Protocol 22 parallel-implementation trap, so
+> list virtualization is re-sequenced into the 2.9.0 inventory-panel foundation and built once, there. (The
+> one genuine mis-ordering the 2026-07-18 evaluation found.)
+
+### I. ⬜ Finally: the ROBCO SYSTEM ATLAS — 8 views over one graph (D shipped — dependency cleared)
+
+**What it is.** The synthesis deliverable from the ecosystem cross-review
+(`planning/2.8.5/audits/ATLAS_ECOSYSTEM_SYNTHESIS.md`): a single generated representation of the whole
+system, offering **8 views over one graph** — and, load-bearing, the **assurance view is one of those
+eight** (generated FROM the test suite's structure so it can never drift from what's actually guarded). The
+governing rule: **generate everything a script can compute; hand-maintain only the un-derivable WHY.**
+
+**What it depends on.** (1) The **pinned baseline** (available now: the R4 pin). (2) The
+**architecture-conformance scanner** (shipped, Suite 236) and a cheap **dependency-structure matrix**. (3)
+The **TEST_CATALOG generator** (D) — ✅ **shipped 2026-07-27** (Protocol 47); the same "generate, don't
+maintain" plumbing (`scripts/generate-test-catalog.js`'s extraction + gate-diff shape) is directly reusable
+here.
+
+**Why it's last.** It's the capstone that represents the finished round, and it wants the round finished and
+pinned to represent it honestly.
+
+**⭐ IT RIDES P11's GRAPH RENDERER (recorded 2026-07-27 — do not build a second one).** P8's structure map
+specifies a single node/edge schema (a superset of the shipped `library/knowledge-graph.json`) whose
+`protocol → enforced_by → guard`, `claims_checked_by` vs `invokes`, and `leaves_unverified` edges **are** the
+Atlas's assurance view — and **P11 Stage 2, the coverage view, is that view already owner-approved and
+specified**. So the Atlas's most valuable output now has a home in the museum's build order, and building
+separate plumbing for it would be the Protocol 22 parallel-implementation trap. This does not merge the two:
+design note (b)'s "link via a stable identifier scheme, do NOT fuse" still governs, and design note (c)'s
+cadence split still holds — the museum pins to RELEASES, the Atlas to a CURRENT baseline. **Share a renderer,
+never share a cadence.**
+
+**⬜ Design note (a) — enumerate the eight views NOW; that's cheap scoping, not implementation
+(2026-07-21).** This entry says "8 views over one graph" but only ever NAMES two (assurance, dependency) — the
+other six are a number standing in for a specification. Enumerating the eight — each view plus the one
+question it answers — is a cheap scoping step worth doing NOW, independent of everything else. **Explicitly
+NOT the implementation:** do not spec how they're built. The round is unfinished, 2.9.0 will change much of
+what the Atlas maps, and this entry's own "why it's last" wants the round finished so the Atlas represents
+something real. Scope it, don't spec it.
+
+**⬜ Design note (b) — LINK the Atlas, library and museum; do NOT fuse them (owner: "link not fuse",
+2026-07-21).** All three share one principle — generate what a script can compute, hand-maintain only the
+un-derivable WHY — but cover different corpora and time axes: **library = current-state prose, Atlas =
+current-state structure, museum = history.** The valuable connection: **the Atlas's assurance view and the
+museum's bug room are the same relationship from opposite ends** — the Atlas answers "what guards this?", the
+museum answers "why does this guard exist?" (always some specific bug that escaped). Walking it both ways
+answers "why is this here", otherwise unanswerable without having been present. **RULING: link via a stable
+identifier scheme** (files, protocols, suites, queue items) so each references the others WITHOUT any owning
+the others — do NOT merge into one shared graph. Three things that reference each other can each fail alone;
+one merged thing fails everywhere. The scheme is already half-present: the skill and rules cite protocol
+numbers, and queue items have stable IDs the restructure just protected. (The AI-facing read side is P3's
+spec — the raw archive / internal manifest, never the ~190MB generated HTML nor the name-substituted public
+tree; not restated here.)
+
+**⭐ Sharpened by the knowledge-architecture audit (R10, finding I, 2026-07-21) — the ruling stands, but the
+naive version of it breaks: file paths are LOCATORS, not IDENTITIES.** This project already has the evidence —
+its own archive-rename work measured git's content-similarity rename detection **undercounting by ~22%, and
+failing silently** (recorded under P1). So a durable link scheme needs, concretely: **namespaced immutable IDs**
+(`incident:0042`, `protocol:1`, `guard:cache-bump`, `queue:R9`) kept **separate from an evidence locator**
+(repo + commit + path); IDs that **survive** label / path / display-name changes; **no reuse after retirement**;
+**retirement tombstones** carrying status and an optional `superseded_by` (deleting the _enforcement_ must never
+delete the _identity_ — the Protocol 49 discipline, made structural); **baseline-aware relations** ("prevented
+this at release X" ≠ "active now"); **one owner per relation** with inverses generated, not hand-written; and
+**validation that lives in the Atlas / museum / extract generators, NOT in the app's release gate** (linking
+metadata must never be able to block a release). **What breaks it, recorded so it isn't re-invented:** deriving
+IDs from paths / headings / slugs; reusing retired numbers; deleting IDs on retirement; treating a _moving_
+branch URL as historical evidence; public sanitisation changing IDs instead of only display labels; and
+treating a missing reference as "retired" or "current" instead of **"unknown."**
+
+**⬜ Design note (c) — share the museum's renderer, keep publication separate (owner: "part of the museum on
+the user end", 2026-07-21).** Yes to sharing the museum's generator plumbing — renderer, navigation, search,
+styling, pinning discipline — rather than building a second browsable site. BUT the Atlas maps where the
+architecture is violated and what isn't covered by tests: a fair description of an **attack map** for a live
+app with cloud sync and auth. So the Atlas lives on the **PRIVATE side by default**, using the same
+private-source-vs-published-output split P2 already designs. The one genuine difference to record: the museum
+is pinned to **RELEASES** (history, deliberately frozen); the Atlas is pinned to a **CURRENT BASELINE** and
+marks itself **degraded** when the repo moves off it. Same pinning idea, opposite intent — **share a renderer,
+never share a cadence.** (Design only — build nothing here.)
+
+**Done means:** one generated Atlas, pinned to a baseline, with 8 views (assurance among them) computed from
+source rather than hand-authored.
 
 ---
 
@@ -2776,6 +3257,15 @@ wouldn't do it all the time."_
 scheduled-tasks), so this is **buildable, not hypothetical.** ⚠ Real constraints to record: it only fires when
 the owner's machine (the **Ally**) is **ON**; it **consumes usage** (why the cap + selectivity matter); and an
 always-on runner ties to the **deferred spare-laptop idea** (the G-review owner-decision).
+
+**⭐ OVERLAP WITH THE CONTROL-PLANE PROGRAM — read this before starting either (2026-07-27).** T and
+**CP2 stage 4** (scheduled reconciliation + notifications) are the same machinery seen from two ends: T wants
+chores to START on a clock; CP2 wants a completion event and a periodic reconcile. **CP1's spikes cover T's
+own feasibility questions directly** — the scheduled-task-across-sleep probe answers "does it fire when the
+Ally sleeps?", and the phone-notification probe answers "does the owner actually hear about it?". So **T
+should not be built independently**: whichever lands first builds the mechanism, the other extends it
+(Protocol 22). T's guardrails — opt-in per chore, safe/report/prep tasks only, consequential actions still
+need the owner's explicit go, and a hard cap — carry over to CP2 stage 4 unchanged.
 
 **Earn-condition / status (why it sits in the drawer).** It has no version because it is **opt-in,
 activate-on-demand infrastructure**, not a release feature — it may never "ship" as a version; it gets turned

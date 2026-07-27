@@ -8,13 +8,43 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [App Check](#appcheck) · [L (private view)](#l)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+### 2026-07-27 — the big reorganization: the control-plane program takes the top of the board
+
+A long work session produced more than `QUEUE.md` could hold, so this pass folded all of it in and re-ordered
+the board around the owner's explicit call that the **workflow / control plane is the top priority**. **New
+program at the top — CP1-CP5**, all of it labelled **PROPOSED / PLANNED / gated** because **none of it is
+built**: the empirical **spike campaign** that must prove or _kill_ hook-based containment before anything is
+written (it needs owner hands-on time — a quiesced window, an away-from-machine notification test, letting the
+Ally sleep), the **staged build** gated on it (passive observation → push/sync wrappers → containment with
+separate L1/L2/L3 leases → reconciliation + notifications → _proposal-only_ verified termination → optional
+worktrees), an **immediate-mitigations** track that deliberately needs no control layer at all, the broader
+**sync audit** across all three replication surfaces, and the **laptop-witness inventory** (recommendation:
+witness first, not controller). The arc that produced it is recorded with GPT's adversarial correction intact —
+**"proven" had been used for mechanisms never executed**, one lease cannot cover four lock domains, containment
+buys at-most-one-_writer_ not exactly-once, and lease revocation is write-quarantine, **not** cancel.
+**The museum moved up** out of the 2.8.5 tail into its own top-level section, second band, and gained five
+items: **P10** (drop the hardcoded 10-stop tab bar — the owner identified it as leftover theme copy, so P8's
+"no eleventh slot" constraint is **void**), **P11** (the Visual Web on P8's structure — `arcs.json` → arc spine
+→ coverage view → radial web, cluster-first, never all ~1,450 nodes), **P12** (the Article Room), **P13** (a
+⚠ security finding: a live email in a planning doc that the publish scan never covered) and **P14** (the live
+site is stale — the republish). **Shipped and moved here:** **V** (the archive-sync repair), **W** (archive
+organization fixes), **X** (the Exhibit relocation) and **P8**'s completed account. **A3 and A4 were moved
+here too and then moved back**, deliberately: Suite **246.3** hardcodes `A3` as an ID it expects to parse out
+of `QUEUE.md` and **246.5** requires a done-status item to exist there, so honouring the ahead-only contract
+for those two turns the gate red. The fix is a `tests/` change this pass was scoped out of; it is recorded in
+`QUEUE.md` beside them instead of being worked around silently. **Two owner wrap-up asks became items:** **Y** (memory-for-the-story reconciliation) and **Z** (an
+evidence-grounded workflow explanation). Also corrected: the top-of-file status still said development was
+pausing for a multi-week gap — the owner is **back on Max 5x as of 2026-07-27**, so that note is superseded in
+place with its own date. Item **I** (the Atlas) now records that it **rides P11's graph renderer**, and item
+**T** records its overlap with CP2 stage 4. No `APP_VERSION` / `CACHE_NAME` bump — queue files are not served.
 
 ### 2026-07-21 — A3 build attempt: feasibility wall (no JVM) + a premise correction
 
@@ -1225,6 +1255,234 @@ reasoning to players or gets sanitized until it stops being useful internally.
 **Done means (private view): ✅ MET** — built 2026-07-23, owner-confirmed 2026-07-27. A generated HTML
 page, readable on a phone, reflects the current `QUEUE.md` in full, and the owner has personally confirmed
 it reads right on his own device (`npm run queue-view` → `queue-view/queue-view.html`).
+
+---
+
+<a id="p8"></a>
+
+### P8. ✅ Story-material + STRUCTURE synthesis audit — SHIPPED 2026-07-27 (both deliverables filed in the archive)
+
+**✅ RESOLUTION (2026-07-27) — run as a Claude session against the private archive, exactly as the spec below
+required. Both deliverables are filed at `_RobCo-Archive/audits/museum/`:**
+
+- **`2026-07-27_P8-story-corpus.md`** — the story corpus. Five read-only passes over disjoint clusters, then
+  synthesis and de-duplication: **126 memory files read in full**, 596 planning files inventoried (~55 read in
+  full), **all** bug and graveyard records, **all 63** numbered protocol entries, `QUEUE.md` (2,845 lines),
+  `QUEUE_LOG.md`, `CHANGELOG.md`, the archive audits, and read-only git in both repos. **175 raw arcs
+  de-duplicated to 146 canonical arcs**, in fifteen groups, each carrying its source arc IDs so the underlying
+  material stays traceable. It opens with a **PII firewall** — a by-path map of where the archive retains the
+  owner's real identity, with none of the values reproduced — and that firewall is what surfaced the finding
+  now tracked as **P13**.
+- **`2026-07-27_P8-structure-and-connection-map.md`** — the structure and connection map, read from
+  `museum/generate.mjs` (4,004 lines) and the emitted `museum/site/` tree rather than from any prior session's
+  description of them. It inventories every room, page type and navigation edge (12 rooms built, 687 HTML
+  pages, 34 MB), and specifies the **node/edge schema** the Visual Web will render as an explicit **superset of
+  the shipped `library/knowledge-graph.json`** (schema 2.0.0 over R11's 1.x) — 14 new node kinds, 21 new edge
+  types, projected ≈1,450 nodes / ≈2,200 edges.
+
+**The finding that reshaped the build order — and it is the reason P11 starts where it does.** The museum is a
+**star topology**: lobby plus tab bar out to each room, with **no room→room edge, no doc→doc edge, and exactly
+one cross-room content edge in the whole site**. Every real relationship — which bug produced which guard,
+which lesson drove which protocol — lives in **prose**. **The Visual Web is therefore a DATA problem, not a
+rendering problem; building the renderer first would produce a beautiful picture of a star.** Hence P11's Stage
+0 (`arcs.json`) as the prerequisite, and the four-stage sequence that follows it.
+
+**Two open build decisions it surfaced, and where they went.** The "no eleventh nav slot" constraint became
+**P10** — and was **resolved the same day** by the owner, who identified the ten-stop tab bar as leftover
+RobCo-theme copy rather than a design invariant, voiding the constraint the map recorded as hard. The
+**motion-as-exhibit-behaviour** question remains genuinely open for the owner.
+
+**Honest caveats the audit states about itself, preserved:** it is a Claude session auditing Claude-built work,
+so it shares those blind spots; and every count in the schema marked _projected_ is a sizing estimate from
+counted entities, **not a measurement of a graph that exists**.
+
+**Done means:** met — both outputs exist, filed at the established archive audit path, and are the input to
+**P11**. The original spec follows verbatim.
+
+---
+
+**The original spec, verbatim as it last stood in `QUEUE.md`:**
+
+### P8 (spec). ⬜ Story-material + STRUCTURE synthesis audit — the story corpus AND the room/structure/connection map (PARKED, not started; owner, 2026-07-24, scope-expanded 2026-07-25)
+
+**What it is.** A pass that **gathers, organizes, and synthesizes literally every story beat** the museum
+could ever draw from, into one curatable corpus, so the owner curates the exhibits from the FULL material
+rather than whatever a session happens to remember. **Scope (owner's words): "literally everything story-wise,
+no lookup-able PII."** Sources to sweep: orchestrator **memory**, `planning/`, the **bug→guard** records, the
+**graveyard**, the archive **audits**, **`QUEUE_LOG.md`**, and every **protocol's origin incident**.
+
+**Explicit beats to fold in (named so they aren't lost):**
+
+- The **OneDrive/Antigravity pivot** (the P7 origin arc — the two are related; P8 is the corpus, P7 is one
+  exhibit drawn from it).
+- The **wrong-tool incident**: a git/deploy task was launched as a **sandboxed Dispatch** session that
+  **couldn't push** (no network route / no `gh` / no Chromium), had to be **re-routed to an on-machine Code
+  session**, and the lesson **became a rule** (know the execution tier before dispatching git/deploy work).
+- The **development PAUSE** for the **apartment move / subscription frugality** (see the STATUS note up top) —
+  an honest "the project stopped for real-life reasons" beat.
+- The **independent-convergence arc** — a 2026 wave of external guides now teaches, as novel technique, the
+  multi-agent architecture RobCo had ALREADY built without a guide. (Full source map + thesis in the ⭐ block
+  directly below.)
+
+**⭐ A MUSEUM ARC — RobCo independently converged on (and on verification, EXCEEDS) the architecture the 2026
+guides now teach (owner observation, 2026-07-25).** A wave of external write-ups describes as _novel technique_
+the multi-agent architecture this solo, free-tier project had already built without a guide. Recorded as story
+material — **CITE + MAP the titles; NEVER dump external copyrighted content into the museum** (at most a short
+attributed quote; the mapping is ours):
+
+- **"Loop Engineering"** (qibaz, X, Jul 2026) → RobCo already has it: the **plan → implement → gate → audit
+  ratchet loop** plus the **self-improving gate** as the verification harness — the exact ingredient the
+  article says most people skip.
+- **"Graph Engineering"** (an 11-page synthesis of Karpathy's autoresearch ratchet-loop + AgentHub's "the DAG
+  IS the graph" + Anthropic's Knowledge-Graph cookbook; X, Jul 2026) → its staged path is **"one measured loop
+  → typed knowledge graph → graph-grounded swarm,"** where the graph externalizes shared facts / provenance /
+  cross-session memory and the evaluator checks claims against graph edges ("triple not found" beats "seems
+  off"). RobCo already has: **R11** (independently-derived typed edges; drift surfaces as data), the
+  **provenance discipline** (every fact links to its commit), **"green is scoped evidence, not proof,"** the
+  persistent **memory / queue / archive as the cross-session shared brain**, **git-worktree per-session
+  isolation**, and **`CLAUDE.md` / rules / protocols as the "program.md that programs the program."**
+- The earlier **second-brain / visual-brain / "the last prompt you'll write"** threads — same pattern, same
+  convergence.
+
+**The thesis point (why this is a museum ARC, not just a note).** RobCo **independently converged on** — and on
+the **verification harness, EXCEEDS** — the architecture these guides now teach, as a **solo, free-tier
+project.** The ONE deliberate omission is **SCALE** (the 1,000-agent swarm): a solo / free-tier / owner-control
+**choice, NOT a gap.** This is direct evidence for the self-maintaining-system thesis — **the discipline was
+principled, not accidental.** **Owner's words, preserved:** _"all these guides are out there yet we've already
+done it all without a guide — just me and you."_
+
+**⭐ SCOPE EXPANSION (owner, 2026-07-25) — the audit is ALSO the layout blueprint, not just story content.**
+Beyond the story corpus, this audit must **catalog every existing museum ROOM + the whole site structure** —
+what each room holds and **how they connect** — so its output **doubles as the layout blueprint for a
+redesign** (feeding the archive-native nav design direction + the Fable pass under P), and must **map the
+CONNECTIONS** (the facet-2 connections map, Part C) so the connection-layer / Visual Web builds from a **real
+inventory** rather than a guess. **TWO OUTPUTS, then:** (1) the **story corpus** for curation; (2) the **room +
+structure + connection map** for the layout redesign and the Visual Web.
+
+**⚠ Run it as a CLAUDE session — NOT a GPT copy-paste.** The audit **must read the PRIVATE archive** (memory,
+`bugs/`, graveyard, audits, AND the built museum's own room/structure) to be real; GPT has **no access to that
+private material**, so a GPT pass would be inventing from a summary. A Claude session that can actually read
+the archive is the only honest way to run it — the same "Claude first, because it can EXECUTE / read the
+private material" reasoning as design note (e).
+
+**Why it's the enabling prerequisite.** Curation ("capture everything, exhibit a curated subset") only works
+if the full collection is actually assembled first; this is the "capture everything" half made a deliberate
+task — and now the **structure inventory** the redesign + Visual Web both need. **Recorded as a parked
+candidate — not started.**
+
+---
+
+<a id="v"></a>
+
+### V. ✅ The archive-sync repair — a backup that reported success while protecting nothing (SHIPPED 2026-07-27)
+
+**What it is.** `sync.ps1` is the **only** backup of the three local-only artifact classes Protocol 48 exists
+to protect — `library/`, `planning/`, and the orchestrator's memory store. It was **reporting "Done" on a push
+that had been REJECTED.** Root cause, and it is a language-level trap rather than a coding slip: **Windows
+PowerShell 5.1 does not throw on a native non-zero exit code**, no matter what `$ErrorActionPreference` says.
+So `git push` could fail, print its rejection to stderr, and the script would carry on to its success message.
+
+**Why this is the worst shape of failure this project recognises.** A backup that quietly protects nothing is
+**worse than no backup**, because it removes the pressure to notice — the same reasoning already on file for
+the original hardcoded-GUID version of this script, and the same "green that lied" class as the inert cache
+guard. The material at risk is the memory store, the planning tree and the library docs: **they exist on
+exactly one disk.**
+
+**Shipped (commit `2cf7d5f`):**
+
+- **`Invoke-Git` — the only way the script is allowed to run git.** It returns an object carrying
+  `ExitCode`/`StdOut`/`StdErr` and, unless `-AllowFail` is passed, **fails with the command, the exit code and
+  the captured stderr**. Checking by hand at each call site is exactly how the swallowed push survived, so the
+  wrapper makes the check **impossible to forget**. It uses `Start-Process` with two temp files rather than
+  pipes, because a piped read can deadlock when the child fills the stderr buffer — and `git push` writes both
+  its progress and its rejection text to stderr.
+- **L5 / L6 locks, held OUTSIDE git, released in `try/finally`**, with stale-lock reaping validated on
+  **(pid, process-start-time)** rather than pid alone (a recycled pid must not be mistaken for a live holder).
+  **L5** is sync-run exclusivity; **L6** is archive-tree ownership — a sync and a code session must never both
+  write.
+- **A SHA-256 content digest** over `library/` + `planning/` + **every** memory store (re-resolved at
+  digest time, never trusting a remembered path), taken at entry and re-checked, so a source mutating mid-run
+  is caught rather than silently half-captured.
+- **Foreign-commit refusal**, **real `ls-remote` verification of origin**, and a **tiered refusal policy** —
+  with the session probe's CPU floor **measured on this machine** rather than guessed (an idle session tree
+  ticks at 0.31-0.78% of one core; an actively-running one measured 9.51%), so the policy's explicit
+  permission for **idle** daemons is actually reachable instead of being swallowed by an
+  any-CPU-movement floor.
+
+**Then a follow-up closed the gap an independent audit found (commit `410f930`).** The "nothing changed since
+the last sync" **no-op path** still printed "already current" and returned 0 **without ever asking the remote
+anything** — so a run whose push had failed, followed by a run with nothing to do, would report green while
+the remote still lacked the archive. **The exact "success while protecting nothing" shape this whole repair
+exists to kill, surviving on the one path that never reached the verification.** The fix extracts
+`Get-OriginMainVerdict` as the single place that decides "does the remote have it?", and **every** path that
+exits 0 claiming a backup must now clear that same bar through that same code.
+
+**Verification.** **13 tests** in `tests/sync-repair.tests.ps1` pass under **both PowerShell 5.1 and 7.6.4** —
+both shells, because the original defect only exists in one of them. The harness builds a complete throwaway
+world per scenario and injects mid-run mutations after the entry digest, so the source-moved-mid-run paths are
+genuinely exercised rather than modelled. The work was **externally reviewed end to end (GPT)** and
+**independently diff-audited** — the audit is what found the no-op gap above.
+
+**⚠ Recorded honestly — one residual is NOT fixed.** A **millisecond-scale race** remains and is documented in
+the script rather than papered over; closing it needs the Level B work (mechanical enforcement of the L3/L6
+domains), which is **CP2 territory**. Stating the remaining hole is the point: this repair's whole subject is a
+script that claimed more than it delivered.
+
+**Done means:** met — a rejected push can no longer report success, every exit-0 path verifies the remote
+through one shared function, the sources are guarded mid-run, and the residual race is documented rather than
+hidden.
+
+---
+
+<a id="w"></a>
+
+### W. ✅ Archive/museum organization fixes — the classifier's fall-through, loud catch-alls, and a FILING REPORT (SHIPPED 2026-07-27, commit `2767d45`)
+
+**What it is.** The archive's `classify()` decides which room every artifact belongs to, and a **fall-through**
+was letting files land in **UNCLASSIFIED** — a state the museum's own lobby integrity report surfaces, which
+means the museum was reporting a fault about itself. **UNCLASSIFIED went 5 → 0.**
+
+**Shipped:**
+
+- **The `classify()` fall-through closed**, and the **catch-alls made LOUD** — an unrecognised file must
+  announce itself rather than quietly landing in a bucket. This is the same lesson as the earlier
+  UNCLASSIFIED-3 fix (`.claude/launch.json` leaking as tooling, `memory-audit/` unrecognised): a silent
+  catch-all is how a classifier stops telling the truth.
+- **A `--check` FILING REPORT** — **deterministic, idempotent, dry-run, and loud.** It reports where everything
+  filed and what it could not place, and writes nothing. Same "flag, never auto-fix" posture as every other
+  check in this project.
+- **README count fixes**, a new **`memory-audit/README.md`**, and `README.txt` **preserved to the graveyard
+  first, then removed** — the ordering matters and is the standing rule: capture, then delete, never the
+  reverse.
+
+**Verification.** A **double-fresh reproducibility check passed** — the archive's own bar, and the one that
+catches a classifier change that happens to be stable only on the machine that made it.
+
+**Done means:** met — UNCLASSIFIED is 0, unrecognised files are loud rather than silent, `--check` gives a
+deterministic filing report, and reproducibility still holds.
+
+---
+
+<a id="x"></a>
+
+### X. ✅ The Exhibit folder relocated into the project family (2026-07-27)
+
+**What it is.** The public exhibit's working copy now lives at **`C:\Dev\!RobCo\!RobCo-Exhibit`** — inside the
+`!RobCo` family alongside the app repo and the private archive — where it was previously the sibling
+`C:\Dev\!RobCo-Exhibit`, one level up and easy to mistake for something unrelated.
+
+**⭐ The fact worth recording, because it is the thing a future session would otherwise worry about: GitHub and
+Cloudflare are UNAFFECTED. Both bind to the repository, not to the local path.** The Cloudflare Pages project
+builds from the `Robco-Exhibit` GitHub repo; nothing in that chain knows or cares where the working copy sits
+on this disk. **No re-wiring was needed and none should be attempted.**
+
+**Why it was worth doing at all.** The naming rules already on file are strict for a reason — the app repo is
+**never** renamed (it is the PWA's install origin), and `_RobCo-Archive` (private) and `!RobCo-Exhibit`
+(public) are different things that must never be confused. Putting all three under one parent makes that
+distinction visible at a glance instead of depending on the reader remembering it.
+
+**Done means:** met — the folder is at the new path, the old path is gone, and both hosting paths were
+confirmed unaffected.
 
 ---
 
