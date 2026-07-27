@@ -51952,6 +51952,131 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 248 — QUEUE.md structural integrity (QUEUE_LOG.md anchors +
+//  item-ID uniqueness) — QUEUE.md item U, GENERATE-vs-hand-maintain audit
+//  candidates #4/#5
+//
+//  WHY: confirmed by reading the audit directly (planning/2.8.5/audits/
+//  GENERATE_VS_MAINTAIN_AUDIT.md, owner-requested) against the live repo —
+//  nothing before this suite ever checked that QUEUE.md's own
+//  [account](QUEUE_LOG.md#anchor) links resolve, nor that its stable
+//  item IDs stay unique. Both are zero-FP, deterministic, and cheap.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
+
+  const QV248 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+  const queueSrc248 = readFile('QUEUE.md');
+  const logSrc248 = readFile('QUEUE_LOG.md');
+
+  // ── 248.1  QUEUE.md → QUEUE_LOG.md anchor integrity ──
+  // QUEUE_LOG.md anchors resolve two ways: (a) an explicit <a id="slug">
+  // (the convention every "Shipped" entry's account uses), and (b) GitHub's
+  // own auto-slug of a real `#`/`##`/.../`######` heading — the one
+  // reference that predates the explicit-anchor convention,
+  // QUEUE_LOG.md#update-history--the-running-last-updated-chain, links its
+  // own "# Update history — the running "Last updated" chain" heading via
+  // GitHub's default slugger (lowercase; strip anything that isn't a word
+  // char/hyphen/space; replace each individual space with a hyphen — NOT
+  // a collapsed \s+, which is why the em-dash's two surrounding spaces
+  // survive as the doubled hyphen in that anchor). Checking only (a) would
+  // false-flag that real, working link as broken, so both anchor sources
+  // are unioned — the general, self-updating fix, not a hardcoded
+  // allowlist entry for one link (the link stays validated even if the
+  // heading text is edited later).
+  const explicitAnchors248 = new Set(
+    [...logSrc248.matchAll(/<a id="([a-z0-9-]+)">/g)].map(m => m[1])
+  );
+  const githubSlug248 = text =>
+    String(text)
+      .toLowerCase()
+      .replace(/[^\w\- ]+/g, '')
+      .replace(/ /g, '-');
+  const headingAnchors248 = new Set(
+    [...logSrc248.matchAll(/^#{1,6}\s+(.*)$/gm)].map(m => githubSlug248(m[1].trim()))
+  );
+  const anchors248 = new Set([...explicitAnchors248, ...headingAnchors248]);
+
+  const refFailures248 = [];
+  let refsChecked248 = 0;
+  for (const m of queueSrc248.matchAll(/QUEUE_LOG\.md#([a-z0-9-]+)/g)) {
+    refsChecked248++;
+    if (!anchors248.has(m[1])) refFailures248.push(m[1]);
+  }
+  assert(
+    explicitAnchors248.size >= 20 && refsChecked248 >= 20 && refFailures248.length === 0,
+    '248.1: every QUEUE_LOG.md#anchor reference in QUEUE.md resolves to a real <a id> or a real GitHub-auto-slugged heading in QUEUE_LOG.md' +
+      (explicitAnchors248.size < 20
+        ? ` — only ${explicitAnchors248.size} explicit anchors found (extraction regression?)`
+        : '') +
+      (refsChecked248 < 20
+        ? ` — only ${refsChecked248} references found (extraction regression?)`
+        : '') +
+      (refFailures248.length
+        ? ' — DANGLING: ' + refFailures248.map(a => 'QUEUE_LOG.md#' + a).join(', ')
+        : '')
+  );
+
+  // ── 248.2  QUEUE.md item-ID uniqueness ──
+  // Reuses queue-view.js's own parseQueue()/parseHeading() (Protocol 22 —
+  // extend, don't fork) rather than a second ID parser — the same
+  // extraction Suite 246 already trusts for the private queue view.
+  const model248 = QV248.parseQueue(queueSrc248);
+  const ids248 = model248.blocks.filter(b => b.type === 'item' && b.id).map(b => b.id);
+  const dupeIds248 = ids248.filter((id, i) => ids248.indexOf(id) !== i);
+  assert(
+    ids248.length >= 15 && dupeIds248.length === 0,
+    '248.2: every QUEUE.md item ID (A0-A4, B-U, R1-R11, ...) is unique — QUEUE.md\'s own rule is "never renumber, never re-letter, never reuse"' +
+      (ids248.length < 15 ? ` — only ${ids248.length} IDs found (extraction regression?)` : '') +
+      (dupeIds248.length ? ' — DUPLICATE: ' + [...new Set(dupeIds248)].join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 249 — CHANGELOG.md Cache: header vs sw.js CACHE_NAME
+//  (QUEUE.md item U, GENERATE-vs-hand-maintain audit candidate #9)
+//
+//  WHY: confirmed by reading scripts/cache-bump-guard.js,
+//  scripts/check-boot-chain.js, and scripts/release-receipt.js directly —
+//  NONE of the three ever reads CHANGELOG.md. The <!-- Cache: ... -->
+//  token on CHANGELOG.md's topmost version-header comment (Protocol 2's
+//  own structural marker) and sw.js's live CACHE_NAME agree right now
+//  purely by discipline, not by any check — nothing stops them silently
+//  diverging. Reuses scripts/release-receipt.js's extractCacheName()
+//  (Protocol 22) rather than a second regex for the same marker shape.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 249 — CHANGELOG.md Cache: header vs sw.js CACHE_NAME');
+
+  const RR249 = require(path.join(ROOT, 'scripts', 'release-receipt.js'));
+  const changelogSrc249 = readFile('CHANGELOG.md');
+  const swSrc249 = readFile('sw.js');
+
+  const topHeaderMatch249 = changelogSrc249.match(/^## \[.*?\].*$/m);
+  const cacheTokenMatch249 = topHeaderMatch249
+    ? topHeaderMatch249[0].match(/Cache:\s*([^\s|]+?)\s*(?:-->|\|)/)
+    : null;
+  const changelogCache249 = cacheTokenMatch249 ? cacheTokenMatch249[1] : null;
+  const swCache249 = RR249.extractCacheName(swSrc249);
+
+  assert(
+    topHeaderMatch249 !== null &&
+      changelogCache249 !== null &&
+      swCache249 !== null &&
+      changelogCache249 === swCache249,
+    "249: CHANGELOG.md's topmost version-header <!-- Cache: ... --> token matches sw.js's live CACHE_NAME (nothing else in the gate ever compares these two)" +
+      (topHeaderMatch249 === null ? ' — no version header found (extraction regression?)' : '') +
+      (changelogCache249 === null
+        ? ' — no Cache: token parsed from the header (marker shape regression?)'
+        : '') +
+      (swCache249 === null ? ' — CACHE_NAME not found in sw.js' : '') +
+      (changelogCache249 && swCache249 && changelogCache249 !== swCache249
+        ? ` — DRIFT: CHANGELOG says ${changelogCache249}, sw.js says ${swCache249}`
+        : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
