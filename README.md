@@ -255,42 +255,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 
 ### Script Load Order
 
-Global-scope `<script>` tags load in strict order (per-game db/reg pair is chosen by the boot manifest):
-
-```
-0. core/idb.js                →  window.IdbStore (async IndexedDB engine; loaded before the boot manifest)
-1. data/db_nv.js / data/db_fo3.js →  databaseCSVs, lookupItemInDb (active game)
-2. core/state.js              →  state, APP_VERSION, GAME_DEFS, THEMES, saveState, migrateState
-3. data/reg_nv.js / data/reg_fo3.js →  FALLOUT_REGISTRY (active game, read-only)
-4. data/registry-core.js      →  registrySearch (shared, game-agnostic)
-5. ui/ui-audio.js             →  AudioSettings, audio + boot + optics functions
-6. ui/ui-render.js            →  render-pipeline hub (2.8.5 U-A4 split) — only _updateContextPanels
-7. ui/ui-render-inventory.js  →  Cargo Manifest & Ammo (2.8.5 U-A4 split)
-8. ui/ui-render-character.js  →  Character & Field Status: squad, clock/calendar, faction standing, status, perks, quests (2.8.5 U-A4 split)
-9. ui/ui-render-record.js     →  Personal Record: session tally, equipped, collectibles, Lincoln, traits (2.8.5 U-A4 split)
-10. ui/ui-render-ledger.js    →  Field Ledger: skill/magazine tracker, campaign notes, chronicle (2.8.5 U-A4 split)
-11. ui/ui-render-map.js       →  Cartography Table: renderWorldMap (2.8.5 U-A4 split)
-12. ui/ui-render-factions.js  →  Faction Reputation & Karma (2.8.5 U-A4 split)
-13. ui/ui-render-economy.js   →  Resource Economy: Craft + Trade (2.8.5 U-A4 split)
-14. ui/ui-render-loot.js      →  Item Acquisition: Loot + Visual Upload OCR apply (2.8.5 U-A4 split)
-15. ui/ui-render-databank.js  →  Native Databank Tools: Threat/Consult/Eligible Perks/Bio-Scan (2.8.5 U-A4 split)
-16. ui/ui-saves.js            →  save slots, file import/export, autocomplete
-17. ui/ui-account.js          →  renderAccount, renderSavesList, undoLastSync
-18. services/ocr.js           →  window.routeVisualUpload (lazy Tesseract.js OCR; never loads at boot)
-19. core/runtime.js           →  window.AmbientRuntime (lifecycle state machine + observer scheduler)
-20. ui/ui-core.js             →  appendToChat, loadUI, updateMath (the ui-core spine hub)
-21. ui/ui-core-nav.js         →  selectSubsystem, switchTab, SHORTCUT_ROUTES (2.8.5 U-A1 split)
-22. ui/ui-core-overseer.js    →  setOverseerState, the Director Uplink scope canvas (2.8.5 U-A1 split)
-23. ui/ui-core-chassis.js     →  _coreRefresh, initChassisCore, System Status (2.8.5 U-A1 split)
-24. ui/ui-core-modulebay.js   →  renderModuleBay, the campaign-config board (2.8.5 U-A1 split)
-25. ui/ui-core-cmd.js         →  native stat setters, COMMAND_REGISTRY (2.8.5 U-A1 split)
-26. dev/test-console.js       →  window.initTestConsole (Diagnostic Shell; gated by _devConsoleUnlocked)
-27. services/api.js           →  transmitMessage, fetchAuthorizedModels, comm-config cache (2.8.5 U-A3 split)
-28. services/api-directive.js →  getSystemDirective + its 8 _directive* section builders (2.8.5 U-A3 split)
-29. services/api-import.js    →  autoImportState, sanitizeImportedContainer (2.8.5 U-A3 split)
-30. services/api-router.js    →  NATIVE_COMMAND_ROUTER, transmitTerminal, quick-log routing (2.8.5 U-A3 split)
-31. services/cloud.js         →  window.saveCurrentToCloud / window.loadCloudSave (ES module)
-```
+Global-scope `<script>` tags load in strict order (per-game db/reg pair is chosen by the boot manifest). The canonical, gate-checked list lives in one place — `rules/file-layout.md`'s `LOAD-ORDER-GUARD` block — machine-verified against `index.html` on every commit (Suite 220.3/220.4). This file previously carried its own hand-copied third copy of that same list; it was deleted rather than kept in sync, to remove a drift surface rather than add a third check to police it (Protocol 36b, QUEUE.md item U candidate #13).
 
 `ARCHITECTURE.md` is the canonical deep reference (persistence lifecycle, audio chain, boundaries) — task-retrieved by section (R10 Step 3), not read wholesale. The current add-a-field/audio/panel checklists live in `rules/*.md`.
 

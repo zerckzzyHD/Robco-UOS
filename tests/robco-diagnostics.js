@@ -52426,6 +52426,159 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 252 — README/CHANGELOG/ARCHITECTURE doc-integrity backlog
+//  (QUEUE.md item U, GENERATE-vs-hand-maintain audit candidates
+//  #2 / #10 / #12 / #14 — the audit's own ranked-list tail, batch 4)
+//
+//  WHY bundled into one suite: the audit itself ranked these as real
+//  but lower-priority/lower-urgency gaps and suggested bundling a
+//  "changelog gate check" and reusing a shared directory read rather
+//  than four standalone suites — see GENERATE_VS_MAINTAIN_AUDIT.md
+//  candidates #10/#12/#14's own text. Building 252.1 against the
+//  live ARCHITECTURE.md immediately found real drift (a dozen-plus
+//  scripts/tests files and the vendored OCR bundle silently
+//  undocumented) — fixed in the same commit (Protocol 42), never
+//  shipped as a check that starts red.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 252 — README/CHANGELOG/ARCHITECTURE doc-integrity backlog (item U batch 4)');
+
+  // ── 252.1  ARCHITECTURE.md File Map reverse-completeness (candidate #2) ──
+  // Suite 220.2/2b/2c already prove every path the File Map NAMES exists on
+  // disk — one direction only. This is the mirror direction: every tracked
+  // source file must be named SOMEWHERE in the File Map, so a new file
+  // dropped into js/, css/, scripts/, or tests/ can't ship silently
+  // undocumented. js/vendor/ is excluded because allJsFiles() itself
+  // excludes it by established convention (see its own header comment
+  // above) — a manually curated third-party precache allowlist, not app
+  // source — so this reuses that same exclusion (Protocol 22) rather than
+  // re-deciding it here.
+  const archSrc252 = readFile('ARCHITECTURE.md');
+  const fileMapMatch252 = archSrc252.match(/^## File Map\n([\s\S]*?)\n## /m);
+  const fileMapBlock252 = fileMapMatch252 ? fileMapMatch252[1] : '';
+  assert(
+    fileMapBlock252.length > 1000,
+    '252.1 (setup): the "## File Map" section was extracted as a non-trivial block from the real ARCHITECTURE.md'
+  );
+
+  const cssFiles252 = fs.readdirSync(path.join(ROOT, 'css')).filter(f => f.endsWith('.css'));
+  const scriptFiles252 = fs.readdirSync(path.join(ROOT, 'scripts')).filter(f => f.endsWith('.js'));
+  const testFiles252 = fs
+    .readdirSync(path.join(ROOT, 'tests'))
+    .filter(f => /\.(?:js|mjs)$/.test(f));
+  const sourceBasenames252 = [
+    ...allJsFiles().map(f => f.name),
+    ...cssFiles252,
+    ...scriptFiles252,
+    ...testFiles252,
+  ];
+  const unmapped252 = sourceBasenames252.filter(name => !fileMapBlock252.includes(name));
+  assert(
+    sourceBasenames252.length >= 60 && unmapped252.length === 0,
+    `252.1: every tracked js/**/*.js (excl. vendor), css/*.css, scripts/*.js, and tests/*.{js,mjs} file (saw ${sourceBasenames252.length}) is named somewhere in ARCHITECTURE.md's File Map` +
+      (sourceBasenames252.length < 60
+        ? ` — only ${sourceBasenames252.length} tracked source files found (extraction regression?)`
+        : '') +
+      (unmapped252.length ? ' — UNDOCUMENTED: ' + unmapped252.join(', ') : '')
+  );
+
+  // ── 252.2  CHANGELOG.md category-heading ordering (candidate #10) ──
+  // Protocol 21's fixed relative order — Added / Fixed / Changed / Improved /
+  // Under the Hood, skipping empties — checked as ORDERING only (not prose
+  // quality, which stays hand-maintained per the audit's own KEEP list).
+  // Categories outside Protocol 21's five (Hotfix, Deprecated, Removed,
+  // Security — Suite 97's wider recognized set) are not part of the ordered
+  // sequence Protocol 21 defines, so they're ignored here rather than forced
+  // into a position the protocol never specified — forcing one would be
+  // exactly the false-positive risk the zero-FP bar exists to catch.
+  const changelogSrc252 = readFile('CHANGELOG.md');
+  const CANON_ORDER_252 = ['Added', 'Fixed', 'Changed', 'Improved', 'Under the Hood'];
+
+  function parseCatBlocks252(src) {
+    const blocks = [];
+    let cur = null;
+    for (const ln of src.split('\n')) {
+      if (/^##\s+\[/.test(ln)) {
+        cur = { header: ln.trim(), cats: [] };
+        blocks.push(cur);
+      } else if (cur) {
+        const m = ln.match(/^###\s+(.+?)\s*$/);
+        if (m) cur.cats.push(m[1]);
+      }
+    }
+    return blocks;
+  }
+  function catsOutOfOrder252(cats) {
+    const idxs = cats.map(c => CANON_ORDER_252.indexOf(c)).filter(i => i !== -1);
+    for (let i = 1; i < idxs.length; i++) {
+      if (idxs[i] < idxs[i - 1]) return true;
+    }
+    return false;
+  }
+
+  // Self-proof before trusting the helper against the real file.
+  assert(
+    catsOutOfOrder252(['Fixed', 'Added']) === true &&
+      catsOutOfOrder252(['Added', 'Fixed', 'Changed', 'Improved', 'Under the Hood']) === false,
+    '252.2 (setup): catsOutOfOrder252() flags a synthetic out-of-order category pair and clears a correctly-ordered full set'
+  );
+
+  const catBlocks252 = parseCatBlocks252(changelogSrc252);
+  const catOrderFailures252 = catBlocks252.filter(b => catsOutOfOrder252(b.cats));
+  assert(
+    catBlocks252.length >= 5 && catOrderFailures252.length === 0,
+    '252.2: every CHANGELOG.md version block presents its Protocol-21 category headings (Added/Fixed/Changed/Improved/Under the Hood) in their fixed relative order' +
+      (catBlocks252.length < 5
+        ? ` — only ${catBlocks252.length} version blocks found (extraction regression?)`
+        : '') +
+      (catOrderFailures252.length
+        ? ' — OUT OF ORDER: ' +
+          catOrderFailures252.map(b => b.header + ' → ' + b.cats.join(', ')).join(' | ')
+        : '')
+  );
+
+  // ── 252.3  README.md css-file count (candidate #12) ──
+  const readmeSrc252 = readFile('README.md');
+  const cssCountMatches252 = [...readmeSrc252.matchAll(/(\d+)\s+order-prefixed files/g)];
+  const realCssCount252 = cssFiles252.length;
+  const wrongCssCounts252 = cssCountMatches252.filter(m => Number(m[1]) !== realCssCount252);
+  assert(
+    cssCountMatches252.length >= 1 && wrongCssCounts252.length === 0,
+    `252.3: README.md's "N order-prefixed files" count matches css/'s real file count (${realCssCount252})` +
+      (cssCountMatches252.length < 1 ? ' — no such count found (extraction regression?)' : '') +
+      (wrongCssCounts252.length
+        ? ' — STALE: claims ' + wrongCssCounts252.map(m => m[1]).join(', ')
+        : '')
+  );
+
+  // ── 252.4  README.md version markers vs CHANGELOG.md's latest RELEASED
+  //           header (candidate #14) ──
+  const releasedTags252 = [...changelogSrc252.matchAll(/^## \[(.+?)\]/gm)]
+    .map(m => m[1])
+    .filter(v => v !== 'Unreleased');
+  const latestTag252 = releasedTags252[0];
+  const latestVersion252 = latestTag252 && (latestTag252.match(/^v?([0-9.]+)/) || [])[1];
+
+  const readmeVersions252 = [
+    ...readmeSrc252.matchAll(/\*\*Current version:\s*([0-9.]+)/g),
+    ...readmeSrc252.matchAll(/^## Current State \(v([0-9.]+)\)/gm),
+  ].map(m => m[1]);
+  const staleReadmeVersions252 = readmeVersions252.filter(v => v !== latestVersion252);
+
+  assert(
+    latestVersion252 != null &&
+      readmeVersions252.length >= 2 &&
+      staleReadmeVersions252.length === 0,
+    `252.4: README.md's version markers ("Current version: …" + "Current State (v…)") match CHANGELOG.md's latest RELEASED version header (${latestVersion252})` +
+      (latestVersion252 == null ? ' — could not parse the latest released CHANGELOG header' : '') +
+      (readmeVersions252.length < 2
+        ? ` — only ${readmeVersions252.length} README version marker(s) found (extraction regression?)`
+        : '') +
+      (staleReadmeVersions252.length ? ' — STALE: ' + staleReadmeVersions252.join(', ') : '')
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

@@ -144,21 +144,40 @@
 │   │   └── ocr.js                Visual Upload on-device OCR: lazy Tesseract.js load, deterministic parser, hybrid routing + kill-switch (primary path, AI-vision fallback)
 │   ├── dev/                    Dev-only tooling
 │   │   └── test-console.js Developer Console — the canonical dev/debug console (Phase 2), gated by _devConsoleUnlocked()
-│   └── vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API, worker, wasm core
+│   └── vendor/                 Self-hosted Tesseract.js (Apache-2.0) — main API (tesseract.min.js), worker (worker.min.js), wasm core (tesseract-core-lstm.wasm.js)
 ├── sw.js               Service worker (cache-first for same-origin)
 ├── assets/ocr/                Vendored OCR language data (eng.traineddata.gz, runtime-cached)
 ├── tests/
 │   ├── robco-diagnostics.js    Node test runner (the single canonical gate audit)
+│   ├── arch-conformance-check.js Suite 236 Protocol 23 architecture-debt scan, diffed against tests/arch-conformance-baseline.json
 │   ├── boot-smoke.mjs          CI boot smoke test (zero console errors, booted state)
 │   ├── render-check.mjs        Mobile overflow check at 360px and 412px
 │   ├── render-integrity.mjs    FO3 Pip-Boy geometry/contrast/reachability audit (occlusion, clipping, invisibility, truncation, touch-scroll reachability, limb-box/figure alignment, glass monochrome-green colour) — called from render-check.mjs as one more section, push-gate only (U6)
+│   ├── a11y-check.mjs          Axe accessibility baseline-diff vs tests/a11y-baseline.json, push-gate only
+│   ├── offline-first.mjs       Real offline-first behavioral test — cuts the network and watches the app boot from the service-worker cache, push-gate only
 │   ├── save-survival.mjs       SAVE_INTEGRITY_PASS behavioural gate: boots real fixtures (current/mature-dual-campaign/legacy-v7/malformed) through the REAL boot + import paths and compares the full durable-field inventory (sourced from window._defaultState) — push-gate only
+│   ├── test-html-check.mjs     Runs tests/test.html headless in the full gate (Protocol 40)
+│   ├── browser-server.mjs      Launches one shared Chromium for the gate's Playwright-driven checks
+│   ├── browser-shared.mjs      Shared-Chromium acquisition helper each Playwright-driven check connects through
+│   ├── static-server.mjs       Shared minimal static HTTP file server for the browser-driven checks
 │   └── artifacts.mjs           CI failure-evidence capture (Health-batch U4): shared helper that screenshots + dumps console for any failing browser check into test-artifacts/ (uploaded by CI on failure) — wired into every browser harness
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
+│   ├── gate-lint-manifest.js   Git-tracked ESLint manifest — scopes the gate's lint step to tracked files so a sibling session's untracked scratch file can never fail an unrelated push
+│   ├── gate.js                 Full local gate orchestrator (lint, format, the Node runner, browser checks) — `npm run gate` / `gate:fast`
+│   ├── check-boot-chain.js     Boot-chain preflight — validates index.html's script order before the browser gate runs
+│   ├── cloud-serialization-check.js Protocol 34 modeled Firestore-write-safety guard (A3) — self-derives the state literal, flags undefined/nested-array/oversize values
+│   ├── emulator-round-trip-check.js A4 real-Firebase-emulator save→sync→load round-trip (standalone, `npm run test:emulator`, not gated)
+│   ├── generate-architecture-toc.js Protocol 52 — regenerates this file's own Table of Contents from its real headings
+│   ├── generate-code-map.js    Protocol 53 — regenerates library/CODE_MAP.md's three GENERATED sections
+│   ├── generate-test-catalog.js Protocol 47 — regenerates library/TEST_CATALOG.md from the runner's own suite headers
 │   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
 │   ├── knowledge-graph.js      R11 knowledge-graph / retrieval-topology extractor (Node, manual run) — emits library/knowledge-graph.json (gitignored, generated on demand); un-gated, no Suite/hook, per Protocol 50
+│   ├── queue-drift-check.js    Protocol 50 pre-push nudge — flags `type: project` memories that don't look referenced in QUEUE.md
+│   ├── queue-view.js           Parses QUEUE.md into a private, phone-readable HTML view (`npm run queue-view`)
+│   ├── release-receipt.js      Fetches the live production build and compares served CACHE_NAME/APP_VERSION against what was actually deployed
+│   ├── backup-nudge.js         Protocol 48 pre-push nudge — flags when the local-only artifacts (library/, planning/, agent memory) have drifted from the private archive backup
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        Full version history
 ├── assets/              PWA icon + app-shortcut icons

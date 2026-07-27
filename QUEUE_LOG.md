@@ -1100,6 +1100,92 @@ gate-checked against the local copy; no human hand-edits it again.
 
 ---
 
+<a id="u"></a>
+
+### U. ✅ The generate-vs-hand-maintain audit — the generalization of D (SHIPPED 2026-07-27)
+
+**What it is.** A focused ANALYSIS audit that finds every remaining HAND-MAINTAINED artifact in the project
+that should instead be GENERATED — the generalization of **D** (Protocol 47, the TEST_CATALOG generator) and
+the `library/MANIFEST.txt` gate (Protocol 46). The project's own ethos, stated plainly: **generate what a
+script can compute.** Hand-maintenance drifts — the retired test-count bookkeeping (Protocol 2a) and the
+now-generated TEST_CATALOG are the two precedents already on file, one a removal, one a replacement.
+
+**Method.** Survey the repo and docs for candidates — e.g. `CLAUDE.md`'s retrieval map, `library/CODE_MAP.md`,
+`README.md`'s feature tables / Current-State section, `ARCHITECTURE.md`'s Table of Contents, the Atlas's
+planned inputs (item I), and any other count/table/list a session currently hand-types. For **each**
+candidate, judge exactly one question: **is it computable from source with ZERO false positives?** A **YES**
+gets generated and gate-diffed against the on-disk/committed copy (D's shape); a **NO** stays hand-maintained
+with the reason recorded, explicitly — a "no" is as valuable an answer as a "yes."
+
+**Output.** A triaged list — candidate → computable? → verdict + one-line why —
+(`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`, ARCHIVE-class, frozen as of 2026-07-27) — followed
+by implementing the clear wins directly under this item across dated batches rather than as separate lettered
+follow-ups, a deliberate deviation made because each win was small and self-contained enough that a separate
+item letter would be pure bookkeeping overhead.
+
+**Shipped, across four dated batches (all landed 2026-07-27):**
+
+- **Batch 1 (Suite 248/249 + 2 live-drift fixes).** Landed candidates **#4** (`QUEUE.md` → `QUEUE_LOG.md`
+  anchor integrity) and **#5** (`QUEUE.md` item-ID uniqueness) as Suite 248, and **#9** (`CHANGELOG.md`
+  `Cache:` header vs `sw.js` `CACHE_NAME`) as Suite 249. Candidate **#3** (`ARCHITECTURE.md#anchor`
+  integrity) turned out to already be shipped as Suite 220.16 (R10 Step 3) — re-verified against the live
+  repo rather than rebuilt. Also fixed Live Drifts **#1** (README device-capability count contradiction) and
+  **#2** (`library/CODE_MAP.md`'s stale Protocol 47 re-pin).
+- **Batch 2 (Protocol 52 + Live Drift #3).** Landed candidate **#1**, the audit's own headline win:
+  `ARCHITECTURE.md`'s Table of Contents is now GENERATED (`scripts/generate-architecture-toc.js`, `npm run
+architecture-toc` / `architecture-toc:check`, gate-wired both fast+full, Suite 250) — see **Protocol 52**
+  in `rules/docs-and-library.md`. Also completed **Live Drift #3**: stripped the ~20 leftover
+  `Suite N (…, X tests)` count fragments from `ARCHITECTURE.md` that the Protocol 2a retirement (R3) had
+  missed everywhere else.
+- **Batch 3 (Protocol 53, Suite 251).** Landed candidates **#6/#7/#8**: `library/CODE_MAP.md`'s Diagnostic
+  Shell registry table, Render Pipeline per-file function lists, and Event Bus emitted-event-name list are
+  now GENERATED (`scripts/generate-code-map.js`, `npm run code-map` / `code-map:check`, gate-wired both
+  fast+full, Suite 251) — see **Protocol 53** in `rules/docs-and-library.md`. Also fixed two housekeeping
+  items found in passing: deleted a leftover untracked scratch file (`queue_log_anchors.txt`, repo root) and
+  corrected `rules/deploy-and-cache.md`'s Protocol 1 prose to name `CHANGELOG.md` as a served/precached file
+  (it already was per `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier — the prose just never said so).
+- **Batch 4, the closing batch (Suite 252 + the owner-decided fork).** Landed the audit's remaining
+  low-priority tail plus the one candidate the audit deliberately left as an owner judgment call rather than
+  resolving unilaterally:
+  - **#2 — File Map reverse-completeness.** New Suite 252.1 asserts every tracked source file (`js/**/*.js`
+    excluding `js/vendor/` — already excluded from every js-file scan in the runner by established
+    convention, since it's a manually curated third-party precache allowlist, not app source — plus
+    `css/*.css`, `scripts/*.js`, `tests/*.{js,mjs}`) is named somewhere in `ARCHITECTURE.md`'s File Map, by
+    basename substring. **Building this check immediately found real drift (Protocol 42):** roughly a dozen
+    scripts (`gate.js`, the three `generate-*.js` generators, `queue-view.js`, `release-receipt.js`,
+    `backup-nudge.js`, `queue-drift-check.js`, `check-boot-chain.js`, `cloud-serialization-check.js`,
+    `emulator-round-trip-check.js`, `gate-lint-manifest.js`) and tests (`arch-conformance-check.js`,
+    `a11y-check.mjs`, `offline-first.mjs`, `test-html-check.mjs`, `browser-server.mjs`, `browser-shared.mjs`,
+    `static-server.mjs`) plus the vendored Tesseract.js bundle's real filenames had never been added to
+    `ARCHITECTURE.md`'s File Map. Fixed in the same commit before the check was allowed to ship — it never
+    shipped red.
+  - **#10 — CHANGELOG category-heading ordering.** New Suite 252.2 asserts each `CHANGELOG.md` version
+    block's present Protocol-21 category headings (Added/Fixed/Changed/Improved/Under the Hood) appear in
+    their fixed relative order, skipping empties. Deliberately narrow: categories outside that five-item set
+    (Hotfix, Deprecated, Removed, Security — Suite 97's wider recognized category set) are excluded from the
+    ordering check rather than forced into a position Protocol 21 never specified for them.
+  - **#12 — README css-file count.** New Suite 252.3 asserts README's "N order-prefixed files" digit matches
+    `css/`'s real file count.
+  - **#14 — README version vs CHANGELOG.** New Suite 252.4 asserts README's "Current version: X" line and
+    its "Current State (vX)" heading both match `CHANGELOG.md`'s latest non-`[Unreleased]` header.
+  - **#13 — the fork (owner decision: DELETE, not a third check).** README carried a **third** hand-copy of
+    the same script load-order list already gate-checked between `rules/file-layout.md` and
+    `ARCHITECTURE.md` (Suite 220.3/220.4's `LOAD-ORDER-GUARD`), with no guard markers of its own and outside
+    either suite's scanned file list. The owner chose the audit's own recommendation — **delete the copy,
+    point at the guarded original** — over adding a third check to keep three copies in lockstep (Protocol
+    36b: eliminate a failure class rather than extend machinery to police it). README's "Script Load Order"
+    section now states the load-order narrative and points readers at `rules/file-layout.md`'s canonical,
+    machine-checked list.
+
+**Done means:** met. Every actionable GENERATE candidate from the audit's own ranked list is now shipped (14
+of 14 triaged items resolved — the KEEP-list entries were decisions, not open work). The audit document
+itself (`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`) stays ARCHIVE-class, its snapshot framing
+proven correct throughout: several of its cited counts, and even one candidate (#3), had already drifted or
+shipped by the time each batch re-verified them against the live repo — exactly what its own dissent note
+warned would happen.
+
+---
+
 # Appendix — the original running "Last updated" header, verbatim
 
 _Preserved exactly as it last stood on line 8 of `QUEUE.md` before the split, so no word of the running history is lost._

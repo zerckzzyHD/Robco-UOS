@@ -19,12 +19,17 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — batch 2 landed**
-(GENERATE candidate #1, the audit's own headline win: `ARCHITECTURE.md`'s Table of Contents is now
-generated, Protocol 52; plus Live Drift #3, the leftover `ARCHITECTURE.md` test-count residue). Batch 1
-(Suite 248/249 + 2 live-drift fixes) is also now recorded here retroactively — it landed earlier the same
-day but was never written up at the time. See **U** below for the full dated breakdown and the remaining
-optional backlog.
+**Last updated: 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — CLOSED, all four batches
+shipped.** Batch 4 (the closing batch) landed the audit's remaining low-priority tail — File Map
+reverse-completeness (Suite 252.1, which immediately found and fixed real drift: about a dozen
+undocumented scripts/tests plus the vendored OCR bundle), CHANGELOG category-heading ordering (252.2),
+README's css-file count (252.3), and README's version-vs-CHANGELOG check (252.4) — plus the one candidate
+left as an owner judgment call: README's third hand-copy of the script load-order list is now **deleted**
+in favour of a pointer at `rules/file-layout.md`'s guarded original (owner chose the audit's own
+recommendation over adding a third check). Batch 3 (Protocol 53, `library/CODE_MAP.md`'s three generated
+sections) had also landed but was never written up here at the time — folded in retroactively. Every
+actionable GENERATE candidate from the audit is now shipped; full account moved to
+[QUEUE_LOG.md#u](QUEUE_LOG.md#u).
 
 **Prior update — 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
 `library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
@@ -293,6 +298,9 @@ _Governance restructure:_
 - **D** ✅ The TEST_CATALOG generator (Protocol 47) — `library/TEST_CATALOG.md` is now GENERATED from the
   runner's own suite headers, never hand-typed; the Atlas (item I) reuses this plumbing directly. →
   [account](QUEUE_LOG.md#d)
+- **U** ✅ The generate-vs-hand-maintain audit (the generalization of D) — every actionable GENERATE
+  candidate from the triaged audit shipped across four dated batches (Suites 248-252, Protocols 52/53, plus
+  the owner-decided deletion of README's third script load-order copy). → [account](QUEUE_LOG.md#u)
 
 _Small residual fixes:_
 
@@ -1011,85 +1019,6 @@ this** — `planning/audits/G_workflow_review/CLAIM_LEDGER.md` addresses only th
 different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verification. R11 stays un-gated —
 its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
 settled it.
-
-### U. 🔄 The generate-vs-hand-maintain audit — the generalization of D (owner-requested, 2026-07-27)
-
-**What it is.** A focused ANALYSIS audit that finds every remaining HAND-MAINTAINED artifact in the project
-that should instead be GENERATED — the generalization of **D** (Protocol 47, the TEST_CATALOG generator) and
-the `library/MANIFEST.txt` gate (Protocol 46). The project's own ethos, stated plainly: **generate what a
-script can compute.** Hand-maintenance drifts — the retired test-count bookkeeping (Protocol 2a) and the
-now-generated TEST_CATALOG are the two precedents already on file, one a removal, one a replacement.
-
-**Method.** Survey the repo and docs for candidates — e.g. `CLAUDE.md`'s retrieval map, `library/CODE_MAP.md`,
-`README.md`'s feature tables / Current-State section, `ARCHITECTURE.md`'s Table of Contents, the Atlas's
-planned inputs (item I), and any other count/table/list a session currently hand-types. For **each**
-candidate, judge exactly one question: **is it computable from source with ZERO false positives?**
-
-- **YES** → generate it and gate-diff it against the on-disk/committed copy, the same shape as D (Protocol 47) and Protocol 46's `library/MANIFEST.txt` fix — implement as a bounded follow-up.
-- **NO** (it needs human judgment, or can't be expressed as a clean mechanical rule) → leave it
-  hand-maintained and **record WHY**, explicitly. A "no" is a real, load-bearing answer here — this is the
-  same zero-false-positive bar Protocol 36b/45 already hold every gate guard to: a scanner that flags
-  ordinary prose or judgment calls gets ignored, then weakened, then it is dead. Do not force a candidate
-  into GENERATED-class just because generation is the fashionable answer.
-
-**Output.** A triaged list — candidate → computable? (yes/no) → verdict + one-line why — followed by
-implementing the clear wins as their own bounded follow-up items (not bundled into this one). **This is an
-analysis pass, NOT an auto-convert-everything task** — the audit's job is to separate the two, not to
-generate-ify the whole project on the spot.
-
-**Relates to.** **D** (the audit's own precedent and template — `scripts/generate-test-catalog.js`'s
-extraction + gate-diff shape is directly reusable for any other YES candidate); **I**, the Atlas (its
-generated assurance view is exactly this ethos applied to the test suite's structure, and shares the "which
-of the Atlas's 8 views can be computed with zero false positives" question); the standing "generate over
-maintain" discipline recorded in `rules/docs-and-library.md`'s 3-class library model.
-
-**What it depends on.** Nothing — it is pure analysis over the current repo/docs, so it can run whenever.
-
-**Done means:** the triaged candidate list exists (candidate → computable? → verdict + why), and every YES
-verdict has its own follow-up item queued (not built inline here) so this audit stays a scoping pass rather
-than silently growing into the implementation work itself.
-
-**Progress (dated, Protocol 50).** The triage list itself is done (`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`,
-ARCHIVE-class). Its ranked clear-wins are being implemented directly under this item across dated batches,
-rather than as separate lettered follow-ups — a deliberate deviation from the "not built inline here" line
-above, made because each win is small and self-contained enough that a separate item letter would be pure
-bookkeeping overhead:
-
-- **2026-07-27 — batch 1 (Suite 248/249 + 2 live-drift fixes).** Landed candidates **#4** (`QUEUE.md` →
-  `QUEUE_LOG.md` anchor integrity) and **#5** (`QUEUE.md` item-ID uniqueness) as Suite 248, and **#9**
-  (`CHANGELOG.md` `Cache:` header vs `sw.js` `CACHE_NAME`) as Suite 249. Candidate **#3**
-  (`ARCHITECTURE.md#anchor` integrity) turned out to already be shipped as Suite 220.16 (R10 Step 3) —
-  re-verified against the live repo rather than rebuilt. Also fixed Live Drifts **#1** (README
-  device-capability count contradiction) and **#2** (`library/CODE_MAP.md`'s stale Protocol 47 re-pin). This
-  progress was never recorded here at the time it landed — added retroactively now per this same protocol.
-- **2026-07-27 — batch 2 (Protocol 52 + Live Drift #3).** Landed candidate **#1**, the audit's own headline
-  win: `ARCHITECTURE.md`'s Table of Contents is now GENERATED (`scripts/generate-architecture-toc.js`,
-  `npm run architecture-toc` / `architecture-toc:check`, gate-wired both fast+full, Suite 250) — see
-  **Protocol 52** in `rules/docs-and-library.md`. Also completed **Live Drift #3**: stripped the ~20 leftover
-  `Suite N (…, X tests)` count fragments from `ARCHITECTURE.md` that the Protocol 2a retirement (R3) had
-  missed everywhere else.
-- **2026-07-27 — batch 3 (Protocol 53, Suite 251).** Landed candidates **#6/#7/#8**:
-  `library/CODE_MAP.md`'s Diagnostic Shell registry table, Render Pipeline per-file function
-  lists, and Event Bus emitted-event-name list are now GENERATED (`scripts/generate-code-map.js`,
-  `npm run code-map` / `code-map:check`, gate-wired both fast+full, Suite 251) — see **Protocol 53**
-  in `rules/docs-and-library.md`. Unlike Protocol 47/52's targets, `library/CODE_MAP.md` is both
-  gitignored AND a hybrid doc (only these 3 sections are generated; the Two-Store Boundary,
-  Registry, panel-wiring checklist, Audio categorization, and Boot Lifecycle "why" notes stay
-  hand-maintained per the audit's own KEEP list), so the generator combines Protocol 47's
-  absent→pass/stale→fail gate-diff with Protocol 52's marker-delimited hybrid-section shape. Also
-  fixed two housekeeping items found in passing: deleted a leftover untracked scratch file
-  (`queue_log_anchors.txt`, repo root) the owner had already authorized removing, and corrected
-  `rules/deploy-and-cache.md`'s Protocol 1 prose to name `CHANGELOG.md` as a served/precached file
-  (it already was per `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier — the prose just never
-  said so).
-- **Remaining backlog (optional, low-priority per the audit's own ranked list) — not yet built.** Candidates
-  **#2** (File Map reverse-completeness), **#10** (`CHANGELOG.md` category-ordering assertion), **#12**
-  (README css-file-count assertion), **#13** (delete README's third load-order copy — the audit's own
-  dissent note flags this as an owner judgment call, not resolved unilaterally), and **#14** (README
-  version-header vs `CHANGELOG.md` assertion). Each is a real but lower-value/lower-urgency gap per the
-  audit's own ranking — good backlog filler, not worth its own dedicated session. **Earn-condition:**
-  pick up whenever a session is already touching the relevant file for another reason, or the owner
-  explicitly asks for a "batch 4."
 
 ## ⚠️ Blocked on an owner decision
 

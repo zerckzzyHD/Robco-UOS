@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r13 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r14 -->
 
 ### Under the Hood
 
@@ -11,6 +11,7 @@
 - Fixed a couple of small inconsistencies found while extending those checks: the project readme stated two different device-capability counts in two different places (the correct count is nine, not eight), and one piece of internal developer reference material still described a tool as "not yet built" that had since shipped. No effect on anything you see or do in the app.
 - The project's architecture reference document now generates its own table of contents directly from the document's real section headings, instead of a hand-typed list — closing the exact kind of drift that let an earlier version of that same list quietly fall twenty sections behind reality before anyone noticed. The pre-save safety checks now confirm the list is current every time. No effect on anything you see or do in the app.
 - Cleaned up a batch of stale test-count numbers left over in the architecture reference document from a bookkeeping habit retired everywhere else in the project earlier this year — the descriptive notes stay, just without the numbers that used to need constant hand-updating. No effect on anything you see or do in the app.
+- Extended the terminal's own documentation self-check to catch four more small ways its internal reference docs could quietly go stale: a new source file shipping without ever being mentioned in the architecture map, a changelog entry's categories landing in the wrong order, the readme's stylesheet-file count drifting from the real count, and the readme's stated version number falling out of step with the published release notes. Building the first of these immediately turned up a real gap — about a dozen small helper scripts and test files that had never been added to the architecture map — which is now corrected in the same pass. Also removed a third, redundant copy of the script-loading-order list from the readme, since the terminal already keeps one authoritative copy that's checked automatically; the readme now points at that copy instead of risking a second one quietly drifting out of sync. No effect on anything you see or do in the app.
 
 ---
 
