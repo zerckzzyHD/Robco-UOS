@@ -392,6 +392,25 @@ A private GitHub repo (`zerckzzyHD/_RobCo-Archive`, confirmed PRIVATE) is the on
 
 ---
 
+## Protocol 54 — Sync-Before-Synthesis (owner-approved 2026-07-27)
+
+Any task whose job is to **READ or SYNTHESIZE from the private archive** — museum story-synthesis, a corpus/audit pass, anything that treats the archive as its source of truth — must run against a **CURRENT** archive. The archive must be synced (Protocol 48) to the latest app-repo + memory state **before** the synthesis reads it, so a synthesis pass never silently reasons off a stale snapshot.
+
+**Either form satisfies this — pick whichever fits the task's shape:**
+
+1. **Sync-then-dispatch:** the archive sync (`sync.ps1`, Protocol 48) runs immediately before the synthesis task begins, as a distinct step the dispatching session confirms landed.
+2. **Self-syncing task:** the synthesis task runs the sync itself, via Protocol 48, as its own first step, before it reads anything from the archive.
+
+Either form is acceptable; what is not acceptable is a synthesis task starting with no sync step at all, on the unstated assumption that the archive happens to already be current.
+
+**Precedent.** The P8 museum-synthesis pass (2026-07-27) launched without a sync-first step. It turned out low-impact only because the substantive material it needed happened to already live in the current app repo — a genuinely stale archive snapshot could have silently produced an incomplete corpus, with no signal that anything was missing.
+
+**Why:** synthesis output is only as trustworthy as its source, and a stale archive fails **silently** — nothing errors, the pass just reasons off old material. That is worse than a loud failure, because nothing prompts a session to double-check it.
+
+**Related:** Protocol 48 (the sync mechanism, its trigger conditions, and the Bash-only sandbox caveat).
+
+---
+
 ## Protocol 50 — Queue Currency: Write Plans Where They Live
 
 A plan that lives only in the orchestrator's memory is not planned, it is remembered — and it

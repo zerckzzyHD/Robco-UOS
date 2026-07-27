@@ -406,10 +406,10 @@ whole reason it is its own item rather than CP2's first stage.
 - **A completion-evidence contract.** A session's report must carry **test / commit / push / origin hashes**
   — the evidence, not the narration. This is the standing rule _"a session's account of its work is a claim,
   not evidence"_ (Protocol 8) given a concrete required form.
-- **FORMALIZE sync-before-synthesis as a protocol — ✅ owner-approved (2026-07-27), not yet written.** The
-  rule: the local-only artifacts are synced **before** a session synthesizes from them, so a synthesis pass
-  never reasons off a stale archive. It earns its protocol number on the next rules-layer pass; until then
-  it is a recorded decision, not an enforced rule — **say so rather than implying it is live.**
+- **Sync-before-synthesis is formalized — ✅ shipped 2026-07-27 as Protocol 54** (`CLAUDE.md`, alongside
+  Protocol 48). The rule: any archive-read/synthesis task syncs the archive (Protocol 48) **before** reading
+  it — either as a sync-then-dispatch step or as the synthesis task's own first step. It is now a live,
+  enforced rule, not just a recorded decision.
 - **The mobile-reporting discipline.** The plain-text-invisible-on-mobile failure recurred 3+ times in a
   single session because the operator kept using a channel the owner literally cannot see on his phone.
 - **A usage early-warning relay** off `plan-usage-history.json`, so the cap is known **before** a session hits
