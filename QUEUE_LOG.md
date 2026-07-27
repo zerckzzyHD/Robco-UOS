@@ -1081,10 +1081,19 @@ content directly from the test runner and gate-diffs it against the local copy �
   allowlist-note formatter's honesty against a **synthetic** hit, decoupled from whether any real
   forward-reference exists in the docs at a given moment — arguably better regression coverage than the
   original, which would have silently gone stale the moment its one real example resolved.
+- **A second flaw caught live, at this very feature's own first push (Protocol 42).** The generated file's
+  commit/branch/date stamp legitimately changes on every commit, including ones that never touch the runner
+  — so the first version of `--check` (diffing against a freshly re-derived stamp) failed on the push that
+  landed this very feature, for a HEAD that had simply moved with no suite content change at all. Fixed in
+  the same commit: `--check` now recovers the on-disk file's own stamp (`extractMeta()`) and compares
+  against **that**, so only a real change to a suite's title or narration is ever reported as drift. Locked
+  by **247.10/247.11**.
 
 **Why it doesn't hand-maintain a preamble either.** The generated file's own header stamps the commit,
 branch, and (git-derived, not wall-clock) generation date — the same discipline the old hand-written
-BASELINE PIN followed, but now produced by the script instead of a session remembering to update it.
+BASELINE PIN followed, but now produced by the script instead of a session remembering to update it. That
+stamp is free to lag between deliberate regenerations (see the stamp-drift fix above) — only the per-suite
+content underneath it is the thing `--check` actually guarantees is current.
 
 **Done means:** met. `library/TEST_CATALOG.md`'s per-suite content is regenerated from the runner and
 gate-checked against the local copy; no human hand-edits it again.

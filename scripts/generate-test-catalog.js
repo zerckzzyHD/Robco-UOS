@@ -25,6 +25,13 @@
  *     --check exits 0 — there is nothing to diff against, and a guard that fails on absence
  *     would fail every CI run forever. Currency is enforced only where the file actually
  *     exists to drift, exactly the fix Protocol 46 already established for library/MANIFEST.txt.
+ *
+ *     --check compares SUITE CONTENT against the on-disk file's OWN commit/branch/date stamp
+ *     (extractMeta()), not a freshly re-derived one. The stamp legitimately changes on every
+ *     commit, including ones that never touch the runner — comparing against a fresh stamp
+ *     would fail the very next push after ANY commit, for a HEAD that moved and nothing else
+ *     (caught live, Protocol 42, when this feature's own landing commit made its own catalog
+ *     look stale). Only an actual difference in suite title/description is ever reported.
  */
 'use strict';
 
@@ -187,6 +194,22 @@ function buildMarkdown(suites, meta) {
   );
 }
 
+/**
+ * Pulls {shortHash, hash, branch, date} back out of a previously-generated file's own
+ * stamp table, or null if it doesn't look like one of ours. Used so `--check` can compare
+ * SUITE CONTENT against the on-disk copy without the stamp itself (which legitimately
+ * changes on every commit, including ones that never touch the runner) counting as drift —
+ * otherwise every commit that isn't itself a catalog regenerate would spuriously fail the
+ * very next push, for a HEAD that moved and nothing else.
+ */
+function extractMeta(markdown) {
+  const commit = /\*\*Commit\*\* \| `([0-9a-f]+)` \(`([0-9a-f]+)`\) \|/.exec(markdown);
+  const branch = /\*\*Branch\*\* \| `([^`]*)` \|/.exec(markdown);
+  const date = /\*\*Generated\*\* \| (.+?) \|/.exec(markdown);
+  if (!commit || !branch || !date) return null;
+  return { shortHash: commit[1], hash: commit[2], branch: branch[1], date: date[1] };
+}
+
 function main() {
   const runnerSrc = fs.readFileSync(RUNNER_PATH, 'utf8');
   const suites = extractSuites(runnerSrc);
@@ -200,13 +223,12 @@ function main() {
     process.exit(1);
   }
 
-  const meta = {
+  const realMeta = {
     hash: git(['rev-parse', 'HEAD']) || '(uncommitted)',
     shortHash: git(['rev-parse', '--short', 'HEAD']) || '(uncommitted)',
     branch: git(['branch', '--show-current']) || '(unknown)',
     date: git(['log', '-1', '--format=%ad', '--date=short']) || '(unknown)',
   };
-  const markdown = buildMarkdown(suites, meta);
 
   const checkMode = process.argv.includes('--check');
   if (checkMode) {
@@ -217,7 +239,12 @@ function main() {
       process.exit(0);
     }
     const onDisk = fs.readFileSync(OUTPUT_PATH, 'utf8');
-    if (onDisk === markdown) {
+    // Compare against the on-disk file's OWN stamp (falling back to the real one only if
+    // it can't be parsed at all) — content drift is what --check exists to catch; the
+    // commit/date stamp moving on its own, with no suite content change, is not drift.
+    const compareMeta = extractMeta(onDisk) || realMeta;
+    const expected = buildMarkdown(suites, compareMeta);
+    if (onDisk === expected) {
       console.log(
         `[test-catalog:check] library/TEST_CATALOG.md is current (${suites.length} suites).`
       );
@@ -233,10 +260,10 @@ function main() {
     process.exit(1);
   }
 
-  fs.writeFileSync(OUTPUT_PATH, markdown, 'utf8');
+  fs.writeFileSync(OUTPUT_PATH, buildMarkdown(suites, realMeta), 'utf8');
   console.log(`[test-catalog] Wrote library/TEST_CATALOG.md (${suites.length} suites).`);
 }
 
 if (require.main === module) main();
 
-module.exports = { extractSuites, buildMarkdown };
+module.exports = { extractSuites, buildMarkdown, extractMeta };

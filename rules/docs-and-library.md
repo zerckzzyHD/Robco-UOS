@@ -108,10 +108,20 @@ local `library/` tree sees no difference at all, so CI can never fail here) and 
 cloud-serialization guard) — harmless everywhere the file is absent, and load-bearing on the one
 machine (the owner's) where it exists to drift.
 
+**The stamp is compared against ITSELF, not a fresh one (found live, Protocol 42, at this
+feature's own first push).** The generated file's commit/branch/date stamp legitimately changes
+on every commit — including ones that never touch the runner — so diffing against a freshly
+re-derived stamp meant any unrelated commit made the very next push's `--check` fail for a HEAD
+that had simply moved. `--check` instead recovers the on-disk file's own stamp
+(`extractMeta()`) and rebuilds against **that** for comparison — only an actual change to a
+suite's title or narration is ever reported as drift; the stamp is free to lag until the next
+deliberate `npm run test-catalog`.
+
 **Regression coverage:** **Suite 247** requires the real extraction to parse a large,
 de-duplicated suite list (both the numbered "Suite N —" convention and the suites that predate
 it), proves de-duplication of a re-emitted header, proves a genuinely bare suite gets the honest
-fallback rather than an invented one, and exercises the real `--check` CLI end-to-end (absent →
+fallback rather than an invented one, proves an unrelated commit alone (stamp-only drift) is
+never reported as staleness, and exercises the real `--check` CLI end-to-end (absent →
 exit 0, current → exit 0, stale → exit 1) against a throwaway output path
 (`ROBCO_TEST_CATALOG_OUTPUT`) so the developer's own local file is never touched by the test
 itself.

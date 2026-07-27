@@ -51900,6 +51900,52 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
       rStale247.status === 1 && /is STALE/.test(rStale247.stderr),
       '247.9c: --check exits 1 when the on-disk copy has drifted from what the runner would currently produce — a real drift is never silently accepted'
     );
+
+    // 247.10  Regression (Protocol 42 — found while verifying THIS change, fixed in the
+    // same commit): the stamp table (commit/branch/date) legitimately changes on EVERY
+    // commit, including ones that never touch the runner. Comparing against a freshly
+    // re-derived stamp meant any unrelated commit made the very next push's --check fail
+    // — caught live, mid-push, when this feature's own commit landed and immediately made
+    // its own catalog look stale. --check must compare against the ON-DISK file's OWN
+    // stamp, so only a real suite-content change is ever reported as drift.
+    spawnSync247(process.execPath, [genPath247], {
+      cwd: ROOT,
+      env: Object.assign({}, process.env, { ROBCO_TEST_CATALOG_OUTPUT: tmpOut247 }),
+    });
+    const freshOut247 = fs.readFileSync(tmpOut247, 'utf8');
+    const backdated247 = freshOut247
+      .replace(
+        /\*\*Commit\*\* \| `[0-9a-f]+` \(`[0-9a-f]+`\) \|/,
+        '**Commit** | `0000000` (`' + '0'.repeat(40) + '`) |'
+      )
+      .replace(/\*\*Generated\*\* \| .+? \|/, '**Generated** | 2000-01-01 |');
+    assert(
+      backdated247 !== freshOut247,
+      '247.10 (setup): the backdated fixture actually differs from the fresh output (the stamp substitution took effect)'
+    );
+    fs.writeFileSync(tmpOut247, backdated247, 'utf8');
+    const rBackdated247 = runCheck247();
+    assert(
+      rBackdated247.status === 0 && /is current/.test(rBackdated247.stdout),
+      '247.10: --check still exits 0 when only the commit/date STAMP is stale (simulating an unrelated later commit) but the actual suite content has not changed — a moved HEAD alone is never reported as drift'
+    );
+
+    // 247.11  extractMeta() is the unit under 247.10: it recovers the real stamp fields
+    // from a genuine generated file, and returns null (rather than a bogus partial match)
+    // for text that doesn't carry the expected stamp table at all.
+    const parsedMeta247 = GEN.extractMeta(freshOut247);
+    assert(
+      parsedMeta247 &&
+        /^[0-9a-f]{7,}$/.test(parsedMeta247.shortHash) &&
+        /^[0-9a-f]{40}$/.test(parsedMeta247.hash) &&
+        parsedMeta247.branch &&
+        parsedMeta247.date,
+      '247.11a: extractMeta() recovers {shortHash, hash, branch, date} from a real generated file'
+    );
+    assert(
+      GEN.extractMeta('# not a generated catalog at all') === null,
+      '247.11b: extractMeta() returns null for text with no recognizable stamp table (never a bogus partial parse)'
+    );
   } finally {
     fs.rmSync(tmpDir247, { recursive: true, force: true });
   }
