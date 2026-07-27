@@ -29,6 +29,8 @@
  *   4c. Test-catalog currency (Protocol 47 — library/TEST_CATALOG.md vs the runner's
  *      own suite headers; pure Node, runs on fast + full, no-op where the gitignored
  *      library/ file is absent)
+ *   4d. Architecture TOC currency (Protocol 52 — ARCHITECTURE.md's Table of Contents vs
+ *      its own headings/anchors; pure Node, runs on fast + full)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -401,6 +403,15 @@ run('Cloud-serialization guard (A3, modeled)', 'node scripts/cloud-serialization
 // (and on any machine without the local-only library/ tree), and the script exits 0 in
 // that case — there is nothing to diff against there, so this step can never fail CI.
 run('Test-catalog currency (Protocol 47)', 'node scripts/generate-test-catalog.js --check');
+
+// ── 4d. Architecture TOC currency (Protocol 52, QUEUE.md item U) ─────────────────
+// ARCHITECTURE.md's Table of Contents is GENERATED from the file's own `## ` headings +
+// preceding `<a id="…">` anchors — this fails the gate if the committed list has drifted from
+// what the generator would produce right now. Pure Node, zero external dependency, so it runs
+// on BOTH gate:fast and gate like the two static checks above. Unlike Protocol 47's
+// TEST_CATALOG.md, ARCHITECTURE.md is committed (not gitignored) — no absence fail-safe needed;
+// --check simply fails on any drift.
+run('Architecture TOC currency (Protocol 52)', 'node scripts/generate-architecture-toc.js --check');
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so

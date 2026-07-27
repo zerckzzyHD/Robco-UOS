@@ -19,10 +19,12 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **New item U queued — the generate-vs-hand-maintain audit**
-(owner-requested), the generalization of D: find every remaining hand-maintained artifact that should
-instead be GENERATED, judged one-by-one against the zero-false-positive bar, output as a triaged list
-with the clear wins queued as their own bounded follow-ups. See **U** below.
+**Last updated: 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — batch 2 landed**
+(GENERATE candidate #1, the audit's own headline win: `ARCHITECTURE.md`'s Table of Contents is now
+generated, Protocol 52; plus Live Drift #3, the leftover `ARCHITECTURE.md` test-count residue). Batch 1
+(Suite 248/249 + 2 live-drift fixes) is also now recorded here retroactively — it landed earlier the same
+day but was never written up at the time. See **U** below for the full dated breakdown and the remaining
+optional backlog.
 
 **Prior update — 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
 `library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
@@ -1010,7 +1012,7 @@ different question), not R11's. See G's account (`QUEUE_LOG.md#g`) for the verif
 its existing safe default — pending an explicit owner call; do not gate R11 on the assumption G already
 settled it.
 
-### U. ⬜ The generate-vs-hand-maintain audit — the generalization of D (owner-requested, 2026-07-27)
+### U. 🔄 The generate-vs-hand-maintain audit — the generalization of D (owner-requested, 2026-07-27)
 
 **What it is.** A focused ANALYSIS audit that finds every remaining HAND-MAINTAINED artifact in the project
 that should instead be GENERATED — the generalization of **D** (Protocol 47, the TEST_CATALOG generator) and
@@ -1046,6 +1048,34 @@ maintain" discipline recorded in `rules/docs-and-library.md`'s 3-class library m
 **Done means:** the triaged candidate list exists (candidate → computable? → verdict + why), and every YES
 verdict has its own follow-up item queued (not built inline here) so this audit stays a scoping pass rather
 than silently growing into the implementation work itself.
+
+**Progress (dated, Protocol 50).** The triage list itself is done (`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`,
+ARCHIVE-class). Its ranked clear-wins are being implemented directly under this item across dated batches,
+rather than as separate lettered follow-ups — a deliberate deviation from the "not built inline here" line
+above, made because each win is small and self-contained enough that a separate item letter would be pure
+bookkeeping overhead:
+
+- **2026-07-27 — batch 1 (Suite 248/249 + 2 live-drift fixes).** Landed candidates **#4** (`QUEUE.md` →
+  `QUEUE_LOG.md` anchor integrity) and **#5** (`QUEUE.md` item-ID uniqueness) as Suite 248, and **#9**
+  (`CHANGELOG.md` `Cache:` header vs `sw.js` `CACHE_NAME`) as Suite 249. Candidate **#3**
+  (`ARCHITECTURE.md#anchor` integrity) turned out to already be shipped as Suite 220.16 (R10 Step 3) —
+  re-verified against the live repo rather than rebuilt. Also fixed Live Drifts **#1** (README
+  device-capability count contradiction) and **#2** (`library/CODE_MAP.md`'s stale Protocol 47 re-pin). This
+  progress was never recorded here at the time it landed — added retroactively now per this same protocol.
+- **2026-07-27 — batch 2 (Protocol 52 + Live Drift #3).** Landed candidate **#1**, the audit's own headline
+  win: `ARCHITECTURE.md`'s Table of Contents is now GENERATED (`scripts/generate-architecture-toc.js`,
+  `npm run architecture-toc` / `architecture-toc:check`, gate-wired both fast+full, Suite 250) — see
+  **Protocol 52** in `rules/docs-and-library.md`. Also completed **Live Drift #3**: stripped the ~20 leftover
+  `Suite N (…, X tests)` count fragments from `ARCHITECTURE.md` that the Protocol 2a retirement (R3) had
+  missed everywhere else.
+- **Remaining backlog (optional, low-priority per the audit's own ranked list) — not yet built.** Candidates
+  **#2** (File Map reverse-completeness), **#6/#7/#8** (`library/CODE_MAP.md` generated tables), **#10**
+  (`CHANGELOG.md` category-ordering assertion), **#12** (README css-file-count assertion), **#13** (delete
+  README's third load-order copy — the audit's own dissent note flags this as an owner judgment call, not
+  resolved unilaterally), and **#14** (README version-header vs `CHANGELOG.md` assertion). Each is a real but
+  lower-value/lower-urgency gap per the audit's own ranking — good backlog filler, not worth its own dedicated
+  session. **Earn-condition:** pick up whenever a session is already touching the relevant file for another
+  reason, or the owner explicitly asks for a "batch 3."
 
 ## ⚠️ Blocked on an owner decision
 

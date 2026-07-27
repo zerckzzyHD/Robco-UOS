@@ -22,7 +22,9 @@
     "release-receipt": "node scripts/release-receipt.js",
     "queue-view": "node scripts/queue-view.js",
     "test-catalog": "node scripts/generate-test-catalog.js",
-    "test-catalog:check": "node scripts/generate-test-catalog.js --check"
+    "test-catalog:check": "node scripts/generate-test-catalog.js --check",
+    "architecture-toc": "node scripts/generate-architecture-toc.js",
+    "architecture-toc:check": "node scripts/generate-architecture-toc.js --check"
   },
   "repository": {
     "type": "git",

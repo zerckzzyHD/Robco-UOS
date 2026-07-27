@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r12 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r13 -->
 
 ### Under the Hood
 
@@ -9,6 +9,8 @@
 - The developer-facing test catalog is now generated automatically instead of hand-typed. It's produced fresh from the test suite's own build notes every time, and the pre-save safety checks now confirm it's actually up to date before letting a change through, so it can no longer quietly drift out of sync the way it twice had before. No effect on anything you see or do in the app.
 - Closed two more gaps in the same documentation self-check: the project's roadmap file and its shipped-work archive can no longer link to each other with a broken reference, and the roadmap's own item labels are checked to make sure none of them accidentally repeats a label already in use. Also added a check that catches the app's cache-version marker and its published release notes ever quietly falling out of step with each other. No effect on anything you see or do in the app.
 - Fixed a couple of small inconsistencies found while extending those checks: the project readme stated two different device-capability counts in two different places (the correct count is nine, not eight), and one piece of internal developer reference material still described a tool as "not yet built" that had since shipped. No effect on anything you see or do in the app.
+- The project's architecture reference document now generates its own table of contents directly from the document's real section headings, instead of a hand-typed list — closing the exact kind of drift that let an earlier version of that same list quietly fall twenty sections behind reality before anyone noticed. The pre-save safety checks now confirm the list is current every time. No effect on anything you see or do in the app.
+- Cleaned up a batch of stale test-count numbers left over in the architecture reference document from a bookkeeping habit retired everywhere else in the project earlier this year — the descriptive notes stay, just without the numbers that used to need constant hand-updating. No effect on anything you see or do in the app.
 
 ---
 

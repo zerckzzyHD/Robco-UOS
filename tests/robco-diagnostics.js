@@ -52077,6 +52077,125 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 250 — ARCHITECTURE.md Table of Contents generator (Protocol 52,
+//  QUEUE.md item U, candidate #1 — the audit's own headline win)
+//  Verifies scripts/generate-architecture-toc.js actually parses the REAL
+//  ARCHITECTURE.md into the correct ordered (anchor, heading) list, that
+//  every entry resolves to a real anchor, that package.json/gate.js wire the
+//  regenerate + gate-check commands, and that the --check CLI behaves
+//  correctly (current → exit 0, stale → exit 1) against a throwaway copy —
+//  never the developer's own ARCHITECTURE.md. Unlike Suite 247's TEST_CATALOG
+//  target, ARCHITECTURE.md is committed (not gitignored), so there is no
+//  absent → pass branch to prove here.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 250 — ARCHITECTURE.md Table of Contents generator (Protocol 52)');
+
+  const genPath250 = path.join(ROOT, 'scripts', 'generate-architecture-toc.js');
+  assert(fs.existsSync(genPath250), '250.1: scripts/generate-architecture-toc.js exists on disk');
+
+  delete require.cache[genPath250];
+  const GEN250 = require(genPath250);
+  const archSrc250 = readFile('ARCHITECTURE.md');
+  const entries250 = GEN250.extractTocEntries(archSrc250);
+
+  // 250.2  Non-trivial parse against the real file (self-integrity, same anti-vacuous bar
+  // the generator itself enforces via MIN_EXPECTED_ENTRIES before it will write/compare).
+  assert(
+    entries250.length >= 20,
+    `250.2: extractTocEntries() parses a non-trivial heading list from the real ARCHITECTURE.md (saw ${entries250.length})`
+  );
+
+  // 250.3  Every extracted entry resolved a real anchor — a heading with no preceding
+  // <a id="…"> would be a structural doc error, never silently tolerated.
+  assert(
+    entries250.every(e => !!e.anchor),
+    '250.3: every extracted heading resolved a preceding <a id="…"> anchor (none missing)'
+  );
+
+  // 250.4  The "Table of Contents" heading itself is excluded (it is the section this
+  // list lives in, not a numbered entry pointing at itself), and the first/last real
+  // entries match the file's own known first/last sections.
+  assert(
+    !entries250.some(e => e.title === 'Table of Contents') &&
+      entries250[0].anchor === 'project-philosophy' &&
+      entries250[entries250.length - 1].anchor === 'adding-a-new-ui-panel',
+    '250.4: the "Table of Contents" heading is excluded from its own list, and the first ("Project Philosophy") / last ("Adding a New UI Panel") entries match'
+  );
+
+  // 250.5  buildTocLines() renders a correctly-numbered markdown link per entry.
+  const built250 = GEN250.buildTocLines([
+    { anchor: 'foo-bar', title: 'Foo Bar' },
+    { anchor: 'baz', title: 'Baz (`x.js`)' },
+  ]);
+  assert(
+    built250[0] === '1. [Foo Bar](#foo-bar)' && built250[1] === '2. [Baz (`x.js`)](#baz)',
+    '250.5: buildTocLines() renders correctly-numbered markdown links, verbatim heading text included'
+  );
+
+  // 250.6  package.json wires both the regenerate and the gate-check commands.
+  const pkg250 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg250.scripts['architecture-toc'] === 'node scripts/generate-architecture-toc.js' &&
+      pkg250.scripts['architecture-toc:check'] ===
+        'node scripts/generate-architecture-toc.js --check',
+    '250.6: package.json exposes both `npm run architecture-toc` (regenerate) and `npm run architecture-toc:check` (gate-diff)'
+  );
+
+  // 250.7  scripts/gate.js actually runs the check on both the fast and full gate (above
+  // the fast/full split, same placement as the Protocol 47 catalog check it sits beside).
+  const gateSrc250 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+  const idxCheck250 = gateSrc250.indexOf('generate-architecture-toc.js --check');
+  const idxFastSplit250 = gateSrc250.indexOf('if (fast) {');
+  assert(
+    idxCheck250 !== -1 && idxCheck250 < idxFastSplit250,
+    '250.7: scripts/gate.js runs `generate-architecture-toc.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
+  );
+
+  // 250.8  The --check CLI, exercised as a REAL child process against
+  // ROBCO_ARCHITECTURE_MD_PATH (a throwaway tmp copy — see the script's DOC_PATH override),
+  // so this proves actual CLI behavior without ever touching the real ARCHITECTURE.md:
+  // current → exit 0, stale (hand-edited after generation) → exit 1.
+  const os250 = require('os');
+  const { spawnSync: spawnSync250 } = require('child_process');
+  const tmpDir250 = fs.mkdtempSync(path.join(os250.tmpdir(), 'robco-arch-toc-250-'));
+  const tmpDoc250 = path.join(tmpDir250, 'ARCHITECTURE.md');
+  try {
+    fs.writeFileSync(tmpDoc250, archSrc250, 'utf8');
+    const runCheck250 = () =>
+      spawnSync250(process.execPath, [genPath250, '--check'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: Object.assign({}, process.env, { ROBCO_ARCHITECTURE_MD_PATH: tmpDoc250 }),
+      });
+
+    const rCurrent250 = runCheck250();
+    assert(
+      rCurrent250.status === 0 && /is current/.test(rCurrent250.stdout),
+      '250.8a: --check exits 0 against a fresh copy of the real (already-current) ARCHITECTURE.md'
+    );
+
+    // Mutate an existing heading's TEXT (not its anchor) so extraction still succeeds
+    // cleanly (no missing-anchor error) but the derived TOC entry now disagrees with
+    // what's committed between the markers — genuine content drift, not a structural
+    // doc error, which is the case 250.8b exists to prove.
+    assert(
+      (archSrc250.match(/^## File Map$/m) || []).length === 1,
+      '250.8b (setup): the real ARCHITECTURE.md has exactly one "## File Map" heading to mutate'
+    );
+    const mutated250 = archSrc250.replace(/^## File Map$/m, '## File Map (renamed)');
+    fs.writeFileSync(tmpDoc250, mutated250, 'utf8');
+    const rStale250 = runCheck250();
+    assert(
+      rStale250.status === 1 && /is STALE/.test(rStale250.stderr),
+      '250.8b: --check exits 1 when the on-disk copy has drifted from what the generator would currently produce — a real drift is never silently accepted'
+    );
+  } finally {
+    fs.rmSync(tmpDir250, { recursive: true, force: true });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
