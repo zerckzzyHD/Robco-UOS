@@ -8,7 +8,7 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [App Check](#appcheck)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [App Check](#appcheck) · [L (private view)](#l)
 
 ---
 
@@ -1183,6 +1183,48 @@ itself (`planning/2.8.5/audits/GENERATE_VS_MAINTAIN_AUDIT.md`) stays ARCHIVE-cla
 proven correct throughout: several of its cited counts, and even one candidate (#3), had already drifted or
 shipped by the time each batch re-verified them against the live repo — exactly what its own dissent note
 warned would happen.
+
+---
+
+<a id="l"></a>
+
+### L (private view). ✅ A generated, private HTML view of THIS queue — SHIPPED & OWNER-CONFIRMED (built 2026-07-23, sign-off 2026-07-27)
+
+**What it is.** `QUEUE.md` is the file the owner steers the project from — generate an HTML view of it that
+reads comfortably on a phone. This is the **private half** of item **L**'s two-view ruling. The item keeps
+its ID and stays open in `QUEUE.md` for the still-deferred player-facing public half (post-P2) — only this
+shipped, owner-confirmed half moves here (Protocol 49 discipline: a partially-shipped item's ID never
+splits or renumbers).
+
+**The ruling — ONE SOURCE, TWO GENERATED VIEWS.** `QUEUE.md` stays the single source of truth; two separate
+generated views read from it: a private view for the owner (this account, shipped) and a player-facing view
+for the live site's already-queued "upcoming updates" feature, generated later from **only** items
+explicitly marked public, opt-in never opt-out (still open — see `QUEUE.md`'s item L).
+
+**Shipped.** `scripts/queue-view.js` (`npm run queue-view`) parses `QUEUE.md` and emits a single
+self-contained, offline, phone-first HTML page to the gitignored `queue-view/` (generator tracked, HTML
+regenerated on demand — the same generation-over-maintenance discipline as `library/`; not
+served/precached, so no cache concern). It renders the queue **unfiltered / in full** (the private owner
+view — ONE SOURCE, `QUEUE.md` stays the source of truth). Phone-first UX: a sticky **status filter**
+(⏭️/🔄/⚠️/⬜ shown, ✅ hidden by default), **collapsible items** (tap to expand full reasoning) with
+prominent stable **ID badges**, long section prose behind a **"context" toggle**, a **section jump-nav**,
+and a **"what's next" band** surfacing the active/ready work at the top. **Deterministic** (same
+`QUEUE.md` → byte-identical HTML), **rendered and verified at 360px** (no horizontal overflow,
+filter/collapse/nav all work), and guarded by **Suite 246** (parser + markdown-render determinism, incl.
+red-then-green locks for the double-backtick and wrapped-bold render bugs found during verification).
+
+**✅ Owner sign-off landed (2026-07-27).** The 360px verification above was Dispatch's own DOM check; the
+one thing still missing was the owner's own eyes on his actual phone. He opened the generated page and
+confirmed it reads right ("it looks good", 2026-07-27) — the private view's Definition of Done is now fully
+met, not just Dispatch-verified.
+
+**Why the two views are not merged into one document.** This file's value is that it records rejected
+options, hazards, and reasoning — not just current status. A single merged document either leaks that
+reasoning to players or gets sanitized until it stops being useful internally.
+
+**Done means (private view): ✅ MET** — built 2026-07-23, owner-confirmed 2026-07-27. A generated HTML
+page, readable on a phone, reflects the current `QUEUE.md` in full, and the owner has personally confirmed
+it reads right on his own device (`npm run queue-view` → `queue-view/queue-view.html`).
 
 ---
 

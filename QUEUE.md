@@ -19,7 +19,13 @@ that "tidies" these breaks every external reference — do not.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — CLOSED, all four batches
+**Last updated: 2026-07-27** — **Item L's private view is now owner-confirmed.** The owner opened the
+generated `queue-view/queue-view.html` on his own phone and confirmed it reads right ("it looks good",
+2026-07-27) — the sign-off L's private half was waiting on (Dispatch's own 360px verification had already
+passed). L's private-view account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l); L stays open, narrowed to only
+the still-deferred player-facing public view (post-P2).
+
+**Prior update — 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — CLOSED, all four batches
 shipped.** Batch 4 (the closing batch) landed the audit's remaining low-priority tail — File Map
 reverse-completeness (Suite 252.1, which immediately found and fixed real drift: about a dozen
 undocumented scripts/tests plus the vendored OCR bundle), CHANGELOG category-heading ordering (252.2),
@@ -564,55 +570,37 @@ fuller synthetic-DOM harness (event dispatch and a mount pipeline), which is a h
 **Done means:** the remaining deferred render-path suites execute the real render and assert the result,
 matching the behavioral bar the rest of U3 set.
 
-### L. 🔄 A generated, private HTML view of THIS queue — PRIVATE VIEW BUILT (2026-07-23); player-facing view still deferred
+### L. ⬜ Player-facing public view of the queue — PRIVATE VIEW SHIPPED & OWNER-CONFIRMED (2026-07-27); public view still deferred (post-P2)
 
-**✅ PRIVATE VIEW BUILT (2026-07-23).** `scripts/queue-view.js` (`npm run queue-view`) parses `QUEUE.md`
-and emits a single self-contained, offline, phone-first HTML page to the gitignored `queue-view/`
-(generator tracked, HTML regenerated on demand — the same generation-over-maintenance discipline as
-`library/`; not served/precached, so no cache concern). It renders the queue **unfiltered / in full**
-(the private owner view — ONE SOURCE, `QUEUE.md` stays the source of truth). Phone-first UX: a sticky
-**status filter** (⏭️/🔄/⚠️/⬜ shown, ✅ hidden by default), **collapsible items** (tap to expand full
-reasoning) with prominent stable **ID badges**, long section prose behind a **"context" toggle**, a
-**section jump-nav**, and a **"what's next" band** surfacing the active/ready work at the top.
-**Deterministic** (same `QUEUE.md` → byte-identical HTML), **rendered and verified at 360px** (no
-horizontal overflow, filter/collapse/nav all work), and guarded by **Suite 246** (parser + markdown-render
+**✅ Private view: SHIPPED and OWNER-CONFIRMED.** Built 2026-07-23 (`npm run queue-view` →
+`queue-view/queue-view.html`, guarded by Suite 246). The owner opened the generated page on his own phone
+and confirmed it reads right ("it looks good", 2026-07-27) — the one thing that had kept this half at 🔄
+(Dispatch's own 360px DOM verification had already passed; this was the missing human eyeball). Full build
+account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l). **⛔ The player-facing opt-in view is NOT built** — L's
+own ruling defers it (below); this is now the only work remaining under item L.
 
-- determinism, incl. red-then-green locks for the double-backtick and wrapped-bold render bugs found during
-  verification). **⏳ Awaiting the owner's own phone eyeball:** the 360px verification was done by Dispatch
-  against the rendered DOM (no horizontal overflow, filter/collapse/nav all work) — the owner has **not yet
-  opened it on his actual phone** and given the "yes this reads right" sign-off, which is why L stays 🔄 rather
-  than ✅. **⛔ The player-facing opt-in view is NOT built** — L's own ruling defers it (below).
+**The ruling — ONE SOURCE, TWO GENERATED VIEWS** (still governs the open half): `QUEUE.md` stays the single
+source of truth; two separate generated views read from it:
 
-**What it is.** `QUEUE.md` is the file the owner steers the project from — generate an HTML view of it that
-reads comfortably on a phone. _(Note: this restructure and the new [`QUEUE_LOG.md`](QUEUE_LOG.md) split
-have already cut the queue down substantially; L now renders a much leaner source.)_
-
-**The ruling — ONE SOURCE, TWO GENERATED VIEWS.** `QUEUE.md` stays the single source of truth; two separate
-generated views read from it:
-
-- **A private view, for the owner** — generated unfiltered, everything in this file, phone-readable. Build
-  this one soon; small and immediately useful.
-- **A player-facing view, for the live site's already-queued "upcoming updates" feature** — generated
-  later, from **only** items explicitly marked public in this file. **The marking must be opt-in, never
-  opt-out** — a forgotten mark means a player silently misses an update (the safe failure direction),
-  rather than internal reasoning silently leaking to players (which isn't). Same fail-closed shape as the
-  museum's name-substitution guard (P2, in the museum sub-program below).
+- A private view, for the owner — ✅ shipped and confirmed, above.
+- A player-facing view, for the live site's already-queued "upcoming updates" feature — generated later,
+  from **only** items explicitly marked public in this file. **The marking must be opt-in, never opt-out**
+  — a forgotten mark means a player silently misses an update (the safe failure direction), rather than
+  internal reasoning silently leaking to players (which isn't). Same fail-closed shape as the museum's
+  name-substitution guard (P2, in the museum sub-program below).
 
 **Why the two views are not merged into one document.** This file's value is that it records rejected
 options, hazards, and reasoning — not just current status. A single merged document either leaks that
 reasoning to players or gets sanitized until it stops being useful internally.
 
-**Sequencing.** The private view ships soon. The player-facing view is deliberately left until **after** the
-museum publication work (P2) — it needs the same substitution-and-fail-closed-guard machinery P2 is
-building, and building it twice would be wasteful (Protocol 22).
+**Sequencing.** The player-facing view is deliberately left until **after** the museum publication work
+(P2) — it needs the same substitution-and-fail-closed-guard machinery P2 is building, and building it twice
+would be wasteful (Protocol 22).
 
-**What it depends on.** Nothing, for the private view. The player-facing view depends on P2's
-substitution/guard machinery.
+**What it depends on.** P2's substitution/guard machinery.
 
-**Done means (private view): ✅ MET (2026-07-23)** — a generated HTML page, readable on a phone, reflects
-the current `QUEUE.md` in full (`npm run queue-view` → `queue-view/queue-view.html`). **Done means (public
-view, later — STILL DEFERRED):** a separate generated page shows only opt-in-marked items, defaults to
-omitting anything unmarked, and reuses P2's machinery.
+**Done means (public view, still deferred):** a separate generated page shows only opt-in-marked items,
+defaults to omitting anything unmarked, and reuses P2's machinery.
 
 ### Q. ⬜ Planning-folder hygiene — a standing rule + an owed cleanup task (owner, 2026-07-22)
 
