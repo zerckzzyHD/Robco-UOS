@@ -24,7 +24,18 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
+**Last updated: 2026-07-28** — **CP2's spec moved to v2.3: S7 ran for real and came back NEGATIVE — Stage
+4b (real unattended push notifications from a headless task) is CLOSED, a platform limit rather than a
+build gap. A one-time Claude scheduled task fired on time while the owner was away, but had no direct
+proactive-notify-to-phone tool and hung on an unattended permission prompt before it could even complete.
+The permanent design is PULL (a live agent + a status-file read at the next check-in), not push. Also
+folded in: a docs-grounded finding that genuine unattended launch autonomy exists at the headless/SDK
+level but not on the Dispatch launch path — tracked, gated on the existing S12-T non-local-transport
+re-verify. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23); CP2's entry below updated to match. **Also
+recorded:** the owner re-confirmed 2026-07-28 that the museum finishes BEFORE 2.9.0 starts — the execution
+order already had it that way; the re-confirmation now carries its own date (Protocol 50 a-date).
+
+**Prior update — 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
 top priority (owner's explicit call), and the museum sits directly under it.** A long work session produced
 more than the queue could hold, so this pass folds all of it in and re-orders the board. **New at the top —
 a whole new program (CP1-CP5):** the empirical spike campaign that must prove or kill hook-based containment
@@ -220,7 +231,10 @@ overwriting the original).**
 2. **THEN the MUSEUM → [P, P5-P14].** The build order inside it is P8's own: **P10** (the nav is now free to
    change) → **P11 Stage 0** (`arcs.json`, the curated edge layer — the one genuinely new data artifact) →
    the arc spine → the coverage view → the Visual Web. **P13 → P14** (the security scan-list fix, then the
-   republish) closes the loop on a live site that is currently stale.
+   republish) closes the loop on a live site that is currently stale. **⭐ Re-confirmed by the owner
+   2026-07-28: the museum finishes BEFORE 2.9.0 starts** — this band's ordering already put it there; the
+   re-confirmation is recorded per Protocol 50 (a-date) so it carries its own date rather than being folded
+   silently into the 2026-07-27 reorganization above.
 3. **THEN everything else** — the 2.8.5 tail (B, L, Q, R10's residue, R11's gating call, R5-R7, C1, I), then
    2.9.0. **Item I (the Atlas) explicitly RIDES P11's graph renderer** — it is the same "one derivation,
    many views" plumbing, and building a second one would be the Protocol 22 parallel-implementation trap.
@@ -393,13 +407,29 @@ exists because that distinction was blurred once already.
 that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
 whether hook-based containment is viable at all.
 
-### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.2**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only; **S12 CLEARED** — 2026-07-27)
+### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.3**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only; **S12 CLEARED** — 2026-07-27; **Stage 4b CLOSED NEGATIVE** — 2026-07-28)
 
 > **Status history, kept short.** This item briefly read "SPEC LOCKED" — it was not. An external GPT
 > review of v1 returned **"remain SPEC, NOT READY TO BUILD"** pending ten corrections; folding them in
 > (v2, v2.1) **revealed a hard gate**, so the status went backwards. **That gate has since been proven
 > and cleared (v2.2).** Full accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v21) and
 > [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2s12).
+>
+> **⛔ v2.3 (2026-07-28) — S7 ran for real and came back NEGATIVE.** A one-time Claude scheduled task
+> fired on time while the owner was away, but (a) a headless/scheduled task has **no direct
+> proactive-notify-to-phone tool** — only a **live Dispatch agent** reaches the phone (confirmed the
+> same session) — and (b) it **hung on a permission prompt** for a write action with nobody present to
+> approve it, so it never completed and even its own completion-notification never fired. **Stage 4b
+> (real unattended push notifications) is NOT achievable with available mechanisms — a PLATFORM LIMIT,
+> not a build gap. Do not re-attempt the scheduled-task→phone route.** The permanent design is PULL,
+> not push: notify while a live agent is active, plus a status-file read at the next check-in — which
+> is already what Dispatch does today. **Also folded into v2.3:** a docs-grounded finding that genuine
+> unattended launch autonomy ("owner is busy, just go") exists at the headless/SDK level
+> (`bypassPermissions` / `--dangerously-skip-permissions`, persistent `.claude/settings.local.json`
+> allow-rules) but **not** on the Dispatch launch path (`start_code_task` approvals expire ~30 min and
+> re-prompt every launch) — real autonomy needs either that headless/SDK path (gated on **S12-T**,
+> below) or a future Dispatch feature that persists launch authorization. Full account →
+> [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23).
 >
 > **📄 The spec:** `planning/control-plane/CONTROL_PLANE_SPEC.md` (gitignored; tracked home is the
 > private archive — v2 `d4399da`, v2.1 `408be59`). Beside it: the review verbatim at
@@ -425,6 +455,17 @@ whether hook-based containment is viable at all.
 > 2. **S12-T — the non-local-transport re-verify.** Every S12 sample used the local desktop launch
 >    path. A headless/remote/CI launch may set the variable differently or not at all. Blocks **only**
 >    non-local transports; the Ally-only deployment does not use any, so nothing waits on it today.
+>
+> **⬜ Riding S12-T: unattended launch autonomy** ("owner is busy, just go" — a distinct idea from
+> Stage 4b's notifications, docs-checked 2026-07-28). Real: headless `claude -p` + a permission-bypass
+> mode (`bypassPermissions` / `--dangerously-skip-permissions`) skips the interactive warning dialog in
+> headless mode; persistent pre-authorized allow-rules can live in `.claude/settings.local.json`; an
+> SDK parent's `bypassPermissions` is inherited by spawned subagents. **Not real yet on the path this
+> project actually uses:** the **Dispatch launch path** (`start_code_task`) has no documented
+> pre-authorization equivalent — approvals expire ~30 min and re-prompt every launch. **Do not build
+> toward this** until either (a) S12-T clears the headless/SDK path for non-local use, or (b) Dispatch
+> ships a launch-authorization-persistence feature — whichever arrives first. Full account →
+> [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23).
 >
 > ⭐ **The next action is no longer a spike — it is a build.** The critical path now contains only
 > builds and decisions.
@@ -457,10 +498,10 @@ whether hook-based containment is viable at all.
 > cover the same-tree case, the archive, or L1/L2 at all. **Stage 1d's telemetry decides it** by splitting
 > overlaps into same-tree vs different-tree. If different-tree dominates, **Stage 3 may never be built.**
 >
-> **Owner decisions still open:** how the supervisor reaches the phone (the proven channel belongs to a
-> live agent session; a headless task has no established path, and the agent-task alternative costs usage
-> on **every** run, so the interval is the cost lever); whether the hook config is committed or local-only;
-> and the lock-coverage option for archive writers.
+> **Owner decisions still open:** whether the hook config is committed or local-only; and the
+> lock-coverage option for archive writers. ⛔ **No longer open: how the supervisor reaches the
+> phone** — S7 closed that negative 2026-07-28 (above); the answer is PULL (a live agent + a
+> status-file read at check-in), not a mechanism/interval choice.
 
 **What it is.** The build, if and only if CP1 says the substrate supports it. Deliberately staged so that
 **every stage is independently useful and independently abandonable** — the project's standing

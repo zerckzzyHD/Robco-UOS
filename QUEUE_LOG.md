@@ -8,13 +8,65 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cp2v23"></a>
+
+### 2026-07-28 — S7 ran for real and came back NEGATIVE: Stage 4b is a platform limit, not a build gap (spec → v2.3); plus the unattended-launch-autonomy capability finding
+
+**Two unrelated findings landed the same day, both folded into the spec as v2.3.**
+
+**1. S7 (re-scoped) actually ran, owner away from the machine — and it failed.** A real one-time
+Claude scheduled task fired **on time** while the owner was genuinely away — the scheduling mechanism
+itself works. But it failed on both of the two things §7.4's four-step test exists to prove:
+
+- **No direct path to the phone.** A headless/scheduled task has **no proactive-notify-to-phone
+  tool** of its own. What IS confirmed — the **same session** — is that a **live Dispatch agent**
+  reaches the phone. That is the already-established channel, not the headless one this spike was
+  testing.
+- **It hung.** The task attempted a write action, hit a permission prompt, and — with nobody present
+  to approve it — **never completed**. Because it never completed, not even its own
+  completion-notification fired. There was no signal at all, not even an indirect one.
+
+⇒ **Stage 4b — a headless task pushing a real unattended notification to the phone — is NOT
+achievable with available mechanisms.** This is recorded as a **platform limit** (spec §8, new limit
+7), not a design defect to iterate on: no different marker design, polling interval, or retry policy
+fixes "no tool exists" or "an unattended prompt blocks forever." **Do not re-attempt the
+scheduled-task→phone route.** The honest, permanent design is what §7.4 already named as the
+fallback and is now the program's actual notification story rather than an interim state: **PULL,
+not push** — notify while a live Dispatch agent is active (the proven channel), plus a status-file
+read on the owner's next check-in.
+
+**2. A second, unrelated finding: "unattended launch autonomy" — checked against the docs, not
+assumed.** The owner raised the idea of letting a session launch and run unattended ("owner is busy,
+just go"). A docs check (code.claude.com / docs.claude.com — Claude Code + Agent SDK, 2026-07-28)
+found the underlying capability **is real** at the Claude Code / SDK level: headless `claude -p` plus
+a permission-bypass mode (`bypassPermissions` / `--dangerously-skip-permissions`) skips the
+interactive warning dialog in headless mode; persistent pre-authorized allow-rules can live in
+`.claude/settings.local.json`; and at the SDK level a parent session's `bypassPermissions` is
+inherited by spawned subagents. **But the Dispatch launch path (`start_code_task`) has no documented
+equivalent** — Dispatch's own approvals expire after roughly 30 minutes and re-prompt on every
+launch.
+
+⇒ Real unattended autonomy needs **either** the headless/SDK path — which is a **non-local
+transport**, so it is gated on **S12-T**, the same non-local-transport re-verify already named in
+the spec (§3.5/R-11) — **or** a future Dispatch feature that persists launch authorization across
+launches. Recorded as spec §8 limit 8, and as its own queue tracking note under **CP2**, gated on
+S12-T rather than treated as available today.
+
+**Why both land in the same pass.** Neither finding required new spikes or new machinery — both came
+from actually running the pending experiment (S7) and actually reading the platform's own
+documentation instead of assuming (the launch-autonomy check) — the same discipline Protocol 51a
+already requires of any Dispatch-origin claim before it is built on.
+
+Full spec diff: `planning/control-plane/CONTROL_PLANE_SPEC.md` v2.2 → v2.3 (header banner, §0.3 row
+8, §0.4 DISSENT 2, §1.2 S7 result block, §7.4 RESULT block, §8 limits 7–8, §10 Stage 4, §11 item 1).
 
 <a id="cp2s12"></a>
 
