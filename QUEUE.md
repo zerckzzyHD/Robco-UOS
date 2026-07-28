@@ -336,7 +336,30 @@ is also prime museum material** (the self-maintaining system turned on its own o
 multi-model collaboration and its dissent preserved) — it feeds **P8**'s orchestration-channel and
 review-and-convergence groups and the **P6** AI-collaboration exhibit when it concludes.
 
-### CP1. ⏭️ The empirical SPIKE CAMPAIGN — prove or KILL the hook-based containment before building (PROPOSED; the next actionable control-plane step)
+### CP1. 🔄 The empirical SPIKE CAMPAIGN — prove or KILL the hook-based containment before building (AUTONOMOUS PORTION COMPLETE 2026-07-27; three owner-dependent probes remain)
+
+> **⭐ RESULT (2026-07-27, Claude Code build 2.1.206): the design HELD.** The probes that a session
+> could run alone were run, and they came back positive: a project `SessionStart` hook fires in a
+> Dispatch-launched session (**session_id arrives via stdin — the assumed `CLAUDE_SESSION_ID` env var
+> does NOT exist**); a `PreToolUse` hook genuinely **BLOCKS** a write, even under
+> `permission_mode=bypassPermissions`; coverage spans all five write tools **plus MCP plus
+> SUB-AGENTS** (payload carries `agent_id`, and the deny enforces on a sub-agent's write — so
+> **containment is NOT bypassable via Agent fan-out, and the earlier "no sub-agent fan-out in writing
+> jobs" ban is LIFTED**); a broken hook **always fails OPEN**, and a hook killed at its `timeout` is
+> unconditionally fail-open and un-patchable from inside; verified process-tree termination can be
+> autonomous-safe **only** under six strict identity conditions; the double-buffered intent-file
+> handshake passed 17/17; and worktrees turned out to be a **platform** feature (an in-app toggle),
+> so worktree provisioning is **not** something this program has to build.
+>
+> **Still outstanding — each needs the owner, which is the gating cost:** **S7** (does a notification
+> actually reach the phone — needs him away from the machine), **S8** (scheduled task across sleep —
+> LOW priority now that the laptop is parked and the Ally never sleeps), and **S10's** live routing
+> probe (needs a quiet window; the platform finding above is established independently).
+>
+> ⚠ **One honest caveat, recorded rather than glossed:** the campaign ran on build **2.1.206** and the
+> machine is now on **2.1.217**. Nothing suggests hook semantics moved — but nobody has checked, so
+> the spec requires a cheap re-probe of the three load-bearing results on the then-current build
+> **before** any hook is made load-bearing.
 
 **What it is.** A small, bounded, throwaway campaign — **spikes S0-S11 in the design's own numbering** (these
 are spike labels, _not_ queue item IDs; item **S** is the unrelated shipped PWA-install work) — that actually
@@ -370,7 +393,31 @@ exists because that distinction was blurred once already.
 that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
 whether hook-based containment is viable at all.
 
-### CP2. ⬜ The STAGED control-plane build — six stages, each gated on the one before (PLANNED; gated on CP1)
+### CP2. ⬜ The STAGED control-plane build — six stages, each gated on the one before (SPEC LOCKED 2026-07-27; ⛔ NOTHING BUILT)
+
+> **📄 The locked production spec now exists: `planning/control-plane/CONTROL_PLANE_SPEC.md`**
+> (gitignored, permanent home is the private archive). It consolidates everything the spikes proved
+> into one buildable specification — the six lock domains with their keys/holders/lifetimes/reapers,
+> the durable job ledger and its adapters, the Dispatch intent channel, the hook containment and its
+> fail-open/fail-closed split, the controlled push wrapper and the completion-evidence contract, the
+> supervisor, and the six stages each with its own empirical gate, rollback and new failure modes.
+> **It is a design under test, not a description of anything that runs.** Where the mechanism is
+> wanted but unproven it says so and names the evidence that would unlock it.
+>
+> **Filed at `planning/control-plane/` rather than under a version folder** because the control-plane
+> program is above the app roadmap — no release produced it — following the `planning/audits/G_workflow_review/`
+> precedent for non-versioned, topic-scoped program material. Later CP artifacts (spike logs, per-stage
+> evidence, the CP4 table, the CP5 inventory) file alongside it.
+>
+> **Two decisions the spec deliberately left to the owner**, neither blocking the first two stages:
+> **(1)** how the supervisor reaches the phone — the proven notification channel belongs to a live
+> agent session, and a headless scheduled task has no established path to it, so the spec splits that
+> stage and recommends a hybrid (free reconcile loop + a rare agent task that notifies only when
+> there's something to say); **(2)** whether the hook config is committed or local-only.
+>
+> **The first thing anyone builds from it is read-only** — a passive observation ledger that changes
+> nothing and measures the real collision rate. Its honest possible outcome is _"the rate is near
+> zero, don't build the containment stage,"_ and the spec says so in those words.
 
 **What it is.** The build, if and only if CP1 says the substrate supports it. Deliberately staged so that
 **every stage is independently useful and independently abandonable** — the project's standing
