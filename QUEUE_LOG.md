@@ -8,13 +8,103 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cp2s12"></a>
+
+### 2026-07-27 — S12 cleared: the "#1 missing gap" was already provided by the platform (spec → v2.2)
+
+**The blocking gap that sent CP2's status backwards hours earlier is closed, and the answer was better
+than the design that was going to replace it.** Evidence:
+`planning/control-plane/evidence/S12_EVIDENCE.md`, with the reconciler prototype and its test suite
+beside it.
+
+**What the gap was.** The external review's most consequential finding — _"the spec hides it from
+itself"_ — was that nothing carried a control-plane job id into a launched session. Every job-keyed
+mechanism (L1, L2, L3's attribution, ghost detection, push-evidence attribution, termination's
+"duplicate-loser") assumed a hook could answer _"which job am I?"_, and nothing could. v2 responded by
+specifying an invented mechanism: mint an opaque `launchNonce`, smuggle it through the Code session's
+launch title, read it back at `SessionStart`. That step was flagged in the spec as the specific
+unproven one.
+
+**✅ What the spike found instead — the platform already publishes the join key.**
+`env.CLAUDE_CODE_HOST_SESSION_ID` equals `"local_"` plus the exact `session_id` Dispatch is handed at
+launch. **3/3 subjects, exact match, present at the FIRST `SessionStart` firing** — no race on the
+value itself. The child session's own id (arriving on the hook's stdin) is a **different** UUID in
+every case, confirming the variable is genuinely the _launcher's_ identity and not an echo.
+
+⇒ **The invented token is withdrawn as unnecessary.** Recorded rather than quietly deleted, because
+the design that was avoided is part of the evidence: a home-grown token threaded through a _display
+field_ would have been strictly more fragile than a variable the platform sets itself.
+
+**⭐ The finding that changed the architecture, not just the mechanism.** The `SessionStart` hook can
+fire **before Dispatch has recorded the launch id** — Dispatch only learns the child's id when
+`start_code_task` _returns_, and that return races the child's own hook. There is no guaranteed
+ordering. So a design that **gates** admission at `SessionStart` ("is my hostId in Dispatch's ledger
+yet?") **false-negatives on exactly the legitimate case it exists to admit**: if the hook wins the
+race, a real child is rejected as unbound.
+
+**Admission is therefore reconciliation, not a gate.** Two independent append-only ledgers — the
+hook's shadow record (`hostId`, child id, pid, procStart, cwd, ts), written unconditionally the moment
+it fires; and Dispatch's launch record (`hostId`, jobId, generation, ts), including a launch-attempt
+record with **no id** when the call times out before one comes back. Neither writer ever reads or
+blocks on the other. A supervisor joins them on `hostId` later, whenever an ownership answer is
+actually needed. That property is what makes the race harmless rather than merely unlikely — and the
+timed-out-launch record is precisely what makes a ghost attributable afterwards.
+
+**The binding logic: 12/12.** All four required cases — simultaneous duplicates (earlier timestamp
+binds, later is the duplicate-loser), delayed ghost (matches no launch record ⇒ reported, ownership
+refused), legitimate retry (higher generation binds, prior is superseded), and rerouted work
+(classification is identical whether the tree changes or not, because binding never reads the tree) —
+plus eight edges: malformed record on either side, one hostId with two session records, generation at
+the cap, one hostId claimed by two jobs, launch-with-no-session-yet, empty ledgers, and purity. _The
+suite was re-run independently while folding this in: 12 pass, 0 fail._
+
+**⛔ The trap, recorded because it is the tempting shortcut.** `CLAUDE_CODE_HOST_SESSION_ID` is the
+platform's **general** nested-session marker — a plain interactive session launched by anything carries
+one too, pointing at whatever launched _it_, and `CLAUDE_CODE_CHILD_SESSION=1` is likewise present.
+**Presence proves nothing about Dispatch; only an exact id-suffix match against a launch record proves
+admission.** Taking presence as sufficient would attribute every nested session on the machine to the
+control plane — the wrong-binding failure, reached by the easiest available route. Two hard invariants
+follow: **refuse-on-doubt** (malformed, duplicate, or ambiguous ⇒ refused, never a best-guess bind),
+and **alarm — not merely refuse — when the generation counter hits its cap**, because in production
+that means a retry loop, and refusing silently would hide the loop while looking correct.
+
+**A bonus finding worth its own line.** `~/.claude/sessions/<pid>.json` **does not exist yet when
+`SessionStart` fires** — ENOENT, 3/3. Any hook that resolves session identity by reading that file at
+start time is racy by construction. The environment variable sidesteps it entirely. This is now a
+standing prohibition in the spec rather than a footnote, because the failure would present as
+intermittent rather than obviously wrong. _(Dispatch reports the file lands ~326 ms later; the captured
+dump carries no hook timestamp, so the ENOENT is what is proven here — not the magnitude. Recorded at
+the strength the evidence actually supports.)_
+
+**⚠ What stays open — S12-T, the non-local-transport re-verify.** All three subjects used the local
+desktop launch transport (`claude-desktop`, Windows, build 2.1.219). A headless, remote, or CI launch
+path may set the variable differently or not at all. Since deployment is Ally-only and every Dispatch
+code session uses exactly that transport, **nothing in the program as it runs today waits on this** —
+but it is a named gate in the spec, not a footnote. Scope is the **channel only**: the binding logic is
+a pure function over two ledgers and is transport-independent.
+
+**What this changes about the program.** S12 is removed as a blocker on Stages 1c, 3 and 5. The
+critical path becomes `1a → 1b → 1c → re-probe → 1d → the worktrees decision → Stage 3` — **every
+remaining item is a build or a decision; there is no longer a spike on it.** Buildable today with zero
+blocked dependencies grows from `1a → 1b → Stage 2` to **`1a → 1b → 1c → Stage 2`**. In the spec,
+platform-limit #6 ("no job identity at launch") is **struck** — the premise was false — and the
+residual is re-scoped: R-8 shrinks from _"the mechanism does not exist"_ to _"the join key is an
+undocumented environment variable"_, defended by adding it to the per-build re-probe; R-11 (transport
+scope) and R-12 (the ENOENT prohibition) are new.
+
+**⭐ The discipline point, because it cuts against the good news.** A cleared gate is **not a mandate**.
+S12 removes an obstacle to building Stage 3; it says nothing about whether Stage 3 _should_ be built.
+That remains Stage 1d's measurement to answer, and the open worktrees-vs-Stage-3 comparison is
+untouched. The honest possible outcome of Stage 1 is still _"overlapping write attempts are near zero
+— do not build Stage 3."_
 
 <a id="cp2v21"></a>
 

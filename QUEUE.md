@@ -393,23 +393,41 @@ exists because that distinction was blurred once already.
 that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
 whether hook-based containment is viable at all.
 
-### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.1**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only — 2026-07-27)
+### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.2**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only; **S12 CLEARED** — 2026-07-27)
 
-> **⛔ Status correction (2026-07-27): this item briefly read "SPEC LOCKED". It was not, and is not.**
-> An external GPT review of the v1 spec returned **"remain SPEC, NOT READY TO BUILD"** pending ten
-> corrections. All ten are now folded in — the spec is at **v2.1** — but folding in the corrections is
-> what **revealed a new hard gate**, so the honest status went backwards, not forwards. Full account →
-> [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v21).
+> **Status history, kept short.** This item briefly read "SPEC LOCKED" — it was not. An external GPT
+> review of v1 returned **"remain SPEC, NOT READY TO BUILD"** pending ten corrections; folding them in
+> (v2, v2.1) **revealed a hard gate**, so the status went backwards. **That gate has since been proven
+> and cleared (v2.2).** Full accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v21) and
+> [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2s12).
 >
 > **📄 The spec:** `planning/control-plane/CONTROL_PLANE_SPEC.md` (gitignored; tracked home is the
-> private archive — v2 at `d4399da`, v2.1 at `408be59`). The review is saved verbatim beside it at
-> `planning/control-plane/reviews/GPT_REVIEW_01.md`.
+> private archive — v2 `d4399da`, v2.1 `408be59`). Beside it: the review verbatim at
+> `planning/control-plane/reviews/GPT_REVIEW_01.md`, and the spike evidence at
+> `planning/control-plane/evidence/S12_EVIDENCE.md` with its reconciler prototype and test suite.
 >
-> **⛔ THE GATE — S12, the job→session admission binding.** Nothing carries a control-plane job id into
-> a launched session, and the platform's own session record has no job field — so **a hook cannot know
-> which job it belongs to.** Every job-keyed lock (L1, L2, L3's attribution), ghost detection and
-> termination rest on that binding. **Until S12 proves it, Stages 1(full), 3 and 5 have no trustworthy
-> job identity.** The next action in this program is **a spike, not code.**
+> **✅ S12 — the job→session admission binding — is CLEARED (2026-07-27).** The gap GPT called the #1
+> missing piece turned out to be **already provided by the platform**: an environment variable carries
+> the launching session's exact id into the launched one, present at the very first hook firing, 3/3
+> subjects. **No invented launch token is needed** — the spec's own proposed one is withdrawn. The
+> binding logic is proven **12/12** across simultaneous duplicates, delayed ghosts, legitimate retries,
+> rerouted work and eight edge cases. ⭐ It also changed the architecture: because the hook can fire
+> **before** Dispatch has recorded the launch, admission must be **reconciliation between two
+> append-only ledgers joined later — never a synchronous gate**. A design that checked at hook time
+> would have rejected exactly the real sessions it exists to admit.
+>
+> **⚠ The two remaining gates, now explicit and much smaller than the one they replace:**
+>
+> 1. **The full re-probe** — all load-bearing hook behaviour (S1–S6 **plus hot-reload, plus the new
+>    admission variable**) re-verified **per live build**, **before** shadow collection. The machine
+>    runs more than one build under one shared hook config, so "the current build" is not a single
+>    thing. Blocks Stage 1d and Stage 3 — **not** 1a/1b/1c/2.
+> 2. **S12-T — the non-local-transport re-verify.** Every S12 sample used the local desktop launch
+>    path. A headless/remote/CI launch may set the variable differently or not at all. Blocks **only**
+>    non-local transports; the Ally-only deployment does not use any, so nothing waits on it today.
+>
+> ⭐ **The next action is no longer a spike — it is a build.** The critical path now contains only
+> builds and decisions.
 >
 > **✅ What IS built — the Stage 1 substrate, running READ-ONLY.** The passive-observation ledger and
 > its adapters live at `C:\Dev\!RobCo\_RobCo-Control\` — **its own private repo**
@@ -427,10 +445,11 @@ whether hook-based containment is viable at all.
 > number that decides whether Stage 3 gets built. Three detections are honestly marked **UNOBSERVABLE**
 > rather than zero (same-job ghosts and orphan jobs need Stage 3; stranded pushes need Stage 2).
 >
-> **Critical path to any enforcement:**
-> `S12 → 1a → 1b → re-probe (all load-bearing hook behaviour, every live build) → 1d telemetry → the worktrees-vs-Stage-3 decision → Stage 3`.
-> **Buildable today with zero blocked dependencies: `1a → 1b → Stage 2`** (ledger, observer, push
-> wrapper, completion contract) — the chain that survives even if S12 fails.
+> **Critical path to any enforcement (updated):**
+> `1a → 1b → 1c → re-probe (every live build) → 1d telemetry → the worktrees-vs-Stage-3 decision → Stage 3`.
+> **Buildable today with zero blocked dependencies: `1a → 1b → 1c → Stage 2`** — ledger, observer,
+> **admission enrollment**, status file, push wrapper, completion contract. (`1c` joined that list when
+> S12 cleared; before, only `1a → 1b → Stage 2` was unblocked.)
 >
 > **⭐ Open architectural question (do not settle on taste):** the review graded **worktrees (Stage 6)
 > B+, the program's highest**, and suggested they may deserve promotion **ahead of Stage 3** — structural
