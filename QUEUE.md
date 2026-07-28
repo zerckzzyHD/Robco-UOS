@@ -393,31 +393,55 @@ exists because that distinction was blurred once already.
 that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
 whether hook-based containment is viable at all.
 
-### CP2. ⬜ The STAGED control-plane build — six stages, each gated on the one before (SPEC LOCKED 2026-07-27; ⛔ NOTHING BUILT)
+### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.1**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only — 2026-07-27)
 
-> **📄 The locked production spec now exists: `planning/control-plane/CONTROL_PLANE_SPEC.md`**
-> (gitignored, permanent home is the private archive). It consolidates everything the spikes proved
-> into one buildable specification — the six lock domains with their keys/holders/lifetimes/reapers,
-> the durable job ledger and its adapters, the Dispatch intent channel, the hook containment and its
-> fail-open/fail-closed split, the controlled push wrapper and the completion-evidence contract, the
-> supervisor, and the six stages each with its own empirical gate, rollback and new failure modes.
-> **It is a design under test, not a description of anything that runs.** Where the mechanism is
-> wanted but unproven it says so and names the evidence that would unlock it.
+> **⛔ Status correction (2026-07-27): this item briefly read "SPEC LOCKED". It was not, and is not.**
+> An external GPT review of the v1 spec returned **"remain SPEC, NOT READY TO BUILD"** pending ten
+> corrections. All ten are now folded in — the spec is at **v2.1** — but folding in the corrections is
+> what **revealed a new hard gate**, so the honest status went backwards, not forwards. Full account →
+> [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v21).
 >
-> **Filed at `planning/control-plane/` rather than under a version folder** because the control-plane
-> program is above the app roadmap — no release produced it — following the `planning/audits/G_workflow_review/`
-> precedent for non-versioned, topic-scoped program material. Later CP artifacts (spike logs, per-stage
-> evidence, the CP4 table, the CP5 inventory) file alongside it.
+> **📄 The spec:** `planning/control-plane/CONTROL_PLANE_SPEC.md` (gitignored; tracked home is the
+> private archive — v2 at `d4399da`, v2.1 at `408be59`). The review is saved verbatim beside it at
+> `planning/control-plane/reviews/GPT_REVIEW_01.md`.
 >
-> **Two decisions the spec deliberately left to the owner**, neither blocking the first two stages:
-> **(1)** how the supervisor reaches the phone — the proven notification channel belongs to a live
-> agent session, and a headless scheduled task has no established path to it, so the spec splits that
-> stage and recommends a hybrid (free reconcile loop + a rare agent task that notifies only when
-> there's something to say); **(2)** whether the hook config is committed or local-only.
+> **⛔ THE GATE — S12, the job→session admission binding.** Nothing carries a control-plane job id into
+> a launched session, and the platform's own session record has no job field — so **a hook cannot know
+> which job it belongs to.** Every job-keyed lock (L1, L2, L3's attribution), ghost detection and
+> termination rest on that binding. **Until S12 proves it, Stages 1(full), 3 and 5 have no trustworthy
+> job identity.** The next action in this program is **a spike, not code.**
 >
-> **The first thing anyone builds from it is read-only** — a passive observation ledger that changes
-> nothing and measures the real collision rate. Its honest possible outcome is _"the rate is near
-> zero, don't build the containment stage,"_ and the spec says so in those words.
+> **✅ What IS built — the Stage 1 substrate, running READ-ONLY.** The passive-observation ledger and
+> its adapters live at `C:\Dev\!RobCo\_RobCo-Control\` — **its own private repo**
+> (`github.com/zerckzzyHD/RobCo-Control`), code in `code/`, runtime state in the sibling `state/` so a
+> lockfile can never be committed. **`ENFORCED: false`** — nothing is blocked, denied, reaped or killed.
+> ⚠ Note the divergence from the spec: state moved out of `%LOCALAPPDATA%\robco-control\` (which the
+> spec still names), deliberately and documented in `lib/paths.js`. **Consequence: two lock roots exist**
+> until `sync.ps1`'s is repointed — the observer reads the old one strictly read-only so lock detection
+> isn't a fabricated zero.
+>
+> **📊 First real finding: the collision class is measurably NON-ZERO.** The observer recorded a live
+> **tree collision in this very app repo** — two live sessions co-resident in `C:\Dev\!RobCo\!RobCo-UOS`,
+> twice. ⚠ Read that precisely: it is **co-residency, not overlapping write attempts**. Distinguishing
+> the two needs Stage 1d shadow telemetry, and the spec is explicit that conflating them inflates the
+> number that decides whether Stage 3 gets built. Three detections are honestly marked **UNOBSERVABLE**
+> rather than zero (same-job ghosts and orphan jobs need Stage 3; stranded pushes need Stage 2).
+>
+> **Critical path to any enforcement:**
+> `S12 → 1a → 1b → re-probe (all load-bearing hook behaviour, every live build) → 1d telemetry → the worktrees-vs-Stage-3 decision → Stage 3`.
+> **Buildable today with zero blocked dependencies: `1a → 1b → Stage 2`** (ledger, observer, push
+> wrapper, completion contract) — the chain that survives even if S12 fails.
+>
+> **⭐ Open architectural question (do not settle on taste):** the review graded **worktrees (Stage 6)
+> B+, the program's highest**, and suggested they may deserve promotion **ahead of Stage 3** — structural
+> isolation cannot fail open, needs no per-build re-probe and doesn't depend on S12. It also doesn't
+> cover the same-tree case, the archive, or L1/L2 at all. **Stage 1d's telemetry decides it** by splitting
+> overlaps into same-tree vs different-tree. If different-tree dominates, **Stage 3 may never be built.**
+>
+> **Owner decisions still open:** how the supervisor reaches the phone (the proven channel belongs to a
+> live agent session; a headless task has no established path, and the agent-task alternative costs usage
+> on **every** run, so the interval is the cost lever); whether the hook config is committed or local-only;
+> and the lock-coverage option for archive writers.
 
 **What it is.** The build, if and only if CP1 says the substrate supports it. Deliberately staged so that
 **every stage is independently useful and independently abandonable** — the project's standing

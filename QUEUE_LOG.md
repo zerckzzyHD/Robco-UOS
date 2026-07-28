@@ -8,13 +8,132 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cp2v21"></a>
+
+### 2026-07-27 — CP2's spec went to v2.1 after an external review, and its status went BACKWARDS from "locked"
+
+**The short version: a spec that had been recorded as "SPEC LOCKED" hours earlier was reviewed
+externally, failed, and is now honestly marked NOT build-locked — while the first stage of it got
+built anyway, read-only, and immediately found something.** Both halves matter. This entry records the
+correction because a queue that claims something is locked when it is not is worse than a queue that
+says nothing.
+
+**What happened, in order.**
+
+1. **v1 of `planning/control-plane/CONTROL_PLANE_SPEC.md` was written and `QUEUE.md` recorded CP2 as
+   "SPEC LOCKED 2026-07-27"** (app commit `10f6263`).
+2. **An external GPT review of v1 came back: "remain SPEC, NOT READY TO BUILD"**, pending ten
+   corrections. It graded the **architecture B+** but the **six-stage execution plan C+**, citing
+   "several dependency cycles", an over-claimed L3, and "one foundational join completely
+   unspecified". Per-stage: Stage 1 **C**, Stage 2 **C+**, Stage 3 **C**, Stage 4 **B**, Stage 5 **B−**,
+   Stage 6 **B+**.
+3. **v2 folded in the ten corrections** as enumerated in the revision brief — archive commit
+   **`d4399da`**.
+4. **The verbatim review arrived afterwards** and was saved unedited at
+   `planning/control-plane/reviews/GPT_REVIEW_01.md`. Reading it surfaced **four substantive findings
+   the ten-point summary had compressed away**, so a second pass landed as **v2.1** — archive commit
+   **`408be59`**. The version marker was bumped rather than overwriting "v2" with a different body,
+   because two documents under one version label is precisely the drift this program exists to stop.
+
+**⛔ The finding that moved the status backwards — S12, the job→session admission binding.** The review
+called it "most consequential" and noted "the spec hides it from itself". Nothing carries a
+control-plane `jobId` into a launched session; the platform's own session record
+(`~/.claude/sessions/<pid>.json`) carries `pid`, `sessionId`, `cwd`, `procStart` and **no job field of
+any kind**. So a hook firing in a fresh session knows _that it is a session in a directory_ and cannot
+know _which job it is executing_ — and `cwd` cannot disambiguate, because the ghost case is two
+sessions in the _same_ directory. Every job-keyed mechanism (L1, L2, L3's attribution, ghost detection,
+push-evidence attribution, termination's "duplicate-loser") rests on a join that does not exist and has
+never been tested. v1 wrote "claim the job" without ever specifying how the job is known. **Spike S12
+must prove it against four cases — simultaneous duplicates, a delayed ghost, a legitimate retry, and
+rerouted work — and every ambiguous case must REFUSE ownership rather than guess.**
+
+**Why this is a success and not a setback.** The review did exactly what the spike campaign was
+supposed to do and what this project's own discipline demands: it falsified a claim before anything was
+built on it. Had CP2 stayed "locked", the containment layer would have been built on an identity that
+cannot be established, and the failure would have surfaced as mis-attributed writes — the worst possible
+place to find it. **A negative result before the build is the cheapest one available.**
+
+**The other nine corrections, folded in.** Observe-only reconciliation moved from Stage 4a into Stage 1
+(a ledger with no scheduled collector is a storage library, not an observer). Stage 2 was decoupled from
+Stages 3 and 4 entirely. Stage 3's "seven quiet days" off-ramp — which the review called "mostly
+theater" — was replaced with **measurable exposure against denominators** (writing jobs, launches,
+launch timeouts, overlapping write attempts) plus the requirement to declare which residual risks are
+**accepted** if Stage 3 is skipped. The re-probe gate widened from S1/S2/S6 to **all** load-bearing hook
+behaviour **per live build** (the machine runs two builds at once under one shared config) and **before**
+shadow collection, since re-probing afterwards contaminates the evidence. Adapter compatibility was
+redefined as **N concurrent recognized shapes**, selected per record — and the separate, uncovered
+problem was named: **adapters isolate disk records, not the hook's stdin payload**, so a changed
+`PreToolUse` payload has nothing in its path to notice. L3 was relabelled from "fail-CLOSED" to
+**"deny-by-default for handled hook execution; structurally fail-open when the hook does not
+complete"** — it has no independent second guard, unlike L4/L5/L6 — and Stage 3 no longer claims to
+_close_ the PLAN 0 source race, only to reduce it during healthy hook execution. The no-unique-work
+precondition was restored to termination (a lease-loser can still hold unique changes, especially after
+a hook fail-open). And the 4b notification spike was redefined end-to-end, after the finding that
+**S7 as originally scoped tested an agent-session notification — which was never the open question**
+and would have returned a green result proving nothing about the headless path.
+
+**⭐ The coverage gap that invalidated the item-U justification.** The review caught that the incident
+cited to justify L3 **happened in the archive**, that the spec routes the archive to L6, and that **L6
+is acquired only by `sync.ps1` during a sync** — so two ordinary archive-writing sessions take nothing,
+and hooks were specified for the app repo only. In its words, the arrangement **"protects sync from
+sync, not archive-writer from archive-writer."** The exact incident remained uncovered. v2 adds a
+coverage section with two options and a recommendation, plus the honest limit that **tool coverage ≠
+resource coverage**: the hook sees a `Bash` call but cannot tell which tree `git -C <archive>` mutates.
+v2.1 refines that further — `Edit`/`Write` targets _are_ usually inspectable and coverable cheaply;
+arbitrary shell and MCP are not, and need a policy rather than a parser.
+
+**✅ What got BUILT anyway — the Stage 1 substrate, read-only.** The passive-observation ledger and its
+adapters are running at `C:\Dev\!RobCo\_RobCo-Control\`, in **its own private GitHub repo**
+(`github.com/zerckzzyHD/RobCo-Control`) — code in `code/`, runtime state in the **sibling** `state/`
+directory. The separation is deliberate and documented: `state/` holds lockfiles, and a committed lock
+can be pushed, reverted or checked out, which would let a git operation delete a live lock out from
+under its holder or resurrect a dead one. `.gitignore` belts that braces. **`ENFORCED: false`** —
+nothing is blocked, denied, reaped or killed.
+
+**⚠ A divergence from the spec, deliberate and now on record.** The spec (§3) still names
+`%LOCALAPPDATA%\robco-control\` as the ledger's home; the build put it in `_RobCo-Control\state\`
+instead. Both satisfy the actual requirement (outside both the app repo and the archive), and the
+choice is documented in `lib/paths.js` — but **the spec's stated path is now stale doc**, and the real
+consequence is that **two lock roots exist**: PLAN 0's `sync.ps1` still takes L5/L6 in the old location,
+so the observer reads that directory **strictly read-only** to avoid reporting a fabricated zero for
+lock detection. Repointing `sync.ps1` collapses the two roots and is a named follow-up.
+
+**📊 The first real finding — the collision class is measurably non-zero.** On its second run the
+observer recorded a **tree collision in this app repo**: two live sessions co-resident in
+`C:\Dev\!RobCo\!RobCo-UOS`, seen twice. ⚠ **Stated precisely, because the spec is emphatic about this:
+that is co-residency, not overlapping write attempts.** Two sessions merely open in one tree is not a
+collision; two sessions _attempting writes_ into it in an overlapping window is. Separating them needs
+Stage 1d shadow telemetry, which is not built — and conflating them would inflate the very number that
+decides whether Stage 3 is worth building. Equally deliberate: three detections report **UNOBSERVABLE**
+rather than zero (same-job ghosts and orphan jobs need Stage 3's job identity; stranded pushes need
+Stage 2's push wrapper). **A fabricated zero would have been the worst possible output of an observer
+whose entire job is to produce an honest denominator.**
+
+**⭐ The open architectural question, recorded so it is decided on evidence.** The review graded
+**Stage 6 (worktrees) B+ — the program's highest** — and suggested it "may deserve comparison with
+Stage 3 earlier — stronger structural isolation". The brief's summary had dropped that comparison
+entirely; only the verbatim review carried it. It is not a scheduling note: Stage 3 spends the
+program's largest complexity budget (the admission join, three lock domains, a deny-by-default hook
+atop a fail-open mechanism, a shadow phase, a per-build re-probe regime, a coverage policy for channels
+no static check can read) to buy at-most-one-writer-per-tree — **which worktrees buy structurally, and
+structural isolation cannot fail open, needs no re-probe when the CLI updates, and does not depend on
+S12.** Against that: worktrees do nothing for the same-tree case (which is what item U actually was),
+nothing for the archive, and nothing for L1/L2. **Stage 1d's telemetry answers it** by splitting
+overlaps into same-tree vs different-tree. If different-tree dominates, Stage 6 should be promoted and
+**Stage 3 may never need building** — a materially cheaper program.
+
+**The lesson worth keeping, beyond this item.** A faithful ten-point summary of a review still dropped
+four substantive findings, one of them architectural. **Review originals are kept verbatim from now on,
+not just their digests** — `planning/control-plane/reviews/` exists for exactly that, and this entry is
+the evidence that it earns its keep.
 
 ### 2026-07-27 — the big reorganization: the control-plane program takes the top of the board
 
