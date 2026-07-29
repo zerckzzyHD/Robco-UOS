@@ -8,13 +8,204 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cpkernel0728"></a>
+
+### 2026-07-28 (late) — three-model review campaign (Gemini + DeepSeek + GPT) converges on a trusted-action-kernel reframe; reconciled into CP1-CP5
+
+**Analysis only — nothing here is built or approved to build** (owner: "fold into queue until you've analyzed
+all 3 responses; don't run anything"). Source: `planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`, the
+converged reading of three independent reviews of the whole control-plane vision:
+
+- **Gemini 3.1 Pro (Deep Research)** — the current capability surface of Claude Code / the app. Mechanisms.
+- **DeepSeek (Expert, DeepThink)** — a technical pass: hooks-feed-the-ledger, `--resume`.
+- **GPT-5.6 Sol (Work, Max)** — the architecture pass, and the deepest.
+
+**The reviews did not conflict — they composed.** GPT supplied the architecture the kernel needs, Gemini the
+mechanisms it would be built from, DeepSeek the technical seam (hooks feeding the ledger), and all three landed
+on the same narrowing as the project's own prior lessons ("green is scoped evidence," "passing ≠ catching,"
+"the control plane is the weakness," "AI is a typist").
+
+**The headline reframe.** The project has built a strong **flight recorder** (OBSERVE) and a weak **actuator**
+(safe action). Several things planned or built turn **weak inference into destructive action** — the wrong
+place to spend the risk budget. The next maturity jump is a **tiny trusted action kernel**, not more detectors.
+
+**The revised build order (replaces CP2's six-stage order as the _working_ plan — CP2's own order is kept in
+QUEUE.md for its reasoning, per Protocol 50 a-date, not deleted or renumbered):**
+
+1. **Job contract + reconciler.** A tiny manifest of desired state per job (job id + nonce, canonical
+   repo/worktree, base SHA + expected remote, job type, allowed write scope, usage reserve, wall-clock
+   deadline, required verification commands, terminal condition, notification policy, context/protocol
+   version-hash), then intent → act → observe-independently → result with idempotency keys; reconcile
+   intents-without-results after a crash. The ledger records what _happened_; this adds what was _supposed to_.
+   Generalizes the existing Stage-2 push contract (intent→verify→result) to every job. No DB needed — ledger +
+   a deterministic projection. Mechanism: `SessionStart` `additionalContext` injection at zero token cost.
+2. **Transactional exact-SHA verifier/publisher + fault-injection tests.** The publisher pushes only a SHA it
+   independently produced evidence for. Real choke point (credential separation makes it one). Enforce first,
+   only for unattended publication, with a tested, ledger-recorded break-glass. Promotion requires real
+   exposure **and** injected negative cases, not calendar time.
+3. **Recovery inventory + off-machine durability + restore test + supervisor freshness.** "expected == observed
+   SHA" proves one ref at one moment, not recoverability. Inventory everything a total-disk-loss takes
+   (uncommitted/untracked work, control-plane source+config, Task Scheduler defs, ledger segments + manifests,
+   hooks/wrappers, orchestrator memory) and periodically restore into a temp dir and validate (checkout, ledger
+   replay, expected refs, supervisor config). Append-only local data still dies with the disk.
+4. **Deterministic continuation packet.** An AI-free resumption file at session exit/failure (objective;
+   base/current/remote SHAs; branch/worktree; changed + uncommitted files; commands+tests already run with
+   results; recent distinct failure signatures; unfinished verification; current job state + exact blocker;
+   which protocols the previous session actually got; agent-claims vs independently-observed facts kept
+   separate). Fed to the next session with minimal scoped protocols. Kills the "every fresh session rediscovers
+   everything" usage cost. Better than DeepSeek's bare `--resume`.
+5. **Incident lifecycle + daily housekeeping.** Alerts modeled as open→updated→resolved→reopened (so ledger
+   dedupe can't suppress a recurring incident forever); send-intent tracked separately from acknowledged
+   delivery. A daily pass detects supervisor/adapter/disk/ledger/replication degradation.
+
+**Reconsidered / de-prioritized (was planned or built — now narrowed), with reasoning:**
+
+- **Idle reaper (BUILT the same night, commit `643ebb8`, `_RobCo-Control` repo) — over-invested; re-scoped to
+  terminal-job cleanup.** An idle session normally costs no tokens; a mistaken kill destroys unsaved reasoning
+  or interrupts git. Keep it, but change the _authorization_ from "idle + archived" to
+  independently-verified terminal state OR an explicitly authorized hard deadline, only for
+  supervisor-launched jobs, using stored process identity / a Windows Job Object, never an interactive Desktop
+  session on idle-inference. Tonight's congestion was itself GPT's own carve-out: an idle process _holding a
+  scarce lease_ — authorize on "blocking a lease," not on "idle."
+- **Thrashing → kill — do NOT graduate.** 4 same-tool failures can be valid diagnosis; file-changes aren't real
+  progress. Stays alert-only / job-budget signal. Legitimate termination = crossing an owner-approved
+  time/tool/usage envelope, never a "thrashing" guess.
+- **Headless AI for sync / reap / run-tests — CUT.** Deterministic; the supervisor runs Node/PowerShell/git/the
+  test command directly (`spawn()`). Using Claude burns the scarce resource, widens authority, adds
+  nondeterminism. Reserve headless AI for interpretation (bounded log diagnosis, a proposed patch). Corrects a
+  claim Dispatch made mid-session.
+- **Auto-restart — decouple from repo sync.** Separate: continuous checkpoint/durability · app-health detection
+  · restart with cooldown + max-attempts (alert after one failure, never loop) · repo sync by its own contract.
+  Restart only when no active mutating jobs. "Sync memory before restart" is not a reliable emergency plan if
+  the app is already hung — state must be checkpointed continuously enough that restart is _already_ safe.
+- **`--no-verify` tripwire — low leverage, de-prioritize.** Targets one bypass while direct git / alternate
+  binaries / hook edits / credential use remain. The exact-SHA publisher + credential separation is the real
+  invariant. Keep the flag detector as cheap telemetry only.
+- **Usage thresholds 50/80/85/90/95 → operating MODES.** Five thresholds become wallpaper. Map usage to modes —
+  Normal / Conserve / Reserve-for-owner / Stop-unattended-AI — notify only on a _mode change_; keep exact
+  percentages in `status.json`. Weekly rollup answers "what decision should change?" (usage per verified
+  outcome, duplicate launches, blind time, overrides), not event counts. **← Owner judgment call — decided
+  ✅ APPROVED below** (he specified the original thresholds).
+- **Worktrees — defer; prefer a per-repo mutating lease first.** Worktrees share git objects/refs/config/
+  credentials → concurrency, not containment (Kimi + GPT agree). At one machine / one cap, a single
+  mutating-job lease per repo may deliver most of the value with less machinery; allow parallel read-only/test
+  work; add multiple mutating worktrees only when measured concurrency value beats cleanup+integration cost.
+
+**Doctrine refinement (the sharpest correction).** "fail-open / shadow-first" is not universal. A false
+_denial_ of one unattended job is cheap; a false _allowance_ of an autonomous push/kill/restart is expensive.
+So: preserve availability **for the owner** (always-available logged break-glass), but let **automation's**
+safety-critical paths fail **CLOSED**. That dissolves the project's long-standing "a guard that locks me out is
+worse than no guard" tension — it was conflating the owner's path with automation's. Correct defaults: an
+observational adapter failing → human workflow continues, report unavailable/stale; an unattended launch
+lacking fresh prerequisites → do not launch, manual workflow remains; verification evidence missing → do not
+publish; termination identity/state ambiguous → do nothing (+ alert); the owner needing to work despite a guard
+failure → explicit logged break-glass; platform internal schema changes → disable the dependent automation, not
+the whole workflow. Shadow-first also needs: measure trigger opportunities, not calendar time; label TP/FP/FN;
+inject rare failure cases; promote the smallest action; prefer bounded/reversible denials over destructive
+responses. **Simplicity stays 4-5 executable invariants, not a pile of detectors:** (1) no unapproved
+concurrent writer to the same workspace; (2) no unattended publication without exact-SHA independent evidence;
+(3) no destructive action on ambiguous or stale identity; (4) every durable state promised to the owner is
+demonstrably restorable; (5) unattended work cannot consume the owner's reserved usage or authority.
+
+**Gemini mechanisms to VERIFY before building (leads, not facts).** Gemini gave very specific version-gated
+features with real-looking doc citations, but LLMs hallucinate version numbers and Dispatch's own knowledge is
+older — verify each against the actually-installed CLI build + live docs before any of it is load-bearing.
+Highest-value to confirm: `CLAUDE_CODE_PROCESS_WRAPPER` (claimed v2.1.208+/`processWrapper` v2.1.210) —
+host-level spawn interceptor, would be the AI-free choke point to inject a job id/env into every session +
+throttle; native OpenTelemetry export (claimed v2.1.214+) — token/latency/tool spans, would be a first-class
+ledger feed including real token consumption; Channels (`claude/channel`, claimed v2.1.216+, experimental) — a
+local listener that can inject a message into a _running_ session, which if real overturns "headless can't be
+re-prompted after launch"; `SessionEnd`, `PostToolBatch`, `UserPromptSubmit`, `Setup`; native
+`isolation:"worktree"` + `WorktreeRemove`; native timeouts `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` /
+`BASH_MAX_TIMEOUT_MS`. Windows realities to design around: hooks route through `powershell.exe`; ~32 KB arg
+limit → pass context via stdin/files not inline; `child_process.exec` hangs → `spawn()` with piped stdio +
+sanitized env; `--bare` bypasses global hooks (observe via `stream-json` instead). Settled by Gemini (DeepSeek
+had it wrong): a working `PreToolUse` hook CAN block (exit 2 / `"decision":"block"` / `permissionDecision`).
+"Fail-open" only means a crashed/silent hook doesn't override — hooks can enforce, they are still bypassable,
+so they are guards not guarantees.
+
+**What the reviews got wrong / didn't know.** DeepSeek reinvented Dispatch (a "REST API so your phone can
+launch" — Dispatch already is that); claimed hooks "can't block" (wrong, above); floated
+multiple-accounts-to-double-the-cap (ToS — no, and it flagged this itself); "estimate usage from tool
+durations" is unreliable (the real usage file already exists). Gemini's version numbers are unverified. All
+three don't know Dispatch's role, so their "how do you launch/trigger" answers over-build surfaces the project
+already has.
+
+**Owner decisions (2026-07-28):**
+
+1. **Usage thresholds → operating modes — ✅ APPROVED.** Normal / Conserve / Reserve-for-owner /
+   Stop-unattended-AI; notify only on a mode _change_; exact % stays in `status.json`.
+2. **Sequencing — ✅ this whole kernel program runs BEFORE the museum and before 2.9.0.**
+3. **Separate trust domain for unattended jobs — folded as DEFERRED, laptop-leaning.** The owner asked whether
+   the spare laptop could serve as the isolation boundary instead of a separate Windows account on the main PC.
+   First read: the laptop is a _stronger_ boundary than a same-PC account — real machine isolation + a second
+   disk that doubles as the rank-3 off-machine durability — but it is a bigger ops commitment, and the kernel
+   itself needs neither, so it stays deferred until unattended autonomy is real enough to warrant hard
+   containment. Aligns with **CP5** (laptop-witness) and the earlier software-first deferral of the spare
+   laptop.
+
+**What was explicitly left OPEN by this pass:** whether to pull 2.9.0 hardening items (event-bus / bootstrap
+isolation) forward — pending the owner, not decided in this pass. **⭐ RESOLVED the same day, later —
+2026-07-28:** the owner decided. Full account → [below](#hg0728).
+
+**Reconciliation done this pass (2026-07-28, documentation-only — no code, no sessions launched):** `QUEUE.md`
+gained a new overlay section ("⭐ The CP program's BUILD ORDER — CURRENT") directly under the CP1-CP5 program
+header, plus short dated addenda on CP1 (narrowed termination doctrine), CP2 (six-stage order marked superseded
+as the _working_ plan, kept for its reasoning), and CP5 (separate-trust-domain question folded in as deferred).
+`planning/control-plane/CONTROL_PLANE_SPEC.md` gained a dated pointer at its top noting the overlay, without
+rewriting the spec itself. The archive sync (Protocol 48) was **not** run for this pass — known-blocked
+tonight by idle-session congestion; it backs these files up after the app restart.
+
+<a id="hg0728"></a>
+
+### 2026-07-28 — the 2.9.0 hardening-gate pull-forward question is RESOLVED: HG1 (event-bus) and HG2 (bootstrap isolation) join the pre-museum band; the dependency-cycle burn-down stays in 2.9.0
+
+**The question left open by the same day's earlier kernel-reframe pass** (above, [`#cpkernel0728`](#cpkernel0728))
+is now decided. 2.9.0's hardening gate names three subtractive items, all originally scoped as narrative
+bullets with no stable ID: the UI↔services dependency-cycle burn-down, bootstrap isolation, and event-bus
+hardening. The owner pulled **two of the three** up into the pre-museum priority band, alongside the
+control-plane kernel (CP1-CP5) — because they are pure debt-reduction, independent of the new OS services that
+motivate the rest of the hardening gate, so doing them now costs nothing and removes debt that would otherwise
+sit for a full additional round.
+
+**Assigned stable IDs — new family prefix, per this project's own ID convention** (single letters exhausted;
+new work takes a family prefix, same shape as `R1-R11`, `P1-P14`, `CP1-CP5`):
+
+- **HG1 — event-bus hardening.** `RobcoEvents` gets `off`/`once`/dedup, and listener-error isolation so a
+  thrown handler can't block unrelated handlers in the same event. Pulled forward because nothing about it
+  depends on the OS round's new services, and the OS round is about to widen `RobcoEvents`' usage — hardening
+  it before that widening is strictly cheaper than after.
+- **HG2 — bootstrap isolation.** ~45 boot-phase calls, currently under one outer `try`/`catch` with no
+  per-phase isolation, get per-phase guards classified fatal-vs-degradable, failing loudly rather than
+  silently. Pulled forward for the same reason as HG1 — it is debt in code that exists today, unrelated to what
+  the new OS services will add to the boot sequence.
+
+**What did NOT move, and why — the UI↔services dependency-cycle burn-down.** This item is different in kind
+from the other two: it depends on the very render↔service boundary the new 2.9.0 OS services are going to
+reshape. Burning it down now risks inverting edges that the 2.9.0 services simply re-tangle on arrival — doing
+the same work twice. It stays exactly where the hardening gate's own original ordering reasoning already put
+it ("build the services first and you multiply the debt... burn the baseline down FIRST, then the services
+plug into a clean seam") — that reasoning is untouched, not overwritten (Protocol 50 a-date).
+
+**Sequencing stays intact.** Pre-museum work (the control-plane kernel + HG1 + HG2) → the museum → 2.9.0
+(carrying the remaining dependency-cycle burn-down as its own hardening-gate item). Nothing about the
+three-band execution order changed; HG1/HG2 simply joined band 1 alongside CP1-CP5.
+
+**Reconciliation done this pass (2026-07-28, documentation-only — no code, no sessions launched):** `QUEUE.md`
+gained a new top-level section ("⭐ ALSO PRE-MUSEUM — the 2.9.0 hardening pull-forward") holding the HG1/HG2
+entries, an extension to execution-order band 1 naming them, and dated annotations on the three original
+hardening-gate bullets (the two that moved point at their new IDs; the one that stayed carries an explicit
+"confirmed staying" note) — none of the original bullet reasoning was deleted, only annotated, per Protocol 50.
+The archive sync (Protocol 48) was **not** run for this pass — still known-blocked tonight by idle-session
+congestion; it backs these files up after the app restart.
 
 <a id="cp2v23"></a>
 

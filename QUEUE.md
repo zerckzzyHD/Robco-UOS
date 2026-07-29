@@ -35,6 +35,34 @@ re-verify. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23); CP2's entry b
 recorded:** the owner re-confirmed 2026-07-28 that the museum finishes BEFORE 2.9.0 starts — the execution
 order already had it that way; the re-confirmation now carries its own date (Protocol 50 a-date).
 
+**Update — 2026-07-28 (late) — ⭐ THREE-MODEL CONTROL-PLANE REVIEW CONVERGED (Gemini + DeepSeek + GPT).**
+Analysis only; **nothing built or approved from it** (owner: "fold into queue until you've analyzed all 3;
+don't run anything"). Full converged reading → [`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md).
+Headline: we built a strong **flight recorder** (OBSERVE) and a weak **actuator** — several planned/built items
+turn weak inference into destructive action. The reframe replaces CP2's stage order as the _working_ plan with a
+**trusted-action-kernel** build order: **(1) job contract + reconciler → (2) transactional exact-SHA
+verifier/publisher + fault-injection tests → (3) recovery inventory + off-machine durability + restore test →
+(4) deterministic continuation packet → (5) incident lifecycle + daily housekeeping.** **De-prioritized /
+narrowed:** the generic idle reaper (BUILT tonight, `643ebb8`) → re-scope to _verified-terminal_ job cleanup, not
+idle-inference; thrashing → **alert-only, never graduate to kill** (kill only on an owner-approved envelope);
+headless-AI-for-sync/reap/tests → **CUT** (deterministic, run directly); auto-restart → decouple from repo sync;
+`--no-verify` tripwire → low-leverage telemetry only; usage 50/80/85/90/95 → **operating modes ✅ APPROVED
+(owner, 2026-07-28)** — Normal / Conserve / Reserve-for-owner / Stop-unattended-AI, notify only on a mode change,
+exact % stays in `status.json`; worktrees → defer, prefer a per-repo mutating **lease** first. **Doctrine tweak:**
+fail-open/shadow-first is not universal — keep the _owner's_ path always available (break-glass) but let
+_automation's_ safety-critical paths fail **closed**; simplicity = 4–5 executable invariants, not a pile of
+detectors. **Before any build:** verify which Gemini-cited mechanisms (`PROCESS_WRAPPER`, native OTLP, Channels,
+`SessionEnd`, native worktree/timeouts) actually exist on the installed CLI build. **⭐ SEQUENCING (owner,
+2026-07-28): this whole trusted-action-kernel program runs BEFORE the museum and before 2.9.0.** **Separate trust domain for unattended
+jobs → folded as DEFERRED, laptop-leaning (owner, 2026-07-28).** Not scheduled; the kernel needs no separate trust
+domain (the exact-SHA publisher + credential separation + restore-proof carry the safety). Revisit once unattended
+autonomy is in regular use; when built, the **spare laptop** is preferred over a separate Windows account — a real
+machine boundary that also doubles as the rank-3 off-machine durability. Aligns with **CP5** (laptop-witness) and
+the earlier software-fixes-first deferral of the spare laptop. **Reconciled into the CP1-CP5 entries below in
+this same-day pass** — see the new overlay directly under the program header (**"⭐ The CP program's BUILD
+ORDER — CURRENT"**), CP2's superseded-order note, CP1's narrowed-termination addendum, and CP5's
+deferred-trust-domain addendum. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
+
 **Prior update — 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
 top priority (owner's explicit call), and the museum sits directly under it.** A long work session produced
 more than the queue could hold, so this pass folds all of it in and re-orders the board. **New at the top —
@@ -221,13 +249,26 @@ _Everything shipped is summarized below with a link to its full account in
 as the record of the round it governed (Protocol 50 (a-date) — a revision carries its own date rather than
 overwriting the original).**
 
-1. **⭐ FIRST — the WORKFLOW / CONTROL-PLANE program → [CP1-CP5].** The owner's explicit call. **The one
-   actionable next step is CP1**, the empirical spike campaign — it needs owner hands-on time and it exists
-   to prove or **kill** the hook-based approach before anything is built. **CP3 (immediate mitigations) can
-   run in parallel and needs no control layer at all**, which is exactly why it is separated out: if the
-   spikes come back negative, CP3 still ships. **Why it goes first:** every other item on this board is
-   dispatched THROUGH the control plane, so its defects tax all of them — the same "fix what bleeds every
-   session first" reasoning that put R10's trusted-layer fixes at the head of the 2026-07-21 order.
+1. **⭐ FIRST — the WORKFLOW / CONTROL-PLANE program → [CP1-CP5], PLUS the 2.9.0 hardening pull-forward →
+   [HG1-HG2] (owner, 2026-07-28).** The owner's explicit call. **The one actionable next step is CP1**, the
+   empirical spike campaign — it needs owner hands-on time and it exists to prove or **kill** the hook-based
+   approach before anything is built. **CP3 (immediate mitigations) can run in parallel and needs no control
+   layer at all**, which is exactly why it is separated out: if the spikes come back negative, CP3 still ships.
+   **Why it goes first:** every other item on this board is dispatched THROUGH the control plane, so its
+   defects tax all of them — the same "fix what bleeds every session first" reasoning that put R10's
+   trusted-layer fixes at the head of the 2026-07-21 order.
+   **Reaffirmed 2026-07-28 (late), Protocol 50 (a-date):** the program's _internal_ build order is now
+   specifically the trusted-action-kernel order (job contract → exact-SHA publisher → recovery/durability →
+   continuation packet → incident lifecycle) set out in the CP program's build-order overlay, below — this
+   band's "CP1-CP5 first" ranking is unchanged, only what happens inside it.
+   **⭐ 2026-07-28 — the open "pull 2.9.0 hardening forward?" question is now RESOLVED: two of the three items
+   join this band.** **HG1** (event-bus hardening) and **HG2** (bootstrap isolation) move up — pure
+   debt-reduction, independent of the new OS services the rest of 2.9.0's hardening gate exists to protect, so
+   there is nothing to do twice by doing them now. **The third item — the UI↔services dependency-cycle
+   burn-down — stays in 2.9.0's hardening gate, unmoved**, because it depends on the surface the new OS
+   services reshape; hardening it before that surface exists risks doing the work twice. Full entries →
+   the new **"⭐ ALSO PRE-MUSEUM"** section directly below CP5; original reasoning kept in place in the 2.9.0
+   hardening-gate section per Protocol 50 (a-date). Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#hg0728).
 2. **THEN the MUSEUM → [P, P5-P14].** The build order inside it is P8's own: **P10** (the nav is now free to
    change) → **P11 Stage 0** (`arcs.json`, the curated edge layer — the one genuinely new data artifact) →
    the arc spine → the coverage view → the Visual Web. **P13 → P14** (the security scan-list fix, then the
@@ -350,6 +391,104 @@ is also prime museum material** (the self-maintaining system turned on its own o
 multi-model collaboration and its dissent preserved) — it feeds **P8**'s orchestration-channel and
 review-and-convergence groups and the **P6** AI-collaboration exhibit when it concludes.
 
+## ⭐ The CP program's BUILD ORDER — CURRENT (owner's call, 2026-07-28 (late) — three-model review convergence)
+
+**Supersedes CP2's six-stage order as the _working_ plan; CP2's own order stays recorded in place below for
+its reasoning (Protocol 50 (a-date) — a revision carries its own date, it does not overwrite the original).**
+This is an overlay, exactly like the "⭐ The execution ORDER — CURRENT" band above it — it does not re-file or
+renumber anything. Full converged reading →
+[`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md);
+full account of this reconciliation pass → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
+
+Three external reviews (Gemini 3.1 Pro, DeepSeek, GPT-5.6 Sol) converged on one reframe: the project built a
+strong **flight recorder** (OBSERVE) and a weak **actuator**, and several planned/built items **turn weak
+inference into destructive action** — the wrong place to spend the risk budget. The next maturity jump is a
+**tiny trusted action kernel**, not more detectors. The working build order is now:
+
+1. **Job contract + reconciler.** A tiny manifest of _desired_ state per job (id/nonce, repo, base SHA, write
+   scope, deadline, verification commands, terminal condition) plus intent→act→observe-independently→result
+   with idempotency keys, reconciling intents-without-results after a crash. Generalizes Stage 2's push
+   contract to every job. _Mechanism: `SessionStart` `additionalContext` injection, zero token cost._
+2. **Transactional exact-SHA verifier/publisher + fault-injection tests.** The publisher pushes only a SHA it
+   independently produced evidence for — enforced first for unattended publication only, with a tested,
+   ledger-recorded break-glass. Promotion requires real exposure **and** injected negative cases, not calendar
+   time.
+3. **Recovery inventory + off-machine durability + restore test + supervisor freshness.** "expected == observed
+   SHA" proves one ref at one moment, not recoverability — inventory everything a total-disk-loss takes
+   (uncommitted/untracked work, control-plane source+config, Task Scheduler defs, ledger segments, hooks,
+   orchestrator memory) and periodically restore into a temp dir and validate it.
+4. **Deterministic continuation packet.** An AI-free resumption file at session exit/failure — objective SHAs,
+   changed/uncommitted files, commands+tests already run with results, current job state and blocker,
+   agent-claims kept separate from independently-observed facts. Kills the "every fresh session rediscovers
+   everything" usage cost.
+5. **Incident lifecycle + daily housekeeping.** Alerts modeled open→updated→resolved→reopened so ledger dedupe
+   can't suppress a recurring incident forever; a daily pass detects supervisor/adapter/disk/ledger/replication
+   degradation.
+
+**Not in the next five** (reconsidered / de-prioritized — was planned or built, now narrowed, each with its
+reasoning):
+
+- **The idle reaper — BUILT tonight (`643ebb8`, `_RobCo-Control` repo) — over-invested; RE-SCOPED.** Authorize
+  cleanup on **independently-verified terminal state OR an explicitly authorized hard deadline**, for
+  supervisor-launched jobs only (stored process identity / a Windows Job Object), **never** idle-inference on
+  an interactive Desktop session. Why: an idle session normally costs no tokens; a mistaken kill destroys
+  unsaved reasoning or interrupts git. (Tonight's own congestion was itself a lease-blocking process, not an
+  idle one — the correct trigger is "blocking a lease," not "idle.")
+- **Thrashing detection — stays ALERT-ONLY, does NOT graduate to kill.** 4 same-tool failures can be valid
+  diagnosis; file-changes aren't real progress either way. Legitimate termination = crossing an
+  owner-approved time/tool/usage **envelope**, never a "thrashing" guess.
+- **Headless AI for sync / reap / run-tests — CUT.** Deterministic work (`spawn()` of Node/PowerShell/git/the
+  test command) should run directly; using Claude for it burns the scarce resource, widens authority, and adds
+  nondeterminism for no benefit. Headless AI stays reserved for interpretation (bounded log diagnosis, a
+  proposed patch).
+- **Auto-restart — decoupled from repo sync.** Split into: continuous checkpoint/durability · app-health
+  detection · restart with cooldown + max-attempts (alert after one failure, never loop) · repo sync by its own
+  contract. Restart only when no active mutating jobs — "sync memory before restart" is not a reliable
+  emergency plan if the app is already hung; state must be checkpointed continuously enough that restart is
+  _already_ safe.
+- **`--no-verify` tripwire — de-prioritized to telemetry-only.** It targets one bypass while direct git,
+  alternate binaries, hook edits, or credential use all remain open; the exact-SHA publisher + credential
+  separation is the real invariant. Keep the flag detector as cheap telemetry, not an enforcement point.
+- **Worktrees — deferred; prefer a per-repo mutating LEASE first.** Worktrees share git objects/refs/config/
+  credentials, so they buy concurrency, not containment. At one machine / one cap, a single mutating-job lease
+  per repo may deliver most of the value with less machinery; add worktrees only when measured concurrency
+  value beats the cleanup+integration cost.
+
+**Doctrine refinement — fail-open/shadow-first is not universal.** A false _denial_ of one unattended job is
+cheap; a false _allowance_ of an autonomous push/kill/restart is expensive. So: preserve availability **for the
+owner** (always-available, logged break-glass) but let **automation's** safety-critical paths fail **CLOSED**.
+This dissolves the old "a guard that locks me out is worse than no guard" tension — it was conflating the
+owner's path with automation's. Correct defaults: an observational adapter failing lets the human workflow
+continue (report unavailable/stale); an unattended launch lacking fresh prerequisites does not launch; missing
+verification evidence means do not publish; ambiguous termination identity means do nothing plus alert; the
+owner working around a guard failure is an explicit logged break-glass; a platform schema change disables the
+dependent automation, not the whole workflow. **Simplicity stays 4-5 executable invariants, not a pile of
+detectors:** (1) no unapproved concurrent writer to the same workspace; (2) no unattended publication without
+exact-SHA independent evidence; (3) no destructive action on ambiguous or stale identity; (4) every durable
+state promised to the owner is demonstrably restorable; (5) unattended work cannot consume the owner's reserved
+usage or authority. **This is where the CP program's doctrine/principles live** — future additions to it
+belong in this section, not scattered per-stage.
+
+**Owner decisions (2026-07-28):**
+
+- **Usage thresholds 50/80/85/90/95 → operating MODES — ✅ APPROVED.** Normal / Conserve / Reserve-for-owner /
+  Stop-unattended-AI; notify only on a mode _change_; exact % stays in `status.json`. Five raw thresholds were
+  becoming wallpaper; a weekly rollup answers "what decision should change?" (usage per verified outcome,
+  duplicate launches, blind time, overrides), not event counts.
+- **Sequencing — ✅ this whole kernel program runs BEFORE the museum and before 2.9.0** — reaffirming, per
+  Protocol 50 (a-date), the existing "⭐ The execution ORDER — CURRENT" band above; that band's "CP1-CP5 first"
+  ranking already had this, and now specifically means the kernel build order above.
+- **Separate trust domain for unattended jobs → folded as DEFERRED, laptop-leaning.** Not scheduled — the
+  kernel needs no separate trust domain (the exact-SHA publisher + credential separation + restore-proof carry
+  the safety). Revisit once unattended autonomy is in regular use; when built, the **spare laptop** is
+  preferred over a separate Windows account on the main PC — a real machine boundary that also doubles as the
+  rank-3 off-machine durability. See **CP5**.
+
+**Before any build:** verify which Gemini-cited mechanisms (`CLAUDE_CODE_PROCESS_WRAPPER`, native OpenTelemetry
+export, Channels, `SessionEnd`, native worktree/timeout env vars) actually exist on the installed CLI build —
+Gemini gave specific version-gated features with real-looking doc citations, but LLMs hallucinate version
+numbers; none of it is load-bearing until confirmed against the live docs + the installed build.
+
 ### CP1. 🔄 The empirical SPIKE CAMPAIGN — prove or KILL the hook-based containment before building (AUTONOMOUS PORTION COMPLETE 2026-07-27; three owner-dependent probes remain)
 
 > **⭐ RESULT (2026-07-27, Claude Code build 2.1.206): the design HELD.** The probes that a session
@@ -406,6 +545,11 @@ exists because that distinction was blurred once already.
 **Done means:** each probe above has a recorded, dated result with the evidence attached; every CP2 claim
 that depends on one is re-graded to _executed_ or **struck**; and the owner has a plain-English verdict on
 whether hook-based containment is viable at all.
+
+> **⛔ 2026-07-28 (late) addendum (Protocol 50 a-date):** the "verified process-tree termination" probe above
+> is narrowed by the three-model review's doctrine — legitimate termination is only an owner-approved
+> time/tool/usage envelope, never a "thrashing" guess, and the idle reaper built the same night is re-scoped to
+> verified-terminal-state cleanup only, never idle-inference. See the CP program's build-order overlay above.
 
 ### CP2. 🔄 The STAGED control-plane build — six stages, each gated on the one before (spec at **v2.3**, ⛔ **NOT build-locked**; Stage 1 substrate BUILT read-only; **S12 CLEARED** — 2026-07-27; **Stage 4b CLOSED NEGATIVE** — 2026-07-28)
 
@@ -502,6 +646,14 @@ whether hook-based containment is viable at all.
 > lock-coverage option for archive writers. ⛔ **No longer open: how the supervisor reaches the
 > phone** — S7 closed that negative 2026-07-28 (above); the answer is PULL (a live agent + a
 > status-file read at check-in), not a mechanism/interval choice.
+>
+> **⛔ 2026-07-28 (late) — the six-stage order below is SUPERSEDED AS THE WORKING PLAN**, not renumbered or
+> deleted: a three-model review convergence (Gemini + DeepSeek + GPT) replaces it with the trusted-action-kernel
+> build order in the overlay directly above ("⭐ The CP program's BUILD ORDER — CURRENT"). Kept below verbatim
+> per Protocol 50 (a-date) — the stage reasoning (the L1/L2/L3 lease correction, the ledger-outside-both-repos
+> rule, the worktrees-vs-Stage-3 telemetry decision) still holds, and CP2 resumes from it once the kernel's
+> early ranks land. The spec file (`CONTROL_PLANE_SPEC.md`) is **not** rewritten by this pass; it carries its
+> own dated pointer at the top instead. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
 
 **What it is.** The build, if and only if CP1 says the substrate supports it. Deliberately staged so that
 **every stage is independently useful and independently abandonable** — the project's standing
@@ -591,6 +743,63 @@ watching** — at a fraction of the risk. Promotion to controller is a later, se
 
 **Done means:** the inventory is answered item by item, the archive-clone privacy call is made explicitly, and
 the witness-vs-controller decision is recorded with its date and reasoning.
+
+> **⛔ 2026-07-28 (late) addendum (Protocol 50 a-date):** the separate-trust-domain-for-unattended-jobs question
+> folds in here as **DEFERRED, laptop-leaning** — not scheduled, revisit once unattended autonomy is in regular
+> use; when built, prefer the spare laptop (this item) over a separate Windows account on the main PC, since it
+> is a real machine boundary that also doubles as the rank-3 off-machine durability. The kernel program itself
+> needs no separate trust domain today. See the CP program's build-order overlay above for the full reasoning.
+
+---
+
+# ⭐ ALSO PRE-MUSEUM — the 2.9.0 hardening pull-forward (HG1-HG2, new 2026-07-28)
+
+**New family prefix, per this file's own rule (single letters are exhausted; new work takes a family prefix —
+see the header note at the top of this file).** These two items were, until 2026-07-28, narrative bullets
+inside 2.9.0's hardening-gate section (below, under "Then, before any new OS service: the hardening gate") with
+no stable ID of their own. The owner resolved the previously-open "pull 2.9.0 hardening forward?" question
+(recorded as open in [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728)) by pulling these two — and only these two —
+into the pre-museum band, alongside the control-plane kernel (CP1-CP5). Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#hg0728).
+
+**Why these two move and the third does not.** The hardening gate has three items. Two of them —
+event-bus hardening and bootstrap isolation — are **pure debt-reduction in code that already exists today**;
+nothing about the new 2.9.0 OS services changes what "fix this" means for either of them, so doing them now
+costs nothing extra and removes debt that would otherwise sit around for another full round. The third — the
+**UI↔services dependency-cycle burn-down** — is different in kind: it depends on the very surface the new OS
+services are going to reshape (the render↔service boundary). Burning it down before that surface exists risks
+inverting edges that the 2.9.0 services will just re-tangle, i.e. doing the same work twice. So it **stays** in
+2.9.0's hardening gate, exactly where the original ordering reasoning ("build the services first and you
+multiply the debt... burn the baseline down FIRST") put it — that reasoning is preserved verbatim there, not
+overwritten by this pass (Protocol 50 a-date).
+
+### HG1. ⬜ Event-bus hardening — `off`/`once`/dedup, listener-error isolation (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
+
+**What it is.** `RobcoEvents` currently has no `off` / `once` / dedup, and a thrown listener handler can block
+unrelated handlers from running. Add `off`/`once`/dedup, and isolate each handler so a thrown error in one
+never prevents the others in the same event from firing.
+
+**Why it's here and not in 2.9.0.** Surface-independent: nothing about the new OS services changes what
+`RobcoEvents` needs to be correct today, and the OS round is about to **widen** its usage — hardening it before
+that widening, rather than after, is strictly cheaper. Original bullet (with its original reasoning, kept per
+Protocol 50) is still in place under 2.9.0's hardening-gate section, now cross-referenced here.
+
+**Done means:** `off`/`once`/dedup exist and are used where appropriate; a thrown handler is caught and logged
+per-handler, never propagating to abort sibling handlers; a regression test proves the isolation (Protocol 13).
+
+### HG2. ⬜ Bootstrap isolation — per-phase boot guards, fatal-vs-degradable (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
+
+**What it is.** ~45 boot-phase calls currently sit under ONE outer `try`/`catch` with zero per-phase isolation.
+Add per-phase guards, classify each phase's failure as fatal (boot cannot continue) or degradable (boot
+continues, the failure is surfaced), and fail loudly — never silently — in both cases.
+
+**Why it's here and not in 2.9.0.** Same reasoning as HG1: this is debt in the existing boot sequence,
+independent of what the new OS services will add to it. Original bullet (with its original reasoning, kept per
+Protocol 50) is still in place under 2.9.0's hardening-gate section, now cross-referenced here.
+
+**Done means:** every boot phase runs under its own guard; each phase is classified fatal or degradable; a
+degradable failure surfaces to the user (not console-only, echoing the same standard Protocol 24 already sets
+for AI state-apply failures); a fatal failure fails loudly with a clear message, never a silent black screen.
 
 ---
 
@@ -2897,11 +3106,20 @@ hardening gate runs before any of them lands. The work is subtractive.
 - **The UI↔services dependency cycles.** The render layer had quietly become a _second state manager_. ✅
   **UPDATE (2026-07-18):** the ENFORCEMENT half already shipped in the U1–U12 capstone — a static gate (Suite 236) now **blocks any NEW cross-layer violation**, and the existing debt is baselined at 20 render→save +
   26 service→view + 0 registry. What this gate item still owes is the **burn-down**: actually invert the
-  baselined edges (services emit, the UI subscribes).
+  baselined edges (services emit, the UI subscribes). **⭐ CONFIRMED STAYING HERE (owner, 2026-07-28) —
+  Protocol 50 (a-date):** when the "pull 2.9.0 hardening forward?" question was resolved, this item was
+  deliberately left in this round rather than pulled forward — it depends on the surface the new OS services
+  reshape, so hardening it early would risk doing the work twice. See **"⭐ ALSO PRE-MUSEUM"** above for the
+  full reasoning.
 - **Bootstrap isolation.** ~45 boot-phase calls sit under ONE outer try/catch with zero per-phase isolation.
-  Add per-phase guards, classified fatal-versus-degradable. Fail loudly, never silently.
+  Add per-phase guards, classified fatal-versus-degradable. Fail loudly, never silently. **⭐ PULLED FORWARD to
+  the pre-museum band as [HG2] (owner, 2026-07-28) — Protocol 50 (a-date).** This reasoning stays here
+  unchanged; the live entry with its own ID and "Done means" is in **"⭐ ALSO PRE-MUSEUM"**, directly under CP5.
 - **Event-bus hardening.** `RobcoEvents` has no `off` / `once` / dedup and swallows listener errors silently.
   Harden it before the OS round widens it; a thrown handler must not prevent unrelated handlers from running.
+  **⭐ PULLED FORWARD to the pre-museum band as [HG1] (owner, 2026-07-28) — Protocol 50 (a-date).** This
+  reasoning stays here unchanged; the live entry with its own ID and "Done means" is in **"⭐ ALSO
+  PRE-MUSEUM"**, directly under CP5.
 - **The one escaped interval.** Exactly ONE stray `setInterval` escaped the AmbientRuntime heartbeat. Fold it
   in.
 - **An AI state-apply failure must be surfaced to the user (Protocol 24).** Today, when the AI's state update
