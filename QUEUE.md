@@ -24,7 +24,27 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-28** — **CP2's spec moved to v2.3: S7 ran for real and came back NEGATIVE — Stage
+**Last updated: 2026-07-29** — **Control-plane kernel RANKS 1-2 SHIPPED** in the private `RobCo-Control`
+repo: job contract + reconciler (commit `8eab8fd`) and the transactional exact-SHA verifier/publisher with
+a fail-closed break-glass + fault-injection tests (commit `dd49ed4`). **Five new Pushover alerts** landed
+alongside (commits `f14499d` + `bac032a`), on top of the four already live: "needs your input" and
+"session died/errored" are documented-contract only (their hooks are unverified-live, not wired); ⭐
+**backup-unhealthy** is LIVE and already caught a real problem on a real run; deadline-exceeded (wall-clock
+only) and break-glass-used are both LIVE — all five demoed to the owner's phone. **The thrashing detector
+was recalibrated** (commit `15c17d0`): a "nearby-progress" gate fixed a real false positive (session
+`53a3bb89`); it stays shadow-only, never kills. **The usage-measurement accuracy spike ran**
+([`planning/control-plane/USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md),
+read-only): per-job cost/tokens ARE measurable, even under concurrency, via OTLP or a headless job's own
+`-p` JSON result — so the deadline/budget alert's budget half is UNBLOCKED for dollar/token budgets, still
+blocked for "% of the weekly cap" (the global usage file carries no session id — structurally
+unobservable, not just imprecise). **Rank 3 (off-machine durability) now has a SPEC, not a build**
+([`planning/control-plane/RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md)) —
+gated on the owner creating the private backup repo. **A new museum item, P15, is filed:** the museum's
+scope predates the control plane becoming the top program, so P15 is now a precondition on "museum done" —
+fold the control-plane's own arcs into P8's corpus, give the self-maintaining-system thesis a prominent
+room, and confirm P11's Visual Web includes them. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp0729).
+
+**Prior update — 2026-07-28** — **CP2's spec moved to v2.3: S7 ran for real and came back NEGATIVE — Stage
 4b (real unattended push notifications from a headless task) is CLOSED, a platform limit rather than a
 build gap. A one-time Claude scheduled task fired on time while the owner was away, but had no direct
 proactive-notify-to-phone tool and hung on an unattended permission prompt before it could even complete.
@@ -35,7 +55,7 @@ re-verify. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23); CP2's entry b
 recorded:** the owner re-confirmed 2026-07-28 that the museum finishes BEFORE 2.9.0 starts — the execution
 order already had it that way; the re-confirmation now carries its own date (Protocol 50 a-date).
 
-**Update — 2026-07-28 (late) — ⭐ THREE-MODEL CONTROL-PLANE REVIEW CONVERGED (Gemini + DeepSeek + GPT).**
+**Prior update — 2026-07-28 (late) — ⭐ THREE-MODEL CONTROL-PLANE REVIEW CONVERGED (Gemini + DeepSeek + GPT).**
 Analysis only; **nothing built or approved from it** (owner: "fold into queue until you've analyzed all 3;
 don't run anything"). Full converged reading → [`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md).
 Headline: we built a strong **flight recorder** (OBSERVE) and a weak **actuator** — several planned/built items
@@ -489,6 +509,38 @@ export, Channels, `SessionEnd`, native worktree/timeout env vars) actually exist
 Gemini gave specific version-gated features with real-looking doc citations, but LLMs hallucinate version
 numbers; none of it is load-bearing until confirmed against the live docs + the installed build.
 
+> **⛔ 2026-07-29 addendum (Protocol 50 a-date) — ranks 1-2 SHIPPED, five alerts live, thrashing
+> recalibrated, a rank-3 spec, and the usage-measurement question answered.** All in the private
+> `RobCo-Control` repo unless noted; nothing here touches this app repo's runtime code.
+>
+> - **Rank 1 — job contract + reconciler — ✅ SHIPPED, commit `8eab8fd`.**
+> - **Rank 2 — transactional exact-SHA verifier/publisher — ✅ SHIPPED, commit `dd49ed4`** (fails closed, a
+>   tested break-glass, fault-injection tests).
+> - **The idle-session reaper (built `643ebb8`, above) is re-scoped**, exactly per this section's own
+>   de-prioritization note: verified-terminal/owner-authorized-deadline cleanup only, never idle-inference.
+> - **Five new Pushover alerts** (commits `f14499d` + `bac032a`), on top of the four already built + live:
+>   (1) "a session needs your input" — documented contract, the `Notification` hook is unverified-live, not
+>   wired; (2) ⭐ **backup-unhealthy** — LIVE, and already fired correctly on a real run; (3) session
+>   died/errored — documented contract, `StopFailure` hook, unverified-live, not wired; (4)
+>   deadline-exceeded — LIVE, wall-clock only; (5) break-glass-used — LIVE. All demoed to the owner's phone.
+> - **Thrashing detector recalibrated, commit `15c17d0`** — a "nearby-progress" gate fixed a real false
+>   positive (session `53a3bb89`). Stays shadow-only, never kills, per this section's doctrine above.
+> - **Usage-measurement accuracy spike run** (read-only investigation, no repo touched, nothing killed —
+>   [`planning/control-plane/USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md)):
+>   per-job tokens/cost ARE measurable, even under two-job concurrency, via OTLP or a headless job's own `-p`
+>   JSON result — both channels agree to the same floating-point value. **This unblocks the deadline/budget
+>   alert's budget half for dollar/token budgets.** It does NOT unblock "% of the weekly/5-hour cap" — `fh`/
+>   `sd` in the global usage file carry no session id and are structurally incapable of per-job attribution;
+>   that stays `UNOBSERVABLE`, never estimated, per this project's own doctrine.
+> - **Rank 3 (off-machine durability) now has a SPEC, not a build** —
+>   [`planning/control-plane/RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md):
+>   a dedicated private backup repo mirroring the control-plane's runtime ledger, scheduled-task XML, and hook
+>   config, with a periodic restore test. **Gated on the owner creating the private repo** — Dispatch does not
+>   create accounts/repos. Ranks 4 (continuation packet) and 5 (incident lifecycle + housekeeping) remain
+>   unbuilt.
+>
+> Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp0729).
+
 ### CP1. 🔄 The empirical SPIKE CAMPAIGN — prove or KILL the hook-based containment before building (AUTONOMOUS PORTION COMPLETE 2026-07-27; three owner-dependent probes remain)
 
 > **⭐ RESULT (2026-07-27, Claude Code build 2.1.206): the design HELD.** The probes that a session
@@ -810,7 +862,9 @@ buckets would fragment, so they are kept together — and as of 2026-07-27 they 
 control-plane program** rather than buried in the 2.8.5 tail, because the museum is the second priority band
 and was never really 2.8.5 work. **State of play: P is built; P1 is FULLY CLOSED; P2 is PUBLISHED and LIVE
 (2026-07-24) — but the live site is now STALE against its source, which is P14; P8 ✅ SHIPPED 2026-07-27 and
-is the blueprint P11 builds on; P3/J both depend on P1.** None of it gates the `dev → main` release._
+is the blueprint P11 builds on; P3/J both depend on P1.** **P15 (new 2026-07-29) is a precondition on
+museum-done** — the control plane became the board's top program the day after P8's corpus was cut, and
+its own arcs are not in it yet. None of it gates the `dev → main` release._
 
 **⭐ The build order inside this program (P8's own recommendation, adopted 2026-07-27):** **P10** (the nav is
 free to change now) → **P11 Stage 0** (`arcs.json` — the one genuinely new data artifact) → the arc spine →
@@ -1952,6 +2006,44 @@ further from it, which is the same class of gap as a green check that means noth
 
 **Done means:** P13 is closed, the site is regenerated from the current archive, verified privately, exposed,
 and the live URL confirmed serving the new build.
+
+### P15. ⬜ MUSEUM RE-AUDIT — fold the control-plane program into the corpus before "museum done" (owner, 2026-07-29)
+
+**What it is.** P8's story-corpus and structure audit (146 arcs, the room/connection map) were cut
+2026-07-27 — the day BEFORE the control plane became the board's top program and the kernel work of
+2026-07-28/29 landed. The museum's scope is therefore stale against its own subject: the self-maintaining
+system is the museum's organizing thesis (item **P**, "the story of the workflow and every measure that
+maintains it"), and the single richest recent instance of that thesis — a live three-model review
+converging on a trusted-action-kernel reframe, two kernel ranks actually shipped, a real false positive
+caught and corrected in the thrashing detector, five new alerts demoed live — currently has NO arc in the
+corpus at all. **This item is a precondition on calling the museum done, not an optional content pass.**
+
+**Three parts:**
+
+1. **Extend the arc corpus.** Add the control-plane program's own arcs to P8's 146 (CP1-CP5's spike
+   campaign and staged build, the three-model convergence review and its dissent, kernel ranks 1-2 shipped,
+   the reaper's re-scoping, the thrashing detector's real false-positive-then-fix, the five alerts, and the
+   usage-measurement spike) as **new, dated entries** — never edited into the existing 146, which are P8's
+   own frozen snapshot (Protocol 49 discipline: extend, don't rewrite history).
+2. **Decide its room / placement.** This is the museum's CENTERPIECE material per item **P**'s own thesis
+   (the self-maintaining system, not app history) — it must be placed **prominently**, not folded as a
+   footnote to an existing room. Which room (a new one, or the strongest existing candidate) is an open
+   design decision, not yet made.
+3. **Verify P11's Visual Web includes it.** Once **P11**'s `arcs.json` (Stage 0) exists, confirm the
+   control-plane arcs from part 1 are represented in it — the Visual Web claims to be complete-but-navigable
+   over the WHOLE corpus, so an arc corpus missing its own most recent chapter would silently break that
+   claim.
+
+**Cross-references, not restatements.** Depends on **P8**'s corpus (extends it, Protocol 22) and **P11**
+(the arc corpus is P11 Stage 0's direct input — this item's part 1 IS P11 Stage 0 material, filed here
+because the trigger is "the museum fell behind the control plane," not "P11 needs more data"). Sits inside
+**THE MUSEUM PROGRAM** cluster above and inherits its curation law + lay-audience bar (item **P**) and its
+PII/identity discipline (**P13**) — the control-plane material is unusually rich in paths/session ids/the
+owner's own working notes, so the same fail-closed visibility rule P11 already specifies applies here
+without exception.
+
+**Done means:** the control-plane arcs exist in the corpus as dated entries; a room/placement decision is
+made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them.
 
 ---
 

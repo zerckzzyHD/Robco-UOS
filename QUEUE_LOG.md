@@ -8,13 +8,135 @@
 
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
-**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728)
+**Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
+[CP kernel ranks 1-2 shipped, P15](#cp0729)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cp0729"></a>
+
+### 2026-07-29 — kernel ranks 1-2 SHIPPED, five new alerts, thrashing recalibrated, a rank-3 backup-repo spec, the usage-measurement question answered, and a new museum item (P15)
+
+**All control-plane work below shipped in the private `RobCo-Control` repo, not this app repo.** This entry
+is the documentation fold-in of that work into `QUEUE.md`/`QUEUE_LOG.md` — the pass itself was read-only
+against this repo: reads, doc edits, and the commit/push/archive-sync described at the bottom, nothing else.
+No process was killed, no code path was activated, no enforcement was flipped on.
+
+**Kernel rank 1 — job contract + reconciler — ✅ SHIPPED, commit `8eab8fd`.** The per-job manifest of desired
+state (id/nonce, canonical repo/worktree, base SHA + expected remote, job type, allowed write scope, usage
+reserve, wall-clock deadline, required verification commands, terminal condition, notification policy,
+context/protocol version-hash) plus intent → act → observe-independently → result with idempotency keys, and
+reconciliation of intents-without-results after a crash — exactly the design the 2026-07-28 (late)
+three-model convergence set as rank 1 (see [above](#cpkernel0728)).
+
+**Kernel rank 2 — transactional exact-SHA verifier/publisher — ✅ SHIPPED, commit `dd49ed4`.** The publisher
+pushes only a SHA it independently produced evidence for; it **fails closed**, carries a tested,
+ledger-recorded break-glass, and has fault-injection tests proving the negative cases, not just the happy
+path. This is the real choke point the convergence review identified (credential separation makes it one).
+
+**The idle-session reaper (built the night before, commit `643ebb8`) is confirmed re-scoped** to
+verified-terminal-state / owner-authorized-hard-deadline cleanup only, for supervisor-launched jobs, never
+idle-inference on an interactive session — matching the 2026-07-28 (late) narrowing exactly (see
+[above](#cpkernel0728)); no new commit for this, it is the same build, now explicitly confirmed against the
+convergence doctrine rather than left as an open re-scope.
+
+**Five new Pushover alerts, commits `f14499d` + `bac032a`** (on top of the four already built + live —
+usage-threshold crossing, thrashing/stuck session, ghost/duplicate launch, stranded/unconfirmed push):
+
+1. **"A session needs your input"** — documented contract only. Depends on the `Notification` hook firing
+   reliably on the installed build; unverified-live, not wired yet.
+2. **⭐ Backup unhealthy** — LIVE, and the highest-value alert shipped tonight: it already fired correctly on
+   a real run, catching unpushed/uncommitted work or a stale archive sync before it became a loss. This is
+   the direct response to the 2026-07-28 near-miss (the control repo sat with 2 unpushed commits).
+3. **Session died / errored** — documented contract only, via the `StopFailure` hook; unverified-live, not
+   wired yet.
+4. **Deadline exceeded** — LIVE, wall-clock only (the budget half is separate, see the usage-measurement
+   verdict below).
+5. **Break-glass used** — LIVE. Fires when rank 2's manual publish-without-evidence override is invoked.
+
+All five were demoed to the owner's phone.
+
+**Thrashing detector recalibrated, commit `15c17d0`.** Added a "nearby-progress" gate: a session making
+real, adjacent progress no longer trips the same-tool-failure heuristic. This corrected a **real false
+positive** on session `53a3bb89` — recorded plainly as a live miss the shadow-only detector caught and fixed
+in itself, exactly the kind of shadow-first evidence the convergence review's promotion criteria ask for.
+The detector stays shadow-only; it still never kills, per the standing doctrine.
+
+**Usage-measurement accuracy spike run — read-only investigation, no enforcement, no budget code, nothing
+killed.** Full document:
+[`planning/control-plane/USAGE_MEASUREMENT_SPIKE.md`](../planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).
+This is the spike the 2026-07-28 (late) convergence explicitly gated the budget half of the deadline/budget
+alert on. Method: real bounded `claude -p` jobs (single-turn), three configurations (plain headless, headless
+with OTLP pointed at a throwaway local listener, two jobs launched genuinely concurrently), compared against
+the global usage file the supervisor already reads. Total spend: ~$0.72 across 7 jobs.
+
+- **The global usage file (`plan-usage-history.json`)** is a flat, account-wide time series with **no
+  session id, job id, or process id of any kind** — structurally incapable of per-job attribution, not just
+  imprecise. It moved in the right direction for every test job (confirming it's live), but `fh`/`sd` stay
+  undocumented and integer-rounded.
+- **A headless job's own `-p --output-format json` result** carries `session_id`, `total_cost_usd`, and full
+  token accounting — real, precise, per-job, no extra infrastructure needed for the headless case.
+- **Native OpenTelemetry export is real and far more granular than expected** — metrics and logs (no traces:
+  `OTEL_TRACES_EXPORTER=otlp` produced nothing on this build), every data point tagged with `session.id`,
+  cost and token counts broken out per model. Cross-checked exactly against the `-p` JSON result for the same
+  job — both channels agree to the same floating-point value.
+- **The concurrency test is the key result:** two `claude -p` jobs launched genuinely simultaneously (OTLP
+  posts landed within 1ms of each other) stayed cleanly separated — every payload carried exactly one
+  `session.id`, no cross-contamination, both jobs' numbers matched their own `-p` results exactly. This holds
+  mechanically (each process runs its own OTel SDK instance with no shared mutable state), not by luck of a
+  2-job sample.
+- **Verdict:** per-job token/dollar attribution is real, precise, and survives concurrency — via OTLP or the
+  headless `-p` result, never via the global usage file. **"% of the weekly/5-hour cap" per job remains
+  UNOBSERVABLE** — `fh`/`sd` are undocumented, integer-rounded, and carry no identity field to attribute a
+  delta to; per this project's own doctrine ("never fabricate the unobservable"), that boundary stays
+  unobservable rather than estimated.
+- **What this does NOT cover:** only 2 concurrent jobs tested, not higher concurrency; only headless jobs
+  tested, not interactive sessions (OTLP for interactive is unverified, though there's no mechanistic reason
+  to expect a difference); nothing is wired into the real supervisor/job-contract launch path yet — this is a
+  measurement result, not shipped plumbing.
+- **Consequence for the deadline/budget alert:** the budget half is now **unblocked** for a `usageReserve`
+  defined in dollars or tokens (both proven measurable, even concurrently); it stays **blocked** for any
+  alert framed as "% of cap consumed by job X." `planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`'s
+  own budget-gating note was updated in this same pass to point at the spike's verdict rather than leaving
+  the question open.
+- One leftover, flagged rather than acted on per the task's "kill nothing" rule: a throwaway local OTLP
+  listener process may still be bound to `127.0.0.1:4318` on the machine from the spike — localhost-only,
+  writes only to a log file, flagged to the owner to stop by hand.
+
+**Rank 3 (off-machine durability) now has a SPEC, not a build.** Full document:
+[`planning/control-plane/RANK3_BACKUP_REPO_SPEC.md`](../planning/control-plane/RANK3_BACKUP_REPO_SPEC.md).
+A dedicated private GitHub repo (proposed name `RobCo-Control-Backup`) mirroring the control-plane's
+append-only ledger, `snapshot.json`/`status.json`, exported Task Scheduler XML, and non-secret hook
+configuration — explicitly **never** secrets (Pushover creds, the OAuth client secret) or transient state
+(lockfiles, the `DISABLE` kill-switch), enforced by an exclude-list plus a pre-commit secret-scan that fails
+closed. Includes a periodic restore test (clone into a temp dir, replay the ledger, validate refs/config) so
+"backed up" means provably recoverable. **Open decisions left to the owner:** the repo name and actually
+creating it (Dispatch does not create accounts/repos), the backup/restore-test cadence, and whether the
+separate `C:\Dev\auth` secrets-backup problem is in scope now or tracked apart. Ranks 4 (deterministic
+continuation packet) and 5 (incident lifecycle + daily housekeeping) remain unbuilt.
+
+**The control-plane ↔ archive relationship, recorded plainly for the record:** the control-plane **code**
+lives in its own separate private repo (`RobCo-Control`) and is **not** part of the private archive mirror;
+its **design/story docs** (`planning/control-plane/*.md` in this app repo) **are** archive-mirrored, same as
+any other `planning/` doc (Protocol 48); and `QUEUE.md`/`QUEUE_LOG.md` live in this app repo, backed up via
+its own `origin/dev` push, **outside** the archive mirror entirely. Three different backup surfaces, three
+different mechanisms — recorded here because CP4 (the sync audit) is exactly the item that asks "what is
+covered and by what" across surfaces like these.
+
+**New museum item filed: P15** (in `QUEUE.md`, THE MUSEUM PROGRAM section) — the control plane became the
+board's top program the day after P8's story-corpus (146 arcs) was cut, so the corpus, room placement, and
+P11's Visual Web are all now stale against the control plane's own recent history. Filed as its own item
+(family prefix **P**, next free number) per the owner's instruction that it get "its own item," and as an
+explicit precondition on calling the museum done — full body in `QUEUE.md`.
+
+**What did NOT happen in this pass:** no code was written or changed in this app repo or the control repo;
+no process was killed; no enforcement was turned on; no new build was started. This is a documentation and
+backup pass only — the queue/log edits above, plus a commit/push of this repo's tracked docs to `origin/dev`
+and an archive-sync run (Protocol 48) to back up the `planning/control-plane/*.md` docs referenced above.
 
 <a id="cpkernel0728"></a>
 
