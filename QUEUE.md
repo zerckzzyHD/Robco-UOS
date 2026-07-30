@@ -24,7 +24,19 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
+**Last updated: 2026-07-30 (CPB5 fold — three owner additions, doc-only)** — Folded three owner-approved
+additions (all 2026-07-30) into the existing **CPB5** operator-control-CLI entry, no ID renumbered, nothing
+rebuilt: **(1)** a **locked startup-banner decision** — the `robco` CLI opens on a two-tone sea-turtle banner
+(phosphor-green turtle over a blue waterline), GPT's dependency-free `robco-turtle-banner.mjs` renderer,
+truecolor with `NO_COLOR`/unicode/ascii fallback, chosen over Gemini/Fable/hand-drawn; **(2)** a new
+**notification-control capability** — the CLI manages Pushover delivery with a global on/off plus
+per-alert-type toggles (settings-panel style), human-driven with a ledger event per toggle, guarded by
+critical-alert breakthrough + an optional auto-unmute timer; **(3)** an explicit **first-class aesthetic
+requirement** — a polished TUI at Claude Code CLI finish level (phosphor theme, boxes/tables/color, the
+banner). Doc-only pass, pushed through the CPB4 doc-only fast path. SHA + the post-push DG2 counter are in
+this pass's report.
+
+**Prior update — 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
 checkpoint fold + reconcile + push-verify-all pass; no code feature was built (ACT2 and the control-repo
 push-gate fix are queued, not built here).** Folded: **(a)** a **token-billing framing refinement to CPB1**
 (owner-approved 2026-07-30) — its budget alert (tokens/$) is scoped as a **token-billing guardrail**: stay
@@ -1680,6 +1692,26 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   guardrails above**. This is the owner's "CLI on my phone / manage while away" surface. Folds in GPT's
   "phone-first operator cockpit" and Gemini's `robco status` / supervisor-local-web-view; can surface the same
   pending-events delta as **RB1**'s inbox projection.
+  **Startup banner — locked (owner decision 2026-07-30).** The `robco` CLI opens on a **sea-turtle startup
+  banner**: GPT's dependency-free renderer drawing a side-profile sea turtle cresting a wave, rendered
+  **two-tone** — a phosphor-**green** turtle body over a **blue** waterline/wave (the foam and everything below
+  the surface is blue; the turtle body above it is green). Truecolor with graceful fallback — `NO_COLOR`-aware,
+  with unicode and ascii fallbacks. Chosen over Gemini's, Fable's, and hand-drawn attempts. The asset already
+  exists as GPT's `robco-turtle-banner.mjs`; it gets **integrated and recolored** (green turtle / blue water)
+  when CPB5 is built.
+  **Notification control — the CLI manages Pushover delivery at will (owner add 2026-07-30).** A **global
+  on/off switch** AND **per-alert-type** individual enable/disable, laid out like a settings panel (global
+  switch on top, individual toggles beneath) so each alert family flips **independently** — budget/token,
+  usage-mode change, backup failure/health, session-needs-input, unbacked-work / push-confirm, thrashing,
+  deadline, break-glass, and any others. **Human-driven only**; every toggle **appends a ledger event** (a
+  record of when alerts were off and which). **Two safety guards, both owner-approved:** critical alerts
+  **break through a global mute by default**, and an **optional auto-unmute timer** (configurable duration) so
+  a mute can never silently swallow alerts forever. Commands along the lines of `robco notify on|off|status`
+  plus per-type toggles.
+  **Aesthetic requirement — first-class, not an afterthought (owner add 2026-07-30).** CPB5 must be a
+  **polished, beautiful TUI at the level of finish of the Claude Code CLI**: RobCo/Fallout phosphor theme,
+  clean boxes / tables / color, readable layout, and the turtle banner. Recorded as a first-class requirement
+  of the item.
 - **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
