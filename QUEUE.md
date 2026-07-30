@@ -24,7 +24,23 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-29 (later)** — **Kernel ranks 4 and 5 SHIPPED and pushed**, on top of ranks 1-2
+**Last updated: 2026-07-29 (later still)** — **RB4 and RB5 expanded with GPT's detailed design, and a new
+RB6 filed.** RB4 now specs a full V1 seven-tool contract (`control_get_inbox` / `control_get_job` /
+`control_get_event` / `control_get_health` / `control_ack_event` / `control_submit_intent` /
+`control_get_intent_status`), proposal-only verbs, idempotency, generation checks, and two corrections
+against GPT's original design (the intake dir must resolve via `lib/paths.js`, not a hand-built
+`%LOCALAPPDATA%` path — the MSIX-virtualization trap — and a prerequisite MCP-load spike comes first).
+RB5 now specs the full bounded wake-spike protocol (anchor nonce, 5-minute hands-off window, strict
+4-criteria PASS, seven named failure classifications) and states plainly that even a full pass proves
+only session→Dispatch wake, never the AI-free supervisor→Dispatch wake this program actually needs. **New
+RB6** (near-term, buildable now): a Pushover → Dispatch Android deep-link so the owner's tap on the
+notification opens straight into the conversation — friction reduction on the existing "owner is the
+wake" fallback, not a wake mechanism itself. Full detail →
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md). Also
+this pass: the private control-plane backup repo (rank 3, item below) was renamed from the placeholder
+`RobCo-Control-Backup` to `RobCo-Control-Ledger` — same empty PRIVATE repo, clearer name.
+
+**Prior update — 2026-07-29 (later)** — **Kernel ranks 4 and 5 SHIPPED and pushed**, on top of ranks 1-2
 below: rank 4, the deterministic continuation packet (commit `9fd751d`), and rank 5, incident lifecycle +
 daily housekeeping (commit `32c0fbc`), both in the private `RobCo-Control` repo. **Wiring status verified
 and corrected against the claim this pass started from (Protocol 51 dissent — full account →
@@ -825,7 +841,7 @@ the witness-vs-controller decision is recorded with its date and reasoning.
 
 ---
 
-# The Dispatch Return Bus — RB1-RB5 (new 2026-07-29, plan-only)
+# The Dispatch Return Bus — RB1-RB6 (new 2026-07-29, plan-only)
 
 **New family prefix — CP1-CP5 are already assigned to specific work, so the next slice of the same kernel
 program takes its own prefix rather than force-fitting into CP6+ (same reasoning as HG's own prefix note,
@@ -840,7 +856,8 @@ inform or wake DISPATCH itself — the loop has only half. Three distinct capabi
 **DELIVERY** (put an event where Dispatch can read it), **WAKE** (start a Dispatch turn without the owner
 prompting first), and **ACKNOWLEDGMENT** (the supervisor knows Dispatch actually processed the event).
 RB1-RB4 close DELIVERY + ACKNOWLEDGMENT; RB5 is the only item aimed at WAKE, and WAKE is flagged
-**BLOCKED BY PLATFORM** below.
+**BLOCKED BY PLATFORM** below. RB6 is a separate, smaller item pulled out of the RB5 design pass — it
+reduces friction on the existing owner-is-the-wake fallback, it does not attempt WAKE itself.
 
 ### RB1. ⬜ Dispatch INBOX projection — read at turn start (plan-stage)
 
@@ -874,37 +891,79 @@ times in one session before the arc that produced CP1-CP5.
 **Done means:** a deliberately-triggered hidden response (text emitted outside the messaging tool) is
 detected and produces a phone alert, proven red-then-green, not just reasoned about.
 
-### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage)
+### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage; V1 contract folded in 2026-07-29)
 
 **What it is.** A local MCP server (Cowork already loads MCP servers, so a custom one added to the desktop
 config is very likely callable by Dispatch — confirm with a small load-spike, RB4's own first step)
-exposing `control_get_inbox` / `control_get_job` / `control_get_health` (DELIVERY as a live query, always
-current — better than a stale file projection), `control_ack_event` (ACKNOWLEDGMENT — the piece a flat
-file cannot provide), and `control_submit_intent` (finally makes the Dispatch → supervisor direction
-real). **Hard limit, stated plainly: MCP is request→response — it makes the supervisor QUERYABLE, not
-Dispatch WAKEABLE.** It is a thin reader over the canonical ledger/outbox plus a writer of ack/intent
-events back to it — explicitly **not** a second ledger and **not** a second orchestrator.
+exposing seven V1 tools: `control_get_inbox` / `control_get_job` / `control_get_event` /
+`control_get_health` (DELIVERY as a live query, always current — better than a stale file projection),
+`control_ack_event` (ACKNOWLEDGMENT — the piece a flat file cannot provide), `control_submit_intent`
+(finally makes the Dispatch → supervisor direction real), and `control_get_intent_status` (poll-back so
+intent submission isn't fire-and-forget). Everything `control_submit_intent` can request is a closed set
+of **proposal-only verbs** (`REQUEST_RECONCILE` / `REQUEST_VERIFY_JOB` / `REQUEST_SUPERSEDE_PROPOSAL` /
+`REQUEST_TERMINATION_PROPOSAL`) the supervisor evaluates and may refuse — never a direct command.
+Idempotent via requestId + payload hash, generation-checked against stale state, atomic-file intake, a
+stable closed error-code set, an RB1-flat-file availability fallback if the MCP is down, and version
+banners on every response. **Hard limit, stated plainly: MCP is request→response — it makes the
+supervisor QUERYABLE, not Dispatch WAKEABLE.** It is a thin reader over the canonical ledger/outbox plus
+a writer of ack/intent events back to it — explicitly **not** a second ledger and **not** a second
+orchestrator. Full V1 contract →
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md#rb4--custom-control-plane-mcp-v1-contract-gpt-design-folded-in-2026-07-29).
 
-**Done means:** the load-spike confirms Dispatch can see and call the server's tools; `control_ack_event`
-round-trips into the ledger; no second ledger or parallel orchestrator is introduced.
+**Two corrections locked in against GPT's original design:** (a) the intake directory must be derived
+through `lib/paths.js` under the control-plane state path, never a hand-built `%LOCALAPPDATA%` string —
+that path can be silently virtualized by Windows for a packaged app (the MSIX-virtualization trap), so a
+hand-built path can resolve to a different physical location than where the supervisor actually
+reads/writes. (b) A prerequisite load-spike — confirm Cowork actually loads a custom local MCP server and
+Dispatch can call its tools — comes before any of the seven tools are built; it's RB4's own first step,
+not a separate item. Also: GPT's proposed "fixed wake phrase" is **already** the locked `status` trigger
+(don't add a second one, and don't reuse `sync` — already spoken for); GPT's "separate acknowledgment
+classes" are **largely already** rank 5's incident lifecycle (open/updated/resolved/reopened) —
+`control_ack_event` should map onto that existing model, not invent a parallel one.
 
-### RB5. ⚠️ Bounded `send_message` WAKE spike — BLOCKED BY PLATFORM (plan-only; owner approval required before running)
+**Done means:** the load-spike confirms Dispatch can see and call the server's tools; all seven tools
+round-trip correctly (including idempotent replay and generation-rejection); no second ledger or parallel
+orchestrator is introduced.
 
-**What it is.** From a throwaway session, one nonce-tagged benign message targeting this conversation's
-id. **Pass** = it appears here AND wakes a turn AND is phone-visible AND deduped. Caveat, stated up front:
-a pass only proves _session→Dispatch_, never _supervisor→Dispatch_ — the supervisor is an AI-free Node
-script with no MCP access, so it would have to spawn a Claude session to relay, reintroducing AI + usage
-cost into the AI-free control root. Reject the approach outright if it needs an auth/attestation bypass.
+### RB5. ⚠️ Bounded `send_message` WAKE spike — BLOCKED BY PLATFORM (plan-only; owner approval required before running; bounded protocol folded in 2026-07-29)
+
+**What it is.** One disposable, read-only relay session sends a single nonce-tagged message into this
+Dispatch conversation (the owner posts the anchor nonce into the conversation first, so the spike can
+prove it hit the right target), followed by a 5-minute hands-off observation window — no owner action —
+to see whether the message alone starts a turn. **Strict PASS requires all four:** the nonce appears in
+this conversation; it starts a turn with zero owner prompting; it's phone-visible; and it's deduped (no
+second turn from a duplicate send). A failure is classified, not just logged: `DELIVERY_ONLY` /
+`WAKE_DESKTOP_ONLY` / `WRONG_SURFACE` / `AMBIGUOUS_TARGET` / `UNSAFE_TRANSPORT` / `NO_DELIVERY` /
+`DUPLICATE_DELIVERY`. Reject the approach outright — don't work around it — if it needs an
+auth/attestation bypass. Full spike protocol →
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md#rb5--send_message-wake-spike-bounded-design-gpt-design-folded-in-2026-07-29).
 
 **⚠ Flagged BLOCKED BY PLATFORM, not merely unstarted.** No documented way exists today for a local
 process to inject a turn into the persistent Cowork/Dispatch conversation — this is the one gap in the
 whole return-bus design that genuinely waits on Anthropic shipping a native capability, not on more design
-or code here. RB1-RB4 do not depend on this landing; the documented fallback (**inbox + Pushover = the
-owner is the wake**) is honest, functional, and already achievable through RB1 alone.
+or code here. **Even a clean pass proves only session→Dispatch wake, never AI-free supervisor→Dispatch
+wake** — the supervisor has no MCP access, so it would still need to spawn a relay session, reintroducing
+AI + usage cost into the AI-free control root; AI-free supervisor→Dispatch wake stays BLOCKED BY PLATFORM
+regardless of this spike's outcome. RB1-RB4 do not depend on this landing; the documented fallback
+(**inbox + Pushover = the owner is the wake**) is honest, functional, and already achievable through RB1
+alone.
 
-**Done means:** the spike either runs (owner approval given) and its pass/fail is recorded with evidence,
-or the item stays parked exactly as BLOCKED BY PLATFORM until a native wake capability is confirmed to
-exist.
+**Done means:** the spike either runs (owner approval given) and its pass/fail is recorded with evidence
+and a named classification if it failed, or the item stays parked exactly as BLOCKED BY PLATFORM until a
+native wake capability is confirmed to exist.
+
+### RB6. ⬜ Pushover → Dispatch Android deep-link (near-term, plan-stage, new 2026-07-29)
+
+**What it is.** A small, separate, buildable-now item pulled out of the RB5 design pass: give the
+Pushover notification an Android deep-link tap target straight into the Dispatch conversation, so the
+owner's tap **is** the wake instead of notification-then-hunt-for-the-app. Doesn't touch the AI-free-wake
+question — the owner is still the human triggering it — it just removes friction from the existing RB1
+fallback (**inbox + Pushover = the owner is the wake**). Open question is Android-specific deep-link
+routing (Cowork/Dispatch's actual URI scheme or app-link behavior on Android) — the Pushover side already
+works.
+
+**Done means:** tapping the Pushover notification on Android opens directly into the Dispatch
+conversation, verified on an actual Android device/routing (not assumed from iOS/desktop).
 
 ---
 
