@@ -9,13 +9,71 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cprefine0730"></a>
+
+### 2026-07-30 (later) — three owner-approved refinements folded into the CP activation checklist (REF1-REF3), plus a small CPB1 addition
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No control-plane code was written or changed,
+nothing was killed, no enforcement was flipped on.
+
+**Why.** Three refinements the owner worked out in conversation on 2026-07-30, after the CP activation
+checklist above had already consolidated the program — each sharpens an item already on that checklist
+rather than adding new scope.
+
+**REF1 — session-aware uncommitted-work gating for the backup-unhealthy alert.** The owner hit a false
+alarm: the LIVE backup-unhealthy alert (`f14499d`/`bac032a`) fires on uncommitted work sitting in a repo, but
+files mid-build in an active session are _supposed_ to be uncommitted — that is normal, not a finding. Fix,
+as specified: the alert must not fire on uncommitted work while a session is actively working that repo (the
+supervisor already tracks tree co-residency / active sessions, so this reuses an existing signal rather than
+building a second tracker); it should fire only when the uncommitted work is **orphaned** (its owning session
+finished or died) or has sat uncommitted with no active session past a threshold. Filed as a refinement on
+the alert rather than a rewrite of the 2026-07-29 shipped-alert record (Protocol 50 a-date: a reinforcement
+carries its own date, it does not overwrite the original).
+
+**REF2 — safe-lifecycle reaping, refining DG3 (the idle reaper's shadow → actual-reap promotion).** The
+owner's stated need: he wants finished sessions actually killed once they've served their purpose, and he
+cannot do this himself — archiving a session in the desktop UI does not terminate its process, only a real
+`(pid, procStart)` kill does, which is exactly the reaper's job. The refinement gives the promotion two, and
+only two, clean "done" signals: (a) a supervisor-launched job whose job contract (CPK1's reconciler) reached
+verified-terminal state — no guessing involved; (b) an interactive/Dispatch-launched session idle past an
+owner-set idle threshold — an authorized deadline, not idle-inference (the same "idle-inference is unsafe"
+lesson the reaper's 2026-07-28 re-scope already established, now extended with a concrete idle-vs-verified
+split). Three hard guards sit in front of any kill: long-idle only, never mid-work; never reap a session that
+left uncommitted work — flag it to the owner and hold, never auto-commit possibly-broken WIP and never kill
+unreviewed work; and the rank-4 (CPK4) continuation packet must snapshot the session's state before any reap
+so nothing is lost. The existing kill mechanism is explicitly kept intact by this refinement, not replaced:
+echo-and-confirm `(pid, procStart)`, never batched.
+
+**REF3 — auto-verdict on data-gated promotions, refining DG1-DG5 plus the ACT1 housekeeping pass.** The
+owner's principle, verbatim: "nothing that needs data collection should require me to do it — it should be
+automatic." Today each DG item's promotion condition is described in prose (DG2's "≥10 clean wrapper
+pushes" is the only one with a concrete number; DG1/DG4/DG5 are qualitative — "a clean shadow stretch," "a
+clean hit-based stretch," "a measured collision rate"). REF3's refinement: every DG item gets an **explicit**
+evidence threshold defined up front, not left to be eyeballed later, and the daily/weekly housekeeping pass
+(ACT1 / CPK5) tracks progress toward each threshold automatically. The moment a threshold is met, the
+housekeeping pass Pushovers the owner the decision with the recommendation already computed — the worked
+example the owner gave was "worktrees-vs-lease ready: collision rate X% over N chances → recommendation:
+lease is enough" — so the owner one-tap decides instead of having to manually check progress. The concrete
+numeric thresholds per DG item still need to be pinned down as each promotion is actually built; REF3 fixes
+the _mechanism_ (auto-tracked, auto-surfaced), not the numbers themselves.
+
+**Also folded in — a small addition to CPB1 (the budget alert), from the same conversation.** The alert
+should also state when the usage cap resets: check whether the usage data itself carries a reset/window-end
+timestamp and include it verbatim if so, else compute it from the ~5-hour rolling session window plus the
+weekly cycle. Attached directly to CPB1's own entry rather than filed as a fourth REF item, since it extends
+an item already fully scoped rather than refining a decision.
+
+**Not done in this pass, by design:** no control-plane code was touched for any of the three refinements —
+REF1, REF2, and REF3 are all still design-only, same as the checklist items they refine. This pass only
+records the owner's approved design so it lives in `QUEUE.md`, not only in conversation (Protocol 50).
 
 <a id="cpactivation0730"></a>
 

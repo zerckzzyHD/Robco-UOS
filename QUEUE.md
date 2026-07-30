@@ -24,7 +24,26 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30** — **Every owner-gated / activation / to-implement step of the control-plane
+**Last updated: 2026-07-30 (later)** — **Three owner-approved refinements folded into the CP activation
+checklist, plus one small addition to CPB1.** New family prefix **REF1-REF3** (single letters and all prior
+CP-program families now spoken for): **REF1** makes the LIVE **backup-unhealthy** alert session-aware — it
+must not fire on uncommitted work while an active session still owns that tree (files mid-build are
+_supposed_ to be uncommitted), only on uncommitted work that is orphaned or has sat stale past a threshold
+with no active session. **REF2** is a safe-lifecycle-reaping design for **DG3** (the idle reaper's
+shadow→actual-reap promotion): two clean "done" signals (a verified-terminal job contract, or an owner-set
+idle deadline) behind three hard guards (long-idle only; never reap uncommitted work — flag + hold instead;
+snapshot via the **CPK4** continuation packet before any reap), keeping the proven `(pid, procStart)`
+echo-and-confirm kill intact and never batched. **REF3** gives every data-gated promotion (**DG1-DG5**) an
+explicit evidence threshold defined up front, with the **ACT1** daily/weekly housekeeping pass tracking
+progress toward each automatically and Pushovering the owner a ready-computed recommendation the instant a
+threshold is met — the owner's own principle, verbatim: "nothing that needs data collection should require
+me to do it — it should be automatic." **Also folded in — CPB1** now specs including the usage-cap
+reset/window-end timestamp when the usage data carries one verbatim, else computed from the ~5-hour rolling
+session window plus the weekly cycle. All three refinements are OWNER-APPROVED (2026-07-30) but **NOT YET
+BUILT** — this is a doc-only pass, no control-plane code touched, nothing killed. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730).
+
+**Prior update — 2026-07-30** — **Every owner-gated / activation / to-implement step of the control-plane
 program consolidated into one tracked checklist** — "⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST",
 filed directly after HG2, above. Fourteen new items across six new family prefixes (**CPK1-CPK5** retroactive
 IDs for the kernel ranks; **CPB1-CPB3** the next build batch — budget alert, usage→operating-modes, the
@@ -1065,8 +1084,10 @@ reused here, never reassigned.
   the usage-measurement spike — per-job cost/tokens are measurable even under concurrency, via OTLP or a
   headless job's own `-p` JSON result (both channels agree). ("% of the weekly cap" per job stays
   structurally `UNOBSERVABLE` — out of scope for this alert; see doctrine in
-  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).) No existing ID;
-  assigned here.
+  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).) **Refined 2026-07-30
+  (owner-approved):** the alert must also state when the usage cap resets — check whether the usage data
+  carries its own reset/window-end timestamp and include it verbatim if so, else compute it from the ~5-hour
+  rolling session window plus the weekly cycle. No existing ID; assigned here.
 - **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
   Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
   decided, not yet built. No existing ID; assigned here.
@@ -1106,7 +1127,10 @@ reused here, never reassigned.
   housekeeping check is only the drift **safety net**, catching a Protocol 2 miss after the fact, never a
   replacement for the same-commit discipline. **Record this plainly: keeping READMEs current is NOT a new
   trigger word** — it is Protocol 2 plus this housekeeping check, and no session should read this item as
-  license to defer a doc update to a nightly job.
+  license to defer a doc update to a nightly job. **Refined 2026-07-30 — see REF1**: the backup-unhealthy
+  alert this nudge rides on must become session-aware (never fire on uncommitted work an active session
+  still owns) before this housekeeping pass leans on it further; **see also REF3** for the auto-verdict
+  tracking this same daily/weekly pass owes the data-gated promotions.
 - **ACT2.** Wire the write-side kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
   generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
   direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
@@ -1149,11 +1173,47 @@ reused here, never reassigned.
   clean through the wrapper. Fed by **ACT3** (which starts the counter moving today).
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
+  **Refined 2026-07-30 — see REF2** below for the full safe-lifecycle design (two clean "done" signals,
+  three hard guards, a continuation-packet snapshot before any reap) this promotion must build to.
 - **DG4.** `--no-verify` tripwire: shadow → enforce. Promotes only after it catches a real violation cleanly
   (hit-based, with a per-session override) — de-prioritized to telemetry-only by the three-model review.
 - **DG5.** Worktrees-vs-lease: whether anything beyond worktrees is needed. Decided by Stage 1d's measured
   collision rate (cross-ref **CP2**'s "open architectural question" above) — if collisions are ~zero once
   worktrees are on, nothing more gets built here, on purpose.
+
+## REFINEMENTS — owner-approved changes to already-scoped items (2026-07-30)
+
+- **REF1.** Session-aware uncommitted-work gating for the **backup-unhealthy** alert (refines the LIVE
+  alert, `f14499d`/`bac032a`). **Problem the owner hit:** the alert fires on uncommitted work mid-session —
+  but files being actively built/edited are _supposed_ to be uncommitted, so that reads as a finding when
+  it's really a false alarm. **Fix:** the alert must NOT fire on uncommitted work while a session is
+  actively working that repo (the supervisor already tracks tree co-residency / active sessions per repo —
+  reuse that, don't build a second tracker). It should fire ONLY when the uncommitted work is **orphaned**
+  (its owning session finished or died) OR has sat uncommitted with **no active session** past a threshold.
+  OWNER-APPROVED, NOT YET BUILT.
+- **REF2.** Safe-lifecycle reaping (refines **DG3**, the idle-session reaper's shadow → actual-reap
+  promotion). **Why:** the owner wants finished sessions actually killed once they've served their purpose —
+  he can't do this himself, because archiving a session in the UI does **not** terminate its process; only a
+  real `(pid, procStart)` kill does, which is the reaper's job. **Two clean "done" signals, and only these:**
+  (a) supervisor-launched jobs whose job contract (**CPK1**'s reconciler) reached **verified-terminal** —
+  safe, no guessing; (b) interactive/Dispatch-launched sessions idle past an **owner-set idle threshold** —
+  an authorized deadline, not idle-inference. **Three hard guards before any kill:** (i) long-idle only,
+  never mid-work; (ii) **never** reap a session that left uncommitted work — flag it to the owner and
+  **HOLD** (never auto-commit possibly-broken WIP, never kill unreviewed work); (iii) the rank-4 (**CPK4**)
+  continuation packet snapshots the session's state **before** any reap, so nothing is lost. The existing
+  kill mechanism stays exactly as proven — echo-and-confirm `(pid, procStart)`, never batched. OWNER-APPROVED,
+  NOT YET BUILT.
+- **REF3.** Auto-verdict on data-gated promotions (refines **DG1-DG5** + the **ACT1** housekeeping pass).
+  **Owner principle, verbatim:** "nothing that needs data collection should require me to do it — it should
+  be automatic." Each data-gated item — **DG2** (push-guard, ≥10 clean wrapper pushes), **DG1** (thrashing →
+  kill, a clean shadow track record), **DG5** (worktrees-vs-lease, a measured collision rate over N chances),
+  **DG4** (`--no-verify` tripwire, a clean hit-based stretch) — gets an **explicit evidence threshold defined
+  up front**, not a vague "wait and see." The daily/weekly housekeeping pass (**ACT1** / **CPK5**) tracks
+  progress toward each threshold automatically, and the **moment** a threshold is met it Pushovers the owner
+  the decision with the recommendation **already computed** (e.g. "worktrees-vs-lease ready: collision rate
+  X% over N chances → recommendation: lease is enough") — one-tap decide, zero manual checking.
+  OWNER-APPROVED, NOT YET BUILT; the per-item numeric thresholds themselves still need to be pinned down as
+  each promotion is actually built.
 
 ## DONE — for the record, with SHAs
 
