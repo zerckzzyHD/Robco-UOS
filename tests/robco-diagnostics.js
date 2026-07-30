@@ -53242,6 +53242,234 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 257 — ND1: cross-repo naming domains (this repo's half)
+//
+//  The app owns `RobcoEvents` — a client-side game/UI bus, nothing persisted.
+//  The control plane owns "ledger events" — appended, replayable records with a
+//  `type:` field (its lib/ledger.js `appendMany`). Two runtimes, no code clash
+//  today, but "events" is ambiguous between them and both are still growing.
+//  ND1 writes the boundary down once (tests/naming-domains.json, duplicated
+//  byte-identical into the control repo) and gives EACH repo a guard over its
+//  OWN source. There is no cross-repo runtime coupling: this suite reads this
+//  repo's own copy of the list and scans this repo's own js/.
+//
+//  What this suite must NOT become: a taxonomy. The bare word "ledger" is
+//  SHARED — this repo has shipped a user-facing Field Ledger panel, a
+//  transcript event ledger and a per-game parity ledger for months — so only
+//  the distinctive compound "ledger event" is reserved, and 257.7 proves
+//  behaviourally that the shared words stay un-flagged.
+//
+//  Scanning is over CODE with comments stripped (the control repo's group S
+//  precedent): identifiers, string literals, property names and message text
+//  are the collision surface; a comment EXPLAINING the other domain is not a
+//  violation. A guard that cannot tell an explanation from an implementation is
+//  a guard that gets disabled.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 257 — ND1 cross-repo naming domains (app half)');
+
+  const ND_PATH = path.join(ROOT, 'tests', 'naming-domains.json');
+  const SELF_DOMAIN = 'app';
+  let nd = null;
+  try {
+    nd = JSON.parse(fs.readFileSync(ND_PATH, 'utf8'));
+  } catch (e) {
+    /* left null on purpose — 257.1/257.2 fail CLOSED on a missing or unparseable list */
+  }
+
+  assert(
+    !!nd && nd.schemaVersion === 1 && !!nd.domains && !!nd.domains[SELF_DOMAIN],
+    '257.1: tests/naming-domains.json exists, parses, and declares this repo as the "app" domain'
+  );
+
+  // The list is the guard's whole input — a truncated or half-edited list must
+  // fail loudly here rather than silently scanning for nothing (fail-closed).
+  assert(
+    !!nd &&
+      Object.keys(nd.domains || {}).length >= 2 &&
+      Object.values(nd.domains).every(
+        d => Array.isArray(d.reserved) && d.reserved.length > 0 && d.liveProof
+      ) &&
+      Array.isArray(nd.shared) &&
+      nd.shared.length > 0,
+    '257.2: every declared domain carries a non-empty reserved list and a liveProof, and the shared (never-reservable) list is non-empty — a hollowed-out list cannot silently disable the guard'
+  );
+
+  // The scanner. Comments are stripped before matching, and the stripper is
+  // itself proven below (257.6) before anything is trusted to it.
+  const strip257 = src =>
+    src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .filter(l => !l.trim().startsWith('//'))
+      .join('\n');
+
+  const collectJs257 = dir => {
+    const out = [];
+    (function walk(d) {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const full = path.join(d, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith('.js')) out.push(full);
+      }
+    })(dir);
+    return out;
+  };
+
+  // Every reserved term of every domain that is NOT this one.
+  const foreign257 = [];
+  if (nd && nd.domains) {
+    for (const [name, d] of Object.entries(nd.domains)) {
+      if (name === SELF_DOMAIN) continue;
+      for (const r of d.reserved || []) foreign257.push({ domain: name, ...r });
+    }
+  }
+  assert(
+    foreign257.length > 0,
+    '257.3: at least one FOREIGN domain reserves at least one term — the scan below has something real to look for'
+  );
+
+  const scan257 = text => {
+    const hits = [];
+    for (const r of foreign257) {
+      let re;
+      try {
+        re = new RegExp(r.pattern, (r.flags || '').replace('g', '') + 'g');
+      } catch (e) {
+        hits.push(r.id + ' (UNCOMPILABLE PATTERN: ' + e.message + ')');
+        continue;
+      }
+      const m = text.match(re);
+      if (m) hits.push(r.id + ' → ' + m.slice(0, 3).join(', '));
+    }
+    return hits;
+  };
+
+  // 257.4  THE GUARD. This repo's own shipped source must not use any name a
+  //        another domain reserves. Fail-closed: an unreadable scope is a
+  //        failure, not a pass.
+  {
+    const scope = (nd && nd.domains[SELF_DOMAIN].scanScope) || [];
+    let files = [];
+    let scopeOk = scope.length > 0;
+    for (const s of scope) {
+      const dir = path.join(ROOT, s);
+      if (!fs.existsSync(dir)) {
+        scopeOk = false;
+        continue;
+      }
+      files = files.concat(collectJs257(dir));
+    }
+    const offenders = [];
+    for (const f of files) {
+      const hits = scan257(strip257(fs.readFileSync(f, 'utf8')));
+      if (hits.length) offenders.push(path.relative(ROOT, f) + ': ' + hits.join(' | '));
+    }
+    assert(
+      scopeOk && files.length > 20 && offenders.length === 0,
+      '257.4: no file in this repo\'s own js/ uses a name reserved by another domain (the app must not adopt "ledger events" or a LedgerEvents/RobcoLedger identifier for a competing concept)' +
+        (offenders.length ? ' — OFFENDERS: ' + offenders.join(' ;; ') : '') +
+        (scopeOk ? '' : ' — SCAN SCOPE UNREADABLE (fail-closed)') +
+        (files.length > 20 ? '' : ' — ONLY ' + files.length + ' FILES SCANNED (fail-closed floor)')
+    );
+  }
+
+  // 257.5  RED-THEN-GREEN. A guard that can only ever pass proves nothing, so
+  //        the scanner is run against a synthetic source that DOES violate each
+  //        foreign reservation and must flag every one of them.
+  {
+    const synthetic =
+      'const LedgerEvents = {};\n' +
+      "appendMany([{ type: 'ledger.event' }]); // one ledger event\n" +
+      "const RobcoLedger = require('./nope');\n" +
+      "log('appended 3 ledger events');\n";
+    const hits = scan257(synthetic);
+    assert(
+      hits.length === foreign257.length,
+      '257.5: red-then-green — a synthetic source that violates EVERY foreign reservation is flagged by every one of them (' +
+        hits.length +
+        '/' +
+        foreign257.length +
+        '), so 257.4 passing means something'
+    );
+  }
+
+  // 257.6  the comment stripper actually strips, and does not empty the corpus
+  //        — 257.4's whole scope rests on it (group S's S1b/S1d precedent).
+  {
+    const sample =
+      '// ledger events in a line comment\n/* ledger events in a block */\nvar ok = 1;\n';
+    const stripped = strip257(sample);
+    const real = strip257(fs.readFileSync(path.join(ROOT, 'js', 'core', 'state.js'), 'utf8'));
+    assert(
+      scan257(stripped).length === 0 && /var ok = 1;/.test(stripped) && real.length > 5000,
+      '257.6: comments are stripped before scanning (a comment explaining the control plane is never a violation) and stripping does not empty the corpus'
+    );
+  }
+
+  // 257.7  ANTI-OVER-RESERVATION. The words both repos legitimately share must
+  //        stay un-flagged — proven behaviourally, not by comparing strings, so
+  //        a future session that reserves bare "ledger" turns THIS red instead
+  //        of quietly outlawing the shipped Field Ledger panel.
+  {
+    const flagged = [];
+    for (const s of (nd && nd.shared) || []) {
+      const line = 'const ' + s.term + ' = x.' + s.term + "; render('" + s.term + "s');\n";
+      if (scan257(line).length) flagged.push(s.term);
+    }
+    assert(
+      flagged.length === 0,
+      '257.7: every term on the SHARED list stays un-flagged by the scanner — no bare shared word (ledger, event, receipt, incident, proposal) has been reserved' +
+        (flagged.length ? ' — WRONGLY RESERVED: ' + flagged.join(', ') : '')
+    );
+  }
+
+  // 257.8  the guard protects a LIVE name, not a ghost. If the bus is ever
+  //        renamed, this goes red rather than the reservation quietly
+  //        protecting something that no longer exists (S2d's precedent).
+  {
+    const lp = nd && nd.domains[SELF_DOMAIN].liveProof;
+    let live = false;
+    try {
+      const src = fs.readFileSync(path.join(ROOT, lp.file), 'utf8');
+      live = new RegExp(lp.pattern).test(src);
+    } catch (e) {
+      /* left false on purpose — an unreadable home is a failed proof, not a pass */
+    }
+    assert(
+      live,
+      "257.8: this domain's reserved name is actually live in its stated home (RobcoEvents in js/core/state.js) — the guard is not protecting a ghost"
+    );
+  }
+
+  // 257.9  the sibling copy is byte-identical. The two repos share no package,
+  //        so the list is duplicated on purpose; this is what keeps the copies
+  //        honest. It DEGRADES rather than failing when the control plane is
+  //        not on this machine — a public clone or CI must never be blocked by
+  //        the absence of a private sibling (Suite 255.3's precedent), and no
+  //        absolute private path is hardcoded into this public repo.
+  {
+    const sibling =
+      process.env.ROBCO_NAMING_DOMAINS_SIBLING ||
+      path.join(ROOT, '..', '_RobCo-Control', 'code', 'test', 'naming-domains.json');
+    if (fs.existsSync(sibling)) {
+      const a = fs.readFileSync(ND_PATH, 'utf8').replace(/\r\n/g, '\n');
+      const b = fs.readFileSync(sibling, 'utf8').replace(/\r\n/g, '\n');
+      assert(
+        a === b,
+        "257.9: the control repo's copy of naming-domains.json is identical to this one — the duplicated list has not drifted (edit BOTH copies in the same change)"
+      );
+    } else {
+      console.log(
+        dim(
+          '      257.9 — sibling naming-domains.json not present (no control-plane checkout); sync UNVERIFIED, not failed'
+        )
+      );
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

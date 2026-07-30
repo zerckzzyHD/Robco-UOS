@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "title": "RobCo cross-repo reserved naming domains",
+  "queueItem": "ND1",
+  "updated": "2026-07-30",
+  "what": "Which vocabulary belongs to which repo, so two runtimes that share a project name never come to mean the same word two different ways. Each repo's own test gate reads THIS file and scans ONLY its own source for the terms another domain owns. There is no runtime coupling between the repos - each self-checks.",
+  "scanContract": "A domain's `reserved` patterns are scanned against every OTHER domain's source, never its own. Scanning is over CODE with comments stripped (identifiers, string literals, property names, message text) - prose in a comment explaining the other domain is deliberately NOT a violation, because a guard that cannot tell an explanation from an implementation is a guard that gets disabled.",
+  "syncNote": "This file is DUPLICATED, byte-identical, in both repos - they share no package, so there is nothing to import. Edit BOTH copies in the same change. Each repo's guard, when it can see the sibling checkout, asserts the two copies are identical; when it cannot (a public clone, CI), it reports the sync as unverified and does NOT fail. Adding a domain or a term is therefore a two-repo commit pair, deliberately.",
+  "copies": {
+    "app": "!RobCo-UOS/tests/naming-domains.json",
+    "control": "_RobCo-Control/code/test/naming-domains.json"
+  },
+  "extending": "To add a domain (the archive and the museum are the expected next two), add a key under `domains` with its own `reserved` list and give that repo a guard of the same shape. To add a term, add it to the owning domain's `reserved` list - but first check it against `shared` below: a word both repos already use legitimately must NOT be reserved, only a distinctive compound of it. Do not invent reservations for collisions that have not happened.",
+  "domains": {
+    "app": {
+      "repo": "!RobCo-UOS",
+      "visibility": "public",
+      "runtime": "browser PWA (the OS the player uses)",
+      "scanScope": ["js"],
+      "scanExclude": [],
+      "scanScopeWhy": "js/ is the app's own shipped source. tests/ and scripts/ are deliberately OUT of scope - they legitimately discuss the control plane (the push wrapper, the pre-push guard, this very file).",
+      "reserved": [
+        {
+          "id": "app.robco-events-identifier",
+          "pattern": "\\bRobcoEvents\\b",
+          "flags": "i",
+          "kind": "identifier",
+          "means": "the app's client-side game/UI event bus - `window.RobcoEvents` (js/core/state.js): on/off/once/emit over in-page subscribers. Nothing is persisted; nothing leaves the tab.",
+          "othersMustNot": "declare, reference, or name anything `RobcoEvents`. The control plane's appended records are LEDGER EVENTS - a different thing in a different runtime, and it must keep saying so."
+        },
+        {
+          "id": "app.robco-events-phrase",
+          "pattern": "\\bRobCo[ _-]events?\\b",
+          "flags": "i",
+          "kind": "phrase",
+          "means": "the spoken form of the same bus - 'a RobCo event' is something the app's bus emitted.",
+          "othersMustNot": "call their own records 'RobCo events' in code, string literals, or user-facing message text. Say 'ledger events'."
+        }
+      ],
+      "liveProof": {
+        "pattern": "\\bRobcoEvents\\b",
+        "file": "js/core/state.js",
+        "why": "The guard must protect a name that actually exists. If the bus is ever renamed, this goes red rather than the guard quietly protecting a ghost."
+      }
+    },
+    "control": {
+      "repo": "_RobCo-Control/code",
+      "visibility": "private",
+      "runtime": "Node supervisor + append-only ledger (the control plane that watches the work)",
+      "scanScope": ["."],
+      "scanExclude": ["test", "node_modules"],
+      "scanScopeWhy": "every .js file in the control repo (supervisor.js, reconcile.js, controlled-push.js, lib/, scripts/, hooks/) EXCEPT test/ - the test dir holds this file and the guard itself, both of which necessarily contain every reserved term.",
+      "reserved": [
+        {
+          "id": "control.ledger-event-phrase",
+          "pattern": "\\bledger[ _-]events?\\b",
+          "flags": "i",
+          "kind": "phrase",
+          "means": "one appended record in the control plane's durable ledger (lib/ledger.js `appendMany`), each carrying a `type:` field - job.intent, push.result, incident.opened, and the rest. Written to disk, replayable, mirrored off-machine.",
+          "othersMustNot": "introduce a competing 'ledger events' concept. The app's Field Ledger panel and its transcript EVENT LEDGER are fine and long-standing - see `shared` - but a record type called a 'ledger event' belongs to the control plane."
+        },
+        {
+          "id": "control.ledger-event-identifier",
+          "pattern": "\\b(LedgerEvents|ControlEvents|RobcoLedger)\\b",
+          "flags": "i",
+          "kind": "identifier",
+          "means": "the identifier forms of the same concept, reserved ahead of use so the app cannot rename its bus INTO the control plane's vocabulary.",
+          "othersMustNot": "name a bus, store, or emitter any of these. The app's bus is `RobcoEvents` and stays that name."
+        }
+      ],
+      "liveProof": {
+        "pattern": "\\bledger[ _-]events?\\b",
+        "file": "lib",
+        "why": "The control plane must actually USE its own canonical term. If it stops saying 'ledger event', the reservation is protecting nothing."
+      }
+    }
+  },
+  "shared": [
+    {
+      "term": "ledger",
+      "why": "Both repos own one honestly. The app has a user-facing FIELD LEDGER panel (js/ui/ui-render-ledger.js), a transcript event ledger, and a per-game data parity ledger; the control plane has its append-only ledger. Only the compound 'ledger event' is reserved - never the bare word."
+    },
+    {
+      "term": "event",
+      "why": "Universal. The app emits them on a bus, the control plane appends them to disk. Reserving 'event' would make both repos unwritable."
+    },
+    {
+      "term": "receipt",
+      "why": "The app has scripts/release-receipt.js; the control plane writes push.intent/push.result receipts. Two different artifacts, no ambiguity in practice, no incident on file."
+    },
+    {
+      "term": "incident",
+      "why": "The control plane has an incident lifecycle (lib/incident.js); the app's Fallout game data and narrative text use the ordinary English word. Not reservable."
+    },
+    {
+      "term": "proposal",
+      "why": "Control-plane vocabulary today, but too generic to reserve against a word the app may legitimately need. Listed so the decision is on file rather than re-argued."
+    }
+  ],
+  "sharedRule": "A term in `shared` must never appear as a domain's reserved pattern. Both repos prove this behaviourally - they run their own scanner over synthetic lines using each shared term and assert nothing is flagged - so a future session that reserves bare 'ledger' turns the gate red instead of quietly outlawing a shipped panel."
+}

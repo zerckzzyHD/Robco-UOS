@@ -44,6 +44,20 @@ headings, note-header routing, catalog/TOC/code-map currency). Guarded by **Suit
 wiring + unit classification + a real-git-repo integration proof of every case). Same gate-scoping
 principle as Protocol 41's `eslint .` → git-tracked-manifest fix, applied to the push boundary.
 
+### Cross-repo naming domains (ND1)
+
+`tests/naming-domains.json` is the reserved-terms list shared with the private control plane: which
+vocabulary belongs to which repo (`RobcoEvents` is this app's bus; "ledger events" are the control
+plane's records), plus the explicitly **shared** terms that must never be reserved. It is
+**duplicated byte-identical** into `_RobCo-Control/code/test/naming-domains.json` — the repos share
+no package — so **edit both copies in the same change**. Enforced by **Suite 257** here (scans
+`js/**`, comments stripped, for the control plane's reserved terms) and by test group **ND** in the
+control repo (the mirror-image scan). Each repo scans only its OWN source; there is no cross-repo
+runtime coupling. Both guards carry a red-then-green proof (a synthetic violating source must be
+flagged) and an anti-over-reservation proof (every shared term must stay un-flagged), and both
+degrade to "sync unverified" rather than failing when the sibling checkout is absent. Design →
+`ARCHITECTURE.md#cross-repo-naming-domains`.
+
 ---
 
 ## Protocol 20 — Static Source-Invariant Guards (LAST RESORT — narrowed 2026-07-20)

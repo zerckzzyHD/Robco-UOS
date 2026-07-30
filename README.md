@@ -350,6 +350,12 @@ git push --no-verify                       # bypasses ALL git hooks — the abso
 
 **Control-repo gate (CPB6 — shipped in the same session):** the control repo now runs its own test suite as the wrapper's gate. A control-repo wrapper push runs `node test/run-tests.js` **before** pushing and **aborts on failure**, recording `gate.passed`, not `gate.skipped` — so a control-repo push is both routed through the wrapper (DG2) **and** genuinely gated (CPB6). The app repo is unchanged: it still delegates its own gate to this pre-push hook (CPB4 fast path intact).
 
+### Naming Domains (ND1 — cross-repo reserved terms)
+
+This app and the private control plane share a project name but not a runtime, and both were circling the word **"events"**: the app owns `RobcoEvents` (the client-side game/UI bus in `js/core/state.js`), the control plane owns **"ledger events"** (its appended, replayable records). Nothing clashes in code today; ND1 keeps it that way as both grow.
+
+`tests/naming-domains.json` declares which vocabulary belongs to which domain — and, just as importantly, which terms are **shared** and may never be reserved (`ledger`, `event`, `receipt`, `incident`, `proposal` — this app has shipped a Field Ledger panel and a release-receipt script for months, so only the compound "ledger event" is the control plane's). The file is duplicated byte-identical into the control repo; the two repos share no package, so **each self-checks**: **Suite 257** here scans `js/**` for control-plane-reserved names, and the control repo's test group **ND** does the mirror-image scan of its own sources. No cross-repo runtime coupling, and each side degrades to "sync unverified" — never a failure — when the sibling checkout is absent. Full design → [`ARCHITECTURE.md`](ARCHITECTURE.md#cross-repo-naming-domains).
+
 ---
 
 ## 📜 Project History

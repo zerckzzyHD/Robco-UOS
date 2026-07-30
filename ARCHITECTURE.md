@@ -59,12 +59,13 @@
 30. [World Map (G6)](#world-map)
 31. [Settings & localStorage Keys](#settings-localstorage-keys)
 32. [System Dependency Map](#system-dependency-map)
-33. [Historical Lessons](#historical-lessons)
-34. [Service Worker Cache Protocol](#service-worker-cache-protocol)
-35. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
-36. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
-37. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
-38. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
+33. [Cross-Repo Naming Domains (ND1)](#cross-repo-naming-domains)
+34. [Historical Lessons](#historical-lessons)
+35. [Service Worker Cache Protocol](#service-worker-cache-protocol)
+36. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
+37. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
+38. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
+39. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
 
 <!-- TOC:END -->
 
@@ -3408,6 +3409,33 @@ graph TD
 4. **AudioSettings cache** — 8 audio functions read from this object. `toggleAudio()`
    and `toggleMasterMute()` maintain it. Adding a new audio source requires adding to
    both the cache and the toggle functions.
+
+---
+
+<a id="cross-repo-naming-domains"></a>
+
+## Cross-Repo Naming Domains (ND1)
+
+Two RobCo codebases run side by side and share a project name but not a runtime: **this app** (`!RobCo-UOS`, a browser PWA) and the private **control plane** (`_RobCo-Control/code`, a Node supervisor with an append-only ledger). Each owns a vocabulary, and the word they were both circling was **"events"**:
+
+| Domain            | Owns                                                          | What it actually is                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **app**           | `RobcoEvents` · "RobCo event"                                 | The client-side game/UI event bus — `window.RobcoEvents` in `js/core/state.js`. In-page subscribers, `on`/`off`/`once`/`emit`, nothing persisted.                       |
+| **control plane** | "ledger event" · `LedgerEvents`/`ControlEvents`/`RobcoLedger` | One appended record in the control plane's durable ledger (`lib/ledger.js` `appendMany`), each with a `type:` field. Written to disk, replayable, mirrored off-machine. |
+
+There is **no code clash today** — the app has never used a control-plane term and the control plane has never used `RobcoEvents`. ND1 exists to keep it that way while both sides grow, because the ambiguity is real: "events" means two entirely different things depending on which repo you are standing in, and the cheapest moment to fix that is before either side has built on the confusion.
+
+**The mechanism is two self-checks, not a shared dependency.** `tests/naming-domains.json` declares every domain, its reserved patterns, and — just as important — the terms that are explicitly **shared** and may never be reserved. The file is duplicated **byte-identical** into `_RobCo-Control/code/test/naming-domains.json`; the repos share no package, so there is nothing to import, and each repo's own gate reads its own copy and scans **only its own source** for the terms another domain owns. Nothing at runtime, in either repo, depends on the other.
+
+- **This repo:** **Suite 257** scans `js/**` (comments stripped) for the control plane's reserved terms. The app must not adopt "ledger events" or a `LedgerEvents`/`RobcoLedger` identifier for a competing concept.
+- **Control plane:** its test group **ND** does the mirror-image scan of its own `.js` sources for `RobcoEvents` / "RobCo events".
+- **Sync:** each side compares its copy against the sibling checkout when one is present and fails on drift; when the sibling is absent (a public clone, CI) it reports the sync as unverified and **does not fail** — the same degrade-don't-block shape as the DG2 push guard.
+
+**The guard protects the existing names; it does not change them.** `window.RobcoEvents` is referenced across the app and precached — renaming it would be a cross-file change with a cache-bump risk and no benefit. ND1 freezes the boundary as it already stands.
+
+**Two things keep it from rotting into a taxonomy.** First, only distinctive **compounds** are reserved: the bare word `ledger` is on the shared list, because this app has shipped a user-facing Field Ledger panel (`js/ui/ui-render-ledger.js`), a transcript event ledger, and a per-game data parity ledger for months — reserving it would outlaw shipped code. `event`, `receipt`, `incident` and `proposal` are shared for the same reason. Second, both guards prove that **behaviourally**: they run their own scanner over synthetic lines using each shared term and assert nothing is flagged, so a future session that reserves bare "ledger" turns the gate red instead of quietly banning a live panel. Both also run a **red-then-green** proof — a synthetic violating source must be flagged — so a passing scan means something rather than proving the scanner is a no-op.
+
+**Extending it:** add a domain key (the archive and the museum are the expected next two) plus a guard of the same shape in that repo. Do **not** invent reservations for collisions that have not happened. When **WB2** (the machine-readable guard registry) lands, both guards get registry rows.
 
 ---
 
