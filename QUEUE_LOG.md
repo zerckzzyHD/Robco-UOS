@@ -9,13 +9,90 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="rb0729"></a>
+
+### 2026-07-29 (later) — RB1-RB5 filed (Dispatch Return Bus), kernel ranks 4-5 shipped, wiring status corrected via dissent
+
+**Scope of this pass: read-only reads + doc edits + git commit/push/sync only.** No control-plane code was
+written or changed in this pass, no process was killed, no enforcement was flipped on. Ranks 4 and 5
+themselves were already built earlier tonight in the private `RobCo-Control` repo (confirmed by
+`git log`/`git show` against that repo, not taken on faith); this entry is the queue fold-in plus a
+correction the fold-in surfaced.
+
+**Kernel rank 4 — deterministic continuation packet — ✅ SHIPPED, commit `9fd751d`.** An AI-free
+resumption file written at session exit/failure: objective SHAs, changed/uncommitted files, commands and
+tests already run with their results, current job state and blocker, agent-claims kept separate from
+independently-observed facts — exactly rank 4 in the 2026-07-28 (late) three-model build order (see
+[above](#cpkernel0728)). Invoked via `scripts/generate-continuation-packet.js`; `state\continuation-packets\`
+shows it was exercised at least once around build time (22:41, one minute before the commit).
+
+**Kernel rank 5 — incident lifecycle + daily housekeeping — ✅ SHIPPED, commit `32c0fbc`.** Alerts modeled
+open→updated→resolved→reopened (`lib/incident.js`) so ledger dedupe can't suppress a recurring incident
+forever, plus a daily pass (`scripts/daily-housekeeping.js`) for supervisor/adapter/disk/ledger/replication
+degradation — rank 5 in the same build order.
+
+**RB1-RB5 filed in `QUEUE.md`** — new family prefix, own section under the CP program, directly following
+CP5: RB1 the Dispatch inbox projection, RB2 launch + structured completion receipts (G1/G2), RB3 the
+mobile-hidden-response detector (G5), RB4 the custom control-plane MCP (delivery + ack, explicitly not
+wake), RB5 the bounded `send_message` WAKE spike. All plan-stage, cross-linked to
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](../planning/control-plane/DISPATCH_RETURN_BUS.md), which
+was already written and is unchanged by this pass. RB5 is flagged **BLOCKED BY PLATFORM** — no documented
+way exists today for a local process to inject a turn into the persistent Cowork/Dispatch conversation;
+RB1-RB4 do not depend on it.
+
+### DISSENT — "none of the kernel is auto-wired into the live supervisor loop" does not hold, verified against the code and a live Task Scheduler check
+
+The instruction that started this pass asserted the kernel is not yet auto-wired into the live supervisor
+loop (owner-gated activation). Per Protocol 51(a) — a Dispatch-origin work-status claim is a hypothesis
+until verified against the repository, never repeated as given — this was checked rather than recorded
+as-is, and it does not hold as stated:
+
+- `supervisor.js` requires and calls `lib/job-contract.js` and `lib/job-reconciler.js` (rank 1) on every
+  loop iteration — `jobContract.readAllManifests()` / `jobReconciler.reconcileFromData(...)`, lines
+  289-290.
+- `supervisor.js` also requires and calls `lib/incident.js` (rank 5's incident-lifecycle half) on every
+  loop iteration — `incident.reduceIncidents` / six `incident.reconcileIncidentSet(...)` call sites, lines
+  670-757 — feeding the live Pushover alert pipeline directly.
+- The `RobCo-Control-Supervisor` Windows Scheduled Task is registered and **State: Ready**, `LastRunTime`
+  2026-07-29 23:19:00, `LastTaskResult` 0 (success), `NextRunTime` 2026-07-29 23:23:59 — i.e. actually
+  running on its ~5-minute cadence right now, not merely built-and-dormant. No `state\DISABLE` kill-switch
+  file is present. `state\events-2026-07-29.jsonl` was written at 23:19, the same minute as the confirmed
+  scheduled run, ruling out a silent no-op.
+
+**So rank 1 and rank 5's incident-lifecycle half ARE live and auto-wired, today, against real jobs.** What
+genuinely is _not_ auto-wired: rank 2's publisher (`lib/publisher.js` — only called from the standalone
+`scripts/publish.js`, which nothing schedules and `controlled-push.js` does not call), rank 4's
+continuation-packet generator (only via `scripts/generate-continuation-packet.js`, no scheduled task), and
+rank 5's daily-housekeeping half (`scripts/daily-housekeeping.js`, no scheduled task found). That is a
+materially different picture from "none of the kernel is auto-wired" — the detect/alert path is live
+today; only the write-side actions (publish, packet generation, daily housekeeping) remain
+manual-invoke-only. `QUEUE.md`'s running header and the RB section above reflect this corrected picture.
+
+**Why recorded as dissent rather than silently fixed:** "owner-gated activation" implies nothing acts on
+real data until the owner flips something on — but the detection/alert half has been acting on live data
+every five minutes since ranks 1 and 5 shipped tonight. That changes what "nothing is enforced yet"
+actually covers, and per Protocol 51(c) the correction is surfaced here, in the record, rather than
+smoothed into agreement with the original claim.
+
+**What this pass backed up, and what it did not.** This app repo's `QUEUE.md`/`QUEUE_LOG.md` and
+`planning/control-plane/*.md` changes are covered by this repo's own `origin/dev` push plus the private
+archive's `sync.ps1` mirror (Protocol 48) — both described in this session's own final report. The
+control-plane **code** in the private `RobCo-Control` repo is backed up only by its own `origin/main` (no
+archive mirror — the archive mirrors this app repo's `planning/` docs and the orchestrator's memory, not a
+third repo's source). Rank 3 (a dedicated off-machine mirror of the control-plane's own runtime ledger,
+Task Scheduler exports, and hook config) remains spec-only, blocked on the owner creating the private
+backup repo — so the control-plane's **runtime state** (the ledger, `continuation-packets/`, etc. under
+`state\`) has no off-machine backup of any kind yet. That gap is exactly what rank 3 exists to close.
+
+---
 
 <a id="cp0729"></a>
 

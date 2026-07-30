@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-29** — **Control-plane kernel RANKS 1-2 SHIPPED** in the private `RobCo-Control`
+**Last updated: 2026-07-29 (later)** — **Kernel ranks 4 and 5 SHIPPED and pushed**, on top of ranks 1-2
+below: rank 4, the deterministic continuation packet (commit `9fd751d`), and rank 5, incident lifecycle +
+daily housekeeping (commit `32c0fbc`), both in the private `RobCo-Control` repo. **Wiring status verified
+and corrected against the claim this pass started from (Protocol 51 dissent — full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)):** rank 1 (job contract + reconciler) and rank 5's
+incident-lifecycle module are **already live** in the supervisor's polling loop — confirmed by direct
+`require()`/call-site inspection of `supervisor.js` and by a live Task Scheduler check
+(`RobCo-Control-Supervisor`, State: Ready, last run succeeded minutes before this pass, next run minutes
+after) plus a same-minute ledger write. Rank 2's publisher, rank 4's continuation-packet generator, and
+rank 5's daily-housekeeping pass are built and callable but **not** auto-invoked by anything — no
+scheduled task calls them, so "owner-gated activation" only accurately describes the write-side actions,
+not the detect/alert path, which is already running against real jobs every ~5 minutes. **Five new queue
+items filed — RB1-RB5**, a new family prefix under the CP program, folding in the plan-only Dispatch
+Return Bus design pass
+([`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md)): the
+Dispatch inbox projection (RB1), launch + structured completion receipts (RB2), the mobile-hidden-response
+detector (RB3), the custom control-plane MCP for delivery+ack (RB4), and the bounded `send_message` WAKE
+spike (RB5 — flagged **BLOCKED BY PLATFORM**, no wake mechanism exists today). All five are plan-stage,
+nothing built. Rank 3 is unchanged from the entry directly below — spec'd, blocked on the owner creating
+the private backup repo. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729).
+
+**Prior update — 2026-07-29** — **Control-plane kernel RANKS 1-2 SHIPPED** in the private `RobCo-Control`
 repo: job contract + reconciler (commit `8eab8fd`) and the transactional exact-SHA verifier/publisher with
 a fail-closed break-glass + fault-injection tests (commit `dd49ed4`). **Five new Pushover alerts** landed
 alongside (commits `f14499d` + `bac032a`), on top of the four already live: "needs your input" and
@@ -801,6 +822,89 @@ the witness-vs-controller decision is recorded with its date and reasoning.
 > use; when built, prefer the spare laptop (this item) over a separate Windows account on the main PC, since it
 > is a real machine boundary that also doubles as the rank-3 off-machine durability. The kernel program itself
 > needs no separate trust domain today. See the CP program's build-order overlay above for the full reasoning.
+
+---
+
+# The Dispatch Return Bus — RB1-RB5 (new 2026-07-29, plan-only)
+
+**New family prefix — CP1-CP5 are already assigned to specific work, so the next slice of the same kernel
+program takes its own prefix rather than force-fitting into CP6+ (same reasoning as HG's own prefix note,
+below).** Filed from a plan-only pressure-test of GPT's "Dispatch Return Bus" idea against the control
+plane that actually exists — full design and reasoning in
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md).
+**Nothing here is built.** All five items are ASSIST-tier, plan-stage — recorded so the recommended build
+sequence has stable homes, not because any of them has started.
+
+**The problem.** The supervisor can notify the OWNER (Pushover) and write a status file, but has no way to
+inform or wake DISPATCH itself — the loop has only half. Three distinct capabilities are in play:
+**DELIVERY** (put an event where Dispatch can read it), **WAKE** (start a Dispatch turn without the owner
+prompting first), and **ACKNOWLEDGMENT** (the supervisor knows Dispatch actually processed the event).
+RB1-RB4 close DELIVERY + ACKNOWLEDGMENT; RB5 is the only item aimed at WAKE, and WAKE is flagged
+**BLOCKED BY PLATFORM** below.
+
+### RB1. ⬜ Dispatch INBOX projection — read at turn start (plan-stage)
+
+**What it is.** A derived delta off the existing ledger — ACTION-REQUIRED / ACTIVE /
+COMPLETED-SINCE-LAST-ACK / CONTROL-PLANE-HEALTH — that Dispatch reads at the **start of every turn**,
+after every launch, and before reporting completion. The recommended smallest useful thing even without
+wake: without it, the owner's "yo" _is_ the wake; with it, Dispatch surfaces everything pending
+automatically instead of the owner relaying each event by hand. Delivered as either a projected file or
+(better, see RB4) the custom MCP.
+
+**Done means:** the projection exists, derives cleanly from the ledger (not a second ledger), and a
+session reading it at turn-start can enumerate pending events without the owner having relayed them.
+
+### RB2. ⬜ Launch receipts + structured completion receipts (G1/G2) (plan-stage)
+
+**What it is.** Cheap legibility for every job: a receipt at launch and a structured receipt at
+completion, so a job's state is never inferred only from polling. Most of the _payload_ this needs already
+exists (rank 1's job contract, rank 2's completion-evidence/exact-SHA publisher) — this item is the
+receipt framing/format on top, not new detection machinery.
+
+**Done means:** every job launched through the kernel produces a launch receipt and, on completion, a
+structured completion receipt, both legible without re-deriving state from raw ledger events.
+
+### RB3. ⭐ Mobile-hidden-response detector — G5 (plan-stage)
+
+**What it is.** The supervisor tails Dispatch's own output and flags substantive text that did **not** go
+through the messaging tool → Pushover "Dispatch produced a hidden response." Starred because it directly
+targets the recurring failure this whole program started from — plain-text-invisible-on-mobile recurred 3+
+times in one session before the arc that produced CP1-CP5.
+
+**Done means:** a deliberately-triggered hidden response (text emitted outside the messaging tool) is
+detected and produces a phone alert, proven red-then-green, not just reasoned about.
+
+### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage)
+
+**What it is.** A local MCP server (Cowork already loads MCP servers, so a custom one added to the desktop
+config is very likely callable by Dispatch — confirm with a small load-spike, RB4's own first step)
+exposing `control_get_inbox` / `control_get_job` / `control_get_health` (DELIVERY as a live query, always
+current — better than a stale file projection), `control_ack_event` (ACKNOWLEDGMENT — the piece a flat
+file cannot provide), and `control_submit_intent` (finally makes the Dispatch → supervisor direction
+real). **Hard limit, stated plainly: MCP is request→response — it makes the supervisor QUERYABLE, not
+Dispatch WAKEABLE.** It is a thin reader over the canonical ledger/outbox plus a writer of ack/intent
+events back to it — explicitly **not** a second ledger and **not** a second orchestrator.
+
+**Done means:** the load-spike confirms Dispatch can see and call the server's tools; `control_ack_event`
+round-trips into the ledger; no second ledger or parallel orchestrator is introduced.
+
+### RB5. ⚠️ Bounded `send_message` WAKE spike — BLOCKED BY PLATFORM (plan-only; owner approval required before running)
+
+**What it is.** From a throwaway session, one nonce-tagged benign message targeting this conversation's
+id. **Pass** = it appears here AND wakes a turn AND is phone-visible AND deduped. Caveat, stated up front:
+a pass only proves _session→Dispatch_, never _supervisor→Dispatch_ — the supervisor is an AI-free Node
+script with no MCP access, so it would have to spawn a Claude session to relay, reintroducing AI + usage
+cost into the AI-free control root. Reject the approach outright if it needs an auth/attestation bypass.
+
+**⚠ Flagged BLOCKED BY PLATFORM, not merely unstarted.** No documented way exists today for a local
+process to inject a turn into the persistent Cowork/Dispatch conversation — this is the one gap in the
+whole return-bus design that genuinely waits on Anthropic shipping a native capability, not on more design
+or code here. RB1-RB4 do not depend on this landing; the documented fallback (**inbox + Pushover = the
+owner is the wake**) is honest, functional, and already achievable through RB1 alone.
+
+**Done means:** the spike either runs (owner approval given) and its pass/fail is recorded with evidence,
+or the item stays parked exactly as BLOCKED BY PLATFORM until a native wake capability is confirmed to
+exist.
 
 ---
 
