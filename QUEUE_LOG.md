@@ -9,13 +9,76 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cpactivation0730"></a>
+
+### 2026-07-30 — Every owner-gated / activation / to-implement CP-program step consolidated into one checklist
+
+**Scope of this pass: read-only reads + doc edits + git commit/push/sync only.** No control-plane code was
+written or changed, nothing was killed, no enforcement was flipped on.
+
+**Why.** The owner asked to make sure the whole control-plane plan is captured — every owner-gated,
+activation, and to-implement step across CP1-CP5, RB1-RB6, HG1-HG2, and the private planning docs
+(`CONVERGENCE_2026-07-28.md`, `CONTROL_PLANE_STATUS.md`, `DISPATCH_RETURN_BUS.md`,
+`RANK3_BACKUP_REPO_SPEC.md`, `USAGE_MEASUREMENT_SPIKE.md`) tracked in `QUEUE.md`, not left living only in
+Dispatch's own head.
+
+**What landed.** A new consolidated section, "⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST
+(2026-07-30)", filed in `QUEUE.md` directly after **HG2** (inside the pre-museum CP/RB/HG cluster, before
+the museum program). It is a cross-linked index over the existing CP/RB/HG entries, organized by six status
+buckets (READY-TO-BUILD, ACTIVATION-SWITCH, OWNER-DECISION, SPIKE, DATA-GATED, DONE) rather than by build
+order — the axis the owner actually needed for "what do I need to say yes to."
+
+**New stable IDs assigned** (family-prefix convention, single letters exhausted — Protocol 50 a-form: every
+entry gets a home or an explicit earn-condition; all of these got homes):
+
+- **CPK1-CPK5** — retroactive IDs for the five "kernel ranks" referenced throughout the CP program's prose
+  as "rank 1" – "rank 5", which never had stable IDs of their own before this pass. CPK1 (`8eab8fd`), CPK2
+  (`dd49ed4`), CPK4 (`9fd751d`), CPK5 (`32c0fbc`) are shipped; CPK3 (off-machine durability, spec'd in
+  `RANK3_BACKUP_REPO_SPEC.md`) is READY-TO-BUILD.
+- **CPB1-CPB3** — the next control-plane build batch that had no ID: CPB1 the budget alert (tokens/$, now
+  unblocked by the usage-measurement spike), CPB2 the usage→operating-modes change (decided 2026-07-28, not
+  yet built), CPB3 the "backup-all" script (new, scope not yet spec'd beyond what the owner stated — flagged
+  honestly rather than invented).
+- **ACT1-ACT3** — activation switches: ACT1 registers CPK5's daily-housekeeping half as a scheduled task,
+  ACT2 wires CPK2's publisher + CPK4's continuation-packet generator into the live supervisor loop, and
+  **ACT3 is new** — "wire the controlled-push wrapper into the real push path," owner-approved 2026-07-30 as
+  the concrete first step toward the ≥10-clean-pushes gate (**DG2**). ACT3 is explicitly scoped as routing
+  only; raw-push refusal stays a separate, later, data-gated promotion.
+- **OD1-OD2** — owner decisions: OD1 the rank-3 (CPK3) backup + restore-test cadence (already named in the
+  spec's own "Open decisions"), and **OD2 is newly filed as its own tracked item** per the owner's explicit
+  instruction — whether to set up the `C:\Dev\auth` secure backup now (its own encrypted vault, never a
+  repo).
+- **SP1** — new: live-confirm the two documented-contract-only Pushover alerts ("needs your input" /
+  "session died") by actually watching a hook fire. Previously only a bullet in `CONTROL_PLANE_STATUS.md`
+  §2, now a tracked item.
+- **DG1-DG5** — the data-gated promotions (thrashing shadow→kill, push-guard enforcement, reaper
+  shadow→reaping, `--no-verify` tripwire shadow→enforce, worktrees-vs-lease), previously scattered across
+  CP2's doctrine section, the CONVERGENCE review, and `CONTROL_PLANE_STATUS.md` §3 — unified under one
+  family so each has exactly one home instead of three partial mentions.
+
+**Existing IDs cross-linked, not renumbered:** RB1 (inbox), RB2 (receipts), RB3 (hidden-response detector),
+RB4 (its own load-spike stays inside RB4, per that entry's own text — cross-referenced, not forked into a
+new ID), RB5, RB6, HG1, HG2 all moved from their scattered "plan-stage" / "PULLED FORWARD" framing into the
+READY-TO-BUILD bucket, reflecting the owner's 2026-07-30 go — their own entries above are left as-is
+(Protocol 50 a-date: a reinforcement carries its own date, it does not overwrite the original).
+
+**Verified against source before filing, not taken on faith (Protocol 51(b)):** the "9 alerts, 7 live"
+count, the four shipped kernel-rank SHAs, the reaper's re-scope, the thrashing recalibration SHA, and the
+private `RobCo-Control-Ledger` repo's existence were all read from `QUEUE.md`'s own prior entries and the
+planning docs directly, not assumed from this pass's own framing.
+
+**Not done in this pass, by design:** no control-plane code was touched, no scheduled task was registered,
+no wrapper was actually wired, no kill-switch or enforcement flag was changed. This pass is the tracking
+layer only — every item it created is still exactly as unbuilt/undecided as it was before, just now visible
+in one place instead of several.
 
 <a id="rb0729"></a>
 

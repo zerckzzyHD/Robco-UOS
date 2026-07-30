@@ -24,7 +24,19 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-29 (later still)** — **RB4 and RB5 expanded with GPT's detailed design, and a new
+**Last updated: 2026-07-30** — **Every owner-gated / activation / to-implement step of the control-plane
+program consolidated into one tracked checklist** — "⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST",
+filed directly after HG2, above. Fourteen new items across six new family prefixes (**CPK1-CPK5** retroactive
+IDs for the kernel ranks; **CPB1-CPB3** the next build batch — budget alert, usage→operating-modes, the
+"backup-all" script; **ACT1-ACT3** activation switches, including new **ACT3** "wire the controlled-push
+wrapper into the real push path" — owner-approved the same day as the concrete first step toward the
+≥10-real-pushes gate; **OD1-OD2** owner decisions, including the auth-folder secure-backup call filed as its
+own item; **SP1** live-confirming the two documented-contract-only hook alerts; **DG1-DG5** the data-gated
+promotions, unified from scattered mentions across CP2/CONVERGENCE/CONTROL_PLANE_STATUS). Existing IDs
+(RB1-RB6, HG1-HG2, P15) are cross-linked, not renumbered. Read-only reads + doc edits only — no control-plane
+code touched, nothing killed. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpactivation0730).
+
+**Prior update — 2026-07-29 (later still)** — **RB4 and RB5 expanded with GPT's detailed design, and a new
 RB6 filed.** RB4 now specs a full V1 seven-tool contract (`control_get_inbox` / `control_get_job` /
 `control_get_event` / `control_get_health` / `control_ack_event` / `control_submit_intent` /
 `control_get_intent_status`), proposal-only verbs, idempotency, generation checks, and two corrections
@@ -1015,6 +1027,142 @@ Protocol 50) is still in place under 2.9.0's hardening-gate section, now cross-r
 **Done means:** every boot phase runs under its own guard; each phase is classified fatal or degradable; a
 degradable failure surfaces to the user (not console-only, echoing the same standard Protocol 24 already sets
 for AI state-apply failures); a fatal failure fails loudly with a clear message, never a silent black screen.
+
+---
+
+# ⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST (2026-07-30)
+
+**What this section is.** The CP kernel program (CP1-CP5), the Dispatch Return Bus (RB1-RB6), and the
+pre-museum hardening pull-forward (HG1-HG2) above each carry their own owner-gated / activation / to-build
+steps, scattered across their own sections and the private planning docs. The owner asked (2026-07-30) for
+every one of those steps consolidated into ONE tracked list, so nothing lives only in Dispatch's head. **This
+section does not replace any item's own entry above** — it is a cross-linked index over them, plus a small
+number of genuinely new items this pass surfaced (chiefly **ACT3**, owner-approved the same day). Full
+account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpactivation0730).
+
+**Status vocabulary for this section only** (distinct from the file's usual ✅/🔄/⏭️/⚠️/⬜ tags, because this
+list's job is readiness-to-activate, not build progress): **BUILT** (code exists, nothing left to do) ·
+**READY-TO-BUILD** (owner has said go; unblocked) · **ACTIVATION-SWITCH** (already built; owner needs to flip
+it on) · **OWNER-DECISION** (needs an owner call, not code) · **SPIKE** (needs the owner in the loop to run)
+· **DATA-GATED** (waits on measured evidence, not a decision).
+
+**New family prefixes assigned this pass** (single letters are exhausted, per this file's own rule — header
+note at the top of this file): **CPK** for the five kernel ranks referenced throughout the CP program as
+"rank 1" – "rank 5" (retroactive IDs for the four already shipped, plus the one still to build — they never
+had stable IDs of their own before now); **CPB** for the next control-plane build batch that had no ID yet;
+**ACT** for the activation switches; **OD** for owner decisions; **SP** for owner-in-loop spikes without an
+existing ID; **DG** for the data-gated promotions. Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are
+reused here, never reassigned.
+
+## READY TO BUILD — owner go given (2026-07-30)
+
+- **CPK3.** Off-machine durability: the rank-3 backup mirror + restore-test. Spec approved 2026-07-28 →
+  [`RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md); the private repo
+  (`RobCo-Control-Ledger`) is already created, empty, confirmed PRIVATE. Waiting on: **OD1** (cadence) —
+  build can start with a sane default (daily) and be tuned later, since picking a default doesn't require
+  waiting for the decision.
+- **CPB1.** The budget alert (tokens/$). The dollar/token half of the deadline/budget alert is unblocked by
+  the usage-measurement spike — per-job cost/tokens are measurable even under concurrency, via OTLP or a
+  headless job's own `-p` JSON result (both channels agree). ("% of the weekly cap" per job stays
+  structurally `UNOBSERVABLE` — out of scope for this alert; see doctrine in
+  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).) No existing ID;
+  assigned here.
+- **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
+  Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
+  decided, not yet built. No existing ID; assigned here.
+- **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
+- **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
+- **RB1.** Dispatch inbox projection — full entry above.
+- **RB2.** Launch + structured completion receipts — full entry above.
+- **RB3.** Mobile-hidden-response detector — full entry above.
+- **CPB3.** The "backup-all" script — a single on-demand pass that runs every backup mechanism this project
+  has in one go, instead of separate manual invocations. Concretely, at minimum: the archive sync
+  (`sync.ps1`, Protocol 48) and, once **CPK3** ships, the rank-3 control-plane mirror. ⚠ **Honest gap,
+  stated rather than papered over:** no planning doc defines this script's exact scope beyond that — it is
+  captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm scope (does it
+  also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than assuming.
+
+## NEW — WIRE THE CONTROLLED-PUSH WRAPPER (owner said yes 2026-07-30)
+
+- **ACT3.** Wire the controlled-push wrapper into the real push path. Today every push in this project's
+  repos is plain `git push` and bypasses the wrapper entirely, so the ≥10-clean-pushes counter that gates
+  **DG2** (push-guard enforcement) can never advance. This item routes real pushes through
+  `controlled-push.js` so the counter starts moving. **Scope note, stated explicitly so a later session
+  doesn't over-build:** this is ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
+  **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
+  wrapper in does not turn on enforcement.
+
+## ACTIVATION SWITCHES — built, waiting on the owner to flip on
+
+- **ACT1.** Register the daily-housekeeping pass (**CPK5**'s daily half — `scripts/daily-housekeeping.js`)
+  as a Windows scheduled task. The module is shipped (`32c0fbc`) and callable, but nothing currently invokes
+  it.
+- **ACT2.** Wire the write-side kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
+  generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
+  direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
+  detect/alert path (rank 1 + rank 5's incident lifecycle) is already live in the 5-minute loop — this item
+  is only the write-side half.
+- **(later) DG2.** Activate push-guard enforcement (raw-push refusal) — fed by **ACT3** above; see
+  Data-Gated below for its own entry and gating condition.
+- **(later) DG3.** Graduate the reaper from shadow to actually reaping — see Data-Gated below.
+
+## OWNER DECISIONS
+
+- **OD1.** Rank-3 (**CPK3**) backup cadence — daily vs. every supervisor run — and the restore-test cadence
+  (weekly?). Open question named explicitly in `RANK3_BACKUP_REPO_SPEC.md`'s own "Open decisions" section.
+- **OD2.** Whether to set up the auth-folder (`C:\Dev\auth`) secure backup now — its own encrypted vault /
+  password manager, **never a git repo** (the folder holds live secrets: Pushover creds, the Google OAuth
+  client secret). Flagged as a separate problem in `RANK3_BACKUP_REPO_SPEC.md` ("flag, don't fold in") —
+  filed here as its own tracked item per the owner's 2026-07-30 instruction, still undecided.
+
+## SPIKES / OWNER-IN-LOOP
+
+- **(RB4's own spike, not a separate ID)** — the Cowork-loads-a-custom-MCP load-spike, RB4's prerequisite
+  first step (confirm Cowork actually loads a custom local MCP server and Dispatch can call its tools)
+  before any of RB4's seven tools are built. Kept inside RB4 per that entry's own text; cross-referenced
+  here only so a consolidated read doesn't miss it.
+- **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
+  required before running regardless.
+- **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
+- **SP1.** Live-confirm the two documented-contract-only Pushover alerts — "a session needs your input"
+  (the `Notification` hook) and "session died/errored" (the `StopFailure` hook) — by actually watching one
+  fire. Both alerts shipped 2026-07-29 (`f14499d`/`bac032a`) but are unverified-live;
+  `CONTROL_PLANE_STATUS.md` §2 lists this as the first item in the current build batch. No existing ID;
+  assigned here.
+
+## DATA-GATED — wait on measured evidence, not a decision
+
+- **DG1.** Thrashing: shadow → actual kill. Needs a clean shadow stretch (proves it flags real loops, never
+  cries wolf) before it is trusted to terminate a session; kill would use the proven `(pid, procStart)`
+  re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`.
+- **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
+  clean through the wrapper. Fed by **ACT3** (which starts the counter moving today).
+- **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
+  2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
+- **DG4.** `--no-verify` tripwire: shadow → enforce. Promotes only after it catches a real violation cleanly
+  (hit-based, with a per-session override) — de-prioritized to telemetry-only by the three-model review.
+- **DG5.** Worktrees-vs-lease: whether anything beyond worktrees is needed. Decided by Stage 1d's measured
+  collision rate (cross-ref **CP2**'s "open architectural question" above) — if collisions are ~zero once
+  worktrees are on, nothing more gets built here, on purpose.
+
+## DONE — for the record, with SHAs
+
+- **CPK1.** Rank 1 — job contract + reconciler — ✅ SHIPPED `8eab8fd`. Live in the supervisor's 5-minute
+  loop (verified by code inspection + a Task Scheduler check, 2026-07-29).
+- **CPK2.** Rank 2 — transactional exact-SHA verifier/publisher — ✅ SHIPPED `dd49ed4`. Built, fails closed,
+  tested break-glass + fault-injection tests. Not yet auto-invoked — see **ACT2**.
+- **CPK4.** Rank 4 — deterministic continuation packet — ✅ SHIPPED `9fd751d`. Built, callable. Not yet
+  auto-invoked — see **ACT2**.
+- **CPK5.** Rank 5 — incident lifecycle + daily housekeeping — ✅ SHIPPED `32c0fbc`. Incident-lifecycle half
+  is live in the 5-minute loop; the daily-housekeeping half is built but not scheduled — see **ACT1**.
+- Idle-session reaper — built `643ebb8`, re-scoped 2026-07-28 to verified-terminal / owner-deadline cleanup
+  only; shadow — see **DG3**.
+- Nine Pushover alerts total — 7 live, 2 documented-contract-only — see **SP1**.
+- Thrashing detector recalibrated — `15c17d0` (fixed a real false positive, session `53a3bb89`); stays
+  shadow — see **DG1**.
+- Usage-measurement accuracy spike run (read-only) —
+  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md); unblocks **CPB1**.
+- The private `RobCo-Control-Ledger` repo created (empty, confirmed private) — unblocks **CPK3**.
 
 ---
 
