@@ -1,9 +1,24 @@
 #!/bin/sh
 
-# ── Full gate at push boundary (Protocol 36) ──────────────────────────────────
-# Runs the complete gate including browser checks (boot-smoke + render-check)
-# before anything reaches origin. CI runs the same gate — parity holds here.
-npm run gate || exit 1
+# ── Gate at push boundary (Protocol 36 + CPB4 doc-only fast path) ─────────────
+# Full gate = the complete gate including browser checks (boot-smoke + render +
+# a11y + test.html + save-survival + offline-first). CI runs the same full gate,
+# so parity holds here for every push carrying app code.
+#
+# CPB4: scripts/gate-scope.js inspects the git pre-push payload (fed on this
+# hook's stdin) and prints DOCS_ONLY only when it can PROVE every changed file
+# across the pushed range is a doc (*.md / planning/**); on ANY uncertainty it
+# prints FULL. A DOCS_ONLY push runs the docs gate (lint + format + Node runner +
+# static checks, NO browser) — the app-integrity checks give a planning-doc edit
+# zero protection. Anything touching app code runs the FULL gate, unchanged.
+# Fail-CLOSED: the default branch below is the full gate.
+GATE_SCOPE=$(node scripts/gate-scope.js)
+if [ "$GATE_SCOPE" = "DOCS_ONLY" ]; then
+  echo "  [gate-scope] Doc-only push — running the docs gate (CPB4 fast path, no browser checks)."
+  npm run gate:docs || exit 1
+else
+  npm run gate || exit 1
+fi
 # ── End pre-push gate ─────────────────────────────────────────────────────────
 
 # ── Local-artifact backup NUDGE (Protocol 48) — NEVER a blocker ───────────────

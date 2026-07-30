@@ -24,7 +24,19 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — CPB4 filed: doc-only gate fast path)** — **New item CPB4**
+**Last updated: 2026-07-30 (later still — CPB4 BUILT + SHIPPED)** — **CPB4 is now shipped, not just
+filed.** `scripts/gate-scope.js` reads the git pre-push payload and prints `DOCS_ONLY` only when it can
+prove every changed file is a doc (`*.md` / `planning/**`), else `FULL` — fail-closed; the pre-push hook
+then runs the new `gate:docs` mode (lint + format + the Node runner + static checks, NO browser) on a
+doc-only push, and the FULL gate on anything touching app code, a mixed diff, or a renamed/moved/deleted
+code file. Locked by **Suite 253** (static wiring + unit classification + a real-git-repo integration proof
+of all four required cases). Marked ✅ SHIPPED in the READY-TO-BUILD entry and recorded in the SHIPPED
+section; no ID renumbered (Protocol 49). ⓘ **Protocol 2a note:** the owner's dispatch asked to bump
+hardcoded test counts across the docs — but Protocol 2a is RETIRED and no test count is tracked anywhere
+(Suite 28 guards against reintroducing one), so no counts were added; the runner's exit status is the
+signal.
+
+**Prior update — 2026-07-30 (later still — CPB4 filed: doc-only gate fast path)** — **New item CPB4**
 scopes the pre-push gate so a commit whose diff touches ONLY docs (`QUEUE.md`, `QUEUE_LOG.md`,
 `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE) auto-skips the Playwright render/boot-smoke +
 app-integrity checks; any diff touching app code still runs the FULL gate unchanged. Filed in the READY
@@ -1630,7 +1642,8 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   that — it is captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm
   scope (does it also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than
   assuming.
-- **CPB4.** Gate-scoping — a doc-only fast path for the pre-push gate. When a commit's diff touches ONLY
+- **CPB4.** ✅ **SHIPPED (this pass).** Gate-scoping — a doc-only fast path for the pre-push gate. When a
+  commit's diff touches ONLY
   docs (`QUEUE.md`, `QUEUE_LOG.md`, `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE), the pre-push
   hook skips the Playwright render/boot-smoke + app-integrity checks and passes automatically; any diff
   touching app code (`index.html`, `css/**`, `js/**`, `sw.js`, `tests/**`) still runs the FULL gate exactly
@@ -1642,7 +1655,13 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   `eslint .`) — same principle, applied to the push-boundary gate instead of the lint step. **Done means:**
   a commit whose full diff is docs-only passes the pre-push hook without running Playwright/render/
   boot-smoke, verified red-then-green (a doc-only diff passes fast; a diff touching even one app file still
-  runs the full gate); no bundled code+doc commit can slip through the fast path.
+  runs the full gate); no bundled code+doc commit can slip through the fast path. **Shipped as:**
+  `scripts/gate-scope.js` (reads the git pre-push payload, prints `DOCS_ONLY` only when every changed file
+  is proven a doc, else `FULL` — fail-closed) + `gate:docs` mode in `scripts/gate.js` (static + Node runner,
+  NO browser) + the pre-push hook wiring. **Every "Done means" criterion met**, incl. the four required
+  cases (doc-only skips; one code file forces full; mixed forces full; a renamed/moved/deleted code file
+  forces full — via `git diff --no-renames`), locked by **Suite 253** (static wiring + unit classification +
+  a real-git-repo integration proof). Full record in the SHIPPED section below.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
@@ -1809,6 +1828,12 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md); unblocks **CPB1**.
 - The private `RobCo-Control-Ledger` repo created (empty, confirmed private), now actively receiving mirror
   commits (see **CPK3** above).
+- **CPB4.** Doc-only gate fast path — ✅ SHIPPED (2026-07-30). `scripts/gate-scope.js` scopes the pre-push
+  gate: a push whose whole diff is docs (`*.md` / `planning/**`) runs `npm run gate:docs` (lint + format +
+  the Node runner + static checks, NO browser); anything touching app code, a mixed diff, a
+  renamed/moved/deleted code file, or any uncertainty runs the FULL gate (fail-closed). Locked by
+  **Suite 253**. Full entry above in READY TO BUILD. SHA recorded in the immediately-following doc-only
+  queue commit (which itself runs through this new fast path — its own live proof).
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 

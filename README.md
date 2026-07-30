@@ -309,6 +309,7 @@ npm run format      # Prettier
 npm run dev         # Vite dev server
 npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
+npm run gate:docs   # CPB4 doc-only push fast path (lint + format + Node runner + static checks, NO browser); selected automatically by the pre-push hook when a push touches only docs
 npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
 npm run cloud-check   # A3 — modeled cloud-serialization guard against the live state literal; also runs as gate step 4b
 npm run test:emulator # A4 — OPTIONAL real-Firebase-emulator round-trip (save→sync→load); needs a JDK/JRE 11+ installed
@@ -318,7 +319,7 @@ npm run test:emulator # A4 — OPTIONAL real-Firebase-emulator round-trip (save�
 
 ### Quality Gate
 
-Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A `CACHE_NAME` bump is required whenever a served file changes. No test count is tracked anywhere — the runner's exit status is the only signal that matters (`CLAUDE.md`, Protocol 2a).
+Commits and pushes are blocked unless the gate is green. The pre-commit hook runs the fast subset (lint, format, the Node test runner); the pre-push hook + CI run the full gate (adds Playwright boot-smoke, a 360/412 render-check, an accessibility baseline-diff, and the `test.html` runtime audit). A push whose diff touches **only** docs (`*.md` / `planning/**`) skips the browser checks and runs `gate:docs` instead — a fail-closed fast path (CPB4): any app-code, mixed, renamed/deleted-code, or uncertain diff runs the full gate. A `CACHE_NAME` bump is required whenever a served file changes. No test count is tracked anywhere — the runner's exit status is the only signal that matters (`CLAUDE.md`, Protocol 2a).
 
 ### Commit Workflow (dev-branch model)
 

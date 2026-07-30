@@ -6,6 +6,13 @@
  * Called via:
  *   npm run gate       — full gate (lint + format + tests + browser checks)
  *   npm run gate:fast  — fast gate (lint + format + tests; browser checks skipped)
+ *   npm run gate:docs  — CPB4 doc-only push fast path (lint + format + tests +
+ *                        static checks; NO browser check at all — not even the
+ *                        fast commit boot smoke). Selected by the pre-push hook
+ *                        ONLY when scripts/gate-scope.js proves every changed
+ *                        file is a doc; the hook falls back to the full gate on
+ *                        any uncertainty (fail-closed). NOT a substitute for the
+ *                        commit or push gate on code changes.
  *   npm run gate:iter  — OPT-IN iteration pre-check ONLY (lint changed files +
  *                        format + Node runner). Skips every browser check for
  *                        fast inner-loop feedback. NOT a substitute for the
@@ -57,6 +64,15 @@ const { trackedLintFiles } = require('./gate-lint-manifest.js');
 
 const ROOT = path.join(__dirname, '..');
 const fast = process.argv.includes('--fast');
+// --docs (QUEUE.md item CPB4): the doc-only push fast path. Runs the static +
+// Node portion of the gate (steps 1-4e) and NO browser check at all — not even
+// the fast commit boot smoke. The pre-push hook selects this mode only after
+// scripts/gate-scope.js has proved every changed file is a doc; on any doubt it
+// runs the full gate instead (fail-closed there, not here). The Node runner is
+// still run because several suites guard DOC invariants (QUEUE structure,
+// changelog headings, note-header routing, catalog/TOC/code-map currency), so a
+// doc-only change is exactly what they exist to check.
+const docs = process.argv.includes('--docs');
 
 // ── Per-step wall-time profiling (Health-batch U5) ───────────────────────────
 // Measurement only — this records how long each gate step takes and prints a
@@ -434,12 +450,12 @@ run(
 // bounded (~2s) headless check so commit-green means "the shell boots and
 // paints without throwing." It cold-launches its own Chromium (no shared server
 // for a single check) and runs boot-smoke.mjs in --fast mode.
-if (fast) {
+if (fast && !docs) {
   ensureChromium('commit boot smoke');
   run('Boot smoke (fast, commit gate)', 'node tests/boot-smoke.mjs --fast');
 }
 
-if (!fast) {
+if (!fast && !docs) {
   // ── 5. Playwright Chromium check ──────────────────────────────────────────────
   ensureChromium();
 
@@ -490,7 +506,9 @@ if (!fast) {
 }
 
 console.log(
-  fast
-    ? '\n[GATE] Fast gate passed (browser checks skipped — run npm run gate before pushing).\n'
-    : '\n[GATE] All checks passed!\n'
+  docs
+    ? '\n[GATE] Docs gate passed (CPB4 doc-only fast path — no browser checks; every changed file was a doc).\n'
+    : fast
+      ? '\n[GATE] Fast gate passed (browser checks skipped — run npm run gate before pushing).\n'
+      : '\n[GATE] All checks passed!\n'
 );

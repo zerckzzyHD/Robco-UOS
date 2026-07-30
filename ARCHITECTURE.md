@@ -165,7 +165,8 @@
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
 │   ├── gate-lint-manifest.js   Git-tracked ESLint manifest — scopes the gate's lint step to tracked files so a sibling session's untracked scratch file can never fail an unrelated push
-│   ├── gate.js                 Full local gate orchestrator (lint, format, the Node runner, browser checks) — `npm run gate` / `gate:fast`
+│   ├── gate.js                 Full local gate orchestrator (lint, format, the Node runner, browser checks) — `npm run gate` / `gate:fast` / `gate:docs`
+│   ├── gate-scope.js           CPB4 doc-only gate fast path — reads the git pre-push payload, prints DOCS_ONLY only when every changed file is a doc (fail-closed to FULL), so the hook can run `gate:docs` (no browser) on doc-only pushes
 │   ├── check-boot-chain.js     Boot-chain preflight — validates index.html's script order before the browser gate runs
 │   ├── cloud-serialization-check.js Protocol 34 modeled Firestore-write-safety guard (A3) — self-derives the state literal, flags undefined/nested-array/oversize values
 │   ├── emulator-round-trip-check.js A4 real-Firebase-emulator save→sync→load round-trip (standalone, `npm run test:emulator`, not gated)

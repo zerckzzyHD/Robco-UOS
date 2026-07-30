@@ -25,6 +25,25 @@ the runner would currently produce.
 **No test COUNT is tracked anywhere** — Protocol 2a is retired. The runner's exit status is the
 signal.
 
+### The doc-only push fast path (CPB4)
+
+The gate is split at the commit/push boundary (Protocol 36): the pre-commit hook runs
+`gate:fast`; the pre-push hook runs the FULL gate (`npm run gate`), which adds the browser checks
+(boot-smoke, render, a11y, `test.html`, save-survival, offline-first). **CPB4** adds a third mode
+for the push boundary only. `scripts/gate-scope.js` reads the git pre-push payload (the hook's
+stdin) and prints `DOCS_ONLY` **only when it can prove every changed file across the pushed range
+is a doc** (`*.md` anywhere, or under `planning/**`); the pre-push hook then runs `npm run
+gate:docs` (`gate.js --docs`) — lint + format + the Node runner + the static currency checks, and
+**no browser check at all**. Any diff touching app code (`index.html`, `css/**`, `js/**`, `sw.js`,
+`tests/**`), a mixed doc+code diff, a renamed/moved/deleted code file (surfaced via `git diff
+--no-renames` as delete-old + add-new), or **any** uncertainty (empty payload, unresolvable range,
+git failure) → the classifier prints `FULL` and the complete gate runs. It is **fail-closed**: it
+weakens the gate only where it can positively prove the change is documentation. The Node runner
+still runs on `gate:docs` because several suites guard _doc_ invariants (QUEUE structure, changelog
+headings, note-header routing, catalog/TOC/code-map currency). Guarded by **Suite 253** (static
+wiring + unit classification + a real-git-repo integration proof of every case). Same gate-scoping
+principle as Protocol 41's `eslint .` → git-tracked-manifest fix, applied to the push boundary.
+
 ---
 
 ## Protocol 20 — Static Source-Invariant Guards (LAST RESORT — narrowed 2026-07-20)

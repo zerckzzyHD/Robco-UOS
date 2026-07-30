@@ -7144,8 +7144,8 @@ header('Suite 60 — A11y Gate Guards');
 
   // 60.4  scripts/gate.js invokes a11y-check.mjs in the non-fast block
   assert(
-    /a11y-check\.mjs/.test(gateSrc60) && /if\s*\(!fast\)/.test(gateSrc60),
-    'scripts/gate.js invokes a11y-check.mjs inside the non-fast block'
+    /a11y-check\.mjs/.test(gateSrc60) && /if\s*\(!fast\s*&&\s*!docs\)/.test(gateSrc60),
+    'scripts/gate.js invokes a11y-check.mjs inside the non-fast (push-only, browser) block'
   );
 
   // 60.5  package.json has the "a11y" script
@@ -51875,7 +51875,7 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   // (it sits above the `if (fast)` split, same placement as the A3 cloud guard).
   const gateSrc247 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
   const idxCheck247 = gateSrc247.indexOf('generate-test-catalog.js --check');
-  const idxFastSplit247 = gateSrc247.indexOf('if (fast) {');
+  const idxFastSplit247 = gateSrc247.indexOf('if (fast && !docs) {');
   assert(
     idxCheck247 !== -1 && idxCheck247 < idxFastSplit247,
     '247.8: scripts/gate.js runs `generate-test-catalog.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
@@ -52168,7 +52168,7 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   // the fast/full split, same placement as the Protocol 47 catalog check it sits beside).
   const gateSrc250 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
   const idxCheck250 = gateSrc250.indexOf('generate-architecture-toc.js --check');
-  const idxFastSplit250 = gateSrc250.indexOf('if (fast) {');
+  const idxFastSplit250 = gateSrc250.indexOf('if (fast && !docs) {');
   assert(
     idxCheck250 !== -1 && idxCheck250 < idxFastSplit250,
     '250.7: scripts/gate.js runs `generate-architecture-toc.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
@@ -52362,7 +52362,7 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   // the fast/full split, same placement as the Protocol 47/52 checks it sits beside).
   const gateSrc251 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
   const idxCheck251 = gateSrc251.indexOf('generate-code-map.js --check');
-  const idxFastSplit251 = gateSrc251.indexOf('if (fast) {');
+  const idxFastSplit251 = gateSrc251.indexOf('if (fast && !docs) {');
   assert(
     idxCheck251 !== -1 && idxCheck251 < idxFastSplit251,
     '251.8: scripts/gate.js runs `generate-code-map.js --check` above the fast/full split, so it gates both `gate:fast` and `gate`'
@@ -52598,6 +52598,185 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
         : '') +
       (staleReadmeVersions252.length ? ' — STALE: ' + staleReadmeVersions252.join(', ') : '')
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 253 — CPB4 doc-only gate fast path (Protocol 36)
+//
+//  CPB4 scopes the pre-push gate: a push whose diff touches ONLY docs
+//  (*.md / planning/**) runs the docs gate (lint + format + Node runner +
+//  static checks, NO browser) instead of the full Playwright gate. This is a
+//  deliberate gate-WEAKENING, so it is fail-closed by construction and this
+//  suite is the correctness proof the weakening is paid for with.
+//
+//  Three layers, matching the spec's four required cases:
+//    • static wiring — the script exists, uses `--no-renames`, defaults to
+//      FULL, is wired into the hook, and did NOT displace the full gate or the
+//      backup nudge on code pushes;
+//    • unit — classifyPaths()/isDocPath() classify doc-only vs code/mixed;
+//    • integration (RED-THEN-GREEN, real git repo) — the actual CLI, fed a real
+//      pre-push stdin payload, prints DOCS_ONLY for a pure doc range and FULL
+//      for a single code file, a mixed range, a RENAMED code file, a DELETED
+//      code file, empty stdin, a new-branch zero-remote range, and a malformed
+//      line. The rename/delete cases are the ones that must never slip through
+//      the fast path as "doc-only".
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 253 — CPB4 doc-only gate fast path (Protocol 36)');
+
+  const { spawnSync: spawn253, execFileSync: exec253 } = require('child_process');
+  const os253 = require('os');
+
+  // ── 253.1-4: static wiring ──────────────────────────────────────────────
+  const scopePath253 = path.join(ROOT, 'scripts', 'gate-scope.js');
+  const scopeExists253 = fs.existsSync(scopePath253);
+  assert(scopeExists253, '253.1: scripts/gate-scope.js exists (CPB4 doc-only classifier)');
+  const scopeSrc253 = scopeExists253 ? fs.readFileSync(scopePath253, 'utf8') : '';
+  assert(
+    scopeExists253 && /--no-renames/.test(scopeSrc253),
+    '253.2: the diff resolution uses `--no-renames` so a renamed/moved code file surfaces as delete-old + add-new and cannot slip through as doc-only'
+  );
+
+  const gateSrc253 = fs.readFileSync(path.join(ROOT, 'scripts', 'gate.js'), 'utf8');
+  assert(
+    /--docs/.test(gateSrc253) && /!docs/.test(gateSrc253),
+    '253.3: scripts/gate.js has a --docs mode and both browser blocks are guarded by !docs (docs mode runs NO browser check)'
+  );
+  const pkg253 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg253.scripts && /--docs/.test(pkg253.scripts['gate:docs'] || ''),
+    '253.4: package.json wires "gate:docs" → node scripts/gate.js --docs'
+  );
+
+  const prePush253 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+  assert(
+    /node\s+scripts\/gate-scope\.js/.test(prePush253) &&
+      /DOCS_ONLY/.test(prePush253) &&
+      /npm run gate:docs/.test(prePush253),
+    '253.5: the pre-push hook runs gate-scope.js and routes a DOCS_ONLY result to `npm run gate:docs`'
+  );
+  assert(
+    /npm run gate\b/.test(prePush253) && /node\s+scripts\/backup-nudge\.js/.test(prePush253),
+    '253.6: the full gate (`npm run gate`) is still the else branch and the backup nudge still runs — CPB4 ADDED a fast path, it did not remove either'
+  );
+
+  // ── 253.7-14: unit — classifyPaths()/isDocPath() ────────────────────────
+  const M253 = scopeExists253 ? require(scopePath253) : null;
+  assert(
+    !!M253 && typeof M253.classifyPaths === 'function',
+    '253.7: gate-scope exports classifyPaths()'
+  );
+  if (M253) {
+    assert(
+      M253.classifyPaths(['QUEUE.md', 'README.md', 'rules/x.md']) === 'docs-only',
+      '253.8: a list of only *.md docs classifies as docs-only'
+    );
+    assert(
+      M253.classifyPaths(['planning/2.8.0/plans/x.md', 'planning/mock.png']) === 'docs-only',
+      '253.9: planning/** paths (incl. non-md assets) classify as docs-only'
+    );
+    assert(
+      M253.classifyPaths(['js/foo.js']) === 'full',
+      '253.10: a single app-code file (js/foo.js) forces the full gate'
+    );
+    assert(
+      M253.classifyPaths(['QUEUE.md', 'js/foo.js']) === 'full',
+      '253.11: a MIXED doc+code list forces the full gate'
+    );
+    assert(
+      M253.classifyPaths(['js/old.js', 'js/new.js']) === 'full' &&
+        M253.classifyPaths(['js/gone.js']) === 'full',
+      '253.12: a renamed code file (both halves) and a deleted code file both force the full gate'
+    );
+    assert(
+      M253.classifyPaths([]) === 'full' &&
+        M253.classifyPaths(['index.html']) === 'full' &&
+        M253.classifyPaths(['sw.js']) === 'full' &&
+        M253.classifyPaths(['css/a.css']) === 'full' &&
+        M253.classifyPaths(['package.json']) === 'full',
+      '253.13: empty list AND every non-doc surface (index.html, sw.js, css/**, build config) force the full gate (fail-closed allowlist)'
+    );
+    assert(
+      M253.isDocPath('rules\\note.md') === true && M253.isDocPath('js/core/state.js') === false,
+      '253.14: isDocPath normalizes back-slashes and only matches the doc allowlist'
+    );
+  }
+
+  // ── 253.15-22: integration — the real CLI in a throwaway git repo ───────
+  // Feeds an actual git pre-push stdin payload and asserts the printed token.
+  // This is the real-artifact proof: it exercises stdin parsing → `git diff
+  // --no-renames` → classification end to end, not just the pure function.
+  const repo253 = fs.mkdtempSync(path.join(os253.tmpdir(), 'robco-gate-scope-253-'));
+  try {
+    const ZERO253 = '0000000000000000000000000000000000000000';
+    const g253 = (...a) => exec253('git', a, { cwd: repo253, encoding: 'utf8' }).trim();
+    const head253 = () => g253('rev-parse', 'HEAD');
+    g253('init', '-q');
+    g253('config', 'user.email', 't@example.com');
+    g253('config', 'user.name', 'test');
+    g253('config', 'commit.gpgsign', 'false');
+    fs.writeFileSync(path.join(repo253, 'QUEUE.md'), 'base\n');
+    g253('add', '-A');
+    g253('commit', '-qm', 'c0');
+    const c0 = head253();
+    fs.writeFileSync(path.join(repo253, 'QUEUE.md'), 'doc change\n');
+    fs.writeFileSync(path.join(repo253, 'README.md'), 'r\n');
+    g253('add', '-A');
+    g253('commit', '-qm', 'c1 docs');
+    const c1 = head253();
+    fs.mkdirSync(path.join(repo253, 'js'));
+    fs.writeFileSync(path.join(repo253, 'js', 'app.js'), '1\n');
+    g253('add', '-A');
+    g253('commit', '-qm', 'c2 code');
+    const c2 = head253();
+    g253('mv', 'js/app.js', 'js/app2.js');
+    g253('commit', '-qm', 'c3 rename');
+    const c3 = head253();
+
+    const decide253 = payload =>
+      (
+        spawn253('node', [scopePath253], {
+          cwd: repo253,
+          encoding: 'utf8',
+          input: payload,
+          timeout: 20000,
+        }).stdout || ''
+      ).trim();
+
+    assert(
+      decide253(`refs/heads/dev ${c1} refs/heads/dev ${c0}\n`) === 'DOCS_ONLY',
+      '253.15: RED-THEN-GREEN — a pure doc-only pushed range (QUEUE.md + README.md) yields DOCS_ONLY (the fast path actually triggers)'
+    );
+    assert(
+      decide253(`refs/heads/dev ${c2} refs/heads/dev ${c1}\n`) === 'FULL',
+      '253.16: a range adding one app-code file (js/app.js) yields FULL'
+    );
+    assert(
+      decide253(`refs/heads/dev ${c2} refs/heads/dev ${c0}\n`) === 'FULL',
+      '253.17: a MIXED range (docs commit + code commit) yields FULL'
+    );
+    assert(
+      decide253(`refs/heads/dev ${c3} refs/heads/dev ${c2}\n`) === 'FULL',
+      '253.18: a RENAMED code file (git mv) yields FULL — cannot slip through as doc-only'
+    );
+    assert(decide253('') === 'FULL', '253.19: empty stdin (no push payload) → FULL (fail-closed)');
+    assert(
+      decide253(`refs/heads/dev ${c1} refs/heads/dev ${ZERO253}\n`) === 'FULL',
+      '253.20: a new branch (zero remote oid) → FULL (unresolvable range, fail-closed)'
+    );
+    assert(
+      decide253(`refs/heads/dev ${ZERO253} refs/heads/dev ${c1}\n`) === 'FULL',
+      '253.21: a branch deletion (zero local oid) → FULL (fail-closed)'
+    );
+    assert(
+      decide253('garbage line with too few fields\n') === 'FULL',
+      '253.22: a malformed payload line → FULL (fail-closed)'
+    );
+  } finally {
+    fs.rmSync(repo253, { recursive: true, force: true });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
