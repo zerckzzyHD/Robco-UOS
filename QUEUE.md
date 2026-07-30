@@ -24,7 +24,26 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (HG1 BUILT + SHIPPED — the event bus is hardened)** — **HG1 is shipped, app
+**Last updated: 2026-07-30 (ND1 BUILT + SHIPPED — the two repos can no longer come to mean the same word two ways)** — **ND1 is shipped, app repo `ca38f79` + control repo `31e987c`: a naming-domain guard, filed as a new
+`ND` family and built in the same pass.** The app owns **`RobcoEvents`** — the client-side game/UI bus in
+`js/core/state.js`, in-page subscribers, nothing persisted. The control plane owns **"ledger events"** — the
+appended, replayable records its `lib/ledger.js` writes, each with a `type:` field. **Verified rather than
+assumed, there is no clash today:** the control repo contains zero `RobcoEvents` and the app's `js/` contains
+zero "ledger event". But "events" already means two entirely different things depending on which repo you are
+standing in, and both sides are growing — so the boundary is now written down once (`tests/naming-domains.json`,
+duplicated byte-identical into the control repo, because the two share no package) and **each repo's own gate
+checks its own source against it**: **Suite 257** here, **test group ND** there. No cross-repo runtime coupling;
+each side degrades to "sync unverified" rather than failing when the sibling checkout is absent, so a public
+clone is never blocked. **The part that stops it rotting into a taxonomy:** only distinctive COMPOUNDS are
+reserved — `ledger`, `event`, `receipt`, `incident` and `proposal` sit on an explicit SHARED list, because this
+app has shipped a Field Ledger panel and a release-receipt script for months and reserving those bare words
+would outlaw live code. Both guards prove that behaviourally, and both carry a red-then-green proof that a
+violating source really is caught. **Nothing was renamed** — `window.RobcoEvents` is precached and referenced
+across the app; the guard protects the existing names. Full `npm run gate` green; control suite green
+(1137/1137). `CACHE_NAME` r19 → r20 — no app code changed, but `CHANGELOG.md` is itself precached, so a
+"tests and docs only" commit is not automatically cache-bump-free.
+
+**Prior update — 2026-07-30 (HG1 BUILT + SHIPPED — the event bus is hardened)** — **HG1 is shipped, app
 repo `31206dd`: the OS event bus finally has the four things it was missing.** `RobcoEvents` shipped at U7
 with only "add a listener" and "announce an event" — there was no way to REMOVE a listener, no way to say
 "tell me the next time this happens and then forget me," and nothing stopping the same listener being
@@ -50,7 +69,7 @@ console-present cases are locked. Locked by **Suite 256** (14 assertions, behavi
 (3701/3701 plus boot smoke, render check at 360/412, a11y, `test.html` runtime audit, save-survival,
 offline-first). `CACHE_NAME` r18 → r19.
 
-**Prior update — 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
+**Earlier — 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
 control repo `7ca220c`: the kernel's two write-side actions are finally CALLED by something.** Rank 2's
 publisher and rank 4's continuation-packet generator had been built, tested and callable since 2026-07-29,
 but nothing ever invoked them — every run was a human at a CLI. A new decision layer
@@ -1676,6 +1695,71 @@ where each went. Only **E** and **F** remain, both PARKED.
 
 ---
 
+# 🛡️ CROSS-REPO NAMING DOMAINS — ND1 (new family, 2026-07-30)
+
+**New family prefix `ND` (naming domains), per this file's own rule — single letters are exhausted, so new
+work takes a family prefix.** Guard/governance family, sibling in spirit to **WB2** (the machine-readable
+guard registry) and the DG push guards: it protects a boundary rather than adding a feature. Filed as a
+queue item and shipped in the same pass — it was the owner's "next build" and had never been written down,
+which is exactly the Protocol 50(a) case (a plan that lives only in conversation is remembered, not planned).
+
+### ND1. ✅ SHIPPED (2026-07-30) — a naming-domain guard so the app and the control plane can't come to mean the same word two ways
+
+**The real collision that motivated it.** The **app** (`!RobCo-UOS`, `js/core/state.js`) owns `RobcoEvents` —
+a client-side game/UI event bus: in-page subscribers, `on`/`off`/`once`/`emit`, nothing persisted, nothing
+leaves the tab. The **control plane** (`_RobCo-Control/code`) has **"ledger events"** — appended, replayable
+records via `lib/ledger.js`'s `appendMany([...])`, each carrying a `type:` field, written to disk and mirrored
+off-machine. Different runtimes, and — verified, not assumed — **no code clash today**: the control repo
+contains zero `RobcoEvents`, the app's `js/` contains zero "ledger event". But "events" already means two
+entirely different things depending on which repo you are standing in, and both sides are still growing. The
+cheapest moment to settle that is before either side builds on the confusion.
+
+**What shipped.** One shared list plus two independent self-checks:
+
+- **`tests/naming-domains.json`** — which vocabulary belongs to which domain, with a `why` on every entry, and
+  a **`shared`** list of terms that may never be reserved. Structured so more domains (the archive and the
+  museum are the expected next two) drop in as another key.
+- **Suite 257** (app repo) — scans this repo's own `js/**` for the control plane's reserved terms.
+- **Test group ND** (control repo) — the mirror-image scan of its own `.js` sources for `RobcoEvents` /
+  "RobCo events".
+
+Each repo scans **only its own source**. There is no cross-repo runtime coupling — the list is **duplicated
+byte-identical** because the repos share no package, and each side compares against the sibling checkout when
+one is present (failing on drift) and reports the sync **unverified rather than failing** when it is absent, so
+a public clone or CI is never blocked. **Sync point noted in both repos** (`rules/testing-and-gates.md` here,
+`CLAUDE.md` there): edit both copies in the same change.
+
+**The part that keeps it from rotting into a taxonomy.** Only distinctive **compounds** are reserved. The bare
+word `ledger` is on the **shared** list — this app has shipped a user-facing Field Ledger panel
+(`js/ui/ui-render-ledger.js`), a transcript event ledger and a per-game parity ledger for months, so reserving
+it would outlaw live code — and so are `event`, `receipt` (this repo has `scripts/release-receipt.js`),
+`incident` and `proposal`. Both guards prove that **behaviourally**: they run their own scanner over synthetic
+lines using each shared term and assert nothing is flagged, so a future session that reserves bare "ledger"
+turns the gate red instead of quietly banning a shipped panel. Both also carry a **red-then-green** proof — a
+synthetic source violating every foreign reservation must be flagged — so a passing scan means something
+rather than proving the scanner is a no-op. Both are **fail-closed**: an unreadable scope, a hollowed-out list,
+or too few files scanned is a failure, not a pass.
+
+**Deliberately NOT done:** `window.RobcoEvents` was not renamed. It is referenced across the app and is
+precached, so renaming it is a cross-file change with a cache-bump risk and no benefit — **the guard protects
+the existing names, it does not change them.** No reservations were invented for collisions that have not
+happened (Protocol 36b / 49: a guard must earn its keep).
+
+**Cross-ref — WB2 is NOT yet built.** The machine-readable guard registry is still ⬜ queued, so there was no
+registry to register into. When WB2 lands, Suite 257 and group ND each get a row (failure class: cross-repo
+vocabulary collision; enforcement point: each repo's own gate; retirement condition: the two runtimes stop
+coexisting, or the vocabularies are made structurally distinct).
+
+**Verified:** app repo `npm run gate` green (full gate — Node runner, lint, format, boot smoke, render check at
+360/412, a11y, `test.html` runtime audit, save-survival, offline-first); control repo `node test/run-tests.js`
+green. **Protocol 1: `CACHE_NAME` r19 → r20.** No app code changed — but `CHANGELOG.md` is itself a
+precached file (the in-app changelog viewer fetches it), so touching it is a served-file change and the bump
+is required. This is worth remembering: a "tests and docs only" commit is NOT automatically cache-bump-free.
+
+**Shipped as:** app repo `ca38f79`, control repo `31e987c`.
+
+---
+
 # ⭐ ALSO PRE-MUSEUM — the 2.9.0 hardening pull-forward (HG1-HG2, new 2026-07-28)
 
 **New family prefix, per this file's own rule (single letters are exhausted; new work takes a family prefix —
@@ -2297,6 +2381,12 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   routing only — raw-push refusal stays **DG2**, plain `git push` unrefused. This doc-only QUEUE update is
   itself another wrapper push (it should trip CPB4's `gate:docs` fast path _through_ the wrapper — the live
   proof of the coexistence).
+- **ND1.** Cross-repo naming domains — ✅ SHIPPED (2026-07-30). App repo `ca38f79` (`tests/naming-domains.json`
+  - Suite 257 + docs, `CACHE_NAME` r19→r20); control repo `31e987c` (`test/naming-domains.json` + test group ND
+  - CLAUDE.md/README). The app's `RobcoEvents` and the control plane's "ledger events" are now reserved to their
+    own domains, with each repo self-checking its OWN source against a byte-identical duplicated list. Full entry
+    in its own section above (the `ND` family). **Not a control-plane item** — it is listed here because half of
+    it lands in this repo's sibling control repo.
 - **ACT2.** Write-side activation — ✅ SHIPPED `7ca220c` (2026-07-30, control repo `RobCo-Control`). New
   `lib/write-side.js` is the decision layer `supervisor.js` consults every run. **Rank 4 fully live:**
   `computePacketPlan()` reuses `continuation-packet.js`'s own `packetWorthyJobs` (Protocol 22 — the hook
