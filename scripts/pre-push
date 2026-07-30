@@ -1,25 +1,68 @@
 #!/bin/sh
 
+# ── RobCo Stage 2 push guard (DG2 — raw-push refusal) ─────────────────────────
+# DG2 turns on raw-push refusal now that ≥10 real pushes have run clean through
+# the controlled-push wrapper (ACT3). A push made through `npm run push` (→ the
+# wrapper) sets ROBCO_PUSH_WRAPPER=1 and holds the L4 push lock; a plain
+# `git push` carries neither and is refused here, telling you to use
+# `npm run push`. The guard lives in the sibling control-plane repo, resolved the
+# same way scripts/robco-push.js resolves the wrapper (ROBCO_PUSH_GUARD override,
+# else the ../_RobCo-Control/code sibling), and is [ -f ]-guarded so a checkout
+# WITHOUT the control plane (e.g. a public clone) is NEVER blocked.
+#
+#   Break-glass — you can NEVER be locked out of your own repo:
+#     • ROBCO_PUSH_OVERRIDE="<reason>" git push   — allowed AND recorded to the
+#       control-plane ledger (a push.override event, never silent). The normal
+#       emergency path when the wrapper is unavailable but git itself works.
+#     • git push --no-verify                       — bypasses ALL git hooks
+#       (git's own flag); the absolute fallback if the guard or node itself is
+#       broken. This is the guaranteed escape, since it involves no wrapper code.
+#
+# CPB6 caveat: enforcement forces routing through the wrapper; it does NOT make
+# the control repo run a real gate — control-repo wrapper pushes still record
+# gate.skipped. See CPB6 in QUEUE.md. (The app repo DOES gate — below.)
+#
+# stdin note: git delivers the pre-push payload (one line per pushed ref) exactly
+# ONCE. Both the guard and gate-scope.js consume it, so it is captured to a temp
+# file here and each reads from that file via redirection. A naive second stdin
+# reader would get EOF — which would silently force the FULL gate (defeating
+# CPB4's doc-only fast path) AND leave the guard unable to see the pushed branch.
+# Redirection (not a pipe) also keeps the guard node a DIRECT child of this hook,
+# so its process-ancestry proof of the wrapper's L4 holder stays intact.
+PREPUSH_PAYLOAD_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/robco-prepush-$$")
+cat > "$PREPUSH_PAYLOAD_FILE"
+
+PUSH_GUARD="${ROBCO_PUSH_GUARD:-../_RobCo-Control/code/scripts/pre-push-guard.js}"
+if [ -f "$PUSH_GUARD" ]; then
+  if ! node "$PUSH_GUARD" "$@" <"$PREPUSH_PAYLOAD_FILE"; then
+    rm -f "$PREPUSH_PAYLOAD_FILE"
+    exit 1
+  fi
+fi
+# ── End RobCo Stage 2 push guard ──────────────────────────────────────────────
+
 # ── Gate at push boundary (Protocol 36 + CPB4 doc-only fast path) ─────────────
 # Full gate = the complete gate including browser checks (boot-smoke + render +
 # a11y + test.html + save-survival + offline-first). CI runs the same full gate,
 # so parity holds here for every push carrying app code.
 #
-# CPB4: scripts/gate-scope.js inspects the git pre-push payload (fed on this
-# hook's stdin) and prints DOCS_ONLY only when it can PROVE every changed file
-# across the pushed range is a doc (*.md / planning/**); on ANY uncertainty it
-# prints FULL. A DOCS_ONLY push runs the docs gate (lint + format + Node runner +
-# static checks, NO browser) — the app-integrity checks give a planning-doc edit
-# zero protection. Anything touching app code runs the FULL gate, unchanged.
-# Fail-CLOSED: the default branch below is the full gate.
-GATE_SCOPE=$(node scripts/gate-scope.js)
+# CPB4: scripts/gate-scope.js inspects the git pre-push payload (fed here on the
+# captured payload file's fd) and prints DOCS_ONLY only when it can PROVE every
+# changed file across the pushed range is a doc (*.md / planning/**); on ANY
+# uncertainty it prints FULL. A DOCS_ONLY push runs the docs gate (lint + format +
+# Node runner + static checks, NO browser) — the app-integrity checks give a
+# planning-doc edit zero protection. Anything touching app code runs the FULL
+# gate, unchanged. Fail-CLOSED: the default branch below is the full gate.
+GATE_SCOPE=$(node scripts/gate-scope.js <"$PREPUSH_PAYLOAD_FILE")
 if [ "$GATE_SCOPE" = "DOCS_ONLY" ]; then
   echo "  [gate-scope] Doc-only push — running the docs gate (CPB4 fast path, no browser checks)."
-  npm run gate:docs || exit 1
+  npm run gate:docs || { rm -f "$PREPUSH_PAYLOAD_FILE"; exit 1; }
 else
-  npm run gate || exit 1
+  npm run gate || { rm -f "$PREPUSH_PAYLOAD_FILE"; exit 1; }
 fi
 # ── End pre-push gate ─────────────────────────────────────────────────────────
+
+rm -f "$PREPUSH_PAYLOAD_FILE"
 
 # ── Local-artifact backup NUDGE (Protocol 48) — NEVER a blocker ───────────────
 # A fail-safe reminder to refresh the private archive when the local-only

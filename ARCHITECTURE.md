@@ -173,12 +173,13 @@
 │   ├── generate-architecture-toc.js Protocol 52 — regenerates this file's own Table of Contents from its real headings
 │   ├── generate-code-map.js    Protocol 53 — regenerates library/CODE_MAP.md's three GENERATED sections
 │   ├── generate-test-catalog.js Protocol 47 — regenerates library/TEST_CATALOG.md from the runner's own suite headers
-│   ├── install-hooks.js        Copies pre-commit hook into .git/hooks on npm install
+│   ├── install-hooks.js        Copies the pre-commit AND pre-push hooks into .git/hooks on npm install (`prepare`)
 │   ├── knowledge-graph.js      R11 knowledge-graph / retrieval-topology extractor (Node, manual run) — emits library/knowledge-graph.json (gitignored, generated on demand); un-gated, no Suite/hook, per Protocol 50
 │   ├── queue-drift-check.js    Protocol 50 pre-push nudge — flags `type: project` memories that don't look referenced in QUEUE.md
 │   ├── queue-view.js           Parses QUEUE.md into a private, phone-readable HTML view (`npm run queue-view`)
 │   ├── release-receipt.js      Fetches the live production build and compares served CACHE_NAME/APP_VERSION against what was actually deployed
 │   ├── robco-push.js           ACT3 adoption point — `npm run push` routes a push through the control-plane controlled-push wrapper (resolved via $ROBCO_CONTROL_PUSH or the ../_RobCo-Control sibling), delegating the gate to the pre-push hook so CPB4's fast path is preserved; degrades to a plain `git push` when the wrapper is absent
+│   ├── pre-push                DG2 push-guard host — runs the control-plane raw-push guard ([ -f ]-guarded on the ../_RobCo-Control sibling, ROBCO_PUSH_GUARD overridable, skipped when absent) so a raw `git push` is refused unless routed through the wrapper; captures the git pre-push payload once and feeds BOTH the guard and gate-scope.js (Protocol 42 stdin multiplex). Break-glass: ROBCO_PUSH_OVERRIDE (logged) or `git push --no-verify` (absolute). Then runs the gate + Protocol 48/50 nudges
 │   ├── backup-nudge.js         Protocol 48 pre-push nudge — flags when the local-only artifacts (library/, planning/, agent memory) have drifted from the private archive backup
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        Full version history

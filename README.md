@@ -311,7 +311,7 @@ npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + rend
 npm run gate:fast   # Fast subset run by the pre-commit hook
 npm run gate:docs   # CPB4 doc-only push fast path (lint + format + Node runner + static checks, NO browser); selected automatically by the pre-push hook when a push touches only docs
 npm run gate:iter   # OPT-IN iteration pre-check (lint changed + format + Node runner); never a commit/push gate
-npm run push        # ACT3 — route this push through the control-plane controlled-push wrapper (L4 lock + intent/verify receipt + clean-push counter); delegates the gate to the pre-push hook (CPB4 fast path preserved) and degrades to a plain `git push` when the private wrapper is absent
+npm run push        # ACT3/DG2 — route this push through the control-plane controlled-push wrapper (L4 lock + intent/verify receipt + clean-push counter); delegates the gate to the pre-push hook (CPB4 fast path preserved) and degrades to a plain `git push` when the private wrapper is absent. With DG2 active, a raw `git push` is REFUSED — this is the required path (see Push Guard below)
 npm run cloud-check   # A3 — modeled cloud-serialization guard against the live state literal; also runs as gate step 4b
 npm run test:emulator # A4 — OPTIONAL real-Firebase-emulator round-trip (save→sync→load); needs a JDK/JRE 11+ installed
                        # on your machine + the firebase-tools/firebase dev deps (already in package.json); NOT a gate
@@ -330,8 +330,23 @@ All unreleased work goes to **`dev`**; **`main` is release-only**. Each commit k
 npm run lint && npm run format
 git add -A
 git commit          # pre-commit: cache-bump guard, then fast gate (Node runner)
-git push origin dev # pre-push: full gate (+ Playwright + a11y + test.html)
+npm run push        # DG2: pushes route through the controlled-push wrapper (a raw `git push` is refused)
 ```
+
+### Push Guard (DG2 — raw-push refusal)
+
+Once the controlled-push wrapper had run **≥10 clean pushes** (the ACT3 counter), push-guard enforcement was activated (2026-07-30). A pre-push hook now **refuses a raw `git push`** — any push not routed through the wrapper (`npm run push`) — in both the app repo and the private control repo, and tells you to use `npm run push`. The wrapper takes an L4 push lock, records a push intent, pushes, independently re-verifies the remote with `git ls-remote`, and files a receipt. The guard requires two independent proofs (the wrapper's env token **and** a live L4 process-ancestor), so a bare env var can't forge it.
+
+It never blocks a checkout that lacks the private control plane (e.g. a public clone): the hook `[ -f ]`-guards the guard script on the `../_RobCo-Control` sibling (overridable with `ROBCO_PUSH_GUARD`) and simply skips it when absent.
+
+**Break-glass — you can never be locked out of your own repo** (two independent escapes):
+
+```
+ROBCO_PUSH_OVERRIDE="<reason>" git push   # allowed AND recorded to the control-plane ledger (never silent)
+git push --no-verify                       # bypasses ALL git hooks — the absolute fallback if the wrapper/guard itself is broken
+```
+
+**Honest ceiling / CPB6:** the guard enforces _routing_ (advisory against an accidental raw push; `--no-verify` bypasses it by design). It does **not** make the control repo run a real gate — a control-repo wrapper push still records `gate.skipped`. Wiring a genuine control-repo gate is a separate open item (CPB6).
 
 ---
 

@@ -1796,8 +1796,10 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   detect/alert path (rank 1 + rank 5's incident lifecycle) is already live in the 5-minute loop — this item
   is only the write-side half. Greenlit but deliberately **not** built in this checkpoint pass (which is
   doc-only); it is the first code build to pick up next.
-- **(later) DG2.** Activate push-guard enforcement (raw-push refusal) — fed by **ACT3** above; see
-  Data-Gated below for its own entry and gating condition.
+- **DG2. ✅ SHIPPED + ACTIVE (2026-07-30).** Push-guard enforcement (raw-push refusal) is now ON in both the
+  app and control repos — a raw `git push` is refused; `npm run push` is required. Break-glass:
+  `ROBCO_PUSH_OVERRIDE="<reason>"` (logged) or `git push --no-verify` (absolute). CPB6 NOT fixed by this
+  (control pushes still `gate.skipped`). Full record in Data-Gated below.
 - **(later) DG3.** Graduate the reaper from shadow to actually reaping — see Data-Gated below.
 
 ## OWNER DECISIONS
@@ -1832,15 +1834,34 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   cries wolf) before it is trusted to terminate a session; kill would use the proven `(pid, procStart)`
   re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`. A further
   precision fix (not a promotion) → **REF4**, below.
-- **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
-  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter did its job). **Live count:
-  10/10 — threshold MET (2026-07-30).** Enforcement is now **AVAILABLE, not auto-activated**: reaching 10
-  makes DG2 eligible to turn on, it does **not** flip raw-push refusal on by itself. **Still gated behind
-  CPB6** — the control repo has no enforced gate hook, so its wrapper pushes record `gate.skipped`; raw-push
-  refusal should not be switched on until that control-repo gate is wired (see the CPB6 build gap below).
-  Read the live count any time with `npm run push-count` in the control repo. **Related build gap → CPB6** (the control repo
-  itself has no enforced gate hook, so its wrapper pushes currently record `gate.skipped`, not `gate.passed`
-  — a discipline-not-enforcement gap to close; see CPB6 in READY TO BUILD).
+- **DG2. ✅ SHIPPED + ACTIVE (2026-07-30) — raw-push refusal is ON in both repos.** Push-guard enforcement
+  (raw-push refusal, Stage 2). Fed by **ACT3** (✅ shipped 2026-07-30 — the counter did its job); the ≥10
+  clean-wrapper-push gate was **MET at 10/10 (2026-07-30)** and read **11/10** at activation (`npm run
+push-count` in the control repo, live off the ledger). **Owner explicitly greenlit activation
+  (2026-07-30):** "turn on push guard enforcement." A raw `git push` — one NOT routed through the
+  controlled-push wrapper (`npm run push`) — is now **refused** by a pre-push hook in the app repo AND the
+  control repo, telling the user to run `npm run push`. **How it works:** the wrapper sets
+  `ROBCO_PUSH_WRAPPER=1` and holds the L4 push lock; the guard (`_RobCo-Control/code/scripts/pre-push-guard.js`)
+  refuses unless BOTH the env token is present AND the L4 holder is a live process-ancestor of the push
+  (neither is forgeable alone). App-repo wiring: `scripts/pre-push` resolves the guard on the
+  `../_RobCo-Control/code` sibling (or `ROBCO_PUSH_GUARD`) and `[ -f ]`-guards it so a checkout without the
+  control plane (a public clone) is never blocked; the git pre-push payload is captured once and fed to BOTH
+  the guard and `gate-scope.js` (a Protocol-42 stdin-multiplex fix — a naive second reader would EOF and
+  silently defeat CPB4's doc-only fast path). Locked by **Suite 255** (app) + group **PH** (control-repo hook
+  wiring) on top of the existing end-to-end behaviour proof (control group **PG**: raw refused, wrapper
+  allowed, override logged).
+  **🔑 MANDATORY break-glass — the owner can NEVER be locked out** (two independent escapes, both documented
+  in the hooks + README): (1) `ROBCO_PUSH_OVERRIDE="<reason>" git push` — allowed AND recorded to the ledger
+  as a `push.override` event (never silent); the normal emergency path when the wrapper is unavailable but git
+  works. (2) `git push --no-verify` — bypasses ALL git hooks (git's own flag, no wrapper code involved); the
+  absolute fallback if the guard/node itself is broken.
+  **⚠ CPB6 caveat — stated, NOT fixed by this activation:** enforcement forces _routing_ through the wrapper;
+  it does **not** make the control repo run a real gate. The control repo still has no enforced gate hook, so
+  a control-repo wrapper push still records **`gate.skipped`**, not `gate.passed`. DG2 was deliberately
+  **decoupled from CPB6** at activation (owner decision 2026-07-30, overriding this entry's earlier "don't
+  switch on until CPB6 is wired" posture): the routing-enforcement half is valuable on its own and CPB6
+  (wiring `node test/run-tests.js` into the control-repo push gate) remains a separate open build — see CPB6
+  in READY TO BUILD. Read the live count any time with `npm run push-count` in the control repo.
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
   Full safe-lifecycle design (two clean "done" signals, three hard guards, a continuation-packet snapshot

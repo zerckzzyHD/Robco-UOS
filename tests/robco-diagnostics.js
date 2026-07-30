@@ -52861,6 +52861,81 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 255 — DG2: raw-push refusal wired into the pre-push hook
+//
+//  DG2 turns ON raw-push refusal (Stage 2 of the control plane) now that the
+//  ACT3 clean-push counter passed its ≥10 gate. The refusal mechanism itself
+//  (env-token + L4-ancestry proof, plus the required break-glass) lives in the
+//  private control plane and is proven end-to-end THERE (its test group PG runs
+//  a REAL installed hook: raw push refused, wrapper push allowed, override
+//  logged). What THIS repo owns — and what this suite locks — is the wiring of
+//  that guard into this repo's own scripts/pre-push, and specifically the two
+//  things that could silently go wrong here:
+//    • the guard must be [ -f ]-guarded on the ../_RobCo-Control sibling (or a
+//      ROBCO_PUSH_GUARD override), so a checkout WITHOUT the control plane
+//      (a public clone) is never blocked, and no absolute private path leaks
+//      into this public repo;
+//    • the git pre-push payload (stdin, delivered ONCE) must be captured and
+//      fed to BOTH the guard AND gate-scope.js — a naive second stdin reader
+//      gets EOF, which would silently defeat CPB4's doc-only fast path and
+//      blind the guard to the pushed branch (a Protocol 42 footgun locked here).
+//  The break-glass must be documented in the hook, and the CPB6 caveat stated
+//  honestly (enforcement forces routing; the control repo still gate.skips).
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 255 — DG2 raw-push refusal wired into pre-push (Protocol 36 / 42)');
+
+  const prePush255 = fs.existsSync(path.join(ROOT, 'scripts', 'pre-push'))
+    ? fs.readFileSync(path.join(ROOT, 'scripts', 'pre-push'), 'utf8')
+    : '';
+
+  assert(
+    /RobCo Stage 2 push guard \(DG2/.test(prePush255),
+    '255.1: scripts/pre-push carries the DG2 raw-push guard block'
+  );
+  assert(
+    /ROBCO_PUSH_GUARD:-\.\.\/_RobCo-Control\/code\/scripts\/pre-push-guard\.js/.test(prePush255),
+    '255.2: the guard is resolved via a ROBCO_PUSH_GUARD override else the ../_RobCo-Control/code sibling (mirrors robco-push.js)'
+  );
+  assert(
+    /if \[ -f "\$PUSH_GUARD" \]; then/.test(prePush255),
+    '255.3: the guard invocation is [ -f ]-guarded — a checkout WITHOUT the control plane is never blocked (no lockout of a public clone)'
+  );
+  assert(
+    !/[A-Za-z]:\\\\/.test(prePush255) && !/[A-Za-z]:\//.test(prePush255),
+    '255.4: no absolute private path is hardcoded in this PUBLIC repo (env-var + relative sibling only)'
+  );
+  // The guard must run BEFORE the (potentially minutes-long) gate, so a raw
+  // push is refused fast rather than after a full Playwright run.
+  const guardIdx255 = prePush255.indexOf('RobCo Stage 2 push guard (DG2');
+  const gateIdx255 = prePush255.search(/npm run gate\b/);
+  assert(
+    guardIdx255 >= 0 && gateIdx255 >= 0 && guardIdx255 < gateIdx255,
+    '255.5: the guard runs BEFORE the gate (a raw push is refused fast, before the full gate)'
+  );
+  // The Protocol 42 fix: git delivers the pre-push payload on stdin exactly
+  // once; it is captured to a file and BOTH consumers read from that file.
+  assert(
+    /PREPUSH_PAYLOAD_FILE=\$\(mktemp/.test(prePush255) &&
+      /cat > "\$PREPUSH_PAYLOAD_FILE"/.test(prePush255),
+    '255.6: the git pre-push payload (stdin, delivered once) is captured to a temp file'
+  );
+  assert(
+    /node "\$PUSH_GUARD" "\$@" <"\$PREPUSH_PAYLOAD_FILE"/.test(prePush255) &&
+      /node scripts\/gate-scope\.js <"\$PREPUSH_PAYLOAD_FILE"/.test(prePush255),
+    '255.7: BOTH the guard AND gate-scope.js read the payload from the captured file (stdin multiplexed — no second EOF reader defeats CPB4/mis-scopes the guard)'
+  );
+  assert(
+    /ROBCO_PUSH_OVERRIDE/.test(prePush255) && /--no-verify/.test(prePush255),
+    '255.8: the break-glass is documented in the hook — ROBCO_PUSH_OVERRIDE (logged) and git push --no-verify (absolute fallback), so the owner is never locked out'
+  );
+  assert(
+    /gate\.skipped/.test(prePush255),
+    '255.9: the CPB6 caveat is stated in the hook — enforcement forces routing, it does NOT make the control repo run a real gate (control pushes still gate.skipped)'
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
