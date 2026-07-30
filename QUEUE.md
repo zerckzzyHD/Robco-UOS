@@ -1243,6 +1243,180 @@ refuted against the live spec) before any Gemini-specific mechanic is designed a
 
 ---
 
+# ⭐ WIDE ROUND-2 BRAINSTORM — narrowed net-new survivors (Gemini 3.1 + GPT-5.6, folded 2026-07-30)
+
+**New family prefix `WB`, per this file's own rule (single letters exhausted; new work takes a family
+prefix).** Two independent models each ran a WIDE round-2 brainstorm over the whole RobCo system (control
+plane, dev/orchestration loop, museum, app, and their connections). This section is the **narrowed** result —
+the firehose ground against what is actually built, cross-model-deduped, and curated. **The raw lists are NOT
+folded in; only the invariant-respecting net-new survivors are.** What the pass ruled out is recorded in the
+fold's report, not here: most of both lists was **already covered** (the CP kernel CPK1-5, the return bus
+RB1-6, the MCP synthesis MCP1/2, the museum program, the doctrine block) or **rejected** (all-caps terminal
+mode = token waste; AI "state-the-rule-you-fulfill" self-justification; live wiki-radio-as-oracle — pinned
+snapshots only per MCP2 + Protocol 3). **Everything here is PLAN-STAGE — nothing is built, no owner build-go
+except where an item maps to already-approved doctrine.** Standing invariants apply unchanged: zero MCP-owned
+truth, zero MCP executors, supervisor is sole ledger-writer, AI-is-a-typist-not-authority, pinned/reproducible
+data, private-archive/public-museum boundary.
+
+### WB1. ⬜ Universal provenance spine + one evidence envelope (the composability backbone)
+
+**What it is.** GPT's single highest-leverage pick, which Gemini's "correlation spine" independently landed on
+too: **one lineage ID** threaded across contract → session → receipt → gate → ledger → backup → release →
+app-build → museum arc, plus **one evidence-envelope schema** (source SHA, artifact hashes, producer, job id,
+timestamps, sensitivity, verification state) that every record carries. **Adds no executor and no new source of
+truth** — it makes the records that already exist *composable*, so completion-verification, release proofs,
+incident replay, museum generation, backup certification, diagnostics intake, and mobile summaries all become
+**joins over known records** instead of bespoke code each. Partially seeded already (CPK1's job id/nonce, RB2's
+receipts, MCP1's evidence surface) — **this item is the explicit unification, not new machinery.** Environment
+capture (Node/git/browser/OS per receipt) rides the same envelope rather than being its own item.
+
+**Done means:** a single documented lineage-ID + envelope schema that CPK1/RB2/MCP1 all reference; at least one
+real cross-surface join (e.g. release → job → session → gate) demonstrated over live records; no second ledger
+or parallel identifier scheme introduced.
+
+### WB2. ⬜ Machine-readable guard registry
+
+**What it is.** Turn Protocol 36b/49's per-guard *prose* obligations (the real incident, the enforcement point,
+the false-positive analysis, the marginal cost, the retirement condition) into **one structured, queryable
+registry** — each guard = {failure class, enforcement point, test id, owner, retirement condition}. Makes the
+escape-ratchet / retirement discipline **auditable** instead of scattered narrative, and directly feeds the
+why-blocked query (MCP1) and the museum's failure→lesson→rule→guard→test genealogy (MCP2). A **read-model over
+rules that already exist** — no executor, no new authority; the prose in `CLAUDE.md`/`rules/` stays canonical.
+
+**Done means:** every active gate/suite guard has a registry row with those five fields; a stale row (guard
+deleted but registry entry survives, or vice-versa) is detectable; the registry is generated/checked, never
+hand-synced (the Protocol 2a failure mode is not reintroduced).
+
+### WB3. ⬜ Machine-readiness preflight (the unattended-launch gate)
+
+**What it is.** Before an **unattended** launch, a deterministic AI-free check: required tools present, disk
+space, creds reachable, worktree clean, backups fresh, network up, scheduler healthy. This is the concrete
+implementation of the CP doctrine already on file — *"an unattended launch lacking fresh prerequisites does not
+launch."* Fail **CLOSED** for automation; **report-and-continue** for the owner's own path (the doctrine's
+asymmetry). Composes with WB1's envelope (the preflight result is evidence).
+
+**Done means:** an unattended launch with a failed prerequisite is refused with a named reason, logged, and
+Pushover'd; the owner's interactive path is never blocked by it; the check runs with no model in the loop.
+
+### WB4. ⬜ Off-machine recovery kit + printed disaster card
+
+**What it is.** Merges GPT's portable-recovery-kit + Gemini's ".holotape" export + GPT's printed QR card. A
+periodically-refreshed **encrypted off-machine bundle** (control-plane source+config, Task Scheduler XML, hook
+config, ledger segments, restore instructions) **plus a one-page printed card** (QR-backed) listing the
+recovery ORDER and the exact verification commands. Rank-3 durability (CPK3, shipped) mirrors the running
+ledger; **this covers the bootstrap-from-nothing recipe and the human runbook** — the half rank-3 does not.
+Directly serves the Protocol 48 machine-loss fear.
+
+**Done means:** the kit restores into a clean temp machine/dir following only the printed card, with no access
+to this conversation or the live machine; the restore is periodically test-run (rides CPK3's restore-test
+cadence); secrets in it are encrypted, never a plaintext git repo (consistent with OD2).
+
+### WB5. ⬜ App build fingerprint + PWA self-verification
+
+**What it is.** Embed **build SHA / data-pack rev / schema version / release id** into the shipped app, and let
+a dev-mode PWA **hash itself against the published exact-SHA** publisher record (CPK2). Gives the app side a
+real provenance anchor: the running site can prove which exact commit it is, which feeds release-proof and the
+museum's release manifest. **App-surface change** — when built it routes through the normal app gate + cache
+bump (Protocol 1), unlike the control-plane-repo WB items.
+
+**Done means:** the app exposes its build fingerprint; a self-hash check can confirm-or-flag drift from the
+published SHA; the fingerprint is what the museum/release-proof reads, not a hand-maintained version string.
+
+### WB6. ⬜ Ledger integrity hardening — hash-chained records + content-addressed evidence
+
+**What it is.** Make the append-only ledger **tamper-evident** — each record chains the prior record's hash —
+and store bulky evidence **by content hash**. Strengthens the replay/verify that already exists
+(`reconcile.js --verify-replay`) from "reconstructable" to "tamper-evident + integrity-checkable." Supervisor
+stays **sole writer**; this is pure integrity, no new authority and no executor.
+
+**Done means:** a mutated/truncated ledger record is detected by chain verification; evidence is addressable by
+hash and deduped; `--verify-replay` gains the chain check without changing who may write.
+
+### WB7. ⬜ Supervisor watchdog + dead-man's switch ("who watches the watcher")
+
+**What it is.** Merges GPT's Task-Scheduler watchdog + Gemini's dead-man's switch. A **tiny independent**
+watchdog that (a) restarts the supervisor scheduled task under **narrow, verified** conditions — one attempt,
+then alert, **never a restart loop** — and (b) fires a Pushover **"supervisor missing-in-action"** if no
+supervisor tick has landed within a window. Answers the exact failure that started this whole CP arc —
+*nobody was watching* — at near-zero cost. **CP5's laptop-witness remains the fuller answer**; this is the
+cheap same-machine interim, honestly framed as such (a same-machine watchdog cannot survive the machine
+itself dying — that is CP5's job).
+
+**Done means:** a killed supervisor task is restarted once (then alerts if it fails again); a supervisor that
+silently stops ticking produces a phone alert within one window; the watchdog itself is dead-simple enough that
+it does not need its own watcher.
+
+### WB8. ⬜ Gate emits copyable CORRECTIONS, not just violations (positive linting)
+
+**What it is.** When the gate/hook blocks, it prints the **exact fix to paste**, not only "violation X." Turns
+each gate failure into an actionable next step and composes with the why-blocked query (MCP1). Small QoL; **no
+enforcement change** — same guards, better output.
+
+**Done means:** at least the highest-traffic gate failures (cache-bump, lint, format, a tripped static guard)
+emit a copy-pasteable correction line alongside the failure; no guard's strictness changes.
+
+### WB9. ⬜ Smaller net-new cluster — buildable once the batch above lands (one entry, six small items)
+
+Filed together because each is small, invariant-respecting, and low-priority on its own:
+
+- **Quiet-hours Pushover batching** — hold non-urgent alerts during owner-set quiet hours, batch on exit;
+  urgent classes (failure, decision-needed) still fire immediately (mirrors Protocol 9's report cadence for the
+  Pushover channel).
+- **Deferred-push queue on network loss** — when offline, queue pushes and drain on reconnect instead of
+  failing; the exact-SHA publisher (CPK2) still gates each one.
+- **Pre-risk git bundle** — snapshot a `git bundle` before any risky operation; composes with WB4's kit and
+  CPK4's continuation packet.
+- **Environment-drift proposal** — toolchain version changed (Node/git/browser) → raise a **review proposal**,
+  never self-update (extends CPK5's adapter/schema-drift watch from platform files to the toolchain).
+- **Shadow-supervisor replay harness** — replay recorded observations through a *candidate* supervisor and
+  diff its decisions before promoting a change; a safe test bed, not a second live supervisor.
+- **F.E.V. isolated experiment branches** — experimental/high-risk contracts confined to an isolated branch,
+  **human out-of-band approval to merge** (respects the human-merge gate; a lighter cousin of the deferred
+  worktree work, DG5).
+
+**Also logged, NOT folded as active items — optional museum/cockpit flavor (cross-ref the museum program P /
+the WB-CLI cockpit, CPB5):** failure-class *achievements* (a badge earned only when a failure class gains a
+verified guard+test+museum record — distinct from the ruled-out *app* achievements, this is control-plane/
+museum), terminal-boot-sequence-varies-by-real-health, a USB status lamp (green/yellow/red off the verified
+state — a harmless read-only physical renderer), G.O.A.T. operator-onboarding walkthrough, and the public
+"missing-edge" reference-graph challenge. These are decoration/exhibit ideas, considered when the museum and
+the cockpit are actually live — not control-plane build items.
+
+## ⚠ Stretch — needs an owner ruling (each strains an invariant; recorded, NOT active)
+
+Filed here rather than as active items because each strains one of the standing invariants. Kept because each
+might still be worth it under the right, owner-decided framing.
+
+- **ST-WB-A. Declarative invariant manifest** *(strains TRUTH — zero MCP/second source of truth).* The CP
+  doctrine's 4-5 executable invariants become a machine-read manifest. Risk: it becomes a **second authority**
+  competing with the doctrine prose. Worth it **only** if it is a *generated view of* the prose, never the
+  source of truth for it.
+- **ST-WB-B. Automatic rollback + republish** *(strains EXECUTOR + Protocol 16 dev-first rollback).* Supervisor
+  auto-reverts to a known-good SHA and republishes on a narrow catastrophic predicate. Collides with
+  no-autonomous-destructive-action and the **no direct-`main`** rollback rule. The only arguably-worth-it slice
+  is the single narrowest "prod is a black screen" predicate — and even that must run the gated `dev → main`
+  path, which is slow *by design*, fighting the point. Owner call.
+- **ST-WB-C. Public live control-room exhibit** *(strains PRIVACY — private-archive/public-museum boundary).*
+  Delayed, redacted control-plane health as a public museum exhibit. Raw records carry the owner's name/paths.
+  Worth it **only** if redaction is a **mandatory** gate (never AI-optional) and the feed is a curated
+  derivative, never the raw ledger.
+- **ST-WB-D. Self-writing guards** *(strains AUTHORITY/EXECUTOR — AI-is-a-typist).* Drafting a guard **as a
+  proposal** is an ordinary reviewed job and fine; **auto-installing** one is the executor violation. Owner
+  ruling on whether even proposal-drafting is wanted here, given the typist-not-authority line.
+- **ST-WB-E. Job-scoped capability tokens** *(strains the one-machine/one-trust-domain simplicity).* Bind a job
+  to a narrow capability token. Ties to the already-DEFERRED separate-trust-domain question — worth it only
+  once unattended autonomy is in *regular* use (revisit with CP5).
+- **ST-WB-F. In-chat MCP-Apps cockpit** *(strains PINNING/verify-first — depends on UNVERIFIED SEP-1865).*
+  Gemini's "render the job queue as an interactive HTML surface inside the Claude chat." Already flagged
+  verify-first in the MCP section; restated here as **owner-gated on the spec being real**. Overlaps CPB5's
+  HTML cockpit renderer — if it lands, it's a *third* renderer over the same read layer, not new truth.
+- **ST-WB-G. "Stimpack" owner hard-reset** *(strains append-only-ledger).* An owner-invoked break-glass:
+  rewind git + drop the session + reset to the last clean exact-SHA. The catch: the ledger is **append-only** —
+  a reset must be recorded as a *new reset event*, never a literal ledger rewind. Worth it as an owner-only,
+  logged break-glass **if** reframed to preserve append-only.
+
+---
+
 # ⭐ ALSO PRE-MUSEUM — the 2.9.0 hardening pull-forward (HG1-HG2, new 2026-07-28)
 
 **New family prefix, per this file's own rule (single letters are exhausted; new work takes a family prefix —
@@ -1349,6 +1523,16 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
 - **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
   Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
   decided, not yet built.
+- **CPB5 — `robco status`, the read-only operator CLI (owner-confirmed 2026-07-30; high-priority).** A single
+  read-only PowerShell CLI that renders the supervisor AND the watcher/reaper in ONE terminal screen from the
+  ledger + snapshots: supervisor **jobs / usage / last-tick / open-incidents / backup-health** up top, watcher
+  **last-sweep + flags** below. **Strictly a read-only observer — it never actuates and never writes the
+  ledger** (no-executor invariant). It is the **foundation for a phone-openable read-only HTML cockpit**: a
+  single self-contained `.html` regenerated on each supervisor tick, served locally over Tailscale or synced to
+  the phone — **PRIVATE, never public GitHub Pages** (the records carry the owner's name) — a **second renderer
+  over the same read layer** the CLI uses. Reads what already exists (`status.json` + the ledger); adds a read
+  *view*, not a new source of truth. Folds in GPT's "phone-first operator cockpit" and Gemini's `robco status`
+  / supervisor-local-web-view; can surface the same pending-events delta as **RB1**'s inbox projection.
 - **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
