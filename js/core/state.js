@@ -301,24 +301,109 @@ window.otherInputMode = otherInputMode;
 // that REACTS to them (sound, haptic, chat message, auto-log) — a detector
 // emits a fact once; any number of consumers subscribe instead of each
 // re-implementing the same crossing check inline (Protocol 22). A handler
-// that throws is caught and swallowed so one bad listener can never break
-// the emitter or any other listener (the emitter itself must never throw).
+// that throws is caught so one bad listener can never break the emitter or
+// any other listener (the emitter itself must never throw).
+//
+// ── HG1 HARDENING (QUEUE item HG1, pulled forward from the 2.9.0 hardening
+//    gate) ──────────────────────────────────────────────────────────────────
+// The bus had on/emit and nothing else. HG1 adds the four missing pieces,
+// deliberately BEFORE the 2.9.0 OS services widen bus usage:
+//
+//   off(event, fn)  — unsubscribe. on()/once() also RETURN an unsubscribe
+//                     handle (the AmbientRuntime.register() convention), so a
+//                     caller never has to keep the handler reference around.
+//   once(event, fn) — fires at most once. De-registered BEFORE it is invoked,
+//                     so a handler that re-emits its own event cannot re-enter
+//                     itself.
+//   dedup           — re-registering the SAME fn for the SAME event is a no-op
+//                     (addEventListener semantics), so a wiring pass that runs
+//                     twice cannot double-fire an identity-registered handler.
+//                     HONEST LIMIT: dedup keys on function IDENTITY, so the
+//                     anonymous arrows every shipped _wire*EventBusSubscribers()
+//                     registers are distinct objects and are NOT deduped. That
+//                     is the caller's contract, not a defect — and no shipped
+//                     subscriber is registered twice today (each wiring fn is
+//                     called exactly once from window.onload). This is API-level
+//                     hardening landed ahead of the widening, not a fix for a
+//                     live double-fire.
+//   error isolation — behaviourally unchanged (a throwing listener still never
+//                     breaks the emitter or its siblings) but no longer SILENT:
+//                     each failure is logged per-handler with its event name and
+//                     handler index. The logging itself is fully guarded —
+//                     state.js is evaluated in sandboxes with no `console` (the
+//                     gate's vm harness), and a ReferenceError raised inside the
+//                     catch would let the very error this exists to contain
+//                     escape emit().
+//
+// Dispatch iterates a SNAPSHOT of the handler list, so a handler that
+// subscribes or unsubscribes mid-emit can neither skip a sibling nor fire a
+// handler that was just removed — each record carries a `removed` tombstone the
+// snapshot loop re-checks before invoking.
 const RobcoEvents = (() => {
   const handlers = {};
-  function on(event, fn) {
-    if (!handlers[event]) handlers[event] = [];
-    handlers[event].push(fn);
-  }
-  function emit(event, payload) {
-    (handlers[event] || []).forEach(fn => {
-      try {
-        fn(payload);
-      } catch (_) {
-        /* a listener failure must never break the emitter or other listeners */
+
+  // Report a listener failure without ever letting the report itself throw.
+  function _reportListenerError(event, index, err) {
+    try {
+      if (typeof console !== 'undefined' && console && typeof console.error === 'function') {
+        console.error(`[RobcoEvents] listener #${index} for "${event}" threw:`, err);
       }
-    });
+    } catch (_) {
+      /* a logging failure must never break the emitter */
+    }
   }
-  return { on, emit };
+
+  function _indexOf(event, fn) {
+    const list = handlers[event];
+    if (!list) return -1;
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].fn === fn) return i;
+    }
+    return -1;
+  }
+
+  // Shared registration path for on()/once() — dedup + the unsubscribe handle.
+  function _add(event, fn, isOnce) {
+    if (typeof fn !== 'function') return () => false;
+    if (!handlers[event]) handlers[event] = [];
+    if (_indexOf(event, fn) !== -1) return () => off(event, fn); // dedup — already subscribed
+    handlers[event].push({ fn: fn, once: !!isOnce, removed: false });
+    return () => off(event, fn);
+  }
+
+  function on(event, fn) {
+    return _add(event, fn, false);
+  }
+
+  function once(event, fn) {
+    return _add(event, fn, true);
+  }
+
+  function off(event, fn) {
+    const i = _indexOf(event, fn);
+    if (i === -1) return false;
+    handlers[event][i].removed = true; // tombstone — an in-flight emit skips it
+    handlers[event].splice(i, 1);
+    return true;
+  }
+
+  function emit(event, payload) {
+    const list = handlers[event];
+    if (!list || !list.length) return;
+    const snapshot = list.slice(); // mid-dispatch on()/off() must not shift this loop
+    for (let i = 0; i < snapshot.length; i++) {
+      const rec = snapshot[i];
+      if (rec.removed) continue; // unsubscribed by an earlier handler in this same emit
+      if (rec.once) off(event, rec.fn); // de-register BEFORE invoking (re-entrancy)
+      try {
+        rec.fn(payload);
+      } catch (err) {
+        _reportListenerError(event, i, err);
+      }
+    }
+  }
+
+  return { on, once, off, emit };
 })();
 window.RobcoEvents = RobcoEvents;
 

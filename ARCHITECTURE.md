@@ -3146,8 +3146,33 @@ registry instead.
 decouples STATE CROSSING DETECTION from the code that reacts to it: a detector
 calls `emit()` once when it observes a crossing; any number of independent
 listeners `on()` it without the detector knowing who's listening. A throwing
-listener is caught and swallowed so it can never break the emitter or a sibling
-listener.
+listener is caught so it can never break the emitter or a sibling listener.
+
+**HG1 hardening.** The bus shipped with `on`/`emit` and nothing else. QUEUE item
+**HG1** — pulled forward from the 2.9.0 hardening gate specifically so it lands
+_before_ the 2.9.0 OS services widen bus usage — added the four missing pieces
+(Suite 256; Suite 135 still owns the original U7/U8 contract):
+
+| Addition          | Contract                                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `off(event, fn)`  | Unsubscribe; returns `true`/`false` and never throws on an unknown event or fn. `on()`/`once()` also **return an unsubscribe handle** (the `AmbientRuntime.register()` convention), so a caller need not retain the fn reference.                                                                            |
+| `once(event, fn)` | Fires at most once. De-registered **before** invocation, so a handler that re-emits its own event cannot re-enter itself.                                                                                                                                                                                    |
+| dedup             | Re-registering the **same fn** for the **same event** is a no-op (`addEventListener` semantics), keyed on `(event, fn)`. **Honest limit:** identity dedup cannot see the anonymous arrows every shipped `_wire*EventBusSubscribers()` registers — API-level hardening ahead of the widening, not a live fix. |
+| error isolation   | Behaviourally unchanged (a throwing listener still never escapes `emit()` nor blocks a sibling) but no longer **silent** — each failure is logged per-handler with its event name and handler index.                                                                                                         |
+
+`emit()` dispatches a **snapshot** of the handler list, and each record carries a
+`removed` tombstone the loop re-checks, so a handler that subscribes or
+unsubscribes mid-emit can neither skip a sibling nor fire one already removed.
+A non-function subscriber is refused at registration rather than pushed onto the
+list, so `emit()` can never call a non-function.
+
+**Protocol 42 footgun, locked (Suite 256.9/256.10).** `state.js` is evaluated in
+`vm` sandboxes with **no `console` binding** (the gate's own bus harness). A bare
+`console.error(...)` in `emit()`'s catch would raise a `ReferenceError` from
+inside the catch — turning "a bad listener can never break the emitter" into "a
+bad listener always breaks the emitter" the moment logging was added. The
+reporter is therefore fully guarded (`typeof console` check inside its own
+`try`), and both the console-less and console-present cases are locked.
 
 Three previously-inline crossing detectors were migrated to emit through the
 bus (behavior preserved — only the wiring changed):

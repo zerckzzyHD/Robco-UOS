@@ -52936,6 +52936,312 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 256 — HG1: event-bus hardening (off / once / dedup +
+//  per-handler error isolation)
+//
+//  Suite 135 locks the U7/U8 bus as it originally shipped: on() + emit(),
+//  registration-order dispatch, and a throwing listener that never escapes
+//  emit(). HG1 (pulled forward from the 2.9.0 hardening gate) adds what was
+//  missing, ahead of 2.9.0 widening bus usage — this suite locks the NEW
+//  behaviour and leaves 135 owning the original contract.
+//
+//  Everything here is BEHAVIOURAL (Protocol 20): the real js/core/state.js is
+//  evaluated in a vm sandbox and the real RobcoEvents is exercised, never a
+//  regex over the source. One deliberate exception is marked at 256.12, which
+//  has a source-level subject.
+//
+//  The console-less sandbox is load-bearing, not incidental. The old emit()
+//  swallowed listener errors silently; HG1 logs them per-handler. state.js is
+//  evaluated here (and by Suite 135) in a sandbox with NO `console` binding, so
+//  a naive `console.error(...)` inside the catch raises a ReferenceError from
+//  the very handler the catch exists to contain — turning "a bad listener can
+//  never break the emitter" into "a bad listener always breaks the emitter" the
+//  moment logging was added. 256.9/256.10 are that Protocol 42 footgun, locked.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 256 — HG1 event-bus hardening (off/once/dedup + error isolation)');
+
+  const vm256 = require('vm');
+
+  // A sandbox with NO console — mirrors Suite 135's harness deliberately (see
+  // the header note). makeBusSandbox256(true) adds a capturing console instead.
+  function makeBusSandbox256(withConsole) {
+    const logged = [];
+    const sandbox = { window: {}, document: { getElementById: () => null } };
+    if (withConsole) {
+      sandbox.console = {
+        error: (...args) => logged.push(args),
+        log: () => {},
+        warn: () => {},
+      };
+    }
+    vm256.createContext(sandbox);
+    vm256.runInContext(stateSource, sandbox);
+    sandbox.__logged = logged;
+    return sandbox;
+  }
+
+  // Run a bus scenario in a fresh sandbox. Returns { ok, err } — an exception
+  // escaping emit() is a FAILURE, never a harness error swallowed into a pass.
+  function busRun256(script, withConsole) {
+    try {
+      const sb = makeBusSandbox256(withConsole);
+      sb.out = [];
+      vm256.runInContext(script, sb);
+      return { sb: sb, ok: true, err: null };
+    } catch (e) {
+      return { sb: null, ok: false, err: e };
+    }
+  }
+
+  // 256.1  the hardened API is exposed — off/once alongside the original on/emit
+  {
+    const r = busRun256(
+      'out.push(typeof RobcoEvents.on, typeof RobcoEvents.emit, typeof RobcoEvents.off, typeof RobcoEvents.once)'
+    );
+    assert(
+      r.ok && r.sb.out.join(',') === 'function,function,function,function',
+      '256.1: RobcoEvents exposes on/emit (unchanged) plus the HG1 additions off/once'
+    );
+  }
+
+  // 256.2  off() unsubscribes — the handler stops firing on subsequent emits
+  {
+    const r = busRun256(
+      'var n = 0; function h() { n++; }' +
+        "RobcoEvents.on('t.e', h);" +
+        "RobcoEvents.emit('t.e');" +
+        "RobcoEvents.off('t.e', h);" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.2: off(event, fn) unsubscribes — the handler fires before the off() and never after it'
+    );
+  }
+
+  // 256.3  on() returns a working unsubscribe handle (the AmbientRuntime
+  //        register() convention) — a caller need not keep the fn reference
+  {
+    const r = busRun256(
+      'var n = 0;' +
+        "var stop = RobcoEvents.on('t.e', function () { n++; });" +
+        "RobcoEvents.emit('t.e');" +
+        'stop();' +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.3: on() returns an unsubscribe handle that removes the handler when called'
+    );
+  }
+
+  // 256.4  off() on an unknown event / unknown fn is a safe no-op, and reports
+  //        false rather than throwing
+  {
+    const r = busRun256(
+      "out.push(RobcoEvents.off('never.registered', function () {}));" +
+        "RobcoEvents.on('t.e', function () {});" +
+        "out.push(RobcoEvents.off('t.e', function () {}));"
+    );
+    assert(
+      r.ok && r.sb.out[0] === false && r.sb.out[1] === false,
+      '256.4: off() on an unknown event or an unregistered fn returns false and never throws'
+    );
+  }
+
+  // 256.5  once() fires exactly once across repeated emits
+  {
+    const r = busRun256(
+      'var n = 0;' +
+        "RobcoEvents.once('t.e', function () { n++; });" +
+        "RobcoEvents.emit('t.e');" +
+        "RobcoEvents.emit('t.e');" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.5: once(event, fn) fires on the first emit and never again, however many emits follow'
+    );
+  }
+
+  // 256.6  once() is de-registered BEFORE it is invoked — a handler that
+  //        re-emits its own event cannot re-enter itself (infinite recursion)
+  {
+    const r = busRun256(
+      'var n = 0;' +
+        "RobcoEvents.once('t.e', function () { n++; RobcoEvents.emit('t.e'); });" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.6: a once() handler that re-emits its own event does NOT re-enter itself (de-registered before invocation)'
+    );
+  }
+
+  // 256.7  dedup — registering the SAME fn twice for the SAME event registers
+  //        once, so one emit calls it once (addEventListener semantics)
+  {
+    const r = busRun256(
+      'var n = 0; function h() { n++; }' +
+        "RobcoEvents.on('t.e', h);" +
+        "RobcoEvents.on('t.e', h);" +
+        "RobcoEvents.on('t.e', h);" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.7: dedup — re-registering the same fn for the same event is a no-op; one emit calls it exactly once'
+    );
+  }
+
+  // 256.8  dedup is scoped per EVENT — the same fn on two different events is
+  //        two real subscriptions, not a collision
+  {
+    const r = busRun256(
+      'var n = 0; function h() { n++; }' +
+        "RobcoEvents.on('t.a', h);" +
+        "RobcoEvents.on('t.b', h);" +
+        "RobcoEvents.emit('t.a');" +
+        "RobcoEvents.emit('t.b');" +
+        'out.push(n);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 2,
+      '256.8: dedup is keyed on (event, fn) — the same fn subscribed to two different events fires for both'
+    );
+  }
+
+  // 256.9  PROTOCOL 42 FOOTGUN, LOCKED: a throwing listener must not escape
+  //        emit() in a sandbox with NO console. Naive per-handler logging
+  //        (a bare console.error in the catch) raises a ReferenceError from
+  //        inside the catch — breaking the exact isolation it was added to
+  //        improve. This is the red-then-green case for the HG1 logging.
+  {
+    const r = busRun256(
+      'var b = 0;' +
+        "RobcoEvents.on('t.e', function () { throw new Error('boom'); });" +
+        "RobcoEvents.on('t.e', function () { b++; });" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(b);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 1,
+      '256.9: with NO console in scope, a throwing listener still never escapes emit() and never blocks its siblings — the per-handler log is itself guarded'
+    );
+  }
+
+  // 256.10 …and WHEN a console IS available, the failure is actually LOGGED
+  //        (per-handler, naming the event) rather than silently swallowed —
+  //        the substantive half of the HG1 error-isolation change
+  {
+    const r = busRun256(
+      'var b = 0;' +
+        "RobcoEvents.on('t.e', function () { throw new Error('boom'); });" +
+        "RobcoEvents.on('t.e', function () { b++; });" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(b);',
+      true
+    );
+    const logged = r.ok ? r.sb.__logged : [];
+    const first = logged.length ? String(logged[0][0]) : '';
+    assert(
+      r.ok &&
+        r.sb.out[0] === 1 &&
+        logged.length === 1 &&
+        /RobcoEvents/.test(first) &&
+        /t\.e/.test(first),
+      '256.10: a throwing listener is LOGGED per-handler with its event name (no longer silently swallowed) while its siblings still fire'
+    );
+  }
+
+  // 256.11 mid-dispatch mutation: a handler that unsubscribes a LATER sibling
+  //        actually prevents it firing in that same emit (the `removed`
+  //        tombstone), and a handler subscribed mid-dispatch does not fire
+  //        until the NEXT emit — the snapshot contract
+  {
+    const r = busRun256(
+      'var late = 0, added = 0;' +
+        'function b() { late++; }' +
+        "RobcoEvents.on('t.e', function () {" +
+        "  RobcoEvents.off('t.e', b);" +
+        "  RobcoEvents.on('t.e', function () { added++; });" +
+        '});' +
+        "RobcoEvents.on('t.e', b);" +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(late, added);' +
+        "RobcoEvents.emit('t.e');" +
+        'out.push(added);'
+    );
+    assert(
+      r.ok && r.sb.out[0] === 0 && r.sb.out[1] === 0 && r.sb.out[2] > 0,
+      '256.11: emit() dispatches a snapshot — a sibling unsubscribed mid-emit does not fire, and one subscribed mid-emit waits for the next emit'
+    );
+  }
+
+  // 256.12 a non-function subscriber is refused rather than pushed onto the
+  //        handler list, so a later emit cannot throw "fn is not a function"
+  {
+    const r = busRun256(
+      "out.push(typeof RobcoEvents.on('t.e', null));" +
+        "out.push(typeof RobcoEvents.on('t.e', 'nope'));" +
+        "out.push(typeof RobcoEvents.once('t.e', 42));" +
+        "RobcoEvents.emit('t.e');" +
+        "out.push('survived');"
+    );
+    assert(
+      r.ok &&
+        r.sb.out[0] === 'function' &&
+        r.sb.out[1] === 'function' &&
+        r.sb.out[2] === 'function' &&
+        r.sb.out[3] === 'survived',
+      '256.12: on()/once() refuse a non-function subscriber (still returning an unsubscribe handle) so emit() can never call a non-function'
+    );
+  }
+
+  // 256.13 the original U7/U8 contract is intact under the rewrite — the seven
+  //        real state.js auto-log subscribers still fire through the hardened
+  //        emit(), proving HG1 did not break a shipped subscriber path
+  {
+    let ok = false;
+    try {
+      const sb = makeBusSandbox256(true);
+      vm256.runInContext(
+        "state = { ticks: 7, eventLog: [] }; RobcoEvents.emit('level.up', { oldLvl: 3, newLvl: 4 });",
+        sb
+      );
+      const log = vm256.runInContext('state.eventLog', sb);
+      ok = log.length === 1 && log[0].type === 'level' && log[0].t === 7;
+    } catch (e) {
+      fail(`256.13 harness error: ${e.message}`);
+    }
+    assert(
+      ok,
+      "256.13: the real state.js auto-log subscriber still fires through the hardened emit() — emitting 'level.up' appends its structured eventLog record unchanged"
+    );
+  }
+
+  // 256.14 STATIC (Protocol 20 exception — the subject IS the source text):
+  //        the old unconditional silent-swallow form must not return. A
+  //        behavioural test cannot distinguish "logged through a guarded
+  //        reporter" from "swallowed" in a console-less sandbox, which is
+  //        exactly the sandbox the shipped gate uses, so the negative guard is
+  //        source-level by necessity.
+  assert(
+    /_reportListenerError\(event, i, err\)/.test(stateSource) &&
+      !/catch \(_\) \{\s*\/\* a listener failure must never break the emitter or other listeners \*\/\s*\}/.test(
+        stateSource
+      ),
+    "256.14: emit()'s catch routes through the guarded _reportListenerError() — the pre-HG1 silent-swallow catch is gone and cannot regress"
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
