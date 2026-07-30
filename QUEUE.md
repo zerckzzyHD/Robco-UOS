@@ -30,11 +30,14 @@ rebuilt: **(1)** a **locked startup-banner decision** — the `robco` CLI opens 
 (phosphor-green turtle over a blue waterline), GPT's dependency-free `robco-turtle-banner.mjs` renderer,
 truecolor with `NO_COLOR`/unicode/ascii fallback, chosen over Gemini/Fable/hand-drawn; **(2)** a new
 **notification-control capability** — the CLI manages Pushover delivery with a global on/off plus
-per-alert-type toggles (settings-panel style), human-driven with a ledger event per toggle, guarded by
-critical-alert breakthrough + an optional auto-unmute timer; **(3)** an explicit **first-class aesthetic
-requirement** — a polished TUI at Claude Code CLI finish level (phosphor theme, boxes/tables/color, the
-banner). Doc-only pass, pushed through the CPB4 doc-only fast path. SHA + the post-push DG2 counter are in
-this pass's report.
+per-alert-type toggles (settings-panel style), human-driven with a ledger event per toggle. **Refined same
+day (2026-07-30):** three mute **levels** — normal / standard mute (criticals still break through) / **total
+blackout** (everything off, including criticals) — with an **auto-unmute** safety net on any level, **default
+2h 30m** (configurable), tracked via the supervisor's 5-minute tick (no always-on timer); **(3)** an explicit
+**first-class aesthetic requirement** — a polished TUI at Claude Code CLI finish level (phosphor theme,
+boxes/tables/color, the banner). **Also corrected the stale DG2 counter line to its live value 10/10 —
+threshold MET** (enforcement AVAILABLE, not auto-activated; still gated behind CPB6). Doc-only pass, pushed
+through the CPB4 doc-only fast path. SHA + the post-push DG2 counter are in this pass's report.
 
 **Prior update — 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
 checkpoint fold + reconcile + push-verify-all pass; no code feature was built (ACT2 and the control-repo
@@ -51,8 +54,10 @@ manual `node test/run-tests.js`), so control-plane pushes rely on **discipline, 
 those pushes are genuinely gated and record `gate.passed`. Filed near the DG2 / push-gate items. **(d)**
 **ACT2 marked owner-greenlit (2026-07-30) — the next build after this checkpoint.** Also reconciled:
 `planning/control-plane/CONTROL_PLANE_STATUS.md` brought current with shipped reality (CPB4/ACT3/CPB1/CPB2
-shipped; CPB2 LIVE not dormant), and the **DG2 clean-push counter corrected to its live value 8/10** (the
-`3/10` snapshots below are the ACT3-dogfood-day value, left in place as dated history). No ID renumbered
+shipped; CPB2 LIVE not dormant), and the **DG2 clean-push counter corrected to its live value 8/10 at this
+checkpoint** — _since advanced to **10/10, threshold MET** (2026-07-30, the CPB5-fold push was #10); DG2
+enforcement is now AVAILABLE but NOT auto-activated, still gated behind CPB6 wiring the control-repo gate_
+(the `3/10` snapshots below are the ACT3-dogfood-day value, left in place as dated history). No ID renumbered
 (Protocol 49); doc-only pass. **Verified remote SHAs** and the post-push counter are in this pass's report.
 
 **Prior update — 2026-07-30 (ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
@@ -1704,10 +1709,14 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   switch on top, individual toggles beneath) so each alert family flips **independently** — budget/token,
   usage-mode change, backup failure/health, session-needs-input, unbacked-work / push-confirm, thrashing,
   deadline, break-glass, and any others. **Human-driven only**; every toggle **appends a ledger event** (a
-  record of when alerts were off and which). **Two safety guards, both owner-approved:** critical alerts
-  **break through a global mute by default**, and an **optional auto-unmute timer** (configurable duration) so
-  a mute can never silently swallow alerts forever. Commands along the lines of `robco notify on|off|status`
-  plus per-type toggles.
+  record of when alerts were off and which). **Three mute LEVELS (owner-refined 2026-07-30):** _normal_ (all
+  on) / _standard mute_ (criticals still break through by default) / _total blackout_ (**everything** off,
+  **including the criticals that normally break through** — an explicit opt-in hard "mute all"). **Auto-unmute
+  is the safety net for every level:** any mute — standard OR total blackout — carries an **expiry timestamp**
+  the supervisor checks on its **5-minute tick** and lifts automatically once passed, so nothing (not even a
+  blackout of the criticals) stays silent forever. **Default duration 2h 30m, configurable.** No always-on
+  timer is needed — the CLI tracks the mute purely via that expiry timestamp on the supervisor tick. Commands
+  along the lines of `robco notify on|off|status` plus per-type toggles.
   **Aesthetic requirement — first-class, not an afterthought (owner add 2026-07-30).** CPB5 must be a
   **polished, beautiful TUI at the level of finish of the Claude Code CLI**: RobCo/Fallout phosphor theme,
   clean boxes / tables / color, readable layout, and the turtle banner. Recorded as a first-class requirement
@@ -1824,10 +1833,12 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`. A further
   precision fix (not a promotion) → **REF4**, below.
 - **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
-  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter is moving). **Live count at
-  this checkpoint: 8/10** (`code@main: 3`, `robco-uos@dev: 5`) — 2 more clean wrapper pushes remain before
-  DG2 can be considered (the app-repo push carrying this checkpoint advances it to 9/10). Read the live count
-  any time with `npm run push-count` in the control repo. **Related build gap → CPB6** (the control repo
+  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter did its job). **Live count:
+  10/10 — threshold MET (2026-07-30).** Enforcement is now **AVAILABLE, not auto-activated**: reaching 10
+  makes DG2 eligible to turn on, it does **not** flip raw-push refusal on by itself. **Still gated behind
+  CPB6** — the control repo has no enforced gate hook, so its wrapper pushes record `gate.skipped`; raw-push
+  refusal should not be switched on until that control-repo gate is wired (see the CPB6 build gap below).
+  Read the live count any time with `npm run push-count` in the control repo. **Related build gap → CPB6** (the control repo
   itself has no enforced gate hook, so its wrapper pushes currently record `gate.skipped`, not `gate.passed`
   — a discipline-not-enforcement gap to close; see CPB6 in READY TO BUILD).
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
