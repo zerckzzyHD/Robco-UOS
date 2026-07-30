@@ -1264,7 +1264,7 @@ data, private-archive/public-museum boundary.
 too: **one lineage ID** threaded across contract → session → receipt → gate → ledger → backup → release →
 app-build → museum arc, plus **one evidence-envelope schema** (source SHA, artifact hashes, producer, job id,
 timestamps, sensitivity, verification state) that every record carries. **Adds no executor and no new source of
-truth** — it makes the records that already exist *composable*, so completion-verification, release proofs,
+truth** — it makes the records that already exist _composable_, so completion-verification, release proofs,
 incident replay, museum generation, backup certification, diagnostics intake, and mobile summaries all become
 **joins over known records** instead of bespoke code each. Partially seeded already (CPK1's job id/nonce, RB2's
 receipts, MCP1's evidence surface) — **this item is the explicit unification, not new machinery.** Environment
@@ -1276,40 +1276,57 @@ or parallel identifier scheme introduced.
 
 ### WB2. ⬜ Machine-readable guard registry
 
-**What it is.** Turn Protocol 36b/49's per-guard *prose* obligations (the real incident, the enforcement point,
+**What it is.** Turn Protocol 36b/49's per-guard _prose_ obligations (the real incident, the enforcement point,
 the false-positive analysis, the marginal cost, the retirement condition) into **one structured, queryable
 registry** — each guard = {failure class, enforcement point, test id, owner, retirement condition}. Makes the
 escape-ratchet / retirement discipline **auditable** instead of scattered narrative, and directly feeds the
 why-blocked query (MCP1) and the museum's failure→lesson→rule→guard→test genealogy (MCP2). A **read-model over
 rules that already exist** — no executor, no new authority; the prose in `CLAUDE.md`/`rules/` stays canonical.
 
+**Folds in ruling A (APPROVED in constrained form, 2026-07-30) — a GENERATED invariant index.** The CP
+doctrine's executable invariants get a machine-read index _inside this registry_, **NOT as a standalone item**:
+each invariant entry must **point to the concrete thing that enforces it** (a test id, a WB2 guard row, or a
+protocol section) and be **generated FROM those enforcement points** — so retiring a guard removes its entry
+automatically, and it can never claim protection that isn't enforced. **Explicitly never a hand-authored
+authoritative file that tools check against** (that is the second-source-of-truth trap ST-WB-A was declined in
+its standalone form for). The former **ST-WB-A is removed from the Stretch bucket** accordingly.
+
 **Done means:** every active gate/suite guard has a registry row with those five fields; a stale row (guard
 deleted but registry entry survives, or vice-versa) is detectable; the registry is generated/checked, never
-hand-synced (the Protocol 2a failure mode is not reintroduced).
+hand-synced (the Protocol 2a failure mode is not reintroduced); the generated invariant index points every
+invariant at its real enforcement point and never outlives it.
 
 ### WB3. ⬜ Machine-readiness preflight (the unattended-launch gate)
 
 **What it is.** Before an **unattended** launch, a deterministic AI-free check: required tools present, disk
 space, creds reachable, worktree clean, backups fresh, network up, scheduler healthy. This is the concrete
-implementation of the CP doctrine already on file — *"an unattended launch lacking fresh prerequisites does not
-launch."* Fail **CLOSED** for automation; **report-and-continue** for the owner's own path (the doctrine's
+implementation of the CP doctrine already on file — _"an unattended launch lacking fresh prerequisites does not
+launch."_ Fail **CLOSED** for automation; **report-and-continue** for the owner's own path (the doctrine's
 asymmetry). Composes with WB1's envelope (the preflight result is evidence).
 
 **Done means:** an unattended launch with a failed prerequisite is refused with a named reason, logged, and
 Pushover'd; the owner's interactive path is never blocked by it; the check runs with no model in the loop.
 
-### WB4. ⬜ Off-machine recovery kit + printed disaster card
+### WB4. ⬜ Off-machine recovery kit — its OWN private bootstrap/recovery repo (restructured 2026-07-30)
 
-**What it is.** Merges GPT's portable-recovery-kit + Gemini's ".holotape" export + GPT's printed QR card. A
-periodically-refreshed **encrypted off-machine bundle** (control-plane source+config, Task Scheduler XML, hook
-config, ledger segments, restore instructions) **plus a one-page printed card** (QR-backed) listing the
-recovery ORDER and the exact verification commands. Rank-3 durability (CPK3, shipped) mirrors the running
-ledger; **this covers the bootstrap-from-nothing recipe and the human runbook** — the half rank-3 does not.
-Directly serves the Protocol 48 machine-loss fear.
+**What it is.** The recovery kit becomes its **OWN small PRIVATE "bootstrap/recovery" repo on GitHub** —
+runbook, manifests, restore-and-verify scripts, and **pointers to _where_ secrets live (never the secrets
+themselves)** — mirrored into the off-machine backup. Still merges GPT's portable-recovery-kit + Gemini's
+".holotape" export + GPT's printed QR card, but the structure changes: **because it's GitHub-hosted, the
+owner's phone can pull the runbook even when the primary machine is dead** — the exact disaster case an
+on-machine kit cannot cover. Rank-3 durability (CPK3, shipped) mirrors the running ledger; **this covers the
+bootstrap-from-nothing recipe and the human runbook** — the half rank-3 does not. Directly serves the Protocol
+48 machine-loss fear.
+The **printed QR disaster card drops to a thin last-resort tail** — optional, for the no-digital-access case
+only — and is **ALSO viewable from the CLI/cockpit via `robco recover`** (CPB5). So the runbook is reachable
+three ways: the GitHub repo (phone, machine-dead case), the CLI/cockpit (`robco recover`), and the printed card
+(no-digital-access fallback).
 
-**Done means:** the kit restores into a clean temp machine/dir following only the printed card, with no access
-to this conversation or the live machine; the restore is periodically test-run (rides CPK3's restore-test
-cadence); secrets in it are encrypted, never a plaintext git repo (consistent with OD2).
+**Done means:** the private bootstrap/recovery repo restores into a clean temp machine/dir following only its
+runbook, with no access to this conversation or the live machine; the phone can pull the runbook from GitHub
+with the primary machine down; the restore is periodically test-run (rides CPK3's restore-test cadence);
+**secrets are never in the repo** — only pointers to where they live (consistent with OD2); the printed card is
+a last-resort tail, mirrored by `robco recover`.
 
 ### WB5. ⬜ App build fingerprint + PWA self-verification
 
@@ -1338,7 +1355,7 @@ hash and deduped; `--verify-replay` gains the chain check without changing who m
 watchdog that (a) restarts the supervisor scheduled task under **narrow, verified** conditions — one attempt,
 then alert, **never a restart loop** — and (b) fires a Pushover **"supervisor missing-in-action"** if no
 supervisor tick has landed within a window. Answers the exact failure that started this whole CP arc —
-*nobody was watching* — at near-zero cost. **CP5's laptop-witness remains the fuller answer**; this is the
+_nobody was watching_ — at near-zero cost. **CP5's laptop-witness remains the fuller answer**; this is the
 cheap same-machine interim, honestly framed as such (a same-machine watchdog cannot survive the machine
 itself dying — that is CP5's job).
 
@@ -1368,52 +1385,101 @@ Filed together because each is small, invariant-respecting, and low-priority on 
   CPK4's continuation packet.
 - **Environment-drift proposal** — toolchain version changed (Node/git/browser) → raise a **review proposal**,
   never self-update (extends CPK5's adapter/schema-drift watch from platform files to the toolchain).
-- **Shadow-supervisor replay harness** — replay recorded observations through a *candidate* supervisor and
+- **Shadow-supervisor replay harness** — replay recorded observations through a _candidate_ supervisor and
   diff its decisions before promoting a change; a safe test bed, not a second live supervisor.
 - **F.E.V. isolated experiment branches** — experimental/high-risk contracts confined to an isolated branch,
   **human out-of-band approval to merge** (respects the human-merge gate; a lighter cousin of the deferred
   worktree work, DG5).
 
 **Also logged, NOT folded as active items — optional museum/cockpit flavor (cross-ref the museum program P /
-the WB-CLI cockpit, CPB5):** failure-class *achievements* (a badge earned only when a failure class gains a
-verified guard+test+museum record — distinct from the ruled-out *app* achievements, this is control-plane/
+the WB-CLI cockpit, CPB5):** failure-class _achievements_ (a badge earned only when a failure class gains a
+verified guard+test+museum record — distinct from the ruled-out _app_ achievements, this is control-plane/
 museum), terminal-boot-sequence-varies-by-real-health, a USB status lamp (green/yellow/red off the verified
 state — a harmless read-only physical renderer), G.O.A.T. operator-onboarding walkthrough, and the public
 "missing-edge" reference-graph challenge. These are decoration/exhibit ideas, considered when the museum and
 the cockpit are actually live — not control-plane build items.
 
+## Stretch rulings applied (2026-07-30) — A-G resolved
+
+The seven Stretch items (formerly ST-WB-A … ST-WB-G) received owner rulings on 2026-07-30. Where each went:
+**A** → folded into **WB2** as a generated invariant index (not a standalone item). **B** → accepted as
+**WB10** below. **C** → declined as a live feed; logged decision + safe alternative recorded below. **D** →
+accepted draft-only as **WB11** below, plus a standing rule. **E** → PARKED, stays in Stretch. **F** → PARKED
+but marked owner-wanted, stays in Stretch. **G** → accepted as **WB12** below. After this pass the Stretch
+bucket holds only **E** and **F**.
+
+### WB10. ⬜ Staged one-click catastrophic rollback (ruling B — ACCEPTED, no auto-execution, 2026-07-30)
+
+**What it is.** Formerly ST-WB-B. Accepted in a **no-auto-execution** form: the supervisor **DETECTS** the
+catastrophic condition (e.g. prod is a black screen), **ALERTS** the owner, and **stages a one-click
+rollback** — but the **OWNER fires it**, via the CPB5 control action (above). **Never automatic.** This keeps
+the no-autonomous-destructive-action invariant and Protocol 16's dev-first, no-direct-`main` rollback rule
+intact: the staged rollback still runs the gated `dev → main` path a human triggers — it is not a supervisor
+self-revert. Cross-references **CPB5** (the action that fires it).
+
+**Done means:** a catastrophic predicate produces a detect→alert→stage sequence with the owner as the only
+actuator; nothing auto-reverts; the fire path is the CPB5 human-interactive control action with its confirm +
+ledger-append guardrails.
+
+### WB11. ⬜ Self-writing guards — DRAFT-only proposals (ruling D — APPROVED draft-only + standing rule, 2026-07-30)
+
+**What it is.** Formerly ST-WB-D. The AI may **DRAFT** an incident→guard proposal (acting as typist), but
+**INSTALLING** it stays an ordinary reviewed, gated, owner-approved job — auto-installing a guard is the
+executor violation and is prohibited. Drafting-as-proposal is consistent with the typist-not-authority line.
+
+**Standing rule (a requirement, not a nicety):** **nothing auto-applies silently.** Every pending owner
+approval — a drafted guard, or any other action awaiting the owner — **surfaces on ALL owner surfaces: the
+CPB5 CLI, the approval inbox (RB1), and Pushover.** A proposal that sits invisibly is a silent
+auto-apply-by-neglect, which is exactly what this rule forbids.
+
+**Done means:** a drafted guard lands as a reviewable proposal (never installed) that appears on all three
+owner surfaces; installing it requires the normal reviewed + gated + owner-approved job path.
+
+### WB12. ⬜ "Stimpack" owner hard-reset — logged, append-only, confirmed (ruling G — ACCEPTED with constraints, 2026-07-30)
+
+**What it is.** Formerly ST-WB-G. An owner-only break-glass hard-reset, accepted **with constraints** that
+preserve the append-only ledger:
+
+- Git resets the **WORKING TREE** to a known-good SHA **only AFTER bundling the bad state first** — a pre-risk
+  `git bundle` is taken and kept (recoverable, **never discarded**); composes with WB4's kit and WB9's
+  pre-risk-git-bundle item.
+- The **ledger is NEVER rewound** — the script **APPENDS** a `"rolled back to SHA X because Y"` event, so
+  history stays intact and append-only. A silent history-rewriting reset is **prohibited**.
+- **Session-drop obeys the process-kill rule** — echo the exact target + confirm, never batched.
+- The whole command **requires an explicit human confirm.**
+
+**Done means:** the reset bundles-then-resets the working tree, appends (never rewinds) a rollback event to the
+ledger, drops the session under the process-kill confirm rule, and refuses to run without an explicit human
+confirm; no path silently rewrites history.
+
+### Logged decision — ruling C DECLINED as a live feed (2026-07-30)
+
+**ST-WB-C (public live control-room exhibit) is DECLINED as a live feed** and removed from Stretch. **Safe
+alternative:** a curated **STATIC snapshot exhibit** — a representative window, run through the **mandatory
+name-scrub + curation + pin gate** — delivered via the **existing museum program** (a curation choice, not a
+new build item). **Why the live feed is declined:** the records carry the owner's name; the museum has already
+leaked once; a live feed is a **permanent leak + a recon/attack surface** and it **breaks the
+pinned-reproducible model** the museum is built on. A delayed/redacted live feed was judged not worth those
+costs when a curated static snapshot delivers the same exhibit value with none of them.
+
 ## ⚠ Stretch — needs an owner ruling (each strains an invariant; recorded, NOT active)
 
 Filed here rather than as active items because each strains one of the standing invariants. Kept because each
-might still be worth it under the right, owner-decided framing.
+might still be worth it under the right, owner-decided framing. **On 2026-07-30 five of the original seven
+items (A, B, C, D, G) received owner rulings and left this bucket** — see "Stretch rulings applied" above for
+where each went. Only **E** and **F** remain, both PARKED.
 
-- **ST-WB-A. Declarative invariant manifest** *(strains TRUTH — zero MCP/second source of truth).* The CP
-  doctrine's 4-5 executable invariants become a machine-read manifest. Risk: it becomes a **second authority**
-  competing with the doctrine prose. Worth it **only** if it is a *generated view of* the prose, never the
-  source of truth for it.
-- **ST-WB-B. Automatic rollback + republish** *(strains EXECUTOR + Protocol 16 dev-first rollback).* Supervisor
-  auto-reverts to a known-good SHA and republishes on a narrow catastrophic predicate. Collides with
-  no-autonomous-destructive-action and the **no direct-`main`** rollback rule. The only arguably-worth-it slice
-  is the single narrowest "prod is a black screen" predicate — and even that must run the gated `dev → main`
-  path, which is slow *by design*, fighting the point. Owner call.
-- **ST-WB-C. Public live control-room exhibit** *(strains PRIVACY — private-archive/public-museum boundary).*
-  Delayed, redacted control-plane health as a public museum exhibit. Raw records carry the owner's name/paths.
-  Worth it **only** if redaction is a **mandatory** gate (never AI-optional) and the feed is a curated
-  derivative, never the raw ledger.
-- **ST-WB-D. Self-writing guards** *(strains AUTHORITY/EXECUTOR — AI-is-a-typist).* Drafting a guard **as a
-  proposal** is an ordinary reviewed job and fine; **auto-installing** one is the executor violation. Owner
-  ruling on whether even proposal-drafting is wanted here, given the typist-not-authority line.
-- **ST-WB-E. Job-scoped capability tokens** *(strains the one-machine/one-trust-domain simplicity).* Bind a job
-  to a narrow capability token. Ties to the already-DEFERRED separate-trust-domain question — worth it only
-  once unattended autonomy is in *regular* use (revisit with CP5).
-- **ST-WB-F. In-chat MCP-Apps cockpit** *(strains PINNING/verify-first — depends on UNVERIFIED SEP-1865).*
-  Gemini's "render the job queue as an interactive HTML surface inside the Claude chat." Already flagged
-  verify-first in the MCP section; restated here as **owner-gated on the spec being real**. Overlaps CPB5's
-  HTML cockpit renderer — if it lands, it's a *third* renderer over the same read layer, not new truth.
-- **ST-WB-G. "Stimpack" owner hard-reset** *(strains append-only-ledger).* An owner-invoked break-glass:
-  rewind git + drop the session + reset to the last clean exact-SHA. The catch: the ledger is **append-only** —
-  a reset must be recorded as a *new reset event*, never a literal ledger rewind. Worth it as an owner-only,
-  logged break-glass **if** reframed to preserve append-only.
+- **ST-WB-E. Job-scoped capability tokens** _(strains the one-machine/one-trust-domain simplicity)._ **PARKED
+  (2026-07-30).** Bind a job to a narrow capability token. Ties to the already-DEFERRED separate-trust-domain
+  question — worth it only once unattended autonomy is in _regular_ use (revisit with CP5). **Cross-ref:** the
+  deferred **laptop-witness / multi-machine deferral (CP5)** — both revisit "when the setup grows past
+  solo/single-machine or runs less supervised." **Kept separate, NOT merged** — they solve different problems
+  (E scopes _permissions_; the laptop-witness adds _off-machine observation_).
+- **ST-WB-F. In-chat MCP-Apps cockpit** _(strains PINNING/verify-first — depends on UNVERIFIED SEP-1865)._
+  **PARKED but MARKED OWNER-WANTED (2026-07-30) — ready to green-light once verified.** Gemini's "render the
+  job queue as an interactive HTML surface inside the Claude chat." **Gated on a verification spike** confirming
+  the MCP-Apps / SEP-1865 extension actually exists and works; build nothing until that spike passes. Overlaps
+  CPB5's HTML cockpit renderer — if it lands, it's a _third_ renderer over the same read layer, not new truth.
 
 ---
 
@@ -1523,16 +1589,34 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
 - **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
   Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
   decided, not yet built.
-- **CPB5 — `robco status`, the read-only operator CLI (owner-confirmed 2026-07-30; high-priority).** A single
-  read-only PowerShell CLI that renders the supervisor AND the watcher/reaper in ONE terminal screen from the
-  ledger + snapshots: supervisor **jobs / usage / last-tick / open-incidents / backup-health** up top, watcher
-  **last-sweep + flags** below. **Strictly a read-only observer — it never actuates and never writes the
-  ledger** (no-executor invariant). It is the **foundation for a phone-openable read-only HTML cockpit**: a
-  single self-contained `.html` regenerated on each supervisor tick, served locally over Tailscale or synced to
-  the phone — **PRIVATE, never public GitHub Pages** (the records carry the owner's name) — a **second renderer
-  over the same read layer** the CLI uses. Reads what already exists (`status.json` + the ledger); adds a read
-  *view*, not a new source of truth. Folds in GPT's "phone-first operator cockpit" and Gemini's `robco status`
-  / supervisor-local-web-view; can surface the same pending-events delta as **RB1**'s inbox projection.
+- **CPB5 — `robco`, the OPERATOR CONTROL CLI (owner-confirmed 2026-07-30; upgraded read→control 2026-07-30;
+  high-priority).** A single PowerShell CLI that both **reads** and **drives** the control plane.
+  **Reads** (unchanged from the original read-only scope): renders the supervisor AND the watcher/reaper in ONE
+  terminal screen from the ledger + snapshots — supervisor **jobs / usage / last-tick / open-incidents /
+  backup-health** up top, watcher **last-sweep + flags** below. Reads what already exists (`status.json` + the
+  ledger); adds a read _view_, not a new source of truth.
+  **Human-driven control actions:** pause/resume the supervisor; pause/stop a specific job; acknowledge/resolve
+  an incident; trigger a backup now; flip the usage mode (CPB2's Normal / Conserve / Reserve-for-owner /
+  Stop-unattended-AI); and fire the **one-click rollback** — the human-triggered catastrophic-recovery from
+  ruling B (**WB10** below).
+  **New sub-command `robco recover`:** pulls the **WB4** recovery card + QR up on screen from the CLI, so the
+  recovery runbook is always a keystroke away, not only on the physical card.
+  **Three guardrails (stated explicitly):** (a) **write/action paths execute ONLY when a human runs the command
+  interactively** — the AI and the automation must **never** call them to actuate; this is what preserves the
+  no-executor invariant (the invariant constrains the AI, not the owner). (b) **Destructive actions** (stop
+  session, rollback, revert) **echo the exact target and require explicit confirm, never batched** — per the
+  process-kill safety rule. (c) **Every action appends a ledger event** (keeps it traced + append-only; the
+  supervisor stays sole writer for autonomous records — these are human-initiated events routed through the
+  same append path).
+  **Pending owner approvals surface here too** (ruling D / **WB11**): CPB5 is one of the owner surfaces where a
+  pending approval appears, alongside the approval inbox (**RB1**) and Pushover.
+  **Phone cockpit — control-capable, ONE shared action layer.** The phone-openable cockpit is a single
+  self-contained `.html` regenerated on each supervisor tick, served **PRIVATELY over Tailscale** (never public
+  GitHub Pages — the records carry the owner's name). It is **the same operator control surface as the desktop
+  CLI, just a web renderer** — it shares **ONE action layer** with the CPB5 CLI and enforces the **same three
+  guardrails above**. This is the owner's "CLI on my phone / manage while away" surface. Folds in GPT's
+  "phone-first operator cockpit" and Gemini's `robco status` / supervisor-local-web-view; can surface the same
+  pending-events delta as **RB1**'s inbox projection.
 - **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
