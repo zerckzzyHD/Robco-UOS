@@ -1611,14 +1611,20 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   **Scope held exactly:** this was ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
   **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
   wrapper in did NOT turn on enforcement; a plain `git push` still works, unrefused.
-- **CPB1.** The budget alert (tokens/$). The dollar/token half of the deadline/budget alert is unblocked by
-  the usage-measurement spike — per-job cost/tokens are measurable even under concurrency, via OTLP or a
-  headless job's own `-p` JSON result (both channels agree). ("% of the weekly cap" per job stays
-  structurally `UNOBSERVABLE` — out of scope for this alert; see doctrine in
-  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).) **Refined 2026-07-30
-  (owner-approved):** the alert must also state when the usage cap resets — check whether the usage data
-  carries its own reset/window-end timestamp and include it verbatim if so, else compute it from the ~5-hour
-  rolling session window plus the weekly cycle.
+- **CPB1 — ✅ SHIPPED (2026-07-30), control repo `2d6e90b`.** The budget alert (tokens/$) — the dollar/token
+  half of the deadline/budget alert, sibling of the already-shipped wall-clock half. A non-terminal job whose
+  MEASURED per-job spend is at/over its manifest `usageReserve` raises its own `budget` incident (distinct
+  from `deadline`). **Dollars or tokens only** — a `percent` reserve degrades to `UNOBSERVABLE` (never "% of
+  the weekly cap"; that stays structurally unobservable per
+  [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md)); no measured usage →
+  `UNOBSERVABLE`, never a fabricated `$0`. The **2026-07-30 cap-reset refinement** shipped with it: the alert
+also states when the cap resets — a reported reset/window field verbatim if the usage data ever carries one
+(dormant today — the `{t,org,u:{fh,sd,xu}}`format has none), else an honest approximate (session window a
+~5h upper bound; weekly reset date`UNOBSERVABLE`, no anchor in the data). **Dormant until fed** (same
+posture as the wall-clock half): no launcher writes measured per-job usage into the ledger yet (spike §4 /
+**ACT2** plumbing), so the check reports `UNOBSERVABLE`until a`job.result`carries usage in either
+grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json` result) — then it lights
+  up with no code change. Full record in the SHIPPED section below.
 - **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
   Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
   decided, not yet built.
@@ -1885,6 +1891,23 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   routing only — raw-push refusal stays **DG2**, plain `git push` unrefused. This doc-only QUEUE update is
   itself another wrapper push (it should trip CPB4's `gate:docs` fast path _through_ the wrapper — the live
   proof of the coexistence).
+- **CPB1.** Budget alert (tokens/$) — ✅ SHIPPED `2d6e90b` (2026-07-30, control repo `RobCo-Control`). The
+  budget half of the deadline/budget alert (the sibling of the wall-clock half that was already alert 3 of 4).
+  New `lib/budget-check.js` (pure comparator: extracts a job's measured $/token spend from its own ledger
+  `job.result` events in either grounded shape, compares to `manifest.usageReserve`, degrades to
+  `UNOBSERVABLE` for a `percent` unit or absent measurement — never a fabricated overrun) + `lib/usage-reset.js`
+  (pure cap-reset: reported-field-first, else honest approximate). Wired through `lib/job-reconciler.js`
+  (`budget-exceeded-still-open` flag + `budget` sub-object; `summarizeManifest` now carries `usageReserve`),
+  `lib/notify-messages.js` (`formatBudgetExceededMessage`, with the cap-reset clause), and `supervisor.js`
+  (`finding.budget-exceeded`, `findings.budgetExceeded`, a distinct `budget` incident type at Infinity
+  cooldown, the message router). Locked by test group **BX** (pure comparator incl. the `percent`→unobservable
+  and no-measurement→unobservable doctrine cases, usage-reset both branches, the reconciler flag, the message
+  formatter, and a real sandboxed `supervisor.js --dry-run` wiring proof); `DX1c` updated for the retired
+  wall-clock-only TODO marker. Suite green (0 fail, 0 skip). **DORMANT until fed** — the check reports
+  `UNOBSERVABLE` until a launcher records measured per-job usage into the ledger (spike §4 / **ACT2**),
+  exactly as the wall-clock half is dormant until jobs flow; it is built, correct, and tested, awaiting only
+  the data source. This app-repo QUEUE update is a doc-only push through the ACT3 wrapper (CPB4 `gate:docs`
+  fast path; advances the DG2 clean-push counter).
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 
