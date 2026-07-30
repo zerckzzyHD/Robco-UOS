@@ -178,6 +178,7 @@
 │   ├── queue-drift-check.js    Protocol 50 pre-push nudge — flags `type: project` memories that don't look referenced in QUEUE.md
 │   ├── queue-view.js           Parses QUEUE.md into a private, phone-readable HTML view (`npm run queue-view`)
 │   ├── release-receipt.js      Fetches the live production build and compares served CACHE_NAME/APP_VERSION against what was actually deployed
+│   ├── robco-push.js           ACT3 adoption point — `npm run push` routes a push through the control-plane controlled-push wrapper (resolved via $ROBCO_CONTROL_PUSH or the ../_RobCo-Control sibling), delegating the gate to the pre-push hook so CPB4's fast path is preserved; degrades to a plain `git push` when the wrapper is absent
 │   ├── backup-nudge.js         Protocol 48 pre-push nudge — flags when the local-only artifacts (library/, planning/, agent memory) have drifted from the private archive backup
 │   └── rollback.sh             Protocol 16 one-command hotfix rollback
 ├── CHANGELOG.md        Full version history

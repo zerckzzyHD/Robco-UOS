@@ -52780,6 +52780,87 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 254 — ACT3: the controlled-push adoption point (Protocol 36 / CPB4)
+//
+//  ACT3 wires this repo's pushes through the control-plane controlled-push
+//  wrapper via `npm run push` → scripts/robco-push.js, so the clean-push
+//  counter that gates a future raw-push refusal (DG2) starts advancing. This
+//  suite locks the three things that must hold for the wiring to be correct
+//  AND to coexist with CPB4:
+//    • the launcher delegates the gate (ROBCO_PUSH_DELEGATE_GATE=1) so the
+//      wrapper never double-runs `npm run gate` and never defeats CPB4's
+//      doc-only fast path — the pre-push hook stays the one gate authority;
+//    • it degrades gracefully (does not throw / hang) and leaves plain
+//      `git push` working when the private wrapper is absent — ACT3 is
+//      routing, NOT raw-push refusal (that is DG2);
+//    • resolveWrapper() honours ROBCO_CONTROL_PUSH first, else the sibling
+//      default, and no absolute private path is hardcoded in this public repo.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 254 — ACT3 controlled-push adoption point (Protocol 36 / CPB4)');
+
+  const pushPath254 = path.join(ROOT, 'scripts', 'robco-push.js');
+  const pushExists254 = fs.existsSync(pushPath254);
+  assert(pushExists254, '254.1: scripts/robco-push.js exists (the ACT3 adoption point)');
+  const pushSrc254 = pushExists254 ? fs.readFileSync(pushPath254, 'utf8') : '';
+
+  const pkg254 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert(
+    pkg254.scripts && pkg254.scripts.push === 'node scripts/robco-push.js',
+    '254.2: package.json wires `npm run push` → node scripts/robco-push.js'
+  );
+  assert(
+    /ROBCO_PUSH_DELEGATE_GATE\s*:\s*'1'/.test(pushSrc254),
+    '254.3: the launcher delegates the gate (ROBCO_PUSH_DELEGATE_GATE=1) so the wrapper never double-runs the gate / defeats CPB4'
+  );
+  assert(
+    /fs\.existsSync\(/.test(pushSrc254) && /return 2/.test(pushSrc254),
+    '254.4: it degrades gracefully when the wrapper is absent (existence check + non-zero exit, never a throw/hang)'
+  );
+  assert(
+    !/[A-Za-z]:\\\\/.test(pushSrc254) && !/[A-Za-z]:\//.test(pushSrc254),
+    '254.5: no absolute private path is hardcoded in this PUBLIC repo (env-var + relative sibling only)'
+  );
+
+  const M254 = pushExists254 ? require(pushPath254) : null;
+  assert(
+    !!M254 && typeof M254.resolveWrapper === 'function',
+    '254.6: robco-push exports the pure resolveWrapper()'
+  );
+  if (M254) {
+    const envHit = M254.resolveWrapper(
+      { ROBCO_CONTROL_PUSH: 'D:/x/controlled-push.js' },
+      'C:/repo'
+    );
+    assert(
+      envHit.source === 'ROBCO_CONTROL_PUSH' && envHit.path === 'D:/x/controlled-push.js',
+      '254.7: ROBCO_CONTROL_PUSH is honoured first, verbatim'
+    );
+    const sibling = M254.resolveWrapper({}, path.join('C:', 'Dev', 'X', 'app-repo'));
+    assert(
+      sibling.source === 'sibling-default' &&
+        sibling.path ===
+          path.resolve(
+            path.join('C:', 'Dev', 'X', 'app-repo'),
+            '..',
+            '_RobCo-Control',
+            'code',
+            'controlled-push.js'
+          ),
+      '254.8: with no env, it falls back to the ../_RobCo-Control/code/controlled-push.js sibling default'
+    );
+    const blank = M254.resolveWrapper(
+      { ROBCO_CONTROL_PUSH: '   ' },
+      path.join('C:', 'Dev', 'X', 'app-repo')
+    );
+    assert(
+      blank.source === 'sibling-default',
+      '254.9: a blank/whitespace ROBCO_CONTROL_PUSH is ignored, falls back to the sibling default'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

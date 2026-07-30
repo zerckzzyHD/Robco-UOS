@@ -15,6 +15,7 @@
     "gate:fast": "node scripts/gate.js --fast",
     "gate:docs": "node scripts/gate.js --docs",
     "gate:iter": "node scripts/gate.js --iter",
+    "push": "node scripts/robco-push.js",
     "prepare": "node scripts/install-hooks.js",
     "rollback": "sh scripts/rollback.sh",
     "a11y": "node tests/a11y-check.mjs",
