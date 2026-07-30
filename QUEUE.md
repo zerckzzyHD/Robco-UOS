@@ -24,7 +24,29 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — RB3 watcher)** — **RB3's mechanism is now specified: a LIVE 24/7
+**Last updated: 2026-07-30 (later still — CP board consolidated)** — **The sprawling CONTROL-PLANE
+(workflow) section is TIDIED — status, grouping and dedup only, no ID renumbered (Protocol 49).** Marked
+SHIPPED, out of the pending buckets, with SHAs: kernel ranks 1/2/4/5 (`8eab8fd`/`dd49ed4`/`9fd751d`/
+`32c0fbc`), rank 3's backup mirror + restore test now **BUILT AND ACTIVATED** (`e4384e5` build, `78acfd5`
+activation — wired into daily housekeeping, its own scheduled task registered, the Ledger repo already
+receiving mirror commits `d001a38`/`79afc2e`), the idle-session reaper (shadow, `643ebb8`), all nine
+Pushover alerts, the thrashing recalibration (`15c17d0`), the usage-measurement spike, and **REF1** — the
+session-aware uncommitted-work alert — now BUILT (`a1df1b3`). **Deduped:** the activation-checklist's
+CPK/CPB/ACT/OD/SP/DG index is now explicitly a pointer layer over CP1-CP5/RB1-RB6/HG1-HG2 (light cross-refs
+added at CP2's push-wrapper stage → **ACT3/DG2**, and CP3's usage-relay mitigation → **CPB1/CPB2**), not a
+second copy. **Tightened into one execution list:** ready-to-build (**ACT3** wiring the wrapper NEXT, then
+**CPB1/CPB2/HG1/HG2/RB1/RB2/RB3/CPB3**) → activation switches (**ACT1** — its rank-3 half already done via
+`78acfd5` — then **ACT2**) → owner decisions (**OD1** now practically resolved by the shipped daily default,
+**OD2** still open) → spikes (**SP1**, RB4's own MCP-load-check, **RB5**, **RB6**) → data-gated (**DG1-DG5**,
+self-collecting via **REF3**'s auto-verdict). **New tracked item filed: AUD1** — a post-implementation
+multi-model (GPT/Gemini/DeepSeek) audit on coherence/interconnect and frontier questions, explicitly gated
+on the ready batch running live long enough to produce real data, with a "highest-leverage next, not
+maximize features" guardrail recorded per tonight's own over-building talk-downs. **Small museum touch:**
+P15 is now explicitly slotted into P11's build order (P15 part 1 feeds P11 Stage 0; parts 2-3 close out
+around Stage 3). Doc edits + git only, nothing killed, no control-plane code touched. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730).
+
+**Prior update — 2026-07-30 (later still — RB3 watcher)** — **RB3's mechanism is now specified: a LIVE 24/7
 `fs.watch` watcher, not the supervisor's 5-minute poll.** The moment Dispatch produces substantive assistant
 TEXT that didn't go through the messaging tool, the watcher fires a Pushover within **~1 second** — a
 detector/alarm only, it cannot prevent the leak. **OFF BY DEFAULT** (idle footprint ~0% CPU / ~40MB, but
@@ -810,7 +832,9 @@ evidence-gate discipline (build the simpler thing, see whether it is used, then 
 1. **Passive observation** — adapters plus an **append-only ledger**, strictly **read-only**. Nothing is
    blocked, denied or killed. This is the stage that turns "we think this happens" into data.
 2. **Controlled push / sync wrappers** — the first stage that touches a real operation, aimed at the
-   collision GPT correctly identified: the **working tree, the push, and the archive sync**.
+   collision GPT correctly identified: the **working tree, the push, and the archive sync**. Routing real
+   pushes through it is tracked as **ACT3**; turning on raw-push refusal once that has run clean is
+   **DG2** — both in the activation checklist below.
 3. **Containment** — hooks plus **separate L1/L2/L3 leases** (one lease cannot cover four lock domains — GPT's
    correction, adopted) plus **write quarantine**. ⚠ Record what this does and does not buy: **at-most-one
    writer, NOT exactly-once.** Ghost launches still fire and still burn usage; containment does not stop them.
@@ -844,7 +868,8 @@ whole reason it is its own item rather than CP2's first stage.
 - **The mobile-reporting discipline.** The plain-text-invisible-on-mobile failure recurred 3+ times in a
   single session because the operator kept using a channel the owner literally cannot see on his phone.
 - **A usage early-warning relay** off `plan-usage-history.json`, so the cap is known **before** a session hits
-  it mid-run rather than after.
+  it mid-run rather than after. Tracked concretely as **CPB1** (the budget alert) and **CPB2** (usage →
+  operating modes) in the activation checklist below.
 - **A pre-push + sync LOCK FALLBACK** — the containment that does not depend on hooks firing at all, so there
   is still a collision guard **if CP1 shows hooks are unreliable**.
 
@@ -1098,7 +1123,7 @@ for AI state-apply failures); a fatal failure fails loudly with a clear message,
 
 ---
 
-# ⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST (2026-07-30)
+# ⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST (2026-07-30; tidied 2026-07-30 later still)
 
 **What this section is.** The CP kernel program (CP1-CP5), the Dispatch Return Bus (RB1-RB6), and the
 pre-museum hardening pull-forward (HG1-HG2) above each carry their own owner-gated / activation / to-build
@@ -1108,27 +1133,40 @@ section does not replace any item's own entry above** — it is a cross-linked i
 number of genuinely new items this pass surfaced (chiefly **ACT3**, owner-approved the same day). Full
 account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpactivation0730).
 
+**Tidied 2026-07-30 (later still) — owner-approved consolidation pass.** One very fast night folded a lot of
+work in and this section had gotten sprawly. This pass: (1) moved everything actually **shipped** tonight —
+the rank-3 backup mirror (BUILT + ACTIVATED) and REF1's session-aware alert (BUILT) — out of the pending
+buckets into the SHIPPED record below, each with its SHA, verified directly against the private repos'
+`git log`; (2) confirmed this checklist's CPK/CPB/ACT/OD/SP/DG entries each have exactly ONE home — most
+were already correctly pointer-only ("full entry above"), so the remaining dedup was two small cross-refs
+added in place at CP2's push-wrapper stage (→ **ACT3/DG2**) and CP3's usage-relay mitigation (→
+**CPB1/CPB2**); (3) tightened what remains into one ordered execution list (below); (4) filed one new
+tracked item, **AUD1**. **⛔ No ID was renumbered, re-lettered or reused (Protocol 49) — this pass is
+STATUS, GROUPING and DEDUP only.** Doc edits and git only; no control-plane code touched, nothing killed.
+Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730).
+
 **Status vocabulary for this section only** (distinct from the file's usual ✅/🔄/⏭️/⚠️/⬜ tags, because this
 list's job is readiness-to-activate, not build progress): **BUILT** (code exists, nothing left to do) ·
 **READY-TO-BUILD** (owner has said go; unblocked) · **ACTIVATION-SWITCH** (already built; owner needs to flip
 it on) · **OWNER-DECISION** (needs an owner call, not code) · **SPIKE** (needs the owner in the loop to run)
 · **DATA-GATED** (waits on measured evidence, not a decision).
 
-**New family prefixes assigned this pass** (single letters are exhausted, per this file's own rule — header
-note at the top of this file): **CPK** for the five kernel ranks referenced throughout the CP program as
-"rank 1" – "rank 5" (retroactive IDs for the four already shipped, plus the one still to build — they never
-had stable IDs of their own before now); **CPB** for the next control-plane build batch that had no ID yet;
-**ACT** for the activation switches; **OD** for owner decisions; **SP** for owner-in-loop spikes without an
-existing ID; **DG** for the data-gated promotions. Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are
-reused here, never reassigned.
+**Family prefixes in this section:** **CPK** for the five kernel ranks referenced throughout the CP program
+as "rank 1" – "rank 5" (retroactive IDs — all five are now shipped, see SHIPPED below); **CPB** for the next
+control-plane build batch; **ACT** for the activation switches; **OD** for owner decisions; **SP** for
+owner-in-loop spikes without an existing ID; **DG** for the data-gated promotions; **REF** for owner-approved
+refinements to already-scoped items; **AUD** (new this pass) for post-implementation multi-model audits.
+Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassigned.
 
-## READY TO BUILD — owner go given (2026-07-30)
+## READY TO BUILD — tightened execution order (owner go given 2026-07-30)
 
-- **CPK3.** Off-machine durability: the rank-3 backup mirror + restore-test. Spec approved 2026-07-28 →
-  [`RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md); the private repo
-  (`RobCo-Control-Ledger`) is already created, empty, confirmed PRIVATE. Waiting on: **OD1** (cadence) —
-  build can start with a sane default (daily) and be tuned later, since picking a default doesn't require
-  waiting for the decision.
+- **ACT3 — NEXT (owner's call, approved 2026-07-30).** Wire the controlled-push wrapper into the real push
+  path. Today every push in this project's repos is plain `git push` and bypasses the wrapper entirely, so
+  the ≥10-clean-pushes counter that gates **DG2** (push-guard enforcement) can never advance. This item
+  routes real pushes through `controlled-push.js` so the counter starts moving. **Scope note, stated
+  explicitly so a later session doesn't over-build:** this is ONLY the routing step. Raw-push refusal
+  (actually blocking a bypass) stays **DG2** — a separate, later, data-gated promotion after 10 clean
+  wrapper pushes are observed. Wiring the wrapper in does not turn on enforcement.
 - **CPB1.** The budget alert (tokens/$). The dollar/token half of the deadline/budget alert is unblocked by
   the usage-measurement spike — per-job cost/tokens are measurable even under concurrency, via OTLP or a
   headless job's own `-p` JSON result (both channels agree). ("% of the weekly cap" per job stays
@@ -1136,10 +1174,10 @@ reused here, never reassigned.
   [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md).) **Refined 2026-07-30
   (owner-approved):** the alert must also state when the usage cap resets — check whether the usage data
   carries its own reset/window-end timestamp and include it verbatim if so, else compute it from the ~5-hour
-  rolling session window plus the weekly cycle. No existing ID; assigned here.
+  rolling session window plus the weekly cycle.
 - **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
   Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
-  decided, not yet built. No existing ID; assigned here.
+  decided, not yet built.
 - **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
@@ -1148,28 +1186,22 @@ reused here, never reassigned.
   full entry above.
 - **CPB3.** The "backup-all" script — a single on-demand pass that runs every backup mechanism this project
   has in one go, instead of separate manual invocations. Concretely, at minimum: the archive sync
-  (`sync.ps1`, Protocol 48) and, once **CPK3** ships, the rank-3 control-plane mirror. ⚠ **Honest gap,
-  stated rather than papered over:** no planning doc defines this script's exact scope beyond that — it is
-  captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm scope (does it
-  also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than assuming.
-
-## NEW — WIRE THE CONTROLLED-PUSH WRAPPER (owner said yes 2026-07-30)
-
-- **ACT3.** Wire the controlled-push wrapper into the real push path. Today every push in this project's
-  repos is plain `git push` and bypasses the wrapper entirely, so the ≥10-clean-pushes counter that gates
-  **DG2** (push-guard enforcement) can never advance. This item routes real pushes through
-  `controlled-push.js` so the counter starts moving. **Scope note, stated explicitly so a later session
-  doesn't over-build:** this is ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
-  **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
-  wrapper in does not turn on enforcement.
+  (`sync.ps1`, Protocol 48) and the rank-3 control-plane mirror (**CPK3**, now shipped — see SHIPPED below).
+  ⚠ **Honest gap, stated rather than papered over:** no planning doc defines this script's exact scope beyond
+  that — it is captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm
+  scope (does it also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than
+  assuming.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
 - **ACT1.** Register the daily-housekeeping pass (**CPK5**'s daily half — `scripts/daily-housekeeping.js`)
-  as a Windows scheduled task. The module is shipped (`32c0fbc`) and callable, but nothing currently invokes
-  it. **Folded in (owner-approved, 2026-07-30): a doc/README staleness check.** As part of the same
-  daily/weekly housekeeping pass, add a low-frequency automated nudge — via the same
-  **incident/backup-unhealthy alert path** (the Pushover "backup unhealthy" alert already approved in the
+  as a Windows scheduled task. **Note — the rank-3 half of this is already done:** CPK3's activation commit
+  (`78acfd5`) wired the backup mirror into daily housekeeping AND registered its own scheduled task (see
+  SHIPPED below) — but ACT1 itself, registering the FULL daily-housekeeping pass (ledger maintenance,
+  adapter/schema drift, state hygiene, the README-staleness nudge below), is still open. **Folded in
+  (owner-approved, 2026-07-30): a doc/README staleness check.** As part of the same daily/weekly housekeeping
+  pass, add a low-frequency automated nudge — via the same **incident/backup-unhealthy alert path** (the
+  Pushover "backup unhealthy" alert already approved in the
   [convergence review](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md)) — if a repo's `README.md`
   or another key doc looks out of date relative to its recent changes (e.g. commits touching a surface with
   no matching doc update in the same window). **The PRIMARY mechanism does not change:** Protocol 2 (update
@@ -1177,10 +1209,9 @@ reused here, never reassigned.
   housekeeping check is only the drift **safety net**, catching a Protocol 2 miss after the fact, never a
   replacement for the same-commit discipline. **Record this plainly: keeping READMEs current is NOT a new
   trigger word** — it is Protocol 2 plus this housekeeping check, and no session should read this item as
-  license to defer a doc update to a nightly job. **Refined 2026-07-30 — see REF1**: the backup-unhealthy
-  alert this nudge rides on must become session-aware (never fire on uncommitted work an active session
-  still owns) before this housekeeping pass leans on it further; **see also REF3** for the auto-verdict
-  tracking this same daily/weekly pass owes the data-gated promotions.
+  license to defer a doc update to a nightly job. **REF1 (the alert's session-awareness) is now shipped** —
+  see SHIPPED below — so this nudge no longer waits on that; **see REF3** for the auto-verdict tracking this
+  same daily/weekly pass owes the data-gated promotions.
 - **ACT2.** Wire the write-side kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
   generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
   direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
@@ -1193,28 +1224,30 @@ reused here, never reassigned.
 ## OWNER DECISIONS
 
 - **OD1.** Rank-3 (**CPK3**) backup cadence — daily vs. every supervisor run — and the restore-test cadence
-  (weekly?). Open question named explicitly in `RANK3_BACKUP_REPO_SPEC.md`'s own "Open decisions" section.
+  (weekly?). **Practically resolved by default:** CPK3 shipped and activated using the sane daily default
+  this entry originally allowed ("build can start with a sane default and be tuned later") — the Ledger
+  repo shows the mirror actually running (`d001a38`, `79afc2e`). OD1 stays open only as a future tuning
+  question, not a blocker.
 - **OD2.** Whether to set up the auth-folder (`C:\Dev\auth`) secure backup now — its own encrypted vault /
   password manager, **never a git repo** (the folder holds live secrets: Pushover creds, the Google OAuth
   client secret). Flagged as a separate problem in `RANK3_BACKUP_REPO_SPEC.md` ("flag, don't fold in") —
-  filed here as its own tracked item per the owner's 2026-07-30 instruction, still undecided.
+  still undecided.
 
 ## SPIKES / OWNER-IN-LOOP
 
-- **(RB4's own spike, not a separate ID)** — the Cowork-loads-a-custom-MCP load-spike, RB4's prerequisite
-  first step (confirm Cowork actually loads a custom local MCP server and Dispatch can call its tools)
-  before any of RB4's seven tools are built. Kept inside RB4 per that entry's own text; cross-referenced
-  here only so a consolidated read doesn't miss it.
-- **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
-  required before running regardless.
-- **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
 - **SP1.** Live-confirm the two documented-contract-only Pushover alerts — "a session needs your input"
   (the `Notification` hook) and "session died/errored" (the `StopFailure` hook) — by actually watching one
   fire. Both alerts shipped 2026-07-29 (`f14499d`/`bac032a`) but are unverified-live;
-  `CONTROL_PLANE_STATUS.md` §2 lists this as the first item in the current build batch. No existing ID;
-  assigned here.
+  `CONTROL_PLANE_STATUS.md` §2 lists this as the first item in the current build batch.
+- **(RB4's own spike, not a separate ID)** — the Cowork-loads-a-custom-MCP load-spike ("MCP-load-check"),
+  RB4's prerequisite first step (confirm Cowork actually loads a custom local MCP server and Dispatch can
+  call its tools) before any of RB4's seven tools are built. Kept inside RB4 per that entry's own text;
+  cross-referenced here only so a consolidated read doesn't miss it.
+- **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
+  required before running regardless.
+- **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
 
-## DATA-GATED — wait on measured evidence, not a decision
+## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
 - **DG1.** Thrashing: shadow → actual kill. Needs a clean shadow stretch (proves it flags real loops, never
   cries wolf) before it is trusted to terminate a session; kill would use the proven `(pid, procStart)`
@@ -1223,24 +1256,23 @@ reused here, never reassigned.
   clean through the wrapper. Fed by **ACT3** (which starts the counter moving today).
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
-  **Refined 2026-07-30 — see REF2** below for the full safe-lifecycle design (two clean "done" signals,
-  three hard guards, a continuation-packet snapshot before any reap) this promotion must build to.
+  Full safe-lifecycle design (two clean "done" signals, three hard guards, a continuation-packet snapshot
+  before any reap) → **REF2**, below.
 - **DG4.** `--no-verify` tripwire: shadow → enforce. Promotes only after it catches a real violation cleanly
   (hit-based, with a per-session override) — de-prioritized to telemetry-only by the three-model review.
 - **DG5.** Worktrees-vs-lease: whether anything beyond worktrees is needed. Decided by Stage 1d's measured
   collision rate (cross-ref **CP2**'s "open architectural question" above) — if collisions are ~zero once
   worktrees are on, nothing more gets built here, on purpose.
 
-## REFINEMENTS — owner-approved changes to already-scoped items (2026-07-30)
+## REFINEMENTS — owner-approved changes to already-scoped items
 
-- **REF1.** Session-aware uncommitted-work gating for the **backup-unhealthy** alert (refines the LIVE
-  alert, `f14499d`/`bac032a`). **Problem the owner hit:** the alert fires on uncommitted work mid-session —
-  but files being actively built/edited are _supposed_ to be uncommitted, so that reads as a finding when
-  it's really a false alarm. **Fix:** the alert must NOT fire on uncommitted work while a session is
-  actively working that repo (the supervisor already tracks tree co-residency / active sessions per repo —
-  reuse that, don't build a second tracker). It should fire ONLY when the uncommitted work is **orphaned**
-  (its owning session finished or died) OR has sat uncommitted with **no active session** past a threshold.
-  OWNER-APPROVED, NOT YET BUILT.
+- **REF1. ✅ SHIPPED — `a1df1b3`.** Session-aware uncommitted-work gating for the **backup-unhealthy** alert
+  — full shipped record below; original design reasoning kept here since this is REF1's one home.
+  **Problem the owner hit:** the alert fired on uncommitted work mid-session — but files being actively
+  built/edited are _supposed_ to be uncommitted, so that read as a finding when it was really a false alarm.
+  **Fix:** the alert now fires only when uncommitted work is **orphaned** (its owning session finished or
+  died) or has sat uncommitted with **no active session** past a threshold, reusing the supervisor's
+  existing tree co-residency/active-session tracking rather than building a second tracker.
 - **REF2.** Safe-lifecycle reaping (refines **DG3**, the idle-session reaper's shadow → actual-reap
   promotion). **Why:** the owner wants finished sessions actually killed once they've served their purpose —
   he can't do this himself, because archiving a session in the UI does **not** terminate its process; only a
@@ -1282,16 +1314,27 @@ reused here, never reassigned.
   aggressive — always requires explicit owner approval**, the same bar as a shadow → live promotion. The
   fail-safe direction is automatic; the risky direction stays gated.
 
-## DONE — for the record, with SHAs
+## SHIPPED — for the record, with SHAs
 
 - **CPK1.** Rank 1 — job contract + reconciler — ✅ SHIPPED `8eab8fd`. Live in the supervisor's 5-minute
   loop (verified by code inspection + a Task Scheduler check, 2026-07-29).
 - **CPK2.** Rank 2 — transactional exact-SHA verifier/publisher — ✅ SHIPPED `dd49ed4`. Built, fails closed,
   tested break-glass + fault-injection tests. Not yet auto-invoked — see **ACT2**.
+- **CPK3. Rank 3 — off-machine durability: backup mirror + restore test — ✅ SHIPPED + ACTIVATED
+  (2026-07-30).** Built (`e4384e5`, control-plane repo — "off-machine backup mirror + restore test") and
+  activated the same night (`78acfd5` — "activate rank 3's backup mirror -- wire into daily housekeeping +
+  register scheduled task"). The Ledger repo (`RobCo-Control-Ledger`) shows it actually running: first
+  mirror commit `d001a38`, a second `79afc2e` shortly after. Unblocks **CPB3** and closes out **OD1**'s
+  cadence question (shipped using the daily default).
 - **CPK4.** Rank 4 — deterministic continuation packet — ✅ SHIPPED `9fd751d`. Built, callable. Not yet
   auto-invoked — see **ACT2**.
 - **CPK5.** Rank 5 — incident lifecycle + daily housekeeping — ✅ SHIPPED `32c0fbc`. Incident-lifecycle half
-  is live in the 5-minute loop; the daily-housekeeping half is built but not scheduled — see **ACT1**.
+  is live in the 5-minute loop; the daily-housekeeping half is built, and its rank-3 sub-piece is now
+  scheduled (via `78acfd5`) — the rest of ACT1 (the full pass, README-staleness nudge included) is still
+  open.
+- **REF1.** Session-aware uncommitted-work alert — ✅ SHIPPED `a1df1b3` (control-plane repo — "session-aware
+  uncommitted-work alert -- REF1 refinement to alert 1"). Full design reasoning kept at REF1 above (its one
+  home); this line is the shipped record.
 - Idle-session reaper — built `643ebb8`, re-scoped 2026-07-28 to verified-terminal / owner-deadline cleanup
   only; shadow — see **DG3**.
 - Nine Pushover alerts total — 7 live, 2 documented-contract-only — see **SP1**.
@@ -1299,7 +1342,27 @@ reused here, never reassigned.
   shadow — see **DG1**.
 - Usage-measurement accuracy spike run (read-only) —
   [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md); unblocks **CPB1**.
-- The private `RobCo-Control-Ledger` repo created (empty, confirmed private) — unblocks **CPK3**.
+- The private `RobCo-Control-Ledger` repo created (empty, confirmed private), now actively receiving mirror
+  commits (see **CPK3** above).
+
+## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
+
+- **AUD1. ⬜ GPT/Gemini/DeepSeek pass on the control-plane program, once it's had a real run.** Gated
+  explicitly: run this only **after** the "Ready to build" batch above is built, activated, AND has run live
+  long enough to produce real data (not a review of paper design). Two questions, both required: **(a)
+  coherence/interconnect** — does the control plane actually work together as one system, or is it a pile
+  of loosely-related features bolted on across one very fast night? **(b) frontier** — given everything now
+  built, what's the highest-leverage thing to push next across all workflows (control-plane, museum, app)?
+  **Framing guardrail, recorded because tonight's own reviews are the reason it's needed:** judge by
+  **"highest-leverage next + does it earn its keep,"** never **"maximize features."** The three-model
+  convergence review (2026-07-28) already talked this project out of over-building once — a generic reaper,
+  a headless-AI housekeeping layer, a 50-protocol hook enforce-engine — precisely by asking whether each
+  piece earned its keep rather than whether more could be added. AUD1 exists to re-apply that same
+  discipline after a build phase, not to invite a second round of feature-maximizing.
+
+  **Done means:** the ready-to-build batch (ACT3 through CPB3) is built, activated, and has real live run
+  data; the three-model pass runs against that real state (not the plan); both questions are answered with
+  a plain-English verdict; any finding is filed as its own queued item rather than acted on inline.
 
 ---
 
@@ -1314,11 +1377,14 @@ is the blueprint P11 builds on; P3/J both depend on P1.** **P15 (new 2026-07-29)
 museum-done** — the control plane became the board's top program the day after P8's corpus was cut, and
 its own arcs are not in it yet. None of it gates the `dev → main` release._
 
-**⭐ The build order inside this program (P8's own recommendation, adopted 2026-07-27):** **P10** (the nav is
-free to change now) → **P11 Stage 0** (`arcs.json` — the one genuinely new data artifact) → the arc spine →
-the coverage view → the Visual Web; with **P13 → P14** (security scan-list fix, then the republish) closing
-the loop on the live site, and **P5/P6/P7/P9/P12** plus the Fable design polish landing as content passes
-alongside.
+**⭐ The build order inside this program (P8's own recommendation, adopted 2026-07-27; P15 slotted in
+2026-07-30):** **P10** (the nav is free to change now) → **P15 part 1** (extend the arc corpus with the
+control-plane's own arcs — P8's snapshot predates the kernel work) feeding directly into **P11 Stage 0**
+(`arcs.json` — the one genuinely new data artifact, now inclusive of the control-plane arcs) → the arc spine
+→ the coverage view → the Visual Web, with **P15 parts 2-3** (the room/placement decision, then verifying
+the Visual Web actually renders the control-plane arcs AND the project's interlocking workflows) closing out
+once Stage 3 ships; alongside, **P13 → P14** (security scan-list fix, then the republish) closes the loop on
+the live site, and **P5/P6/P7/P9/P12** plus the Fable design polish land as content passes.
 
 **✅ P8 — the story-material + STRUCTURE synthesis audit — SHIPPED 2026-07-27.** Both deliverables are filed
 in the archive (`audits/museum/2026-07-27_P8-story-corpus.md` — **146 canonical arcs** de-duplicated from 175

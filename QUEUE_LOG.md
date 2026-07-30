@@ -9,13 +9,93 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cpconsolidate0730"></a>
+
+### 2026-07-30 (later still) — CP board consolidation: rank 3 + REF1 marked SHIPPED, activation checklist deduped, execution order tightened, AUD1 filed
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No control-plane code was written or changed,
+nothing was killed, no enforcement was flipped on.
+
+**Why.** A single very fast night folded a large amount of control-plane work into `QUEUE.md` across many
+small passes (the kernel ranks, nine alerts, three REF refinements, the activation checklist, RB3's
+mechanism). The owner asked (2026-07-30) for the CONTROL-PLANE section to be tidied into a clean board
+before more work lands on top of it.
+
+**Verified against the actual repos before recording, not just repeated (Protocol 51 — Dispatch-origin
+claims are hypotheses until checked against the real state).** Read `git log` directly in the private
+control-plane repo (`C:\Dev\!RobCo\_RobCo-Control\code`) and the private Ledger repo
+(`C:\Dev\!RobCo\RobCo-Control-Ledger`) rather than taking the incoming shipped-list at face value:
+
+- `e4384e5` — "off-machine backup mirror + restore test" (rank 3's build).
+- `78acfd5` — "activate rank 3's backup mirror -- wire into daily housekeeping + register scheduled task"
+  (rank 3's activation).
+- `a1df1b3` — "session-aware uncommitted-work alert -- REF1 refinement to alert 1".
+- The Ledger repo (`RobCo-Control-Ledger`) already has two real mirror commits, `d001a38` and `79afc2e` —
+  confirms the mirror is actually running, not just wired.
+
+**Marked SHIPPED, moved out of the pending buckets** (full one-line records now live in the "SHIPPED"
+section of the activation checklist in `QUEUE.md`):
+
+- Kernel ranks 1, 2, 4, 5 — `8eab8fd` / `dd49ed4` / `9fd751d` / `32c0fbc` (already recorded pre-pass; kept in
+  place, only re-homed under the tidied SHIPPED heading).
+- **CPK3 — rank 3, off-machine durability — now BUILT AND ACTIVATED**, not merely spec'd: `e4384e5` +
+  `78acfd5`, confirmed running via the Ledger repo's own commits. Closes **OD1**'s cadence question (shipped
+  using the daily default the original entry explicitly allowed) and unblocks **CPB3** (the backup-all
+  script).
+- **REF1 — the session-aware backup-unhealthy alert — now BUILT**, `a1df1b3`. Moved out of the REFINEMENTS
+  list (which now only carries REF2/REF3, both still unbuilt) into SHIPPED; its design reasoning stays in
+  place at REF1's own entry, which remains its one home.
+- The idle-session reaper (shadow, `643ebb8`), all nine Pushover alerts, and the thrashing recalibration
+  (`15c17d0`) were already correctly recorded as shipped pre-pass — reconfirmed, not re-derived.
+
+**Deduped — the activation checklist reconciled against CP1-CP5/RB1-RB6/HG1-HG2.** Most of the checklist was
+already pointer-only ("full entry above" for HG1/HG2/RB1/RB2/RB3) — the real gap was two entries with no
+back-reference: CP2's stage-2 "controlled push / sync wrappers" bullet now cross-links to **ACT3/DG2** (the
+items that actually operationalize it), and CP3's "usage early-warning relay" bullet now cross-links to
+**CPB1/CPB2** (same reasoning). No prose was duplicated to create these links — one sentence added at each
+existing entry.
+
+**Tightened into one ordered execution list** (owner's exact sequencing, 2026-07-30): ready-to-build
+(**ACT3** NEXT, then **CPB1**, **CPB2**, **HG1**, **HG2**, **RB1**, **RB2**, **RB3**, **CPB3**) → activation
+switches (**ACT1** — noting its rank-3 half is already done — then **ACT2**) → owner decisions (**OD1**,
+**OD2**) → spikes (**SP1**, RB4's own MCP-load-check, **RB5**, **RB6**) → data-gated (**DG1-DG5**,
+self-collecting via **REF3**'s auto-verdict).
+
+**New tracked item filed: AUD1** (new family prefix **AUD** — single letters and
+CP/RB/HG/CPK/CPB/ACT/OD/SP/DG/REF are all spoken for). A post-implementation multi-model audit (GPT +
+Gemini + DeepSeek) on two questions once the ready-to-build batch is actually live: **(a)
+coherence/interconnect** — does the control plane work together as one system, or is it a pile of features
+bolted on across one fast night? **(b) frontier** — what's the highest-leverage thing to push next, across
+every workflow (control-plane, museum, app)? **Guardrail recorded with it:** judge by "highest-leverage next
+and does it earn its keep," never "maximize features" — the exact discipline the three-model convergence
+review (2026-07-28) already applied once to talk this project out of a generic reaper, a headless-AI
+housekeeping layer, and a 50-protocol hook enforce-engine. AUD1 is explicitly gated on real live run data,
+not a review of paper design — running it early against the plan alone would just repeat the 2026-07-28
+review, not extend it.
+
+**Small museum touch.** P15 was filed 2026-07-29 but never actually slotted into the museum band's own
+build-order sentence (P10 → P11 Stage 0 → arc spine → coverage view → Visual Web). It is now: P15 part 1
+(extend the arc corpus with the control-plane's own arcs) feeds directly into P11 Stage 0's `arcs.json`, and
+P15 parts 2-3 (room/placement decision, then verifying the Visual Web actually renders it) close out around
+P11 Stage 3. No new content — P11's and P15's entries already cross-linked each other; only the build-order
+summary sentence was missing the connection.
+
+**⛔ No ID was renumbered, re-lettered or reused (Protocol 49) — this pass is STATUS + GROUPING + DEDUP
+only.** Every stable tag (CPK1-5, CPB1-3, ACT1-3, OD1-2, SP1, DG1-5, REF1-3, RB1-6, HG1-2, P15) keeps its
+exact prior ID; only status labels, section placement, and cross-references changed.
+
+**Not done in this pass, by design:** no control-plane code was touched, nothing was killed, no enforcement
+was flipped on. `CONTROL_PLANE_STATUS.md` (private, gitignored) still reflects 2026-07-29 and was not
+updated in this pass — it is not part of the app repo's commit surface; a future pass should refresh it to
+match.
 
 <a id="cprefine0730c"></a>
 
