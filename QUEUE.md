@@ -24,7 +24,34 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (CPB7 owner ruling STAMPED + ROADMAP SPINE recorded — doc-only)** — Two
+**Last updated: 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
+control repo `7ca220c`: the kernel's two write-side actions are finally CALLED by something.** Rank 2's
+publisher and rank 4's continuation-packet generator had been built, tested and callable since 2026-07-29,
+but nothing ever invoked them — every run was a human at a CLI. A new decision layer
+(`lib/write-side.js`) now sits in the supervisor's 5-minute loop, and it activates the two halves to
+**deliberately different depths**. **Continuation packets are FULLY LIVE:** a packet is a derived local
+JSON file that actuates nothing, so it sits inside the write scope the supervisor always had — every
+packet-worthy job gets one written automatically, and an unchanged job is _not_ rewritten every five
+minutes (a fingerprint read back from the loop's own ledger events decides). **Publishing is SHADOW, OFF
+BY DEFAULT:** readiness is detected, recorded and phone-alerted every run (it is a real thing waiting on
+the owner), but the actuation is gated on `state/auto-publish.json` holding a literal `{"enabled": true}`
+— absent by default, and unreadable/malformed/non-literal-true all fail CLOSED. **The asymmetry is
+recorded as a decision, not a default:** `publishJob()` moves a real remote ref, and giving an unattended
+scheduled task that standing authority is a different class of change from writing a local file — **DG2**
+demanded ten observed clean pushes before it would merely _refuse_ a raw push, and **CPB7**'s kill
+authority is owner-confirmed data-gated; performing pushes earns at least the same care. Flipping the
+switch needs **no code change**, which is what keeps this an activation switch rather than a deferral.
+Locked by test groups **WS** + **WSI**, including an end-to-end proof that a genuinely publish-eligible job
+leaves the remote ref untouched (`ls-remote` ground truth, no publish intent ever recorded), plus an
+out-of-suite red-then-green run showing the switch is the only thing standing between shadow and a real
+push. ⚠ **Deliberately out of scope, said plainly:** the per-job **usage-capture** plumbing CPB1 waits on
+is NOT part of this — capture needs a launcher to capture from, and there is no launcher; building it with
+no producer would be faking a data source. **DORMANT UNTIL FED** — both halves key off jobs, no launcher
+writes a manifest yet, so today both report zero candidates of _zero jobs tracked_. Pushed through the
+wrapper with the real control gate running (CPB6): `gate: PASSED`, origin VERIFIED, clean-push counter
+**18/10**.
+
+**Prior update — 2026-07-30 (CPB7 owner ruling STAMPED + ROADMAP SPINE recorded — doc-only)** — Two
 doc-only folds on the owner's directive, no ID renumbered (Protocol 49). **CPB7:** the session circuit
 breaker's **KILL/RESET authority** (auto-SIGTERM a spiraling session + reset its worktree to the last clean
 SHA) is stamped **OWNER-CONFIRMED to remain DATA-GATED / shadow-only** — explicitly NOT to be built as an
@@ -1729,8 +1756,12 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
 also states when the cap resets — a reported reset/window field verbatim if the usage data ever carries one
 (dormant today — the `{t,org,u:{fh,sd,xu}}`format has none), else an honest approximate (session window a
 ~5h upper bound; weekly reset date`UNOBSERVABLE`, no anchor in the data). **Dormant until fed** (same
-posture as the wall-clock half): no launcher writes measured per-job usage into the ledger yet (spike §4 /
-**ACT2** plumbing), so the check reports `UNOBSERVABLE`until a`job.result`carries usage in either
+posture as the wall-clock half): no launcher writes measured per-job usage into the ledger yet (spike §4).
+⚠ **Correction (2026-07-30, after ACT2 shipped `7ca220c`): this pointer used to read "spike §4 / ACT2
+plumbing", and that was wrong — ACT2 shipped WITHOUT the usage-capture half.** Capture needs a launcher to
+capture *from*, and no launcher exists; building a capture path with no producer would be faking a data
+source. The capture stays with the **approvalless/headless launcher** work, not with ACT2. So the check
+reports `UNOBSERVABLE`until a`job.result`carries usage in either
 grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json`result) — then it lights
 up with no code change. Full record in the SHIPPED section below.
 **Refinement — cap-reset ANCHOR + confirmed-data framing (folded 2026-07-30, owner-provided; multi-model
@@ -1957,13 +1988,26 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
   license to defer a doc update to a nightly job. **REF1 (the alert's session-awareness) is now shipped** —
   see SHIPPED below — so this nudge no longer waits on that; **see REF3** for the auto-verdict tracking this
   same daily/weekly pass owes the data-gated promotions.
-- **ACT2. ⏭️ OWNER-GREENLIT (2026-07-30) — the NEXT build after this checkpoint.** Wire the write-side
-  kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
-  generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
-  direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
-  detect/alert path (rank 1 + rank 5's incident lifecycle) is already live in the 5-minute loop — this item
-  is only the write-side half. Greenlit but deliberately **not** built in this checkpoint pass (which is
-  doc-only); it is the first code build to pick up next.
+- **ACT2. ✅ SHIPPED (2026-07-30), control repo `7ca220c`.** The write-side kernel actions — **CPK2**'s
+  publisher and **CPK4**'s continuation-packet generator — are now wired into the live supervisor loop, via
+  a new decision layer `lib/write-side.js`. **The two halves are activated to deliberately different
+  depths, and the asymmetry is the design:** continuation packets are **FULLY LIVE** (a packet is a derived
+  local JSON file — it actuates nothing, so it sits inside the write scope the supervisor always had),
+  while publishing is **SHADOW, OFF BY DEFAULT** — readiness is detected, recorded and alerted every run,
+  but the actuation is gated on the owner's `state/auto-publish.json` holding a literal `{"enabled": true}`
+  (absent by default; unreadable/malformed/non-literal-true all fail CLOSED). **Why the split, recorded so
+  it is not re-litigated:** `publishJob()` moves a real remote ref, and handing an unattended 5-minute
+  scheduled task that standing authority is a different class of change from writing a local JSON file —
+  **DG2** required ten observed clean wrapper pushes before it would merely _refuse_ a raw push, and
+  **CPB7**'s kill/reset authority is owner-confirmed data-gated rather than built as an autonomous killer;
+  an authority to _perform_ pushes earns at least the same care. Flipping it on needs **no code change**,
+  which is exactly what keeps ACT2 an activation switch rather than a deferral. **DORMANT UNTIL FED** (the
+  CPB1 posture): both halves key off jobs and no launcher writes a manifest yet, so today both report zero
+  candidates of **zero jobs tracked**. ⚠ **Deliberately NOT in scope, stated rather than quietly dropped:**
+  the per-job **usage-capture** plumbing CPB1 waits on (spike §4) is _not_ part of this — capture needs a
+  launcher to capture _from_, and there is no launcher; building a capture path with no producer would be
+  faking a data source. It stays with the approvalless/headless launcher work. Full record in the SHIPPED
+  section below.
 - **DG2 + CPB6. ✅ SHIPPED (2026-07-30, same session).** Push-guard enforcement (raw-push refusal) is ON in
   both the app and control repos — a raw `git push` is refused; `npm run push` is required. Break-glass:
   `ROBCO_PUSH_OVERRIDE="<reason>"` (logged) or `git push --no-verify` (absolute). **CPB6 also shipped
@@ -2136,15 +2180,20 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
 - **CPK1.** Rank 1 — job contract + reconciler — ✅ SHIPPED `8eab8fd`. Live in the supervisor's 5-minute
   loop (verified by code inspection + a Task Scheduler check, 2026-07-29).
 - **CPK2.** Rank 2 — transactional exact-SHA verifier/publisher — ✅ SHIPPED `dd49ed4`. Built, fails closed,
-  tested break-glass + fault-injection tests. Not yet auto-invoked — see **ACT2**.
+  tested break-glass + fault-injection tests. **ACT2 (`7ca220c`) wired its DECISION half into the live loop
+  and left its AUTHORITY where it was:** publish-readiness is now detected/recorded/alerted every run, but
+  actuation stays behind the owner's `auto-publish.json` switch (absent = off), so by default a publish
+  still happens only when a human runs `scripts/publish.js`.
 - **CPK3. Rank 3 — off-machine durability: backup mirror + restore test — ✅ SHIPPED + ACTIVATED
   (2026-07-30).** Built (`e4384e5`, control-plane repo — "off-machine backup mirror + restore test") and
   activated the same night (`78acfd5` — "activate rank 3's backup mirror -- wire into daily housekeeping +
   register scheduled task"). The Ledger repo (`RobCo-Control-Ledger`) shows it actually running: first
   mirror commit `d001a38`, a second `79afc2e` shortly after. Unblocks **CPB3** and closes out **OD1**'s
   cadence question (shipped using the daily default).
-- **CPK4.** Rank 4 — deterministic continuation packet — ✅ SHIPPED `9fd751d`. Built, callable. Not yet
-  auto-invoked — see **ACT2**.
+- **CPK4.** Rank 4 — deterministic continuation packet — ✅ SHIPPED `9fd751d`. Built, callable, and **now
+  auto-invoked: ACT2 (`7ca220c`) took up the `packetWorthyJobs` reconciler hook point this rank explicitly
+  named for the purpose** — the supervisor generates a packet for every packet-worthy job on its 5-minute
+  loop, regenerating only when the job's situation actually moved.
 - **CPK5.** Rank 5 — incident lifecycle + daily housekeeping — ✅ SHIPPED `32c0fbc`. Incident-lifecycle half
   is live in the 5-minute loop; the daily-housekeeping half is built, and its rank-3 sub-piece is now
   scheduled (via `78acfd5`) — the rest of ACT1 (the full pass, README-staleness nudge included) is still
@@ -2178,6 +2227,39 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   routing only — raw-push refusal stays **DG2**, plain `git push` unrefused. This doc-only QUEUE update is
   itself another wrapper push (it should trip CPB4's `gate:docs` fast path _through_ the wrapper — the live
   proof of the coexistence).
+- **ACT2.** Write-side activation — ✅ SHIPPED `7ca220c` (2026-07-30, control repo `RobCo-Control`). New
+  `lib/write-side.js` is the decision layer `supervisor.js` consults every run. **Rank 4 fully live:**
+  `computePacketPlan()` reuses `continuation-packet.js`'s own `packetWorthyJobs` (Protocol 22 — the hook
+  point that build named for exactly this call site) and adds the question a LOOP needs and a one-shot CLI
+  does not, "does it already have a CURRENT one?", via a cheap fingerprint (state + terminality +
+  transition count + reconciler flags) read back from the loop's own prior `continuation.packet` ledger
+  events — so an unchanged job is not rewritten every five minutes, and only a `written: true` event
+  suppresses a retry (a build failure or a dry-run never masquerades as success). **Rank 2 shadow:**
+  `computePublishCandidates()` (pure) requires verified state + `jobType: 'publish'` + a usable
+  `expectedRemote` + passing evidence bound to that EXACT sha — delegating the evidence verdict to
+  `publisher.findPassingEvidence` → `completion-evidence.js` rather than re-deriving it, so this layer can
+  only ever be _more_ conservative than the transaction — and carries a distinct `reason` on every rejected
+  candidate. `runAutoPublish()` gates actuation behind three independent checks: `--dry-run`, the owner's
+  switch, and a **per-run cap of 1** (deterministic by `jobId`; the rest reported deferred, never dropped)
+  so a runaway cannot become many pushes at once. `supervisor.js` never calls `publishJob` and does not even
+  `require` `lib/publisher.js` — `runAutoPublish` is the single choke point (static guard **WS6**). Also:
+  `status.json` `schemaVersion` 2→3 (new `writeSide` block, with the switch state **hoisted to the top
+  level** because "off" must never be something you have to go digging for), a new `publish-ready` incident
+  type + no-PII phone banner, and `supervisor.js`'s header contract corrected in place (it now also writes
+  continuation packets, and runs read-only `status`/`diff`/`rev-parse` alongside `ls-remote` via the packet
+  builder — Protocol 3, docs fixed in the same commit rather than left as drift). Locked by test group
+  **WS** (the switch's fail-closed matrix; the plan's generate/skip/degrade logic; every negative
+  publish-eligibility case including evidence bound to a _different_ sha; the three gates proven with an
+  injected `publishFn` spy that never fires; per-job degrade on build/write throw) and **WSI** (real
+  sandboxed `supervisor.js` runs: a packet actually lands on disk and is NOT rewritten on the second run;
+  and a genuinely publish-**eligible** job leaves the remote ref untouched — verified by `ls-remote` ground
+  truth, not a self-report — with no publish intent ever recorded, while the owner still gets alerted).
+  Suite green, 0 fail / 0 skip; pushed through the wrapper with the real control gate running (CPB6),
+  `gate: PASSED`, origin VERIFIED. **Red-then-green proof run outside the suite** (a test that really pushes
+  does not belong in it): same fixture, switch absent / `enabled:false` / malformed all left the remote ref
+  EMPTY; a literal `enabled:true` moved it to the exact verified sha through the full fail-closed publisher
+  transaction — the switch is genuinely the only thing standing between the two. **DORMANT until fed**, and
+  **usage-capture deliberately out of scope** — see the ACT2 entry above for both.
 - **CPB1.** Budget alert (tokens/$) — ✅ SHIPPED `2d6e90b` (2026-07-30, control repo `RobCo-Control`). The
   budget half of the deadline/budget alert (the sibling of the wall-clock half that was already alert 3 of 4).
   New `lib/budget-check.js` (pure comparator: extracts a job's measured $/token spend from its own ledger
@@ -2191,7 +2273,9 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   and no-measurement→unobservable doctrine cases, usage-reset both branches, the reconciler flag, the message
   formatter, and a real sandboxed `supervisor.js --dry-run` wiring proof); `DX1c` updated for the retired
   wall-clock-only TODO marker. Suite green (0 fail, 0 skip). **DORMANT until fed** — the check reports
-  `UNOBSERVABLE` until a launcher records measured per-job usage into the ledger (spike §4 / **ACT2**),
+  `UNOBSERVABLE` until a launcher records measured per-job usage into the ledger (spike §4 — **and NOT
+  ACT2: it shipped `7ca220c` without the usage-capture half, deliberately, because capture needs a launcher
+  to capture from; that work sits with the approvalless/headless launcher**),
   exactly as the wall-clock half is dormant until jobs flow; it is built, correct, and tested, awaiting only
   the data source. **Framing refinement (owner-approved 2026-07-30, checkpoint pass — record only, NOT a
   rebuild):** the budget alert is a **token-billing guardrail**, not a general spend meter. While the owner
