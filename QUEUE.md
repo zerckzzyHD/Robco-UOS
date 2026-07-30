@@ -24,7 +24,34 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (ND1 BUILT + SHIPPED — the two repos can no longer come to mean the same word two ways)** — **ND1 is shipped, app repo `ca38f79` + control repo `31e987c`: a naming-domain guard, filed as a new
+**Last updated: 2026-07-30 (REF5 BUILT + SHIPPED — the "your work isn't backed up" alerts stopped crying
+wolf)** — **REF5 is shipped, control repo `e3706db`.** The two alerts the owner watched false-fire 6+ times
+during ordinary builds — _"a session tried to push but I never saw it confirm"_ and _"your latest work
+isn't backed up — N commits not on the remote"_ — were firing during the completely **normal push window**.
+The cause is arithmetic, not a bug in the detection: a full-gate push runs **minutes** (the wrapper's own
+ceiling is 20), a build often pushes **both** repos one after the other, and the supervisor checks every
+**5 minutes** — so a check lands mid-push, sees a commit that isn't on the remote yet, and concludes the
+work is unbacked. It wasn't; it was in transit. **Both** detectors now share one set of four checks
+(`lib/push-window.js`, so they can never drift apart): **(1)** if the remote already has that exact commit,
+the alert is **retracted** — previously such a warning stayed open forever, because the record that would
+have closed it can never arrive; **(2)** if a push is actually running, stay quiet — read two ways, from
+the push record ACT3 writes _and_ from the push lock, because the control repo runs its gate **before** the
+push record exists, so the lock is the only thing that covers those first minutes; **(3)** if the session
+that owns the work is still live, stay quiet — work mid-build is _supposed_ to be unbacked; **(4)**
+otherwise wait out a grace period at least as long as a healthy push, taken from the wrapper's own ceiling
+rather than a second number that could drift. **It is not neutered, and that is proven, not asserted:**
+genuinely stuck work — nobody live, at rest past the ceiling, nothing in flight, not on the remote — still
+alarms, and a deliberate mutation that removed the suppression turned the gate **red** (4 failures) before
+being reverted. **One divergence recorded on purpose:** when the machine can't tell whether a session is
+live, REF1 stays silent but REF5 still alarms — a commit sitting off the remote past the full ceiling is a
+real gap whatever the process table said, and the alternative is a machine that quietly does no backup
+alerting at all. **Auto-retract now reaches the phone** for these two alerts only: one all-clear when the
+work lands, instead of a stale warning left standing. **A quiet run stays legible** — every stranded push is
+still detected and logged with the reason it was held back, so "said nothing" can always be told from
+"decided to say nothing". Control gate ran for real (CPB6): `gate: PASSED`, origin VERIFIED, clean-push
+counter **23/10**. Locked by control test groups **PW** + **PWE**.
+
+**Prior update — 2026-07-30 (ND1 BUILT + SHIPPED — the two repos can no longer come to mean the same word two ways)** — **ND1 is shipped, app repo `ca38f79` + control repo `31e987c`: a naming-domain guard, filed as a new
 `ND` family and built in the same pass.** The app owns **`RobcoEvents`** — the client-side game/UI bus in
 `js/core/state.js`, in-page subscribers, nothing persisted. The control plane owns **"ledger events"** — the
 appended, replayable records its `lib/ledger.js` writes, each with a `type:` field. **Verified rather than
@@ -2302,7 +2329,7 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   gate, not stuck. **Stays shadow/alert-only**, exactly per the three-model review's doctrine already
   governing **DG1** — this sharpens what the detector reports, it does not promote it toward a kill.
   OWNER-APPROVED, NOT YET BUILT.
-- **REF5.** Push-window tuning for the **unbacked-work / push-not-confirmed** alerts (refines the LIVE
+- **REF5. ✅ SHIPPED — `e3706db`** (control repo). Push-window tuning for the **unbacked-work / push-not-confirmed** alerts (refines the LIVE
   backup-health alerts — the same alert family **REF1** made session-aware; distinct correction).
   **Symptom:** the two alerts — "A session tried to push but I never saw it confirm on the remote — your
   latest work might not be backed up" and "Your latest work isn't backed up — the repo has N commit(s) not
@@ -2328,6 +2355,20 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   uncommitted-work notification **twice during a single long, still-active session** — a false alarm on work
   that was simply in progress. Reuses the supervisor's existing active-session / tree co-residency tracking
   (as REF1 does), not a second tracker. OWNER-APPROVED (2026-07-30), NOT YET BUILT.
+  **BUILT + SHIPPED 2026-07-30 — control repo `e3706db`** (full shipped record below; the design reasoning
+  above is kept here since this is REF5's one home). All four parts landed, for BOTH detectors and BOTH
+  repos, in one shared module (`lib/push-window.js`) so the two can never drift apart on what "in flight"
+  means. **One hypothesis in the spec above was CHANGED on contact with the repo (Protocol 51a):** the
+  brief named "ACT3's `push.completion` events — a 'started' event distinct from `completed:true`". The
+  wrapper's actual started/finished pair is **`push.intent` → `push.result`** (`push.completion` is the
+  evidence bundle written alongside the result, never a start marker). The mechanism the brief wanted is
+  real and was used; only the event name was wrong. **A gap the brief could not have known about was found
+  and closed:** `controlled-push.js` runs the target repo's gate at step (c) **before** it writes
+  `push.intent` at step (d), so for a CONTROL-repo push — which runs its own suite in-wrapper since CPB6 —
+  the first several minutes have **no intent event in the ledger at all**, and the ledger signal alone
+  would have left that window uncovered. The **L4 push lock** (taken at step (a), released in the
+  `finally`) spans the whole transaction and covers it. **One deliberate divergence from REF1, documented
+  in code:** unknown ownership does NOT suppress the unpushed legs — see the shipped record below.
 
 ## SHIPPED — for the record, with SHAs
 
@@ -2352,6 +2393,23 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   is live in the 5-minute loop; the daily-housekeeping half is built, and its rank-3 sub-piece is now
   scheduled (via `78acfd5`) — the rest of ACT1 (the full pass, README-staleness nudge included) is still
   open.
+- **REF5.** Push-window tuning for the unbacked-work / push-not-confirmed alerts — ✅ SHIPPED `e3706db`
+  (control-plane repo — "REF5 — stop the unbacked-work alerts firing during a normal push"). Full design
+  reasoning kept at REF5 above (its one home); this line is the shipped record. Both detectors now share
+  `lib/push-window.js`'s four checks — **landed on the remote** (the auto-retract; before this, such a
+  warning could never close, because the record that would close it can never arrive), **a push actually in
+  progress** (read from ACT3's `push.intent`/`push.result` pair _and_ from the L4 push lock, because the
+  control repo's in-wrapper gate runs before any push record exists), **the owning session still live**
+  (reusing REF1's tree ownership, not a second tracker), and **a grace period** imported from the wrapper's
+  own ceiling rather than re-declared. **Deliberate divergence from REF1:** when liveness is unobservable,
+  REF1 stays silent but REF5 still alarms — a dirty tree is ambiguous by nature, a commit still off the
+  remote past the full ceiling is not, and making unknown suppress would leave a machine that can't read
+  its own process table with no backup alerting at all. **`notifyOnResolve` is now on for exactly two
+  incident types** (`backup`, `stranded-push`), which is what makes the retraction reach the phone.
+  Verified not-neutered by mutation: removing the suppression turned the gate red (4 failures), then
+  reverted. Locked by control test groups **PW** (pure logic + a REAL L4 lock taken and released against
+  the live process table) and **PWE** (a real sandboxed supervisor run: quiet mid-push, loud when stuck,
+  retracted once it lands, retraction fires once).
 - **REF1.** Session-aware uncommitted-work alert — ✅ SHIPPED `a1df1b3` (control-plane repo — "session-aware
   uncommitted-work alert -- REF1 refinement to alert 1"). Full design reasoning kept at REF1 above (its one
   home); this line is the shipped record.
