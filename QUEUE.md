@@ -1096,7 +1096,17 @@ reused here, never reassigned.
 
 - **ACT1.** Register the daily-housekeeping pass (**CPK5**'s daily half — `scripts/daily-housekeeping.js`)
   as a Windows scheduled task. The module is shipped (`32c0fbc`) and callable, but nothing currently invokes
-  it.
+  it. **Folded in (owner-approved, 2026-07-30): a doc/README staleness check.** As part of the same
+  daily/weekly housekeeping pass, add a low-frequency automated nudge — via the same
+  **incident/backup-unhealthy alert path** (the Pushover "backup unhealthy" alert already approved in the
+  [convergence review](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md)) — if a repo's `README.md`
+  or another key doc looks out of date relative to its recent changes (e.g. commits touching a surface with
+  no matching doc update in the same window). **The PRIMARY mechanism does not change:** Protocol 2 (update
+  the doc in the SAME commit as the change it describes, `CLAUDE.md`) stays the enforcement point — this
+  housekeeping check is only the drift **safety net**, catching a Protocol 2 miss after the fact, never a
+  replacement for the same-commit discipline. **Record this plainly: keeping READMEs current is NOT a new
+  trigger word** — it is Protocol 2 plus this housekeeping check, and no session should read this item as
+  license to defer a doc update to a nightly job.
 - **ACT2.** Wire the write-side kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
   generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
   direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
@@ -2229,7 +2239,12 @@ and running Gource itself was rejected on scale and cost — do not re-propose i
 
 **Cross-references, not restatements.** **Item I (the Atlas) rides this graph renderer** — same plumbing, and a
 second one would be the Protocol 22 parallel-implementation trap. **R11** is the shipped 1.x graph this
-extends. **P10** frees the nav this needs an entry point in.
+extends. **P10** frees the nav this needs an entry point in. **P15** (2026-07-29) is a hard requirement on
+this Stage 3 scope, not just on Stage 0's arc coverage — it requires the finished Visual Web to render the
+project's WORKFLOWS (app-build, control-plane, museum-building, multi-model review) and how they interlock,
+framed as an Obsidian-graph-style explorable node-link "brain" **within the hard constraints already fixed
+above** (no D3/force-graph/CDN/build step) — see P15 for the full requirement and its explicit reconciliation
+note.
 
 **Done means:** `arcs.json` exists and is generated-from/checked-against the corpus; the arc spine and coverage
 view are built, shipped and actually used; and the radial web renders cluster-first at 360px, deterministically,
@@ -2340,21 +2355,37 @@ corpus at all. **This item is a precondition on calling the museum done, not an 
    (the self-maintaining system, not app history) — it must be placed **prominently**, not folded as a
    footnote to an existing room. Which room (a new one, or the strongest existing candidate) is an open
    design decision, not yet made.
-3. **Verify P11's Visual Web includes it.** Once **P11**'s `arcs.json` (Stage 0) exists, confirm the
-   control-plane arcs from part 1 are represented in it — the Visual Web claims to be complete-but-navigable
-   over the WHOLE corpus, so an arc corpus missing its own most recent chapter would silently break that
-   claim.
+3. **Verify P11's Visual Web includes it — and explicitly renders how the project's WORKFLOWS interlock,
+   not just its arcs.** Once **P11**'s `arcs.json` (Stage 0) exists, confirm the control-plane arcs from
+   part 1 are represented in it — the Visual Web claims to be complete-but-navigable over the WHOLE corpus,
+   so an arc corpus missing its own most recent chapter would silently break that claim. Beyond arc
+   coverage, the Visual Web is where the museum's own thesis (**"the self-maintaining system"**) has to be
+   SHOWN, not told — so it must surface the project's **WORKFLOWS themselves and how they connect/interact**,
+   at minimum: the **app-BUILD workflow** (plan → implement → gate → audit, Protocol 8) and the
+   **CONTROL-PLANE workflow** (OBSERVE → ENFORCE → ASSIST, the kernel ranks) — plus any others worth
+   surfacing, with the **museum-building process** itself and the **multi-model review process**
+   (Fable/Opus/Sonnet plus the external convergence reviews) as live candidates. **Target framing:** an
+   Obsidian-graph-**STYLE** explorable node-link "brain" — built **ourselves**, generated from the arc data,
+   hosted on the public Exhibit site — **never** the Obsidian app itself (that stays a separate, optional
+   personal tool, out of scope for the museum). ⚠ **Reconcile before building, don't silently override:**
+   "Obsidian-graph-style" names the desired UX (a visitor pans/clicks through an explorable node-link graph),
+   not a license to reach for a graph library — **P11 already records a hard, enforced constraint against
+   exactly that** (no D3/force-graph/build step/CDN/WASM; hand-assembled SVG with generation-time static
+   coordinates, the `buildGrowthTape()` precedent). Any "free open-source graph library" reading of this
+   framing has to be squared against that existing constraint when P11 is actually built, not read as
+   superseding it.
 
 **Cross-references, not restatements.** Depends on **P8**'s corpus (extends it, Protocol 22) and **P11**
 (the arc corpus is P11 Stage 0's direct input — this item's part 1 IS P11 Stage 0 material, filed here
-because the trigger is "the museum fell behind the control plane," not "P11 needs more data"). Sits inside
-**THE MUSEUM PROGRAM** cluster above and inherits its curation law + lay-audience bar (item **P**) and its
-PII/identity discipline (**P13**) — the control-plane material is unusually rich in paths/session ids/the
-owner's own working notes, so the same fail-closed visibility rule P11 already specifies applies here
-without exception.
+because the trigger is "the museum fell behind the control plane," not "P11 needs more data"; and P11's own
+entry now cross-links back here for the workflow-visualization requirement above). Sits inside **THE MUSEUM
+PROGRAM** cluster above and inherits its curation law + lay-audience bar (item **P**) and its PII/identity
+discipline (**P13**) — the control-plane material is unusually rich in paths/session ids/the owner's own
+working notes, so the same fail-closed visibility rule P11 already specifies applies here without exception.
 
 **Done means:** the control-plane arcs exist in the corpus as dated entries; a room/placement decision is
-made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them.
+made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them AND to
+render the project's interlocking workflows per part 3 above.
 
 ---
 
