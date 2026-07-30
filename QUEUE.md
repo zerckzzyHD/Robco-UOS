@@ -24,7 +24,26 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
+**Last updated: 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
+checkpoint fold + reconcile + push-verify-all pass; no code feature was built (ACT2 and the control-repo
+push-gate fix are queued, not built here).** Folded: **(a)** a **token-billing framing refinement to CPB1**
+(owner-approved 2026-07-30) — its budget alert (tokens/$) is scoped as a **token-billing guardrail**: stay
+**quiet while the owner is on his MAX subscription** (spend is against a usage allowance, not dollars) and
+speak up **only when actually on pay-as-you-go tokens** (the rare fallback); the trigger gates on being in a
+token-billing state. Recorded as framing only — CPB1 is not rebuilt. **(b)** CPB5's phone-cockpit entry now
+**explicitly names Tailscale as the private transport** (it was already stated; reinforced so the mechanism
+is unambiguous). **(c)** a **new item CPB6** — the control-repo push-gate gap: the controlled-push wrapper
+records `gate.skipped` for the control repo because it has **no enforced gate hook** (its tests run via a
+manual `node test/run-tests.js`), so control-plane pushes rely on **discipline, not enforcement**; the fix
+(to BUILD later, not now) wires the control repo's test runner into the wrapper or a real pre-push hook so
+those pushes are genuinely gated and record `gate.passed`. Filed near the DG2 / push-gate items. **(d)**
+**ACT2 marked owner-greenlit (2026-07-30) — the next build after this checkpoint.** Also reconciled:
+`planning/control-plane/CONTROL_PLANE_STATUS.md` brought current with shipped reality (CPB4/ACT3/CPB1/CPB2
+shipped; CPB2 LIVE not dormant), and the **DG2 clean-push counter corrected to its live value 8/10** (the
+`3/10` snapshots below are the ACT3-dogfood-day value, left in place as dated history). No ID renumbered
+(Protocol 49); doc-only pass. **Verified remote SHAs** and the post-push counter are in this pass's report.
+
+**Prior update — 2026-07-30 (ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
 project's pushes now route through the controlled-push wrapper, and the ≥10-clean-pushes counter that gates
 DG2 is moving.** `npm run push` (app repo `scripts/robco-push.js`) routes a push through the control plane's
 `controlled-push.js` (resolved via `$ROBCO_CONTROL_PUSH` or the `../_RobCo-Control` sibling; degrades to a
@@ -1653,8 +1672,10 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   **Pending owner approvals surface here too** (ruling D / **WB11**): CPB5 is one of the owner surfaces where a
   pending approval appears, alongside the approval inbox (**RB1**) and Pushover.
   **Phone cockpit — control-capable, ONE shared action layer.** The phone-openable cockpit is a single
-  self-contained `.html` regenerated on each supervisor tick, served **PRIVATELY over Tailscale** (never public
-  GitHub Pages — the records carry the owner's name). It is **the same operator control surface as the desktop
+  self-contained `.html` regenerated on each supervisor tick, served over **Tailscale — the private transport
+  for this cockpit** (the owner's own tailnet reaches the supervisor machine directly; **never** the public
+  GitHub Pages origin, because the records carry the owner's name). Tailscale is named here as the explicit,
+  required mechanism — the cockpit is reachable from the phone **only** over the tailnet, never a public URL. It is **the same operator control surface as the desktop
   CLI, just a web renderer** — it shares **ONE action layer** with the CPB5 CLI and enforces the **same three
   guardrails above**. This is the owner's "CLI on my phone / manage while away" surface. Folds in GPT's
   "phone-first operator cockpit" and Gemini's `robco status` / supervisor-local-web-view; can surface the same
@@ -1672,6 +1693,20 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   that — it is captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm
   scope (does it also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than
   assuming.
+- **CPB6. ⬜ Control-repo push-gate gap — genuinely gate control-plane pushes (owner-flagged 2026-07-30,
+  checkpoint pass).** Filed with the push-gate items (cross-ref **DG2** / **ACT3**). **The gap:** the
+  controlled-push wrapper (**ACT3**) delegates the gate to the _target repo's_ pre-push hook — the app repo
+  has one, so app pushes record `gate.passed`; the **control repo (`RobCo-Control`) has no enforced gate
+  hook** (its tests run via a manual `node test/run-tests.js`), so a wrapper push of control-plane code
+  records **`gate.skipped`**. Net effect: **control-plane pushes rely on discipline, not enforcement** — a
+  session could push control-repo code without ever running its tests, and nothing stops it. **The fix (to
+  BUILD later, NOT in this checkpoint):** wire the control repo's own test runner into the wrapper's gate
+  step **or** add a real control-repo pre-push hook that runs `node test/run-tests.js`, so control-repo
+  wrapper pushes are genuinely gated and record **`gate.passed`**, not skipped. **Done means:** a control-repo
+  push through the wrapper actually runs the control-repo tests and refuses on failure, and the ledger
+  receipt reads `gate.passed`; a red-then-green proof that a failing control-repo test blocks the push.
+  Sits with the DG2/ACT3 push machinery in priority even though its home here in READY TO BUILD keeps the
+  CPB family together.
 - **CPB4.** ✅ **SHIPPED (this pass).** Gate-scoping — a doc-only fast path for the pre-push gate. When a
   commit's diff touches ONLY
   docs (`QUEUE.md`, `QUEUE_LOG.md`, `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE), the pre-push
@@ -1713,11 +1748,13 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   license to defer a doc update to a nightly job. **REF1 (the alert's session-awareness) is now shipped** —
   see SHIPPED below — so this nudge no longer waits on that; **see REF3** for the auto-verdict tracking this
   same daily/weekly pass owes the data-gated promotions.
-- **ACT2.** Wire the write-side kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
+- **ACT2. ⏭️ OWNER-GREENLIT (2026-07-30) — the NEXT build after this checkpoint.** Wire the write-side
+  kernel actions — **CPK2**'s publisher and **CPK4**'s continuation-packet
   generator — into the live supervisor loop. Both are built and callable but not auto-invoked, confirmed by
   direct code inspection during the 2026-07-29 dissent pass ([`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)). The
   detect/alert path (rank 1 + rank 5's incident lifecycle) is already live in the 5-minute loop — this item
-  is only the write-side half.
+  is only the write-side half. Greenlit but deliberately **not** built in this checkpoint pass (which is
+  doc-only); it is the first code build to pick up next.
 - **(later) DG2.** Activate push-guard enforcement (raw-push refusal) — fed by **ACT3** above; see
   Data-Gated below for its own entry and gating condition.
 - **(later) DG3.** Graduate the reaper from shadow to actually reaping — see Data-Gated below.
@@ -1755,9 +1792,12 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`. A further
   precision fix (not a promotion) → **REF4**, below.
 - **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
-  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter is now moving; it read
-  **3/10** after ACT3's own dogfood pushes, so 7 clean wrapper pushes remain before DG2 can be considered).
-  Read the live count with `npm run push-count` in the control repo.
+  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter is moving). **Live count at
+  this checkpoint: 8/10** (`code@main: 3`, `robco-uos@dev: 5`) — 2 more clean wrapper pushes remain before
+  DG2 can be considered (the app-repo push carrying this checkpoint advances it to 9/10). Read the live count
+  any time with `npm run push-count` in the control repo. **Related build gap → CPB6** (the control repo
+  itself has no enforced gate hook, so its wrapper pushes currently record `gate.skipped`, not `gate.passed`
+  — a discipline-not-enforcement gap to close; see CPB6 in READY TO BUILD).
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
   Full safe-lifecycle design (two clean "done" signals, three hard guards, a continuation-packet snapshot
@@ -1909,7 +1949,14 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   wall-clock-only TODO marker. Suite green (0 fail, 0 skip). **DORMANT until fed** — the check reports
   `UNOBSERVABLE` until a launcher records measured per-job usage into the ledger (spike §4 / **ACT2**),
   exactly as the wall-clock half is dormant until jobs flow; it is built, correct, and tested, awaiting only
-  the data source. This app-repo QUEUE update is a doc-only push through the ACT3 wrapper (CPB4 `gate:docs`
+  the data source. **Framing refinement (owner-approved 2026-07-30, checkpoint pass — record only, NOT a
+  rebuild):** the budget alert is a **token-billing guardrail**, not a general spend meter. While the owner
+  is on his **MAX subscription**, spend is against a **usage allowance, not dollars**, so the alert must stay
+  **quiet** — it should speak up **only when he is actually on pay-as-you-go tokens** (the rare fallback).
+  So the trigger must **gate on being in a token-billing state**: no token-billing state → no budget buzz,
+  regardless of measured usage. This sharpens _when_ CPB1 fires; the shipped comparator/plumbing above is
+  unchanged and this is queued as a tuning to apply when CPB1's data source is wired (ACT2), not built now.
+  This app-repo QUEUE update is a doc-only push through the ACT3 wrapper (CPB4 `gate:docs`
   fast path; advances the DG2 clean-push counter).
 - **CPB2.** Usage → operating modes — ✅ SHIPPED `6154abd` (2026-07-30, control repo `RobCo-Control`). The
   owner-approved (2026-07-28) replacement of the five per-threshold usage **phone alerts** (50/80/85/90/95,
