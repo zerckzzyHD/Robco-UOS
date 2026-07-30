@@ -9,13 +9,56 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cpconsolidate0730b"></a>
+
+### 2026-07-30 (later still) — REF4 (thrashing-detector refinement) and PM1 (post-mortem/retrospective) filed onto the just-tidied control-plane board
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No control-plane code was written or changed,
+nothing was killed, no enforcement was flipped on.
+
+**Context — a live concurrency note, recorded because it actually happened.** The consolidation pass recorded
+below at `#cpconsolidate0730` was found already sitting uncommitted in the working tree when this pass began
+(git status went from clean to modified between two checks a few minutes apart — another session had picked
+up the same consolidation task and was actively writing to `QUEUE.md`/`QUEUE_LOG.md`). Rather than edit over
+live uncommitted work (Protocol 12), this pass paused, reported the collision, and waited; the other session
+finished and committed on its own (`e73c86b`) before this pass resumed. That commit covered items 1-4 and 7
+of the owner's consolidation brief correctly and in full. This pass adds only the two items it was missing:
+**REF4** and **PM1**.
+
+**REF4 — thrashing-detector refinement (owner-approved 2026-07-30).** Two more false-ish positives, distinct
+from the `53a3bb89` case `15c17d0` already fixed, surfaced 2026-07-29/30. Two corrections, filed as a
+refinement to the shadow-only detector (feeds **DG1**'s shadow→kill promotion gate, does not promote it):
+**(i)** a session frozen mid-read with zero activity at all is a **different state** from a session issuing
+repeated failing tool calls — "stalled/hung, no activity" is **POSSIBLY_STALLED**, not thrashing, and needs
+different wording and a different response; **(ii)** the slow-pre-push-gate / push-retry pattern (repeated
+push attempts timing out at the tool level, no file changes between attempts) must **not** be flagged as
+thrashing — a session mid-push, retrying because the previous attempt's tool call itself timed out, is
+waiting on a slow gate, not stuck. Stays shadow/alert-only, per the three-model review's existing doctrine
+governing **DG1** — no kill authority is added or implied.
+
+**PM1 — post-mortem / retrospective of RobCo (new family prefix, owner-approved 2026-07-30).** A three-angle
+document — (a) plain-language "what is RobCo & how it got here," (b) technical/architecture retrospective,
+(c) lessons-learned — sequenced as its own top-level section, placed deliberately **between** the
+control-plane program and **THE MUSEUM PROGRAM** cluster. The owner's own sequencing reasoning: reflect
+first, then build the exhibit; and the retrospective doubles as source material for the museum's next
+content pass (it feeds **P8**'s corpus and **P15**'s control-plane arcs the same way a first-hand account
+would). Gated on the CP program's ready-to-build batch actually landing, same real-data precondition
+**AUD1** already states, so the retrospective describes shipped state rather than a plan that will move
+under it.
+
+**⛔ No ID was renumbered, re-lettered or reused (Protocol 49).** REF4 extends the existing REF family
+(REF1-REF3 already assigned); PM1 is a new family prefix, chosen because it names a genuinely new kind of
+item (a written retrospective, not a control-plane mechanism) — the same "new work takes a family prefix,
+single letters and adjacent families are spoken for" rule the original consolidation pass already applied to
+AUD.
 
 <a id="cpconsolidate0730"></a>
 

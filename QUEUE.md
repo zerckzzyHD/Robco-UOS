@@ -24,7 +24,21 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — CP board consolidated)** — **The sprawling CONTROL-PLANE
+**Last updated: 2026-07-30 (later still — REF4 + PM1 filed)** — **Two items folded into the just-tidied
+CONTROL-PLANE board, both owner-approved 2026-07-30, neither previously tracked.** **REF4** (new) refines the
+shadow-only thrashing detector against two more false-ish positives seen 2026-07-29/30, distinct from the
+`53a3bb89` case `15c17d0` already fixed: **(i)** a session frozen mid-read with zero activity is
+**POSSIBLY_STALLED**, not thrashing — different state, different wording; **(ii)** the slow-pre-push-gate /
+push-retry pattern (repeated push attempts timing out at the tool level, no file changes between them) must
+**not** be flagged as thrashing — a session mid-push isn't stuck. Stays shadow/alert-only, feeds **DG1**'s
+promotion gate, no kill authority added. **PM1** (new family prefix) is a three-angle post-mortem/retrospective
+of the whole project — plain-language overview, technical/architecture retrospective, lessons-learned —
+sequenced deliberately **right before THE MUSEUM PROGRAM begins** (owner's call: reflect, then build the
+exhibit), and doubles as museum source material for P8's corpus. Doc-only pass, no control-plane code
+touched, no ID renumbered (Protocol 49). Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730b).
+
+**Prior update — 2026-07-30 (later still — CP board consolidated)** — **The sprawling CONTROL-PLANE
 (workflow) section is TIDIED — status, grouping and dedup only, no ID renumbered (Protocol 49).** Marked
 SHIPPED, out of the pending buckets, with SHAs: kernel ranks 1/2/4/5 (`8eab8fd`/`dd49ed4`/`9fd751d`/
 `32c0fbc`), rank 3's backup mirror + restore test now **BUILT AND ACTIVATED** (`e4384e5` build, `78acfd5`
@@ -1251,7 +1265,8 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
 
 - **DG1.** Thrashing: shadow → actual kill. Needs a clean shadow stretch (proves it flags real loops, never
   cries wolf) before it is trusted to terminate a session; kill would use the proven `(pid, procStart)`
-  re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`.
+  re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`. A further
+  precision fix (not a promotion) → **REF4**, below.
 - **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
   clean through the wrapper. Fed by **ACT3** (which starts the counter moving today).
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
@@ -1313,6 +1328,18 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   needs no owner sign-off before it takes effect. **Tightening — making any data-gated mechanism MORE
   aggressive — always requires explicit owner approval**, the same bar as a shadow → live promotion. The
   fail-safe direction is automatic; the risky direction stays gated.
+- **REF4.** Thrashing-detector refinement — sharpen what counts as "thrashing" (refines the shadow-only
+  detector recalibrated at `15c17d0`; feeds **DG1**'s shadow→kill promotion gate). **Why:** two more
+  false-ish positives, distinct from the `53a3bb89` case `15c17d0` already fixed, surfaced 2026-07-29/30.
+  **Two corrections, both owner-approved:** **(i)** a session frozen mid-read with zero activity at all is a
+  **different state** from a session issuing repeated failing tool calls, and the detector must say so —
+  "stalled/hung, no activity" is **POSSIBLY_STALLED**, not thrashing, and the two need different wording and
+  a different response. **(ii)** the slow-pre-push-gate / push-retry pattern — repeated push attempts timing
+  out at the tool level with no file changes between attempts — must **NOT** be flagged as thrashing; a
+  session mid-push, retrying because the previous attempt's tool call itself timed out, is waiting on a slow
+  gate, not stuck. **Stays shadow/alert-only**, exactly per the three-model review's doctrine already
+  governing **DG1** — this sharpens what the detector reports, it does not promote it toward a kill.
+  OWNER-APPROVED, NOT YET BUILT.
 
 ## SHIPPED — for the record, with SHAs
 
@@ -1363,6 +1390,42 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   **Done means:** the ready-to-build batch (ACT3 through CPB3) is built, activated, and has real live run
   data; the three-model pass runs against that real state (not the plan); both questions are answered with
   a plain-English verdict; any finding is filed as its own queued item rather than acted on inline.
+
+---
+
+# ⭐ POST-MORTEM / RETROSPECTIVE OF ROBCO — sequenced right before the museum band (PM1, new 2026-07-30)
+
+### PM1. ⬜ A three-angle retrospective of the whole project, written before the museum is built
+
+**What it is.** One document, three required angles, owner-specified: **(a)** a plain-language "what is
+RobCo & how it got here" overview — the story, for a non-technical reader; **(b)** a technical/architecture
+retrospective — the real shape of the system as it stands, how it got that shape, and why; **(c)** a
+lessons-learned pass — what was tried, what failed, what changed as a result, told straight rather than as a
+highlight reel.
+
+**Why it sits exactly here — the owner's own sequencing call.** Reflect first, then build the exhibit. This
+item is placed deliberately **between** the control-plane program above and **THE MUSEUM PROGRAM** below —
+after the CP kernel work is built/activated (so the retrospective has something real to describe, not a plan)
+and before museum construction starts, so the retrospective's own conclusions can inform how the museum tells
+the story rather than the museum locking in a shape first.
+
+**It doubles as museum source material.** All three angles are exactly the kind of corpus **P8**'s
+story-synthesis draws on — the plain-language overview feeds the museum's lay-audience framing, the
+technical retrospective feeds the structure/connection map, and the lessons-learned pass is raw material for
+the failure→lesson→improvement thesis the museum is already built around (item **P**). Writing it before P8's
+successor passes read the corpus means the museum's next audit doesn't have to reconstruct this from scratch.
+
+**Cross-references, not restatements.** Sits upstream of **THE MUSEUM PROGRAM** cluster below (item **P** and
+its family) and of **P15** (which already extends the arc corpus with the control-plane's own arcs) — this
+item is the narrative account those arcs get pulled from, not a duplicate of either. Depends on the CP
+program's ready-to-build batch actually landing (same real-data precondition **AUD1** above states), since a
+retrospective written against the plan rather than the shipped state would need rewriting the moment the
+batch lands.
+
+**Done means:** all three angles exist in one document; the technical retrospective is checked against the
+actual code/git history rather than asserted from memory (Protocol 3/27 discipline); the lessons-learned pass
+names real incidents with dates, not vague characterizations; and the museum's next content pass can cite it
+as source material.
 
 ---
 
