@@ -24,7 +24,22 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later)** — **Three owner-approved refinements folded into the CP activation
+**Last updated: 2026-07-30 (later still)** — **Two more owner-approved additions folded into REF2/REF3 — a
+concrete plan threshold, and a bidirectional auto-verdict with a safety asymmetry.** **REF2** (the reaper's
+safe-lifecycle design) now pins the interactive/Dispatch idle-reap threshold at a concrete **2h30m (150
+minutes)** — explicitly a PLAN value, NOT live; reaping interactive sessions stays shadow-gated until the
+reaper proves itself, nothing auto-kills at 150 minutes today. **REF2 + REF3** together now also require the
+reaper's shadow tracking to watch for **over-aggression**, not only readiness to graduate: a session it would
+have flagged as reapable that later resumes activity is a measured false positive, and a high false-positive
+rate at the current threshold produces its own **"too aggressive → recommend widening to ~X"** verdict,
+Pushovered the same way a graduate-ready verdict is. **⭐ The safety asymmetry this establishes, recorded
+because it generalizes to every data-gated mechanism, not just DG3:** the system MAY auto-apply a
+**loosening** change on its own (widen a threshold, err further toward not acting) since that direction is
+always safe — but **tightening always requires explicit owner approval**, the same bar as any shadow → live
+promotion. Fail-safe direction automatic; risky direction gated. Doc-only pass, no control-plane code
+touched. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730b).
+
+**Prior update — 2026-07-30 (later)** — **Three owner-approved refinements folded into the CP activation
 checklist, plus one small addition to CPB1.** New family prefix **REF1-REF3** (single letters and all prior
 CP-program families now spoken for): **REF1** makes the LIVE **backup-unhealthy** alert session-aware — it
 must not fire on uncommitted work while an active session still owns that tree (files mid-build are
@@ -1201,8 +1216,14 @@ reused here, never reassigned.
   never mid-work; (ii) **never** reap a session that left uncommitted work — flag it to the owner and
   **HOLD** (never auto-commit possibly-broken WIP, never kill unreviewed work); (iii) the rank-4 (**CPK4**)
   continuation packet snapshots the session's state **before** any reap, so nothing is lost. The existing
-  kill mechanism stays exactly as proven — echo-and-confirm `(pid, procStart)`, never batched. OWNER-APPROVED,
-  NOT YET BUILT.
+  kill mechanism stays exactly as proven — echo-and-confirm `(pid, procStart)`, never batched. **Plan
+  threshold set (2026-07-30, owner-approved):** the interactive/Dispatch idle-reap threshold is **2h30m
+  (150 minutes)**. Stated explicitly: this is a PLAN value only, NOT live — reaping interactive sessions
+  stays shadow-gated until the reaper proves itself (per DG3's own promotion gate above); nothing auto-kills
+  at 150 minutes today. **Shadow tracking must also watch for over-aggression, not only readiness to
+  graduate:** if a session the reaper would have flagged as reapable at the plan threshold later resumes
+  activity, that is a measured false positive at the current setting — see REF3 for how this feeds the
+  auto-verdict. OWNER-APPROVED, NOT YET BUILT.
 - **REF3.** Auto-verdict on data-gated promotions (refines **DG1-DG5** + the **ACT1** housekeeping pass).
   **Owner principle, verbatim:** "nothing that needs data collection should require me to do it — it should
   be automatic." Each data-gated item — **DG2** (push-guard, ≥10 clean wrapper pushes), **DG1** (thrashing →
@@ -1213,7 +1234,18 @@ reused here, never reassigned.
   the decision with the recommendation **already computed** (e.g. "worktrees-vs-lease ready: collision rate
   X% over N chances → recommendation: lease is enough") — one-tap decide, zero manual checking.
   OWNER-APPROVED, NOT YET BUILT; the per-item numeric thresholds themselves still need to be pinned down as
-  each promotion is actually built.
+  each promotion is actually built. **Extended 2026-07-30 (owner-approved) — the auto-verdict is
+  bidirectional, and the two directions carry different authority.** Automatic tracking can produce two
+  different verdicts, not only "ready to graduate." For **DG3** specifically: if a session the reaper would
+  have flagged as reapable at the plan threshold (150 minutes — see REF2) later resumes activity, that is a
+  measured false positive at the current setting; a high false-positive rate produces a **"too aggressive →
+  recommend widening the threshold to ~X"** verdict, Pushovered the same way a graduate-ready verdict is.
+  **⭐ Safety asymmetry to record, since it generalizes beyond DG3 to every data-gated mechanism:** the system
+  MAY **auto-loosen** on its own — widen a threshold, err further toward not killing/not acting — when the
+  evidence clearly shows the current setting is too aggressive, because that direction is always safe and
+  needs no owner sign-off before it takes effect. **Tightening — making any data-gated mechanism MORE
+  aggressive — always requires explicit owner approval**, the same bar as a shadow → live promotion. The
+  fail-safe direction is automatic; the risky direction stays gated.
 
 ## DONE — for the record, with SHAs
 

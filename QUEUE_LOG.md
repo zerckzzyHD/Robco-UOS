@@ -9,13 +9,59 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cprefine0730b"></a>
+
+### 2026-07-30 (later still) — REF2 pins a plan idle-reap threshold (2h30m); REF2/REF3 gain a bidirectional auto-verdict with a safety asymmetry
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No control-plane code was written or changed,
+nothing was killed, no enforcement was flipped on.
+
+**Why.** Two more additions the owner worked out in conversation on 2026-07-30, on top of the REF1-REF3 pass
+recorded directly below — same doc-only discipline, each sharpening REF2 and/or REF3 rather than adding new
+scope.
+
+**Addition 1 — a concrete plan threshold for REF2's interactive-session idle-reap signal.** REF2 (above)
+already established the two "done" signals a reaping promotion may use; this addition puts a number on the
+interactive/Dispatch one: **2h30m (150 minutes)**. Stated explicitly, because a plan number is easy to
+mistake for a live one: this is a **PLAN value only**. Reaping interactive sessions stays shadow-gated until
+the reaper proves itself — nothing auto-kills at 150 minutes today, and REF2's own DG3 promotion gate (shadow
+→ actual reaping) still has to clear before this threshold does anything at all.
+
+**Addition 2 — the reaper's shadow tracking must also detect when it is too aggressive, and that detection
+feeds REF3's auto-verdict mechanism.** Previously REF3 described the auto-verdict as always pointed one way —
+toward "ready to graduate." This addition makes it bidirectional: the reaper's shadow tracking watches for a
+session it would have flagged as reapable **later resuming activity** — a directly measured false positive at
+the current threshold. A high false-positive rate produces its own verdict, Pushovered the same way a
+graduate-ready verdict is: **"too aggressive → recommend widening the threshold to ~X."** This is not a
+DG3-only idea; REF3 is where it's recorded because REF3 already owns the auto-verdict mechanism for every
+data-gated item, and this bidirectionality applies to any of them, not only the reaper.
+
+**⭐ The safety asymmetry, recorded because it is the load-bearing part of this addition, not just a detail
+of DG3.** The two directions a data-gated mechanism's threshold can move are **not treated the same way**:
+
+- **Loosening** (widening a threshold, erring further toward not killing / not acting) is always the safe
+  direction — a false denial costs nothing but a manual check later. So the system **may auto-apply a
+  loosening change on its own**, on clear evidence, with no owner sign-off required before it takes effect.
+- **Tightening** (making a mechanism more aggressive) is the risky direction — a false tightening costs real
+  work or a wrongly-terminated session. So tightening **always requires explicit owner approval**, the exact
+  same bar this project already holds for any shadow → live promotion.
+
+In one line: the fail-safe direction is automatic, the risky direction stays gated. This mirrors the CP
+program's own "fail-open/shadow-first is not universal" doctrine (the CONVERGENCE_2026-07-28 review, folded
+into the CP program's build-order section) — that doctrine drew the owner/automation line for safety-critical
+_actions_; this addition draws the same kind of line for safety-critical _threshold changes_.
+
+**Not done in this pass, by design:** no control-plane code was touched — the 150-minute value is a plan
+parameter recorded in `QUEUE.md`, not a config value read by any running script, and the bidirectional
+auto-verdict + safety-asymmetry doctrine is design only, same as the REF1-REF3 pass it extends.
 
 <a id="cprefine0730"></a>
 
