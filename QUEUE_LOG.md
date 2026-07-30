@@ -9,13 +9,63 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c)
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="cprefine0730c"></a>
+
+### 2026-07-30 (later still) — RB3's mechanism specified as a live fs.watch watcher (off by default, trigger-word gated); the supervisor's own kill-switch trigger words recorded
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No control-plane code was written or changed,
+nothing was killed, no enforcement was flipped on.
+
+**Why.** RB3 (the mobile-hidden-response detector) had been plan-stage since it was filed 2026-07-29, with
+its mechanism described only loosely as "the supervisor tails Dispatch's own output." The owner worked out
+the actual mechanism in conversation on 2026-07-30, and separately named an existing kill-switch wiring
+worth recording so a future session doesn't think it needs to be built.
+
+**RB3's mechanism, now specified: a LIVE 24/7 watcher, not the supervisor's 5-minute poll.** A small
+persistent Node process using `fs.watch` on the Dispatch conversation transcript/audit file — not a periodic
+tail, an event-driven watch. The moment Dispatch produces substantive assistant TEXT that did not go through
+the messaging tool (the working-notes leak this whole detector exists to catch), the watcher fires a Pushover
+within **~1 second**. This is a materially different design from "the supervisor's existing 5-minute loop
+also checks this" — the failure mode RB3 targets is a leak sitting invisible on the owner's phone, and a
+5-minute-old alert is a much weaker guarantee than a ~1-second one for exactly that failure mode.
+
+**It is a detector/alarm, not a blocker.** Same as every other alert this program has shipped: it pings the
+owner, it does not and cannot prevent the leak — there is no `PreToolUse`-style hook available for "assistant
+text that never went through the messaging tool," only after-the-fact detection off the transcript file
+itself.
+
+**OFF BY DEFAULT, gated by trigger words "watcher on" / "watcher off."** The reasoning is a footprint/value
+tradeoff, not a safety one: an idle `fs.watch` process costs almost nothing (~0% CPU, ~40MB resident), but
+that cost only buys anything while the owner is actively driving Dispatch — so it defaults off and the owner
+switches it on for a session rather than it running unconditionally in the background at all times.
+
+**The existing 5-minute supervisor loop babysits the watcher process itself.** If the watcher dies silently,
+the supervisor's next pass notices and raises its own incident — so "the instant detector itself went dark"
+is covered by the slower, already-live loop, closing the obvious gap a purely event-driven, unsupervised
+process would otherwise have.
+
+**Owner context, recorded because it's the actual motivation, not just a nice-to-have:** the owner has been
+manually re-reading working-notes on the Claude website to catch these leaks himself. RB3, once built, removes
+that manual step entirely.
+
+**Also recorded — a small control-plane note, no build needed.** The supervisor's own kill-switch is already
+wired to trigger words: "supervisor on" / "supervisor off" map onto the existing `state\DISABLE` file — "off"
+creates it (the supervisor's own loop checks for the file every pass and stops instantly if present), "on"
+removes it. **This works today**, nothing to build. Filed here, immediately next to RB3's own "watcher
+on"/"watcher off" pair, specifically so a future session doesn't conflate the two or spend effort building
+something that already exists.
+
+**Not done in this pass, by design:** no control-plane code was touched. RB3 stays plan-stage — this pass
+specifies its mechanism precisely enough to build from, it does not build it. The supervisor kill-switch note
+describes an existing capability; nothing about it changed.
 
 <a id="cprefine0730b"></a>
 

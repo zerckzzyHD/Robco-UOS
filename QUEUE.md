@@ -24,7 +24,20 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still)** — **Two more owner-approved additions folded into REF2/REF3 — a
+**Last updated: 2026-07-30 (later still — RB3 watcher)** — **RB3's mechanism is now specified: a LIVE 24/7
+`fs.watch` watcher, not the supervisor's 5-minute poll.** The moment Dispatch produces substantive assistant
+TEXT that didn't go through the messaging tool, the watcher fires a Pushover within **~1 second** — a
+detector/alarm only, it cannot prevent the leak. **OFF BY DEFAULT** (idle footprint ~0% CPU / ~40MB, but
+only useful while the owner is actively using Dispatch), controlled by trigger words **"watcher on" /
+"watcher off."** The existing 5-minute supervisor loop babysits it — a dead watcher process is caught on the
+supervisor's next pass and raises its own incident. Removes the owner's prior manual workaround of
+re-reading working-notes on the Claude website to catch these leaks himself. **Also recorded — a small
+control-plane note, no build needed:** the supervisor's own kill-switch is already wired to trigger words
+too — "supervisor on" / "supervisor off" map onto the existing `state\DISABLE` file (off creates it = instant
+stop, on removes it) — this works TODAY. Doc-only pass, no control-plane code touched. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730c).
+
+**Prior update — 2026-07-30 (later still)** — **Two more owner-approved additions folded into REF2/REF3 — a
 concrete plan threshold, and a bidirectional auto-verdict with a safety asymmetry.** **REF2** (the reaper's
 safe-lifecycle design) now pins the interactive/Dispatch idle-reap threshold at a concrete **2h30m (150
 minutes)** — explicitly a PLAN value, NOT live; reaping interactive sessions stays shadow-gated until the
@@ -927,15 +940,36 @@ receipt framing/format on top, not new detection machinery.
 **Done means:** every job launched through the kernel produces a launch receipt and, on completion, a
 structured completion receipt, both legible without re-deriving state from raw ledger events.
 
-### RB3. ⭐ Mobile-hidden-response detector — G5 (plan-stage)
+### RB3. ⭐ Mobile-hidden-response detector — G5 (plan-stage; mechanism specified 2026-07-30)
 
-**What it is.** The supervisor tails Dispatch's own output and flags substantive text that did **not** go
-through the messaging tool → Pushover "Dispatch produced a hidden response." Starred because it directly
-targets the recurring failure this whole program started from — plain-text-invisible-on-mobile recurred 3+
-times in one session before the arc that produced CP1-CP5.
+**What it is — a LIVE 24/7 WATCHER, not the supervisor's 5-minute poll.** A small persistent Node process
+using `fs.watch` on the Dispatch conversation transcript/audit file. The moment Dispatch produces
+substantive assistant TEXT that did **not** go through the messaging tool (the working-notes leak), it
+fires a Pushover within **~1 second** — event-driven, instant, not batched into the next 5-minute pass.
+Starred because it directly targets the recurring failure this whole program started from —
+plain-text-invisible-on-mobile recurred 3+ times in one session before the arc that produced CP1-CP5.
+**Owner context:** the owner has been manually re-reading working-notes on the Claude website to catch
+these leaks himself; this watcher is what removes that need.
+
+**It is a DETECTOR/alarm, not a blocker** — it pings, it cannot prevent the leak (there is no
+`PreToolUse`-style hook for "hidden" plain text, only after-the-fact detection off the transcript).
+
+**OFF BY DEFAULT, owner-controlled via trigger words "watcher on" / "watcher off."** The footprint is tiny
+— an idle `fs.watch` process runs at ~0% CPU, ~40MB resident — but it only earns its keep while the owner
+is actively using Dispatch, so it stays opt-in rather than always-on. **The existing 5-minute supervisor
+loop babysits it:** if the watcher process dies, the supervisor's next pass raises an incident, so a
+silently-dead watcher doesn't leave a phone-invisible gap with no alarm covering it.
+
+**Also recorded 2026-07-30 (a small control-plane note, no build needed) — the supervisor already has a
+kill-switch, and it's already wired to trigger words.** "supervisor on" / "supervisor off" map onto the
+existing `state\DISABLE` file: "off" creates it (instant stop — the supervisor's own loop checks for it
+every pass), "on" removes it. **This works TODAY.** Recorded here because it sits right next to RB3's own
+"watcher on"/"watcher off" pair, and a future session should not confuse the two or think either needs
+building.
 
 **Done means:** a deliberately-triggered hidden response (text emitted outside the messaging tool) is
-detected and produces a phone alert, proven red-then-green, not just reasoned about.
+detected and produces a phone alert within ~1 second, proven red-then-green, not just reasoned about; a
+killed watcher process is caught by the supervisor's next 5-minute pass and raises its own incident.
 
 ### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage; V1 contract folded in 2026-07-29)
 
@@ -1110,7 +1144,8 @@ reused here, never reassigned.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
 - **RB2.** Launch + structured completion receipts — full entry above.
-- **RB3.** Mobile-hidden-response detector — full entry above.
+- **RB3.** Mobile-hidden-response detector — now specified as a live `fs.watch` watcher, off by default —
+  full entry above.
 - **CPB3.** The "backup-all" script — a single on-demand pass that runs every backup mechanism this project
   has in one go, instead of separate manual invocations. Concretely, at minimum: the archive sync
   (`sync.ps1`, Protocol 48) and, once **CPK3** ships, the rank-3 control-plane mirror. ⚠ **Honest gap,
