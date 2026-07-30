@@ -24,7 +24,21 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (multi-model design round FOLDED — GPT-5.6 / Gemini 3.1 / DeepSeek)** — A
+**Last updated: 2026-07-30 (CPB7 owner ruling STAMPED + ROADMAP SPINE recorded — doc-only)** — Two
+doc-only folds on the owner's directive, no ID renumbered (Protocol 49). **CPB7:** the session circuit
+breaker's **KILL/RESET authority** (auto-SIGTERM a spiraling session + reset its worktree to the last clean
+SHA) is stamped **OWNER-CONFIRMED to remain DATA-GATED / shadow-only** — explicitly NOT to be built as an
+autonomous killer. The buildable-now half (classify + recovery budgets + alerting, shadow-only) is
+unchanged; the kill/reset authority waits behind the data-gate (same bar as **DG1**) until there's evidence
+it won't false-fire, consistent with the process-kill echo-and-confirm safety rule. **ROADMAP SPINE:** a
+new near-term macro-ordering section records the **iterative + overlapped** sequence — finish/activate the
+control plane → build the museum **as the live workload** that generates real operating data → run the
+**WORKFLOW AUDIT (AUD1)** on that real data with the **MUSEUM AUDIT (P15)** riding along → absorb
+control-plane fixes → continue the museum; cross-references **AUD1**, **PM1**, and the museum program, and
+is owner-adjustable. Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA +
+counter in this pass's report.
+
+**Prior update — 2026-07-30 (multi-model design round FOLDED — GPT-5.6 / Gemini 3.1 / DeepSeek)** — A
 DOC-ONLY synthesis + fold of a three-model design round into the queue; **nothing here is built** — every
 item is recorded as a design. Grounded first against the repo + `planning/control-plane/**` to dedup.
 **EXTENDED (no new IDs):** **CPB5** gains its phased build plan (GPT's Node-native vertical-slice ladder —
@@ -1899,7 +1913,15 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
   thrashing detector.** The classify + budget-tracking + alert path is buildable now and runs
   **shadow/alert-only**; actually SIGTERMing a session and resetting its worktree is a kill action that
   promotes only on the same evidence bar as DG1 (never auto-kill on a guess — the standing thrashing→kill
-  doctrine). **Done means:** transient-vs-semantic classification is proven against real failure outputs;
+  doctrine). **OWNER RULING (2026-07-30) — CONFIRMED.** The owner has stamped this data-gated posture as a
+  decision on file, not a default: the trip-open **KILL/RESET authority** (auto-SIGTERM a spiraling
+  session, plus a `git stash`/reset of its worktree to the last clean SHA) **remains DATA-GATED /
+  shadow-only and is NOT to be built as an autonomous killer.** The buildable-now half is unchanged from
+  as-filed — classify (transient vs. semantic) + recovery budgets + alerting, all **shadow-only**. The
+  kill/reset authority waits behind the data-gate (the same evidence bar as **DG1**, the thrashing
+  detector) until there is real evidence it will not false-fire — consistent with the standing
+  **process-kill safety rule** (never force-kill a process without echo-and-confirm). Recorded as the
+  owner's confirmed decision so the gating is not re-litigated as a mere default. **Done means:** transient-vs-semantic classification is proven against real failure outputs;
   budgets drain and the breaker _would_ trip at exhaustion (shadow); the trip-open action is gated behind
   DG1's promotion bar, not live on first build.
 - **CPB8 — Quick-ack bot: typed-proposal-only owner approvals (NET-NEW, folded 2026-07-30, multi-model
@@ -2204,6 +2226,34 @@ Reserve-for-owner < Stop-unattended-AI`. New `lib/usage-mode.js` (pure: `modeFor
   a `ROBCO_CLAUDE_APPDATA` usage fixture, incl. **UM6f** proving the retired per-threshold alert no longer
   fires). Suite green (1066 pass, 0 fail, 0 skip). This app-repo QUEUE update is a doc-only push through the
   ACT3 wrapper (CPB4 `gate:docs` fast path; advances the DG2 clean-push counter).
+
+# 🗺️ ROADMAP SPINE — near-term macro-ordering (owner-discussed 2026-07-30 · ITERATIVE + OVERLAPPED · owner-adjustable)
+
+**Why this is here.** This is the near-term macro-sequencing the three bands that follow (**AUD1** below,
+**PM1** below, and **THE MUSEUM PROGRAM** cluster) all fit inside — recorded in the queue so the ordering
+_lives_ here rather than only in a session's memory (Protocol 50). It is deliberately **iterative and
+overlapped, not a strict serial wait**:
+
+1. **Finish + activate the control plane.** Complete the ready-to-build batch (ACT3 → CPB3) and flip on the
+   activation switches.
+2. **Build the museum AS THE LIVE WORKLOAD** that generates real operating data. Do **not** idle-wait for
+   the control plane to "run live" with nothing running through it — museum construction **is** the real
+   work that flows through the control plane, so it doubles as the audit's data source. (**PM1**, the
+   reflect-first retrospective, opens this band per its own sequencing: reflect, then build the exhibit.)
+3. **Once enough real activity has accrued, run the WORKFLOW AUDIT (AUD1)** — the multi-model pass (same
+   shape as the 2026-07-30 GPT-5.6 / Gemini 3.1 / DeepSeek round) — against that **real operating data**,
+   with the **MUSEUM AUDIT (P15)** riding along, auditing the museum increment already built.
+4. **Absorb whatever control-plane fixes the audit surfaces**, then **continue the museum.**
+
+**Key rationale — why overlapped, not serial.** The workflow audit needs real work flowing through the
+control plane to have anything to audit, and the museum is the obvious real work — so the two overlap and
+nothing idles. But **do not build the WHOLE museum before the first audit**: build an increment, audit it,
+fix, continue. This reconciles the bands rather than replacing them — **AUD1** (its own "run only after the
+batch has run live long enough to produce real data" gate is exactly what museum-as-workload satisfies),
+**PM1** (reflect before the exhibit is built), and **the museum program** (item **P** + family) as the live
+workload itself. **Owner-adjustable — a plan of record, not a lock.**
+
+---
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 
