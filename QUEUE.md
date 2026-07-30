@@ -24,7 +24,14 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — MCP1/MCP2 filed, external review synthesis)** — **Two
+**Last updated: 2026-07-30 (later still — git-bisect/AST inspector repositioned)** — **Owner call: the
+git-bisect runner and the AST inspector (Code-session conveniences, NOT control-plane) no longer sit in
+MCP2's low-priority tool-family tail** — moved to their own short note directly after the **MCP1**
+(`robco-control`) block, right before **MCP2** begins, since both are control-plane-**adjacent** in
+priority even though neither is a control-plane deliverable. Descriptions unchanged; nothing else in the
+MCP1/MCP2 section moved. Doc-only, no ID renumbered (Protocol 49).
+
+**Prior update — 2026-07-30 (later still — MCP1/MCP2 filed, external review synthesis)** — **Two
 independent MCP-review passes (GPT-5.6, Gemini 3.1) converged on the same end-state and are folded in as a
 new section right after RB6: TWO MCP servers, not six.** New family prefix **MCP1-MCP2** (RB1-RB6 / HG1-HG2
 / CPB / ACT / OD / SP / DG / REF / AUD / PM / P all already spoken for). **MCP1** (`robco-control`) hardens
@@ -1142,6 +1149,11 @@ file instead; the MCP surface exposes only the decision-shaped summaries, never 
 RB4's own done-criteria (load-spike, idempotent replay, generation-rejection, no second
 ledger/orchestrator) still hold.
 
+**Code-session conveniences — NOT control-plane, do not build under MCP1/2:** the git-bisect runner and
+the AST inspector. Repositioned here (owner call, 2026-07-30) to sit immediately after `robco-control` —
+control-plane-**adjacent** priority — rather than in the low-priority tail under MCP2's tool-family list
+below, where the original review synthesis had filed them.
+
 ### MCP2. ⬜ `robco-evidence` — NEW read-only server (the active-graph-retrieval #1 win)
 
 **What it is.** A second, read-only MCP server: `context.resolve(changed_paths)`, `evidence.search`,
@@ -1195,8 +1207,6 @@ plane, not just MCP1/MCP2:**
 - **Reference-graph lint** (the "radroach scan"). Dead refs, renamed targets, orphaned guards, unrouted
   skills, claims whose evidence vanished — serves both the museum thesis and the dangling-reference audit
   directly; lives under MCP2.
-- **Lower priority — Code-session conveniences, NOT control-plane, do not build under MCP1/2:**
-  git-bisect runner, AST inspector.
 
 **Practice note, filed alongside rather than as its own item.** A session should call its scheduling tool
 as a **fallback** whenever it parks on long background work — a partial patch for the
