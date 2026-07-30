@@ -52930,8 +52930,8 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
     '255.8: the break-glass is documented in the hook — ROBCO_PUSH_OVERRIDE (logged) and git push --no-verify (absolute fallback), so the owner is never locked out'
   );
   assert(
-    /gate\.skipped/.test(prePush255),
-    '255.9: the CPB6 caveat is stated in the hook — enforcement forces routing, it does NOT make the control repo run a real gate (control pushes still gate.skipped)'
+    /CPB6/.test(prePush255) && /genuinely gated/.test(prePush255),
+    '255.9: the hook documents the gate story — the app gate is delegated here and the control repo is gated via CPB6, so a wrapper push is genuinely gated'
   );
 }
 

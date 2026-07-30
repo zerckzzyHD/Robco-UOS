@@ -18,9 +18,11 @@
 #       (git's own flag); the absolute fallback if the guard or node itself is
 #       broken. This is the guaranteed escape, since it involves no wrapper code.
 #
-# CPB6 caveat: enforcement forces routing through the wrapper; it does NOT make
-# the control repo run a real gate — control-repo wrapper pushes still record
-# gate.skipped. See CPB6 in QUEUE.md. (The app repo DOES gate — below.)
+# App repo gate: this hook runs the full gate (below), and the wrapper delegates
+# to it (ROBCO_PUSH_DELEGATE_GATE=1) so the gate runs once with CPB4's doc-only
+# fast path intact. The CONTROL repo is gated differently (CPB6, shipped): its
+# wrapper runs its own test suite in controlled-push.js's runGate step. Either
+# way, a wrapper push is genuinely gated — see CPB6 in QUEUE.md.
 #
 # stdin note: git delivers the pre-push payload (one line per pushed ref) exactly
 # ONCE. Both the guard and gate-scope.js consume it, so it is captured to a temp

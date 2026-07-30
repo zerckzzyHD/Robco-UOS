@@ -346,7 +346,9 @@ ROBCO_PUSH_OVERRIDE="<reason>" git push   # allowed AND recorded to the control-
 git push --no-verify                       # bypasses ALL git hooks — the absolute fallback if the wrapper/guard itself is broken
 ```
 
-**Honest ceiling / CPB6:** the guard enforces _routing_ (advisory against an accidental raw push; `--no-verify` bypasses it by design). It does **not** make the control repo run a real gate — a control-repo wrapper push still records `gate.skipped`. Wiring a genuine control-repo gate is a separate open item (CPB6).
+**Honest ceiling:** the guard enforces _routing_ (advisory against an accidental raw push; `--no-verify` bypasses it by design — that is the point of the break-glass).
+
+**Control-repo gate (CPB6 — shipped in the same session):** the control repo now runs its own test suite as the wrapper's gate. A control-repo wrapper push runs `node test/run-tests.js` **before** pushing and **aborts on failure**, recording `gate.passed`, not `gate.skipped` — so a control-repo push is both routed through the wrapper (DG2) **and** genuinely gated (CPB6). The app repo is unchanged: it still delegates its own gate to this pre-push hook (CPB4 fast path intact).
 
 ---
 

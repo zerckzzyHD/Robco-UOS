@@ -24,7 +24,22 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (CPB5 fold — three owner additions, doc-only)** — Folded three owner-approved
+**Last updated: 2026-07-30 (DG2 + CPB6 SHIPPED — push-guard enforcement is LIVE)** — Two items shipped in
+one session on the owner's go. **DG2:** raw-`git push` refusal is now ACTIVE in both the app and control
+repos — a push not routed through the controlled-push wrapper (`npm run push`) is refused by a pre-push hook
+(the guard requires the wrapper's env token AND a live L4 process-ancestor, neither forgeable alone).
+**Break-glass, so the owner is never locked out:** `ROBCO_PUSH_OVERRIDE="<reason>" git push` (allowed AND
+logged to the ledger) or `git push --no-verify` (bypasses all hooks — absolute fallback). The app hook
+`[ -f ]`-guards the sibling guard so a public clone is never blocked, and captures git's pre-push payload
+once to feed both the guard and `gate-scope.js` (a Protocol-42 stdin-multiplex fix). **CPB6 (folded into the
+same session on owner directive):** the control repo now runs its own test suite as the wrapper's gate — a
+control-repo wrapper push RUNS `node test/run-tests.js` before pushing and ABORTS on failure, recording
+`gate.passed`, not `gate.skipped`. So the earlier "DG2 activation does NOT fix CPB6" framing is superseded:
+**both** shipped together — routing enforced (DG2) AND the control gate enforced (CPB6). Live red/green
+verified on both repos; app `dev` `05c450b`, control `main` `f0ed42a`; clean-push counter 14/10. Locked by
+app Suite 255 + control groups PG/PH (PH7) on the CP2/CP3 code path. SHAs + counter in this pass's report.
+
+**Prior update — 2026-07-30 (CPB5 fold — three owner additions, doc-only)** — Folded three owner-approved
 additions (all 2026-07-30) into the existing **CPB5** operator-control-CLI entry, no ID renumbered, nothing
 rebuilt: **(1)** a **locked startup-banner decision** — the `robco` CLI opens on a two-tone sea-turtle banner
 (phosphor-green turtle over a blue waterline), GPT's dependency-free `robco-turtle-banner.mjs` renderer,
@@ -1734,20 +1749,23 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   that — it is captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm
   scope (does it also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than
   assuming.
-- **CPB6. ⬜ Control-repo push-gate gap — genuinely gate control-plane pushes (owner-flagged 2026-07-30,
-  checkpoint pass).** Filed with the push-gate items (cross-ref **DG2** / **ACT3**). **The gap:** the
-  controlled-push wrapper (**ACT3**) delegates the gate to the _target repo's_ pre-push hook — the app repo
-  has one, so app pushes record `gate.passed`; the **control repo (`RobCo-Control`) has no enforced gate
-  hook** (its tests run via a manual `node test/run-tests.js`), so a wrapper push of control-plane code
-  records **`gate.skipped`**. Net effect: **control-plane pushes rely on discipline, not enforcement** — a
-  session could push control-repo code without ever running its tests, and nothing stops it. **The fix (to
-  BUILD later, NOT in this checkpoint):** wire the control repo's own test runner into the wrapper's gate
-  step **or** add a real control-repo pre-push hook that runs `node test/run-tests.js`, so control-repo
-  wrapper pushes are genuinely gated and record **`gate.passed`**, not skipped. **Done means:** a control-repo
-  push through the wrapper actually runs the control-repo tests and refuses on failure, and the ledger
-  receipt reads `gate.passed`; a red-then-green proof that a failing control-repo test blocks the push.
-  Sits with the DG2/ACT3 push machinery in priority even though its home here in READY TO BUILD keeps the
-  CPB family together.
+- **CPB6. ✅ SHIPPED (2026-07-30, folded into the DG2 session on owner directive), control repo `f0ed42a`.**
+  Control-repo pushes are now genuinely gated. **The gap that was:** the controlled-push wrapper delegated
+  the gate to the _target repo's_ pre-push hook — the app repo has one, so app pushes recorded
+  `gate.passed`; the control repo (`RobCo-Control`) had no `gate` script, so a wrapper push of control-plane
+  code recorded **`gate.skipped`** — control-plane pushes relied on discipline, not enforcement. **The fix
+  (shipped):** the control repo now has `"gate": "node test/run-tests.js"`, so a non-delegated wrapper push
+  (`npm run push` → `node controlled-push.js .`) RUNS the full control-plane test suite via the wrapper's
+  `runGate` step **before** the push and **aborts on a failing gate**, recording **`gate.passed`** (exitCode
+  0), not skipped. The gate lives in the wrapper (single home) so it runs exactly once; the control-repo
+  pre-push hook stays routing-only (DG2). **Done, verified:** live GREEN — a real `npm run push` of the
+  control repo ran the suite and recorded `gate: PASSED (exitCode 0)` before pushing `f0ed42a`; live RED — a
+  deliberately-failing gate on the real control repo produced `aborted: gate-failed` with origin unchanged
+  (nothing pushed). Locked by group **PH7** (the control repo is wired to run its real suite as the gate) on
+  the identical fail-closed code path proven by **CP2** (gate runs, passes → push) / **CP3** (gate fails →
+  abort before push). **What CPB6 does NOT change:** raw-push refusal (DG2) and gate delegation for the APP
+  repo are untouched — the app repo still delegates its gate to its own pre-push hook (CPB4 fast path
+  intact); CPB6 only concerns the control repo's own pushes.
 - **CPB4.** ✅ **SHIPPED (this pass).** Gate-scoping — a doc-only fast path for the pre-push gate. When a
   commit's diff touches ONLY
   docs (`QUEUE.md`, `QUEUE_LOG.md`, `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE), the pre-push
@@ -1796,10 +1814,12 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   detect/alert path (rank 1 + rank 5's incident lifecycle) is already live in the 5-minute loop — this item
   is only the write-side half. Greenlit but deliberately **not** built in this checkpoint pass (which is
   doc-only); it is the first code build to pick up next.
-- **DG2. ✅ SHIPPED + ACTIVE (2026-07-30).** Push-guard enforcement (raw-push refusal) is now ON in both the
-  app and control repos — a raw `git push` is refused; `npm run push` is required. Break-glass:
-  `ROBCO_PUSH_OVERRIDE="<reason>"` (logged) or `git push --no-verify` (absolute). CPB6 NOT fixed by this
-  (control pushes still `gate.skipped`). Full record in Data-Gated below.
+- **DG2 + CPB6. ✅ SHIPPED (2026-07-30, same session).** Push-guard enforcement (raw-push refusal) is ON in
+  both the app and control repos — a raw `git push` is refused; `npm run push` is required. Break-glass:
+  `ROBCO_PUSH_OVERRIDE="<reason>"` (logged) or `git push --no-verify` (absolute). **CPB6 also shipped
+  alongside it:** the control repo now runs its own test suite as the wrapper's gate (records `gate.passed`,
+  aborts on failure) — so a control-repo push is both routed AND genuinely gated. Full records in Data-Gated
+  (DG2) and READY TO BUILD (CPB6) below.
 - **(later) DG3.** Graduate the reaper from shadow to actually reaping — see Data-Gated below.
 
 ## OWNER DECISIONS
@@ -1855,13 +1875,14 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   as a `push.override` event (never silent); the normal emergency path when the wrapper is unavailable but git
   works. (2) `git push --no-verify` — bypasses ALL git hooks (git's own flag, no wrapper code involved); the
   absolute fallback if the guard/node itself is broken.
-  **⚠ CPB6 caveat — stated, NOT fixed by this activation:** enforcement forces _routing_ through the wrapper;
-  it does **not** make the control repo run a real gate. The control repo still has no enforced gate hook, so
-  a control-repo wrapper push still records **`gate.skipped`**, not `gate.passed`. DG2 was deliberately
-  **decoupled from CPB6** at activation (owner decision 2026-07-30, overriding this entry's earlier "don't
-  switch on until CPB6 is wired" posture): the routing-enforcement half is valuable on its own and CPB6
-  (wiring `node test/run-tests.js` into the control-repo push gate) remains a separate open build — see CPB6
-  in READY TO BUILD. Read the live count any time with `npm run push-count` in the control repo.
+  **CPB6 — now ALSO shipped in the SAME session (owner directive 2026-07-30):** the earlier plan decoupled
+  DG2 from CPB6 (activate routing-enforcement first, wire the control-repo gate later), but the owner then
+  folded CPB6 into this same session, so **both shipped together.** The control repo now has a `gate` script,
+  so a control-repo wrapper push RUNS the full test suite in the wrapper's `runGate` step before pushing and
+  records **`gate.passed`** (not `gate.skipped`), aborting on a failing gate — full record and live red/green
+  proof under the CPB6 entry in READY TO BUILD (control repo `f0ed42a`). So DG2 enforces _routing_ and CPB6
+  enforces the control-repo _gate_: a control-repo push is now both routed through the wrapper AND genuinely
+  gated. Read the live count any time with `npm run push-count` in the control repo.
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
   Full safe-lifecycle design (two clean "done" signals, three hard guards, a continuation-packet snapshot
