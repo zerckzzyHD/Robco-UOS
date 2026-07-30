@@ -1625,9 +1625,12 @@ posture as the wall-clock half): no launcher writes measured per-job usage into 
 **ACT2** plumbing), so the check reports `UNOBSERVABLE`until a`job.result`carries usage in either
 grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json` result) — then it lights
   up with no code change. Full record in the SHIPPED section below.
-- **CPB2.** The usage → operating-modes change. Owner-approved 2026-07-28 (Normal / Conserve /
-  Reserve-for-owner / Stop-unattended-AI; notify only on a mode _change_, exact % stays in `status.json`) —
-  decided, not yet built.
+- **CPB2 — ✅ SHIPPED (2026-07-30), control repo `6154abd`.** The usage → operating-modes change. The five
+  per-threshold usage **phone alerts** (50/80/85/90/95 — "became wallpaper") are retired in favour of a single
+  alert on an **operating-mode change**: Normal / Conserve / Reserve-for-owner / Stop-unattended-AI; notify
+  only on a mode _change_, exact % stays in `status.json`. **LIVE, not dormant** (unlike CPB1) — it rides the
+  same live account-wide `fh`/`sd` usage file the supervisor already reads every run, so it lights up on real
+  usage today. Full record in the SHIPPED section below.
 - **CPB5 — `robco`, the OPERATOR CONTROL CLI (owner-confirmed 2026-07-30; upgraded read→control 2026-07-30;
   high-priority).** A single PowerShell CLI that both **reads** and **drives** the control plane.
   **Reads** (unchanged from the original read-only scope): renders the supervisor AND the watcher/reaper in ONE
@@ -1908,6 +1911,30 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   exactly as the wall-clock half is dormant until jobs flow; it is built, correct, and tested, awaiting only
   the data source. This app-repo QUEUE update is a doc-only push through the ACT3 wrapper (CPB4 `gate:docs`
   fast path; advances the DG2 clean-push counter).
+- **CPB2.** Usage → operating modes — ✅ SHIPPED `6154abd` (2026-07-30, control repo `RobCo-Control`). The
+  owner-approved (2026-07-28) replacement of the five per-threshold usage **phone alerts** (50/80/85/90/95,
+  which "became wallpaper") with a single alert on an **operating-mode change**: `Normal < Conserve <
+Reserve-for-owner < Stop-unattended-AI`. New `lib/usage-mode.js` (pure: `modeForPercent`,
+  `computeOperatingMode` = the **most restrictive** of the session `fh` and weekly `sd` modes per invariant #5,
+  naming `drivenBy`; `previousModeFromLedger`; `detectModeChange`). Wired through `supervisor.js` (a
+  `usage.mode` gauge every run + a `usage.mode-change` event; the retired usage-crossing alert kept only as a
+  `reconcileIncidentSet('usage', [])` call to gracefully auto-resolve any pre-CPB2 open incident; a distinct
+  `usage-mode` incident type at Infinity cooldown; `operatingMode`/`modeChange` in `status.json`
+  [schemaVersion 1→2] + report + printHuman), `lib/notify-messages.js` (`formatUsageModeChangeMessage` —
+  advisory, never claims to throttle since the supervisor is observe-only), and `lib/supervisor-detect.js`
+  (owner-tunable `modeThresholds` passthrough on the same usage-thresholds config file). **NOT dormant** — it
+  reads the same live account-wide `fh`/`sd` file the crossing detector already reads every run, so it lights
+  up on real usage today (contrast CPB1, dormant until a launcher writes per-job usage). **UNOBSERVABLE
+  (`mode:null`) when neither field reads — never a fabricated `Normal`;** notify only between two _observable_
+  modes (a transition out of/into UNOBSERVABLE records the gauge but never buzzes). **Design decision recorded
+  (Protocol 51a):** the four modes were owner-approved but the exact band numbers were not pinned, so the
+  default bands collapse the owner's five named thresholds (`<50` Normal, `50–79` Conserve, `80–89`
+  Reserve-for-owner, `≥90` Stop-unattended-AI) — 85/95 fold in with no separate mode but stay visible in
+  `status.json` and the untouched `usage.crossing` ledger events. Locked by test group **UM** (pure band/mode
+  logic, incident-engine integration, and a deterministic sandboxed `supervisor.js --dry-run` wiring proof via
+  a `ROBCO_CLAUDE_APPDATA` usage fixture, incl. **UM6f** proving the retired per-threshold alert no longer
+  fires). Suite green (1066 pass, 0 fail, 0 skip). This app-repo QUEUE update is a doc-only push through the
+  ACT3 wrapper (CPB4 `gate:docs` fast path; advances the DG2 clean-push counter).
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 
