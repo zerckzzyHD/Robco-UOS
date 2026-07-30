@@ -51702,13 +51702,35 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
   );
 
   // ── Markdown render is leak-free — the Protocol-42 bugs stay fixed ──
+  // A rendered block may legitimately contain a literal "**" as DATA inside a
+  // <code> span (e.g. a glob pattern like `css/**`) — that is correct output,
+  // not a leaked bold marker (found 2026-07-30 when QUEUE.md first grew inline
+  // code containing `css/**`/`js/**`/`tests/**`/`planning/**` glob patterns).
+  // So the leak check only looks OUTSIDE <code> tags — code-span content is
+  // stashed out before scanning for a stray "**".
+  const stripCodeSpans246 = html => html.replace(/<code>[\s\S]*?<\/code>/g, '');
   let starLeaks246 = 0;
   for (const b of model246.blocks) {
-    if (QV.mdToHtml(b.body).includes('**')) starLeaks246++;
+    if (stripCodeSpans246(QV.mdToHtml(b.body)).includes('**')) starLeaks246++;
   }
   assert(
     starLeaks246 === 0,
-    '246.7: no block renders a raw "**" — bold spanning wrapped list/blockquote lines and double-backtick code spans are handled (regression: the leaks found during verification)'
+    '246.7: no block renders a raw "**" OUTSIDE a <code> span — bold spanning wrapped list/blockquote lines and double-backtick code spans are handled (regression: the leaks found during verification); a literal "**" glob pattern correctly rendered INSIDE <code> (e.g. `css/**`) is not a leak'
+  );
+  // Red-then-green for the code-span carve-out itself: a `**`-containing glob
+  // pattern inside inline code renders literally and is NOT flagged as a leak,
+  // while a genuinely unrendered "**" sitting outside any <code> span is still
+  // caught — the carve-out narrows the check, it does not blind it.
+  const glob246 = QV.mdToHtml(['- fast path covers `css/**` and `js/**` only.']);
+  assert(
+    /<code>css\/\*\*<\/code>/.test(glob246) &&
+      /<code>js\/\*\*<\/code>/.test(glob246) &&
+      !stripCodeSpans246(glob246).includes('**'),
+    '246.7b: a literal "**" glob pattern inside inline code renders as <code>…**</code> and is not flagged as a leak'
+  );
+  assert(
+    stripCodeSpans246('<p>oops **still raw** outside code</p>').includes('**'),
+    '246.7c: the code-span carve-out does not blind the check — a genuine "**" sitting outside any <code> span is still caught'
   );
   // Targeted red-then-green: a DOUBLE-backtick code span containing backticks,
   // with bold AFTER it, renders the code AND the bold — never swallowing one

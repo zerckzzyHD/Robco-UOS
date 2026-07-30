@@ -24,7 +24,18 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — git-bisect/AST inspector repositioned)** — **Owner call: the
+**Last updated: 2026-07-30 (later still — CPB4 filed: doc-only gate fast path)** — **New item CPB4**
+scopes the pre-push gate so a commit whose diff touches ONLY docs (`QUEUE.md`, `QUEUE_LOG.md`,
+`planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE) auto-skips the Playwright render/boot-smoke +
+app-integrity checks; any diff touching app code still runs the FULL gate unchanged. Filed in the READY
+TO BUILD list right after **CPB3**, ties into the existing gate-scoping precedent from the blind-review
+pass (Protocol 41's `eslint .` → tracked-manifest scoping fix). **Also — this same pass's own reposition
+push (below) was made with the pre-push gate intentionally skipped (`--no-verify`), owner-authorized for
+this one doc-only commit specifically** (`git diff --stat` confirmed QUEUE.md was the only changed file
+before the flag was used) — CPB4 exists precisely so this stops being a manual judgment call. Doc-only,
+no ID renumbered (Protocol 49).
+
+**Prior update — 2026-07-30 (later still — git-bisect/AST inspector repositioned)** — **Owner call: the
 git-bisect runner and the AST inspector (Code-session conveniences, NOT control-plane) no longer sit in
 MCP2's low-priority tool-family tail** — moved to their own short note directly after the **MCP1**
 (`robco-control`) block, right before **MCP2** begins, since both are control-plane-**adjacent** in
@@ -1351,6 +1362,19 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   that — it is captured here from the owner's go on 2026-07-30, not derived from an existing spec. Confirm
   scope (does it also attempt **OD2**'s auth-folder backup once that is decided?) during build rather than
   assuming.
+- **CPB4.** Gate-scoping — a doc-only fast path for the pre-push gate. When a commit's diff touches ONLY
+  docs (`QUEUE.md`, `QUEUE_LOG.md`, `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE), the pre-push
+  hook skips the Playwright render/boot-smoke + app-integrity checks and passes automatically; any diff
+  touching app code (`index.html`, `css/**`, `js/**`, `sw.js`, `tests/**`) still runs the FULL gate exactly
+  as today — no relaxation there. **Why:** those checks protect the app; they give zero protection to a
+  planning-doc edit, and a forced 3-6 minute Playwright run on every queue push is what makes a manual
+  owner-authorized `--no-verify` tempting on doc-only pushes — this closes that gap properly instead of
+  normalizing the workaround. **Ties into the existing gate-scoping precedent** from the blind-review pass
+  (Protocol 41's concurrency fix, which already scopes lint to the git-tracked manifest instead of a bare
+  `eslint .`) — same principle, applied to the push-boundary gate instead of the lint step. **Done means:**
+  a commit whose full diff is docs-only passes the pre-push hook without running Playwright/render/
+  boot-smoke, verified red-then-green (a doc-only diff passes fast; a diff touching even one app file still
+  runs the full gate); no bundled code+doc commit can slip through the fast path.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
