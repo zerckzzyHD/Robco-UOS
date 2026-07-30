@@ -1820,6 +1820,23 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   gate, not stuck. **Stays shadow/alert-only**, exactly per the three-model review's doctrine already
   governing **DG1** — this sharpens what the detector reports, it does not promote it toward a kill.
   OWNER-APPROVED, NOT YET BUILT.
+- **REF5.** Push-window tuning for the **unbacked-work / push-not-confirmed** alerts (refines the LIVE
+  backup-health alerts — the same alert family **REF1** made session-aware; distinct correction).
+  **Symptom:** the two alerts — "A session tried to push but I never saw it confirm on the remote — your
+  latest work might not be backed up" and "Your latest work isn't backed up — the repo has N commit(s) not
+  on the remote" — fire as **false positives during the NORMAL push window**. A full-gate push takes ~5
+  minutes (and now up to the 20-minute wrapper ceiling **ACT3** just set), so the supervisor's check runs
+  **mid-push**, sees a commit not yet on the remote plus a push that hasn't confirmed, and alarms — even
+  though the push is just slow, not stuck. Owner flagged it as trigger-happy; **verified 2026-07-30** (every
+  push landed, nothing was actually lost). **Fix (three parts):** **(i)** a **grace period at least as long
+  as the gate/push ceiling** before it alarms; **(ii)** **push-in-progress awareness** — suppress the alert
+  while a push or gate is actively running. The useful new signal: **ACT3**'s controlled-push wrapper now
+  writes **`push.completion` events to the ledger** — a "started" event distinct from `completed:true` — so
+  the detector can key off an **in-flight push event** instead of guessing; **(iii)** **auto-retract /
+  auto-resolve** the alert once the commit actually lands on the remote, so a since-pushed commit doesn't
+  leave a stale "not backed up" open. **Note:** **CPB4** already shrinks this window for doc-only pushes
+  (~30s fast path), but code pushes still take the full gate, so the tune is still worth doing.
+  OWNER-APPROVED (2026-07-30), NOT YET BUILT.
 
 ## SHIPPED — for the record, with SHAs
 
