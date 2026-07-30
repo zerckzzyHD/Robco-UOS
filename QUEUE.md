@@ -24,7 +24,27 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — CPB4 BUILT + SHIPPED)** — **CPB4 is now shipped, not just
+**Last updated: 2026-07-30 (later still — ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
+project's pushes now route through the controlled-push wrapper, and the ≥10-clean-pushes counter that gates
+DG2 is moving.** `npm run push` (app repo `scripts/robco-push.js`) routes a push through the control plane's
+`controlled-push.js` (resolved via `$ROBCO_CONTROL_PUSH` or the `../_RobCo-Control` sibling; degrades to a
+plain `git push` if absent). **CPB4 coexistence — the interaction was resolved, not ignored:** the launcher
+passes `ROBCO_PUSH_DELEGATE_GATE=1`, so the wrapper DELEGATES the gate to this repo's own pre-push hook
+instead of double-running `npm run gate` — the hook stays the one gate authority and CPB4's doc-only fast
+path is preserved (a doc-only push through the wrapper still skips the browser checks). The wrapper adds the
+L4 lock + a push.intent/push.result receipt + `git ls-remote` verification + the clean-push counter on top.
+**Dogfooded end-to-end:** the control-repo commits (`0f452f9`, `e4e5965`) and this app-repo commit
+(`5433648`) were all pushed _through the wrapper_ — the counter read **3/10** afterward (7 to go before DG2
+can be considered). ⚠ **One defect was found and fixed during verification (Protocol 42):** a delegated gate
+runs the FULL Playwright gate inside the pre-push hook, and the wrapper's old flat 120 s push timeout killed
+the first real app-code push mid-gate (`spawnSync git ETIMEDOUT`); fixed to a gate-covering 20 min default
+(`ROBCO_PUSH_TIMEOUT_MS`), locked by control-repo test group **PT**. **Scope held:** ACT3 is routing only —
+raw-push refusal stays **DG2**, and a plain `git push` still works, unrefused. App-repo wiring locked by
+**Suite 254**; control-repo behavior by groups **GD** (delegation) + **PC** (counter) + **PT** (timeout).
+Marked ✅ SHIPPED below; no ID renumbered (Protocol 49). The counter reader lives at
+`_RobCo-Control/code/lib/push-count.js` (`npm run push-count`), derived live from the ledger.
+
+**Prior update — 2026-07-30 (later still — CPB4 BUILT + SHIPPED)** — **CPB4 is now shipped, not just
 filed.** `scripts/gate-scope.js` reads the git pre-push payload and prints `DOCS_ONLY` only when it can
 prove every changed file is a doc (`*.md` / `planning/**`), else `FULL` — fail-closed; the pre-push hook
 then runs the new `gate:docs` mode (lint + format + the Node runner + static checks, NO browser) on a
@@ -1583,13 +1603,14 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
 
 ## READY TO BUILD — tightened execution order (owner go given 2026-07-30)
 
-- **ACT3 — NEXT (owner's call, approved 2026-07-30).** Wire the controlled-push wrapper into the real push
-  path. Today every push in this project's repos is plain `git push` and bypasses the wrapper entirely, so
-  the ≥10-clean-pushes counter that gates **DG2** (push-guard enforcement) can never advance. This item
-  routes real pushes through `controlled-push.js` so the counter starts moving. **Scope note, stated
-  explicitly so a later session doesn't over-build:** this is ONLY the routing step. Raw-push refusal
-  (actually blocking a bypass) stays **DG2** — a separate, later, data-gated promotion after 10 clean
-  wrapper pushes are observed. Wiring the wrapper in does not turn on enforcement.
+- **ACT3 — ✅ SHIPPED (2026-07-30).** Wired the controlled-push wrapper into the real push path. Every push
+  used to be a plain `git push` that bypassed the wrapper, so the ≥10-clean-pushes counter that gates
+  **DG2** (push-guard enforcement) could never advance. Now `npm run push` (app repo `scripts/robco-push.js`)
+  routes a push through `controlled-push.js`, delegating the gate to the pre-push hook so CPB4's fast path is
+  preserved (see the SHIPPED entry below for SHAs, the delegation/timeout detail, and the live 3/10 counter).
+  **Scope held exactly:** this was ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
+  **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
+  wrapper in did NOT turn on enforcement; a plain `git push` still works, unrefused.
 - **CPB1.** The budget alert (tokens/$). The dollar/token half of the deadline/budget alert is unblocked by
   the usage-measurement spike — per-job cost/tokens are measurable even under concurrency, via OTLP or a
   headless job's own `-p` JSON result (both channels agree). ("% of the weekly cap" per job stays
@@ -1725,7 +1746,9 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   re-verify-at-instant + a self/owner deny-list. Currently shadow-only, recalibrated `15c17d0`. A further
   precision fix (not a promotion) → **REF4**, below.
 - **DG2.** Push-guard enforcement (raw-push refusal, Stage 2) — turns on only after **≥10 real pushes** run
-  clean through the wrapper. Fed by **ACT3** (which starts the counter moving today).
+  clean through the wrapper. Fed by **ACT3** (✅ shipped 2026-07-30 — the counter is now moving; it read
+  **3/10** after ACT3's own dogfood pushes, so 7 clean wrapper pushes remain before DG2 can be considered).
+  Read the live count with `npm run push-count` in the control repo.
 - **DG3.** Reaper: shadow → actually reaping. Currently authorizes cleanup only in shadow, re-scoped
   2026-07-28 to verified-terminal-state / owner-authorized-deadline cleanup, supervisor-launched jobs only.
   Full safe-lifecycle design (two clean "done" signals, three hard guards, a continuation-packet snapshot
@@ -1834,6 +1857,17 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   renamed/moved/deleted code file, or any uncertainty runs the FULL gate (fail-closed). Locked by
   **Suite 253**. Full entry above in READY TO BUILD. This doc-only follow-up commit — the one recording the
   `1245712` SHA — is itself the fast path's first live run (it should trip `gate:docs`, not the full gate).
+- **ACT3.** Controlled-push wrapper wired into the real push path — ✅ SHIPPED (2026-07-30). App repo
+  `5433648` (`scripts/robco-push.js` + `npm run push` + Suite 254 + docs, `CACHE_NAME` r15→r16); control repo
+  `0f452f9` (gate delegation `--no-gate`/`ROBCO_PUSH_DELEGATE_GATE` + the `lib/push-count.js` clean-push
+  counter + test groups GD/PC) and `e4e5965` (Protocol-42 fix: the push timeout must cover a delegated
+  full-gate pre-push hook — 20 min default, env-overridable; test group PT). The wrapper delegates the gate to
+  the app repo's own pre-push hook so it never double-runs the gate or defeats CPB4's doc-only fast path;
+  it adds L4 lock + push.intent/result receipt + `ls-remote` verification + the DG2 clean-push counter on
+  top. All three commits were pushed _through the wrapper_ (dogfood); the counter read 3/10 after. ACT3 is
+  routing only — raw-push refusal stays **DG2**, plain `git push` unrefused. This doc-only QUEUE update is
+  itself another wrapper push (it should trip CPB4's `gate:docs` fast path _through_ the wrapper — the live
+  proof of the coexistence).
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 
