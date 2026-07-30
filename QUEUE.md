@@ -24,7 +24,33 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
+**Last updated: 2026-07-30 (HG1 BUILT + SHIPPED — the event bus is hardened)** — **HG1 is shipped, app
+repo `31206dd`: the OS event bus finally has the four things it was missing.** `RobcoEvents` shipped at U7
+with only "add a listener" and "announce an event" — there was no way to REMOVE a listener, no way to say
+"tell me the next time this happens and then forget me," and nothing stopping the same listener being
+added twice and reacting twice to one event. All three now exist (`off`, `once`, dedup), plus `on`/`once`
+handing back an unsubscribe handle so a caller never has to keep the function around. **The substantive
+change is how a crashing listener is handled:** one was already prevented from taking its siblings down,
+but it was silenced _completely_ — a broken reaction just quietly stopped working with nothing to show for
+it. A crash is now REPORTED per-handler, naming the event, while the other listeners still run. Delivery
+also takes a snapshot first, so a listener that adds or removes another mid-delivery can't cause one to be
+skipped or double-fired. **⚠ Honest limit, stated rather than overclaimed:** dedup keys on function
+IDENTITY, so the anonymous arrow handlers every `_wire*EventBusSubscribers()` registers are distinct
+objects and are NOT deduped — and none of them is registered twice today anyway (each wiring function is
+called exactly once from `window.onload`). This is API-level hardening landed deliberately BEFORE 2.9.0's
+OS services widen bus usage, not a fix for a live double-fire. No re-entry guards were bolted onto the six
+wiring functions either: that would be a parallel implementation of dedup (Protocol 22) for a risk with no
+incident on file (Protocol 36b / 49). **PROTOCOL 42 — a real footgun found while building it, fixed and
+locked in the same commit:** `state.js` is evaluated in `vm` sandboxes with **no `console`** (the gate's own
+bus harness), so the obvious way to write that crash report raises a `ReferenceError` _from inside the
+catch_ — turning "a bad listener can never break the emitter" into "a bad listener always breaks the
+emitter" the moment logging was added. The reporter is fully guarded, and both the console-less and
+console-present cases are locked. Locked by **Suite 256** (14 assertions, behavioural against the real
+`state.js`); Suite 135 keeps the original U7/U8 contract and passes unchanged. Full `npm run gate` green
+(3701/3701 plus boot smoke, render check at 360/412, a11y, `test.html` runtime audit, save-survival,
+offline-first). `CACHE_NAME` r18 → r19.
+
+**Prior update — 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
 control repo `7ca220c`: the kernel's two write-side actions are finally CALLED by something.** Rank 2's
 publisher and rank 4's continuation-packet generator had been built, tested and callable since 2026-07-29,
 but nothing ever invoked them — every run was a human at a CLI. A new decision layer
@@ -1671,11 +1697,11 @@ inverting edges that the 2.9.0 services will just re-tangle, i.e. doing the same
 multiply the debt... burn the baseline down FIRST") put it — that reasoning is preserved verbatim there, not
 overwritten by this pass (Protocol 50 a-date).
 
-### HG1. ⬜ Event-bus hardening — `off`/`once`/dedup, listener-error isolation (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
+### HG1. ✅ SHIPPED (2026-07-30), app repo `31206dd` — Event-bus hardening — `off`/`once`/dedup, listener-error isolation (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
 
-**What it is.** `RobcoEvents` currently has no `off` / `once` / dedup, and a thrown listener handler can block
-unrelated handlers from running. Add `off`/`once`/dedup, and isolate each handler so a thrown error in one
-never prevents the others in the same event from firing.
+**What it was.** `RobcoEvents` had no `off` / `once` / dedup, and a thrown listener handler was caught but
+**silently swallowed**. Add `off`/`once`/dedup, and isolate each handler so a thrown error in one never
+prevents the others in the same event from firing.
 
 **Why it's here and not in 2.9.0.** Surface-independent: nothing about the new OS services changes what
 `RobcoEvents` needs to be correct today, and the OS round is about to **widen** its usage — hardening it before
@@ -1684,6 +1710,43 @@ Protocol 50) is still in place under 2.9.0's hardening-gate section, now cross-r
 
 **Done means:** `off`/`once`/dedup exist and are used where appropriate; a thrown handler is caught and logged
 per-handler, never propagating to abort sibling handlers; a regression test proves the isolation (Protocol 13).
+
+**Shipped as** (`js/core/state.js`): `off(event, fn)` (returns true/false, never throws on an unknown event or
+fn); `once(event, fn)` (de-registered **before** invocation, so a handler that re-emits its own event cannot
+re-enter itself); dedup keyed on `(event, fn)` with `addEventListener` semantics; `on()`/`once()` returning an
+**unsubscribe handle** (the `AmbientRuntime.register()` convention); and per-handler **error reporting** —
+behaviourally unchanged isolation, but the failure is now logged with its event name and handler index instead
+of vanishing. `emit()` dispatches a **snapshot** and each record carries a `removed` tombstone, so a handler
+that subscribes/unsubscribes mid-emit can neither skip a sibling nor fire one already removed; a non-function
+subscriber is refused at registration rather than pushed onto the list.
+
+**⚠ The "used where appropriate" clause, answered honestly rather than padded.** Dedup keys on function
+IDENTITY, so the anonymous arrows every shipped `_wire*EventBusSubscribers()` registers are distinct objects
+and are **not** deduped — and no shipped subscriber is registered twice today (each wiring function is called
+exactly once from `window.onload`). So `off`/`once`/dedup have **no existing call site**: they are API-level
+hardening landed ahead of the widening, in the same "ship it correct, state the caveat" posture as CPB1/ACT2.
+Re-entry guards were deliberately **not** bolted onto the six wiring functions — that would be a parallel
+implementation of dedup (Protocol 22) for a risk with no incident on file, exactly the accretion Protocol 36b
+and 49 exist to prevent. Naming the handlers so identity dedup could see them was also rejected: ~40 handlers
+across six files, against roughly thirty existing static assertions that regex those wiring bodies — churn and
+regression risk far past what the clause asks for.
+
+**PROTOCOL 42 — a real footgun surfaced while building it, fixed and locked in the SAME commit.**
+`js/core/state.js` is evaluated in `vm` sandboxes with **no `console` binding** (the gate's own bus harness,
+Suite 135). A bare `console.error(...)` in `emit()`'s catch raises a `ReferenceError` _from inside the catch_ —
+turning "a bad listener can never break the emitter" into "a bad listener always breaks the emitter" the moment
+logging was added. Verdict: it would have been a **real shipped-path** defect the gate's own harness could not
+have caught by accident, because the harness is precisely the console-less environment. The reporter is fully
+guarded (a `typeof console` check inside its own `try`); **Suite 256.9** locks the console-less case and
+**256.10** locks that the log actually happens when a console IS present.
+
+**Verified:** **Suite 256** — 14 assertions, behavioural against the real `state.js` in a `vm` sandbox
+(Protocol 20; one marked static exception at 256.14, whose subject genuinely IS the source text — a
+behavioural test cannot distinguish "logged through a guarded reporter" from "swallowed" in a console-less
+sandbox). **256.13** re-proves a real shipped subscriber (the `state.js` `level.up` auto-log) still fires
+through the hardened `emit()`. Suite 135 keeps the original U7/U8 contract and passes unchanged. Full
+`npm run gate` green — 3701/3701 Node assertions plus boot smoke, render check (360/412), a11y, the
+`test.html` runtime audit, save-survival and offline-first. Protocol 1: `CACHE_NAME` r18 → r19.
 
 ### HG2. ⬜ Bootstrap isolation — per-phase boot guards, fatal-vs-degradable (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
 
@@ -1880,7 +1943,14 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
     beautiful-TUI aesthetic requirement (all above) are **requirements the ladder must satisfy** — the banner
     ships with v0.1's first screen, notification control lands as v0.3's `notifications.mute|unmute` action,
     and the aesthetic bar applies to every slice.
-- **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
+- **HG1. ✅ SHIPPED (2026-07-30), app repo `31206dd`.** Event-bus hardening — `off`/`once`/dedup +
+  per-handler listener-error **reporting** (isolation was already there; the silence was the defect).
+  `on()`/`once()` now return an unsubscribe handle, and `emit()` dispatches a snapshot with a `removed`
+  tombstone so mid-emit subscribe/unsubscribe can neither skip a sibling nor fire one already removed.
+  Landed deliberately **before** 2.9.0's OS services widen bus usage. ⚠ Dedup keys on function identity, so
+  it has no existing call site (every shipped subscriber is an anonymous arrow wired once at boot) — stated
+  as API-level hardening, not claimed as a live fix. A Protocol 42 footgun (the console-less `vm` harness)
+  was found and locked in the same commit. Full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
 - **RB2.** Launch + structured completion receipts — full entry above.
@@ -4847,7 +4917,8 @@ hardening gate runs before any of them lands. The work is subtractive.
   Harden it before the OS round widens it; a thrown handler must not prevent unrelated handlers from running.
   **⭐ PULLED FORWARD to the pre-museum band as [HG1] (owner, 2026-07-28) — Protocol 50 (a-date).** This
   reasoning stays here unchanged; the live entry with its own ID and "Done means" is in **"⭐ ALSO
-  PRE-MUSEUM"**, directly under CP5.
+  PRE-MUSEUM"**, directly under CP5. **✅ SHIPPED 2026-07-30, app repo `31206dd`** — so this line of the
+  hardening gate is now CLOSED; the full record is at the HG1 entry above.
 - **The one escaped interval.** Exactly ONE stray `setInterval` escaped the AmbientRuntime heartbeat. Fold it
   in.
 - **An AI state-apply failure must be surfaced to the user (Protocol 24).** Today, when the AI's state update
