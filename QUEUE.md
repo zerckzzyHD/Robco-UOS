@@ -1828,12 +1828,12 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   [`USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md); unblocks **CPB1**.
 - The private `RobCo-Control-Ledger` repo created (empty, confirmed private), now actively receiving mirror
   commits (see **CPK3** above).
-- **CPB4.** Doc-only gate fast path — ✅ SHIPPED (2026-07-30). `scripts/gate-scope.js` scopes the pre-push
-  gate: a push whose whole diff is docs (`*.md` / `planning/**`) runs `npm run gate:docs` (lint + format +
-  the Node runner + static checks, NO browser); anything touching app code, a mixed diff, a
+- **CPB4.** Doc-only gate fast path — ✅ SHIPPED `1245712` (2026-07-30). `scripts/gate-scope.js` scopes the
+  pre-push gate: a push whose whole diff is docs (`*.md` / `planning/**`) runs `npm run gate:docs` (lint +
+  format + the Node runner + static checks, NO browser); anything touching app code, a mixed diff, a
   renamed/moved/deleted code file, or any uncertainty runs the FULL gate (fail-closed). Locked by
-  **Suite 253**. Full entry above in READY TO BUILD. SHA recorded in the immediately-following doc-only
-  queue commit (which itself runs through this new fast path — its own live proof).
+  **Suite 253**. Full entry above in READY TO BUILD. This doc-only follow-up commit — the one recording the
+  `1245712` SHA — is itself the fast path's first live run (it should trip `gate:docs`, not the full gate).
 
 ## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
 
