@@ -24,7 +24,30 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (DG2 + CPB6 SHIPPED — push-guard enforcement is LIVE)** — Two items shipped in
+**Last updated: 2026-07-30 (multi-model design round FOLDED — GPT-5.6 / Gemini 3.1 / DeepSeek)** — A
+DOC-ONLY synthesis + fold of a three-model design round into the queue; **nothing here is built** — every
+item is recorded as a design. Grounded first against the repo + `planning/control-plane/**` to dedup.
+**EXTENDED (no new IDs):** **CPB5** gains its phased build plan (GPT's Node-native vertical-slice ladder —
+the STATE VOCABULARY + UNIFIED ACTION ENVELOPE foundations, then v0.1 decision-loop / v0.2
+live-work+admission / v0.3 resilience, with release gates; the turtle banner + 3-level notify +
+beautiful-TUI additions reconciled, not superseded); **CP5** gains the concrete off-machine WITNESS design
+(ledger-head anchoring + second-opinion remote-SHA verify, Tailscale, separate Pushover token,
+advisory-only); **CPB1** gains the cap-reset ANCHOR + confirmed-live-data framing (`fh`=session %,
+`sd`=weekly all-models %; Sunday 2:59 PM weekly reset owner-anchor; ~5h rolling session; "proxy" upgraded to
+confirmed server data); **REF5** gains session-activity-awareness (don't alarm while the owning session is
+still live). **NET-NEW:** **CPB7** (session circuit breaker — failure classify + recovery budget, the
+formalized thrashing/reaper extension, kill authority stays DG1-gated); **CPB8** (quick-ack bot —
+typed-proposal-only owner approvals, sole-writer + AI-never-actuates preserved); **P16** (automated
+pre-publish PII/secret scanner — hardens the name-scrub gate from human-only to enforced); **P17** (museum
+PREVIEW tab — owner favorite, curation surface extending CPB5 + the publish pipeline). **DECLINED /
+proposals-only:** Agentic Museum Curator and Trivial Lint Auto-Resolver (both stretch AI-never-actuates /
+name-scrub-is-a-gate). **ALREADY-HAVE (not re-filed):** the USAGE ADMISSION GATE rides CPB2's operating
+modes; the phone cockpit + Tailscale transport is CPB5's existing spec; the sole-ledger-writer /
+proposal-only / name-scrub-mandatory invariants are the standing doctrine block. No ID renumbered
+(Protocol 49). Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA + counter in
+this pass's report.
+
+**Prior update — 2026-07-30 (DG2 + CPB6 SHIPPED — push-guard enforcement is LIVE)** — Two items shipped in
 one session on the owner's go. **DG2:** raw-`git push` refusal is now ACTIVE in both the app and control
 repos — a push not routed through the controlled-push wrapper (`npm run push`) is refused by a pre-push hook
 (the guard requires the wrapper's env token AND a live L4 process-ancestor, neither forgeable alone).
@@ -1059,6 +1082,26 @@ the witness-vs-controller decision is recorded with its date and reasoning.
 > is a real machine boundary that also doubles as the rank-3 off-machine durability. The kernel program itself
 > needs no separate trust domain today. See the CP program's build-order overlay above for the full reasoning.
 
+**⭐ Concrete WITNESS design (folded 2026-07-30, multi-model round GPT-5.6 / Gemini 3.1 / DeepSeek) — this
+is the "begin as a witness" recommendation above made CONCRETE, NOT a new item.** A tiny, zero-cost agent on
+a **separate device** (the spare laptop, an old laptop, a Pi, or Termux on a phone) reachable over
+**Tailscale**, reading only the **read-only `robco-evidence` MCP (MCP2)** and the **public git remote** —
+never the control repo, never the ledger writer. Two independent checks, both pure advisory alarms that
+**NEVER write the ledger and NEVER act**; the owner responds via the CPB5 CLI:
+
+- **Ledger-head anchoring.** Every ~5 min (offset from the supervisor's tick so the two don't move
+  together), recompute the ledger chain-head hash locally and keep `witness_state.json` (`last_chain_head`,
+  `last_entry_id`, `consecutive_failures`). Alert — via a **separate Pushover token**, so a witness alarm is
+  never confused with a supervisor alarm — if the chain **stalls** (head hash unchanged but no new entries
+  when there should be), a query **fails**, or the head **changes unexpectedly**.
+- **Second-opinion remote-SHA verify.** Independently `git ls-remote` the public remote and compare its SHA
+  to the supervisor's last push-receipt SHA → **critical alert on mismatch** — the off-machine confirmation
+  that a push the supervisor believes landed actually did.
+  This directly answers the failure that started the whole arc — _nobody was watching_ — at near-zero cost and
+  zero risk, because a witness can be wrong without breaking anything. Promotion from witness to controller
+  stays a later, separately-argued decision, exactly as the recommendation above requires. **Reconciled, not
+  duplicated:** this lives inside CP5 as its concrete design and does **not** get its own item ID.
+
 ---
 
 # The Dispatch Return Bus — RB1-RB6 (new 2026-07-29, plan-only)
@@ -1674,8 +1717,20 @@ also states when the cap resets — a reported reset/window field verbatim if th
 ~5h upper bound; weekly reset date`UNOBSERVABLE`, no anchor in the data). **Dormant until fed** (same
 posture as the wall-clock half): no launcher writes measured per-job usage into the ledger yet (spike §4 /
 **ACT2** plumbing), so the check reports `UNOBSERVABLE`until a`job.result`carries usage in either
-grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json` result) — then it lights
-  up with no code change. Full record in the SHIPPED section below.
+grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json`result) — then it lights
+up with no code change. Full record in the SHIPPED section below.
+**Refinement — cap-reset ANCHOR + confirmed-data framing (folded 2026-07-30, owner-provided; multi-model
+round).** Two corrections to the "no anchor in the data / weekly reset`UNOBSERVABLE`" posture above,
+applied when the reset countdown is wired (NOT a rebuild of the shipped comparator): **(1) the mapping is
+now known** — `fh`= the **current-session %**,`sd`= the **weekly all-models %** (confirmed: a live`sd=70`matched the Claude UI's "All models 70%"). The **weekly window resets Sunday 2:59 PM (fixed)** and
+the **session is a rolling ~5h window**. That reset time is an **owner-provided anchor** — updatable, held
+in config, **never hardcoded** — because it is the one piece genuinely not on disk. With it, the supervisor
+/ CPB2 / CPB5 CLI can show **real reset countdowns** alongside the live percentages. **(2) Upgrade the
+earlier "proxy" framing:**`fh`/`sd`are **CONFIRMED live server data**, not a synthetic proxy — Claude
+Code polls an Anthropic endpoint every ~5 min and persists the values; only the reset *time* is absent from
+the file (hence the anchor). This does **not** re-open per-job "% of the weekly cap," which stays
+structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVIDED (2026-07-30), applies
+  when the reset-countdown display is built; the shipped CPB1 plumbing is unchanged.
 - **CPB2 — ✅ SHIPPED (2026-07-30), control repo `6154abd`.** The usage → operating-modes change. The five
   per-threshold usage **phone alerts** (50/80/85/90/95 — "became wallpaper") are retired in favour of a single
   alert on an **operating-mode change**: Normal / Conserve / Reserve-for-owner / Stop-unattended-AI; notify
@@ -1736,6 +1791,50 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   **polished, beautiful TUI at the level of finish of the Claude Code CLI**: RobCo/Fallout phosphor theme,
   clean boxes / tables / color, readable layout, and the turtle banner. Recorded as a first-class requirement
   of the item.
+  **Phased build plan — the Node-native vertical-slice ladder (folded 2026-07-30 from GPT-5.6's MVP ladder;
+  multi-model design round GPT-5.6 / Gemini 3.1 / DeepSeek).** How CPB5 actually gets built, in
+  owner-shippable slices. **Architecture rule for the whole ladder:** the TUI is only a **renderer +
+  action-submission client** — all domain logic lives in shared Node modules, and the CLI reads the real
+  supervisor / ledger / evidence libraries **directly**, NOT through the MCP servers (MCP1/MCP2 are
+  Dispatch's surface, not the operator CLI's). This keeps ONE action layer shared with the phone cockpit
+  (above) and preserves the no-executor invariant.
+  **Two foundations both slices build on:**
+  - **The STATE VOCABULARY.** Every projected field carries `{value, epistemicState, observedAt, sourceRef,
+freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED / CLAIMED / PROPOSED /
+    DERIVED / CACHED / STALE / UNKNOWN. Hard rendering rules: **CLAIMED never renders as complete**;
+    **UNKNOWN never maps to healthy/green**; anything unproven renders **BLIND, never green**. This is the
+    CLI-side expression of the project's own "report `UNOBSERVABLE`, never a fabricated number" doctrine.
+  - **The UNIFIED ACTION ENVELOPE.** Every action carries a frozen **target version + ledger index**, actor,
+    surface, nonce / idempotency key, expiration, and an **expected postcondition**. The action is
+    **rejected if state moved** since the envelope was frozen; on receipt the CLI **holds until the
+    postcondition is observed or it times out**; **rollback is a forward compensating op to an exact SHA**,
+    never a history rewrite (aligns with WB10 / WB12's append-only rollback).
+    **The three slices:**
+  - **v0.1 — the decision loop (walk-away verdict + one real action end-to-end).** Five views: Home /
+    walk-away-verdict, Attention inbox, Work / claimed-vs-verified, Incident detail, Action receipt. Eight
+    command families: `robco`, `status`, `attention`, `work`, `incidents` (incl. `resolve`), `why`,
+    `changes --since last-visit`, `action`. **Exactly ONE real action proven end-to-end:
+    `incident.resolve`** (with race / idempotency / timeout tests). **Release gate (all must hold):** CLAIMED
+    never rendered complete; a stale supervisor renders BLIND; every verdict is explainable by `why`;
+    cached/blind state disables actions; a duplicate submit resolves once; TUI / plain / JSON all render from
+    ONE projection; and no TUI/MCP path writes the ledger.
+  - **v0.2 — live work + admission.** Views: Work Board + Session Inspector, Claims-vs-Reality, Trace +
+    Evidence, Proposals / Approvals, Usage / Admission. Actions: `session.stop`, `proposal.approve|reject`,
+    `usage.mode.set`. Adds the **USAGE ADMISSION GATE** — session launch asks a shared admission module
+    reading the current usage mode (CPB2's Normal / Conserve / Reserve-for-owner / Stop-unattended-AI) →
+    ALLOW / REFUSE, the launcher **mechanically refuses**, **fail-closed for unattended AI**; MCP can
+    read/propose but never override. Plus a deterministic `robco handoff --copy` Dispatch packet.
+  - **v0.3 — resilience / high-risk.** Views: Ship/Gate Room, Survival/Recovery, Law (guards + invariants),
+    System Topology, Notifications/Maintenance. Actions: `rollback.run`, `backup.trigger`, `maintenance.*`,
+    `notifications.mute|unmute`, `posture.set`. Adds Degraded-Read-Only + Survival + Privacy/screen-share
+    modes. **This is where the already-folded controls land in the ladder:** `notifications.mute|unmute` is
+    the three-level notify + 2h30m auto-unmute control (above); `rollback.run` fires the WB10 one-click
+    rollback; `backup.trigger` fires CPB3.
+    **Reconciliation with the already-folded CPB5 additions (kept intact, NOT superseded):** this ladder is
+    the BUILD ORDER; the turtle banner, the three-level notification control + 2h30m auto-unmute, and the
+    beautiful-TUI aesthetic requirement (all above) are **requirements the ladder must satisfy** — the banner
+    ships with v0.1's first screen, notification control lands as v0.3's `notifications.mute|unmute` action,
+    and the aesthetic bar applies to every slice.
 - **HG1.** Event-bus hardening (`off`/`once`/dedup, listener-error isolation) — full entry above.
 - **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
@@ -1786,6 +1885,35 @@ grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json
   cases (doc-only skips; one code file forces full; mixed forces full; a renamed/moved/deleted code file
   forces full — via `git diff --no-renames`), locked by **Suite 253** (static wiring + unit classification +
   a real-git-repo integration proof). Full record in the SHIPPED section below.
+- **CPB7 — Session circuit breaker: failure CLASSIFY + recovery budget (NET-NEW, folded 2026-07-30,
+  multi-model round; the FORMALIZED version of the thrashing detector + reaper — EXTENDS DG1/REF4 + REF2/DG3,
+  it does not replace them).** On a session failure, classify the stderr / test output into two classes:
+  **TRANSIENT** (`ETIMEDOUT` / `529` / a Tailscale drop → exponential backoff, draining a wall-clock time
+  budget) vs. **SEMANTIC** (syntax error / test-logic failure / SHA-mismatch → feed the error back to the
+  session, costs 1 of a ~2-attempt semantic-correction budget). **On semantic-budget exhaustion the breaker
+  trips OPEN:** SIGTERM the session, `git stash` + reset the worktree to the last clean SHA, the supervisor
+  logs a `CIRCUIT_BREAKER_TRIPPED` event, and a quick-ack ping (CPB8) goes to the owner. **The genuinely NEW
+  part is the CLASSIFY step** — transient-vs-semantic triage with separate budgets; the trip-open recovery
+  itself is the reaper's proven `(pid, procStart)` kill (REF2) plus the WB12-style bundle-then-reset.
+  **⛔ Invariant guard — the trip-open KILL/RESET authority stays DATA-GATED exactly as DG1 governs the
+  thrashing detector.** The classify + budget-tracking + alert path is buildable now and runs
+  **shadow/alert-only**; actually SIGTERMing a session and resetting its worktree is a kill action that
+  promotes only on the same evidence bar as DG1 (never auto-kill on a guess — the standing thrashing→kill
+  doctrine). **Done means:** transient-vs-semantic classification is proven against real failure outputs;
+  budgets drain and the breaker _would_ trip at exhaustion (shadow); the trip-open action is gated behind
+  DG1's promotion bar, not live on first build.
+- **CPB8 — Quick-ack bot: typed-proposal-only owner approvals (NET-NEW, folded 2026-07-30, multi-model
+  round; BOTH GPT-5.6 and DeepSeek converged on it — high-priority QoL).** A messenger bot (Telegram, or a
+  Tailscale webhook receiver) whose **Approve button NEVER executes, merges, or touches git.** It writes a
+  rigidly-typed proposal JSON to `pending_proposals/`; the supervisor **reads it on its next 5-minute tick**,
+  validates it against current state (**SHA unchanged** since the proposal was formed), appends the approval
+  event, and the control plane actuates through the normal path. **This respects both standing invariants
+  exactly:** the AI never actuates, and the supervisor stays the **sole ledger-writer** — the bot is an input
+  surface for a typed proposal, not an executor. It is a second surface onto the SAME approval/proposal
+  system as **RB1**'s inbox and **MCP1**'s `proposal.submit` (one proposal model, not a parallel one —
+  Protocol 22). **Done means:** an owner tap produces only a typed `pending_proposals/` entry; the supervisor
+  validates SHA-freshness and appends the approval; a stale-state proposal is refused; nothing the bot
+  receives ever writes the ledger or acts directly.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
@@ -1971,6 +2099,15 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   leave a stale "not backed up" open. **Note:** **CPB4** already shrinks this window for doc-only pushes
   (~30s fast path), but code pushes still take the full gate, so the tune is still worth doing.
   OWNER-APPROVED (2026-07-30), NOT YET BUILT.
+  **Extended 2026-07-30 (owner-approved; multi-model round) — make it SESSION-ACTIVITY-AWARE, the same
+  discipline REF1 applied to the backup-unhealthy alert.** Beyond the grace period and push-in-progress
+  awareness above, the unbacked-work / push-not-confirmed alerts must **not fire at all while the session
+  that OWNS the uncommitted/unpushed work is still actively running** — work mid-build by a live session is
+  _supposed_ to be unbacked. Fire **only once that owning session is idle or done and the work still remains
+  unbacked**, and **auto-retract the moment the work is committed + pushed**. **Why:** the owner received the
+  uncommitted-work notification **twice during a single long, still-active session** — a false alarm on work
+  that was simply in progress. Reuses the supervisor's existing active-session / tree co-residency tracking
+  (as REF1 does), not a second tracker. OWNER-APPROVED (2026-07-30), NOT YET BUILT.
 
 ## SHIPPED — for the record, with SHAs
 
@@ -3338,6 +3475,77 @@ working notes, so the same fail-closed visibility rule P11 already specifies app
 **Done means:** the control-plane arcs exist in the corpus as dated entries; a room/placement decision is
 made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them AND to
 render the project's interlocking workflows per part 3 above.
+
+### P16. ⬜ Automated pre-publish PII / secret scanner — the mandatory museum publish gate, AI-free (NET-NEW, folded 2026-07-30, multi-model round; HARDENS the existing name-scrub gate from human-only to enforced)
+
+**What it is.** A **deterministic** regex / string scanner (no AI in the loop) run over the museum **staging
+dir AFTER generation, BEFORE curation**. It scans for: email addresses, the owner-maintained
+`scrub_list.txt` of real names / paths / usernames, API-key / token formats, and public IP addresses. **On
+any finding, publish is BLOCKED** and the supervisor writes a `museum-pii-block` incident. An **allow-list of
+SHA-256 hashes of confirmed-safe strings** lets a reviewed false positive through without ever storing the
+plaintext. The scanner code lives in the **control repo**, its SHA is recorded in the **guard registry** and
+integrity-checked by the gate's self-integrity check (so the scanner itself cannot be silently swapped).
+
+**Why it hardens what already exists (P13/P14).** Name-scrub is already a **mandatory, non-AI-callable
+publish gate** — but P13 recorded that the guard in place "scanned only for the exact string it was handed":
+it never saw a username inside a path nor an email it was never given, and redaction-after-ingest **has
+already failed here once**. This scanner is the **enforced, pattern-based** version of that gate — it finds
+the CLASS of identifier, not just the one string handed to it. It does **not** replace the structural
+direction P13 sets (public projection built from public sources + placeholders, never ingest-then-redact); it
+is the fail-closed backstop for anything that reaches staging anyway.
+
+**⛔ Invariant.** Name-scrub / PII scanning stays a **mandatory gate, never an AI-callable tool** (the whole
+control plane's standing rule — "if the agent chooses whether to scrub, it isn't a gate").
+
+**Done means:** the scanner runs deterministically over the real staging tree, blocks on a real planted PII
+value (proven red-then-green, never committing the value), writes a `museum-pii-block` incident on a finding,
+the SHA-256 allow-list clears a confirmed-safe string, and its own SHA is registered + integrity-checked.
+Cross-refs **P13** (the scan-list gap that motivated it) and **P14** (the republish it gates).
+
+### P17. ⬜ Museum PREVIEW tab — curation surface for staging-vs-published (owner favorite; NET-NEW, folded 2026-07-30 from DeepSeek's fleshed design; EXTENDS the museum program + the CPB5 CLI)
+
+**What it is.** A curation / review surface that diffs what's **published** against what's **staged**, so the
+owner curates before anything goes public. Built on **two ledger pointers** — `last-published-artifacts-hash`
+and `staging-artifacts-hash` — producing a **semantic diff** (New / Changed / Removed entries). Each entry
+shows its **scan status from the P16 PII scanner**: ✅ clean / ⚠ allow-listed / 🛑 blocked — and **Publish is
+disabled while ANY entry is blocked.**
+
+**Curation workflow.** Inspect an entry (with the scanner's findings highlighted) → **inline scrub** →
+**re-scan that entry** → **Approve / Deny** (a Deny is logged as a curation event) → **Publish**, which runs
+a **final scan + name-scrub**, then the supervisor does the **controlled push** (the ACT3/DG2 wrapper) +
+writes a **publish receipt** and updates the `last-published` pointer.
+
+**Two renderers, ONE action layer (same as CPB5).** A CLI view — `robco museum preview` (or `m` then `p`) —
+and a **phone mirror** (responsive, summary cards, large touch targets), both using the **same typed-proposal
+path** and the same three CPB5 guardrails (human-interactive only; destructive actions echo + confirm; every
+action appends a ledger event). A **yellow "internal — not public" accent**, and the staging tree is served
+**private, Tailscale-only** (never the public origin — the records carry the owner's name).
+
+**Homes / reconciliation.** EXTENDS **CPB5** (the operator CLI gains the `museum preview` sub-command and the
+phone cockpit gains the tab) and the museum publish pipeline (**P13 / P14 / P16**) — it is the human curation
+UI in front of P16's scanner and P14's republish, not a new publish path. Owner flagged it a favorite.
+
+**Done means:** the two-pointer semantic diff renders New/Changed/Removed with per-entry scan status; Publish
+is blocked while any entry is blocked; inspect → inline-scrub → re-scan → approve/deny → publish works
+end-to-end through the controlled-push wrapper with a publish receipt and pointer update; CLI and phone mirror
+share one action layer + the CPB5 guardrails; staging is reachable Tailscale-only.
+
+### Declined this round — auto-actuation stretches kept proposals-only (2026-07-30, multi-model round)
+
+Two ideas from the GPT-5.6 / Gemini 3.1 / DeepSeek round are **recorded as DECLINED / proposals-only** so
+they are not re-proposed as auto-actuating features — both stretch a standing invariant. Recorded per
+Protocol 49 (record the ruling in place) + Protocol 51(a).
+
+- **Agentic Museum Curator** — an agent that auto-drafts AND auto-publishes museum entries. **Declined:** it
+  stretches the zero-MCP-truth / name-scrub-is-a-mandatory-gate rule (an AI that decides what publishes is an
+  executor). Stays **proposals-only** — the curator may _draft_ proposals into the **P17** preview tab; a
+  human publishes. Nothing auto-publishes.
+- **Trivial Lint Auto-Resolver** — auto-commits formatting fixes. **Declined:** it stretches the
+  AI-never-actuates invariant (an auto-commit is an actuation). Stays **proposals-only** — lint findings
+  surface as a proposal; a human commits. Nothing auto-commits.
+
+Neither is dead — each may return the day it is expressed as a proposal a human approves, never as an
+auto-committer / auto-publisher.
 
 ---
 
