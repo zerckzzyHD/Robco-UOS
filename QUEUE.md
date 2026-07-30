@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (later still — REF4 + PM1 filed)** — **Two items folded into the just-tidied
+**Last updated: 2026-07-30 (later still — MCP1/MCP2 filed, external review synthesis)** — **Two
+independent MCP-review passes (GPT-5.6, Gemini 3.1) converged on the same end-state and are folded in as a
+new section right after RB6: TWO MCP servers, not six.** New family prefix **MCP1-MCP2** (RB1-RB6 / HG1-HG2
+/ CPB / ACT / OD / SP / DG / REF / AUD / PM / P all already spoken for). **MCP1** (`robco-control`) hardens
+**RB4**'s seven-tool contract into a six-op-family shape (`state.snapshot` / `changes.since(cursor)` /
+`events.list` / `event.ack_receipt` / `proposal.validate|submit|status` / `job.result`) and folds
+usage/telemetry in as decision-shaped queries (unblocks **CPB1/CPB2**) rather than building a separate
+telemetry server. **MCP2** (`robco-evidence`, NEW) is a read-only server (`context.resolve` /
+`evidence.search` / `reference.trace`) feeding the museum's Visual Web (**P11/P15**) and a
+dangling-reference audit — deterministic search only, no AI-curated writable graph (explicitly rejects
+Gemini's official `memory`-server route as a second source of truth, per Protocol 51(b)), gated on a
+brutal retrospective acceptance test ("if it's just prettier search, kill it"). **Hard rules landing
+across the whole control plane:** the supervisor stays the sole ledger-writer, proposals stay enumerated
+job-kinds only, name-scrub stays a mandatory gate never an AI-callable tool, Fallout data ships as a
+pinned snapshot never a live wiki query, and **museum MCP is killed as a server** — regen/query/scrub
+route through the CLI gate + MCP2 instead, cross-referencing **P15**. **⚠ Flagged, not yet resolved:**
+Gemini's review leans on a claimed 2026-07-28 MCP spec (MRTR/Tasks/statelessness/MCP-Apps/list-caching SEP
+numbers) that is **unverified on our side** — GPT's architecture, which depends on none of them, is the
+backbone until that's confirmed. Doc-only pass, no control-plane code touched, no ID renumbered
+(Protocol 49).
+
+**Prior update — 2026-07-30 (later still — REF4 + PM1 filed)** — **Two items folded into the just-tidied
 CONTROL-PLANE board, both owner-approved 2026-07-30, neither previously tracked.** **REF4** (new) refines the
 shadow-only thrashing detector against two more false-ish positives seen 2026-07-29/30, distinct from the
 `53a3bb89` case `15c17d0` already fixed: **(i)** a session frozen mid-read with zero activity is
@@ -1083,6 +1104,121 @@ works.
 
 **Done means:** tapping the Pushover notification on Android opens directly into the Dispatch
 conversation, verified on an actual Android device/routing (not assumed from iOS/desktop).
+
+---
+
+# ⭐ MCP ARCHITECTURE — external review synthesis (GPT-5.6 + Gemini 3.1, new 2026-07-30)
+
+**New family prefix — RB1-RB6 already own the return-bus specifics, so this next slice takes its own
+prefix rather than force-fitting into RB7+ (same reasoning as HG's and RB's own prefix notes above).**
+Two independent MCP-review passes — GPT-5.6 and Gemini 3.1 — were run 2026-07-30 against **RB4**'s
+existing design and converged, independently, on the same end-state. **End-state: TWO MCP servers, not
+six.** This section hardens RB4 into its V2 shape (**MCP1**) and adds one genuinely new read-only server
+(**MCP2**). Nothing here is built — same plan-only status as the RB family it extends.
+
+**Standing invariant on BOTH servers, stated once here because it governs every tool family below:** zero
+MCP-owned truth, zero MCP executors. All mutations are typed/enumerated proposals the supervisor validates
+and appends — **the MCP server never writes the ledger directly.** This is the same trust boundary RB4
+already drew for `control_submit_intent`'s proposal-only verbs, now stated as the rule for the whole MCP
+surface, not just that one tool.
+
+### MCP1. ⬜ `robco-control` — harden RB4 into its V2 proposal/ack contract (refines RB4, folds in usage/telemetry)
+
+**What it is.** Not a replacement for RB4 above — a hardening pass on its ops shape. Six op families:
+`state.snapshot`; `changes.since(cursor)` (a cheap polling delta, not a full snapshot every poll);
+`events.list`; `event.ack_receipt` (= "Dispatch saw it," explicitly **not** "resolved" — narrower than
+RB4's `control_ack_event` text reads today; tighten that wording when RB4 is actually built);
+`proposal.validate` / `proposal.submit` / `proposal.status` (idempotency keys — the same idempotent-replay
+requirement RB4 already specified); `job.result`.
+
+**Usage/telemetry folds in here — do NOT build a separate telemetry server.** `usage.snapshot` /
+`budget_status` / `burn_rate` and `health.components` are decision-shaped queries over this same op
+surface, and directly unblock **CPB1** (the budget alert) and **CPB2** (usage → operating-modes) once MCP1
+exists — both currently have no query surface to read from. Route verbose OpenTelemetry output to a log
+file instead; the MCP surface exposes only the decision-shaped summaries, never raw spans.
+
+**Done means:** RB4's seven tools are re-specified under this six-op-family shape with the tightened
+`event.ack_receipt` semantics; usage/budget queries are reachable through MCP1 with no second server;
+RB4's own done-criteria (load-spike, idempotent replay, generation-rejection, no second
+ledger/orchestrator) still hold.
+
+### MCP2. ⬜ `robco-evidence` — NEW read-only server (the active-graph-retrieval #1 win)
+
+**What it is.** A second, read-only MCP server: `context.resolve(changed_paths)`, `evidence.search`,
+`reference.trace`. Every result is derived from real files + git SHAs and carries repo/path + SHA +
+excerpt + why-selected edge + a freshness/stale flag — never a synthesized or AI-curated answer standing
+in for the source. One extraction pipeline is meant to feed three consumers at once: the museum's Visual
+Web (**P11/P15**), the dangling-reference audit, and general session context-loading.
+
+**Explicitly rejected: an AI-curated WRITABLE graph** (Gemini's official MCP `memory`-server route) — it
+becomes a second brain / second source of truth, exactly the anti-pattern Protocol 51(b) already names
+("memory is a locator, not evidence"). **Deterministic search first; no embeddings/vectors until plain
+retrieval demonstrably fails** — the fancier mechanism doesn't get reached for before the cheap one is
+shown insufficient.
+
+**Acceptance test, stated brutally on purpose:** run MCP2 retrospectively against recent completed jobs —
+does it actually surface the governing docs/edges those sessions needed? **If it's just prettier search,
+kill it** — a real go/no-go bar, not a formality to wave through.
+
+**Done means:** the retrospective acceptance test runs against real completed jobs (not synthetic ones)
+and clears the "would have surfaced the governing evidence" bar; every result carries repo/path + SHA +
+excerpt + why-selected edge + freshness flag; no writable/AI-curated graph is introduced.
+
+**Convergent hard rules — both reviews independently landed on these; they apply across the whole control
+plane, not just MCP1/MCP2:**
+
+- Supervisor is the SOLE ledger-writer (the standing invariant above, restated as an operational rule):
+  MCP submits an atomic envelope to a supervisor-owned intake; supervisor validates + appends. A stale
+  expected-state is a **conflict**, not a best-effort overwrite.
+- Proposals are enumerated job-kinds only — never a shell string, arbitrary path, or executable.
+- Name-scrub is a **mandatory** publish gate, never an AI-callable tool — "if the agent chooses whether to
+  run it, it's optional" is disqualifying by itself.
+- Fallout game data ships as a **pinned snapshot** (page revision + SHA/hash), never a live wiki query —
+  kills the "canonical live oracle" framing outright, and stays consistent with Protocol 3's existing
+  source-of-truth rule. Any fetched wiki text is treated as untrusted data, never instructions.
+- The test/gate stays a CLI, authoritative with no model present — MCP only passes through its
+  **structured (JSON)** report, never a second implementation that parses stdout.
+- **Museum MCP is KILLED as a server, full stop.** Regen is a deterministic CLI/supervisor job; arc/context
+  queries route through **MCP2**; scrubbing routes through the gate. No `museum.publish()` escape hatch —
+  cross-reference **P15**, whose museum work routes through MCP2 rather than any museum-owned server.
+
+**New tool-families worth building later, as families under MCP1/MCP2 — not as new servers:**
+
+- **Completion receipt (the highest-value new idea).** A finishing session submits its claimed outcome +
+  exact SHA + gate IDs + diff/result manifest to MCP1; the supervisor **independently verifies** the SHA +
+  evidence before it's believed. Directly closes the "the session said it finished = truth" gap Protocol
+  8's own audit stage already exists to catch by hand — this would make that verification queryable
+  instead of manual.
+- **Why-blocked.** Returns the exact failed mechanical predicate, not an inferred reason.
+- **Release proof chain.** Given a SHA → job contract → session receipt → gate report → artifact hashes →
+  publisher result, chained and queryable.
+- **Reference-graph lint** (the "radroach scan"). Dead refs, renamed targets, orphaned guards, unrouted
+  skills, claims whose evidence vanished — serves both the museum thesis and the dangling-reference audit
+  directly; lives under MCP2.
+- **Lower priority — Code-session conveniences, NOT control-plane, do not build under MCP1/2:**
+  git-bisect runner, AST inspector.
+
+**Practice note, filed alongside rather than as its own item.** A session should call its scheduling tool
+as a **fallback** whenever it parks on long background work — a partial patch for the
+notification-doesn't-fire gap. This informs the return-bus WAKE design (**RB5**): it is a host-supported
+**self-timer**, not an external doorbell for an already-dormant session. RB5's own BLOCKED BY PLATFORM
+status is unchanged by this — the two are different mechanisms.
+
+**⚠ Verify-before-building, flagged explicitly rather than assumed.** Gemini's review is built on a
+claimed "2026-07-28 MCP spec" with specific named mechanics (MRTR/SEP-2322, Tasks/SEP-2663,
+statelessness/SEP-2567+2575, MCP Apps/SEP-1865, list-caching/SEP-2549) that are **UNVERIFIED on our
+side** — confirm each against the live spec before designing around any of them. GPT's architecture
+depends on **none** of them, so it is the backbone; Gemini's spec-specific mechanics are additive-only,
+never load-bearing, until independently confirmed.
+
+**Ruled out, both reviews agreeing:** `ntfy.sh` (Pushover already covers phone alerts — **RB6** already
+covers the deep-link friction reduction); the official filesystem + sequential-thinking MCP servers (Code
+sessions already have file+git tools — marginal value).
+
+**Done means (section-level):** MCP1 and MCP2 are both specified to the point RB4 was before it could be
+built, and this pass gets them there; the museum-MCP kill and the pinned-wiki-snapshot rule are reflected
+wherever P15/game-data work is next touched; the "verify before building" flag is resolved (confirmed or
+refuted against the live spec) before any Gemini-specific mechanic is designed around.
 
 ---
 
