@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (CPB5 v0.1 BUILT + SHIPPED — the operator console can now answer "can I walk
+**Last updated: 2026-07-31 (CPB5 session control folded in — list active sessions BY NAME, and stop one;
+doc-only)** — Folded an owner-provided addition (2026-07-31) into **CPB5**'s existing session-control
+scope. **Nothing was built by that pass and no ID was created** — this is the concrete SHAPE of the
+`session.stop` action already on the v0.2 rung, written down so it cannot later be built twice under two
+names. Two halves, split across the ladder: **(a) LIST ACTIVE SESSIONS** — read-only, can surface as
+early as v0.1's Work view — showing each active session's **human-readable UI NAME** alongside its id,
+working directory, state (working/idle/stalled/abandoned) and last activity, because a list of hex ids is
+not something a person can safely pick a kill target from. Its honest caveat is recorded as a hard build
+requirement rather than a footnote: **the title may simply not be persisted anywhere the CLI can read**,
+so the build must **VERIFY on-disk readability** against the real stores (leads named, none asserted) and,
+failing that, degrade the column to `UNOBSERVABLE` and fall back to session id + working directory — never
+invent or infer a name. **(b) KILL/STOP A SESSION** — v0.2, because it needs the confirmed-action
+machinery v0.1 just shipped: echo the exact session by **name + id/pid**, explicit confirm, never blind
+and never batched, ledger-appended, and **held until a `process-terminated` postcondition is actually
+observed** rather than reported on a signal being sent. Two invariants are pinned to it: the postcondition
+is evaluated on **`(pid, procStart)`** identity (never pid alone — a recycled pid could otherwise confirm a
+kill that never happened), and the termination routes through **`lib/reaper.js`'s existing single
+`process.kill` carve-out**, not a second kill path. ⛔ **It does not unblock CPB7's data-gated kill
+authority** and says so in place: this is a human pressing stop on a session he is looking at; CPB7's
+trip-open SIGTERM is the machine deciding on its own, and stays shadow-only behind DG1's evidence bar.
+
+**Prior update — 2026-07-31 (CPB5 v0.1 BUILT + SHIPPED — the operator console can now answer "can I walk
 away?")** — **CPB5 v0.1 is shipped, control repo `ff11244`: `robco`, the operator control CLI, first of
 three slices.** The control plane has spent this whole round learning to WATCH; this is the first thing
 that lets the owner ASK. One question — _can I walk away right now?_ — and three answers:
@@ -2084,56 +2105,104 @@ structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVID
   ruling B (**WB10** below).
   **New sub-command `robco recover`:** pulls the **WB4** recovery card + QR up on screen from the CLI, so the
   recovery runbook is always a keystroke away, not only on the physical card.
-  **Three guardrails (stated explicitly):** (a) **write/action paths execute ONLY when a human runs the command
-  interactively** — the AI and the automation must **never** call them to actuate; this is what preserves the
-  no-executor invariant (the invariant constrains the AI, not the owner). (b) **Destructive actions** (stop
-  session, rollback, revert) **echo the exact target and require explicit confirm, never batched** — per the
-  process-kill safety rule. (c) **Every action appends a ledger event** (keeps it traced + append-only; the
-  supervisor stays sole writer for autonomous records — these are human-initiated events routed through the
-  same append path).
-  **Pending owner approvals surface here too** (ruling D / **WB11**): CPB5 is one of the owner surfaces where a
-  pending approval appears, alongside the approval inbox (**RB1**) and Pushover.
-  **Phone cockpit — control-capable, ONE shared action layer.** The phone-openable cockpit is a single
-  self-contained `.html` regenerated on each supervisor tick, served over **Tailscale — the private transport
-  for this cockpit** (the owner's own tailnet reaches the supervisor machine directly; **never** the public
-  GitHub Pages origin, because the records carry the owner's name). Tailscale is named here as the explicit,
-  required mechanism — the cockpit is reachable from the phone **only** over the tailnet, never a public URL. It is **the same operator control surface as the desktop
-  CLI, just a web renderer** — it shares **ONE action layer** with the CPB5 CLI and enforces the **same three
-  guardrails above**. This is the owner's "CLI on my phone / manage while away" surface. Folds in GPT's
-  "phone-first operator cockpit" and Gemini's `robco status` / supervisor-local-web-view; can surface the same
-  pending-events delta as **RB1**'s inbox projection.
-  **Startup banner — locked (owner decision 2026-07-30).** The `robco` CLI opens on a **sea-turtle startup
-  banner**: GPT's dependency-free renderer drawing a side-profile sea turtle cresting a wave, rendered
-  **two-tone** — a phosphor-**green** turtle body over a **blue** waterline/wave (the foam and everything below
-  the surface is blue; the turtle body above it is green). Truecolor with graceful fallback — `NO_COLOR`-aware,
-  with unicode and ascii fallbacks. Chosen over Gemini's, Fable's, and hand-drawn attempts. The asset already
-  exists as GPT's `robco-turtle-banner.mjs`; it gets **integrated and recolored** (green turtle / blue water)
-  when CPB5 is built.
-  **Notification control — the CLI manages Pushover delivery at will (owner add 2026-07-30).** A **global
-  on/off switch** AND **per-alert-type** individual enable/disable, laid out like a settings panel (global
-  switch on top, individual toggles beneath) so each alert family flips **independently** — budget/token,
-  usage-mode change, backup failure/health, session-needs-input, unbacked-work / push-confirm, thrashing,
-  deadline, break-glass, and any others. **Human-driven only**; every toggle **appends a ledger event** (a
-  record of when alerts were off and which). **Three mute LEVELS (owner-refined 2026-07-30):** _normal_ (all
-  on) / _standard mute_ (criticals still break through by default) / _total blackout_ (**everything** off,
-  **including the criticals that normally break through** — an explicit opt-in hard "mute all"). **Auto-unmute
-  is the safety net for every level:** any mute — standard OR total blackout — carries an **expiry timestamp**
-  the supervisor checks on its **5-minute tick** and lifts automatically once passed, so nothing (not even a
-  blackout of the criticals) stays silent forever. **Default duration 2h 30m, configurable.** No always-on
-  timer is needed — the CLI tracks the mute purely via that expiry timestamp on the supervisor tick. Commands
-  along the lines of `robco notify on|off|status` plus per-type toggles.
-  **Aesthetic requirement — first-class, not an afterthought (owner add 2026-07-30).** CPB5 must be a
-  **polished, beautiful TUI at the level of finish of the Claude Code CLI**: RobCo/Fallout phosphor theme,
-  clean boxes / tables / color, readable layout, and the turtle banner. Recorded as a first-class requirement
-  of the item.
-  **Phased build plan — the Node-native vertical-slice ladder (folded 2026-07-30 from GPT-5.6's MVP ladder;
-  multi-model design round GPT-5.6 / Gemini 3.1 / DeepSeek).** How CPB5 actually gets built, in
-  owner-shippable slices. **Architecture rule for the whole ladder:** the TUI is only a **renderer +
-  action-submission client** — all domain logic lives in shared Node modules, and the CLI reads the real
-  supervisor / ledger / evidence libraries **directly**, NOT through the MCP servers (MCP1/MCP2 are
-  Dispatch's surface, not the operator CLI's). This keeps ONE action layer shared with the phone cockpit
-  (above) and preserves the no-executor invariant.
-  **Two foundations both slices build on:**
+  **SESSION CONTROL — list active sessions by their UI NAME, and stop one (owner add 2026-07-31).** Two
+  halves, deliberately split across the ladder because only one of them needs the confirmed-action
+  machinery. **⛔ This is NOT a new action:** it is the concrete, owner-specified SHAPE of the
+  **`session.stop`** action already listed on the **v0.2** rung below — same action, same one action layer
+  (Protocol 22). Recorded here so it cannot later be built twice under two names.
+  - **(a) LIST ACTIVE SESSIONS — read-only, can surface as early as v0.1's Work view.** Per active session:
+    its **human-readable UI NAME** (the session title the owner actually recognises — e.g. _"Build REF5 —
+    tune unbacked-work alerts"_), plus **session id**, **working directory**, **state**
+    (working / idle / stalled / abandoned), and **last activity**. The name is the whole point of the
+    request: a list of hex session ids is not something a human can make a decision from, and picking the
+    wrong row is exactly the mistake a kill action must not make easy.
+    ⚠ **HONEST CAVEAT, and it is a real one — VERIFY, DO NOT ASSUME.** The UI title may simply not be
+    persisted anywhere this CLI can read. The build **must verify on-disk title-readability against the
+    real stores before claiming the column**, exactly the way this project verified `is_error` on tool
+    results and the `fh`/`sd` usage mapping rather than assuming them. Candidate sources to CHECK — named
+    as leads, **not** as an assertion that any of them carries a title: the desktop-session store
+    (`lib/adapters/desktop-sessions.js` / `paths.desktopSessionsRoot()`), the session records
+    (`lib/adapters/session-records.js` / `paths.sessionRecordsDir()`), and the per-tool transcripts
+    (`lib/adapters/transcripts.js` / `paths.transcriptsRoot()`). **If the title is not readable, the column
+    degrades to `UNOBSERVABLE` and the row falls back to session id + working directory** — both of which
+    are always available — and it says so on screen. It must never invent, infer, or prettify a name.
+    This drops straight onto v0.1's state vocabulary: a readable title is `OBSERVED`, a missing one is
+    `UNKNOWN` with its reasonCode, and `UNKNOWN` can never render as healthy.
+  - **(b) KILL / STOP A SESSION — the destructive half, v0.2.** Echoes the **exact** session (**name +
+    id/pid**) and requires explicit confirmation before anything is stopped — **never blind, never
+    batched**, one target per invocation, per the standing process-kill safety rule and guardrail (b)
+    above. Appends to the ledger like every other action, and **waits on a TERMINATED-POSTCONDITION** —
+    it re-observes that the process is genuinely gone before reporting success, rather than reporting
+    success because a signal was sent.
+    **Reuses what v0.1 already shipped, and adds one thing.** The unified action envelope, the frozen
+    target version, the derived idempotency key, the echo-and-typed-confirm flow and the hold-until-proven
+    receipt are all built (control repo `ff11244`) — this needs no new machinery for any of that. What it
+    adds is a **new postcondition kind** (`process-terminated`) alongside v0.1's `incident-state`, and that
+    kind must be evaluated on **`(pid, procStart)` identity, never pid alone** — a recycled pid reporting
+    "still alive" would block a legitimate stop, and worse, a recycled pid reporting "gone" would confirm a
+    kill that never happened. That identity rule is this repo's oldest lock invariant; the kill path
+    inherits it rather than inventing a second notion of process identity.
+    **Route the actual termination through `lib/reaper.js`, do not shell a kill** — the reaper already
+    holds this tool's ONLY `process.kill` carve-out and already re-verifies `(pid, procStart)` immediately
+    before terminating. A second kill path would be a parallel implementation of the one thing in this
+    codebase that most needs a single home (Protocol 22).
+    ⛔ **This does NOT unblock CPB7's data-gated kill authority, and must not be read as doing so.** The
+    two are different in kind, and the difference is the whole invariant: **this is a HUMAN pressing stop
+    on a session he is looking at** (guardrail (a): _the invariant constrains the AI, not the owner_),
+    whereas **CPB7's trip-open SIGTERM is the MACHINE deciding to kill on its own** and stays DATA-GATED /
+    shadow-only behind the DG1 evidence bar per the owner's confirmed 2026-07-30 ruling. Building (b) gives
+    the owner a stop button; it gives the automation nothing.
+    **Owner-provided 2026-07-31; doc-only fold, nothing built by this pass.**
+    **Three guardrails (stated explicitly):** (a) **write/action paths execute ONLY when a human runs the command
+    interactively** — the AI and the automation must **never** call them to actuate; this is what preserves the
+    no-executor invariant (the invariant constrains the AI, not the owner). (b) **Destructive actions** (stop
+    session, rollback, revert) **echo the exact target and require explicit confirm, never batched** — per the
+    process-kill safety rule. (c) **Every action appends a ledger event** (keeps it traced + append-only; the
+    supervisor stays sole writer for autonomous records — these are human-initiated events routed through the
+    same append path).
+    **Pending owner approvals surface here too** (ruling D / **WB11**): CPB5 is one of the owner surfaces where a
+    pending approval appears, alongside the approval inbox (**RB1**) and Pushover.
+    **Phone cockpit — control-capable, ONE shared action layer.** The phone-openable cockpit is a single
+    self-contained `.html` regenerated on each supervisor tick, served over **Tailscale — the private transport
+    for this cockpit** (the owner's own tailnet reaches the supervisor machine directly; **never** the public
+    GitHub Pages origin, because the records carry the owner's name). Tailscale is named here as the explicit,
+    required mechanism — the cockpit is reachable from the phone **only** over the tailnet, never a public URL. It is **the same operator control surface as the desktop
+    CLI, just a web renderer** — it shares **ONE action layer** with the CPB5 CLI and enforces the **same three
+    guardrails above**. This is the owner's "CLI on my phone / manage while away" surface. Folds in GPT's
+    "phone-first operator cockpit" and Gemini's `robco status` / supervisor-local-web-view; can surface the same
+    pending-events delta as **RB1**'s inbox projection.
+    **Startup banner — locked (owner decision 2026-07-30).** The `robco` CLI opens on a **sea-turtle startup
+    banner**: GPT's dependency-free renderer drawing a side-profile sea turtle cresting a wave, rendered
+    **two-tone** — a phosphor-**green** turtle body over a **blue** waterline/wave (the foam and everything below
+    the surface is blue; the turtle body above it is green). Truecolor with graceful fallback — `NO_COLOR`-aware,
+    with unicode and ascii fallbacks. Chosen over Gemini's, Fable's, and hand-drawn attempts. The asset already
+    exists as GPT's `robco-turtle-banner.mjs`; it gets **integrated and recolored** (green turtle / blue water)
+    when CPB5 is built.
+    **Notification control — the CLI manages Pushover delivery at will (owner add 2026-07-30).** A **global
+    on/off switch** AND **per-alert-type** individual enable/disable, laid out like a settings panel (global
+    switch on top, individual toggles beneath) so each alert family flips **independently** — budget/token,
+    usage-mode change, backup failure/health, session-needs-input, unbacked-work / push-confirm, thrashing,
+    deadline, break-glass, and any others. **Human-driven only**; every toggle **appends a ledger event** (a
+    record of when alerts were off and which). **Three mute LEVELS (owner-refined 2026-07-30):** _normal_ (all
+    on) / _standard mute_ (criticals still break through by default) / _total blackout_ (**everything** off,
+    **including the criticals that normally break through** — an explicit opt-in hard "mute all"). **Auto-unmute
+    is the safety net for every level:** any mute — standard OR total blackout — carries an **expiry timestamp**
+    the supervisor checks on its **5-minute tick** and lifts automatically once passed, so nothing (not even a
+    blackout of the criticals) stays silent forever. **Default duration 2h 30m, configurable.** No always-on
+    timer is needed — the CLI tracks the mute purely via that expiry timestamp on the supervisor tick. Commands
+    along the lines of `robco notify on|off|status` plus per-type toggles.
+    **Aesthetic requirement — first-class, not an afterthought (owner add 2026-07-30).** CPB5 must be a
+    **polished, beautiful TUI at the level of finish of the Claude Code CLI**: RobCo/Fallout phosphor theme,
+    clean boxes / tables / color, readable layout, and the turtle banner. Recorded as a first-class requirement
+    of the item.
+    **Phased build plan — the Node-native vertical-slice ladder (folded 2026-07-30 from GPT-5.6's MVP ladder;
+    multi-model design round GPT-5.6 / Gemini 3.1 / DeepSeek).** How CPB5 actually gets built, in
+    owner-shippable slices. **Architecture rule for the whole ladder:** the TUI is only a **renderer +
+    action-submission client** — all domain logic lives in shared Node modules, and the CLI reads the real
+    supervisor / ledger / evidence libraries **directly**, NOT through the MCP servers (MCP1/MCP2 are
+    Dispatch's surface, not the operator CLI's). This keeps ONE action layer shared with the phone cockpit
+    (above) and preserves the no-executor invariant.
+    **Two foundations both slices build on:**
   - **The STATE VOCABULARY.** Every projected field carries `{value, epistemicState, observedAt, sourceRef,
 freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED / CLAIMED / PROPOSED /
     DERIVED / CACHED / STALE / UNKNOWN. Hard rendering rules: **CLAIMED never renders as complete**;
@@ -2156,9 +2225,18 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
     ONE projection; and no TUI/MCP path writes the ledger. **Every gate line verified — see the shipped
     record at the end of this entry for how each one is proven, and for the three divergences from the
     ladder that are recorded rather than hidden.**
+    **Open extension against this rung (owner add 2026-07-31, NOT built in the shipped v0.1):** the
+    read-only **LIST ACTIVE SESSIONS** half of SESSION CONTROL (above) belongs here — it is a projection
+    over live sessions, needs no action machinery, and can surface in the Work view. Its title column is
+    gated on VERIFYING that the UI name is readable on disk; if it is not, the row degrades to session id
+    - working directory. Full spec at **SESSION CONTROL** in this entry.
   - **v0.2 — live work + admission.** Views: Work Board + Session Inspector, Claims-vs-Reality, Trace +
     Evidence, Proposals / Approvals, Usage / Admission. Actions: `session.stop`, `proposal.approve|reject`,
-    `usage.mode.set`. Adds the **USAGE ADMISSION GATE** — session launch asks a shared admission module
+    `usage.mode.set`. **`session.stop` now has a concrete owner-specified shape (2026-07-31) — see
+    SESSION CONTROL (b) in this entry: echo the exact session by NAME + id/pid, explicit confirm, never
+    batched, a `process-terminated` postcondition evaluated on `(pid, procStart)` identity, and the
+    termination routed through `lib/reaper.js`'s existing single `process.kill` carve-out rather than a
+    second kill path. It is the SAME action, not an additional one.** Adds the **USAGE ADMISSION GATE** — session launch asks a shared admission module
     reading the current usage mode (CPB2's Normal / Conserve / Reserve-for-owner / Stop-unattended-AI) →
     ALLOW / REFUSE, the launcher **mechanically refuses**, **fail-closed for unattended AI**; MCP can
     read/propose but never override. Plus a deterministic `robco handoff --copy` Dispatch packet.
