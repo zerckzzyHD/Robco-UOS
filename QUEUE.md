@@ -24,7 +24,32 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (GPT's REAL turtle banner is in, recoloured blue-wave — control repo
+**Last updated: 2026-07-31 (P16 SHIPPED — the museum's pre-publish PII gate, control repo `0917d20`)** —
+**The gate that should have existed before the name leaked once.** Deterministic regex/string matching,
+**no model anywhere in the loop** — nothing asks an AI and nothing can be called _by_ one, because if the
+agent chooses whether to scrub, it isn't a gate. Four categories: emails, an owner-maintained **scrub
+list** (real names / usernames / absolute paths / internal terms) matched in file **addresses as well as
+content** and inside **non-text files as bytes**, credential shapes, and **public** IPs (private and
+reserved ranges ignored — a gate that cries wolf on `10.0.0.1` teaches you to wave findings through).
+Exit code is the contract: **0 pass, 1 block, and no `--force`.** Fail-closed on everything, including a
+**hollowed-out scrub list** — present but all comments — which is the dangerous case a naive scanner
+reports as clean. ⛔ **The report is never the leak:** findings carry a hash and a redacted snippet,
+never the matched value, and the phone banner names categories and counts only. **The scanner never
+writes the ledger** — it leaves a verdict file and the supervisor appends the incident, and a verdict it
+cannot parse **re-raises** rather than reading as "nothing blocked".
+⚠ **Checking the entry's premise first changed the build:** the archive's `preparePublish()` was
+**already enforced and fail-closed**, not human-only as P16 assumed — what was human-only was the
+read-only `pii-scan.mjs` report. So this does not re-do that work; it adds what neither could do (the
+scrub list, public IPs, the allow-list, a blocking verdict, a ledger incident) and duplicates none of it.
+**Run against the real publishable tree:** **zero** surviving name hits — the existing scrub passing an
+independent audit — and **12 email addresses (2 distinct, 5 files)** it is structurally blind to; neither
+is the owner's own, so that is an allow-list decision, not an emergency. 🔻 **Honest remaining step:
+nothing calls it yet** — mounting it in the archive's publish flow is a one-line change in a third repo
+this pass did not touch, so today it is a gate waiting to be mounted. Also recorded this pass: the owner
+**confirmed WB1's gate-result decision** — gate results stay as fields inside the push records, never
+standalone records (Protocol 22) — so that divergence is resolved as approved-as-is.
+
+**Prior update — 2026-07-31 (GPT's REAL turtle banner is in, recoloured blue-wave — control repo
 `0b8d93b`)** — The owner supplied GPT's original `robco-turtle-banner.mjs`, and it has **replaced the
 from-scratch banner CPB5 v0.1 shipped** — that art is gone. His **72×22 raster**, his four-level phosphor
 palette, his half-block cell logic and both colourless ramps are **verbatim**; the only changes are
@@ -1726,6 +1751,12 @@ the gate red if the two ever diverge.
   they ride inside `push.intent.gateResult` / `push.completion.gate` — so the join **surfaces them from
   inside the push records** rather than inventing a second place the gate outcome lives (Protocol 22).
   Recorded as a deliberate reading of the brief, not an omission.
+  ✅ **OWNER-CONFIRMED (2026-07-31) — the divergence is RESOLVED as approved-as-is.** The WB1 v0.1 record
+  flagged this as an open question (offering to make gate results first-class standalone records if the
+  owner preferred). The owner's ruling: **gate results stay as FIELDS inside the push records; they are
+  NOT promoted to standalone records.** Protocol 22 — a second home for the same fact is the duplication
+  the rule exists to prevent. This is now a decision on file, not a pending judgement call, so a future
+  session should not re-litigate it or "fix" it by emitting a `gate.result` type.
 
 **DEFERRED — named, not implied (the explicit follow-on list):** incident transitions (`incident.transition`);
 the CPB5 action records (`action.submitted` / `action.result` / `action.postcondition`); **`session.observed`
@@ -4410,7 +4441,7 @@ working notes, so the same fail-closed visibility rule P11 already specifies app
 made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them AND to
 render the project's interlocking workflows per part 3 above.
 
-### P16. ⬜ Automated pre-publish PII / secret scanner — the mandatory museum publish gate, AI-free (NET-NEW, folded 2026-07-30, multi-model round; HARDENS the existing name-scrub gate from human-only to enforced)
+### P16. ✅ SHIPPED (2026-07-31), control repo `0917d20` — Automated pre-publish PII / secret scanner — the mandatory museum publish gate, AI-free (NET-NEW, folded 2026-07-30, multi-model round; HARDENS the existing name-scrub gate from human-only to enforced)
 
 **What it is.** A **deterministic** regex / string scanner (no AI in the loop) run over the museum **staging
 dir AFTER generation, BEFORE curation**. It scans for: email addresses, the owner-maintained
@@ -4435,6 +4466,80 @@ control plane's standing rule — "if the agent chooses whether to scrub, it isn
 value (proven red-then-green, never committing the value), writes a `museum-pii-block` incident on a finding,
 the SHA-256 allow-list clears a confirmed-safe string, and its own SHA is registered + integrity-checked.
 Cross-refs **P13** (the scan-list gap that motivated it) and **P14** (the republish it gates).
+
+**── SHIPPED RECORD (2026-07-31, control repo `0917d20`) ──**
+
+⚠ **THIS ENTRY'S OWN PREMISE WAS HALF WRONG, and checking it first changed the build** (Protocol 51a —
+a queue entry is a hypothesis until read against the repository). The museum pipeline is **real and
+live in the ARCHIVE repo** — `generate.mjs` / `publish.mjs` / `capture.mjs` / `pii-scan.mjs`, with 756
+files already generated — and of the two guards already on it:
+
+- **`publish.mjs`'s `preparePublish()` was ALREADY enforced and fail-closed.** It scrubs the supplied
+  name(s), re-scans content **and** paths, sweeps nine credential regexes, and on any hit deletes the
+  scratch tree and throws, emitting nothing. This entry says P16 hardens the gate "from human-only to
+  enforced" — **that half was already enforced.** Recorded rather than quietly overwritten.
+- **`museum/pii-scan.mjs` IS the human-only part**, and this entry is right about it: a read-only
+  battery that prints a report and blocks nothing.
+
+**So the real gap P16 closes is not "unenforced".** It is that the archive's gate only ever knows the
+strings **handed to it at the command line** (`--real-name=X`) — it cannot see a username in a path it
+was never told about, which is exactly the **P13** gap — plus: nothing anywhere detected **public IPs**,
+nothing had an **allow-list**, the class-based battery **blocked nothing**, and no finding ever reached
+the **ledger**.
+
+**Shipped as** `lib/museum-pii-scan.js` + `scripts/museum-pii-gate.js` (control repo). Four categories:
+emails · an owner-maintained **scrub list** (names / usernames / absolute paths / project-internal terms)
+matched in file **ADDRESSES as well as content**, and in **non-text files as bytes** (a name in image
+metadata) · credential shapes · **public** IPs, with RFC1918 / loopback / link-local / CGNAT / TEST-NET /
+multicast ignored — a gate that cries wolf on `10.0.0.1` teaches the owner to wave findings through,
+which is how gates die. **Exit code is the contract: 0 PASS, 1 BLOCK, and NO `--force`** — a gate with
+an override flag is a suggestion.
+
+**Fail-closed on everything:** unreadable scope · missing scrub list · **HOLLOWED-OUT** scrub list
+(present but every line a comment — the dangerous case, where a naive scanner finds nothing and
+cheerfully reports clean) · a term under 3 chars · unreadable allow-list · an unreadable file _inside_
+the tree · a scanner throw · even a failure to **write** the verdict.
+
+⛔ **The report is never the leak.** Findings carry file, line, category, a SHA-256 and a redacted
+snippet — **never the matched value** — and the phone banner names categories and counts only. A banner
+quoting a leaked name to a lock screen through a third-party push service would _be_ the leak.
+
+**The scanner never writes the ledger.** It writes one verdict artifact; **`supervisor.js` reads it on
+its tick and appends the `museum-pii-block` incident** — CPB8's exact shape. An unreadable/unparsable
+verdict **re-raises** rather than reading as "nothing blocked". The scrub list is **itself PII** and
+lives in `state/` (never committed, not on the backup mirror's whitelist): putting it in a git repo to
+protect the owner's name _from_ git repos would be self-defeating.
+
+**RUN AGAINST THE REAL PUBLISHABLE TREE** (`museum/.publish-out`, 756 files): **zero surviving
+scrub-term hits** — the archive's existing scrub passing an independent audit — and **12 email
+addresses (2 distinct, across 5 files)** that the existing gate is structurally blind to. **Neither is
+the owner's own address**, so that is an allow-list decision, not an emergency — precisely the workflow
+the SHA-256 allow-list exists for. ⚠ **Scope matters:** `museum/public` and `museum/site` are PRIVATE
+(the pre-scrub source and the owner's own committed copy) and _correctly_ contain his name; pointing
+the gate at those blocks forever. The scope is `preparePublish()`'s **output**.
+
+**WB2 registry row this guard will take** (WB2 does not exist yet, so its fields are recorded here as
+prior sessions have done): `{ failureClass: 'pii-leak-to-public-museum', enforcementPoint:
+'scripts/museum-pii-gate.js (pre-publish, exit 1 on BLOCK)', testId: 'P16', owner: 'control-plane',
+retirementCondition: 'the museum stops publishing anything derived from private sources' }`. The
+scanner reports its own SHA-256 into every verdict; the mismatch **check** belongs in the registry, not
+in a hand-maintained constant (which would be Protocol 2a's failure mode again).
+
+**Verified:** test group **P16** — red-then-green on all four categories _individually_ plus a clean
+tree that passes (so the four reds are not just a scanner that blocks everything); public-vs-reserved
+IPs; the allow-list carve-out and hash normalisation; five fail-closed cases; the P13 path gap; the
+binary byte scan; a no-leak proof over the whole serialised verdict _and_ the phone banner; the
+no-ledger-write guard; **AI-free proven behaviourally** (no network module, and two scans of one tree
+byte-identical) rather than by hunting vendor words; Protocol 22 reuse of `backup-mirror`'s patterns;
+and a **real sandboxed supervisor run** proving it opens the incident, auto-resolves on a later PASS,
+and re-raises on an unparsable verdict. Full control suite green.
+
+🔻 **REMAINING ACTIVATION — stated, not faked.** The gate is built, tested and correct, but **nothing
+calls it yet**: wiring it into the archive's publish flow is a one-line invocation in a **third repo**
+this pass deliberately did not touch. Until that lands, P16 protects nothing by itself — it is a gate
+waiting to be mounted, in the same honest posture as CPB1/ACT2's dormant halves. **The exact wiring:**
+run `node <control>/scripts/museum-pii-gate.js <preparePublish outDir>` immediately after
+`preparePublish()` returns and **before** anything is published, and abort on a non-zero exit.
 
 ### P17. ⬜ Museum PREVIEW tab — curation surface for staging-vs-published (owner favorite; NET-NEW, folded 2026-07-30 from DeepSeek's fleshed design; EXTENDS the museum program + the CPB5 CLI)
 
