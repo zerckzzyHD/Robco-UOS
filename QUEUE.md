@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (usage-gate refinement + effort tiers + a completeness sweep — doc-only)** —
+**Last updated: 2026-07-31 (can a launch prompt even SET the effort tier? — a spike + a verify requirement,
+doc-only)** — Two folds, nothing built. **(1) SP2, a new spike:** when Dispatch starts a session
+**programmatically**, does an effort directive embedded in the launch prompt actually engage that effort, or
+does it only work typed live in an interactive session? Two mechanisms tested separately — a
+`/effort <level>` line and the `ultrathink` keyword — each against an interactive control arm, because
+without that control the spike cannot tell "the launch path strips it" from "the directive does nothing
+anywhere". ⚠ **Its honest caveat is recorded as part of the item, not as a footnote:** thinking budget is
+very hard to observe from outside, so the spike can far more easily establish that a directive was
+**accepted / echoed / acknowledged** than that the session **definitely ran at that budget** — and this
+project already has a word for the weaker of those, **CLAIMED, not VERIFIED**. The result must be written
+down at the strength it actually earned. Both outcomes are planned for: if yes, CPB9's effort tier can be a
+prompt-level per-job setting; **if no**, the tier needs a different mechanism entirely (a launcher flag or
+config rather than prompt text) or high-effort headless work has to be rescoped — rather than quietly built
+on an assumption that never held. **(2) A requirement on CPB9:** its effort-tier feature must **verify the
+applied tier per job — prove it was set, don't assume it.** A requested tier is CLAIMED; only a
+corroborated one is VERIFIED; and if nothing can corroborate it, the honest record is UNOBSERVABLE, never a
+tier asserted because it was asked for. That is load-bearing rather than bookkeeping: the admission gate
+budgets a shared cap **against the tier it believes a job is running at**, so a job that silently ran at a
+different tier breaks that arithmetic in both directions — over-burning if higher, wasting an unattended
+window if lower. SP2 ↔ CPB9 cross-referenced both ways.
+
+**Prior update — 2026-07-31 (usage-gate refinement + effort tiers + a completeness sweep — doc-only)** —
 Three things, none of them built. **(1) CPB2's Stop-unattended-AI moves to 95%** (owner-approved): the
 shipped default clamps to Stop at **90** — verified in `lib/usage-mode.js`, not assumed — and that is early
 enough to halt unattended work while a genuinely useful slice of the cap is still on the table. **Reserve-
@@ -2498,6 +2519,26 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   **the tier is what makes headless work worth doing, and the gate is what makes it safe to do.**
   At **Stop-unattended-AI** the gate refuses the launch outright regardless of tier (CPB2, above); at the
   restrictive-but-not-stopped modes the tier is the natural thing for admission to negotiate down.
+  **REQUIREMENT — VERIFY THE APPLIED TIER PER JOB (owner-approved 2026-07-31). Prove the tier was set; do
+  not assume it.** Requesting a tier and recording that you requested it is not evidence the job ran at it.
+  Every job must carry the tier it was **actually observed to run at**, per job, at the epistemic strength
+  that observation genuinely earned — the same "verify, don't assume" discipline this project used for
+  `is_error` on tool results, the `fh`/`sd` usage mapping, and CPB5's session-title column.
+  **This maps exactly onto the shipped state vocabulary (CPB5 v0.1, `ff11244`), which already has the right
+  words:** a tier the launcher merely asked for, or that the session merely acknowledged, is **CLAIMED**; a
+  tier corroborated by an independent observation is **VERIFIED**; and if nothing can corroborate it the
+  honest record is **UNOBSERVABLE — never a tier asserted because it was requested.** A CLAIMED tier must
+  never render as a confirmed one, which is the vocabulary's first hard rule and needs no new machinery.
+  **Why this is load-bearing rather than bookkeeping:** the admission gate is doing arithmetic against a
+  shared cap, and it is doing it **on the tier it believes the job is running at**. A job that silently ran
+  at a different tier than requested breaks that arithmetic in **both** directions — burning far more of the
+  cap than the gate budgeted for if it ran higher, or quietly wasting an unattended window at a depth the
+  work did not need if it ran lower. An unverifiable tier makes the gate's own numbers untrustworthy, which
+  is the one thing the gate cannot afford.
+  **Gated on / cross-ref: SP2** (below, in SPIKES) — the spike that determines whether a launch prompt can
+  set the tier at all, and which names the candidate probes for corroborating it. If SP2 comes back
+  negative, this requirement does not disappear: it applies to whatever mechanism replaces prompt-embedded
+  effort.
   **What would earn it a slot (stated, per Protocol 50 a-form):** an owner go plus a spec — at minimum what
   "approvalless" is allowed to mean, how a job is described to it, and what it writes to the ledger
   (measured per-job usage among it, which is what unblocks CPB1). Until then it stays an unversioned,
@@ -2576,6 +2617,38 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
 - **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
   required before running regardless.
 - **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
+- **SP2. ⬜ Can a LAUNCH PROMPT set the reasoning EFFORT TIER? (NEW ID, filed 2026-07-31.)** The empirical
+  question **CPB9's effort-tier-per-job feature stands or falls on**: when Dispatch starts a session
+  **programmatically**, does an effort directive embedded in the launch prompt actually engage that effort —
+  or does it only work when typed live in an interactive session?
+  **Two mechanisms to test, separately** (they may not behave the same, and assuming they do is how a
+  negative result gets missed): **(1)** a `/effort <level>` line in the launch prompt, and **(2)** the
+  `ultrathink` keyword in the launch prompt. Each tested through the real programmatic launch path, and each
+  compared against the same directive typed live in an interactive session as the control — without that
+  control arm the spike cannot tell "the launch path strips it" from "the directive does nothing anywhere".
+  ⚠ **THE MEASUREMENT CAVEAT, and it is the hard part — state it in the result, do not let it be forgotten
+  by the time someone reads the answer.** Thinking budget is **very hard to observe from outside the
+  session.** This spike can far more easily establish that a directive was **accepted / echoed /
+  acknowledged** than that the session **definitely ran at that budget** — and those are not the same
+  claim. An acknowledgement is the session's own account of itself, which this project already has a word
+  for: **CLAIMED, not VERIFIED** (CPB5 v0.1's state vocabulary, shipped `ff11244`). So the spike's own
+  finding must be recorded at the epistemic strength it actually earned, never rounded up to "it works".
+  **Probes worth CHECKING for something stronger than an echo — named as leads, NOT as assertions that any
+  of them carries the answer:** the per-tool transcript store (`lib/adapters/transcripts.js` /
+  `paths.transcriptsRoot()`), which the thrashing detector already replays; the usage file the supervisor
+  reads every tick (a high-effort run should move it detectably more than a low-effort one on the same
+  task); and wall-clock/output-shape differences between the arms. Each is a **proxy**, and the write-up
+  must say so — a convincing proxy is still not a budget readout.
+  **Why it exists / what it decides:** it decides whether **"ultracode headless via the launcher" is
+  achievable through the launch path at all.** Both outcomes are useful and BOTH must be planned for, or
+  this is only half a spike: **if YES**, CPB9's effort tier can be a prompt-level per-job setting. **If NO**
+  (prompt-embedded effort is interactive-only), then either the tier needs a different mechanism entirely —
+  a launcher flag / CLI argument / config rather than prompt text — or high-effort headless work is not
+  reachable that way and CPB9's effort-tier feature has to be rescoped rather than quietly built on an
+  assumption that never held.
+  **Owner-in-loop** (it needs real launches observed), and **doc-only until run** — nothing here is built.
+  **Cross-ref: CPB9** (the feature it gates) and **CPB2 / CPB5 v0.2** (the admission gate any tier must pass
+  through regardless of how it is set).
 
 ## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
