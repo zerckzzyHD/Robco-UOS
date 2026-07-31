@@ -24,7 +24,37 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (three owner-approved follow-ups — the P16 gate is MOUNTED and LIVE, and the
+**Last updated: 2026-07-31 (SP2 ANSWERED — Dispatch can set a session's EFFORT TIER, and the whole effort
+design folded in; doc-only, nothing built)** — **The spike that CPB9's effort tier stood or fell on came back
+POSITIVE, but not the way it assumed.** Dispatch **can** set a spawned session's reasoning tier, **per
+session, at will** — via a **two-message** pattern: a message that is exactly `/effort <level>` and nothing
+else (0 turns, the session idles), **then** the real task as a separate follow-up. **⛔ Inlining the two
+FAILS** — the slash command swallows the task and **nothing runs at all**, a **silent no-op** rather than an
+error, which is why CPB9 must now treat "0 turns" as **RED** and never as an empty success. **Read SP2's
+literal question and the decision it gates as two answers, because they diverge:** an effort directive
+_embedded in_ the launch prompt alongside the task — **NO**; per-session effort control reachable through the
+programmatic path — **YES**. So the tier is reachable and **CPB9 needs no rescoping**. ⚠ **The epistemics are
+split on purpose and must not be rounded up:** the **tier-SET is VERIFIED** — the **harness itself** printed
+`Set effort level to max (this session only): …`, a **system** state-change report naming the level and its
+per-session scope, which clears the mere-echo bar SP2 expected to be stuck at — but **whether a high tier
+materially deepens reasoning is CLAIMED**, being the tool's own description of itself, and **no session can
+introspect its own thinking budget.** "Effort control is confirmed" must never travel into "high-tier runs
+are better". **Three design folds ride on it, none of them built.** **(1)** CPB2's operating modes and CPB5
+v0.2's admission gate gain an **EFFORT DIMENSION** — the gate now returns a **ceiling** as well as a verdict
+and negotiates a tier **down** (no Max/Ultracode in a conserve-class mode), binding **unattended work only,
+never the owner's own session**. **(2)** WB1's evidence envelope gains an **`effort: {requested, applied,
+state}`** field — `requested` and `applied` are separate **because the gate makes them diverge on purpose**,
+which is what turns CPB9's verify-the-tier rule from defensive into **structural**. **(3)** A **standing
+workflow** is adopted: the pre-build **plan** picks the tier per session and Dispatch **announces** every
+change. ⚠ **Two honest divergences:** the "watcher changes the effort tier" idea this pass was asked to mark
+DEAD **had no entry anywhere** — searched across the queue, the log, all of `planning/`, the archive and
+memory — so a **new** logged decision was written instead of a strike-through (and **RB3's watcher is
+unrelated and untouched**); and **`start_code_task` exposes no effort field** (`cwd`/`model`/`prompt`/`title`
+only), so the clean launcher-flag route is **PARKED, not built** — it buys atomicity, not capability. Full
+write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md` (local-only). **SP2 remains OPEN on its second
+mechanism — the `ultrathink` keyword was not tested.**
+
+**Prior update — 2026-07-31 (three owner-approved follow-ups — the P16 gate is MOUNTED and LIVE, and the
 last of the three false-firing backup alerts is fixed)** — **P16 is no longer a gate waiting to be
 mounted.** Its one-line invocation now sits in the archive's publish flow, immediately after the scrub and
 before anything is publishable, blocking on its exit code with **no override flag** (archive repo
@@ -1806,6 +1836,46 @@ housekeeping records. **Also deferred, and it is a real limit:** a push does not
 made it, so a push arc is push-scoped today. The contract → session → receipt chain the spec describes needs
 that binding, and the binding needs the launcher — **CPB9**, which has no owner go.
 
+**── PLANNED EXTENSION — an `effort` FIELD ON THE ENVELOPE (folded 2026-07-31; DESIGN, NOT BUILT) ──**
+
+**Every job's record should carry the effort tier it ran at.** Per-session effort control stopped being
+hypothetical on 2026-07-31 (**SP2** mechanism (1) confirmed —
+`planning/control-plane/EFFORT_CONTROL_SPIKE.md`), and CPB2's new **effort ceiling** means the admission gate
+will deliberately **cap** requested tiers. The envelope is where that belongs: it is already the one place a
+record says who produced it, from what source, and how well-verified it is — the tier is the same kind of fact,
+and giving it its own home elsewhere is the duplication Protocol 22 exists to stop.
+
+**Proposed shape — `effort: {requested, applied, state}`, and the three fields are not padding:**
+
+- **`requested` and `applied` are SEPARATE because the gate makes them diverge on purpose.** Once admission
+  can cap a tier (CPB2's EFFORT DIMENSION), "asked for Max, ran at High" is the **normal** case, not an
+  anomaly. One field would force a choice between recording the intent and recording the truth; the arithmetic
+  needs the truth and the audit needs both.
+- **`state` reuses the shipped CPB5 v0.1 vocabulary** — `CLAIMED` / `VERIFIED` / `UNOBSERVABLE` — exactly as
+  `verification.state` already does, and for the identical reason: **a tier the launcher merely asked for is
+  not evidence the job ran at it** (CPB9's requirement). ⚠ **It is deliberately its OWN state, not the
+  envelope's `verification.state`** — those answer different questions (_is this artifact's provenance
+  verified?_ vs _is this tier's application verified?_) and collapsing them would let a well-verified push
+  silently vouch for an unverified tier.
+- **Additive and fail-safe, like every WB1 field.** Absent `effort` is **not** an error and must never be —
+  the 60k+ records already in the append-only ledger have none and never will, and an unrecognised tier
+  degrades to `UNOBSERVABLE`, never to an asserted one.
+
+**Scope: job-bearing records only.** It rides `job.intent` / `job.result` (and whatever CPB9 writes) — **not**
+`session.observed`, for the same bloat reason already recorded above, and not `job.transition`, which carries
+no evidence.
+
+**⛔ BUILD-TIME REQUIREMENT, carried forward because it is exactly the kind of thing that gets forgotten
+once:** re-prove the new field names against `lib/backup-mirror.js`'s **fail-closed** secret scanner
+(`WB1-S`'s red-then-green, not inspection). None of `effort`/`requested`/`applied`/`state` matches its
+`secret`/`apiKey`/`password`/`privateKey`/`accessToken` list — but v0.1 proved that against the **real**
+scanner rather than by eye, and a field added later deserves the same treatment. A mismatch there silently
+aborts the **entire** off-machine backup, permanently, on a path nothing else tests.
+
+**Blocked on a producer, not on a decision:** nothing writes a tier today, because nothing launches jobs with
+one — that is **CPB9**, which has no owner go. Same dependency, and the same honest reason, as the
+session-binding limit above.
+
 **Proven, not asserted.** Against the machine's own live ledger, read-only: **62,670 real records, 118
 lineages, 33 push arcs**, and a sample arc joined `push.intent + push.result + push.completion` with
 **stamped 0, derived 3** — all three written before this code existed. Then, after shipping, the push that
@@ -2504,6 +2574,46 @@ structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVID
     **Cross-ref:** this behaviour is enforced by **CPB5 v0.2**'s admission gate (see "The three slices"
     below), and CPB5 v0.2 reads its mode from **this** item. One threshold set, one admission module, two
     entries pointing at each other — not two policies.
+    **── THE EFFORT DIMENSION (folded 2026-07-31; DESIGN, NOT A BUILD) ──**
+    **The operating modes gain a second axis: an EFFORT CEILING.** Until now a mode answered one question —
+    _may an unattended session start?_ — with ALLOW or REFUSE. It now answers a second: _and how deep is it
+    allowed to think?_ This became worth specifying the day per-session effort control stopped being
+    hypothetical: **SP2 mechanism (1) came back positive** (see SPIKES, and
+    `planning/control-plane/EFFORT_CONTROL_SPIKE.md`), so the tier is a dial the machine can actually turn,
+    and a dial nothing governs is a dial pointed at the cap.
+  - **The rule: the gate negotiates the tier DOWN, never up.** Admission may **cap** a requested tier to
+    the mode's ceiling and admit the job at the capped tier; it may never **raise** one. A ceiling is a
+    limit, not a recommendation, and a gate that could raise a tier would be spending the cap on its own
+    initiative.
+  - **The shape, by mode** (⚠ the exact ceilings are the **proposal**, owner-unconfirmed except where
+    noted; the SHAPE — a monotonically falling ceiling with refusal at the bottom — is the decision):
+    **Normal** → no ceiling, any tier the plan asked for, up to Ultracode. **Conserve** → **no
+    Max/Ultracode** (owner-stated); the deep tiers are the expensive ones and Conserve is the mode that
+    exists to stop spending like that. **Reserve-for-owner** → tighter still, the low tiers only —
+    unattended work is already meant to be backing off here, and a long deep run is the opposite of
+    backing off. **Stop-unattended-AI** → **REFUSED outright regardless of tier**, unchanged; the tier
+    question does not arise because the launch does not happen.
+  - **⛔ The same asymmetry as the Stop behaviour above, and for the same reason: the ceiling binds
+    UNATTENDED / dispatch-launched work ONLY. It never caps the owner's own interactive session.** The
+    cap is being reserved FOR him; a gate that throttled his own thinking depth at 85% would defeat its
+    own purpose exactly as a gate that locked him out would. _The invariant constrains the AI, not the
+    owner_ — CPB5 guardrail (a), applied to the second axis.
+  - **⭐ The consequence that makes CPB9's verify-the-tier requirement STRUCTURAL rather than defensive.**
+    Once the gate can cap, **"requested tier ≠ applied tier" stops being an anomaly and becomes the
+    NORMAL case** — the gate itself manufactures the divergence, deliberately, every time it negotiates
+    one down. So a job record that stores the **requested** tier is not merely imprecise, it is
+    **systematically wrong in the one direction that matters**, and the gate's own cap-arithmetic would be
+    reading back a number its own cap invalidated. This is why the tier must be recorded as **applied and
+    verified** (CPB9), in the **WB1 envelope's `effort` field** (WB1), rather than echoed from the
+    request. The three folds are one design: **the gate sets it, the launcher verifies it, the envelope
+    records it.**
+  - **Open, with its earn-condition stated (Protocol 50 a-form):** whether the owner can override a
+    ceiling for a specific unattended job, and if so whether that override is logged as a decision or
+    simply as a higher-tier job. Not designed here — it earns a slot when CPB5 v0.2's admission module
+    gets built and the override would have somewhere real to live. Until then the ceiling is absolute for
+    unattended work, which is the fail-closed reading and the right default to start from.
+    **Nothing here is built.** CPB2's shipped code is untouched by this fold; the ceiling lands with CPB5
+    v0.2's admission module, against tiers CPB9 can actually set.
 - **CPB5 — `robco`, the OPERATOR CONTROL CLI (owner-confirmed 2026-07-30; upgraded read→control 2026-07-30;
   high-priority).** 🔄 **IN PROGRESS — v0.1 of 3 SHIPPED (2026-07-31), control repo `ff11244`.** The
   ladder's first slice, "the decision loop", is built and live: the two foundations, the five views, the
@@ -2684,7 +2794,13 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
     2026-07-31, recorded at CPB2 above): REFUSE new unattended / dispatch-launched AI sessions, PRESERVE
     the owner's own interactive headroom, and never gate saving / committing / pushing, which cost no AI.
     The gate reads its mode from CPB2 — one threshold set, one admission module.** It is also the gate the
-    per-job EFFORT TIER (**CPB9**) must pass through. **`session.stop` now has a concrete owner-specified shape (2026-07-31) — see
+    per-job EFFORT TIER (**CPB9**) must pass through. **The admission module therefore returns TWO things,
+    not one (folded 2026-07-31): an ALLOW/REFUSE verdict AND an effort CEILING** — the mode's maximum tier,
+    per CPB2's EFFORT DIMENSION above. A job asking for more than the ceiling is **admitted at the
+    ceiling**, not refused (refusal stays Stop-unattended-AI's job), and the **capped** tier is the one
+    that must be recorded — see CPB9 and WB1's `effort` field. **The ceiling binds unattended /
+    dispatch-launched work only and never the owner's own interactive session**, the same asymmetry the
+    ALLOW/REFUSE half already has. **`session.stop` now has a concrete owner-specified shape (2026-07-31) — see
     SESSION CONTROL (b) in this entry: echo the exact session by NAME + id/pid, explicit confirm, never
     batched, a `process-terminated` postcondition evaluated on `(pid, procStart)` identity, and the
     termination routed through `lib/reaper.js`'s existing single `process.kill` carve-out rather than a
@@ -2892,7 +3008,10 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   worst possible thing to leave unsupervised against a shared cap. So the two are one decision, not two —
   **the tier is what makes headless work worth doing, and the gate is what makes it safe to do.**
   At **Stop-unattended-AI** the gate refuses the launch outright regardless of tier (CPB2, above); at the
-  restrictive-but-not-stopped modes the tier is the natural thing for admission to negotiate down.
+  restrictive-but-not-stopped modes the tier is the natural thing for admission to negotiate down. **That
+  "negotiate down" is now specified rather than gestured at — see the EFFORT DIMENSION under CPB2 above
+  (owner-approved 2026-07-31): a per-mode tier CEILING, with the refusal reserved for the mode that already
+  refuses everything.**
   **REQUIREMENT — VERIFY THE APPLIED TIER PER JOB (owner-approved 2026-07-31). Prove the tier was set; do
   not assume it.** Requesting a tier and recording that you requested it is not evidence the job ran at it.
   Every job must carry the tier it was **actually observed to run at**, per job, at the epistemic strength
@@ -2913,10 +3032,29 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   set the tier at all, and which names the candidate probes for corroborating it. If SP2 comes back
   negative, this requirement does not disappear: it applies to whatever mechanism replaces prompt-embedded
   effort.
-  **What would earn it a slot (stated, per Protocol 50 a-form):** an owner go plus a spec — at minimum what
-  "approvalless" is allowed to mean, how a job is described to it, and what it writes to the ledger
-  (measured per-job usage among it, which is what unblocks CPB1). Until then it stays an unversioned,
-  dependency-bearing placeholder rather than a queued build.
+  **✅ UN-GATED (2026-07-31) — SP2 mechanism (1) came back POSITIVE, so the tier is REACHABLE and this
+  feature does not need rescoping.** Full write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md`.
+  Three things this hands CPB9, and the last one is a hard build requirement, not a note:
+  - **The mechanism is TWO MESSAGES, not one.** A message that is exactly `/effort <level>` and nothing
+    else (0 turns, session idles), **then** the task as a separate follow-up. **⛔ Inlining the directive
+    with the task makes the slash command swallow the task — 0 turns, nothing runs.**
+  - **The clean launcher-flag route is PARKED, not available.** `start_code_task` exposes no effort field
+    (`cwd`/`model`/`prompt`/`title` only). A flag would make the tier part of the launch **transaction**
+    rather than a two-step protocol — **atomicity, not capability** — and its earn-condition is this
+    item's own owner go + spec. ⚠ Protocol 51(a): that schema is Dispatch-origin and unverified from the
+    session that recorded it — **re-read it here at build time** before designing around it.
+  - **⛔ "0 turns" MUST be a RED outcome, never an empty success.** The inline failure is a **silent
+    no-op**, not an error: a session that consumed a launch slot, reported back, and did nothing. For an
+    unattended launcher that is the single worst failure shape available, and it is now known to be
+    reachable by one plausible mistake in prompt construction.
+    **Where the verified tier is RECORDED: the WB1 envelope's `effort` field** (see WB1 above) — the tier
+    and its verification state ride the provenance envelope every job record already carries, rather than
+    becoming a second place the fact lives (Protocol 22). The admission gate's arithmetic and the job's own
+    record then read the **same** tier from the **same** field.
+    **What would earn it a slot (stated, per Protocol 50 a-form):** an owner go plus a spec — at minimum what
+    "approvalless" is allowed to mean, how a job is described to it, and what it writes to the ledger
+    (measured per-job usage among it, which is what unblocks CPB1). Until then it stays an unversioned,
+    dependency-bearing placeholder rather than a queued build.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
@@ -2991,7 +3129,44 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
 - **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
   required before running regardless.
 - **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
-- **SP2. ⬜ Can a LAUNCH PROMPT set the reasoning EFFORT TIER? (NEW ID, filed 2026-07-31.)** The empirical
+- **SP2. 🔄 HALF-ANSWERED — mechanism (1) CONFIRMED POSITIVE 2026-07-31; mechanism (2) still open. (NEW ID,
+  filed 2026-07-31.)** Full write-up: **`planning/control-plane/EFFORT_CONTROL_SPIKE.md`** (local-only).
+  **✅ THE ANSWER (mechanism 1): Dispatch CAN set a spawned session's effort tier, per session, at will —
+  but NOT the way this spike assumed it would be done.** The working mechanism is **two messages**: send a
+  message that is **exactly `/effort <level>` and nothing else** (it parses as a slash command, runs **0
+  turns**, and the session idles), **then** send the real task as a **separate follow-up** to the same
+  session, which runs at that tier. **⛔ INLINE FAILS:** `/effort <level>` on the same message as a task
+  makes the slash command **swallow the whole task as its argument** — 0 turns, **nothing runs at all**.
+  That failure is a **silent no-op, not an error**, which is the shape an unattended launcher is worst at
+  noticing, so **CPB9 must treat "0 turns" as RED, never as an empty success.**
+  **Read the literal question and the decision it gates as two different answers, because they diverge:**
+  as worded — an effort directive _embedded in_ the launch prompt alongside the task — the answer is
+  **NO**. The decision it actually gates — _is prompt-level per-session effort control reachable through
+  the programmatic path at all?_ — is **YES**. CPB9's effort tier is therefore **reachable**, and does not
+  need rescoping.
+  **The epistemic split, stated because SP2 demanded it and it is the part most likely to be rounded up:**
+  **the tier-SET is VERIFIED** — the **harness itself** printed `Set effort level to max (this session
+only): …`, which is a **system** state-change report naming both the level and its **per-session scope**,
+  not the session's own account of itself, so it clears the "accepted / echoed / acknowledged" bar this
+  spike expected to be stuck at. **But whether a high tier materially deepens reasoning is CLAIMED, not
+  VERIFIED** — that is the **tool's own description** of the tier, and **no session can introspect its own
+  thinking budget**, including the one that ran this. ⛔ **"Effort control is confirmed" must never be
+  carried across into "high-tier runs are measurably better" — nothing here establishes that, and nothing
+  here tried to.**
+  **⚠ Still OPEN — mechanism (2), the `ultrathink` keyword, was NOT tested.** SP2 stays open on that half;
+  it is a separate mechanism and assuming it behaves like (1) is exactly how this spike said a negative
+  result gets missed. **The interactive control arm is now MOOT for mechanism (1)** — it existed to
+  disambiguate a **negative** ("the launch path strips it" vs "the directive does nothing anywhere"), and a
+  positive result needs no such disambiguation. It is still required if `ultrathink` comes back negative.
+  **⚠ And a launcher gap worth knowing: `start_code_task` exposes NO effort field** — schema is
+  `cwd`/`model`/`prompt`/`title` only, no args passthrough, no env. The clean "launch it at a tier the way
+  you launch it with a model" route **needs a launcher change and is PARKED, not built** (earn-condition:
+  CPB9's owner go + spec). It buys **atomicity, not capability** — the two-message pattern has a real seam
+  where a launcher crashing between the messages leaves an idle session behind. Protocol 51(a): that schema
+  is **Dispatch-origin, accepted but not independently verified** — **re-read it at CPB9 build time.**
+  **── The ORIGINAL scope, kept in place (Protocol 49 discipline — the reasoning is not deleted just
+  because the answer arrived) ──**
+  The empirical
   question **CPB9's effort-tier-per-job feature stands or falls on**: when Dispatch starts a session
   **programmatically**, does an effort directive embedded in the launch prompt actually engage that effort —
   or does it only work when typed live in an interactive session?
@@ -3021,8 +3196,55 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   reachable that way and CPB9's effort-tier feature has to be rescoped rather than quietly built on an
   assumption that never held.
   **Owner-in-loop** (it needs real launches observed), and **doc-only until run** — nothing here is built.
+  _(That "until run" now applies only to mechanism (2); mechanism (1) ran and is answered above. Still
+  doc-only either way — **nothing was built by the answer**.)_
   **Cross-ref: CPB9** (the feature it gates) and **CPB2 / CPB5 v0.2** (the admission gate any tier must pass
-  through regardless of how it is set).
+  through regardless of how it is set), plus the **standing effort workflow** the answer earned —
+  `planning/control-plane/EFFORT_CONTROL_SPIKE.md` §7, and the ⛔ **DEAD** watcher-adjusts-effort idea at §8.
+
+### Standing workflow — DISPATCH SETS EFFORT PER SESSION (adopted 2026-07-31, from SP2's answer)
+
+**Dispatch sets a spawned session's effort tier at will, the same way it already switches model per stage.**
+Protocol 8 has Dispatch selecting the **model** per stage and switching mid-run as the work demands; the
+effort **tier** is the second dial on that same panel, and SP2 established it is a dial that can actually be
+turned. Four parts, and they are a workflow rule rather than a build:
+
+1. **The pre-build PLAN decides the tier per spawned session** — chosen at plan time alongside the model, not
+   improvised at launch. A tier is a **budget** decision, and budget decisions belong in the plan.
+2. **Dispatch ANNOUNCES the tier on every change**, in the same breath as a model switch. A silent tier change
+   makes the effort budget unauditable — and since the tier-set is the **one** part of this that can be stated
+   with real confidence (see SP2's epistemic split), there is no excuse for not stating it.
+3. **The mechanism is the TWO-MESSAGE pattern** (`/effort <level>` alone, then the task as a separate
+   follow-up) until a launcher flag exists. **⛔ Never inline** — the slash command swallows the task and
+   **nothing runs**.
+4. **Usage caps it.** Once CPB5 v0.2's admission gate exists, the tier is not Dispatch's alone to pick: the
+   gate returns an **effort ceiling** with its verdict and negotiates the tier **down** as usage climbs — no
+   Max/Ultracode in a conserve-class mode (CPB2's EFFORT DIMENSION). Unattended work only; never the owner's
+   own interactive session.
+
+⚠ **Its eventual home is `CLAUDE.md` Protocol 8**, beside the model-per-stage rule it extends. **Flagged, not
+done** — this fold was scoped to the QUEUE and the control-plane docs, and editing a protocol is the owner's
+call, not a side effect of a doc pass. Recorded here so it is a live rule in the meantime rather than a
+remembered one (Protocol 50).
+
+### Logged decision — "a WATCHER changes the effort tier" is ⛔ DEAD (2026-07-31)
+
+**Dropped, superseded by confirmed two-message control (SP2, above).** The idea that some watcher process
+would observe a running session and adjust its effort tier is dead, and is recorded as a decision rather than
+left as an absence so it cannot quietly return as a good idea.
+
+**Why:** effort control turned out to be **direct, per-session, and system-confirmed at the moment it is
+set**. A watcher-mediated version is strictly worse on every axis — it adds a live process; it acts on
+**inference** about a session instead of an instruction to it; and it would change a tier **mid-run** with
+none of the confirmation the direct mechanism gets for free. **Direct is synchronous and confirmed; the
+watcher version would be asynchronous and unverifiable.** That is the whole argument.
+
+⚠ **Divergence, recorded rather than smoothed (Protocol 51(c)).** This fold was asked to mark an **existing**
+QUEUE/planning entry DEAD. **No such entry existed** — `QUEUE.md`, `QUEUE_LOG.md`, all of `planning/`, the
+private archive and the orchestrator's memory were each searched, and none contains a watcher-adjusts-effort
+item. **The only watcher in this queue is RB3**, the mobile-hidden-response detector, which is unrelated and
+is **NOT** affected by this decision — a future session must not read this block as touching RB3. So nothing
+was marked dead; **this block IS the decision, created new.**
 
 ## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
