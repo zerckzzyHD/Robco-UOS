@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (WB6 v0.1 SHIPPED — the ledger is now tamper-EVIDENT, not merely
+**Last updated: 2026-07-31 (three owner-approved follow-ups — the P16 gate is MOUNTED and LIVE, and the
+last of the three false-firing backup alerts is fixed)** — **P16 is no longer a gate waiting to be
+mounted.** Its one-line invocation now sits in the archive's publish flow, immediately after the scrub and
+before anything is publishable, blocking on its exit code with **no override flag** (archive repo
+`b90304fb`). An absent control repo **blocks** rather than skipping — an unscanned tree is never
+publishable. Proven red-then-green against the real generator: a tree carrying an e-mail address (the exact
+class the existing scrub is structurally blind to) reported OK from the scrub and was caught by the gate;
+a clean tree passes. **The two benign e-mails are allow-listed** per the owner's "not mine, allow it", so
+the real publishable tree (756 files) now reads **PASS** — one is in-fiction exhibit prose, the other is
+the post-scrub alias form, which is evidence the existing scrub worked rather than a leak that escaped it.
+⚠ **One thing had to be created to mount it at all:** the owner-maintained **scrub list** did not exist on
+this machine — the P16 build's real-tree run used an ad-hoc list that was never persisted, so the gate
+would have blocked every publish with `scrub-list-absent`. It is seeded (owner identifiers only, zero hits
+against the real tree) and is his to extend; details in the P16 entry. **And REF5 gained its third leg**
+(control repo `99fd90a`): the uncommitted-changes alert, which **REF1 was supposed to have fixed on
+2026-07-30 and never actually did**. The ledger shows why — REF1 matched a session's working directory
+against **one** repo root, but every control-plane build on this machine is a session sitting in the app
+repo editing the control repo beside it, so an actively-typed-in tree read `unowned` forever. The fix is
+evidence, not a wider guess: **a tree whose dirty set is changing between ticks is being worked on,
+whoever is doing it.** Not neutered — abandoned work still alarms, proven by a two-way mutation run.
+
+**Prior update — 2026-07-31 (WB6 v0.1 SHIPPED — the ledger is now tamper-EVIDENT, not merely
 reconstructable)** — **The check that already existed could not see the thing it was named for.**
 `--verify-replay` proved the snapshot matched a full replay — but replay only reads the fields its
 reducer knows, so editing anything else (a push's repo path, a gate's exit code) left the snapshot
@@ -3149,6 +3170,41 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   would have left that window uncovered. The **L4 push lock** (taken at step (a), released in the
   `finally`) spans the whole transaction and covers it. **One deliberate divergence from REF1, documented
   in code:** unknown ownership does NOT suppress the unpushed legs — see the shipped record below.
+  **── THIRD LEG SHIPPED 2026-07-31 — control repo `99fd90a` — the UNCOMMITTED-CHANGES detector ──**
+  The owner reported the third alert in this family — _"your latest work isn't backed up — the repo has N
+  uncommitted changes piling up"_ — still firing while an **active session owned the dirty tree mid-build**
+  (verified live during the WB6 build). ⚠ **The brief's premise was that this leg simply needed REF5's
+  treatment applied. Reading the repository first changed the build (Protocol 51a): the treatment already
+  existed — REF1 shipped it on 2026-07-30 — and it had NEVER ONCE FIRED.** The live ledger
+  (`events-2026-07-31.jsonl`) reproduces it exactly: `robco-control` read `unowned` at 13:54 / 13:59 /
+  14:24 / 14:34 / 14:44 with the dirty count climbing **5 → 12**, while in those same runs `robco-uos` read
+  **owned** by a live session. One session, sitting in the app repo, editing the control repo beside it.
+  **Root cause:** REF1's ownership is a **cwd prefix match against ONE repo root**, so it can only see the
+  repo a session is sitting _in_ — and cross-repo work is how _every_ control-plane build on this machine
+  happens. The signal could never have fired for the case it was built for.
+  **The obvious fix was rejected as a mute, not a tune:** widening the match to siblings (anything under
+  `C:\Dev\!RobCo\`) would hand ownership of all three repos to any session on the machine, so an abandoned
+  dirty tree would go unreported for as long as the owner worked on anything else. **Shipped instead:** a
+  second, evidence-based reading needing no attribution — _a tree whose **dirty set** changed between two
+  supervisor ticks is being worked on, whoever is doing it._ Each run fingerprints the tree (a hash of the
+  sorted `git status --porcelain` lines, from the call the detector **already makes** — no extra git) and
+  compares it with last tick's. A count could never do this: 6 → 6 looks identical whether nothing happened
+  or one file was staged and another touched. **An edit also RESETS the streak**, which is what makes the
+  grace period a grace period — the clock runs from the last real **edit**, not from the first ownerless
+  run. Also suppresses while a **push is in flight** for that repo, reusing `push-window.js`'s own verdict
+  the supervisor already computes (narrow — a tree is usually clean during a push — but a _partially_
+  committed one is not). **Fails toward REF1's prior behaviour:** a missing fingerprint on either side
+  (pre-REF5 history, an unreadable tree) claims nothing; absence of evidence is not evidence.
+  **NOT NEUTERED, proven both ways:** an at-rest, unowned, dirty tree past the threshold still alarms, and a
+  **two-way mutation run** turned the gate red in each direction (deleting the suppression; making the
+  edit-detector always claim an edit) before being reverted. **One honest note on that mutation:** the two
+  suppression legs deliberately overlap, so removing only the `activeEdit` branch still leaves the
+  streak-reset covering the same case — the branch is pinned by asserting the recorded **reason**, not just
+  the silence. **Auto-retract needed no new machinery** and was asserted rather than assumed — committing
+  makes the tree clean, the finding disappears, the incident resolves, and `notifyOnResolve` was already on
+  for `backup`. Locked by control test group **DTW**, including a **real sandboxed supervisor run** proving
+  the fingerprint actually persists to the ledger — without which the whole mechanism would be inert. Full
+  control suite green.
 
 ## SHIPPED — for the record, with SHAs
 
@@ -3173,6 +3229,16 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   is live in the 5-minute loop; the daily-housekeeping half is built, and its rank-3 sub-piece is now
   scheduled (via `78acfd5`) — the rest of ACT1 (the full pass, README-staleness nudge included) is still
   open.
+- **P16 ACTIVATION.** The pre-publish PII gate is **MOUNTED and LIVE** — ✅ SHIPPED `b90304fb` (ARCHIVE
+  repo — "museum: MOUNT the P16 pre-publish PII gate on the publish flow"). The one-line invocation the
+  P16 entry named, in `runPublishPrep()` after `preparePublish()` returns; exit code is the contract, no
+  override, and an absent control repo blocks rather than skips. Allow-list decision applied the same day
+  (owner: "not mine, allow it") — the real 756-file publishable tree now reads PASS. Full record at P16
+  above (its one home); this line is the shipped record.
+- **REF5 THIRD LEG.** The uncommitted-changes detector — ✅ SHIPPED `99fd90a` (control repo — "REF5 third
+  leg -- the uncommitted-changes alert, and why REF1 never fired"). REF1's cwd-only ownership could never
+  see a cross-repo build, which is how all control-plane work here happens; the fix reads the dirty set's
+  own movement instead. Full record at REF5 above (its one home); this line is the shipped record.
 - **REF5.** Push-window tuning for the unbacked-work / push-not-confirmed alerts — ✅ SHIPPED `e3706db`
   (control-plane repo — "REF5 — stop the unbacked-work alerts firing during a normal push"). Full design
   reasoning kept at REF5 above (its one home); this line is the shipped record. Both detectors now share
@@ -4707,6 +4773,62 @@ this pass deliberately did not touch. Until that lands, P16 protects nothing by 
 waiting to be mounted, in the same honest posture as CPB1/ACT2's dormant halves. **The exact wiring:**
 run `node <control>/scripts/museum-pii-gate.js <preparePublish outDir>` immediately after
 `preparePublish()` returns and **before** anything is published, and abort on a non-zero exit.
+
+**── ✅ ACTIVATION CLOSED (2026-07-31, archive repo `b90304fb`) — THE GATE IS MOUNTED AND LIVE ──**
+
+Mounted exactly where the activation note above specified: in `museum/generate.mjs`'s `runPublishPrep()`,
+immediately after `preparePublish()` returns and before anything is publishable. That is the **only**
+caller of `preparePublish`, so both the real path and the `--publish-prep-source` test seam go through it.
+**Only the gate call was added** — no change to file selection, scrub behaviour, or output scope. The
+`try`/`catch` became an early-return so the gate can run after a _successful_ scrub; the failure leg is
+behaviourally unchanged.
+
+**An absent or unrunnable gate BLOCKS, it does not skip.** A checkout with no control repo beside it stops
+rather than emitting an unscanned tree. `ROBCO_PII_GATE` overrides the path (test seam only); no `--force`
+was added, because a gate with an override flag is a suggestion.
+
+**The abort message does not lie.** `preparePublish`'s own trip says "NOTHING emitted", which is true of
+it. The P16 gate runs _after_ the tree is written, so its block says so explicitly rather than inheriting a
+sentence that would be wrong. **Deliberate tradeoff, recorded rather than hidden:** a blocked run leaves
+the emitted tree on disk (exit 1 is the "do not push" contract, and `.publish-out` is gitignored and
+transient). Deleting it would have been a change to publish behaviour beyond the gate call, which the brief
+scoped out. Worth revisiting if the owner would rather it self-destruct.
+
+**Verified red-then-green against the real generator, not a mock:**
+
+- **RED** — a tree carrying an e-mail address, the exact class `preparePublish` is structurally blind to.
+  The scrub reported OK (it substituted the name it was handed and saw nothing else); **P16 caught the
+  address and exit was 1.** This is the P13 gap demonstrated end-to-end, not argued.
+- **GREEN** — a clean tree passes both legs, exit 0, and the OK line now states the gate passed.
+- **FAIL-CLOSED** — an absent gate exits 1, naming the path it looked at.
+- `--check` and a parse check confirm the non-publish paths are untouched.
+
+**── ALLOW-LIST DECISION APPLIED (2026-07-31) — owner: "not mine, allow it" ──**
+
+Both distinct addresses from the real-tree run are allow-listed by SHA-256 (plaintext never stored). The
+real publishable tree (`museum/.publish-out`, 756 files) now reads **PASS**: zero scrub-term hits, 12
+e-mail findings, **0 blocking / 12 allow-listed**. Each exemption carries its reasoning in the file:
+
+- a **fictional in-fiction address** from the museum's own Fallout-flavoured copy — exhibit prose, not a
+  mailbox;
+- the **post-scrub alias form** of an address — `preparePublish()` already rewrote the identifier, so what
+  survives resolves to nobody. It is _evidence the existing scrub worked_, not a leak that escaped it;
+  P16 flags it because it detects the e-mail **class**, which is precisely the blindness it was built to add.
+
+**The allow-list does not weaken anything else** — verified on a probe tree: an unrelated e-mail, a public
+IP, a credential shape and a scrub term all still block.
+
+⚠ **A PREREQUISITE HAD TO BE CREATED, and it is the owner's to own from here.** The owner-maintained
+**scrub list did not exist on this machine** — the P16 build's real-tree run used an ad-hoc list that was
+never persisted, so the mounted gate would have blocked _every_ publish with `scrub-list-absent` (correct
+fail-closed behaviour, useless in practice). It is now seeded at `state/museum-scrub-list.txt` with the
+owner's own identifiers only, and **verified to produce zero hits against the real tree — reproducing the
+P16 build's own "zero surviving scrub-term hits" result.** Two exclusions are recorded _in the file_ so the
+decision is not silently re-made: the machine's **hostname** (`rog-ally`) is a **hardware model name** that
+appears legitimately in the museum's own prose about that hardware, and the username beside it in those
+paths is already scrubbed to the alias — listing it would block on the museum discussing its own hardware;
+and the public GitHub handle, which is the substitution _target_, not a leak. **This list is the gate's
+only knowledge of what a "real name" is — extend it as new identifiers appear.**
 
 ### P17. ⬜ Museum PREVIEW tab — curation surface for staging-vs-published (owner favorite; NET-NEW, folded 2026-07-30 from DeepSeek's fleshed design; EXTENDS the museum program + the CPB5 CLI)
 
