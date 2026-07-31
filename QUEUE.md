@@ -24,7 +24,28 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (WB1 v0.1 BUILT + SHIPPED — the ledger's records can now be JOINED)** — **WB1
+**Last updated: 2026-07-31 (GPT's REAL turtle banner is in, recoloured blue-wave — control repo
+`0b8d93b`)** — The owner supplied GPT's original `robco-turtle-banner.mjs`, and it has **replaced the
+from-scratch banner CPB5 v0.1 shipped** — that art is gone. His **72×22 raster**, his four-level phosphor
+palette, his half-block cell logic and both colourless ramps are **verbatim**; the only changes are
+ESM→CommonJS, the recolour, and routing capability detection through the CLI's existing probe so there is
+one rather than two. **The recolour is a derived mask, not a repaint:** the raster carries no channel
+saying which pixel is water, so the split comes from the art's own geometry — every painted pixel from the
+waterline row down is water (the surface _and_ the submerged flippers, which is why a flipper goes blue
+although it is anatomically turtle: the rule is "below the surface"), and on the four rows that straddle
+the surface, anything outside the turtle's body envelope is foam running out sideways. **The envelope was
+read off the raster, not guessed** — row 13's painted runs are `3-9 | 18-36 | 39-45 | 53-55 | 59-68` and
+the envelope `18-45` lands exactly on the two middle runs, leaving the detached streaks outside it. The
+turtle body is untouched. ⚠ **One of my own claims was corrected by measuring it:** the per-half palette
+means a cell with turtle above and water below _would_ render green-on-blue, and I wrote that this draws
+the waterline inside a single character — it does not, because the edge falls exactly on a cell boundary,
+so **zero** such cells occur and the waterline is a crisp horizontal edge. The capability is kept and
+pinned by a test, but stated as a capability. ✅ **And this closes the v0.1 divergence that said the asset
+did not exist** — it did; it was in a session uploads directory outside the four trees searched. The
+finding was accurate for where it looked, but "I could not find it" was reported in a way that read as "it
+does not exist", and those are different claims.
+
+**Prior update — 2026-07-31 (WB1 v0.1 BUILT + SHIPPED — the ledger's records can now be JOINED)** — **WB1
 v0.1 is shipped, control repo `d36ad1d`: one lineage id and one evidence envelope.** The control plane has
 never been short of records — it holds 62,000+ — but there was no way to ask _"show me everything about
 this one piece of work"_ without writing bespoke code per surface. Now there is. **⚠ This is a FOUNDATIONAL
@@ -2359,6 +2380,33 @@ structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVID
     with unicode and ascii fallbacks. Chosen over Gemini's, Fable's, and hand-drawn attempts. The asset already
     exists as GPT's `robco-turtle-banner.mjs`; it gets **integrated and recolored** (green turtle / blue water)
     when CPB5 is built.
+    ✅ **DONE (2026-07-31), control repo `0b8d93b` — and the asset claim above turned out to be correct after
+    all.** The owner supplied GPT's original `robco-turtle-banner.mjs`, and it is now the shipped banner,
+    **replacing the from-scratch one v0.1 shipped** (that art is gone). His **72×22 raster**, his four-level
+    phosphor **palette**, his half-block `paintedCell` and both colourless ramps are **verbatim**; the only
+    changes are ESM→CommonJS, the recolour, and routing capability detection through the CLI's existing
+    `theme.detectCaps()` so there is one probe rather than two (Protocol 22). His three modes — ansi /
+    unicode / ascii — survive exactly.
+    **The recolour mask, since "which pixel is water" is the whole question.** The raster carries no channel
+    saying so, so the split is **derived from the art's own geometry** by two stated constants rather than
+    hand-painted into a second opaque raster: **`WATERLINE_ROW = 14`** (every painted pixel at or below it is
+    water — the surface _and_ the submerged flippers under it, which is why a flipper goes blue although it is
+    anatomically turtle: the rule is "below the surface", exactly as stated above) plus a **`BODY_ENVELOPE`
+    for rows 10–13**, the rows that straddle the surface, where the shell's lower body is still above water
+    while the foam runs out sideways past it — inside the envelope is turtle, outside is foam. Rows 0–9 carry
+    no water at all. **The envelope was read off the raster, not guessed:** row 13's painted runs are
+    `3-9 | 18-36 | 39-45 | 53-55 | 59-68`, and the envelope `18-45` lands exactly on the two middle runs,
+    leaving the three detached streaks — visibly foam — outside it. The turtle body is **not** recoloured; the
+    water ramp is a parallel four-level ramp sharing no value with the green one.
+    ⚠ **One claim corrected by measurement rather than left standing:** `paintedCell` now picks a palette per
+    half, so a cell with turtle above and water below would render green-on-blue, and the first draft of the
+    code comment said this drew the waterline inside a single character. It does not — cells pair rows
+    (0,1), (2,3)… and the turtle/water edge falls between rows 13 and 14, **exactly on a cell boundary**, so
+    **zero** mixed cells occur in any column and the waterline is a crisp horizontal edge instead. The
+    per-half handling is kept (it is correct, and a future envelope change could need it) and pinned by test
+    `CLI-F2c`, but it is now stated as a capability rather than as something the shipped banner does.
+    The colourless unicode/ascii fallbacks are unchanged — the two-tone is a **colour** distinction, and
+    inventing a second glyph set to fake it would no longer be his art.
     **Notification control — the CLI manages Pushover delivery at will (owner add 2026-07-30).** A **global
     on/off switch** AND **per-alert-type** individual enable/disable, laid out like a settings panel (global
     switch on top, individual toggles beneath) so each alert family flips **independently** — budget/token,
@@ -2469,13 +2517,18 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   incident actually resolved — a claim that the action works is not evidence that it works.
 
   **⚠ THREE DIVERGENCES, recorded rather than buried.**
-  **(1) The turtle banner asset did not exist.** This entry says it "already exists as GPT's
-  `robco-turtle-banner.mjs`" and would be "integrated and recolored". A search of the app repo, the
-  control repo, the private archive and every planning tree found **no turtle asset under any name**. The
-  renderer was therefore **written from scratch to the owner's stated design** (green turtle above a blue
-  waterline, truecolor with graceful fallback, unicode + ascii). Nothing was integrated and nothing was
-  recoloured, because there was nothing on disk to integrate. Protocol 51b: a prose claim about an
-  artifact is a locator, not evidence.
+  **(1) The turtle banner asset did not exist. ✅ RESOLVED 2026-07-31 — the asset was real; the search
+  was looking in the wrong places.** As shipped at v0.1: a search of the app repo, the control repo, the
+  private archive and every planning tree found **no turtle asset under any name**, so the renderer was
+  written from scratch to the owner's stated design. **The owner then supplied GPT's original
+  `robco-turtle-banner.mjs` from a session UPLOADS directory — outside all four of those trees.** It is now
+  the shipped banner, recoloured (control repo `0b8d93b`, full record at the Startup-banner block above);
+  the from-scratch art is gone. **The lesson is worth keeping and it is not the one it looks like:** the
+  v0.1 finding was accurate _for the places searched_ and the honest thing to do was ship something and say
+  so — but "I could not find it" was reported in a way that read as "it does not exist", and those are
+  different claims. Protocol 51b still holds (a prose claim about an artifact is a locator, not evidence) —
+  with the corollary that a **failed** lookup is also only a locator, and the owner may simply be holding
+  the thing.
   **(2) "PowerShell CLI" vs "Node-native ladder"** — resolved in favour of Node, see the note at the top
   of this entry.
   **(3) The `:` palette is a command line, not a menu system** in v0.1 — it re-runs the same dispatcher
