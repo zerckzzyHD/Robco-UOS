@@ -24,7 +24,31 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (can a launch prompt even SET the effort tier? — a spike + a verify requirement,
+**Last updated: 2026-07-31 (WB1 v0.1 BUILT + SHIPPED — the ledger's records can now be JOINED)** — **WB1
+v0.1 is shipped, control repo `d36ad1d`: one lineage id and one evidence envelope.** The control plane has
+never been short of records — it holds 62,000+ — but there was no way to ask _"show me everything about
+this one piece of work"_ without writing bespoke code per surface. Now there is. **⚠ This is a FOUNDATIONAL
+SLICE and does not close WB1:** the schema, the append path and three producers are threaded; several
+others are deliberately not, and are listed by name in the entry rather than quietly implied.
+**The decision that made it safe** is that the lineage id is **derived, not assigned** — computed from a
+root the record already carries (`jobId` > `pushId` > `sessionId`). So a record written _before_ this code
+existed has its lineage computed **at read time**, and every one of the 62,000 joins with **no migration and
+no backfill** — which was not a convenience but a necessity, because an append-only ledger can never be
+backfilled. Proven read-only against the live ledger: **118 lineages, 33 push arcs**, and a sample arc
+gathered its intent + result + completion with **stamped 0, derived 3** — all three older than the code that
+joined them. Then the push that shipped WB1 wrote its own arc with **stamped 3**, carrying the real source
+SHA, the real gate result and verification going `CLAIMED → VERIFIED → VERIFIED`; **the live ledger now holds
+both kinds and still parses cleanly**, which is the whole migration story. **⛔ One deliberate refusal worth
+knowing:** the supervisor's `runId` is _not_ a lineage root, because it is a five-minute **tick** id — joining
+on it would sweep every unrelated finding from that tick into one "lineage" and make the spine actively
+misleading rather than merely incomplete. It would rather answer nothing than answer wrongly. **Adds no
+executor and no new source of truth** — a gate test proves this slice introduced no new write path at all and
+freezes the set of files allowed to write the ledger. And a real hazard was caught on the way: the backup's
+**fail-closed** secret scanner would have aborted the entire off-machine backup, silently and permanently, had
+any envelope field been named `secret`/`apiKey`/`password` — proven clean against the real scanner rather than
+by eye.
+
+**Prior update — 2026-07-31 (can a launch prompt even SET the effort tier? — a spike + a verify requirement,
 doc-only)** — Two folds, nothing built. **(1) SP2, a new spike:** when Dispatch starts a session
 **programmatically**, does an effort directive embedded in the launch prompt actually engage that effort, or
 does it only work typed live in an interactive session? Two mechanisms tested separately — a
@@ -1619,7 +1643,7 @@ except where an item maps to already-approved doctrine.** Standing invariants ap
 truth, zero MCP executors, supervisor is sole ledger-writer, AI-is-a-typist-not-authority, pinned/reproducible
 data, private-archive/public-museum boundary.
 
-### WB1. ⬜ Universal provenance spine + one evidence envelope (the composability backbone)
+### WB1. 🔄 IN PROGRESS — v0.1 (the foundational slice) SHIPPED 2026-07-31, control repo `d36ad1d` — Universal provenance spine + one evidence envelope (the composability backbone)
 
 **What it is.** GPT's single highest-leverage pick, which Gemini's "correlation spine" independently landed on
 too: **one lineage ID** threaded across contract → session → receipt → gate → ledger → backup → release →
@@ -1634,6 +1658,84 @@ capture (Node/git/browser/OS per receipt) rides the same envelope rather than be
 **Done means:** a single documented lineage-ID + envelope schema that CPK1/RB2/MCP1 all reference; at least one
 real cross-surface join (e.g. release → job → session → gate) demonstrated over live records; no second ledger
 or parallel identifier scheme introduced.
+
+**── v0.1 SHIPPED RECORD (2026-07-31, control repo `d36ad1d`) — a FOUNDATIONAL SLICE, NOT THE WHOLE ITEM ──**
+
+⚠ **This does NOT close WB1.** The schema, the append path and the highest-value producers are done; several
+producers are deliberately not threaded and are listed by name below. Read the two lists, not the SHA.
+
+**The one design decision everything else follows from.** The lineage id is **DERIVED, not assigned** —
+`lin_ + sha256(<rootKind>:<rootId>).slice(0,16)` over the first root a record carries, precedence
+**`jobId` > `pushId` > `sessionId`** (a push performed _by_ a job belongs to the job's arc). Two
+consequences, and the second is why this was the right shape: two records naming the same root compute the
+same id independently, and **a record written before WB1 existed still carries its root, so its lineage is
+computed at READ TIME.** Every pre-existing record joins with **no migration and no backfill** — which is
+not a convenience, it is a necessity: the ledger is append-only, so a backfill was never available. Stamping
+new records is therefore a convenience and an audit aid, **never an authority** — exactly what "derived,
+never a second source of truth" has to mean in practice.
+
+**⛔ `runId` is deliberately NOT a lineage root** (nor `idempotencyKey`/`nonce`/`key`). It is the
+supervisor's **tick** id — a _batch_ correlation, not a provenance arc. Rooting on it would sweep every
+unrelated finding, incident and observation from the same five-minute tick into one "lineage" and make the
+spine **actively misleading** rather than merely incomplete. Recorded as a decision, guarded by test
+`WB1-R2`: a tick record resolves to no lineage at all, while a real work arc still resolves.
+
+**The envelope:** `{envelopeVersion, producer{name,version}, jobId, sourceSha, artifacts[{path,sha256,bytes}],
+timestamps{producedAt,observedAt}, sensitivity, verification{state,by,at,detail}}` — every field the spec
+names. It fails safe in **both** directions: `sensitivity` defaults to **`private`** (these records carry the
+owner's absolute paths, so `public` must be stated deliberately) and an unrecognised `verification.state`
+degrades to `UNKNOWN`, never to a trusted state. **`verification.state` reuses CPB5 v0.1's shipped epistemic
+vocabulary rather than forking a second set of words for the same idea** (Protocol 22); test `WB1-V` turns
+the gate red if the two ever diverge.
+
+**THREADED NOW (3 producers + the append path):**
+
+- **`lib/ledger.js` `appendMany`** — stamps **every** appended record at ONE point rather than each producer
+  remembering to. Purely additive (adds `lineageId`, changes nothing else) and **fail-open by contract**: a
+  decoration must never be able to block a ledger write.
+- **`controlled-push.js`** — `push.intent` / `push.result` / `push.completion` carry envelopes. The
+  verification state is **not asserted here**: it comes from the arbiter that already owns the question
+  (`lib/completion-evidence.js`) and from whether the independent `ls-remote` re-read matched — so an intent
+  is `CLAIMED` and a satisfied completion bundle is `VERIFIED`.
+- **`lib/job-contract.js`** — `job.intent` / `job.result` carry envelopes; `job.result`'s state is derived
+  from whether an independent `observed` re-read was recorded, **not** from the caller's own outcome string.
+  `job.transition` deliberately gets **no** envelope — a lifecycle transition carries no evidence, so the
+  spec's "where applicable" clause is applied rather than ignored.
+- **GATE RESULTS are covered without a new record type.** They are not standalone records in this build —
+  they ride inside `push.intent.gateResult` / `push.completion.gate` — so the join **surfaces them from
+  inside the push records** rather than inventing a second place the gate outcome lives (Protocol 22).
+  Recorded as a deliberate reading of the brief, not an omission.
+
+**DEFERRED — named, not implied (the explicit follow-on list):** incident transitions (`incident.transition`);
+the CPB5 action records (`action.submitted` / `action.result` / `action.postcondition`); **`session.observed`
+(~15k records in the live ledger — an envelope there would bloat it for nothing, so lineage-only is the right
+call and the envelope is the open question)**; the backup/mirror records; usage records; reap records;
+housekeeping records. **Also deferred, and it is a real limit:** a push does not yet name the **session** that
+made it, so a push arc is push-scoped today. The contract → session → receipt chain the spec describes needs
+that binding, and the binding needs the launcher — **CPB9**, which has no owner go.
+
+**Proven, not asserted.** Against the machine's own live ledger, read-only: **62,670 real records, 118
+lineages, 33 push arcs**, and a sample arc joined `push.intent + push.result + push.completion` with
+**stamped 0, derived 3** — all three written before this code existed. Then, after shipping, the push that
+carried WB1 itself wrote an arc with **stamped 3, derived 0**, carrying producer `controlled-push`, the real
+source SHA, the real gate result (`exitCode 0`), and verification `CLAIMED → VERIFIED → VERIFIED`. **The live
+ledger now holds both kinds and parses cleanly (62,740 records, not degraded)** — which is the migration
+story, since append-only means it will hold both forever.
+
+**A real hazard caught before it could bite.** `lib/backup-mirror.js`'s **fail-closed** secret scanner aborts
+the **entire** off-machine backup if any mirrored file has a JSON key named `secret` / `apiKey` / `password` /
+`privateKey` / `accessToken`. An envelope field with any of those names would have silently broken the daily
+backup for good, on a path nothing else tests. None of the chosen names match, and `WB1-S` proves it against
+the **real** scanner with a red-then-green rather than by inspection.
+
+**Verified:** test group **WB1** — schema validity and fail-safe defaults; additivity proven field-by-field;
+fail-open against hostile input; backward compatibility against **real pre-WB1 records captured verbatim from
+the live ledger**; every existing reader re-run over stamped records; the replay snapshot byte-identical with
+and without stamps; the join over unstamped records, over a **mixed** arc, and cross-producer; the
+**no-new-write-path** guard (which also freezes the set of files permitted to write the ledger); and an
+end-to-end append/read/join through the real sandboxed ledger. Full control suite green, **nothing regressed**
+in the CP / PG / PH / SP / WS / WSI / CLI groups that already exercise this append path. Pushed through the
+wrapper with its own real gate (`gate: PASSED`, exitCode 0).
 
 ### WB2. ⬜ Machine-readable guard registry
 
