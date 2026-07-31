@@ -47,10 +47,25 @@ state}`** field — `requested` and `applied` are separate **because the gate ma
 which is what turns CPB9's verify-the-tier rule from defensive into **structural**. **(3)** A **standing
 workflow** is adopted: the pre-build **plan** picks the tier per session and Dispatch **announces** every
 change. ⚠ **Two honest divergences:** the "watcher changes the effort tier" idea this pass was asked to mark
-DEAD **had no entry anywhere** — searched across the queue, the log, all of `planning/`, the archive and
-memory — so a **new** logged decision was written instead of a strike-through (and **RB3's watcher is
-unrelated and untouched**); and **`start_code_task` exposes no effort field** (`cwd`/`model`/`prompt`/`title`
-only), so the clean launcher-flag route is **PARKED, not built** — it buys atomicity, not capability. Full
+DEAD **had no entry in the queue or in planning** — so a **new** logged decision was written instead of a
+strike-through (and **RB3's watcher is unrelated and untouched**). ⛔ **That divergence needed its own
+correction, kept on the record:** this pass first claimed memory held nothing either, having searched the
+**wrong store** — Dispatch's agent memory _does_ carry the instruction, as item **(d) DROP the
+watcher-escalation idea**, and it surfaced only when the Protocol 48 archive sync mirrored that store. The
+substance holds (memory records the _decision to drop_, not a live proposal), but "found nothing" and
+"searched the wrong memory" are different claims — **Protocol 51(b), memory is a locator to resolve, not a
+thing to assert from.** Second divergence: **`start_code_task` exposes no effort field**
+(`cwd`/`model`/`prompt`/`title` only), so the clean launcher-flag route is **PARKED, not built** — it buys
+atomicity, not capability. **Two things the primary source added that this fold would otherwise have
+missed:** a **sequencing rule** — _session-configuration slash commands are standalone turns; **wait for the
+acknowledgement and idle state** before sending the brief_, so back-to-back sends are a **race** that
+re-creates the inline failure by accident — and the **ladder as ground truth** read off the actual UI (Low ·
+Medium · **High = default** · Extra · Max · Ultracode), with Max/Ultracode reserved for gnarly high-stakes
+work. **And the arc behind the answer is recorded because it is the best part:** the first run tested only
+the inline form, called it **"definitively no"**, and wrote that to memory as fact — the **owner** and
+**GPT** corrected it from outside the loop, and the re-test confirmed. _A null result under ONE
+configuration is not a general "no"_, and a premature "definitively" in memory is worse than no memory,
+because it stops a future session ever retrying the thing that works. Flagged as **museum** material. Full
 write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md` (local-only). **SP2 remains OPEN on its second
 mechanism — the `ultrathink` keyword was not tested.**
 
@@ -3034,10 +3049,15 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   effort.
   **✅ UN-GATED (2026-07-31) — SP2 mechanism (1) came back POSITIVE, so the tier is REACHABLE and this
   feature does not need rescoping.** Full write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md`.
-  Three things this hands CPB9, and the last one is a hard build requirement, not a note:
+  Four things this hands CPB9, and the last two are hard build requirements, not notes:
   - **The mechanism is TWO MESSAGES, not one.** A message that is exactly `/effort <level>` and nothing
     else (0 turns, session idles), **then** the task as a separate follow-up. **⛔ Inlining the directive
     with the task makes the slash command swallow the task — 0 turns, nothing runs.**
+  - **⭐ WAIT FOR THE ACKNOWLEDGEMENT AND IDLE STATE before sending the brief — this is a sequencing
+    requirement, not a message-count one.** _Session-configuration slash commands are standalone turns._
+    Firing both messages back-to-back is a **race**, and losing it re-creates the inline failure by
+    accident — which is the single most likely way an unattended launcher gets this wrong. **Wait on the
+    acknowledgement, never on a timer.**
   - **The clean launcher-flag route is PARKED, not available.** `start_code_task` exposes no effort field
     (`cwd`/`model`/`prompt`/`title` only). A flag would make the tier part of the launch **transaction**
     rather than a two-step protocol — **atomicity, not capability** — and its earn-condition is this
@@ -3139,6 +3159,21 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   makes the slash command **swallow the whole task as its argument** — 0 turns, **nothing runs at all**.
   That failure is a **silent no-op, not an error**, which is the shape an unattended launcher is worst at
   noticing, so **CPB9 must treat "0 turns" as RED, never as an empty success.**
+  **⭐ AND THERE IS A SEQUENCING RULE, not just a message-count rule — this is the whole operational fix in
+  one line:** _session-configuration slash commands are **standalone turns**; **wait for the command's
+  acknowledgement and idle state** before sending the work brief._ Two messages fired back-to-back without
+  waiting is a **race**, not the pattern — an unattended launcher that blasts both is the most likely way to
+  re-create the inline failure by accident. **CPB9 must WAIT on the acknowledgement, not on a timer.**
+  **THE LADDER (ground truth — read off the actual UI, not inferred): Low** (quick replies to simple
+  questions) · **Medium** (light, casual tasks) · **High = DEFAULT** ("balanced for everyday work") ·
+  **Extra** ("complex, detailed work") · **Max** ("the hardest problems, takes longest") · **Ultracode**
+  ("big coding tasks — Claude plans and runs the workflow"; multi-agent self-review, slowest and most
+  usage-hungry). **Reserve Max/Ultracode for gnarly, high-stakes, wrong-call-is-expensive work; default High
+  is right for routine work** — which is the selection rule the admission ceiling then enforces from above.
+  **The FALLBACK, still valid and worth keeping:** where the two-message pattern is not usable, Dispatch hands
+  the **owner** the ready-to-paste prompt plus exactly which **Model + Effort** to use and he launches it
+  himself. That was the standing workflow _before_ this finding (when the tier was believed unreachable); it
+  is now the fallback rather than the default, and it is deliberately **not** deleted.
   **Read the literal question and the decision it gates as two different answers, because they diverge:**
   as worded — an effort directive _embedded in_ the launch prompt alongside the task — the answer is
   **NO**. The decision it actually gates — _is prompt-level per-session effort control reachable through
@@ -3153,6 +3188,27 @@ only): …`, which is a **system** state-change report naming both the level and
   thinking budget**, including the one that ran this. ⛔ **"Effort control is confirmed" must never be
   carried across into "high-tier runs are measurably better" — nothing here establishes that, and nothing
   here tried to.**
+  **⭐ HOW THIS ANSWER WAS ACTUALLY REACHED — an over-claim, corrected from OUTSIDE the loop. Recorded
+  because the arc is the most valuable part, and because it is the reason the epistemics above are worded so
+  carefully.** The first run of this experiment tested **only** the inline form, watched it fail, and
+  concluded **"definitively no — effort can't be set from Dispatch"** — then wrote that to memory **as
+  established fact**. It was wrong. The **owner** pushed back immediately (you can send _two_ messages), and
+  **GPT** sharpened the critique: the experiment had disproved only _same-message injection_, never tested a
+  command-only first message, and never established that effort was merely a global desktop setting. The
+  clean re-test confirmed the two-message pattern. **⛔ The transferable lesson, which is bigger than effort
+  tiers:** _a null result under ONE configuration is not a general "no."_ When a mechanism has an obvious
+  variant (one message vs two, inline vs flag), **test the adjacent configuration BEFORE writing a conclusion
+  to memory** — and qualify null results as "failed under config X", never "definitively no". **A premature
+  "definitively" in memory is worse than no memory at all: it stops a future session from ever retrying the
+  thing that actually works.** That is precisely what nearly happened here, and it was caught only because
+  the correction came from **outside** the reasoning loop — the owner and a second model, not the session
+  auditing itself.
+  **🏛 MUSEUM VALUE — flagged, not built.** This is a clean, self-contained **over-claim → external
+  correction → re-test → confirmed → doctrine adopted** arc, with the correction arriving from outside the
+  system. That is unusually good exhibit material for the museum program (**P** / **P6** AI-collaboration
+  exhibit, and **PM1**'s retrospective) — the system's own reasoning being audited and corrected, with the
+  fix becoming standing workflow. Recorded here so the arc is not lost; **no museum work is queued by this
+  note.**
   **⚠ Still OPEN — mechanism (2), the `ultrathink` keyword, was NOT tested.** SP2 stays open on that half;
   it is a separate mechanism and assuming it behaves like (1) is exactly how this spike said a negative
   result gets missed. **The interactive control arm is now MOOT for mechanism (1)** — it existed to
@@ -3239,12 +3295,20 @@ set**. A watcher-mediated version is strictly worse on every axis — it adds a 
 none of the confirmation the direct mechanism gets for free. **Direct is synchronous and confirmed; the
 watcher version would be asynchronous and unverifiable.** That is the whole argument.
 
-⚠ **Divergence, recorded rather than smoothed (Protocol 51(c)).** This fold was asked to mark an **existing**
-QUEUE/planning entry DEAD. **No such entry existed** — `QUEUE.md`, `QUEUE_LOG.md`, all of `planning/`, the
-private archive and the orchestrator's memory were each searched, and none contains a watcher-adjusts-effort
-item. **The only watcher in this queue is RB3**, the mobile-hidden-response detector, which is unrelated and
-is **NOT** affected by this decision — a future session must not read this block as touching RB3. So nothing
-was marked dead; **this block IS the decision, created new.**
+⚠ **Divergence, recorded rather than smoothed (Protocol 51(c)) — and CORRECTED once, which is the more
+useful record.** This fold was asked to mark an **existing** QUEUE/planning entry DEAD. **No such entry
+existed in the QUEUE or in planning** — `QUEUE.md`, `QUEUE_LOG.md` and all of `planning/` were searched and
+none carries a watcher-adjusts-effort item, so **nothing was struck through; this block IS the decision,
+created new.** ⛔ **The correction:** the first version of this block also claimed the orchestrator's memory
+held nothing — **that was wrong, and the mistake is worth keeping.** The search covered the wrong store (this
+project's own `memory/`), not **Dispatch's** agent memory, which does carry the instruction as item **(d) DROP
+the watcher-escalation idea** inside its `effort-handoff-workflow` note. It was found only when the Protocol
+48 archive sync mirrored that store. **The substance is unchanged** — Dispatch's memory records the _decision
+to drop_, not a live proposal, so there was still no entry anywhere proposing the thing — but "I searched
+memory and found nothing" and "I searched the wrong memory" are different claims, and **Protocol 51(b) is
+exactly the rule that says memory is a locator to be resolved deterministically rather than asserted from.**
+**The only watcher in this queue is RB3**, the mobile-hidden-response detector, which is unrelated and is
+**NOT** affected by this decision — a future session must not read this block as touching RB3.
 
 ## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
