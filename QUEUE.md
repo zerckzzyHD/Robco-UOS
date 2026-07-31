@@ -24,7 +24,34 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-30 (REF5 BUILT + SHIPPED — the "your work isn't backed up" alerts stopped crying
+**Last updated: 2026-07-30 (HG2 BUILT + SHIPPED — the terminal now says which part failed to start)** —
+**HG2 is shipped, app repo `aef7da4`: the boot sequence is isolated phase by phase.** Starting the terminal
+runs **51** named phases (the queue's old "~45" was an estimate; the real count is 51). Every one of them
+sat under a **single** outer `try`/`catch`, so the first phase to throw silently abandoned all the rest and
+the only trace was a console line no user ever sees — that is the exact mechanism behind "the terminal came
+up blank and there's no way to tell what died." Each phase now runs under its own guard, in **byte-identical
+order** (the two awaited async phases still await; only the isolation is new), and every phase is
+**classified**. **Exactly three are fatal**, each chosen from what the code actually does rather than how
+important it sounds: restoring the campaign, the master render pass, and opening the last-used screen — that
+third one because the tab switch is what makes any panel visible at all, so skipping it produces a literally
+blank column. **Everything else degrades:** a sound channel, a suggestion list or a device pref that fails no
+longer stops the phases after it; the terminal carries on, files the fault in the same ring-buffer the FAULT
+lamp and the service console already read, and **tells the user in the transcript** — never console-only.
+A fatal phase instead paints a **self-contained BOOT FAILURE screen** naming the phase, the fault, anything
+already degraded, and a RETRY BOOT control — built from inline styles and text only, because it may have to
+survive a fatal fault in the very phase that paints the UI. **⚠ One deliberate fail-OPEN, recorded rather
+than buried:** an unknown phase name degrades instead of killing boot — a typo must never be the thing that
+bricks the terminal, and the gate is the right layer to catch it (Suite 258.15 does, in both directions).
+Locked by **Suite 258**, behavioural against the real functions in a `vm` sandbox, **including the HG1
+footgun re-checked one file over** (a console-less sandbox must not turn "a phase failure is contained" into
+"a phase failure is fatal"). **Suite 132.5 was RESTATED, not re-bumped** — its raw line-count ceiling stopped
+measuring anything once every phase became a three-line wrapper, so it now asserts each phase callback is a
+single named call, which is strictly stronger. Full `npm run gate` green; also verified in a real browser
+(clean boot, the degraded transcript line, and the fatal screen). `CACHE_NAME` r20 → r21. **This closes the
+HG1–HG2 pre-museum hardening pull-forward: both are now shipped, ahead of 2.9.0's OS services widening these
+surfaces.**
+
+**Prior update — 2026-07-30 (REF5 BUILT + SHIPPED — the "your work isn't backed up" alerts stopped crying
 wolf)** — **REF5 is shipped, control repo `e3706db`.** The two alerts the owner watched false-fire 6+ times
 during ordinary builds — _"a session tried to push but I never saw it confirm"_ and _"your latest work
 isn't backed up — N commits not on the remote"_ — were firing during the completely **normal push window**.
@@ -1859,10 +1886,10 @@ through the hardened `emit()`. Suite 135 keeps the original U7/U8 contract and p
 `npm run gate` green — 3701/3701 Node assertions plus boot smoke, render check (360/412), a11y, the
 `test.html` runtime audit, save-survival and offline-first. Protocol 1: `CACHE_NAME` r18 → r19.
 
-### HG2. ⬜ Bootstrap isolation — per-phase boot guards, fatal-vs-degradable (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
+### HG2. ✅ SHIPPED (2026-07-30), app repo `aef7da4` — Bootstrap isolation — per-phase boot guards, fatal-vs-degradable (PULLED FORWARD from the 2.9.0 hardening gate, owner 2026-07-28)
 
-**What it is.** ~45 boot-phase calls currently sit under ONE outer `try`/`catch` with zero per-phase isolation.
-Add per-phase guards, classify each phase's failure as fatal (boot cannot continue) or degradable (boot
+**What it was.** ~45 boot-phase calls sat under ONE outer `try`/`catch` with zero per-phase isolation. Add
+per-phase guards, classify each phase's failure as fatal (boot cannot continue) or degradable (boot
 continues, the failure is surfaced), and fail loudly — never silently — in both cases.
 
 **Why it's here and not in 2.9.0.** Same reasoning as HG1: this is debt in the existing boot sequence,
@@ -1872,6 +1899,57 @@ Protocol 50) is still in place under 2.9.0's hardening-gate section, now cross-r
 **Done means:** every boot phase runs under its own guard; each phase is classified fatal or degradable; a
 degradable failure surfaces to the user (not console-only, echoing the same standard Protocol 24 already sets
 for AI state-apply failures); a fatal failure fails loudly with a clear message, never a silent black screen.
+**Every criterion met** — see below.
+
+**Shipped as** (`js/ui/ui-core.js`): the real count is **51** phases, not ~45 — each now wrapped in
+`_bootPhase('<name>', () => { <the same call, unchanged> })`. **Call order and the two `await`ed async phases
+are byte-identical to the pre-HG2 sequence** — only the isolation is new; `_bootPhase()` returns the phase's
+own return value so `await _bootPhase(…)` preserves ordering exactly, and a rejected promise routes into the
+same classifier as a synchronous throw (a phase cannot escape the guard by failing late). Classification
+lives in ONE table (`BOOT_PHASE_SEVERITY`), not at 51 call sites.
+
+**Exactly three phases are FATAL**, each classified from what the code actually does rather than how
+important it sounds: `hydrate-state` (builds `state`; every later phase and every render reads it),
+`load-ui` (the master render pass), and `init-tabs` (`switchTab()` is what adds `.tab-visible` — skip it and
+**no** panel is ever revealed, i.e. a literally blank column). Everything else degrades: an audio arm, a
+datalist, a device pref or a wiring call that fails leaves a terminal that is worse, not unusable.
+
+**Both outcomes fail loudly.** _Degradable_ → boot continues; the fault is recorded through
+`_recordError('boot', …)` so the casing FAULT lamp, the BUS-24 fault console and the LIVING CORE strain
+signal all see it through the one shared ring-buffer reader (Protocol 22), **and** it is surfaced to the USER
+as a `#chatDisplay` transcript line — never console-only. The line is deliberately deferred to end-of-boot by
+`_flushBootFaults()`, because `_restoreApiKeyAndChatHistory()` clears `#chatDisplay` mid-boot and an earlier
+line would be wiped before it was ever read; a clean boot writes nothing. _Fatal_ → `_renderBootFatal()`
+paints the `#bootFatal` screen (`role="alert"`, the failed phase, the fault text, any degradable faults that
+preceded it, and a RETRY BOOT control), built from **inline styles and `textContent` only** — no CSS class,
+no render pass, no `MetaStore` read — precisely because it may have to survive a fatal fault in the phase
+that paints the UI. It paints once and swallows its own failure rather than becoming a second fault.
+
+⚠ **One deliberate fail-OPEN, stated rather than buried:** an unknown phase name degrades at runtime instead
+of killing boot. A typo in a phase name must never be the thing that bricks the terminal; the gate is the
+correct layer to catch the typo, and Suite 258.15 does.
+
+**Verified:** **Suite 258** — behavioural in a `vm` sandbox against the real functions lifted out of
+`ui-core.js` (isolation, ring-buffer recording, fatal propagation, async-rejection routing, the fail-open
+default, return-value passthrough, user surfacing, silence on a clean boot, the fatal screen's content,
+idempotence and never-throws contract) **plus the HG1 footgun re-checked on new ground** (258.13: a
+console-less sandbox must not turn "a phase failure is contained" into "a phase failure is fatal" — the exact
+defect HG1 hit in `state.js`, one file over). Five **marked Protocol 20 static exceptions** carry the part no
+behavioural test can reach: **258.15** holds the severity table and the real call-site list to each other in
+both directions, and **258.16** proves every statement in the try block is a `_bootPhase()` wrapper — so
+"every boot phase runs under its own guard" is checkable rather than merely asserted. **Suite 132.5 was
+RESTATED, not re-bumped:** its raw line-count ceiling stopped measuring anything once every phase became a
+three-line wrapper, so it now asserts each phase callback is a single named call — strictly stronger than the
+count it replaced (a 60-line inline monolith passed the old check and fails the new one). Diagnostic Shell
+registry count 167 → 169. Also verified in a real browser: a clean boot through the wrapped sequence (11
+panels `tab-visible`, no fatal screen), the degradable transcript line, and the fatal screen with its
+`role="alert"` and the preceding degraded fault listed. Full `npm run gate` green. Protocol 1: `CACHE_NAME`
+r20 → r21.
+
+**Protocol 44 trigger shipped with it:** a boot fault only reproduces on a load that already went wrong, so
+the Diagnostic Shell gains **SIMULATE DEGRADED BOOT FAULT** and **SIMULATE FATAL BOOT SCREEN** under
+`SIMULATE BOOT FAULT` — both driving the real shipped functions (Protocol 22), with the degraded one also
+exercising the unknown-name fail-open default by design.
 
 ---
 
@@ -2062,7 +2140,15 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
   it has no existing call site (every shipped subscriber is an anonymous arrow wired once at boot) — stated
   as API-level hardening, not claimed as a live fix. A Protocol 42 footgun (the console-less `vm` harness)
   was found and locked in the same commit. Full entry above.
-- **HG2.** Bootstrap isolation (per-phase boot guards, fatal-vs-degradable) — full entry above.
+- **HG2. ✅ SHIPPED (2026-07-30), app repo `aef7da4`.** Bootstrap isolation — per-phase boot guards,
+  fatal-vs-degradable. All 51 `window.onload` phases (not the ~45 originally estimated) now run under their
+  own `_bootPhase()` guard, in byte-identical order, with severity in one table. Exactly three are fatal
+  (`hydrate-state` / `load-ui` / `init-tabs` — the three whose absence leaves nothing on screen); everything
+  else degrades, is filed in the shared FAULT ring-buffer, and is surfaced to the user as a transcript line
+  rather than console-only. A fatal one paints a self-contained BOOT FAILURE screen instead of the silent
+  black screen this item existed to close. ⚠ One deliberate fail-open: an unknown phase name degrades rather
+  than kills (the gate catches the typo, Suite 258.15). Landed alongside HG1, both before 2.9.0's OS services
+  widen this surface. Full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
 - **RB2.** Launch + structured completion receipts — full entry above.
 - **RB3.** Mobile-hidden-response detector — now specified as a live `fs.watch` watcher, off by default —
@@ -5061,6 +5147,8 @@ hardening gate runs before any of them lands. The work is subtractive.
   Add per-phase guards, classified fatal-versus-degradable. Fail loudly, never silently. **⭐ PULLED FORWARD to
   the pre-museum band as [HG2] (owner, 2026-07-28) — Protocol 50 (a-date).** This reasoning stays here
   unchanged; the live entry with its own ID and "Done means" is in **"⭐ ALSO PRE-MUSEUM"**, directly under CP5.
+  **✅ SHIPPED 2026-07-30, app repo `aef7da4`** — so this line of the hardening gate is now CLOSED; the full
+  record (including the corrected phase count — 51, not ~45) is at the HG2 entry above.
 - **Event-bus hardening.** `RobcoEvents` has no `off` / `once` / dedup and swallows listener errors silently.
   Harden it before the OS round widens it; a thrown handler must not prevent unrelated handlers from running.
   **⭐ PULLED FORWARD to the pre-museum band as [HG1] (owner, 2026-07-28) — Protocol 50 (a-date).** This
