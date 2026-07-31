@@ -24,7 +24,26 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (P16 SHIPPED — the museum's pre-publish PII gate, control repo `0917d20`)** —
+**Last updated: 2026-07-31 (WB6 v0.1 SHIPPED — the ledger is now tamper-EVIDENT, not merely
+reconstructable)** — **The check that already existed could not see the thing it was named for.**
+`--verify-replay` proved the snapshot matched a full replay — but replay only reads the fields its
+reducer knows, so editing anything else (a push's repo path, a gate's exit code) left the snapshot
+matching **perfectly**. That exact case is now a test: the mutated record is one replay never reads,
+`match` stays **true**, and the chain catches it and the command exits non-zero. Every record appended
+from now on carries `chain:{v,algo,seq,prev,self}` — `self` = sha256 of the record's canonical form
+minus `self`, so **everything else is covered including WB1's `lineageId`** — and the verifier names the
+**exact** record: sequence, type, file, line. **Additive exactly like WB1:** the **63,696** records
+written before it carry no chain, still parse, still replay byte-identically, and are reported as
+`unchained` **coverage** — never as breaks, and never counted as verified. Truncation gets the one thing
+a self-contained chain cannot do for itself (a chopped chain is a valid _prefix_): a **high-water
+witness**, advance-only, a witness and never an authority — absent, truncation reads **UNOBSERVABLE**,
+never "fine". **Sequence numbers are never reused**, so a removed span survives as a permanent gap inside
+the append-only record rather than as a comparison that fades. **The verifier writes nothing and does not
+even import the ledger module** — the **supervisor** raises the incident, still the sole writer. Live and
+proven on the machine's own ledger: **63,906 records, 210 chained and intact, 0 breaks.** Full details in
+the WB6 entry below, including what is deliberately deferred.
+
+**Prior update — 2026-07-31 (P16 SHIPPED — the museum's pre-publish PII gate, control repo `0917d20`)** —
 **The gate that should have existed before the name leaked once.** Deterministic regex/string matching,
 **no model anywhere in the loop** — nothing asks an AI and nothing can be called _by_ one, because if the
 agent chooses whether to scrub, it isn't a gate. Four categories: emails, an owner-maintained **scrub
@@ -1854,7 +1873,7 @@ bump (Protocol 1), unlike the control-plane-repo WB items.
 **Done means:** the app exposes its build fingerprint; a self-hash check can confirm-or-flag drift from the
 published SHA; the fingerprint is what the museum/release-proof reads, not a hand-maintained version string.
 
-### WB6. ⬜ Ledger integrity hardening — hash-chained records + content-addressed evidence
+### WB6. 🔄 IN PROGRESS — v0.1 SHIPPED 2026-07-31, control repo `79e8fea` — Ledger integrity hardening: hash-chained records + content-addressed evidence
 
 **What it is.** Make the append-only ledger **tamper-evident** — each record chains the prior record's hash —
 and store bulky evidence **by content hash**. Strengthens the replay/verify that already exists
@@ -1863,6 +1882,154 @@ stays **sole writer**; this is pure integrity, no new authority and no executor.
 
 **Done means:** a mutated/truncated ledger record is detected by chain verification; evidence is addressable by
 hash and deduped; `--verify-replay` gains the chain check without changing who may write.
+
+**── v0.1 SHIPPED RECORD (2026-07-31, control repo `79e8fea`) — all three "done means" clauses MET; the
+follow-on list below is real and named ──**
+
+**The finding that shaped the build: the check that already existed could not see the thing it was named
+for.** `--verify-replay` compared a full replay against `snapshot.json` — but `replay()` only reads the
+fields its reducer knows (`reconcile.completed`, `session.observed`, `finding.*`, `adapter.probe`,
+`job.*`). Edit anything else — a push's repo path, a gate's exit code, an incident's detail — and the
+snapshot **still matched perfectly**. That exact case is now test `WB6-VR`: the record it mutates is one
+replay never reads, the snapshot check reports `match: true`, and the chain catches it and the command
+exits non-zero. That is the "reconstructable → tamper-evident" upgrade stated as a proof rather than a
+claim.
+
+**The chain.** Every record appended from WB6 forward carries
+`chain: {v, algo, seq, prev, self}`, where `self` = sha256 of the record's **canonical form with
+`chain.self` removed** — so **everything else is covered**, including WB1's `lineageId` and the chain's
+own `seq`/`prev` — and `prev` is the previous chained record's `self`. The four attacks read **differently
+on purpose**, because conflating them would lose which one happened: an **edit** breaks that record's own
+hash and names it exactly (sequence, type, file, line); a **deletion** breaks the _following_ record's
+`prev` and leaves a permanent sequence gap; a **reorder** breaks the links although every individual hash
+is still valid; a **front truncation** breaks the genesis rule.
+
+**The canonical form is the load-bearing part, and it is pinned.** Sorted keys, no whitespace, arrays in
+order, and the **JSON round trip is a fixed point** — non-finite numbers, an `undefined` object value, an
+`undefined` array element, `-0` and a `Date` all canonicalise to what they will actually be on disk — so a
+hash computed _before_ the write still matches the record read back _from_ disk. Nothing ambient is
+consulted: hashing the same record twice with the wall clock deliberately moved in between gives the same
+digest. It is pinned by a **known-answer digest** (`WB6-C2`), not a hand-synced value: silently changing
+canonicalisation would orphan every hash already written and make the whole ledger read as tampered.
+
+**Truncation needed a witness, and the witness is deliberately weak.** A truncated chain is a perfectly
+valid **prefix** — it verifies against itself — so nothing inside the ledger can reveal a chopped tail.
+`state/chain-head.json` records the high-water mark, advance-only. It is a **witness, never an authority**:
+`prev` always comes from the ledger itself (no second source of truth), and the witness supplies only the
+sequence **floor**. Absent or unparsable → truncation reports **UNOBSERVABLE**, never "fine" (this repo's
+never-fabricate-the-unobservable invariant). **A sequence number is never reused**: after a truncation the
+next append continues past the old high-water mark, so the missing span becomes a permanent gap **inside
+the append-only record** rather than a comparison that quietly stops being true once appends catch back
+up. It is the one `state/` file **added to the off-machine mirror** — a witness the local machine can
+rewrite at will is only half a witness.
+
+**Additive exactly like WB1, and proven the same way.** The **63,696** records written before WB6 carry no
+chain, still parse, still replay **byte-identically**, and every existing reader still reads them. They
+are reported as `unchained` **coverage** — never as breaks, and never counted as verified. That is not a
+convenience: the ledger is append-only, so a backfill was never available, and an "ok" that hid how much
+it had actually checked would be a false assurance. **The two slices STACK at the ONE append point** —
+WB1 stamps lineage, then WB6 hashes the record _including that stamp_, so rewriting which work arc a
+record belongs to is itself now detectable (`WB6-WB1`). The one place WB6 deliberately differs from WB1:
+a producer-supplied `lineageId` is **respected** (a producer legitimately knows its arc) while a
+producer-supplied `chain` is **overwritten** (only the append path can know a position in history).
+
+**It degrades rather than accuses.** A record from a newer chain version is `unverifiable`, never tampered
+— the same read-only-degrade rule the ledger already applies to `schemaVersion` — with its declared link
+still followed so continuity is still checked. A degraded ledger read verifies nothing and says so. An
+unchained record inside the chained era is reported **by identity** but is not a break (the append path is
+fail-open, so a decoration failure legitimately produces one). **None of those raise an alarm** — a tamper
+alarm that fires for non-tampering is one the owner stops reading.
+
+**Who raises it.** The verifier is pure, writes nothing, and **does not import the ledger module at all**.
+On a detected break the **supervisor** appends a `ledger-integrity` incident — proven by a real sandboxed
+supervisor run (`WB6-RAISE`), with the healthy tick before it raising nothing. Cooldown is **Infinity**
+with the subject **fingerprinting the specific damage** (kind + sequence): an altered append-only record
+cannot be "fixed", so a 6-hourly reminder would be a permanent buzz about something the owner can do
+nothing about, while a genuinely NEW tamper is a new subject and does alert.
+
+**Content-addressing, with one REAL producer threaded.** `lib/content-store.js` files bulky evidence under
+its own sha256 (`state/content/<aa>/<sha256>`); dedupe and immutability are **structural**, and a read
+**verifies the bytes against the address they were filed under** and refuses content that no longer hashes
+to its own name. The reference shape is `{sha256, bytes}` — **WB1's envelope artifact shape, not a second
+one** (Protocol 22). Threaded producer: `controlled-push.js`'s `runGate`, whose FULL stdout/stderr was
+previously truncated to a 40-line tail and **thrown away**; the tails are unchanged, so every existing
+reader is untouched.
+
+**A hazard caught before it could bite, the same class WB1 found.** `lib/backup-mirror.js`'s **fail-closed**
+secret scanner aborts the ENTIRE off-machine backup on one hit. Two exposures here: the new field names,
+and the fact that every record now carries **64-character hex digests**. `WB6-S` proves both clean against
+the **real** scanner with a red-then-green. And it is why the content store is **deliberately NOT
+mirrored** — its bodies are arbitrary captured console output this code does not author and cannot
+constrain, so one test fixture printing something shaped like `"password": "…"` would silently break the
+daily backup for good. Consequence stated rather than hidden: after a machine loss the **hashes** survive
+in the mirrored ledger and the **bodies** do not.
+
+**⚠ A REAL pre-existing flaw this slice's verification surfaced — fixed in the SAME commit (Protocol
+42), and it would have been a false tamper alarm.** `lib/ledger.js`'s `listEventFiles` sorted the event
+files **lexicographically**, with a comment asserting that was chronological. It is not, for the
+**rotated** files: after `events-2026-07-31.` the base file continues `jsonl` and the rotation continues
+`01.jsonl`, and `'0'` sorts before `'j'` — so `events-2026-07-31.01.jsonl` was read **before**
+`events-2026-07-31.jsonl`, i.e. the second half of a day before the first. `replay()` largely survived
+that (last-write-wins per key, min/max on timestamps) and no day has yet hit the 32 MB cap, so no
+rotation has ever happened on this machine and nothing ever noticed. **A hash chain does not survive
+it:** the first rotated day would have produced prev-link mismatches across the whole file boundary and
+raised a **tamper incident on a ledger nobody had touched** — precisely the cry-wolf failure this design
+must never have. Files are now ordered by `(date, rotation index)` with the base as index 0, guarded by
+`WB6-ROT`, which chains records across a **real** rotation boundary and pins the old behaviour as the
+red. Verdict stated per Protocol 42: **a real shipped path, not a harness artifact.**
+
+**Proven live, read-only, against the machine's own ledger:** **63,906 records — 210 chained and intact,
+63,696 pre-WB6 out of scope, 0 breaks**, truncation not detected, replay still matching. Verification of
+the whole ledger costs ~150–200 ms and rides on the read the supervisor already does.
+
+**And then the push that carried WB6 proved it on itself.** Its own arc — `push.intent` + `push.result`
+
+- `push.completion` — landed **chained at sequence 356/357/358**, all three also carrying WB1's lineage
+  `lin_4bbda8fada1e4788`: the two additive slices stacked on a real record, not a fixture. The gate that
+  gated it wrote **133,087 bytes** of output, now stored by content hash and **recovered and verified from
+  that hash after the fact** — where before, only the 13,176-character tail would have survived and the
+  other ~120 KB (including the new `WB6-ROT` line) would have been thrown away. Live chain after the push:
+  **359 chained, 0 breaks.**
+
+**Verified:** test group **WB6** — canonical-form determinism (key order, round-trip fixed point, no clock
+leak, the known-answer pin, and that the hash covers everything but itself); chain integrity and
+additivity field-by-field against **real** records; the tamper **red-then-green** through the real append
+path (clean → edited → detected with the exact record → restored → clean); deletion, reorder, front- and
+tail-truncation each as their own distinct finding; the unobservable-without-a-witness case; the
+never-reuse-a-sequence proof; backward compatibility against **real pre-WB6 records captured verbatim from
+the live ledger**, the byte-identical replay, and every existing reader re-run over chained records; the
+WB1 layering proof; degrade-never-accuse on an unknown chain version and on a degraded read; fail-open
+against hostile input **and** the circular record that appends unchained rather than being lost; the
+**no-new-write-path** guard (the writer set is unchanged from the set WB1 froze); the backup-scanner
+red-then-green; the incident detections and the phone banner; a **real sandboxed supervisor run** raising
+the incident; the `--verify-replay` proof above; the content store's dedupe/immutability/verify-on-read
+and its fail-open surface; and a live read-only probe. **Full control suite green — 1316 assertions, 0
+failures, 0 skips** — with nothing regressed in the CP / PG / PH / SP / WS / WSI / CLI / WB1 / P16 groups
+that already exercise this append path. Pushed through the wrapper with its own real gate (CPB6).
+
+**DEFERRED — named, not implied (the explicit follow-on list):**
+
+- **The pre-WB6 records can never be chained.** Append-only means no backfill; they stay reported as
+  coverage forever. This is a permanent property, not a task.
+- **Content-addressing has ONE producer.** The gate logs are threaded. Not threaded: the other bulky
+  record bodies (`reconcile.completed`'s ~5 KB coverage blob, `finding.*`/`adapter.probe` details,
+  `push.intent`/`push.completion`'s ~9 KB envelopes). Each is a separate producer decision, and moving a
+  body out of a record changes what that record hashes to — so it is a deliberate follow-on, not a sweep.
+- **The content store is not backed up** (fail-closed-scanner reasoning above). Making evidence bodies
+  durable off-machine needs either a scanner exemption path or a separate mirror target — a real decision,
+  not an oversight.
+- **Full verification every tick.** Costs one sha256 per chained record on the ledger read that already
+  happens. Proportionate today; it shares the ceiling the read-everything-per-tick ledger design already
+  has, so a windowed/checkpointed verify belongs with that design's own compaction story rather than ahead
+  of it.
+- **A pre-existing hazard the chain now makes VISIBLE, deliberately not fixed here:** `readAll({repair:
+true})` truncates a trailing partial line **without holding the ledger write lock**. Racing a live
+  append, that could in principle corrupt the tail — and the chain would now report it. Changing the
+  repair path is a riskier edit than anything in this slice, so it is recorded rather than bundled.
+- **Tamper-evidence is not prevention.** A self-contained chain cannot stop an attacker who rewrites the
+  whole file and recomputes forward. The off-machine witness history is a partial answer; a real external
+  anchor (publishing a periodic head hash somewhere the machine cannot reach) is the full one and is not
+  built.
 
 ### WB7. ⬜ Supervisor watchdog + dead-man's switch ("who watches the watcher")
 
