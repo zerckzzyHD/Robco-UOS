@@ -1526,10 +1526,224 @@ function _wireUnloadFlush() {
   });
 }
 
+// ── HG2: PER-PHASE BOOT ISOLATION ──────────────────────────────
+// Until HG2 the entire boot sequence ran under ONE outer try/catch. The first
+// phase to throw silently killed every phase after it, and the only trace was a
+// console line no user ever sees — the classic "the terminal came up blank and
+// I have no idea which part died" report. Every phase now runs under its OWN
+// guard, is classified fatal-vs-degradable, and fails LOUDLY either way:
+//
+//   degradable → boot continues. The fault is recorded in the client error
+//                ring-buffer via _recordError() — so the casing FAULT lamp, the
+//                BUS-24 fault console and the LIVING CORE strain signal all see
+//                it through the one shared reader (Protocol 22) — AND it is
+//                surfaced to the USER as a transcript line, never console-only
+//                (the same standard the AI state-apply surfacing sets).
+//                The transcript line is deferred to the END of boot on purpose:
+//                _restoreApiKeyAndChatHistory() clears #chatDisplay mid-boot, so
+//                a line written by an earlier phase would be wiped before it was
+//                ever read.
+//   fatal      → boot stops and _renderBootFatal() paints a self-contained,
+//                dependency-free failure screen naming the phase that died. A
+//                phase is fatal only when its absence leaves nothing usable on
+//                screen, which means the alternative to that screen is exactly
+//                the silent black screen this item exists to close.
+//
+// Only three phases are fatal, and each was classified from what the code
+// actually does, not from how important it sounds:
+//   hydrate-state  — _hydrateStateFromStorage() builds `state`; every later
+//                    phase and every render reads it.
+//   load-ui        — the master render pass; without it the boards are empty.
+//   init-tabs      — switchTab() is what adds `.tab-visible`. Skip it and NO
+//                    panel is ever revealed: a literally blank column.
+// Everything else degrades: an audio arm, a datalist, a device pref or a wiring
+// call that fails leaves a terminal that is worse, not one that is unusable.
+//
+// The classification lives in ONE table rather than at the call sites so the
+// whole fatal set can be read at a glance; Suite 258 holds the table and the
+// window.onload call-site list to each other, so a phase can neither be added
+// without a classification nor classified without existing.
+const BOOT_PHASE_SEVERITY = {
+  'bus-core': 'degradable',
+  'bus-audio': 'degradable',
+  'bus-api': 'degradable',
+  'bus-chassis': 'degradable',
+  'bus-feedback': 'degradable',
+  'bus-location-card': 'degradable',
+  'hydrate-meta': 'degradable',
+  'restore-live-container': 'degradable',
+  'hydrate-state': 'fatal',
+  'persistent-storage': 'degradable',
+  'cold-store-migration': 'degradable',
+  'restore-apikey-chat': 'degradable',
+  'load-ui': 'fatal',
+  'rail-grouping': 'degradable',
+  'nav-labels': 'degradable',
+  'init-tabs': 'fatal',
+  'bezel-chrome': 'degradable',
+  'hp-bar': 'degradable',
+  'xp-bar': 'degradable',
+  'rad-bar': 'degradable',
+  'bio-harness': 'degradable',
+  'fader-drag': 'degradable',
+  'ambient-crt-hum': 'degradable',
+  'ambient-reactor-hum': 'degradable',
+  'registry-autocomplete': 'degradable',
+  'ammo-datalist': 'degradable',
+  'location-datalist': 'degradable',
+  'wake-lock': 'degradable',
+  haptic: 'degradable',
+  'overseer-log': 'degradable',
+  'high-lumen': 'degradable',
+  immersion: 'degradable',
+  radio: 'degradable',
+  'rotary-dial': 'degradable',
+  standby: 'degradable',
+  'ambient-experiences': 'degradable',
+  'overseer-scope': 'degradable',
+  'ambient-runtime': 'degradable',
+  'chassis-core': 'degradable',
+  'test-console': 'degradable',
+  'panel-persistence': 'degradable',
+  'tool-deck': 'degradable',
+  'optics-pref': 'degradable',
+  'device-prefs': 'degradable',
+  'keyboard-shortcuts': 'degradable',
+  'boot-sequence-briefing': 'degradable',
+  'ambient-timers': 'degradable',
+  'input-history-nav': 'degradable',
+  'unload-flush': 'degradable',
+  'launch-shortcut': 'degradable',
+  'reinstall-tip': 'degradable',
+};
+
+// Faults collected during this boot, in the order they happened. Module scope,
+// so it is empty on every page load and needs no reset.
+const _bootFaults = [];
+
+// _bootPhase — run ONE boot phase under its own guard.
+// Returns whatever the phase returned, so an async phase is still awaited by the
+// caller exactly as before: `await _bootPhase('hydrate-meta', async () => { … })`
+// preserves the original ordering byte-for-byte. A rejected promise is routed
+// into the SAME classifier as a synchronous throw, so an async phase cannot slip
+// past the guard by failing late.
+function _bootPhase(name, fn) {
+  try {
+    const r = fn();
+    if (r && typeof r.then === 'function') {
+      return r.then(null, e => _bootPhaseFailed(name, e));
+    }
+    return r;
+  } catch (e) {
+    return _bootPhaseFailed(name, e);
+  }
+}
+
+// Classify, record, and either continue (degradable) or abort boot (fatal).
+// An UNKNOWN phase name degrades rather than kills — a typo in a phase name must
+// never be the thing that bricks boot. Suite 258 catches the typo at the gate,
+// which is the right layer for it; this is the fail-open runtime backstop.
+function _bootPhaseFailed(name, err) {
+  const severity = BOOT_PHASE_SEVERITY[name] === 'fatal' ? 'fatal' : 'degradable';
+  const msg = (err && err.message) || String(err);
+  // Guarded exactly like the event bus's listener reporter: this file is also
+  // evaluated in console-less harnesses, and a bare console.error here would
+  // throw from inside the very catch that exists to contain the failure.
+  try {
+    if (typeof console !== 'undefined' && console && typeof console.error === 'function') {
+      console.error(`[RobCo] boot phase "${name}" failed (${severity}):`, err);
+    }
+  } catch (_) {
+    /* reporting must never become the failure */
+  }
+  try {
+    _recordError('boot', `${name} (${severity}): ${msg}`);
+  } catch (_) {
+    /* the ring-buffer already swallows its own failures; belt-and-braces */
+  }
+  _bootFaults.push({ phase: name, severity, msg });
+  if (severity === 'fatal') {
+    const fatal = new Error(`BOOT PHASE "${name}" FAILED — ${msg}`);
+    fatal._bootPhase = name;
+    fatal._bootFatal = true;
+    throw fatal; // unwinds to window.onload's catch → _renderBootFatal()
+  }
+  return undefined;
+}
+
+// Surface every degradable fault to the USER, once, at the end of boot. Written
+// straight into #chatDisplay in the same shape the global error net uses, rather
+// than through appendToChat(), so it never enters chatHistory and can never be
+// persisted into the saved transcript.
+function _flushBootFaults() {
+  const degraded = _bootFaults.filter(f => f.severity === 'degradable');
+  if (!degraded.length) return 0;
+  const box = document.getElementById('chatDisplay');
+  if (!box) return 0;
+  degraded.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'msg-sys';
+    el.textContent =
+      `> ⚠ BOOT FAULT — the ${f.phase} subsystem failed to start (${f.msg}). ` +
+      'The terminal is running without it; a reload may clear it.';
+    box.appendChild(el);
+  });
+  return degraded.length;
+}
+
+// The fatal boot screen. Deliberately self-contained: inline styles, no CSS
+// class, no render pass, no MetaStore read, textContent only. A fatal fault may
+// be the only thing the user ever sees on this load, so it must not depend on
+// anything a failed phase might have been responsible for — and it must never
+// itself throw, which is why the whole body is wrapped.
+function _renderBootFatal(err) {
+  try {
+    if (document.getElementById('bootFatal')) return false; // one screen, never stacked
+    const phase = (err && err._bootPhase) || 'unknown';
+    const msg = (err && err.message) || String(err);
+    const box = document.createElement('div');
+    box.id = 'bootFatal';
+    box.setAttribute('role', 'alert');
+    box.setAttribute('aria-live', 'assertive');
+    box.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;overflow:auto;padding:24px;' +
+      'background:#0a0f0a;color:#41ff00;font:14px/1.6 "Courier New",monospace;';
+    const line = (text, extra) => {
+      const el = document.createElement('div');
+      el.textContent = text;
+      if (extra) el.style.cssText = extra;
+      box.appendChild(el);
+    };
+    line('> ROBCO UNIFIED OPERATING SYSTEM — BOOT FAILURE', 'font-size:18px;margin-bottom:12px;');
+    line(`> FAILED PHASE: ${phase}`);
+    line(`> FAULT: ${msg}`);
+    _bootFaults
+      .filter(f => f.severity === 'degradable')
+      .forEach(f => line(`> ALSO DEGRADED: ${f.phase} — ${f.msg}`));
+    line('');
+    line('> The terminal stopped before it could finish starting.');
+    line('> This fault did not modify your saved campaign.');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '[ RETRY BOOT ]';
+    btn.style.cssText =
+      'margin-top:16px;padding:10px 18px;background:transparent;color:#41ff00;' +
+      'border:1px solid #41ff00;font:inherit;cursor:pointer;';
+    btn.addEventListener('click', () => window.location.reload());
+    box.appendChild(btn);
+    document.body.appendChild(box);
+    return true;
+  } catch (_) {
+    return false; // the fatal screen must never become a second fault
+  }
+}
+
 // ── window.onload — BOOT ORCHESTRATOR ───────────────────────────
 // Calls every boot-phase function above (plus a handful defined in sibling
 // ui-core-*.js files, already in scope by this point — see index.html load
-// order) in the exact order they ran in the original pre-split monolith.
+// order) in the exact order they ran in the original pre-split monolith, each
+// wrapped in its own _bootPhase() guard (HG2, above) — the ORDER and the calls
+// themselves are unchanged, only the isolation around them is new.
 // GOTCHA: do not reorder without re-auditing every boot/lifecycle entry path
 // (planning/STEP2_PHASE0_PLAN.md) — two orderings are load-bearing today:
 // _hydrateMetaFromIdb() must resolve before anything reads a device pref
@@ -1539,61 +1753,169 @@ function _wireUnloadFlush() {
 window.onload = async function () {
   try {
     // U7: wire the OS Event Bus subscribers first (RobcoEvents is guaranteed loaded by onload).
-    _wireCoreEventBusSubscribers();
-    _wireAudioEventBusSubscribers();
-    _wireApiEventBusSubscribers();
-    _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
-    _wireFeedbackEchoSubscribers(); // FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR
-    _wireLocationCardSubscriber(); // LOCATION CONFIRMATION CARD: top-right arrival toast
+    _bootPhase('bus-core', () => {
+      _wireCoreEventBusSubscribers();
+    });
+    _bootPhase('bus-audio', () => {
+      _wireAudioEventBusSubscribers();
+    });
+    _bootPhase('bus-api', () => {
+      _wireApiEventBusSubscribers();
+    });
+    _bootPhase('bus-chassis', () => {
+      _wireChassisCoreEventBusSubscribers(); // CHASSIS LIVING CORE: runtime.state/level.up/data.write/stat.change
+    });
+    _bootPhase('bus-feedback', () => {
+      _wireFeedbackEchoSubscribers(); // FEEDBACK ANIMATION WAVE 1: the STATUS ANNUNCIATOR
+    });
+    _bootPhase('bus-location-card', () => {
+      _wireLocationCardSubscriber(); // LOCATION CONFIRMATION CARD: top-right arrival toast
+    });
     // P2: reconcile device prefs from IndexedDB (bounded + fail-safe) BEFORE the rest of boot reads them.
-    await _hydrateMetaFromIdb();
+    await _bootPhase('hydrate-meta', async () => {
+      await _hydrateMetaFromIdb();
+    });
     // P8: recover the live container from its IDB shadow if localStorage was evicted (bounded, fail-safe, recovery-only — see the boot phase).
-    await _restoreLiveContainerFromIdb();
-    _hydrateStateFromStorage();
-    _requestPersistentStorage(); // SAVE_INTEGRITY_PASS Layer 2: fire-and-forget, never blocks boot
-    if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
-    _restoreApiKeyAndChatHistory();
-    loadUI();
-    _applyRailGrouping(); // FO3 PIP-BOY BUILD U1: stamp data-subtab (no-op without identity.rails) — must run before initTabs()/switchTab() so the boot-time sub-tab restore has real data-subtab attributes to work with
-    _applyFo3NavLabels(); // FO3 PIP-BOY BUILD U2 owner-feedback pass: re-label the 3 lamp keycaps from identity.navLamps (no-op without it) — board elements are static markup already present, same boot phase as _applyRailGrouping()
-    initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
-    _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
-    setupHpBarInteraction();
-    setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
-    setupRadBarInteraction(); // RAD bar click-drag (mirrors HP/XP bars, owner batch item 2)
-    _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
-    _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
-    _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
-    if (typeof startReactorHum === 'function') _armAmbientAudio(startReactorHum); // LIVING CORE #6: same autoplay-safe first-gesture arm
-    initRegistryAutocomplete();
-    initAmmoDatalist();
-    initLocationDatalist();
-    initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
-    initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
-    initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
-    initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
-    initImmersion(); // P8: restore the Global Immersion dial (Full/Balanced/Minimal) device pref
-    initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
-    _wireRotaryDialClick();
-    _wireStandby();
-    _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
-    initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
-    initAmbientRuntime(); // Ambient Runtime — the single-heartbeat scheduler; owns the app's one setInterval and drives every ambient observer
-    initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
-    if (typeof initTestConsole === 'function') initTestConsole(); // staging/dev-only Test Console — hidden on prod, which STRIPS the file (Health-U7); typeof guard prevents a ReferenceError → black screen (Protocol 33, Suite 149.17)
-    _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
-    _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
-    _restoreOpticsPreference();
-    _restoreDevicePrefs();
-    _wireKeyboardShortcuts();
-    _runBootSequenceAndBriefing();
-    _startAmbientTimers();
-    _wireInputHistoryNav();
-    _wireUnloadFlush();
-    routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
-    if (typeof _maybeShowReinstallTip === 'function') _maybeShowReinstallTip(); // Option-1 FO3 reinstall tip (installed PWA + FO3 + once), after routeLaunchShortcut so #go= isn't clobbered
+    await _bootPhase('restore-live-container', async () => {
+      await _restoreLiveContainerFromIdb();
+    });
+    _bootPhase('hydrate-state', () => {
+      _hydrateStateFromStorage();
+    });
+    _bootPhase('persistent-storage', () => {
+      _requestPersistentStorage(); // SAVE_INTEGRITY_PASS Layer 2: fire-and-forget, never blocks boot
+    });
+    _bootPhase('cold-store-migration', () => {
+      if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
+    });
+    _bootPhase('restore-apikey-chat', () => {
+      _restoreApiKeyAndChatHistory();
+    });
+    _bootPhase('load-ui', () => {
+      loadUI();
+    });
+    _bootPhase('rail-grouping', () => {
+      _applyRailGrouping(); // FO3 PIP-BOY BUILD U1: stamp data-subtab (no-op without identity.rails) — must run before initTabs()/switchTab() so the boot-time sub-tab restore has real data-subtab attributes to work with
+    });
+    _bootPhase('nav-labels', () => {
+      _applyFo3NavLabels(); // FO3 PIP-BOY BUILD U2 owner-feedback pass: re-label the 3 lamp keycaps from identity.navLamps (no-op without it) — board elements are static markup already present, same boot phase as _applyRailGrouping()
+    });
+    _bootPhase('init-tabs', () => {
+      initTabs(); // Phase 4: restore active tab (defaults to 'stat' on first load)
+    });
+    _bootPhase('bezel-chrome', () => {
+      _initBezelChrome(); // DO-N: restore bezel subsystem highlight + sync the FAULT lamp
+    });
+    _bootPhase('hp-bar', () => {
+      setupHpBarInteraction();
+    });
+    _bootPhase('xp-bar', () => {
+      setupXpBarInteraction(); // C11: XP bar click-drag (mirrors HP bar, within current level range)
+    });
+    _bootPhase('rad-bar', () => {
+      setupRadBarInteraction(); // RAD bar click-drag (mirrors HP/XP bars, owner batch item 2)
+    });
+    _bootPhase('bio-harness', () => {
+      _wireBioHarnessZones(); // PHASE 3 · OPERATOR BUS-03: SVG zone taps route through toggleLimb()
+    });
+    _bootPhase('fader-drag', () => {
+      _wireFaderDrag(); // PHASE 3 follow-up · OPERATOR BUS-02: fader-ladder drag routes through commitStat()
+    });
+    _bootPhase('ambient-crt-hum', () => {
+      _armAmbientAudio(startCrtHum); // continuous ambient — deferred to first gesture (blocked-autoplay spam fix)
+    });
+    _bootPhase('ambient-reactor-hum', () => {
+      if (typeof startReactorHum === 'function') _armAmbientAudio(startReactorHum); // LIVING CORE #6: same autoplay-safe first-gesture arm
+    });
+    _bootPhase('registry-autocomplete', () => {
+      initRegistryAutocomplete();
+    });
+    _bootPhase('ammo-datalist', () => {
+      initAmmoDatalist();
+    });
+    _bootPhase('location-datalist', () => {
+      initLocationDatalist();
+    });
+    _bootPhase('wake-lock', () => {
+      initWakeLock(); // WU-F1: restore the Sustained Power Cell (Screen Wake Lock) preference
+    });
+    _bootPhase('haptic', () => {
+      initHaptic(); // WU-F2: restore the Haptic Solenoid (Vibration) preference
+    });
+    _bootPhase('overseer-log', () => {
+      initOverseerLog(); // WU-F7: start the Overseer's Log session clock + bump boot count (once)
+    });
+    _bootPhase('high-lumen', () => {
+      initHighLumen(); // WU-F8: restore the High-Lumen Optics (max-contrast) preference
+    });
+    _bootPhase('immersion', () => {
+      initImmersion(); // P8: restore the Global Immersion dial (Full/Balanced/Minimal) device pref
+    });
+    _bootPhase('radio', () => {
+      initRadio(); // WU-F5: restore the Pip-Boy Radio preference (autoplay-safe first-gesture arm)
+    });
+    _bootPhase('rotary-dial', () => {
+      _wireRotaryDialClick();
+    });
+    _bootPhase('standby', () => {
+      _wireStandby();
+    });
+    _bootPhase('ambient-experiences', () => {
+      _wireAmbientExperiences(); // A3: IDLE/STANDBY-deepen/SHUTDOWN dial-gated ambient observers
+    });
+    _bootPhase('overseer-scope', () => {
+      initOverseerScope(); // DO-O: the living Overseer (Director Uplink oscilloscope presence)
+    });
+    _bootPhase('ambient-runtime', () => {
+      initAmbientRuntime(); // Ambient Runtime — the single-heartbeat scheduler; owns the app's one setInterval and drives every ambient observer
+    });
+    _bootPhase('chassis-core', () => {
+      initChassisCore(); // CHASSIS: the LIVING CORE — paints its initial frame after the runtime state is live
+    });
+    _bootPhase('test-console', () => {
+      if (typeof initTestConsole === 'function') initTestConsole(); // staging/dev-only Test Console — hidden on prod, which STRIPS the file (Health-U7); typeof guard prevents a ReferenceError → black screen (Protocol 33, Suite 149.17)
+    });
+    _bootPhase('panel-persistence', () => {
+      _wirePanelPersistence(); // also wires the Module Bay hatch ceremony to securityConfigPanel's own first user-open (owner report — never at boot); also re-applies scroll restore (Protocol 42)
+    });
+    _bootPhase('tool-deck', () => {
+      _wireToolDeck(); // Tool Deck + Quick-Draw Holster — deck/scrim/tool-row/socket/bind-key wiring
+    });
+    _bootPhase('optics-pref', () => {
+      _restoreOpticsPreference();
+    });
+    _bootPhase('device-prefs', () => {
+      _restoreDevicePrefs();
+    });
+    _bootPhase('keyboard-shortcuts', () => {
+      _wireKeyboardShortcuts();
+    });
+    _bootPhase('boot-sequence-briefing', () => {
+      _runBootSequenceAndBriefing();
+    });
+    _bootPhase('ambient-timers', () => {
+      _startAmbientTimers();
+    });
+    _bootPhase('input-history-nav', () => {
+      _wireInputHistoryNav();
+    });
+    _bootPhase('unload-flush', () => {
+      _wireUnloadFlush();
+    });
+    _bootPhase('launch-shortcut', () => {
+      routeLaunchShortcut(); // PWA shortcut deep-link routing — must run last, after initTabs
+    });
+    _bootPhase('reinstall-tip', () => {
+      if (typeof _maybeShowReinstallTip === 'function') _maybeShowReinstallTip(); // Option-1 FO3 reinstall tip (installed PWA + FO3 + once), after routeLaunchShortcut so #go= isn't clobbered
+    });
+    // HG2: surface every degradable fault to the user, once, now that the
+    // transcript is settled (_restoreApiKeyAndChatHistory clears it mid-boot).
+    _flushBootFaults();
   } catch (e) {
     console.error('[RobCo] boot failed:', e);
+    // HG2: boot aborted — paint the loud failure screen instead of leaving the
+    // user staring at a blank terminal with the reason only in the console.
+    _renderBootFatal(e);
   }
 };
 

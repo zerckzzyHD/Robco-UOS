@@ -30,42 +30,43 @@
 1. [Project Philosophy](#project-philosophy)
 2. [File Map](#file-map)
 3. [Script Load Order & Globals](#script-load-order)
-4. [Ambient Runtime (`js/core/runtime.js` — Step 2 · Phase 2 · A1)](#ambient-runtime)
-5. [Developer Console / Diagnostic Shell (`js/dev/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)](#diagnostic-shell)
-6. [Fallout Data Registry (`js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js`)](#fallout-data-registry)
-7. [Per-Game Data Parity & Reserved-Column Ledger (Step 2 Phase 0 U11)](#per-game-data-parity)
-8. [Per-Game Identity Block (`GAME_DEFS[ctx].identity` — Design Overhaul DO-K)](#per-game-identity-block)
-9. [Bezel Chrome + Subsystem Nav (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul DO-N)](#bezel-chrome-nav)
-10. [Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/` (order-prefixed files) — Design Overhaul DO-O)](#director-uplink)
-11. [CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)](#chassis)
-12. [OPERATOR Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)](#operator-screen)
-13. [OPERATIONS Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)](#operations-screen)
-14. [DATABANK Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)](#databank-screen)
-15. [Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/` (order-prefixed files) — Suite 208)](#ceremony-moments)
-16. [Mobile Density Standard, Tier-1 (`css/` (order-prefixed files) — planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md §2/§3)](#mobile-density-standard)
-17. [State Architecture](#state-architecture)
-18. [CAMPG Tab System](#campg-tab-system)
-19. [Registry Autocomplete System](#registry-autocomplete)
-20. [Persistence Lifecycle](#persistence-lifecycle)
-21. [Save/Load/Sync Contract](#save-load-sync-contract)
-22. [Terminal Record (P4 — structured event log)](#terminal-record)
-23. [AI Integration Pipeline](#ai-integration-pipeline)
-24. [Command-Line MODE (`js/services/api.js` + `js/ui/ui-core.js` — Step 2 · Phase 2 · B1)](#command-line-mode)
-25. [Audio System](#audio-system)
-26. [UI Rendering Pipeline](#ui-rendering-pipeline)
-27. [Time System](#time-system)
-28. [Faction System](#faction-system)
-29. [Undo System](#undo-system)
-30. [World Map (G6)](#world-map)
-31. [Settings & localStorage Keys](#settings-localstorage-keys)
-32. [System Dependency Map](#system-dependency-map)
-33. [Cross-Repo Naming Domains (ND1)](#cross-repo-naming-domains)
-34. [Historical Lessons](#historical-lessons)
-35. [Service Worker Cache Protocol](#service-worker-cache-protocol)
-36. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
-37. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
-38. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
-39. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
+4. [Boot Isolation — per-phase guards, fatal vs degradable (`js/ui/ui-core.js` — HG2)](#boot-isolation-hg2)
+5. [Ambient Runtime (`js/core/runtime.js` — Step 2 · Phase 2 · A1)](#ambient-runtime)
+6. [Developer Console / Diagnostic Shell (`js/dev/test-console.js` — Step 2 · Phase 2, Diagnostic Shell U1-U5, complete)](#diagnostic-shell)
+7. [Fallout Data Registry (`js/data/registry-core.js` + `js/data/reg_nv.js` / `js/data/reg_fo3.js`)](#fallout-data-registry)
+8. [Per-Game Data Parity & Reserved-Column Ledger (Step 2 Phase 0 U11)](#per-game-data-parity)
+9. [Per-Game Identity Block (`GAME_DEFS[ctx].identity` — Design Overhaul DO-K)](#per-game-identity-block)
+10. [Bezel Chrome + Subsystem Nav (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul DO-N)](#bezel-chrome-nav)
+11. [Director Uplink — the Living Overseer (`js/ui/ui-core.js` + `js/services/api.js` + `css/` (order-prefixed files) — Design Overhaul DO-O)](#director-uplink)
+12. [CHASSIS — Self-Diagnostic Maintenance Bay + THE LIVING CORE (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/ui/ui-saves.js` + `js/services/cloud.js` — Design Overhaul CHASSIS unit)](#chassis)
+13. [OPERATOR Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` — Design Overhaul, Phase-3 hero-three)](#operator-screen)
+14. [OPERATIONS Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-core.js` + `js/ui/ui-render.js` — Phase 3 · Piece 2, quartermaster's freight console)](#operations-screen)
+15. [DATABANK Screen Hardware Dressing (`index.html` + `css/` (order-prefixed files) + `js/ui/ui-render.js` + `js/ui/ui-core.js` + `js/core/state.js` — Phase 3 · Piece 3, "The Records Bay" archival cartography station)](#databank-screen)
+16. [Ceremony Moments Wave 1 (`js/ui/ui-core.js` + `js/ui/ui-audio.js` + `js/core/state.js` + `css/` (order-prefixed files) — Suite 208)](#ceremony-moments)
+17. [Mobile Density Standard, Tier-1 (`css/` (order-prefixed files) — planning/2.8.0/plans/MOBILE_DENSITY_PLAN.md §2/§3)](#mobile-density-standard)
+18. [State Architecture](#state-architecture)
+19. [CAMPG Tab System](#campg-tab-system)
+20. [Registry Autocomplete System](#registry-autocomplete)
+21. [Persistence Lifecycle](#persistence-lifecycle)
+22. [Save/Load/Sync Contract](#save-load-sync-contract)
+23. [Terminal Record (P4 — structured event log)](#terminal-record)
+24. [AI Integration Pipeline](#ai-integration-pipeline)
+25. [Command-Line MODE (`js/services/api.js` + `js/ui/ui-core.js` — Step 2 · Phase 2 · B1)](#command-line-mode)
+26. [Audio System](#audio-system)
+27. [UI Rendering Pipeline](#ui-rendering-pipeline)
+28. [Time System](#time-system)
+29. [Faction System](#faction-system)
+30. [Undo System](#undo-system)
+31. [World Map (G6)](#world-map)
+32. [Settings & localStorage Keys](#settings-localstorage-keys)
+33. [System Dependency Map](#system-dependency-map)
+34. [Cross-Repo Naming Domains (ND1)](#cross-repo-naming-domains)
+35. [Historical Lessons](#historical-lessons)
+36. [Service Worker Cache Protocol](#service-worker-cache-protocol)
+37. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
+38. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
+39. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
+40. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
 
 <!-- TOC:END -->
 
@@ -513,6 +514,37 @@ its exports to `window.*` for the other scripts to call.
 **Dynamic ACCOUNT status words (SU-4, Step 2 v2.8.0):** `renderAccount()` (`js/ui/ui-account.js`) paints the REG PORT / Operator Registry board entirely from live state — `window.getAccountState()`, `isFeatureEnabled('googleSignIn')`, and the SAME `_isUplinkConnected()` carrier signal the UPLINK lamp/bezel telemetry/SYSTEM STATUS panel already read (Protocol 22 — no second `navigator.onLine` check) — across four conditions (signed-out×googleSignIn-on/off, signed-in×carrier-connected/disconnected). A collapsed-state summary line (`#acctSummaryStatus`, `.panel-substatus`) sits in the panel's `<summary>` so the state reads even while collapsed. `renderAccount()` is called from `refreshOverseerCarrier()` — the same connection choke point that drives `_updateUplinkLamp()`/`_refreshBezelTelemetry()`/`renderSystemStatus()` — so none of those readouts can disagree; it's also called from `loadUI()` at boot and from the three sign-in/out/collision call sites in `cloud.js`. The summary line is set via `.textContent` (not parsed as HTML), so its name/email separator is the literal Unicode `·` character, never the `&middot;` entity used inside the `.innerHTML`-rendered board.
 
 **Content Security Policy (CSP Stage 2 — enforcing):** The `<meta http-equiv="Content-Security-Policy">` in `index.html` is now in enforcing mode. It was run in report-only mode for Stage 1 and confirmed clean (boot + Firebase + auth + Firestore produced zero violations) before the flip. **`'unsafe-inline'` is intentionally retained** in `script-src` and `style-src`: the app has ~148 inline event handlers, and per CSP Level 2+ a `sha256-` or `nonce-` token in `script-src` silently disables `unsafe-inline`, breaking all of them. Guard 55.10 (tripwire: `'unsafe-inline'` still present) and 55.11 (tripwire: no `sha256-`/`nonce-` token) enforce this invariant. `img-src` includes `blob:` to cover canvas and screenshot-preview images. The suite-55 and suite-30 guards enforce that the enforcing policy is present and report-only is absent.
+
+---
+
+<a id="boot-isolation-hg2"></a>
+
+## Boot Isolation — per-phase guards, fatal vs degradable (`js/ui/ui-core.js` — HG2)
+
+`window.onload` runs 51 named boot phases. Until HG2 all of them sat under **one** outer `try`/`catch`: the first phase to throw silently killed every phase after it, and the only trace was a `console.error` no user ever sees. That is the mechanism behind "the terminal came up blank and there's no way to tell which part died" — a class of report the app had no answer for.
+
+**The shape now.** Each phase is wrapped in `_bootPhase('<name>', () => { <the same call, unchanged> })`. The call order and the two `await`ed async phases are byte-identical to the pre-HG2 sequence; only the isolation around them is new. `_bootPhase()` returns whatever the phase returned, so `await _bootPhase('hydrate-meta', async () => { await _hydrateMetaFromIdb(); })` preserves the original async-before-sync ordering exactly. A rejected promise is routed into the same classifier as a synchronous throw, so a phase cannot escape the guard by failing late.
+
+**Classification lives in one table, not at 51 call sites.** `BOOT_PHASE_SEVERITY` maps every phase name to `'fatal'` or `'degradable'`. Exactly three are fatal, each classified from what the code does rather than from how important it sounds:
+
+| Phase           | Why fatal                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------- |
+| `hydrate-state` | `_hydrateStateFromStorage()` builds `state`; every later phase and every render reads it.                       |
+| `load-ui`       | the master render pass — without it every board is empty.                                                       |
+| `init-tabs`     | `switchTab()` is what adds `.tab-visible`. Skip it and **no** panel is ever revealed: a literally blank column. |
+
+Everything else degrades. An audio arm, a datalist, a device pref or a wiring call that fails leaves a terminal that is worse, not one that is unusable.
+
+**Both outcomes fail loudly — that is the point of the item.**
+
+- **Degradable** → boot continues. The fault is recorded through `_recordError('boot', …)`, so the casing FAULT lamp, the BUS-24 fault console and the LIVING CORE strain signal all see it through the one shared ring-buffer reader (Protocol 22), and it is surfaced to the **user** as a `#chatDisplay` transcript line — never console-only. The transcript line is deliberately deferred to the end of boot by `_flushBootFaults()`, because `_restoreApiKeyAndChatHistory()` clears `#chatDisplay` mid-boot and a line written earlier would be wiped before it was ever read. A clean boot writes nothing.
+- **Fatal** → `_bootPhaseFailed()` throws an error carrying `_bootPhase`/`_bootFatal`, which unwinds to `window.onload`'s catch, and `_renderBootFatal()` paints the `#bootFatal` screen: `role="alert"`, the failed phase, the fault text, any degradable faults that preceded it, and a RETRY BOOT control. It is built from **inline styles and `textContent` only** — no CSS class, no render pass, no `MetaStore` read — precisely because it may have to survive a fatal fault in the phase that paints the UI. It paints once (a second call is a no-op) and swallows its own failure rather than becoming a second fault.
+
+**An unknown phase name degrades rather than kills.** A typo in a phase name must never be the thing that bricks boot, so `_bootPhaseFailed()` fails open at runtime; the gate is the layer that catches the typo (below), which is the correct layer for it.
+
+**Enforcement.** **Suite 258** is behavioural against the real functions lifted out of `ui-core.js` into a `vm` sandbox — including the HG1 footgun re-checked on new ground (a console-less sandbox must not turn "a phase failure is contained" into "a phase failure is fatal"). Its five static assertions are marked Protocol 20 exceptions because their subject genuinely **is** the source text: **258.15** holds the severity table and the real call-site list to each other in both directions, and **258.16** proves every statement in the try block is a `_bootPhase()` wrapper — so "every boot phase runs under its own guard" is checkable rather than merely asserted. **Suite 132.5** was restated (not re-bumped) in the same change: its old raw line-count ceiling stopped measuring anything once every phase became a three-line wrapper, so it now asserts each phase callback is a single named call — strictly stronger than the count it replaced.
+
+**Trigger (Protocol 44).** A boot fault only reproduces on a load that already went wrong, so the Diagnostic Shell registers **SIMULATE DEGRADED BOOT FAULT** and **SIMULATE FATAL BOOT SCREEN** under `SIMULATE BOOT FAULT`. Both drive the real shipped functions (Protocol 22); the degraded one also exercises the unknown-phase fail-open default by design.
 
 ---
 

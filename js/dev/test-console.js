@@ -2538,6 +2538,38 @@
       action: kind => _dshSimulateAiResponse(kind),
     },
 
+    // ── HG2: SIMULATE BOOT FAULT — the per-phase boot guards, on demand.
+    // Both drive the REAL runner/renderer in ui-core.js (Protocol 22); see the
+    // _dshSimulateBootFault* helpers for exactly which step each one skips.
+    {
+      id: 'sim-boot-fault-degraded',
+      label: 'SIMULATE DEGRADED BOOT FAULT',
+      subLabel: "_bootPhase('diagnostic-sim', throws) → _flushBootFaults()",
+      icon: '⚠',
+      category: 'infra',
+      group: 'SIMULATE BOOT FAULT',
+      tier: 'staging',
+      destructive: false,
+      tooltip:
+        'Runs a throwing phase through the REAL _bootPhase() guard and flushes it through the REAL _flushBootFaults(), so the BOOT FAULT transcript line and the FAULT-lamp ring-buffer entry are the shipped ones. Also exercises the unknown-phase-name fail-open default. No state change.',
+      triggers: [],
+      action: () => _dshSimulateBootFaultDegraded(),
+    },
+    {
+      id: 'sim-boot-fault-fatal',
+      label: 'SIMULATE FATAL BOOT SCREEN',
+      subLabel: '_renderBootFatal() — the real full-screen boot-failure overlay',
+      icon: '⛔',
+      category: 'infra',
+      group: 'SIMULATE BOOT FAULT',
+      tier: 'staging',
+      destructive: true,
+      tooltip:
+        'Paints the REAL fatal boot-failure screen (the one a fatal phase would produce instead of a blank terminal). It covers the whole viewport and, exactly like the shipped screen, only a reload clears it — hence confirm-gated. Never touches the campaign.',
+      triggers: [],
+      action: () => _dshSimulateBootFaultFatal(),
+    },
+
     // ── U5: RESILIENCE & INFRA — cache / SW controls (planning §4/§11 U5).
     // sw-force-update-prompt reuses the REAL _triggerUpdate() modal
     // (index.html seam, Protocol 22) — never a second implementation.
@@ -4115,6 +4147,33 @@
     var text = _SIM_AI_KIND_TEXT[kind];
     if (!text || typeof appendToChat !== 'function') return;
     appendToChat('> [DIAGNOSTIC SHELL] SIMULATED AI RESPONSE (' + kind + '): ' + text, 'sys');
+  }
+  // ── HG2 boot-fault simulators (Protocol 44) ──────────────────────────
+  // A boot fault is the definition of hard to reproduce: it only happens while
+  // window.onload is running, on a load that already went wrong. Both tools
+  // drive the REAL shipped functions (Protocol 22) — never a mock of them.
+  //
+  // DEGRADED runs a genuine phase through the real _bootPhase() runner with a
+  // phase name that is deliberately NOT in BOOT_PHASE_SEVERITY, which also
+  // exercises the fail-open unknown-name default, then flushes through the real
+  // _flushBootFaults() so the transcript line is the shipped one.
+  function _dshSimulateBootFaultDegraded() {
+    if (typeof _bootPhase !== 'function' || typeof _flushBootFaults !== 'function') return;
+    _bootPhase('diagnostic-sim', function () {
+      throw new Error('simulated degradable boot fault (Diagnostic Shell)');
+    });
+    _flushBootFaults();
+  }
+  // FATAL paints the real _renderBootFatal() screen from an error shaped exactly
+  // as _bootPhaseFailed() shapes one. The only step it skips is the throw/unwind
+  // itself (which would need a real failing phase mid-onload); everything the
+  // user would see is produced by the shipped renderer, unmodified.
+  function _dshSimulateBootFaultFatal() {
+    if (typeof _renderBootFatal !== 'function') return;
+    var err = new Error('BOOT PHASE "diagnostic-sim" FAILED — simulated fatal boot fault');
+    err._bootPhase = 'diagnostic-sim';
+    err._bootFatal = true;
+    _renderBootFatal(err);
   }
   function _dshClearCaches() {
     if (typeof caches === 'undefined' || typeof caches.keys !== 'function') return;

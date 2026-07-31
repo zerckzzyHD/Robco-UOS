@@ -97,6 +97,12 @@ export default [
         // FO3 PIP-BOY BUILD U2 owner-feedback pass — lamp re-labeling (js/ui/ui-core-nav.js -> js/ui/ui-core.js)
         _applyFo3NavLabels: 'readonly',
         appendToChat: 'readonly',
+        // HG2 per-phase boot isolation (js/ui/ui-core.js) — the Diagnostic Shell's
+        // SIMULATE BOOT FAULT tools drive the real runner/renderer (Protocol 22),
+        // same shared classic-script-scope pattern as the other cross-file reads.
+        _bootPhase: 'readonly',
+        _flushBootFaults: 'readonly',
+        _renderBootFatal: 'readonly',
         loadUI: 'readonly',
         saveState: 'readonly',
         migrateState: 'readonly',

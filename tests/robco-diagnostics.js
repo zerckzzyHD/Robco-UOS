@@ -17375,21 +17375,39 @@ header('Suite 111 — WU-E1 diegetic terminology / voice standards');
 
     // 132.5  window.onload stays a slim composition (regression guard against
     //        logic drifting back into the monolith instead of into a named seam).
-    //        Threshold has headroom for new named init/phase calls (e.g. P8
-    //        initImmersion()) — the guard catches a monolith (hundreds of lines),
-    //        not the natural growth of the named-call list.
+    //
+    //        HG2 (2026-07-30) RESTATED THIS ASSERTION rather than bumping its
+    //        number again. Every phase call is now wrapped in its own
+    //        _bootPhase('name', () => { … }) guard, which prettier prints across
+    //        three lines — so the body grew ~3x on the same, unchanged list of
+    //        named calls, and a raw line count no longer measures the thing this
+    //        test cares about. What it actually cared about is "is the body a
+    //        list of named calls, or has logic drifted back inline?" — so it now
+    //        asserts that directly: every statement in the try block is a
+    //        _bootPhase() wrapper whose callback is a single named call. That is
+    //        STRICTLY STRONGER than the old ceiling (a 60-line inline monolith
+    //        would have passed the count and fails this), and the ceiling is
+    //        kept alongside it, widened to match the wrapper's real cost, so a
+    //        genuine monolith still trips something even if the shape check is
+    //        ever weakened. Suite 258.16 owns the guarded-ness half of this
+    //        invariant; this one owns the "still just a call list" half.
     const onloadLineCount = onloadBody132.split('\n').length;
-    // DO-N added one legitimate named call (_initBezelChrome()) — bumped per this test's
-    // own stated intent (headroom for natural named-call growth, not a monolith guard).
-    // CHASSIS unit added two more (_wireChassisCoreEventBusSubscribers()/initChassisCore()) —
-    // bumped again for the same reason. FO3 PIP-BOY BUILD U1 added one more
-    // (_applyRailGrouping()) — bumped again, same reason. FO3 PIP-BOY BUILD U2
-    // owner-feedback pass added one more (_applyFo3NavLabels()) — bumped again, same reason.
-    // SAVE_INTEGRITY_PASS added one more (_requestPersistentStorage()) — bumped again, same reason.
-    // P8 live-container recovery added one more (await _restoreLiveContainerFromIdb()) — bumped again, same reason.
+    const tryOnly132 = onloadBody132.slice(
+      0,
+      onloadBody132.indexOf('  } catch (e) {') === -1
+        ? undefined
+        : onloadBody132.indexOf('  } catch (e) {')
+    );
+    // Each phase callback body: exactly one line, and that line is a call (or a
+    // guarded call) — never a block of inline logic.
+    const phaseBodies132 = [
+      ...tryOnly132.matchAll(/_bootPhase\('[^']+', (?:async )?\(\) => \{\n([\s\S]*?)\n {4}\}\);/g),
+    ].map(m => m[1]);
+    const fatBodies132 = phaseBodies132.filter(b => b.split('\n').length !== 1);
     assert(
-      onloadLineCount < 61,
-      `window.onload body stays a slim named-call composition (${onloadLineCount} lines, expected < 61)`
+      phaseBodies132.length > 40 && fatBodies132.length === 0 && onloadLineCount < 260,
+      `window.onload body stays a named-call composition — ${phaseBodies132.length} phases, each a single named call, ${onloadLineCount} lines (ceiling 260)` +
+        (fatBodies132.length ? ` — INLINE LOGIC IN: ${fatBodies132.join(' | ')}` : '')
     );
 
     // 132.6  initTabs() still called directly in window.onload (not wrapped —
@@ -39553,7 +39571,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // (9 U1 + 45 U3), for 61; U4b (Suite 215) then added 80 more (63
         // STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE), for 141 — this
         // test's own scope stays the 45 U3-specific ids.
-        tools212.length === 167 &&
+        tools212.length === 169 &&
         expectedNew212.length === 45 &&
         expectedNew212.every(id => toolIds212.includes(id)) &&
         new Set(toolIds212).size === toolIds212.length; // no duplicate ids
@@ -39562,7 +39580,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok212,
-      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 167 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools)' +
+      '212.1: DIAGNOSTIC_SHELL_TOOLS registers all 45 new U3 tool ids (living core states/flare/burst, boot flavors, ceremonies M1-M5, day/night, fire-anim bus events, fire-pending animations) with no duplicate id, for a total of 169 (54 from U1+U3, +7 U4a INSPECT tools, +80 U4b STATE SETUP/RESETS/FIXTURES/INLINE tools, +18 U5 RESILIENCE/INFRA+ENVIRONMENT/UNLOCK+RESETS tools, +7 SAVE_LAYER3 SAVE INTEGRITY tools, +2 HG2 SIMULATE BOOT FAULT tools)' +
         (err212 ? ' — ' + err212.message : '')
     );
   }
@@ -40607,7 +40625,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         // U4b (Suite 215) added 80 more tools and U5 (Suite 216) added 18
         // more after this unit shipped, so the registry now totals 166
         // (61 at this unit's own ship time + 80 U4b + 18 U5 + 1 P8 eviction-recovery trigger).
-        tools214.length === 167 &&
+        tools214.length === 169 &&
         newIds214.every(id => {
           const t = tools214.find(x => x.id === id);
           return t && t.category === 'inspect';
@@ -40620,7 +40638,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok214,
-      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (167 tools, after U4b+U5+SAVE_LAYER3+the AI_OVERSEER change-card trigger) carries no duplicate id' +
+      '214.8: the 7 new U4a INSPECT tools (vitals/device-detail/sw-internal/connection/flags/flags-internal/copy) exist under category:"inspect", the relocated inspect-runtime-state/inspect-observers now share the DEVICE / SYSTEM group, and the full registry (169 tools, after U4b+U5+SAVE_LAYER3+the AI_OVERSEER change-card trigger+HG2) carries no duplicate id' +
         (err214 ? ' — ' + err214.message : '')
     );
   }
@@ -41005,7 +41023,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok215 =
         newIds215.length === 80 &&
-        tools215.length === 167 &&
+        tools215.length === 169 &&
         newIds215.every(id => ids215.includes(id)) &&
         new Set(ids215).size === ids215.length;
     } catch (e) {
@@ -41013,7 +41031,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok215,
-      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 (after this unit + U5 + SAVE_LAYER3 + the AI_OVERSEER change-card trigger) with no duplicate id' +
+      '215.1: all 80 new U4b tool ids (63 STATE SETUP + 13 RESETS + 1 FIXTURE + 3 INLINE) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 169 (after this unit + U5 + SAVE_LAYER3 + the AI_OVERSEER change-card trigger + HG2) with no duplicate id' +
         (err215 ? ' — ' + err215.message : '')
     );
   }
@@ -42019,7 +42037,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ];
       ok216 =
         newIds216.length === 18 &&
-        tools216.length === 167 &&
+        tools216.length === 169 &&
         newIds216.every(id => ids216.includes(id)) &&
         new Set(ids216).size === ids216.length;
     } catch (e) {
@@ -42027,7 +42045,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     }
     assert(
       ok216,
-      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 167 with no duplicate id' +
+      '216.1: all 18 new U5 tool ids (8 feature-flag overrides + 3 AI/OCR failure sim + 3 cache/SW controls + 1 RESETS + 3 ENVIRONMENT & UNLOCK) are registered exactly once, bringing the full DIAGNOSTIC_SHELL_TOOLS registry to 169 (incl. HG2 boot-fault sims) with no duplicate id' +
         (err216 ? ' — ' + err216.message : '')
     );
   }
@@ -42220,7 +42238,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       const stagingTools216 = tools216.filter(t => t.tier === 'staging');
       const prodTools216 = tools216.filter(t => t.tier === 'prod');
       ok216 =
-        tools216.length === 167 &&
+        tools216.length === 169 &&
         stagingTools216.length > 0 &&
         prodTools216.length > 0 &&
         stagingTools216.every(t => sandbox216._toolVisible(t, 'prod') === false) &&
@@ -42687,7 +42705,7 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
     try {
       const tools216 = _evalRealTools216();
       ok216 =
-        tools216.length === 167 &&
+        tools216.length === 169 &&
         tools216.every(t => !t.destructive || t.tier === 'staging') &&
         tools216.every(
           t =>
@@ -53466,6 +53484,499 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
         )
       );
     }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 258 — HG2: per-phase boot isolation (fatal vs degradable)
+//
+//  Before HG2 every boot phase ran under ONE outer try/catch: the first throw
+//  killed the ~50 phases after it and left a console line the user never sees.
+//  This suite locks the replacement — a per-phase guard, a classification, and
+//  a LOUD failure in both directions.
+//
+//  Mostly BEHAVIOURAL (Protocol 20): the real _bootPhase / _bootPhaseFailed /
+//  _flushBootFaults / _renderBootFatal are lifted verbatim out of
+//  js/ui/ui-core.js and executed in a vm sandbox against a DOM stub, so these
+//  assertions go red if the BEHAVIOUR regresses, not merely if the wording
+//  does. The five static assertions at the end are the marked Protocol 20
+//  exceptions: their subject genuinely IS the source text — which call sites
+//  exist inside window.onload, and whether any of them is unguarded. No
+//  behavioural test can reach "phase N of the real boot sequence is wrapped"
+//  without booting the whole app, and a boot that fully works proves nothing
+//  about the guards: they only matter on the load that goes wrong.
+//
+//  258.13 is the HG1 footgun re-checked on new ground. ui-core.js is evaluated
+//  in console-less harnesses too, so a bare console.error inside the failure
+//  handler would throw a ReferenceError from inside the very catch that exists
+//  to contain the failure. Locked here rather than assumed.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 258 — HG2 per-phase boot isolation (fatal vs degradable)');
+
+  const vm258 = require('vm');
+  const uiCore258 = readFile('js/ui/ui-core.js');
+
+  // Slice a whole `function NAME(...) { … }` (declaration + params + body) so it
+  // can be reconstructed verbatim in a sandbox. extractFunctionBody() returns
+  // the body only, which loses the parameter list these functions need.
+  function wholeFn258(name) {
+    const idx = uiCore258.indexOf(`function ${name}(`);
+    if (idx === -1) throw new Error(`Cannot find function ${name} in ui-core.js`);
+    let depth = 0;
+    for (let i = uiCore258.indexOf('{', idx); i < uiCore258.length; i++) {
+      if (uiCore258[i] === '{') depth++;
+      else if (uiCore258[i] === '}' && --depth === 0) return uiCore258.slice(idx, i + 1);
+    }
+    throw new Error(`Unclosed brace for ${name}`);
+  }
+  // The classification table, sliced the same way.
+  function severityTable258() {
+    const m = uiCore258.match(/const BOOT_PHASE_SEVERITY = \{/);
+    if (!m) throw new Error('Cannot find BOOT_PHASE_SEVERITY in ui-core.js');
+    let depth = 0;
+    for (let i = uiCore258.indexOf('{', m.index); i < uiCore258.length; i++) {
+      if (uiCore258[i] === '{') depth++;
+      else if (uiCore258[i] === '}' && --depth === 0) return uiCore258.slice(m.index, i + 1) + ';';
+    }
+    throw new Error('Unclosed brace for BOOT_PHASE_SEVERITY');
+  }
+
+  const BOOT_SRC_258 = [
+    severityTable258(),
+    'const _bootFaults = [];',
+    wholeFn258('_bootPhase'),
+    wholeFn258('_bootPhaseFailed'),
+    wholeFn258('_flushBootFaults'),
+    wholeFn258('_renderBootFatal'),
+  ].join('\n');
+
+  // Minimal DOM stub — exactly what the two surfacing paths touch and nothing
+  // more, so a test can never pass because of something the stub invented.
+  // `innerHTML` is left undefined on purpose: a write to it would be visible.
+  function makeBootSandbox258(opts) {
+    const o = opts || {};
+    const byId = {};
+    const recorded = [];
+    const logged = [];
+    function mkEl(tag) {
+      return {
+        tagName: tag,
+        id: '',
+        type: '',
+        className: '',
+        textContent: '',
+        innerHTML: undefined,
+        attrs: {},
+        style: { cssText: '' },
+        children: [],
+        setAttribute(k, v) {
+          this.attrs[k] = v;
+        },
+        appendChild(c) {
+          this.children.push(c);
+          if (c && c.id) byId[c.id] = c;
+          return c;
+        },
+        addEventListener() {},
+      };
+    }
+    const chat = mkEl('div');
+    chat.id = 'chatDisplay';
+    if (o.chatDisplay !== false) byId.chatDisplay = chat;
+    const sandbox = {
+      document: {
+        getElementById: id => byId[id] || null,
+        createElement: mkEl,
+        body: o.noBody ? null : mkEl('body'),
+      },
+      window: { location: { reload() {} } },
+      _recordError: (type, msg) => recorded.push({ type, msg }),
+      __chat: chat,
+      __recorded: recorded,
+      __logged: logged,
+      __byId: byId,
+    };
+    if (o.withConsole !== false) {
+      sandbox.console = { error: (...a) => logged.push(a), log() {}, warn() {} };
+    }
+    vm258.createContext(sandbox);
+    vm258.runInContext(BOOT_SRC_258, sandbox);
+    return sandbox;
+  }
+  // `const` declarations in a vm script live in the context's lexical scope, not
+  // as own properties of the sandbox object, so they are read by evaluating an
+  // expression in that context rather than off the returned object.
+  const evalIn258 = (sb, expr) => vm258.runInContext(expr, sb);
+
+  // 258.1  a degradable phase failure does NOT stop the phases after it — the
+  //        whole point of the change
+  {
+    const sb = makeBootSandbox258();
+    let after = 0;
+    sb.__after = () => after++;
+    evalIn258(
+      sb,
+      "_bootPhase('haptic', function () { throw new Error('x'); });" +
+        "_bootPhase('radio', function () { __after(); });"
+    );
+    assert(
+      after === 1 && sb.__recorded.length === 1,
+      '258.1: a degradable phase that throws does not abort boot — the next phase still runs'
+    );
+  }
+
+  // 258.2  …and the failure is RECORDED, not swallowed: it lands in the client
+  //        error ring-buffer (which the casing FAULT lamp, the BUS-24 fault
+  //        console and the LIVING CORE strain signal all read through the one
+  //        shared reader) and in _bootFaults with its classification
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(sb, "_bootPhase('haptic', function () { throw new Error('boom'); });");
+    const faults = evalIn258(sb, '_bootFaults');
+    const rec = sb.__recorded[0] || {};
+    assert(
+      faults.length === 1 &&
+        faults[0].phase === 'haptic' &&
+        faults[0].severity === 'degradable' &&
+        faults[0].msg === 'boom' &&
+        rec.type === 'boot' &&
+        /haptic/.test(rec.msg) &&
+        /boom/.test(rec.msg),
+      '258.2: a degradable failure is recorded in the client error ring-buffer (_recordError) and in _bootFaults with phase/severity/message'
+    );
+  }
+
+  // 258.3  a FATAL phase throws OUT of _bootPhase so boot actually stops, and
+  //        the error carries the phase for the failure screen
+  {
+    const sb = makeBootSandbox258();
+    let threw = null;
+    sb.__catch = e => (threw = e);
+    evalIn258(
+      sb,
+      "try { _bootPhase('load-ui', function () { throw new Error('render died'); }); }" +
+        'catch (e) { __catch(e); }'
+    );
+    assert(
+      threw &&
+        threw._bootFatal === true &&
+        threw._bootPhase === 'load-ui' &&
+        /load-ui/.test(threw.message) &&
+        /render died/.test(threw.message),
+      '258.3: a FATAL phase failure propagates out of _bootPhase (boot stops) carrying _bootPhase/_bootFatal and the underlying message'
+    );
+  }
+
+  // 258.4  an ASYNC phase rejection is routed into the SAME classifier — a phase
+  //        cannot escape the guard by failing late. Driven with a synchronous
+  //        thenable rather than a real promise: it exercises the identical
+  //        `r.then(null, handler)` branch, deterministically, inside a runner
+  //        whose assertions are synchronous (a real promise would settle after
+  //        the assert had already run, which is a test that proves nothing).
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(
+      sb,
+      "_bootPhase('hydrate-meta', function () {" +
+        '  return { then: function (ok, err) { err(new Error("idb gone")); } };' +
+        '});'
+    );
+    const faults = evalIn258(sb, '_bootFaults');
+    assert(
+      faults.length === 1 &&
+        faults[0].phase === 'hydrate-meta' &&
+        faults[0].severity === 'degradable' &&
+        faults[0].msg === 'idb gone',
+      '258.4: a rejected ASYNC phase is routed into the same classifier — an async failure cannot slip past the guard by failing late'
+    );
+  }
+
+  // 258.5  an UNKNOWN phase name fails OPEN (degradable), never fatal — a typo
+  //        in a phase name must not become the thing that bricks boot. The gate
+  //        (258.15) is the layer that catches the typo; this is the backstop.
+  {
+    const sb = makeBootSandbox258();
+    let threw = false;
+    try {
+      evalIn258(sb, "_bootPhase('not-a-real-phase', function () { throw new Error('x'); });");
+    } catch (_) {
+      threw = true;
+    }
+    const faults = evalIn258(sb, '_bootFaults');
+    assert(
+      !threw && faults.length === 1 && faults[0].severity === 'degradable',
+      '258.5: an unknown phase name is classified degradable and never throws — the runtime fails open, the gate catches the typo'
+    );
+  }
+
+  // 258.6  _bootPhase returns the phase's own return value, so the two awaited
+  //        async phases keep their exact pre-HG2 ordering semantics
+  {
+    const sb = makeBootSandbox258();
+    assert(
+      evalIn258(sb, "_bootPhase('haptic', function () { return 'kept'; })") === 'kept',
+      "258.6: _bootPhase returns the phase's return value unchanged, so `await _bootPhase(…)` preserves the original boot ordering"
+    );
+  }
+
+  // 258.7  the USER is told: every degradable fault becomes a transcript line in
+  //        #chatDisplay, not a console-only whisper
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(
+      sb,
+      "_bootPhase('haptic', function () { throw new Error('no vibrate'); });" +
+        "_bootPhase('radio', function () { throw new Error('no tuner'); });" +
+        'var n = _flushBootFaults();'
+    );
+    const lines = sb.__chat.children.map(c => c.textContent);
+    assert(
+      evalIn258(sb, 'n') === 2 &&
+        lines.length === 2 &&
+        lines.every(t => /BOOT FAULT/.test(t)) &&
+        /haptic/.test(lines[0]) &&
+        /no vibrate/.test(lines[0]) &&
+        /radio/.test(lines[1]) &&
+        sb.__chat.children.every(c => c.className === 'msg-sys' && c.innerHTML === undefined),
+      '258.7: every degradable fault is surfaced to the user as a #chatDisplay transcript line naming the phase and the fault (textContent, never innerHTML)'
+    );
+  }
+
+  // 258.8  a clean boot says nothing — the surfacing must not become noise
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(sb, "_bootPhase('haptic', function () { return 1; }); var n = _flushBootFaults();");
+    assert(
+      evalIn258(sb, 'n') === 0 && sb.__chat.children.length === 0,
+      '258.8: a boot with no degradable fault writes no transcript line at all'
+    );
+  }
+
+  // 258.9  the FATAL screen is painted, names the phase and the fault, and is
+  //        announced to assistive tech — the replacement for the black screen
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(
+      sb,
+      "try { _bootPhase('init-tabs', function () { throw new Error('no tabs'); }); }" +
+        'catch (e) { var painted = _renderBootFatal(e); }'
+    );
+    const screen = sb.__byId.bootFatal;
+    const text = screen ? screen.children.map(c => c.textContent).join('\n') : '';
+    assert(
+      evalIn258(sb, 'painted') === true &&
+        screen &&
+        screen.attrs.role === 'alert' &&
+        /BOOT FAILURE/.test(text) &&
+        /init-tabs/.test(text) &&
+        /no tabs/.test(text) &&
+        screen.children.some(c => c.tagName === 'button'),
+      '258.9: a fatal phase failure paints the #bootFatal screen — role="alert", the failed phase, the fault text and a retry control — instead of a silent black screen'
+    );
+  }
+
+  // 258.10 the fatal screen also carries the degradable faults that preceded it,
+  //        so the report the user can give back is complete
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(
+      sb,
+      "_bootPhase('haptic', function () { throw new Error('no vibrate'); });" +
+        "try { _bootPhase('load-ui', function () { throw new Error('render died'); }); }" +
+        'catch (e) { _renderBootFatal(e); }'
+    );
+    const screen = sb.__byId.bootFatal;
+    const text = screen ? screen.children.map(c => c.textContent).join('\n') : '';
+    assert(
+      screen && /ALSO DEGRADED/.test(text) && /haptic/.test(text) && /render died/.test(text),
+      '258.10: the fatal screen lists the degradable faults that preceded it, not only the fatal one'
+    );
+  }
+
+  // 258.11 it never stacks a second screen, and it NEVER throws — a failure
+  //        screen that becomes a second failure is worse than none
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(
+      sb,
+      'var a = _renderBootFatal(new Error("one")); var b = _renderBootFatal(new Error("two"));'
+    );
+    const noBody = makeBootSandbox258({ noBody: true });
+    let threwNoBody = false,
+      resultNoBody = null;
+    try {
+      resultNoBody = evalIn258(noBody, '_renderBootFatal(new Error("hostile"))');
+    } catch (_) {
+      threwNoBody = true;
+    }
+    assert(
+      evalIn258(sb, 'a') === true &&
+        evalIn258(sb, 'b') === false &&
+        !threwNoBody &&
+        resultNoBody === false &&
+        sb.__byId.bootFatal.children.filter(c => /BOOT FAILURE/.test(c.textContent)).length === 1,
+      '258.11: _renderBootFatal() paints exactly one screen (a second call is a no-op) and swallows its own failure rather than becoming a second fault'
+    );
+  }
+
+  // 258.12 …and it reaches for nothing that a failed phase owns: no stylesheet
+  //        class, no render pass, no MetaStore. The screen is built from inline
+  //        styles and textContent alone, which is why it survives a fatal fault
+  //        in the very phase that paints the UI.
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(sb, '_renderBootFatal(new Error("x"))');
+    const screen = sb.__byId.bootFatal;
+    assert(
+      screen &&
+        screen.style.cssText.length > 0 &&
+        screen.className === '' &&
+        screen.children.every(c => c.className === '' && c.innerHTML === undefined),
+      '258.12: the fatal screen is self-contained — inline styles and textContent only, no CSS class and no render pass it could have lost'
+    );
+  }
+
+  // 258.13 PROTOCOL 42 / HG1 FOOTGUN ON NEW GROUND: with NO console binding, a
+  //        phase failure must still record and continue. A bare console.error in
+  //        the handler would ReferenceError from inside the catch that exists to
+  //        contain the failure — the exact HG1 defect, one file over.
+  {
+    const sb = makeBootSandbox258({ withConsole: false });
+    let threw = false,
+      after = 0;
+    sb.__after = () => after++;
+    try {
+      evalIn258(
+        sb,
+        "_bootPhase('haptic', function () { throw new Error('x'); });" +
+          "_bootPhase('radio', function () { __after(); });"
+      );
+    } catch (_) {
+      threw = true;
+    }
+    assert(
+      !threw && after === 1 && evalIn258(sb, '_bootFaults.length') === 1,
+      '258.13: with NO console in scope, a degradable phase failure is still recorded and the next phase still runs — the per-phase log is itself guarded'
+    );
+  }
+
+  // 258.14 …and when a console IS present the failure is actually logged, with
+  //        its phase name and classification (the loud half of "fail loudly")
+  {
+    const sb = makeBootSandbox258();
+    evalIn258(sb, "_bootPhase('haptic', function () { throw new Error('x'); });");
+    const first = sb.__logged.length ? String(sb.__logged[0][0]) : '';
+    assert(
+      sb.__logged.length === 1 && /haptic/.test(first) && /degradable/.test(first),
+      '258.14: a phase failure is logged naming the phase and its classification — never silently swallowed'
+    );
+  }
+
+  // ── STATIC (Protocol 20 exceptions) ───────────────────────────
+  // The subject below genuinely IS the source text: WHICH call sites exist
+  // inside window.onload, and whether any is unguarded. A behavioural test would
+  // have to boot the whole app, and a successful boot proves nothing about the
+  // guards — they only matter on the load that goes wrong.
+  let onloadBody258 = '';
+  {
+    const oi = uiCore258.indexOf('window.onload = async function () {');
+    if (oi !== -1) {
+      let depth = 0;
+      for (let i = uiCore258.indexOf('{', oi); i < uiCore258.length; i++) {
+        if (uiCore258[i] === '{') depth++;
+        else if (uiCore258[i] === '}' && --depth === 0) {
+          onloadBody258 = uiCore258.slice(oi, i + 1);
+          break;
+        }
+      }
+    }
+  }
+  const callNames258 = [...onloadBody258.matchAll(/_bootPhase\('([^']+)'/g)].map(m => m[1]);
+  const table258 = evalIn258(makeBootSandbox258(), 'BOOT_PHASE_SEVERITY');
+  const tableKeys258 = Object.keys(table258 || {});
+
+  // 258.15 the classification table and the real call-site list are held to each
+  //        other in BOTH directions — a phase can neither be added without a
+  //        classification (it would silently inherit the fail-open default) nor
+  //        classified without existing (a stale entry nobody ever notices)
+  {
+    const missing = callNames258.filter(n => tableKeys258.indexOf(n) === -1);
+    const stale = tableKeys258.filter(n => callNames258.indexOf(n) === -1);
+    const dupes = callNames258.filter((n, i) => callNames258.indexOf(n) !== i);
+    assert(
+      callNames258.length > 40 && !missing.length && !stale.length && !dupes.length,
+      `258.15: every window.onload phase has a BOOT_PHASE_SEVERITY entry and every entry has a phase, with no duplicate names (${callNames258.length} phases)` +
+        (missing.length ? ` — UNCLASSIFIED: ${missing.join(', ')}` : '') +
+        (stale.length ? ` — STALE ENTRY: ${stale.join(', ')}` : '') +
+        (dupes.length ? ` — DUPLICATE: ${dupes.join(', ')}` : '')
+    );
+  }
+
+  // 258.16 NOTHING runs unguarded. Every statement at the try block's own
+  //        indentation level is a _bootPhase() wrapper (or its closing line, or
+  //        the end-of-boot flush) — this is what makes "every boot phase runs
+  //        under its own guard" checkable instead of merely asserted.
+  {
+    // The TRY block only — the catch block's own two lines (the console trail
+    // and _renderBootFatal) are the failure handler, not phases, and 258.18
+    // owns them.
+    const catchIdx258 = onloadBody258.indexOf('  } catch (e) {');
+    const tryBlock258 = catchIdx258 === -1 ? onloadBody258 : onloadBody258.slice(0, catchIdx258);
+    const offenders = tryBlock258
+      .split('\n')
+      .filter(l => /^ {4}\S/.test(l))
+      .filter(l => !/^ {4}\/\//.test(l))
+      .filter(
+        l =>
+          !/^ {4}(await )?_bootPhase\('/.test(l) &&
+          !/^ {4}\}\);$/.test(l) &&
+          !/^ {4}_flushBootFaults\(\);$/.test(l)
+      );
+    assert(
+      tryBlock258.length > 0 && catchIdx258 !== -1 && offenders.length === 0,
+      "258.16: every statement in window.onload's try block is a _bootPhase() guard — no phase call runs unguarded" +
+        (offenders.length ? ` — UNGUARDED: ${offenders.map(o => o.trim()).join(' | ')}` : '')
+    );
+  }
+
+  // 258.17 exactly three phases are fatal, and they are the three whose absence
+  //        leaves nothing usable on screen. Widening this set silently is how a
+  //        degradable annoyance turns back into a dead terminal.
+  {
+    const fatal = tableKeys258.filter(k => table258[k] === 'fatal').sort();
+    const expected = ['hydrate-state', 'init-tabs', 'load-ui'];
+    assert(
+      fatal.join(',') === expected.join(',') &&
+        tableKeys258.every(k => table258[k] === 'fatal' || table258[k] === 'degradable'),
+      `258.17: exactly hydrate-state / load-ui / init-tabs are classified fatal and every other phase is degradable (found fatal: ${fatal.join(', ')})`
+    );
+  }
+
+  // 258.18 the outer catch paints the failure screen. The pre-HG2 catch logged
+  //        to the console and returned, which IS the black-screen bug.
+  {
+    const ci = onloadBody258.indexOf('} catch (e) {');
+    const tail = ci === -1 ? '' : onloadBody258.slice(ci);
+    assert(
+      /_renderBootFatal\(e\)/.test(tail) && /_flushBootFaults\(\);/.test(onloadBody258),
+      "258.18: window.onload's catch calls _renderBootFatal(e) (never console-only) and a completed boot flushes its degradable faults to the user"
+    );
+  }
+
+  // 258.19 the Diagnostic Shell can fire both halves on demand (Protocol 44) — a
+  //        boot fault is otherwise reproducible only on a load that already went
+  //        wrong — and both tools drive the REAL functions (Protocol 22).
+  {
+    const shell258 = readFile('js/dev/test-console.js');
+    assert(
+      /id: 'sim-boot-fault-degraded'/.test(shell258) &&
+        /id: 'sim-boot-fault-fatal'/.test(shell258) &&
+        /_bootPhase\('diagnostic-sim'/.test(shell258) &&
+        /_flushBootFaults\(\)/.test(shell258) &&
+        /_renderBootFatal\(err\)/.test(shell258),
+      '258.19: the Diagnostic Shell registers SIMULATE DEGRADED BOOT FAULT and SIMULATE FATAL BOOT SCREEN, both driving the real _bootPhase/_flushBootFaults/_renderBootFatal (Protocol 44 + 22)'
+    );
   }
 }
 

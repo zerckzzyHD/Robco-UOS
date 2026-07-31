@@ -8,6 +8,30 @@
 
 ---
 
+## Adding a boot phase (HG2 — per-phase boot isolation)
+
+**A new `window.onload` phase must go through `_bootPhase()`, and it must be classified.** Since
+HG2 every phase in the boot orchestrator (`js/ui/ui-core.js`) runs under its own guard rather than
+one shared outer `try`/`catch`, so a phase that throws no longer silently abandons the ~50 after it.
+Two obligations come with that, and the gate enforces both:
+
+1. **Wrap the call:** `_bootPhase('<kebab-name>', () => { yourInitFn(); })`. Keep the callback a
+   single named call — never inline logic (Suite 132.5). An async phase keeps its `await`:
+   `await _bootPhase('<name>', async () => { await yourAsyncFn(); })`.
+2. **Classify it** in `BOOT_PHASE_SEVERITY`, in the same file. **Default to `'degradable'`.**
+   `'fatal'` means _the terminal has nothing usable on screen without this_ — today exactly three
+   phases qualify (`hydrate-state`, `load-ui`, `init-tabs`) and widening that set is how a
+   degradable annoyance turns back into a dead terminal. Suite 258.15 holds the table and the real
+   call-site list to each other in both directions, and 258.17 pins the fatal set, so an
+   unclassified phase or a quietly-widened fatal set fails the gate rather than shipping.
+
+An unknown phase name degrades at runtime rather than killing boot (fail-open by design — the gate
+is the layer that catches the typo). Degradable faults are surfaced to the **user** via
+`_flushBootFaults()`, not console-only; a fatal one paints `_renderBootFatal()`. Full design →
+`ARCHITECTURE.md#boot-isolation-hg2`.
+
+---
+
 ## Protocol 5 — Adding a New UI Panel
 
 **A new panel must be wired into every panel-wiring point, not just rendered.** The authoritative
