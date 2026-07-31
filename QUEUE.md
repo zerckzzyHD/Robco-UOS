@@ -24,7 +24,43 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (SP2 ANSWERED — Dispatch can set a session's EFFORT TIER, and the whole effort
+**Last updated: 2026-07-31 (CHECKPOINT — a full RECONCILE, not just a fold: the queue is now current against
+git and the live ledger)** — **This pass folded four new things and then went back and fixed what had rotted.**
+**FOLDED:** **(1) RB3's default is FLIPPED to ON/ARMED** — the hidden-response watcher now starts with the
+machine and stays armed until an explicit `watcher off`, toggleable from the CPB5 CLI **including remotely
+over Tailscale** (the toggle is a state file the watcher polls, same shape as the supervisor's existing
+`state\DISABLE`, so remote and local are the same code path). The auto-arm-off-transcript alternative was
+**considered and REJECTED — reliability over cleverness, no activity-detection gating**; making the owner opt
+in to his own safety net was the wrong default. **(2) The return-bus/MCP shape is CORRECTED against
+Anthropic's own docs:** a Dispatch-callable connector **must be a REMOTE Streamable-HTTP endpoint** — local
+stdio MCP works in Claude Desktop but **not in Cowork/claude.ai** — so the old "add a local server to the
+desktop config" plan was never going to work, and its prerequisite spike is **retired as answered-NO rather
+than left pending**. With it came the relay-durability model (**"disposable" = replaceable INFRASTRUCTURE,
+never lossy delivery**; the four-state receipt chain `RECEIVED_BY_RELAY → INGESTED_BY_SUPERVISOR →
+ACCEPTED/REJECTED →` verified outcome; at-least-once + idempotency; **outbound pull preferred over a public
+tunnel**), two more ceilings (**no resource subscriptions/sampling**, **5-minute tool timeout**) that force
+**submit→receipt→poll**, and the agreed build sequence (**`robco-control`'s five ops first, then read-only
+`robco-evidence`** — and ⛔ **do not build an MCP just for effort**, that motivation is gone). **(3) A museum
+PLATFORM-LOCKED exhibit** is specified at **P15 part 4**, splitting **hard-locked** (WAKE · remote-only MCP ·
+no subscriptions/sampling · 5-min timeout) from **worked-around** (per-session effort), every item carrying
+the doc or experiment that set its ceiling — an exhibit that **flips to UNLOCKED as the platform moves**.
+**RECONCILED — and this half found real rot:** ⛔ the top-line status still said the control plane was
+**"None of it is built"**, which was badly untrue and was the first thing a phone reader saw; the **SHIPPED
+roll-up had fallen SEVEN items behind** (CPB5 v0.1, WB1 v0.1, WB6 v0.1, P16, HG1, HG2, DG2-activation, plus
+today's effort fold); **CPB4 was marked "SHIPPED (this pass)"**, which means nothing to a later reader; a
+**3/10 DG2 counter was labelled "live"** when the live value is **44/10**; and **the "CURRENT build order"
+listed five ranks that have ALL shipped**. All fixed, with **every SHA re-verified this pass** via
+`git cat-file` **and** `git merge-base --is-ancestor` in its own repo, plus ledger confirmation where it
+existed — **WB6's hash chain was observed genuinely writing in production** (a live record at `seq 1820`
+carrying real `prev`/`self`), and **REF5's third leg was observed working** (this session's actively-edited
+tree correctly read `owned` 9×, the exact case that read `unowned` forever before the fix). A **current
+ORDER for what remains** now sits at the top of the CP build-order section. ⚠ **And one live reading worth
+the owner's attention: usage is at 91% weekly / 81% session, and the machine has been in
+`Stop-unattended-AI` all afternoon** — under CPB2's owner-approved-but-**unbuilt** refinement that band
+would read Reserve-for-owner instead, so that refinement is now **first** in the derived order on evidence
+rather than preference.
+
+**Prior update — 2026-07-31 (SP2 ANSWERED — Dispatch can set a session's EFFORT TIER, and the whole effort
 design folded in; doc-only, nothing built)** — **The spike that CPB9's effort tier stood or fell on came back
 POSITIVE, but not the way it assumed.** Dispatch **can** set a spawned session's reasoning tier, **per
 session, at will** — via a **two-message** pattern: a message that is exactly `/effort <level>` and nothing
@@ -600,7 +636,9 @@ around Stage 3). Doc edits + git only, nothing killed, no control-plane code tou
 TEXT that didn't go through the messaging tool, the watcher fires a Pushover within **~1 second** — a
 detector/alarm only, it cannot prevent the leak. **OFF BY DEFAULT** (idle footprint ~0% CPU / ~40MB, but
 only useful while the owner is actively using Dispatch), controlled by trigger words **"watcher on" /
-"watcher off."** The existing 5-minute supervisor loop babysits it — a dead watcher process is caught on the
+"watcher off."** ⚠ **[SUPERSEDED 2026-07-31 — the default is now ON/ARMED.** This paragraph is left as dated
+history per the queue's own convention; the reasoning that flipped it, and the REJECTED auto-arm option, are
+in the RB3 entry itself.**]** The existing 5-minute supervisor loop babysits it — a dead watcher process is caught on the
 supervisor's next pass and raises its own incident. Removes the owner's prior manual workaround of
 re-reading working-notes on the Claude website to catch these leaks himself. **Also recorded — a small
 control-plane note, no build needed:** the supervisor's own kill-switch is already wired to trigger words
@@ -868,12 +906,34 @@ running history chain in
   **L** ✅ (owner-confirmed on his phone 2026-07-27), and **P9** — still open, now sitting with the other
   museum polish. **Nothing is mid-flight or broken.** ⚠ The tier is not permanent; re-confirm if the owner
   mentions a change.
-- **⭐ THE TOP PRIORITY IS NOW THE WORKFLOW / CONTROL PLANE (owner's explicit call, 2026-07-27)** — the
-  program at **CP1-CP5**, directly below. The honest framing, and the reason it outranks feature work: the
-  project's real bottleneck was never a missing agentic technique, it is the **control plane** — no completion
-  event, no cancel, ghost/duplicate launches, no durable job ledger, no usage warning until a session hits the
-  cap mid-run. **⚠ None of it is built.** CP1 (the empirical spike campaign) exists to prove or KILL the
-  hook-based approach before a line of it is written.
+- **⭐ THE TOP PRIORITY IS THE WORKFLOW / CONTROL PLANE (owner's explicit call, 2026-07-27)** — the program
+  at **CP1-CP5**, directly below. The honest framing, and the reason it outranks feature work: the project's
+  real bottleneck was never a missing agentic technique, it is the **control plane** — no completion event,
+  no cancel, ghost/duplicate launches, no durable job ledger, no usage warning until a session hits the cap
+  mid-run.
+  **✅ CORRECTED 2026-07-31 — this bullet used to end "⚠ None of it is built." That is NO LONGER TRUE and had
+  become the single most misleading line in this file.** A great deal is built, live, and running
+  unattended every five minutes. **What actually exists now** (each verified against git + the live ledger at
+  this reconcile): the **durable job ledger** and reconciler (CPK1), the **transactional verifier/publisher**
+  (CPK2), **off-machine backup and restore test** (CPK3), **continuation packets** (CPK4), **incident
+  lifecycle and daily housekeeping** (CPK5); the **controlled-push wrapper** routing every push (ACT3) with
+  **raw-push refusal ACTIVE in both repos** (DG2, counter **44/10**) and the control repo's own pushes
+  genuinely gated (CPB6); the **budget alert** (CPB1, dormant until fed) and **usage→operating-modes** (CPB2,
+  **live**); the **operator control CLI** (CPB5 v0.1); the **provenance spine** (WB1 v0.1) and the
+  **tamper-evident hash chain** (WB6 v0.1, observed writing at seq 1820); the **pre-publish PII gate**, built
+  and **mounted**
+  (P16); plus ND1, REF1 and REF5's three legs. **What is still NOT built** is the honest remainder: **WAKE**
+  (platform-locked), the **return bus / MCP channel** (RB1-RB4, MCP1-MCP2), the **headless launcher** (CPB9,
+  no owner go), CPB5 **v0.2/v0.3**, and CPB7/CPB8. CP1's spike campaign did its job — it proved rather than
+  killed the approach, and the build followed.
+- **⚠ LIVE USAGE STATE AT THIS RECONCILE (2026-07-31, read from the ledger, not assumed): weekly `sd` = 91%,
+  session `fh` = 81%, and the machine has been sitting in `Stop-unattended-AI` mode all afternoon** (153
+  `usage.mode` events today, the last six consecutive all `Stop-unattended-AI`). Under the **shipped**
+  thresholds `>= 90` is Stop; under **CPB2's owner-approved-but-UNBUILT refinement** (Stop moves to 95,
+  Reserve-for-owner widens to 80-94) today would instead read **Reserve-for-owner**. ⭐ **So that refinement
+  is no longer theoretical — it is being exercised right now**, and the gap between the shipped default and
+  the approved one is currently deciding whether unattended work may start at all. Recorded as live evidence,
+  dated; it is an argument for building the refinement, not a licence to assume it.
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
 - **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
@@ -1087,10 +1147,47 @@ renumber anything. Full converged reading →
 [`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md);
 full account of this reconciliation pass → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
 
+> **✅ RECONCILED 2026-07-31 — ALL FIVE RANKS BELOW ARE SHIPPED. This section is now HISTORY, not a plan.**
+> Ranks 1-5 map to **CPK1 `8eab8fd`** · **CPK2 `dd49ed4`** · **CPK3 `e4384e5`+`78acfd5`** · **CPK4 `9fd751d`**
+> · **CPK5 `32c0fbc`** — every SHA re-verified in the control repo this pass. It is kept in place (Protocol
+> 49: retire in place, never delete the reasoning) because the **reframe** that produced it is the most
+> load-bearing argument in this file. **The trusted-action-kernel thesis was correct and the kernel is
+> built** — so what follows is the ORDER FOR WHAT REMAINS.
+>
+> **⭐ THE CURRENT ORDER (derived at this reconcile from what is already recorded as priority + what the
+> kernel now unblocks — offered for owner confirmation, NOT an owner mandate; nothing here overrides a
+> standing call):**
+>
+> 1. **CPB2's threshold refinement (Stop → 95, Reserve-for-owner → 80-94).** ⭐ **Promoted to first on live
+>    evidence, not preference:** the machine sat in `Stop-unattended-AI` all afternoon at **91% weekly**, a
+>    band the owner has already approved re-classifying as Reserve-for-owner. It is owner-approved, tiny, and
+>    **currently deciding whether unattended work may start at all**. The bands are even tunable via config
+>    today — but changing the shipped default is the recorded build task.
+> 2. **RB1 — the Dispatch INBOX projection.** Still the biggest leverage per unit of work and needs no wake,
+>    no channel, and no platform change: one derived delta off the ledger that already exists, plus the
+>    read-at-turn-start rule. Everything later plugs into it.
+> 3. **CPB5 v0.2** — live work + admission (Work Board, Session Inspector, the **usage admission gate** with
+>    its new **effort ceiling**, `session.stop`). Owner-confirmed high-priority, and v0.1 shipped, so the
+>    rung is genuinely next rather than aspirational.
+> 4. **RB3 — the hidden-response watcher**, now **ON/ARMED by default**. Starred because it targets the
+>    recurring failure this whole program started from.
+> 5. **CPB3 — the `backup-all` script**, the mechanical half of the checkpoint ritual. Small, and it removes
+>    a standing manual burden from every checkpoint.
+> 6. **RB2 receipts**, then the **channel** (**MCP1**'s five-op `robco-control` slice → **MCP2**
+>    `robco-evidence`, both REMOTE per the 2026-07-31 correction) — explicitly **not** pulled forward, since
+>    the effort motivation that used to argue for it is gone.
+> 7. **The museum tail** — **P13** (security precondition) → **P14** (the stale-site republish) → **P15**
+>    (control-plane arcs + the new platform-locked exhibit).
+>
+> **Deliberately NOT in this order:** **CPB9** (no owner go), **CPB7/CPB8** (data-gated / not in the go
+> batch), **RB5** (blocked by platform, owner approval required), and **WAKE** (platform-locked, nothing to
+> build). **WB1/WB6** continue as additive follow-on slices rather than competing for a slot.
+
 Three external reviews (Gemini 3.1 Pro, DeepSeek, GPT-5.6 Sol) converged on one reframe: the project built a
 strong **flight recorder** (OBSERVE) and a weak **actuator**, and several planned/built items **turn weak
 inference into destructive action** — the wrong place to spend the risk budget. The next maturity jump is a
-**tiny trusted action kernel**, not more detectors. The working build order is now:
+**tiny trusted action kernel**, not more detectors. The working build order **was** (all five now shipped —
+see the reconcile note above):
 
 1. **Job contract + reconciler.** A tiny manifest of _desired_ state per job (id/nonce, repo, base SHA, write
    scope, deadline, verification commands, terminal condition) plus intent→act→observe-independently→result
@@ -1534,7 +1631,7 @@ receipt framing/format on top, not new detection machinery.
 **Done means:** every job launched through the kernel produces a launch receipt and, on completion, a
 structured completion receipt, both legible without re-deriving state from raw ledger events.
 
-### RB3. ⭐ Mobile-hidden-response detector — G5 (plan-stage; mechanism specified 2026-07-30)
+### RB3. ⭐ Mobile-hidden-response detector — G5 (plan-stage; mechanism specified 2026-07-30; **default flipped to ON/ARMED 2026-07-31**)
 
 **What it is — a LIVE 24/7 WATCHER, not the supervisor's 5-minute poll.** A small persistent Node process
 using `fs.watch` on the Dispatch conversation transcript/audit file. The moment Dispatch produces
@@ -1548,11 +1645,33 @@ these leaks himself; this watcher is what removes that need.
 **It is a DETECTOR/alarm, not a blocker** — it pings, it cannot prevent the leak (there is no
 `PreToolUse`-style hook for "hidden" plain text, only after-the-fact detection off the transcript).
 
-**OFF BY DEFAULT, owner-controlled via trigger words "watcher on" / "watcher off."** The footprint is tiny
-— an idle `fs.watch` process runs at ~0% CPU, ~40MB resident — but it only earns its keep while the owner
-is actively using Dispatch, so it stays opt-in rather than always-on. **The existing 5-minute supervisor
-loop babysits it:** if the watcher process dies, the supervisor's next pass raises an incident, so a
-silently-dead watcher doesn't leave a phone-invisible gap with no alarm covering it.
+**⭐ ON BY DEFAULT — ARMED, always-running while the machine is up (owner correction, 2026-07-31; this
+REPLACES the earlier "off by default" spec).** The watcher process **starts with the machine and stays
+armed** until an explicit **"watcher off"**; **"watcher on"** re-arms it. The footprint is trivial — an
+idle `fs.watch` process runs at ~0% CPU, ~40MB resident — and **the leak it catches only happens while the
+owner is using Dispatch, which is exactly when it must already be live.** That is the whole reversal:
+**making the owner opt in to his own safety net was the wrong default**, because the moment he needs it is
+the moment he has not thought about it.
+
+**⛔ The auto-arm-off-transcript option was CONSIDERED and REJECTED (owner, 2026-07-31) — reliability over
+cleverness.** The rejected design would have watched for transcript activity and armed/disarmed itself
+automatically. It is not being built: **there is NO activity-detection gating.** A watcher that decides for
+itself when it is needed has a failure mode where it is wrong precisely when it matters, and the thing it
+would be optimising — a ~40MB idle process — is not worth a correctness risk. **Simple, always-covered,
+always-on.** Recorded so it is not re-proposed as an obvious improvement.
+
+**TOGGLEABLE FROM THE CPB5 OPERATOR CLI — INCLUDING REMOTELY, over Tailscale.** The mechanism is
+deliberately boring and already proven: **the toggle is a STATE FILE the watcher polls each loop** — the
+same shape as the supervisor's existing `state\DISABLE` kill-switch, which works today. The CLI and the
+file both live **on the machine**, and **Tailscale just carries a shell to it** (Tailscale SSH) from the
+owner's phone or laptop — so `watcher off` behaves **identically local or remote**, with no separate remote
+code path to build, secure, or keep in sync. The eventual control-plane MCP (**RB4/MCP1**) would make it
+one-tap, but **CLI-over-Tailscale works without it** and is not blocked on it.
+
+**The existing 5-minute supervisor loop babysits it:** if the watcher process dies, the supervisor's next
+pass raises an incident, so a silently-dead watcher doesn't leave a phone-invisible gap with no alarm
+covering it. **That babysitting matters more now that the watcher is always-on** — an always-armed watcher
+that silently died would otherwise read exactly like an always-armed watcher with nothing to report.
 
 **Also recorded 2026-07-30 (a small control-plane note, no build needed) — the supervisor already has a
 kill-switch, and it's already wired to trigger words.** "supervisor on" / "supervisor off" map onto the
@@ -1563,13 +1682,46 @@ building.
 
 **Done means:** a deliberately-triggered hidden response (text emitted outside the messaging tool) is
 detected and produces a phone alert within ~1 second, proven red-then-green, not just reasoned about; a
-killed watcher process is caught by the supervisor's next 5-minute pass and raises its own incident.
+killed watcher process is caught by the supervisor's next 5-minute pass and raises its own incident;
+**the watcher comes up ARMED on a machine restart with no one asking it to** (the default is proven by
+reboot, not by reading the config); and **`watcher off` / `watcher on` flip it from the CPB5 CLI both
+locally AND over a Tailscale shell**, with the remote path exercised rather than assumed — it is the same
+state file either way, so proving one and reasoning about the other is exactly the shortcut this entry
+should not take.
 
-### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage; V1 contract folded in 2026-07-29)
+### RB4. ⬜ Custom control-plane MCP — delivery + ack, NOT wake (plan-stage; V1 contract folded in 2026-07-29; **deployment shape CORRECTED 2026-07-31**)
 
-**What it is.** A local MCP server (Cowork already loads MCP servers, so a custom one added to the desktop
-config is very likely callable by Dispatch — confirm with a small load-spike, RB4's own first step)
-exposing seven V1 tools: `control_get_inbox` / `control_get_job` / `control_get_event` /
+⛔ **CORRECTION (2026-07-31), verified against Anthropic's own docs — this entry used to say "a LOCAL MCP
+server", and that was WRONG.** A Dispatch-callable connector **must be a REMOTE Streamable-HTTP endpoint
+reachable from Anthropic's cloud** — Claude connects from its **cloud** infrastructure, not from this
+machine. **Local stdio servers (`claude_desktop_config.json`) work in Claude Desktop but explicitly NOT in
+Cowork / claude.ai**, so the bridge **cannot be a localhost process** and "add it to the desktop config and
+Dispatch will see it" was never going to work. Sources: `support.claude.com/en/articles/11175166` ·
+`/11725091` · `/14680753`.
+**What that changes, and what it does not.** The **tools and their value are unchanged**; only the
+**deployment shape** moves — but it moves a long way:
+
+- **The corrected architecture:** Dispatch → **remote thin MCP front door** (typed intent relay) → **local
+  AI-free supervisor** → **canonical local ledger + executor**. The remote piece is **disposable transport,
+  never canonical truth.**
+- ⭐ **Prefer the PC PULLING authenticated proposals OUTBOUND over exposing the supervisor through a public
+  tunnel** — an outbound pull needs no inbound hole in the machine that holds every repo and secret here.
+- **"Disposable" describes the INFRASTRUCTURE, not the DELIVERY** — a distinction that reads similarly and
+  means the opposite operationally. Once the front door ACKs an intent it **must not vanish before the PC
+  pulls it**: unacknowledged transport data needs **durability until supervisor ingestion**. Receipt chain:
+  **`RECEIVED_BY_RELAY`** (transport only — never renders as "it will happen") → **`INGESTED_BY_SUPERVISOR`**
+  (canonical locally) → **`ACCEPTED`/`REJECTED`** (the supervisor's own decision) → verified outcome.
+  **At-least-once delivery + idempotency** so duplicate pulls are harmless. The relay's ACK grants
+  **transport, never authority** — the supervisor still independently checks state, usage-admission,
+  repo-ownership, nonce and expiry before executing.
+- **Two more ceilings, and they bite the design:** remote connectors **lack resource subscriptions and
+  sampling** (query-only — cannot push or stream to Dispatch) and **tool calls time out at 5 minutes**
+  (cannot stay attached for a whole Code job). Together they force **submit → receipt → poll
+  (`changes.since` / `job.result`)**, and they **reinforce the WAKE ceiling rather than relieving it.**
+- **Constraint:** the remote front door stays inside the project's **free / ≤$10** rule — a minimal
+  free-tier relay.
+
+**What it is.** An MCP server exposing seven V1 tools: `control_get_inbox` / `control_get_job` / `control_get_event` /
 `control_get_health` (DELIVERY as a live query, always current — better than a stale file projection),
 `control_ack_event` (ACKNOWLEDGMENT — the piece a flat file cannot provide), `control_submit_intent`
 (finally makes the Dispatch → supervisor direction real), and `control_get_intent_status` (poll-back so
@@ -1588,16 +1740,34 @@ orchestrator. Full V1 contract →
 through `lib/paths.js` under the control-plane state path, never a hand-built `%LOCALAPPDATA%` string —
 that path can be silently virtualized by Windows for a packaged app (the MSIX-virtualization trap), so a
 hand-built path can resolve to a different physical location than where the supervisor actually
-reads/writes. (b) A prerequisite load-spike — confirm Cowork actually loads a custom local MCP server and
-Dispatch can call its tools — comes before any of the seven tools are built; it's RB4's own first step,
-not a separate item. Also: GPT's proposed "fixed wake phrase" is **already** the locked `status` trigger
+reads/writes. (b) ⛔ **RETIRED 2026-07-31 — the prerequisite LOCAL load-spike is answered NO by the docs, so
+there is nothing to run.** _(It read: "confirm Cowork actually loads a custom local MCP server and Dispatch
+can call its tools — RB4's own first step.")_ Local stdio MCP does not work in Cowork at all, so the local
+route is **ruled out, not unconfirmed**. **Replaced by a REMOTE front-door spike** — stand up a minimal
+free-tier Streamable-HTTP endpoint, register it as a connector, confirm Dispatch can call one trivial
+read-only tool. Same purpose (don't build seven tools on an unproven channel), different shape — and ⚠ it
+carries a cost the local spike did not: **a public endpoint is an attack surface** on the machine holding
+every repo and secret on this project, which is exactly why the outbound-pull shape is preferred. Also: GPT's proposed "fixed wake phrase" is **already** the locked `status` trigger
 (don't add a second one, and don't reuse `sync` — already spoken for); GPT's "separate acknowledgment
 classes" are **largely already** rank 5's incident lifecycle (open/updated/resolved/reopened) —
 `control_ack_event` should map onto that existing model, not invent a parallel one.
 
-**Done means:** the load-spike confirms Dispatch can see and call the server's tools; all seven tools
-round-trip correctly (including idempotent replay and generation-rejection); no second ledger or parallel
-orchestrator is introduced.
+**Done means:** the **remote** front-door spike confirms Dispatch can see and call the server's tools; all
+seven tools round-trip correctly (including idempotent replay and generation-rejection); no second ledger or
+parallel orchestrator is introduced; **an intent ACKed by the relay survives to supervisor ingestion**
+(proven by killing the relay between ACK and pull, not reasoned about); and **the whole front door runs
+inside the free/≤$10 rule**.
+
+**⭐ BUILD SEQUENCE — SMALLEST SLICE FIRST (GPT, agreed 2026-07-31).** ⛔ **Do NOT build an MCP just to set
+the effort tier** — that motivation is **gone** (effort is solved by the two-message pattern, SP2), and
+building a remote connector to deliver a capability that already works locally is the most expensive
+possible way to buy nothing. **When the channel reaches its own scheduled point:** **(i) `robco-control`**,
+exactly five tools — **`state.snapshot`**, **`changes.since`**, **`proposal.submit`**, **`proposal.status`**,
+**`job.result`** — a set chosen to fit the platform's shape rather than fight it, since submit + poll **is**
+the pattern the 5-minute timeout and missing subscriptions force; then **(ii) `robco-evidence`**,
+**read-only** — `context.resolve`, `evidence.search`, `reference.trace` — second on purpose, because it adds
+retrieval value with **no new authority**. **Effort becomes an atomic field in the `session.launch` envelope
+eventually — polish, not a blocker, and explicitly not a reason to pull this item forward.**
 
 ### RB5. ⚠️ Bounded `send_message` WAKE spike — BLOCKED BY PLATFORM (plan-only; owner approval required before running; bounded protocol folded in 2026-07-29)
 
@@ -1658,6 +1828,14 @@ surface, not just that one tool.
 
 ### MCP1. ⬜ `robco-control` — harden RB4 into its V2 proposal/ack contract (refines RB4, folds in usage/telemetry)
 
+⛔ **Inherits RB4's 2026-07-31 deployment correction in full: this is a REMOTE Streamable-HTTP connector, not
+a local server** (local stdio MCP does not work in Cowork/claude.ai), with the disposable-but-durable relay
+and its four-state receipt chain, outbound-pull preference, and the free/≤$10 constraint. **⭐ MCP1's first
+five ops ARE the agreed smallest first slice** — `state.snapshot`, `changes.since`, `proposal.submit`,
+`proposal.status`, `job.result` — so this item, not RB4's seven-tool V1, is the shape to build when the
+channel reaches its scheduled point. **And it is NOT pulled forward for effort:** that motivation is gone
+(SP2's two-message pattern).
+
 **What it is.** Not a replacement for RB4 above — a hardening pass on its ops shape. Six op families:
 `state.snapshot`; `changes.since(cursor)` (a cheap polling delta, not a full snapshot every poll);
 `events.list`; `event.ack_receipt` (= "Dispatch saw it," explicitly **not** "resolved" — narrower than
@@ -1682,6 +1860,11 @@ control-plane-**adjacent** priority — rather than in the low-priority tail und
 below, where the original review synthesis had filed them.
 
 ### MCP2. ⬜ `robco-evidence` — NEW read-only server (the active-graph-retrieval #1 win)
+
+⛔ **Also REMOTE, inheriting RB4's 2026-07-31 correction.** **⭐ Sequenced SECOND, deliberately** (GPT,
+agreed 2026-07-31): `robco-control`'s five-op slice lands first, then this — read-only second because it
+adds retrieval value with **no new authority**, which is the right order to grow a channel that reaches into
+this machine.
 
 **What it is.** A second, read-only MCP server: `context.resolve(changed_paths)`, `evidence.search`,
 `reference.trace`. Every result is derived from real files + git SHAs and carries repo/path + SHA +
@@ -2516,7 +2699,10 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   used to be a plain `git push` that bypassed the wrapper, so the ≥10-clean-pushes counter that gates
   **DG2** (push-guard enforcement) could never advance. Now `npm run push` (app repo `scripts/robco-push.js`)
   routes a push through `controlled-push.js`, delegating the gate to the pre-push hook so CPB4's fast path is
-  preserved (see the SHIPPED entry below for SHAs, the delegation/timeout detail, and the live 3/10 counter).
+  preserved (see the SHIPPED entry below for SHAs, the delegation/timeout detail, and the **3/10 counter as
+  it read on ACT3's dogfood day** — ⚠ corrected 2026-07-31: that figure was labelled "live" here, which it
+  has not been since 2026-07-30. It is a **dated snapshot**; the **live** value is **44/10, threshold long
+  since MET**).
   **Scope held exactly:** this was ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
   **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
   wrapper in did NOT turn on enforcement; a plain `git push` still works, unrefused.
@@ -2917,8 +3103,9 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   widen this surface. Full entry above.
 - **RB1.** Dispatch inbox projection — full entry above.
 - **RB2.** Launch + structured completion receipts — full entry above.
-- **RB3.** Mobile-hidden-response detector — now specified as a live `fs.watch` watcher, off by default —
-  full entry above.
+- **RB3.** Mobile-hidden-response detector — a live `fs.watch` watcher, **ON/ARMED by default** (owner
+  correction 2026-07-31; explicit `watcher off` only, toggleable from the CPB5 CLI including remotely over
+  Tailscale) — full entry above.
 - **CPB3.** The "backup-all" script — a single on-demand pass that runs every backup mechanism this project
   has in one go, instead of separate manual invocations. Concretely, at minimum: the archive sync
   (`sync.ps1`, Protocol 48) and the rank-3 control-plane mirror (**CPK3**, now shipped — see SHIPPED below).
@@ -2943,7 +3130,10 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   abort before push). **What CPB6 does NOT change:** raw-push refusal (DG2) and gate delegation for the APP
   repo are untouched — the app repo still delegates its gate to its own pre-push hook (CPB4 fast path
   intact); CPB6 only concerns the control repo's own pushes.
-- **CPB4.** ✅ **SHIPPED (this pass).** Gate-scoping — a doc-only fast path for the pre-push gate. When a
+- **CPB4.** ✅ **SHIPPED `1245712` (2026-07-30, app repo).** _(Was "SHIPPED (this pass)" — replaced at the
+  2026-07-31 reconcile: "this pass" is meaningless to anyone reading later, which is exactly the rot a
+  reconcile exists to catch. **Exercised live twice on 2026-07-31**, gating both of that day's doc-only
+  commits.)_ Gate-scoping — a doc-only fast path for the pre-push gate. When a
   commit's diff touches ONLY
   docs (`QUEUE.md`, `QUEUE_LOG.md`, `planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE), the pre-push
   hook skips the Playwright render/boot-smoke + app-integrity checks and passes automatically; any diff
@@ -3258,6 +3448,49 @@ only): …`, which is a **system** state-change report naming both the level and
   through regardless of how it is set), plus the **standing effort workflow** the answer earned —
   `planning/control-plane/EFFORT_CONTROL_SPIKE.md` §7, and the ⛔ **DEAD** watcher-adjusts-effort idea at §8.
 
+### Standing workflow — THE TRIGGER WORDS + the CHECKPOINT ritual (owner, 2026-07-29; refined 2026-07-31)
+
+⚠ **Folded into the repo 2026-07-31 because it was NOT here at all** — this ritual governs how nearly every
+session ends, and it existed **only in Dispatch's agent memory**. That is precisely the failure Protocol 50
+exists to prevent (_"everything planned should live in queue, not just remembered by you"_), and it survived
+this long because a workflow that runs correctly every day never announces that it is unrecorded. Recorded
+here at its point of use; **the memory copy stays as the operational note, this is the durable one.**
+
+**`checkpoint`** (also honours **`wrap`** / **`save state`**) — the owner's one word for the full update
+ritual, so he never has to enumerate the steps. **In exact order** (memory BEFORE sync, because the sync
+mirrors memory):
+
+1. **Fold AND RECONCILE the queue** — `QUEUE.md` + `QUEUE_LOG.md` must end **TRULY CURRENT, not just
+   larger**. Folding new items is only half. Reconcile against reality: **(a)** mark every SHIPPED item
+   DONE, **verified against git log / SHAs / the ledger — never assumed**; **(b)** mark DROPPED/superseded
+   items **DEAD with the reason**; **(c)** **RE-ORDER** what remains by current priority; **(d)** **PRUNE**
+   stale, duplicate or obsolete entries. ⛔ **Appending without reconciling lets the queue rot into a pile
+   that no longer reflects reality** (owner flag, 2026-07-31 — raised because it had started happening).
+2. **Reconcile the planning docs** — control-plane spec / status / convergence / anything this session made
+   stale.
+3. **Commit + push EVERY repo** — control (`_RobCo-Control`) and app (`!RobCo-UOS`, `origin/dev`) — and
+   **verify each push actually LANDED on its remote** (`git ls-remote`), not merely "committed". ⭐ **That
+   verify step exists because of a real incident:** two unpushed control-repo commits were lost track of on
+   2026-07-29 by trusting "committed" as "pushed".
+4. **Update agent memory** — write the session's decisions and findings **FIRST**, so step 5 captures them.
+5. **Run the archive sync** — `_RobCo-Archive/sync.ps1`, **by absolute path from a non-archive cwd**
+   (Protocol 48). ⛔ **If it refuses because a genuine active writer holds a lock: report and STOP — never
+   force it, never kill anything.**
+6. **Report** — every repo SHA **plus the archive SHA**, and an **explicit statement of what IS backed up
+   versus anything that is not**.
+
+**Companion triggers:** **`status`** (or `standup`) — **read-only**: report queue position, live
+jobs/sessions, control-plane health, and backed-up-vs-not. Changes nothing. **`sync`** — the **mechanical
+half only**: push every repo, verify each landed, run the archive sync. No folding. **Control triggers:**
+**`watcher on` / `watcher off`** (RB3 — ⚠ **now ARMED by default**, see RB3; goes live only once RB3 is
+built) and **`supervisor on` / `supervisor off`**, which map onto the existing `state\DISABLE` kill-switch
+and **work today**. ⛔ **A destructive action must NEVER be a bare trigger word** — always an explicit ask
+with confirmation.
+
+**Automation split:** the **mechanical half** (steps 3 + 5) is meant to become the **`backup-all` script**
+(**CPB3**, AI-free, one command, queued) with the **daily-housekeeping pass** as its natural automatic
+home; the **judgment half** (steps 1, 2, 4) stays with Dispatch and is not automatable.
+
 ### Standing workflow — DISPATCH SETS EFFORT PER SESSION (adopted 2026-07-31, from SP2's answer)
 
 **Dispatch sets a spawned session's effort tier at will, the same way it already switches model per stage.**
@@ -3493,6 +3726,43 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   control suite green.
 
 ## SHIPPED — for the record, with SHAs
+
+> **⚠ RECONCILED 2026-07-31 — this roll-up had fallen SEVEN items behind.** Every item below the divider was
+> already marked ✅ at its own full entry, but was missing from this index, which is the one place a reader
+> goes for "what shipped, with the SHA". **Every SHA in this section was re-verified this pass** against
+> `git cat-file` **and** `git merge-base --is-ancestor` in its own repo — so each one provably exists **and**
+> is genuinely in its branch's history, not merely quoted. Where a claim could be checked against the live
+> control-plane **ledger** as well, it was; those are marked **ledger-confirmed**.
+
+**── Added by the 2026-07-31 reconcile (all SHAs verified this pass) ──**
+
+- **CPB5 v0.1.** `robco`, the operator control CLI — ✅ SHIPPED `ff11244` (control repo). The decision loop:
+  two foundations, five views, eight command families, `incident.resolve` proven end to end. **v0.2 and v0.3
+  are NOT built** — the item stays 🔄, this is the first rung only.
+- **WB1 v0.1.** Universal provenance spine + evidence envelope — ✅ SHIPPED `d36ad1d` (control repo).
+  Lineage is **derived, not assigned**, so pre-existing records join with no migration. **Additive; does not
+  close WB1** — several producers are deliberately unthreaded and named at the entry.
+- **WB6 v0.1.** Tamper-EVIDENT ledger — hash chain + content-addressed evidence — ✅ SHIPPED `79e8fea`
+  (control repo). **Ledger-confirmed:** live records today carry `chain:{v,algo,seq,prev,self}` — a record
+  sampled this pass sat at **seq 1820** with real `prev`/`self` hashes, so the chain is genuinely writing in
+  production, not merely committed. **Additive; does not close WB6.**
+- **P16.** The pre-publish PII/secret scanner itself — ✅ SHIPPED `0917d20` (control repo). _(Its MOUNT onto
+  the publish flow is the separate `b90304fb` entry below — the scanner and its mounting shipped apart, and
+  conflating them is how a built-but-unmounted gate gets recorded as live.)_
+- **HG1.** Event-bus hardening — `off`/`once`/dedup + per-handler error isolation — ✅ SHIPPED `31206dd`
+  (app repo).
+- **HG2.** Bootstrap isolation — per-phase boot guards, fatal-vs-degradable — ✅ SHIPPED `aef7da4` (app
+  repo).
+- **DG2 ACTIVATION.** Raw-push refusal turned ON — ✅ SHIPPED `05c450b` (app repo) + `ec4acfb` (control
+  repo). **Ledger-confirmed LIVE:** the clean-push counter read **44/10, threshold MET** on this pass's own
+  pushes, and every push this session routed through the wrapper.
+- **SP2 / the effort fold.** Per-session effort control ANSWERED and folded — ✅ `72134e6` + `040885c` (app
+  repo, doc-only). Dispatch **can** set a spawned session's tier via the two-message pattern; the design
+  consequences landed on CPB2/CPB5 v0.2 (effort ceiling), WB1 (`effort` envelope field) and CPB9. **Nothing
+  was built** — this is a documentation/design landing, recorded here because the SHAs are real and a reader
+  should be able to find them.
+
+**── Earlier entries ──**
 
 - **CPK1.** Rank 1 — job contract + reconciler — ✅ SHIPPED `8eab8fd`. Live in the supervisor's 5-minute
   loop (verified by code inspection + a Task Scheduler check, 2026-07-29).
@@ -4948,6 +5218,43 @@ corpus at all. **This item is a precondition on calling the museum done, not an 
    framing has to be squared against that existing constraint when P11 is actually built, not read as
    superseding it.
 
+**── PART 4 — the PLATFORM-LOCKED exhibit (owner idea, folded 2026-07-31) ──**
+
+**The control-plane room must explicitly LIST the ideas we explored and found are PLATFORM-LOCKED — blocked
+on Anthropic changing the platform, not on us building.** ⭐ **Why it belongs, and why it ages WELL rather
+than badly:** it is the honest edge of the self-maintaining-system thesis — not everything the design wanted
+was buildable — and **when Anthropic ships a missing capability, the exhibit flips that item from LOCKED to
+UNLOCKED, showing the ceiling itself moving.** An exhibit that improves as the world changes is worth more
+than one that quietly rots.
+
+⛔ **Two buckets, and they must NOT be lumped** — "we couldn't" and "we couldn't the easy way" are different
+claims, and blurring them would overstate the constraint:
+
+**(a) HARD-LOCKED — no workaround, waiting on Anthropic:**
+
+- **WAKE** — no documented way for a local process (the supervisor) to start a Dispatch/Cowork turn
+  unprompted. **This is THE missing half of the control-plane loop:** delivery and acknowledgment are both
+  buildable; wake is not. _Ceiling set by:_ `DISPATCH_RETURN_BUS.md` § "The exact missing capability: WAKE".
+- **No local MCP in Cowork/claude.ai** — a Dispatch-callable bridge **must** be a remote HTTP server; it
+  cannot be a localhost process. **Shapes the entire return-bus architecture.** _Ceiling set by:_ Anthropic
+  support docs, verified 2026-07-31 (`support.claude.com/en/articles/11175166` · `/11725091` · `/14680753`),
+  which **corrected an earlier wrong assumption of ours** — worth exhibiting as such.
+- **Remote connectors lack resource subscriptions + sampling** — a connector cannot push to Dispatch or
+  stream; it is query-only. **Reinforces the no-wake ceiling.** _Ceiling set by:_ the same docs review.
+- **5-minute tool-call timeout on remote connectors** — a connector cannot hold a connection for a whole
+  Code job, forcing **submit → receipt → poll** instead of stay-attached. _Ceiling set by:_ the same review.
+
+**(b) WORKED-AROUND — the tool didn't expose it, but we found a path:**
+
+- **Per-session effort tier** — `start_code_task` exposes no `--effort` parameter, **but the two-message
+  pattern works and is confirmed**. So: **partially locked** (the clean route still needs a launcher change)
+  yet **functionally solved.** _Ceiling and workaround set by:_ `EFFORT_CONTROL_SPIKE.md` + **SP2** — and it
+  carries its own over-claim→correction→re-test arc, which is separately good exhibit material.
+
+⛔ **Keep it EVIDENCE-BASED: every locked item cites the doc or experiment that established the ceiling**
+(as above). A list of things we say we couldn't do, with no citation, is an excuse; a list with citations is
+a finding. **Inherits P13's PII discipline** like the rest of this item.
+
 **Cross-references, not restatements.** Depends on **P8**'s corpus (extends it, Protocol 22) and **P11**
 (the arc corpus is P11 Stage 0's direct input — this item's part 1 IS P11 Stage 0 material, filed here
 because the trigger is "the museum fell behind the control plane," not "P11 needs more data"; and P11's own
@@ -4957,8 +5264,9 @@ discipline (**P13**) — the control-plane material is unusually rich in paths/s
 working notes, so the same fail-closed visibility rule P11 already specifies applies here without exception.
 
 **Done means:** the control-plane arcs exist in the corpus as dated entries; a room/placement decision is
-made and recorded with its reasoning; and P11's Visual Web (once built) is confirmed to include them AND to
-render the project's interlocking workflows per part 3 above.
+made and recorded with its reasoning; P11's Visual Web (once built) is confirmed to include them AND to
+render the project's interlocking workflows per part 3 above; and **the platform-locked exhibit (part 4)
+exists with both buckets kept distinct and every locked item carrying its citation.**
 
 ### P16. ✅ SHIPPED (2026-07-31), control repo `0917d20` — Automated pre-publish PII / secret scanner — the mandatory museum publish gate, AI-free (NET-NEW, folded 2026-07-30, multi-model round; HARDENS the existing name-scrub gate from human-only to enforced)
 
