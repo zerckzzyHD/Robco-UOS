@@ -24,7 +24,32 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (CPB5 session control folded in — list active sessions BY NAME, and stop one;
+**Last updated: 2026-07-31 (usage-gate refinement + effort tiers + a completeness sweep — doc-only)** —
+Three things, none of them built. **(1) CPB2's Stop-unattended-AI moves to 95%** (owner-approved): the
+shipped default clamps to Stop at **90** — verified in `lib/usage-mode.js`, not assumed — and that is early
+enough to halt unattended work while a genuinely useful slice of the cap is still on the table. **Reserve-
+for-owner widens to 80-94** and Stop becomes the true last resort. Nothing else moves: the four-mode
+coarsening stands, the retired per-threshold buzzes stay retired, and the exact readings still live in
+`status.json` and the ledger. **(2) What Stop-unattended-AI actually DOES is now pinned**, enforced by
+CPB5 v0.2's admission gate and deliberately asymmetric: it **refuses new unattended / dispatch-launched AI
+sessions** and **never blocks the owner's own interactive work** — the last of the cap is being reserved
+FOR him, so a gate that locked him out would defeat its own purpose. And **saving, committing and pushing
+cost no AI and are never blocked by usage**, stated outright because it is the obvious thing to get wrong:
+a gate that stopped the owner committing at 96% would strand finished work behind a limit that has nothing
+to do with it. **(3) EFFORT TIER PER JOB** is folded onto the headless launcher — up to **ultracode** for
+gnarly, high-stakes builds, gated by that same admission gate. The two halves are one decision: ultracode
+is slow, deep and self-reviewing, which is exactly what suits fire-and-forget headless work where depth
+costs wall-clock instead of attention — and that same property is why an unattended run that is both long
+and expensive must never be left unsupervised against a shared cap. ⚠ **The sweep found one real gap and
+it is now closed: the headless launcher had no entry at all.** Three shipped items (CPB1's dormant capture,
+ACT2's omitted capture half, CPB5 v0.2's gate) were pointing at "the approvalless/headless launcher" as
+the place that work lives, and no such item existed — the vague drawer Protocol 50 (a-form) forbids. It is
+now **CPB9**, with its earn-condition stated and all three pointers resolved to it. **No owner go is on
+file for CPB9 and it is explicitly NOT in the ready batch.** Everything else swept — CPB5's four sub-items,
+P16, CPB7, CPB8, P17, CP5's off-machine witness, CPB1's reset-anchor and confirmed-live-data framing, REF5,
+ND1, the roadmap spine — is present and correctly folded.
+
+**Prior update — 2026-07-31 (CPB5 session control folded in — list active sessions BY NAME, and stop one;
 doc-only)** — Folded an owner-provided addition (2026-07-31) into **CPB5**'s existing session-control
 scope. **Nothing was built by that pass and no ID was created** — this is the concrete SHAPE of the
 `session.stop` action already on the v0.2 rung, written down so it cannot later be built twice under two
@@ -2061,7 +2086,7 @@ posture as the wall-clock half): no launcher writes measured per-job usage into 
 ⚠ **Correction (2026-07-30, after ACT2 shipped `7ca220c`): this pointer used to read "spike §4 / ACT2
 plumbing", and that was wrong — ACT2 shipped WITHOUT the usage-capture half.** Capture needs a launcher to
 capture *from*, and no launcher exists; building a capture path with no producer would be faking a data
-source. The capture stays with the **approvalless/headless launcher** work, not with ACT2. So the check
+source. The capture stays with the **approvalless/headless launcher** work (now tracked as **CPB9**), not with ACT2. So the check
 reports `UNOBSERVABLE`until a`job.result`carries usage in either
 grounded shape (the tool's own`observedUsage`, or a raw `-p --output-format json`result) — then it lights
 up with no code change. Full record in the SHIPPED section below.
@@ -2083,6 +2108,39 @@ structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVID
   only on a mode _change_, exact % stays in `status.json`. **LIVE, not dormant** (unlike CPB1) — it rides the
   same live account-wide `fh`/`sd` usage file the supervisor already reads every run, so it lights up on real
   usage today. Full record in the SHIPPED section below.
+  **REFINEMENT — Stop-unattended-AI moves to 95% (owner-approved 2026-07-31; NOT yet built).** The shipped
+  default band map is `>= 90 -> Stop-unattended-AI`, `80-89 -> Reserve-for-owner` (verified in
+  `lib/usage-mode.js`'s `DEFAULT_MODE_THRESHOLDS`, not assumed). The owner's call: **clamp to Stop only at
+  95**, widening **Reserve-for-owner to 80-94**. The other two bands are unchanged (`< 50` Normal, `50-79`
+  Conserve). **Why it is worth the change:** 90 is early enough that the machine stops unattended work while
+  a genuinely useful slice of the cap is still on the table; the last stretch is exactly where the owner
+  wants room for his own final changes, and Reserve-for-owner already means "back off unattended work". 95
+  makes Stop the true last resort rather than a second, earlier reserve band.
+  ⚠ **Two things that must NOT drift with it:** the mode COARSENING is unchanged — this moves one boundary,
+  it does not reintroduce the five per-threshold phone alerts CPB2 retired; and the exact 90/95 readings are
+  still not lost, because they remain in `status.json` and in the untouched `usage.crossing` / `usage.level`
+  ledger events.
+  **Available today without a code change, worth knowing:** the bands are already owner-tunable through the
+  `modeThresholds` key in the usage-thresholds config file (`lib/usage-mode.js` honours a valid override and
+  falls back to the documented default otherwise), so the owner can move the boundary live before the
+  default is edited. Changing the shipped DEFAULT is still the build task recorded here.
+  **The Stop behaviour itself — recorded now, enforced by the CPB5 v0.2 USAGE ADMISSION GATE
+  (owner-approved 2026-07-31).** What Stop-unattended-AI actually DOES has until now been named but never
+  pinned down. It is deliberately asymmetric:
+  - **REFUSES new UNATTENDED / dispatch-launched AI sessions.** The launcher asks the shared admission
+    module and is **mechanically refused** — fail-closed for unattended work, exactly as the v0.2 rung
+    already specifies.
+  - **NEVER blocks the owner's own interactive work.** This is the whole point of the mode and the reason
+    it is not simply "stop everything": the last of the cap is being **reserved FOR the owner**, so a gate
+    that also locked him out would defeat its own purpose. Same principle as CPB5's guardrail (a) — _the
+    invariant constrains the AI, not the owner._
+  - **Saving, committing and pushing cost no AI and are therefore NEVER blocked by usage.** Stated
+    explicitly because it is the obvious thing to get wrong: a usage gate that stopped the owner committing
+    at 96% would strand finished work behind a limit that has nothing to do with it. The push wrapper, the
+    gate and the archive sync are not AI paths and no usage mode touches them.
+    **Cross-ref:** this behaviour is enforced by **CPB5 v0.2**'s admission gate (see "The three slices"
+    below), and CPB5 v0.2 reads its mode from **this** item. One threshold set, one admission module, two
+    entries pointing at each other — not two policies.
 - **CPB5 — `robco`, the OPERATOR CONTROL CLI (owner-confirmed 2026-07-30; upgraded read→control 2026-07-30;
   high-priority).** 🔄 **IN PROGRESS — v0.1 of 3 SHIPPED (2026-07-31), control repo `ff11244`.** The
   ladder's first slice, "the decision loop", is built and live: the two foundations, the five views, the
@@ -2232,7 +2290,11 @@ freshnessDeadline, reasonCode}`, where `epistemicState` ∈ VERIFIED / OBSERVED 
     - working directory. Full spec at **SESSION CONTROL** in this entry.
   - **v0.2 — live work + admission.** Views: Work Board + Session Inspector, Claims-vs-Reality, Trace +
     Evidence, Proposals / Approvals, Usage / Admission. Actions: `session.stop`, `proposal.approve|reject`,
-    `usage.mode.set`. **`session.stop` now has a concrete owner-specified shape (2026-07-31) — see
+    `usage.mode.set`. **The admission gate's Stop-unattended-AI behaviour is now pinned (owner-approved
+    2026-07-31, recorded at CPB2 above): REFUSE new unattended / dispatch-launched AI sessions, PRESERVE
+    the owner's own interactive headroom, and never gate saving / committing / pushing, which cost no AI.
+    The gate reads its mode from CPB2 — one threshold set, one admission module.** It is also the gate the
+    per-job EFFORT TIER (**CPB9**) must pass through. **`session.stop` now has a concrete owner-specified shape (2026-07-31) — see
     SESSION CONTROL (b) in this entry: echo the exact session by NAME + id/pid, explicit confirm, never
     batched, a `process-terminated` postcondition evaluated on `(pid, procStart)` identity, and the
     termination routed through `lib/reaper.js`'s existing single `process.kill` carve-out rather than a
@@ -2412,6 +2474,34 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   Protocol 22). **Done means:** an owner tap produces only a typed `pending_proposals/` entry; the supervisor
   validates SHA-freshness and appends the approval; a stale-state proposal is refused; nothing the bot
   receives ever writes the ledger or acts directly.
+- **CPB9 — the APPROVALLESS / HEADLESS LAUNCHER (NEW ID, filed 2026-07-31). ⬜ NOT IN THIS OWNER-GO BATCH —
+  no spec, no owner go on file; filed because three shipped items already depend on it and it had no home.**
+  ⚠ **This ID exists because the completeness sweep found a real gap, not because new work was invented.**
+  "The approvalless/headless launcher" is referenced three times elsewhere in this file as the place other
+  work _lives_ — CPB1's dormant usage-capture half, ACT2's deliberately-omitted capture, and CPB5 v0.2's
+  admission gate all point at it — but **it had no entry, no ID, and no earn-condition anywhere.** That is
+  precisely the vague-drawer state Protocol 50 (a-form) forbids: work cannot be "filed onto" a thing that
+  does not exist, and three real items were pointing into thin air. Filing it fixes that; **nothing here is
+  approved to build.**
+  **Why it matters (the dependency it already carries).** No launcher writes measured per-job usage into
+  the ledger, which is the single reason **CPB1**'s budget alert is DORMANT-UNTIL-FED rather than live, and
+  the reason ACT2 shipped without a capture half (building a capture path with no producer would be faking
+  a data source). Whatever CPB9 turns out to be, it is the producer those checks are waiting on.
+  **FOLDED IN — EFFORT TIER PER JOB (owner idea, 2026-07-31).** The launcher should support a **per-job
+  effort tier**, up to the high tiers (**ultracode**) for gnarly, high-stakes builds, **GATED by the usage
+  admission gate** (CPB5 v0.2, reading CPB2's mode) so an unattended high-effort run cannot blow the cap.
+  **The rationale, recorded because it is the whole argument:** ultracode is slow, deep and self-reviewing,
+  which is exactly the shape that suits **fire-and-forget headless work** — nobody is watching, so depth
+  costs wall-clock rather than attention, and the self-review replaces the human in the loop. But that same
+  property is why it **must** sit behind the gate: an unattended run that is both long and expensive is the
+  worst possible thing to leave unsupervised against a shared cap. So the two are one decision, not two —
+  **the tier is what makes headless work worth doing, and the gate is what makes it safe to do.**
+  At **Stop-unattended-AI** the gate refuses the launch outright regardless of tier (CPB2, above); at the
+  restrictive-but-not-stopped modes the tier is the natural thing for admission to negotiate down.
+  **What would earn it a slot (stated, per Protocol 50 a-form):** an owner go plus a spec — at minimum what
+  "approvalless" is allowed to mean, how a job is described to it, and what it writes to the ledger
+  (measured per-job usage among it, which is what unblocks CPB1). Until then it stays an unversioned,
+  dependency-bearing placeholder rather than a queued build.
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
@@ -2451,7 +2541,7 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   candidates of **zero jobs tracked**. ⚠ **Deliberately NOT in scope, stated rather than quietly dropped:**
   the per-job **usage-capture** plumbing CPB1 waits on (spike §4) is _not_ part of this — capture needs a
   launcher to capture _from_, and there is no launcher; building a capture path with no producer would be
-  faking a data source. It stays with the approvalless/headless launcher work. Full record in the SHIPPED
+  faking a data source. It stays with the approvalless/headless launcher work (now tracked as **CPB9**). Full record in the SHIPPED
   section below.
 - **DG2 + CPB6. ✅ SHIPPED (2026-07-30, same session).** Push-guard enforcement (raw-push refusal) is ON in
   both the app and control repos — a raw `git push` is refused; `npm run push` is required. Break-glass:
@@ -2757,7 +2847,7 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   wall-clock-only TODO marker. Suite green (0 fail, 0 skip). **DORMANT until fed** — the check reports
   `UNOBSERVABLE` until a launcher records measured per-job usage into the ledger (spike §4 — **and NOT
   ACT2: it shipped `7ca220c` without the usage-capture half, deliberately, because capture needs a launcher
-  to capture from; that work sits with the approvalless/headless launcher**),
+  to capture from; that work sits with the approvalless/headless launcher, now tracked as CPB9**),
   exactly as the wall-clock half is dormant until jobs flow; it is built, correct, and tested, awaiting only
   the data source. **Framing refinement (owner-approved 2026-07-30, checkpoint pass — record only, NOT a
   rebuild):** the budget alert is a **token-billing guardrail**, not a general spend meter. While the owner
