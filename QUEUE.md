@@ -3543,6 +3543,178 @@ exactly the rule that says memory is a locator to be resolved deterministically 
 **The only watcher in this queue is RB3**, the mobile-hidden-response detector, which is unrelated and is
 **NOT** affected by this decision — a future session must not read this block as touching RB3.
 
+## HARNESS AUDIT — PROPOSED, [DECISION]-PENDING (filed 2026-07-31; NOT approved, NOT scheduled)
+
+**Source.** A Claude Code cloud-session harness audit (v2.1.220 binary inspection + repo-map review),
+relayed by the owner 2026-07-31. **Protocol 51(a) governs this entire block:** every mechanism,
+architecture, or repo-status claim below **originates from the audit, not from this repo's own
+sessions**, and is therefore a **hypothesis until a repo-aware session verifies it against source** —
+nothing here is an owner mandate, nothing here is scheduled, and nothing here is built. Filed as its own
+section, separate from OWNER DECISIONS / SPIKES, because none of it has been triaged yet.
+
+**⭐ Two standing gates apply across this whole block — read before touching any item below:**
+
+- **GATE A** (binds **HA1**). Before building HA1, **verify the Stop hook actually fires with a readable
+  transcript for the DISPATCH/Cowork conversation surface — not only local CLI sessions.** Dispatch
+  planning chats are exactly where Protocol 50(c)'s highest-risk case (a decision dropped in conversation
+  that never touches the repo) lives; a hook that only fires in CLI sessions never reaches that case at
+  all, so this must be confirmed before HA1 is worth building.
+- **GATE B** (binds **HA1**, **HA2**). Quote the REAL current text of the protocol being amended (50(c)
+  for HA1, 12 for HA2) from source before amending it, to confirm the audit is critiquing the actual rule
+  and not a paraphrase of it. **Done for this fold** — both quotes below are verified 2026-07-31 against
+  the live `CLAUDE.md` on `dev`; the audit's characterization of both protocols holds against the real
+  text.
+
+**Suggested order (recorded as relayed, not adopted as a ruling).** (0) run `/insights` first — usage/impact
+data may re-rank everything below; then **HA3 → HA2 → HA4**; then **HA1**, gated on GATE A; **HA5** last.
+HA2/HA4 are doc-only. HA1/HA3/HA5 take the full pre-commit/pre-push gate when actually built.
+
+### HA1. ⬜ [DECISION] Protocol 50(c)'s "no automated backstop" claim may be factually wrong — GATE A required before building
+
+**The audit's claim.** Protocol 50(c)'s real text says the conversation↔queue gap has no automated
+backstop because _"a script cannot read a conversation, and the sessions most likely to drop a decision
+never push."_ The audit says both halves are false **in this harness**: hooks receive `transcript_path`
+(a script CAN read the conversation), and `Stop`/`SessionEnd` fire when a turn/session ends **regardless
+of any push**. So a Stop-hook queue-drift check is buildable in principle — the (c) gap may not actually
+be unclosable, only unclosed.
+
+**Why it isn't just "build it."** GATE A is the load-bearing check: Protocol 50(c)'s own stated
+highest-risk case is a **purely conversational Dispatch/Cowork session that never touches the repo**. If
+the Stop hook only fires reliably for local CLI Code sessions and not for the Dispatch/Cowork surface,
+a Stop-hook check would cover the _low_-risk case (sessions that already push, where the existing REF-style
+nudges apply) and miss the _high_-risk case entirely — which would make this a guard that "pretends,"
+exactly what Protocol 50(c) already warns against building. **Verify the hook actually fires on the
+Dispatch surface, with a readable transcript, before any implementation work starts.**
+
+**Status.** Unverified, unbuilt. Earn-condition: GATE A passes → re-scope as a real build item (own ID)
+under a Protocol 50(c) amendment; GATE A fails → HA1 is recorded as **ruled out, mechanism doesn't reach
+the risk it needs to cover** and Protocol 50(c) stands unchanged.
+
+### HA2 / HA-C2. ⬜ [DECISION] Protocol 12 may be scoped to the wrong unit (per-repo, should be per-dependency-edge)
+
+**The audit's claim.** Protocol 12's real text is _"Never run two sessions that commit/push this repo at
+the same time — sequence them to avoid branch/worktree collisions"_ — scoped to **one repo**. With five
+repos now in the ecosystem (UOS, Control, Ledger, Archive, Exhibit), the audit argues the actual hazard is
+the **dependency edge between two repos**, not either repo in isolation, and gives a counterexample the
+current rule permits but arguably shouldn't: **a session editing Control's push-gate running concurrently
+with a UOS session pushing THROUGH that gate** — two different repos, Protocol 12 as written doesn't
+touch it, one real hazard.
+
+**Proposed rewrite (not adopted).** Serialize along a dependency edge; parallelize freely across
+repo pairs with no edge between them. The dependency graph, as relayed:
+
+```
+Control ─gates/watches▶ UOS
+Control ─writes records▶ Ledger
+UOS(planning/, library/) + agent-memory ─▶ Archive ─scrubs▶ Exhibit
+```
+
+**Net effect if adopted.** An UNLOCK, not a tightening — it frees safe parallelism across unconnected
+repos (e.g. a Ledger doc pass alongside a UOS feature branch) that a strict per-repo reading doesn't
+technically forbid but a cautious session might avoid anyway. Doc-only change, no cache bump.
+
+**Recorded, not forgotten: Protocol 12 carries a live keep-case.** It was reviewed and deliberately KEPT
+at R3 (2026-07-20) as a Protocol 49 keep-case specifically because it governs _daily_ dispatch decisions
+and duplicate/overlapping launches have caused real collisions on this project. Any rewrite must preserve
+that keep-case reasoning for the parts of the graph that stay per-repo (e.g. two UOS sessions), not just
+relax the rule wholesale.
+
+**Status.** Doc-only if adopted. Earn-condition: owner reviews the graph above and either approves the
+edge-scoped rewrite, keeps the current per-repo rule, or asks for a narrower version.
+
+### HA3 / HA-C1. ⚠️ [DECISION, HIGHEST BLAST RADIUS — do first if any of this proceeds] Exhibit publication protocol + scrubber hardening
+
+**Why this outranks HA2/HA4/HA5.** Archive → Exhibit is the only private→public automated flow in the
+five-repo graph. It is **generated** (a scrubber gap leaks silently, at scale, on every run — not a
+one-off mistake) and **git history is permanent** (a revert does not un-leak a public repo). **Cross-ref:
+this is the same class of failure P16 was built to close** — P16's own framing was _"the gate that should
+have existed before the name leaked once"_ (museum PII/secret leak, mounted `0917d20`/`b90304fb`). HA3
+proposes hardening the publish path one level further out, at the Archive→Exhibit boundary specifically.
+
+**Proposed design (not adopted, not built):**
+
+- **(a) Allow-list eligible file paths; fail CLOSED.** Do not rely on a name deny-list — a deny-list fails
+  OPEN on the one name nobody thought to list.
+- **(b) Gate the STAGED diff, not the working tree.**
+- **(c) SQUASH-REGENERATE the Exhibit** — force-push a single `"generated from UOS@<sha>"` commit per run,
+  so a leak that lands is one force-push from gone, not permanent history.
+- **(d) Escape-ratchet** — every scrub miss permanently adds a pattern (Protocol 36b shape, applied to the
+  scrubber specifically).
+- **(e) Scrub targets beyond personal names** — owner email, absolute Windows paths, session GUIDs,
+  **private repo names**, API keys, git author metadata.
+
+**Effort note.** Treat the scrubber as security-critical code if built — Opus/max tier, not a routine
+implementation pass (see Section D below).
+
+**Status.** Design-only, unbuilt, unreviewed by the owner. Earn-condition: owner reviews (a)-(e) against
+the existing P16/scrub-list machinery and either approves a build (own ID, full gate, effort per Section
+D) or narrows the scope.
+
+### HA4 / HA-C3. ⬜ [DECISION] Extend the 3-class doc model from files to repos — pairs with HA3
+
+**The proposal.** The existing 3-class model (LIVE / ARCHIVE / GENERATED, already defined in
+`rules/docs-and-library.md` for files) extended to the repo level: **LIVE** = UOS, Control (full gate,
+hand-authored); **ARCHIVE** = Ledger, Archive (additive-only, never hand-edited); **GENERATED** = Exhibit
+(never hand-edit — a scrub miss gets fixed in the generator and re-run, never patched directly in
+Exhibit). The GENERATED classification is what prevents a scrub miss from being patched in place while
+leaving the generator that produced it still broken.
+
+**Status.** Small — it's an application of an already-approved model (Protocol 49-style: extend, don't
+duplicate), and it pairs directly with HA3. Doc-only. Earn-condition: rides along with an HA3 decision
+rather than needing its own separate ruling.
+
+### HA5 / HA-C5. ⬜ [DECISION, lowest priority] A shared-protocol plugin across the two code-holding repos
+
+**The proposal.** Only UOS and Control hold code; the rest are data/archive. SHARED-candidate protocols
+(would move into a shared plugin): **8, 9, 12, 19, 26, 27, 28, 36, 41, 42, 49, plus 39.** UOS-only, stays
+in this file: **1, 2, 3, 23, 38.**
+
+**⛔ Hard constraint, load-bearing.** Control is **AI-free by design.** The plugin must be tooling for
+**sessions that edit Control**, never anything Control itself **executes at runtime** — plugins ship
+hooks, and that boundary is easy to violate by accident if the plugin's hooks end up wired into Control's
+own execution path instead of staying session-side tooling.
+
+**Other constraint.** Keep the plugin repo **private** — two of the five repos are public, and hooks
+tend to accumulate local paths.
+
+**Status.** Design-intent only, lowest priority of the set, no build implied. Earn-condition: HA1/HA2/HA3
+settle first (they change what a shared-protocol set would even contain); revisit after.
+
+### Section D — effort guidance for this set, recorded as guidance, not a decision
+
+Per-repo Protocol 8 effort model, as relayed (informational — not a ruling, nothing here changes Protocol
+8's text):
+
+- **UOS** — Fable: med/high. Opus diagnose+plan: **MAX** (highest ROI stage). Sonnet implement: med/high.
+  Opus audit: high/max.
+- **Control** (no Fable) — Opus plan: high. Sonnet implement: med/high. Opus audit: **MAX** (Control _is_
+  the gate — an audit miss here is categorically worse than elsewhere).
+- **Exhibit** — Opus max on the scrubber specifically (see HA3's effort note).
+- **Ledger / Archive** — low effort; rarely touched.
+
+`/advisor` automates Protocol 8 escalation in-session but **does not replace** the stage-3 diff audit by a
+session that didn't write the code — that stage stays a separate session per Protocol 8 as written.
+
+### Section E — recorded as [NO-ACTION] so these are not re-litigated
+
+- **E1.** Protocol 48 backup coverage is sound as designed: Ledger = what the control plane did, Archive
+  = what was authored, shared memory covered once (not duplicated across the two).
+- **E2.** Do **NOT** auto-schedule the Protocol 48 sync. A silently no-op backup is worse than no backup —
+  the whole reason Protocol 48 is an agent obligation with a loud-failure sync script rather than a cron
+  job.
+- **E3.** Do **NOT** adopt `ultracode` as a default tier. It fans work out to parallel file-writers, which
+  conflicts with Protocol 12/19 (sequencing, batch-before-push). Use it only for bounded, read-only
+  analysis.
+- **E4.** `ultraplan` not highlighting on phone is **correct behavior** (gated on `!ba()`, remote
+  workspace), not a bug — no fix owed.
+
+**Why this whole block exists as PROPOSED rather than actioned.** Every item above originates from an
+external audit relaying a binary/repo-map inspection, not from a repo-aware session's own verification —
+exactly the Protocol 51(a) case ("a mechanism/architecture/repo fact from Dispatch is a hypothesis until
+verified"). Folding it into QUEUE.md satisfies Protocol 50 (a decision/proposal reached in conversation
+gets written down in the same session), while the `[DECISION]`/PROPOSED tags on every item keep a future
+session from reading any of HA1-HA5 as already approved or already scheduled.
+
 ## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
 - **DG1.** Thrashing: shadow → actual kill. Needs a clean shadow stretch (proves it flags real loops, never
