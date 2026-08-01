@@ -2485,4 +2485,602 @@ _Preserved exactly as it last stood on line 8 of `QUEUE.md` before the split, so
 
 ---
 
+<a id="appendix2"></a>
+
+# Appendix II — the relocated `QUEUE.md` header chain: 2026-07-30 and earlier (moved 2026-08-01)
+
+_**Moved, not deleted — verbatim.** On 2026-08-01 the accuracy pass found `QUEUE.md`'s running
+"Last updated / Prior update" chain had grown to ~870 lines sitting **above** "Where we are right now" —
+so a phone-first reader had to scroll past most of a year's worth of history to reach the queue itself.
+That is the exact failure the 2026-07-21 QUEUE/LOG split exists to prevent, reappearing in the header
+instead of the body. Every block dated **2026-07-30 or earlier** was relocated here, byte-for-byte, in its
+original newest-first order; `QUEUE.md` keeps the 2026-07-31 round and everything after it, plus a pointer
+to this appendix. Nothing was rewritten, summarised or dropped._
+
+**Prior update — 2026-07-30 (HG2 BUILT + SHIPPED — the terminal now says which part failed to start)** —
+**HG2 is shipped, app repo `aef7da4`: the boot sequence is isolated phase by phase.** Starting the terminal
+runs **51** named phases (the queue's old "~45" was an estimate; the real count is 51). Every one of them
+sat under a **single** outer `try`/`catch`, so the first phase to throw silently abandoned all the rest and
+the only trace was a console line no user ever sees — that is the exact mechanism behind "the terminal came
+up blank and there's no way to tell what died." Each phase now runs under its own guard, in **byte-identical
+order** (the two awaited async phases still await; only the isolation is new), and every phase is
+**classified**. **Exactly three are fatal**, each chosen from what the code actually does rather than how
+important it sounds: restoring the campaign, the master render pass, and opening the last-used screen — that
+third one because the tab switch is what makes any panel visible at all, so skipping it produces a literally
+blank column. **Everything else degrades:** a sound channel, a suggestion list or a device pref that fails no
+longer stops the phases after it; the terminal carries on, files the fault in the same ring-buffer the FAULT
+lamp and the service console already read, and **tells the user in the transcript** — never console-only.
+A fatal phase instead paints a **self-contained BOOT FAILURE screen** naming the phase, the fault, anything
+already degraded, and a RETRY BOOT control — built from inline styles and text only, because it may have to
+survive a fatal fault in the very phase that paints the UI. **⚠ One deliberate fail-OPEN, recorded rather
+than buried:** an unknown phase name degrades instead of killing boot — a typo must never be the thing that
+bricks the terminal, and the gate is the right layer to catch it (Suite 258.15 does, in both directions).
+Locked by **Suite 258**, behavioural against the real functions in a `vm` sandbox, **including the HG1
+footgun re-checked one file over** (a console-less sandbox must not turn "a phase failure is contained" into
+"a phase failure is fatal"). **Suite 132.5 was RESTATED, not re-bumped** — its raw line-count ceiling stopped
+measuring anything once every phase became a three-line wrapper, so it now asserts each phase callback is a
+single named call, which is strictly stronger. Full `npm run gate` green; also verified in a real browser
+(clean boot, the degraded transcript line, and the fatal screen). `CACHE_NAME` r20 → r21. **This closes the
+HG1–HG2 pre-museum hardening pull-forward: both are now shipped, ahead of 2.9.0's OS services widening these
+surfaces.**
+
+**Prior update — 2026-07-30 (REF5 BUILT + SHIPPED — the "your work isn't backed up" alerts stopped crying
+wolf)** — **REF5 is shipped, control repo `e3706db`.** The two alerts the owner watched false-fire 6+ times
+during ordinary builds — _"a session tried to push but I never saw it confirm"_ and _"your latest work
+isn't backed up — N commits not on the remote"_ — were firing during the completely **normal push window**.
+The cause is arithmetic, not a bug in the detection: a full-gate push runs **minutes** (the wrapper's own
+ceiling is 20), a build often pushes **both** repos one after the other, and the supervisor checks every
+**5 minutes** — so a check lands mid-push, sees a commit that isn't on the remote yet, and concludes the
+work is unbacked. It wasn't; it was in transit. **Both** detectors now share one set of four checks
+(`lib/push-window.js`, so they can never drift apart): **(1)** if the remote already has that exact commit,
+the alert is **retracted** — previously such a warning stayed open forever, because the record that would
+have closed it can never arrive; **(2)** if a push is actually running, stay quiet — read two ways, from
+the push record ACT3 writes _and_ from the push lock, because the control repo runs its gate **before** the
+push record exists, so the lock is the only thing that covers those first minutes; **(3)** if the session
+that owns the work is still live, stay quiet — work mid-build is _supposed_ to be unbacked; **(4)**
+otherwise wait out a grace period at least as long as a healthy push, taken from the wrapper's own ceiling
+rather than a second number that could drift. **It is not neutered, and that is proven, not asserted:**
+genuinely stuck work — nobody live, at rest past the ceiling, nothing in flight, not on the remote — still
+alarms, and a deliberate mutation that removed the suppression turned the gate **red** (4 failures) before
+being reverted. **One divergence recorded on purpose:** when the machine can't tell whether a session is
+live, REF1 stays silent but REF5 still alarms — a commit sitting off the remote past the full ceiling is a
+real gap whatever the process table said, and the alternative is a machine that quietly does no backup
+alerting at all. **Auto-retract now reaches the phone** for these two alerts only: one all-clear when the
+work lands, instead of a stale warning left standing. **A quiet run stays legible** — every stranded push is
+still detected and logged with the reason it was held back, so "said nothing" can always be told from
+"decided to say nothing". Control gate ran for real (CPB6): `gate: PASSED`, origin VERIFIED, clean-push
+counter **23/10**. Locked by control test groups **PW** + **PWE**.
+
+**Prior update — 2026-07-30 (ND1 BUILT + SHIPPED — the two repos can no longer come to mean the same word two ways)** — **ND1 is shipped, app repo `ca38f79` + control repo `31e987c`: a naming-domain guard, filed as a new
+`ND` family and built in the same pass.** The app owns **`RobcoEvents`** — the client-side game/UI bus in
+`js/core/state.js`, in-page subscribers, nothing persisted. The control plane owns **"ledger events"** — the
+appended, replayable records its `lib/ledger.js` writes, each with a `type:` field. **Verified rather than
+assumed, there is no clash today:** the control repo contains zero `RobcoEvents` and the app's `js/` contains
+zero "ledger event". But "events" already means two entirely different things depending on which repo you are
+standing in, and both sides are growing — so the boundary is now written down once (`tests/naming-domains.json`,
+duplicated byte-identical into the control repo, because the two share no package) and **each repo's own gate
+checks its own source against it**: **Suite 257** here, **test group ND** there. No cross-repo runtime coupling;
+each side degrades to "sync unverified" rather than failing when the sibling checkout is absent, so a public
+clone is never blocked. **The part that stops it rotting into a taxonomy:** only distinctive COMPOUNDS are
+reserved — `ledger`, `event`, `receipt`, `incident` and `proposal` sit on an explicit SHARED list, because this
+app has shipped a Field Ledger panel and a release-receipt script for months and reserving those bare words
+would outlaw live code. Both guards prove that behaviourally, and both carry a red-then-green proof that a
+violating source really is caught. **Nothing was renamed** — `window.RobcoEvents` is precached and referenced
+across the app; the guard protects the existing names. Full `npm run gate` green; control suite green
+(1137/1137). `CACHE_NAME` r19 → r20 — no app code changed, but `CHANGELOG.md` is itself precached, so a
+"tests and docs only" commit is not automatically cache-bump-free.
+
+**Prior update — 2026-07-30 (HG1 BUILT + SHIPPED — the event bus is hardened)** — **HG1 is shipped, app
+repo `31206dd`: the OS event bus finally has the four things it was missing.** `RobcoEvents` shipped at U7
+with only "add a listener" and "announce an event" — there was no way to REMOVE a listener, no way to say
+"tell me the next time this happens and then forget me," and nothing stopping the same listener being
+added twice and reacting twice to one event. All three now exist (`off`, `once`, dedup), plus `on`/`once`
+handing back an unsubscribe handle so a caller never has to keep the function around. **The substantive
+change is how a crashing listener is handled:** one was already prevented from taking its siblings down,
+but it was silenced _completely_ — a broken reaction just quietly stopped working with nothing to show for
+it. A crash is now REPORTED per-handler, naming the event, while the other listeners still run. Delivery
+also takes a snapshot first, so a listener that adds or removes another mid-delivery can't cause one to be
+skipped or double-fired. **⚠ Honest limit, stated rather than overclaimed:** dedup keys on function
+IDENTITY, so the anonymous arrow handlers every `_wire*EventBusSubscribers()` registers are distinct
+objects and are NOT deduped — and none of them is registered twice today anyway (each wiring function is
+called exactly once from `window.onload`). This is API-level hardening landed deliberately BEFORE 2.9.0's
+OS services widen bus usage, not a fix for a live double-fire. No re-entry guards were bolted onto the six
+wiring functions either: that would be a parallel implementation of dedup (Protocol 22) for a risk with no
+incident on file (Protocol 36b / 49). **PROTOCOL 42 — a real footgun found while building it, fixed and
+locked in the same commit:** `state.js` is evaluated in `vm` sandboxes with **no `console`** (the gate's own
+bus harness), so the obvious way to write that crash report raises a `ReferenceError` _from inside the
+catch_ — turning "a bad listener can never break the emitter" into "a bad listener always breaks the
+emitter" the moment logging was added. The reporter is fully guarded, and both the console-less and
+console-present cases are locked. Locked by **Suite 256** (14 assertions, behavioural against the real
+`state.js`); Suite 135 keeps the original U7/U8 contract and passes unchanged. Full `npm run gate` green
+(3701/3701 plus boot smoke, render check at 360/412, a11y, `test.html` runtime audit, save-survival,
+offline-first). `CACHE_NAME` r18 → r19.
+
+**Earlier — 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
+control repo `7ca220c`: the kernel's two write-side actions are finally CALLED by something.** Rank 2's
+publisher and rank 4's continuation-packet generator had been built, tested and callable since 2026-07-29,
+but nothing ever invoked them — every run was a human at a CLI. A new decision layer
+(`lib/write-side.js`) now sits in the supervisor's 5-minute loop, and it activates the two halves to
+**deliberately different depths**. **Continuation packets are FULLY LIVE:** a packet is a derived local
+JSON file that actuates nothing, so it sits inside the write scope the supervisor always had — every
+packet-worthy job gets one written automatically, and an unchanged job is _not_ rewritten every five
+minutes (a fingerprint read back from the loop's own ledger events decides). **Publishing is SHADOW, OFF
+BY DEFAULT:** readiness is detected, recorded and phone-alerted every run (it is a real thing waiting on
+the owner), but the actuation is gated on `state/auto-publish.json` holding a literal `{"enabled": true}`
+— absent by default, and unreadable/malformed/non-literal-true all fail CLOSED. **The asymmetry is
+recorded as a decision, not a default:** `publishJob()` moves a real remote ref, and giving an unattended
+scheduled task that standing authority is a different class of change from writing a local file — **DG2**
+demanded ten observed clean pushes before it would merely _refuse_ a raw push, and **CPB7**'s kill
+authority is owner-confirmed data-gated; performing pushes earns at least the same care. Flipping the
+switch needs **no code change**, which is what keeps this an activation switch rather than a deferral.
+Locked by test groups **WS** + **WSI**, including an end-to-end proof that a genuinely publish-eligible job
+leaves the remote ref untouched (`ls-remote` ground truth, no publish intent ever recorded), plus an
+out-of-suite red-then-green run showing the switch is the only thing standing between shadow and a real
+push. ⚠ **Deliberately out of scope, said plainly:** the per-job **usage-capture** plumbing CPB1 waits on
+is NOT part of this — capture needs a launcher to capture from, and there is no launcher; building it with
+no producer would be faking a data source. **DORMANT UNTIL FED** — both halves key off jobs, no launcher
+writes a manifest yet, so today both report zero candidates of _zero jobs tracked_. Pushed through the
+wrapper with the real control gate running (CPB6): `gate: PASSED`, origin VERIFIED, clean-push counter
+**18/10**.
+
+**Prior update — 2026-07-30 (CPB7 owner ruling STAMPED + ROADMAP SPINE recorded — doc-only)** — Two
+doc-only folds on the owner's directive, no ID renumbered (Protocol 49). **CPB7:** the session circuit
+breaker's **KILL/RESET authority** (auto-SIGTERM a spiraling session + reset its worktree to the last clean
+SHA) is stamped **OWNER-CONFIRMED to remain DATA-GATED / shadow-only** — explicitly NOT to be built as an
+autonomous killer. The buildable-now half (classify + recovery budgets + alerting, shadow-only) is
+unchanged; the kill/reset authority waits behind the data-gate (same bar as **DG1**) until there's evidence
+it won't false-fire, consistent with the process-kill echo-and-confirm safety rule. **ROADMAP SPINE:** a
+new near-term macro-ordering section records the **iterative + overlapped** sequence — finish/activate the
+control plane → build the museum **as the live workload** that generates real operating data → run the
+**WORKFLOW AUDIT (AUD1)** on that real data with the **MUSEUM AUDIT (P15)** riding along → absorb
+control-plane fixes → continue the museum; cross-references **AUD1**, **PM1**, and the museum program, and
+is owner-adjustable. Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA +
+counter in this pass's report.
+
+**Prior update — 2026-07-30 (multi-model design round FOLDED — GPT-5.6 / Gemini 3.1 / DeepSeek)** — A
+DOC-ONLY synthesis + fold of a three-model design round into the queue; **nothing here is built** — every
+item is recorded as a design. Grounded first against the repo + `planning/control-plane/**` to dedup.
+**EXTENDED (no new IDs):** **CPB5** gains its phased build plan (GPT's Node-native vertical-slice ladder —
+the STATE VOCABULARY + UNIFIED ACTION ENVELOPE foundations, then v0.1 decision-loop / v0.2
+live-work+admission / v0.3 resilience, with release gates; the turtle banner + 3-level notify +
+beautiful-TUI additions reconciled, not superseded); **CP5** gains the concrete off-machine WITNESS design
+(ledger-head anchoring + second-opinion remote-SHA verify, Tailscale, separate Pushover token,
+advisory-only); **CPB1** gains the cap-reset ANCHOR + confirmed-live-data framing (`fh`=session %,
+`sd`=weekly all-models %; Sunday 2:59 PM weekly reset owner-anchor; ~5h rolling session; "proxy" upgraded to
+confirmed server data); **REF5** gains session-activity-awareness (don't alarm while the owning session is
+still live). **NET-NEW:** **CPB7** (session circuit breaker — failure classify + recovery budget, the
+formalized thrashing/reaper extension, kill authority stays DG1-gated); **CPB8** (quick-ack bot —
+typed-proposal-only owner approvals, sole-writer + AI-never-actuates preserved); **P16** (automated
+pre-publish PII/secret scanner — hardens the name-scrub gate from human-only to enforced); **P17** (museum
+PREVIEW tab — owner favorite, curation surface extending CPB5 + the publish pipeline). **DECLINED /
+proposals-only:** Agentic Museum Curator and Trivial Lint Auto-Resolver (both stretch AI-never-actuates /
+name-scrub-is-a-gate). **ALREADY-HAVE (not re-filed):** the USAGE ADMISSION GATE rides CPB2's operating
+modes; the phone cockpit + Tailscale transport is CPB5's existing spec; the sole-ledger-writer /
+proposal-only / name-scrub-mandatory invariants are the standing doctrine block. No ID renumbered
+(Protocol 49). Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA + counter in
+this pass's report.
+
+**Prior update — 2026-07-30 (DG2 + CPB6 SHIPPED — push-guard enforcement is LIVE)** — Two items shipped in
+one session on the owner's go. **DG2:** raw-`git push` refusal is now ACTIVE in both the app and control
+repos — a push not routed through the controlled-push wrapper (`npm run push`) is refused by a pre-push hook
+(the guard requires the wrapper's env token AND a live L4 process-ancestor, neither forgeable alone).
+**Break-glass, so the owner is never locked out:** `ROBCO_PUSH_OVERRIDE="<reason>" git push` (allowed AND
+logged to the ledger) or `git push --no-verify` (bypasses all hooks — absolute fallback). The app hook
+`[ -f ]`-guards the sibling guard so a public clone is never blocked, and captures git's pre-push payload
+once to feed both the guard and `gate-scope.js` (a Protocol-42 stdin-multiplex fix). **CPB6 (folded into the
+same session on owner directive):** the control repo now runs its own test suite as the wrapper's gate — a
+control-repo wrapper push RUNS `node test/run-tests.js` before pushing and ABORTS on failure, recording
+`gate.passed`, not `gate.skipped`. So the earlier "DG2 activation does NOT fix CPB6" framing is superseded:
+**both** shipped together — routing enforced (DG2) AND the control gate enforced (CPB6). Live red/green
+verified on both repos; app `dev` `05c450b`, control `main` `f0ed42a`; clean-push counter 14/10. Locked by
+app Suite 255 + control groups PG/PH (PH7) on the CP2/CP3 code path. SHAs + counter in this pass's report.
+
+**Prior update — 2026-07-30 (CPB5 fold — three owner additions, doc-only)** — Folded three owner-approved
+additions (all 2026-07-30) into the existing **CPB5** operator-control-CLI entry, no ID renumbered, nothing
+rebuilt: **(1)** a **locked startup-banner decision** — the `robco` CLI opens on a two-tone sea-turtle banner
+(phosphor-green turtle over a blue waterline), GPT's dependency-free `robco-turtle-banner.mjs` renderer,
+truecolor with `NO_COLOR`/unicode/ascii fallback, chosen over Gemini/Fable/hand-drawn; **(2)** a new
+**notification-control capability** — the CLI manages Pushover delivery with a global on/off plus
+per-alert-type toggles (settings-panel style), human-driven with a ledger event per toggle. **Refined same
+day (2026-07-30):** three mute **levels** — normal / standard mute (criticals still break through) / **total
+blackout** (everything off, including criticals) — with an **auto-unmute** safety net on any level, **default
+2h 30m** (configurable), tracked via the supervisor's 5-minute tick (no always-on timer); **(3)** an explicit
+**first-class aesthetic requirement** — a polished TUI at Claude Code CLI finish level (phosphor theme,
+boxes/tables/color, the banner). **Also corrected the stale DG2 counter line to its live value 10/10 —
+threshold MET** (enforcement AVAILABLE, not auto-activated; still gated behind CPB6). Doc-only pass, pushed
+through the CPB4 doc-only fast path. SHA + the post-push DG2 counter are in this pass's report.
+
+**Prior update — 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
+checkpoint fold + reconcile + push-verify-all pass; no code feature was built (ACT2 and the control-repo
+push-gate fix are queued, not built here).** Folded: **(a)** a **token-billing framing refinement to CPB1**
+(owner-approved 2026-07-30) — its budget alert (tokens/$) is scoped as a **token-billing guardrail**: stay
+**quiet while the owner is on his MAX subscription** (spend is against a usage allowance, not dollars) and
+speak up **only when actually on pay-as-you-go tokens** (the rare fallback); the trigger gates on being in a
+token-billing state. Recorded as framing only — CPB1 is not rebuilt. **(b)** CPB5's phone-cockpit entry now
+**explicitly names Tailscale as the private transport** (it was already stated; reinforced so the mechanism
+is unambiguous). **(c)** a **new item CPB6** — the control-repo push-gate gap: the controlled-push wrapper
+records `gate.skipped` for the control repo because it has **no enforced gate hook** (its tests run via a
+manual `node test/run-tests.js`), so control-plane pushes rely on **discipline, not enforcement**; the fix
+(to BUILD later, not now) wires the control repo's test runner into the wrapper or a real pre-push hook so
+those pushes are genuinely gated and record `gate.passed`. Filed near the DG2 / push-gate items. **(d)**
+**ACT2 marked owner-greenlit (2026-07-30) — the next build after this checkpoint.** Also reconciled:
+`planning/control-plane/CONTROL_PLANE_STATUS.md` brought current with shipped reality (CPB4/ACT3/CPB1/CPB2
+shipped; CPB2 LIVE not dormant), and the **DG2 clean-push counter corrected to its live value 8/10 at this
+checkpoint** — _since advanced to **10/10, threshold MET** (2026-07-30, the CPB5-fold push was #10); DG2
+enforcement is now AVAILABLE but NOT auto-activated, still gated behind CPB6 wiring the control-repo gate_
+(the `3/10` snapshots below are the ACT3-dogfood-day value, left in place as dated history). No ID renumbered
+(Protocol 49); doc-only pass. **Verified remote SHAs** and the post-push counter are in this pass's report.
+
+**Prior update — 2026-07-30 (ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
+project's pushes now route through the controlled-push wrapper, and the ≥10-clean-pushes counter that gates
+DG2 is moving.** `npm run push` (app repo `scripts/robco-push.js`) routes a push through the control plane's
+`controlled-push.js` (resolved via `$ROBCO_CONTROL_PUSH` or the `../_RobCo-Control` sibling; degrades to a
+plain `git push` if absent). **CPB4 coexistence — the interaction was resolved, not ignored:** the launcher
+passes `ROBCO_PUSH_DELEGATE_GATE=1`, so the wrapper DELEGATES the gate to this repo's own pre-push hook
+instead of double-running `npm run gate` — the hook stays the one gate authority and CPB4's doc-only fast
+path is preserved (a doc-only push through the wrapper still skips the browser checks). The wrapper adds the
+L4 lock + a push.intent/push.result receipt + `git ls-remote` verification + the clean-push counter on top.
+**Dogfooded end-to-end:** the control-repo commits (`0f452f9`, `e4e5965`) and this app-repo commit
+(`5433648`) were all pushed _through the wrapper_ — the counter read **3/10** afterward (7 to go before DG2
+can be considered). ⚠ **One defect was found and fixed during verification (Protocol 42):** a delegated gate
+runs the FULL Playwright gate inside the pre-push hook, and the wrapper's old flat 120 s push timeout killed
+the first real app-code push mid-gate (`spawnSync git ETIMEDOUT`); fixed to a gate-covering 20 min default
+(`ROBCO_PUSH_TIMEOUT_MS`), locked by control-repo test group **PT**. **Scope held:** ACT3 is routing only —
+raw-push refusal stays **DG2**, and a plain `git push` still works, unrefused. App-repo wiring locked by
+**Suite 254**; control-repo behavior by groups **GD** (delegation) + **PC** (counter) + **PT** (timeout).
+Marked ✅ SHIPPED below; no ID renumbered (Protocol 49). The counter reader lives at
+`_RobCo-Control/code/lib/push-count.js` (`npm run push-count`), derived live from the ledger.
+
+**Prior update — 2026-07-30 (later still — CPB4 BUILT + SHIPPED)** — **CPB4 is now shipped, not just
+filed.** `scripts/gate-scope.js` reads the git pre-push payload and prints `DOCS_ONLY` only when it can
+prove every changed file is a doc (`*.md` / `planning/**`), else `FULL` — fail-closed; the pre-push hook
+then runs the new `gate:docs` mode (lint + format + the Node runner + static checks, NO browser) on a
+doc-only push, and the FULL gate on anything touching app code, a mixed diff, or a renamed/moved/deleted
+code file. Locked by **Suite 253** (static wiring + unit classification + a real-git-repo integration proof
+of all four required cases). Marked ✅ SHIPPED in the READY-TO-BUILD entry and recorded in the SHIPPED
+section; no ID renumbered (Protocol 49). ⓘ **Protocol 2a note:** the owner's dispatch asked to bump
+hardcoded test counts across the docs — but Protocol 2a is RETIRED and no test count is tracked anywhere
+(Suite 28 guards against reintroducing one), so no counts were added; the runner's exit status is the
+signal.
+
+**Prior update — 2026-07-30 (later still — CPB4 filed: doc-only gate fast path)** — **New item CPB4**
+scopes the pre-push gate so a commit whose diff touches ONLY docs (`QUEUE.md`, `QUEUE_LOG.md`,
+`planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE) auto-skips the Playwright render/boot-smoke +
+app-integrity checks; any diff touching app code still runs the FULL gate unchanged. Filed in the READY
+TO BUILD list right after **CPB3**, ties into the existing gate-scoping precedent from the blind-review
+pass (Protocol 41's `eslint .` → tracked-manifest scoping fix). **Also — this same pass's own reposition
+push (below) was made with the pre-push gate intentionally skipped (`--no-verify`), owner-authorized for
+this one doc-only commit specifically** (`git diff --stat` confirmed QUEUE.md was the only changed file
+before the flag was used) — CPB4 exists precisely so this stops being a manual judgment call. Doc-only,
+no ID renumbered (Protocol 49).
+
+**Prior update — 2026-07-30 (later still — git-bisect/AST inspector repositioned)** — **Owner call: the
+git-bisect runner and the AST inspector (Code-session conveniences, NOT control-plane) no longer sit in
+MCP2's low-priority tool-family tail** — moved to their own short note directly after the **MCP1**
+(`robco-control`) block, right before **MCP2** begins, since both are control-plane-**adjacent** in
+priority even though neither is a control-plane deliverable. Descriptions unchanged; nothing else in the
+MCP1/MCP2 section moved. Doc-only, no ID renumbered (Protocol 49).
+
+**Prior update — 2026-07-30 (later still — MCP1/MCP2 filed, external review synthesis)** — **Two
+independent MCP-review passes (GPT-5.6, Gemini 3.1) converged on the same end-state and are folded in as a
+new section right after RB6: TWO MCP servers, not six.** New family prefix **MCP1-MCP2** (RB1-RB6 / HG1-HG2
+/ CPB / ACT / OD / SP / DG / REF / AUD / PM / P all already spoken for). **MCP1** (`robco-control`) hardens
+**RB4**'s seven-tool contract into a six-op-family shape (`state.snapshot` / `changes.since(cursor)` /
+`events.list` / `event.ack_receipt` / `proposal.validate|submit|status` / `job.result`) and folds
+usage/telemetry in as decision-shaped queries (unblocks **CPB1/CPB2**) rather than building a separate
+telemetry server. **MCP2** (`robco-evidence`, NEW) is a read-only server (`context.resolve` /
+`evidence.search` / `reference.trace`) feeding the museum's Visual Web (**P11/P15**) and a
+dangling-reference audit — deterministic search only, no AI-curated writable graph (explicitly rejects
+Gemini's official `memory`-server route as a second source of truth, per Protocol 51(b)), gated on a
+brutal retrospective acceptance test ("if it's just prettier search, kill it"). **Hard rules landing
+across the whole control plane:** the supervisor stays the sole ledger-writer, proposals stay enumerated
+job-kinds only, name-scrub stays a mandatory gate never an AI-callable tool, Fallout data ships as a
+pinned snapshot never a live wiki query, and **museum MCP is killed as a server** — regen/query/scrub
+route through the CLI gate + MCP2 instead, cross-referencing **P15**. **⚠ Flagged, not yet resolved:**
+Gemini's review leans on a claimed 2026-07-28 MCP spec (MRTR/Tasks/statelessness/MCP-Apps/list-caching SEP
+numbers) that is **unverified on our side** — GPT's architecture, which depends on none of them, is the
+backbone until that's confirmed. Doc-only pass, no control-plane code touched, no ID renumbered
+(Protocol 49).
+
+**Prior update — 2026-07-30 (later still — REF4 + PM1 filed)** — **Two items folded into the just-tidied
+CONTROL-PLANE board, both owner-approved 2026-07-30, neither previously tracked.** **REF4** (new) refines the
+shadow-only thrashing detector against two more false-ish positives seen 2026-07-29/30, distinct from the
+`53a3bb89` case `15c17d0` already fixed: **(i)** a session frozen mid-read with zero activity is
+**POSSIBLY_STALLED**, not thrashing — different state, different wording; **(ii)** the slow-pre-push-gate /
+push-retry pattern (repeated push attempts timing out at the tool level, no file changes between them) must
+**not** be flagged as thrashing — a session mid-push isn't stuck. Stays shadow/alert-only, feeds **DG1**'s
+promotion gate, no kill authority added. **PM1** (new family prefix) is a three-angle post-mortem/retrospective
+of the whole project — plain-language overview, technical/architecture retrospective, lessons-learned —
+sequenced deliberately **right before THE MUSEUM PROGRAM begins** (owner's call: reflect, then build the
+exhibit), and doubles as museum source material for P8's corpus. Doc-only pass, no control-plane code
+touched, no ID renumbered (Protocol 49). Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730b).
+
+**Prior update — 2026-07-30 (later still — CP board consolidated)** — **The sprawling CONTROL-PLANE
+(workflow) section is TIDIED — status, grouping and dedup only, no ID renumbered (Protocol 49).** Marked
+SHIPPED, out of the pending buckets, with SHAs: kernel ranks 1/2/4/5 (`8eab8fd`/`dd49ed4`/`9fd751d`/
+`32c0fbc`), rank 3's backup mirror + restore test now **BUILT AND ACTIVATED** (`e4384e5` build, `78acfd5`
+activation — wired into daily housekeeping, its own scheduled task registered, the Ledger repo already
+receiving mirror commits `d001a38`/`79afc2e`), the idle-session reaper (shadow, `643ebb8`), all nine
+Pushover alerts, the thrashing recalibration (`15c17d0`), the usage-measurement spike, and **REF1** — the
+session-aware uncommitted-work alert — now BUILT (`a1df1b3`). **Deduped:** the activation-checklist's
+CPK/CPB/ACT/OD/SP/DG index is now explicitly a pointer layer over CP1-CP5/RB1-RB6/HG1-HG2 (light cross-refs
+added at CP2's push-wrapper stage → **ACT3/DG2**, and CP3's usage-relay mitigation → **CPB1/CPB2**), not a
+second copy. **Tightened into one execution list:** ready-to-build (**ACT3** wiring the wrapper NEXT, then
+**CPB1/CPB2/HG1/HG2/RB1/RB2/RB3/CPB3**) → activation switches (**ACT1** — its rank-3 half already done via
+`78acfd5` — then **ACT2**) → owner decisions (**OD1** now practically resolved by the shipped daily default,
+**OD2** still open) → spikes (**SP1**, RB4's own MCP-load-check, **RB5**, **RB6**) → data-gated (**DG1-DG5**,
+self-collecting via **REF3**'s auto-verdict). **New tracked item filed: AUD1** — a post-implementation
+multi-model (GPT/Gemini/DeepSeek) audit on coherence/interconnect and frontier questions, explicitly gated
+on the ready batch running live long enough to produce real data, with a "highest-leverage next, not
+maximize features" guardrail recorded per tonight's own over-building talk-downs. **Small museum touch:**
+P15 is now explicitly slotted into P11's build order (P15 part 1 feeds P11 Stage 0; parts 2-3 close out
+around Stage 3). Doc edits + git only, nothing killed, no control-plane code touched. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730).
+
+**Prior update — 2026-07-30 (later still — RB3 watcher)** — **RB3's mechanism is now specified: a LIVE 24/7
+`fs.watch` watcher, not the supervisor's 5-minute poll.** The moment Dispatch produces substantive assistant
+TEXT that didn't go through the messaging tool, the watcher fires a Pushover within **~1 second** — a
+detector/alarm only, it cannot prevent the leak. **OFF BY DEFAULT** (idle footprint ~0% CPU / ~40MB, but
+only useful while the owner is actively using Dispatch), controlled by trigger words **"watcher on" /
+"watcher off."** ⚠ **[SUPERSEDED 2026-07-31 — the default is now ON/ARMED.** This paragraph is left as dated
+history per the queue's own convention; the reasoning that flipped it, and the REJECTED auto-arm option, are
+in the RB3 entry itself.**]** The existing 5-minute supervisor loop babysits it — a dead watcher process is caught on the
+supervisor's next pass and raises its own incident. Removes the owner's prior manual workaround of
+re-reading working-notes on the Claude website to catch these leaks himself. **Also recorded — a small
+control-plane note, no build needed:** the supervisor's own kill-switch is already wired to trigger words
+too — "supervisor on" / "supervisor off" map onto the existing `state\DISABLE` file (off creates it = instant
+stop, on removes it) — this works TODAY. Doc-only pass, no control-plane code touched. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730c).
+
+**Prior update — 2026-07-30 (later still)** — **Two more owner-approved additions folded into REF2/REF3 — a
+concrete plan threshold, and a bidirectional auto-verdict with a safety asymmetry.** **REF2** (the reaper's
+safe-lifecycle design) now pins the interactive/Dispatch idle-reap threshold at a concrete **2h30m (150
+minutes)** — explicitly a PLAN value, NOT live; reaping interactive sessions stays shadow-gated until the
+reaper proves itself, nothing auto-kills at 150 minutes today. **REF2 + REF3** together now also require the
+reaper's shadow tracking to watch for **over-aggression**, not only readiness to graduate: a session it would
+have flagged as reapable that later resumes activity is a measured false positive, and a high false-positive
+rate at the current threshold produces its own **"too aggressive → recommend widening to ~X"** verdict,
+Pushovered the same way a graduate-ready verdict is. **⭐ The safety asymmetry this establishes, recorded
+because it generalizes to every data-gated mechanism, not just DG3:** the system MAY auto-apply a
+**loosening** change on its own (widen a threshold, err further toward not acting) since that direction is
+always safe — but **tightening always requires explicit owner approval**, the same bar as any shadow → live
+promotion. Fail-safe direction automatic; risky direction gated. Doc-only pass, no control-plane code
+touched. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730b).
+
+**Prior update — 2026-07-30 (later)** — **Three owner-approved refinements folded into the CP activation
+checklist, plus one small addition to CPB1.** New family prefix **REF1-REF3** (single letters and all prior
+CP-program families now spoken for): **REF1** makes the LIVE **backup-unhealthy** alert session-aware — it
+must not fire on uncommitted work while an active session still owns that tree (files mid-build are
+_supposed_ to be uncommitted), only on uncommitted work that is orphaned or has sat stale past a threshold
+with no active session. **REF2** is a safe-lifecycle-reaping design for **DG3** (the idle reaper's
+shadow→actual-reap promotion): two clean "done" signals (a verified-terminal job contract, or an owner-set
+idle deadline) behind three hard guards (long-idle only; never reap uncommitted work — flag + hold instead;
+snapshot via the **CPK4** continuation packet before any reap), keeping the proven `(pid, procStart)`
+echo-and-confirm kill intact and never batched. **REF3** gives every data-gated promotion (**DG1-DG5**) an
+explicit evidence threshold defined up front, with the **ACT1** daily/weekly housekeeping pass tracking
+progress toward each automatically and Pushovering the owner a ready-computed recommendation the instant a
+threshold is met — the owner's own principle, verbatim: "nothing that needs data collection should require
+me to do it — it should be automatic." **Also folded in — CPB1** now specs including the usage-cap
+reset/window-end timestamp when the usage data carries one verbatim, else computed from the ~5-hour rolling
+session window plus the weekly cycle. All three refinements are OWNER-APPROVED (2026-07-30) but **NOT YET
+BUILT** — this is a doc-only pass, no control-plane code touched, nothing killed. Full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730).
+
+**Prior update — 2026-07-30** — **Every owner-gated / activation / to-implement step of the control-plane
+program consolidated into one tracked checklist** — "⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST",
+filed directly after HG2, above. Fourteen new items across six new family prefixes (**CPK1-CPK5** retroactive
+IDs for the kernel ranks; **CPB1-CPB3** the next build batch — budget alert, usage→operating-modes, the
+"backup-all" script; **ACT1-ACT3** activation switches, including new **ACT3** "wire the controlled-push
+wrapper into the real push path" — owner-approved the same day as the concrete first step toward the
+≥10-real-pushes gate; **OD1-OD2** owner decisions, including the auth-folder secure-backup call filed as its
+own item; **SP1** live-confirming the two documented-contract-only hook alerts; **DG1-DG5** the data-gated
+promotions, unified from scattered mentions across CP2/CONVERGENCE/CONTROL_PLANE_STATUS). Existing IDs
+(RB1-RB6, HG1-HG2, P15) are cross-linked, not renumbered. Read-only reads + doc edits only — no control-plane
+code touched, nothing killed. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpactivation0730).
+
+**Prior update — 2026-07-29 (later still)** — **RB4 and RB5 expanded with GPT's detailed design, and a new
+RB6 filed.** RB4 now specs a full V1 seven-tool contract (`control_get_inbox` / `control_get_job` /
+`control_get_event` / `control_get_health` / `control_ack_event` / `control_submit_intent` /
+`control_get_intent_status`), proposal-only verbs, idempotency, generation checks, and two corrections
+against GPT's original design (the intake dir must resolve via `lib/paths.js`, not a hand-built
+`%LOCALAPPDATA%` path — the MSIX-virtualization trap — and a prerequisite MCP-load spike comes first).
+RB5 now specs the full bounded wake-spike protocol (anchor nonce, 5-minute hands-off window, strict
+4-criteria PASS, seven named failure classifications) and states plainly that even a full pass proves
+only session→Dispatch wake, never the AI-free supervisor→Dispatch wake this program actually needs. **New
+RB6** (near-term, buildable now): a Pushover → Dispatch Android deep-link so the owner's tap on the
+notification opens straight into the conversation — friction reduction on the existing "owner is the
+wake" fallback, not a wake mechanism itself. Full detail →
+[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md). Also
+this pass: the private control-plane backup repo (rank 3, item below) was renamed from the placeholder
+`RobCo-Control-Backup` to `RobCo-Control-Ledger` — same empty PRIVATE repo, clearer name.
+
+**Prior update — 2026-07-29 (later)** — **Kernel ranks 4 and 5 SHIPPED and pushed**, on top of ranks 1-2
+below: rank 4, the deterministic continuation packet (commit `9fd751d`), and rank 5, incident lifecycle +
+daily housekeeping (commit `32c0fbc`), both in the private `RobCo-Control` repo. **Wiring status verified
+and corrected against the claim this pass started from (Protocol 51 dissent — full account →
+[`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)):** rank 1 (job contract + reconciler) and rank 5's
+incident-lifecycle module are **already live** in the supervisor's polling loop — confirmed by direct
+`require()`/call-site inspection of `supervisor.js` and by a live Task Scheduler check
+(`RobCo-Control-Supervisor`, State: Ready, last run succeeded minutes before this pass, next run minutes
+after) plus a same-minute ledger write. Rank 2's publisher, rank 4's continuation-packet generator, and
+rank 5's daily-housekeeping pass are built and callable but **not** auto-invoked by anything — no
+scheduled task calls them, so "owner-gated activation" only accurately describes the write-side actions,
+not the detect/alert path, which is already running against real jobs every ~5 minutes. **Five new queue
+items filed — RB1-RB5**, a new family prefix under the CP program, folding in the plan-only Dispatch
+Return Bus design pass
+([`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md)): the
+Dispatch inbox projection (RB1), launch + structured completion receipts (RB2), the mobile-hidden-response
+detector (RB3), the custom control-plane MCP for delivery+ack (RB4), and the bounded `send_message` WAKE
+spike (RB5 — flagged **BLOCKED BY PLATFORM**, no wake mechanism exists today). All five are plan-stage,
+nothing built. Rank 3 is unchanged from the entry directly below — spec'd, blocked on the owner creating
+the private backup repo. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729).
+
+**Prior update — 2026-07-29** — **Control-plane kernel RANKS 1-2 SHIPPED** in the private `RobCo-Control`
+repo: job contract + reconciler (commit `8eab8fd`) and the transactional exact-SHA verifier/publisher with
+a fail-closed break-glass + fault-injection tests (commit `dd49ed4`). **Five new Pushover alerts** landed
+alongside (commits `f14499d` + `bac032a`), on top of the four already live: "needs your input" and
+"session died/errored" are documented-contract only (their hooks are unverified-live, not wired); ⭐
+**backup-unhealthy** is LIVE and already caught a real problem on a real run; deadline-exceeded (wall-clock
+only) and break-glass-used are both LIVE — all five demoed to the owner's phone. **The thrashing detector
+was recalibrated** (commit `15c17d0`): a "nearby-progress" gate fixed a real false positive (session
+`53a3bb89`); it stays shadow-only, never kills. **The usage-measurement accuracy spike ran**
+([`planning/control-plane/USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md),
+read-only): per-job cost/tokens ARE measurable, even under concurrency, via OTLP or a headless job's own
+`-p` JSON result — so the deadline/budget alert's budget half is UNBLOCKED for dollar/token budgets, still
+blocked for "% of the weekly cap" (the global usage file carries no session id — structurally
+unobservable, not just imprecise). **Rank 3 (off-machine durability) now has a SPEC, not a build**
+([`planning/control-plane/RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md)) —
+gated on the owner creating the private backup repo. **A new museum item, P15, is filed:** the museum's
+scope predates the control plane becoming the top program, so P15 is now a precondition on "museum done" —
+fold the control-plane's own arcs into P8's corpus, give the self-maintaining-system thesis a prominent
+room, and confirm P11's Visual Web includes them. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp0729).
+
+**Prior update — 2026-07-28** — **CP2's spec moved to v2.3: S7 ran for real and came back NEGATIVE — Stage
+4b (real unattended push notifications from a headless task) is CLOSED, a platform limit rather than a
+build gap. A one-time Claude scheduled task fired on time while the owner was away, but had no direct
+proactive-notify-to-phone tool and hung on an unattended permission prompt before it could even complete.
+The permanent design is PULL (a live agent + a status-file read at the next check-in), not push. Also
+folded in: a docs-grounded finding that genuine unattended launch autonomy exists at the headless/SDK
+level but not on the Dispatch launch path — tracked, gated on the existing S12-T non-local-transport
+re-verify. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23); CP2's entry below updated to match. **Also
+recorded:** the owner re-confirmed 2026-07-28 that the museum finishes BEFORE 2.9.0 starts — the execution
+order already had it that way; the re-confirmation now carries its own date (Protocol 50 a-date).
+
+**Prior update — 2026-07-28 (late) — ⭐ THREE-MODEL CONTROL-PLANE REVIEW CONVERGED (Gemini + DeepSeek + GPT).**
+Analysis only; **nothing built or approved from it** (owner: "fold into queue until you've analyzed all 3;
+don't run anything"). Full converged reading → [`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md).
+Headline: we built a strong **flight recorder** (OBSERVE) and a weak **actuator** — several planned/built items
+turn weak inference into destructive action. The reframe replaces CP2's stage order as the _working_ plan with a
+**trusted-action-kernel** build order: **(1) job contract + reconciler → (2) transactional exact-SHA
+verifier/publisher + fault-injection tests → (3) recovery inventory + off-machine durability + restore test →
+(4) deterministic continuation packet → (5) incident lifecycle + daily housekeeping.** **De-prioritized /
+narrowed:** the generic idle reaper (BUILT tonight, `643ebb8`) → re-scope to _verified-terminal_ job cleanup, not
+idle-inference; thrashing → **alert-only, never graduate to kill** (kill only on an owner-approved envelope);
+headless-AI-for-sync/reap/tests → **CUT** (deterministic, run directly); auto-restart → decouple from repo sync;
+`--no-verify` tripwire → low-leverage telemetry only; usage 50/80/85/90/95 → **operating modes ✅ APPROVED
+(owner, 2026-07-28)** — Normal / Conserve / Reserve-for-owner / Stop-unattended-AI, notify only on a mode change,
+exact % stays in `status.json`; worktrees → defer, prefer a per-repo mutating **lease** first. **Doctrine tweak:**
+fail-open/shadow-first is not universal — keep the _owner's_ path always available (break-glass) but let
+_automation's_ safety-critical paths fail **closed**; simplicity = 4–5 executable invariants, not a pile of
+detectors. **Before any build:** verify which Gemini-cited mechanisms (`PROCESS_WRAPPER`, native OTLP, Channels,
+`SessionEnd`, native worktree/timeouts) actually exist on the installed CLI build. **⭐ SEQUENCING (owner,
+2026-07-28): this whole trusted-action-kernel program runs BEFORE the museum and before 2.9.0.** **Separate trust domain for unattended
+jobs → folded as DEFERRED, laptop-leaning (owner, 2026-07-28).** Not scheduled; the kernel needs no separate trust
+domain (the exact-SHA publisher + credential separation + restore-proof carry the safety). Revisit once unattended
+autonomy is in regular use; when built, the **spare laptop** is preferred over a separate Windows account — a real
+machine boundary that also doubles as the rank-3 off-machine durability. Aligns with **CP5** (laptop-witness) and
+the earlier software-fixes-first deferral of the spare laptop. **Reconciled into the CP1-CP5 entries below in
+this same-day pass** — see the new overlay directly under the program header (**"⭐ The CP program's BUILD
+ORDER — CURRENT"**), CP2's superseded-order note, CP1's narrowed-termination addendum, and CP5's
+deferred-trust-domain addendum. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
+
+**Prior update — 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
+top priority (owner's explicit call), and the museum sits directly under it.** A long work session produced
+more than the queue could hold, so this pass folds all of it in and re-orders the board. **New at the top —
+a whole new program (CP1-CP5):** the empirical spike campaign that must prove or kill hook-based containment
+before anything is built, the staged build gated on it, an immediate-mitigations track that needs no control
+layer at all, the broader sync audit, and the laptop-witness inventory. **⚠ Everything in that program is
+PROPOSED / PLANNED / gated — nothing of it is built or operating; it is written that way deliberately.**
+**The museum moved up** out of the 2.8.5 tail into its own top-level section, gaining five new items:
+**P10** (⭐ drop the hardcoded 10-stop tab bar and redo the nav — the "no 11th slot" constraint is VOID),
+**P11** (the Visual Web build on P8's structure), **P12** (the Article Room), **P13** (⚠ a SECURITY scan-list
+gap P8 found) and **P14** (the live museum is stale — the republish). **Shipped this session and moved to the
+log:** **V** (the archive-sync repair — a silent-push-failure fixed), **W** (archive/museum organization
+fixes), **X** (the Exhibit folder relocated into `!RobCo`) and **P8**'s completed account. **A3/A4 stay in
+this file on purpose** — a test fixture pins them here; the reason is recorded in the shipped list below.
+**Two owner wrap-up asks are now tracked:** **Y** (the memory-for-the-story reconciliation) and
+**Z** (the evidence-grounded workflow explanation). The ordering overlay below is rewritten to match.
+
+**Prior update — 2026-07-27** — **Item L's private view is now owner-confirmed.** The owner opened the
+generated `queue-view/queue-view.html` on his own phone and confirmed it reads right ("it looks good",
+2026-07-27) — the sign-off L's private half was waiting on (Dispatch's own 360px verification had already
+passed). L's private-view account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l); L stays open, narrowed to only
+the still-deferred player-facing public view (post-P2).
+
+**Prior update — 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — CLOSED, all four batches
+shipped.** Batch 4 (the closing batch) landed the audit's remaining low-priority tail — File Map
+reverse-completeness (Suite 252.1, which immediately found and fixed real drift: about a dozen
+undocumented scripts/tests plus the vendored OCR bundle), CHANGELOG category-heading ordering (252.2),
+README's css-file count (252.3), and README's version-vs-CHANGELOG check (252.4) — plus the one candidate
+left as an owner judgment call: README's third hand-copy of the script load-order list is now **deleted**
+in favour of a pointer at `rules/file-layout.md`'s guarded original (owner chose the audit's own
+recommendation over adding a third check). Batch 3 (Protocol 53, `library/CODE_MAP.md`'s three generated
+sections) had also landed but was never written up here at the time — folded in retroactively. Every
+actionable GENERATE candidate from the audit is now shipped; full account moved to
+[QUEUE_LOG.md#u](QUEUE_LOG.md#u).
+
+**Prior update — 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
+`library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
+(`scripts/generate-test-catalog.js`, `npm run test-catalog` / `test-catalog:check`), never hand-typed —
+the gitignored-`library/` gate-diff tension resolved the same way Protocol 46 resolved it for
+`library/MANIFEST.txt` (absent → pass, present-and-stale → fail). Wired into `scripts/gate.js` on both
+`gate:fast` and `gate`; Suite 247 proves the real extraction end-to-end. The Atlas (item I) reuses this
+plumbing directly. Full account in [QUEUE_LOG.md#d](QUEUE_LOG.md#d).
+
+**Prior update — 2026-07-26** — **A4 is DONE — the real-Firebase-emulator round-trip is built and
+red-then-green PROVEN.** With the JDK blocker cleared (2026-07-23) and `firebase-tools` committed as a
+dev-only dependency, A4 upgrades A3's modeled cloud-serialization guard from _modelled_ to _verified_:
+`scripts/emulator-round-trip-check.js` (`npm run test:emulator`) runs the real Firebase client SDK against
+the local Firestore + Auth emulator, self-derives the save payload from the live `state` literal (reusing
+A3's extractor, Protocol 22), writes it via the real additive `addDoc()` path, reads it back, and asserts
+field-level fidelity. **Red-then-green proven against the real emulator, both directions:** a clean payload
+round-trips every field equal; a planted directly-nested array and a planted `undefined` field each
+correctly make the write fail. **A genuine finding, not just a confidence upgrade:** the real emulator
+showed A3's model was wrong about the mechanism — an `undefined` field does not get silently stripped by
+Firestore, it makes the **whole write throw** (the Web SDK rejects it client-side by default, since
+`cloud.js` never sets `ignoreUndefinedProperties`) — safer than modeled, but the modeled guard's comments
+said otherwise, so they're corrected in the same pass. Standalone only (`npm run test:emulator`), **not**
+wired into `scripts/gate.js` — needs a JDK + firebase-tools that the normal gate/CI can't assume, and A4 was
+never a release blocker (owner decision 2026-07-21, unchanged). Full account in **A4** below; A3's record
+also updated to point at it.
+
+**Prior update — 2026-07-22** — **2.8.5 "Foundations & Fidelity" is SHIPPED to production.** The
+`dev → main` release merge was performed with `--no-ff` (a fast-forward makes the tip shared with `dev`,
+which makes GitHub Pages reject the production deploy — recorded lesson), the release workflow
+auto-created the `v2.8.5` tag on CI-green `main` and deployed to GitHub Pages. `APP_VERSION` 2.8.0→2.8.5,
+cache `robco-terminal-v2.8.5-r1`, the `[Unreleased]` block consolidated into a dated `## [v2.8.5]` block
+with a fresh empty `[Unreleased]` opened, and ARCHITECTURE/README brought current. **No tag was pushed by
+hand** — pushing one would make `release.yml` see the tag already exists and skip the deploy. Owed to the
+owner: the real-device installed-PWA update check (Android). Owed to Dispatch: the post-release ritual
+(archive sync + museum regeneration).
+
+**Also 2026-07-22 — a Protocol 50 recording pass (no build, recording only):** six owner-approved decisions
+folded into their existing items — **P4** bug records move to **find-time** (OPEN → IN-FLIGHT → SEALED; an
+editable issues-board explicitly declined); **P** gains the museum-wide **curation law** (capture everything,
+exhibit a curated subset) and its ONE exemption, the **Visual Web "Magnum Opus"** (complete-but-navigable);
+**P2** gains three verified **intent-vs-reality publication blockers** + the serve-and-look audit lesson;
+**R5** gains the reinforced **branch-protection** candidate (PRs rejected); and a new item **Q** records the
+**planning-folder hygiene** standing rule + the owed cleanup task.
+
+**Prior update — 2026-07-21:** an **A3 build attempt** that hit a feasibility wall and surfaced a premise
+correction; built nothing, recorded both in **A3** in place (Protocol 50). **(1)** The Firebase emulator
+**cannot run here** — the Firestore/Auth emulators are Java processes and there is **no JVM** on the
+machine (`java` absent, `JAVA_HOME` unset, no JDK/JRE/JBR anywhere, `firebase-tools` not installed), so the
+emulator-backed round-trip could not be run or verified, and A3's own red-then-green Hard rule forbids
+shipping a cloud-safety test green-but-unrun. **Unblock:** owner installs a **JDK/JRE 11+** (a system
+install, not a dev npm dep) then `npm i -D firebase-tools` (dev-only, never precached). **(2) Premise
+correction:** the "field added to `state` but missed in the cloud **sync mapping**" failure A3 was written
+to catch **does not exist in the current code** — `cloud.js` stores the whole `robco_v8` container
+wholesale, and the load path (`sanitizeImportedContainer` + `migrateState`) passes unknown fields through,
+so a new plain field round-trips losslessly; the only residual silent-drop is the **Firestore
+serialization boundary** (undefined-strip / nested-array-reject / doc-size), exactly what needs the real
+emulator. A non-emulator round-trip substitute would pass for any field and catch nothing, so none was
+shipped. **Owner decision (same day): build the modeled guard NOW, no JDK — and A3 is CLEARED as a release
+blocker.** Shipped `scripts/cloud-serialization-check.js` (`npm run cloud-check`): self-derives the field
+set from the real `state` literal, flags Firestore-hostile values (`undefined` / nested arrays / oversize),
+red-then-green proven on the real literal (caught both a planted `[[1,2]]` and an `undefined`), with
+a built-in positive control and NO silent-skip path; now WIRED INTO THE GATE (step 4b, fast+full) later the
+same day per the owner's "wire it" — see A3. The premise correction (state stored WHOLESALE +
+pass-through loads → a forgotten field-mapping **cannot** silently drop data) drops the true emulator test
+from release-blocker to the **optional post-2.8.5 item A4** (needs a JDK/JRE 11+ + dev-only
+`firebase-tools`). **A3 was the last thing gating 2.8.5; it is now resolved — nothing data-safety blocks the
+ship.** Cache bumped r55→r56 (the precached `CHANGELOG.md` changed); no `APP_VERSION` bump (Under-the-Hood,
+not user-visible). Earlier passes — the QUEUE.md header-mangle fix,
+the seven- and six-decision recording passes, the cross-cutting **EXECUTION SEQUENCE** — are in the
+running history chain in
+[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
+
+---
+
 _This log is append-only (ARCHIVE-class). New shipped accounts are added under a stable `<a id>` anchor; `QUEUE.md` keeps the matching one-liner. See `rules/docs-and-library.md` for the maintenance model._

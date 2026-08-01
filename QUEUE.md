@@ -24,7 +24,49 @@ item belongs to, and it never runs out.
 
 Status tags: ✅ shipped · 🔄 in progress · ⏭️ next · ⚠️ blocked/contentious · ⬜ queued.
 
-**Last updated: 2026-07-31 (CHECKPOINT — a full RECONCILE, not just a fold: the queue is now current against
+**Last updated: 2026-08-01 (FULL ACCURACY PASS — every claim in this file re-checked against reality, plus
+the owner-greenlit batch consolidated and Round 3 folded)** — **Doc-only. Nothing was built.** Three jobs, in
+order. **(1) THE ACCURACY PASS.** Every status claim was verified against `git`, the live ledger, the live
+scheduled tasks and the actual code — never against the prose. **All 38 SHAs re-verified** (27 control · 11
+app, plus archive `b90304fb` and Ledger `d001a38`/`79afc2e`) with `git cat-file` **and**
+`git merge-base --is-ancestor` in their own repos: every one exists and is genuinely in its branch history.
+**Four stale-NEGATIVE claims found and fixed** — the worst by far being the CP program's own header, which
+still opened _"⛔ NOTHING IN THIS PROGRAM IS BUILT … ledgers, wrappers, notifications … PROPOSED or
+PLANNED."_ That is the single most misleading sentence left in the file: it sits directly under the
+**TOP PRIORITY** banner, and the ledger has **78,627 records**, the wrapper routes every push, and seven
+alerts are live. The identical claim was corrected one section lower on 2026-07-31 and this copy was
+missed — which is exactly why a reconcile has to sweep, not spot-fix. Also fixed: the standing effort
+workflow said its `CLAUDE.md` landing was _"Flagged, not done"_ when it **landed 2026-07-31 as `055b586`**
+(verified at `CLAUDE.md` Protocol 8); the RB family header said _"all five items"_ of **six**; and REF5's
+kept-in-place design text read `NOT YET BUILT` twice inside an entry that ships at its own top. **Two
+drifted numbers corrected against live readings** — the DG2 counter (**44 → 49/10**, and now retired as a
+headline, see below) and the live usage state, which had moved far enough to **invalidate an argument this
+file was making**: the 2026-07-31 bullet said 91% weekly would read _Reserve-for-owner_ under CPB2's
+approved refinement. Live now: **`sd` 100% · `fh` 9% · mode `Stop-unattended-AI`** — at 100 the refinement
+changes nothing, so that specific evidence claim has **expired** and is corrected rather than left
+flattering. ⚠ **The refinement is still first in the build order** — it is owner-greenlit; only the
+"it would help right this minute" argument is gone. **Confirmed-correct and left alone** (checking a claim
+and finding it TRUE is half the job): ACT1's correction holds — **both** scheduled tasks are registered,
+`Ready`, `Enabled`, `Last Result 0`, with the daily 03:15 job's Last Run reading exactly
+`2026-07-31 03:15:01` as recorded; `state/manifests/` still does not exist, so BR8's premise stands; and
+`lib/usage-mode.js`'s shipped bands really are `90/80/50/0`. **`#44`/`#45` are referenced nowhere** in
+`QUEUE.md`, `QUEUE_LOG.md`, `CLAUDE.md` or the global rules files — nothing to drop. **(2) THE GREENLIT
+BATCH.** Four owner-greenlit items are consolidated into one **⭐ OWNER-GREENLIT — READY TO BUILD** section
+in build order, so the next thing to do is one scroll from the top instead of scattered across five
+sections. Everything still parked stays parked; the **HARNESS AUDIT (HA)** and **BR** sets stay
+`[DECISION]`-pending and were **not** promoted. **(3) ROUND 3** is folded into the `BR` block as a dated
+**PROPOSED** addendum — the subtraction/fragility round, headlined _"RobCo is over-recording health and
+under-proving coverage."_ **And a legibility fix with teeth:** this file's running header had grown to ~870
+lines **above** "Where we are right now", so the phone-readable queue opened with most of a project's
+history. Everything dated **2026-07-30 or earlier** moved **verbatim** into `QUEUE_LOG.md`'s new Appendix II
+(583 lines, byte-for-byte, nothing rewritten or dropped) — the same split that created the LOG in the first
+place, applied to the header this time. **Measured result: "Where we are right now" moved from line 899 to
+line 360, and the greenlit "what do I build next" section sits at 511.** ⚠ **Stated precisely rather than
+flatteringly, since this pass exists to kill exactly that habit: the FILE is only ~50 lines shorter overall
+(7,934 → 7,885)** — the corrections and the two folds added back most of what the move took out. **The win is
+the 539 lines a reader no longer scrolls past to reach the queue, not the file size.**
+
+**Prior update — 2026-07-31 (CHECKPOINT — a full RECONCILE, not just a fold: the queue is now current against
 git and the live ledger)** — **This pass folded four new things and then went back and fixed what had rotted.**
 **FOLDED:** **(1) RB3's default is FLIPPED to ON/ARMED** — the hidden-response watcher now starts with the
 machine and stays armed until an explicit `watcher off`, toggleable from the CPB5 CLI **including remotely
@@ -310,594 +352,21 @@ to the owner's stated design; the entry's older "PowerShell CLI" line is superse
 Node-native ladder; and v0.1's `:` palette is a command line, not yet a navigable menu. **v0.2 and v0.3
 are not built.** Full control suite green. Full record at the CPB5 entry.
 
-**Prior update — 2026-07-30 (HG2 BUILT + SHIPPED — the terminal now says which part failed to start)** —
-**HG2 is shipped, app repo `aef7da4`: the boot sequence is isolated phase by phase.** Starting the terminal
-runs **51** named phases (the queue's old "~45" was an estimate; the real count is 51). Every one of them
-sat under a **single** outer `try`/`catch`, so the first phase to throw silently abandoned all the rest and
-the only trace was a console line no user ever sees — that is the exact mechanism behind "the terminal came
-up blank and there's no way to tell what died." Each phase now runs under its own guard, in **byte-identical
-order** (the two awaited async phases still await; only the isolation is new), and every phase is
-**classified**. **Exactly three are fatal**, each chosen from what the code actually does rather than how
-important it sounds: restoring the campaign, the master render pass, and opening the last-used screen — that
-third one because the tab switch is what makes any panel visible at all, so skipping it produces a literally
-blank column. **Everything else degrades:** a sound channel, a suggestion list or a device pref that fails no
-longer stops the phases after it; the terminal carries on, files the fault in the same ring-buffer the FAULT
-lamp and the service console already read, and **tells the user in the transcript** — never console-only.
-A fatal phase instead paints a **self-contained BOOT FAILURE screen** naming the phase, the fault, anything
-already degraded, and a RETRY BOOT control — built from inline styles and text only, because it may have to
-survive a fatal fault in the very phase that paints the UI. **⚠ One deliberate fail-OPEN, recorded rather
-than buried:** an unknown phase name degrades instead of killing boot — a typo must never be the thing that
-bricks the terminal, and the gate is the right layer to catch it (Suite 258.15 does, in both directions).
-Locked by **Suite 258**, behavioural against the real functions in a `vm` sandbox, **including the HG1
-footgun re-checked one file over** (a console-less sandbox must not turn "a phase failure is contained" into
-"a phase failure is fatal"). **Suite 132.5 was RESTATED, not re-bumped** — its raw line-count ceiling stopped
-measuring anything once every phase became a three-line wrapper, so it now asserts each phase callback is a
-single named call, which is strictly stronger. Full `npm run gate` green; also verified in a real browser
-(clean boot, the degraded transcript line, and the fatal screen). `CACHE_NAME` r20 → r21. **This closes the
-HG1–HG2 pre-museum hardening pull-forward: both are now shipped, ahead of 2.9.0's OS services widening these
-surfaces.**
-
-**Prior update — 2026-07-30 (REF5 BUILT + SHIPPED — the "your work isn't backed up" alerts stopped crying
-wolf)** — **REF5 is shipped, control repo `e3706db`.** The two alerts the owner watched false-fire 6+ times
-during ordinary builds — _"a session tried to push but I never saw it confirm"_ and _"your latest work
-isn't backed up — N commits not on the remote"_ — were firing during the completely **normal push window**.
-The cause is arithmetic, not a bug in the detection: a full-gate push runs **minutes** (the wrapper's own
-ceiling is 20), a build often pushes **both** repos one after the other, and the supervisor checks every
-**5 minutes** — so a check lands mid-push, sees a commit that isn't on the remote yet, and concludes the
-work is unbacked. It wasn't; it was in transit. **Both** detectors now share one set of four checks
-(`lib/push-window.js`, so they can never drift apart): **(1)** if the remote already has that exact commit,
-the alert is **retracted** — previously such a warning stayed open forever, because the record that would
-have closed it can never arrive; **(2)** if a push is actually running, stay quiet — read two ways, from
-the push record ACT3 writes _and_ from the push lock, because the control repo runs its gate **before** the
-push record exists, so the lock is the only thing that covers those first minutes; **(3)** if the session
-that owns the work is still live, stay quiet — work mid-build is _supposed_ to be unbacked; **(4)**
-otherwise wait out a grace period at least as long as a healthy push, taken from the wrapper's own ceiling
-rather than a second number that could drift. **It is not neutered, and that is proven, not asserted:**
-genuinely stuck work — nobody live, at rest past the ceiling, nothing in flight, not on the remote — still
-alarms, and a deliberate mutation that removed the suppression turned the gate **red** (4 failures) before
-being reverted. **One divergence recorded on purpose:** when the machine can't tell whether a session is
-live, REF1 stays silent but REF5 still alarms — a commit sitting off the remote past the full ceiling is a
-real gap whatever the process table said, and the alternative is a machine that quietly does no backup
-alerting at all. **Auto-retract now reaches the phone** for these two alerts only: one all-clear when the
-work lands, instead of a stale warning left standing. **A quiet run stays legible** — every stranded push is
-still detected and logged with the reason it was held back, so "said nothing" can always be told from
-"decided to say nothing". Control gate ran for real (CPB6): `gate: PASSED`, origin VERIFIED, clean-push
-counter **23/10**. Locked by control test groups **PW** + **PWE**.
-
-**Prior update — 2026-07-30 (ND1 BUILT + SHIPPED — the two repos can no longer come to mean the same word two ways)** — **ND1 is shipped, app repo `ca38f79` + control repo `31e987c`: a naming-domain guard, filed as a new
-`ND` family and built in the same pass.** The app owns **`RobcoEvents`** — the client-side game/UI bus in
-`js/core/state.js`, in-page subscribers, nothing persisted. The control plane owns **"ledger events"** — the
-appended, replayable records its `lib/ledger.js` writes, each with a `type:` field. **Verified rather than
-assumed, there is no clash today:** the control repo contains zero `RobcoEvents` and the app's `js/` contains
-zero "ledger event". But "events" already means two entirely different things depending on which repo you are
-standing in, and both sides are growing — so the boundary is now written down once (`tests/naming-domains.json`,
-duplicated byte-identical into the control repo, because the two share no package) and **each repo's own gate
-checks its own source against it**: **Suite 257** here, **test group ND** there. No cross-repo runtime coupling;
-each side degrades to "sync unverified" rather than failing when the sibling checkout is absent, so a public
-clone is never blocked. **The part that stops it rotting into a taxonomy:** only distinctive COMPOUNDS are
-reserved — `ledger`, `event`, `receipt`, `incident` and `proposal` sit on an explicit SHARED list, because this
-app has shipped a Field Ledger panel and a release-receipt script for months and reserving those bare words
-would outlaw live code. Both guards prove that behaviourally, and both carry a red-then-green proof that a
-violating source really is caught. **Nothing was renamed** — `window.RobcoEvents` is precached and referenced
-across the app; the guard protects the existing names. Full `npm run gate` green; control suite green
-(1137/1137). `CACHE_NAME` r19 → r20 — no app code changed, but `CHANGELOG.md` is itself precached, so a
-"tests and docs only" commit is not automatically cache-bump-free.
-
-**Prior update — 2026-07-30 (HG1 BUILT + SHIPPED — the event bus is hardened)** — **HG1 is shipped, app
-repo `31206dd`: the OS event bus finally has the four things it was missing.** `RobcoEvents` shipped at U7
-with only "add a listener" and "announce an event" — there was no way to REMOVE a listener, no way to say
-"tell me the next time this happens and then forget me," and nothing stopping the same listener being
-added twice and reacting twice to one event. All three now exist (`off`, `once`, dedup), plus `on`/`once`
-handing back an unsubscribe handle so a caller never has to keep the function around. **The substantive
-change is how a crashing listener is handled:** one was already prevented from taking its siblings down,
-but it was silenced _completely_ — a broken reaction just quietly stopped working with nothing to show for
-it. A crash is now REPORTED per-handler, naming the event, while the other listeners still run. Delivery
-also takes a snapshot first, so a listener that adds or removes another mid-delivery can't cause one to be
-skipped or double-fired. **⚠ Honest limit, stated rather than overclaimed:** dedup keys on function
-IDENTITY, so the anonymous arrow handlers every `_wire*EventBusSubscribers()` registers are distinct
-objects and are NOT deduped — and none of them is registered twice today anyway (each wiring function is
-called exactly once from `window.onload`). This is API-level hardening landed deliberately BEFORE 2.9.0's
-OS services widen bus usage, not a fix for a live double-fire. No re-entry guards were bolted onto the six
-wiring functions either: that would be a parallel implementation of dedup (Protocol 22) for a risk with no
-incident on file (Protocol 36b / 49). **PROTOCOL 42 — a real footgun found while building it, fixed and
-locked in the same commit:** `state.js` is evaluated in `vm` sandboxes with **no `console`** (the gate's own
-bus harness), so the obvious way to write that crash report raises a `ReferenceError` _from inside the
-catch_ — turning "a bad listener can never break the emitter" into "a bad listener always breaks the
-emitter" the moment logging was added. The reporter is fully guarded, and both the console-less and
-console-present cases are locked. Locked by **Suite 256** (14 assertions, behavioural against the real
-`state.js`); Suite 135 keeps the original U7/U8 contract and passes unchanged. Full `npm run gate` green
-(3701/3701 plus boot smoke, render check at 360/412, a11y, `test.html` runtime audit, save-survival,
-offline-first). `CACHE_NAME` r18 → r19.
-
-**Earlier — 2026-07-30 (ACT2 BUILT + SHIPPED — the write-side is activated)** — **ACT2 is shipped,
-control repo `7ca220c`: the kernel's two write-side actions are finally CALLED by something.** Rank 2's
-publisher and rank 4's continuation-packet generator had been built, tested and callable since 2026-07-29,
-but nothing ever invoked them — every run was a human at a CLI. A new decision layer
-(`lib/write-side.js`) now sits in the supervisor's 5-minute loop, and it activates the two halves to
-**deliberately different depths**. **Continuation packets are FULLY LIVE:** a packet is a derived local
-JSON file that actuates nothing, so it sits inside the write scope the supervisor always had — every
-packet-worthy job gets one written automatically, and an unchanged job is _not_ rewritten every five
-minutes (a fingerprint read back from the loop's own ledger events decides). **Publishing is SHADOW, OFF
-BY DEFAULT:** readiness is detected, recorded and phone-alerted every run (it is a real thing waiting on
-the owner), but the actuation is gated on `state/auto-publish.json` holding a literal `{"enabled": true}`
-— absent by default, and unreadable/malformed/non-literal-true all fail CLOSED. **The asymmetry is
-recorded as a decision, not a default:** `publishJob()` moves a real remote ref, and giving an unattended
-scheduled task that standing authority is a different class of change from writing a local file — **DG2**
-demanded ten observed clean pushes before it would merely _refuse_ a raw push, and **CPB7**'s kill
-authority is owner-confirmed data-gated; performing pushes earns at least the same care. Flipping the
-switch needs **no code change**, which is what keeps this an activation switch rather than a deferral.
-Locked by test groups **WS** + **WSI**, including an end-to-end proof that a genuinely publish-eligible job
-leaves the remote ref untouched (`ls-remote` ground truth, no publish intent ever recorded), plus an
-out-of-suite red-then-green run showing the switch is the only thing standing between shadow and a real
-push. ⚠ **Deliberately out of scope, said plainly:** the per-job **usage-capture** plumbing CPB1 waits on
-is NOT part of this — capture needs a launcher to capture from, and there is no launcher; building it with
-no producer would be faking a data source. **DORMANT UNTIL FED** — both halves key off jobs, no launcher
-writes a manifest yet, so today both report zero candidates of _zero jobs tracked_. Pushed through the
-wrapper with the real control gate running (CPB6): `gate: PASSED`, origin VERIFIED, clean-push counter
-**18/10**.
-
-**Prior update — 2026-07-30 (CPB7 owner ruling STAMPED + ROADMAP SPINE recorded — doc-only)** — Two
-doc-only folds on the owner's directive, no ID renumbered (Protocol 49). **CPB7:** the session circuit
-breaker's **KILL/RESET authority** (auto-SIGTERM a spiraling session + reset its worktree to the last clean
-SHA) is stamped **OWNER-CONFIRMED to remain DATA-GATED / shadow-only** — explicitly NOT to be built as an
-autonomous killer. The buildable-now half (classify + recovery budgets + alerting, shadow-only) is
-unchanged; the kill/reset authority waits behind the data-gate (same bar as **DG1**) until there's evidence
-it won't false-fire, consistent with the process-kill echo-and-confirm safety rule. **ROADMAP SPINE:** a
-new near-term macro-ordering section records the **iterative + overlapped** sequence — finish/activate the
-control plane → build the museum **as the live workload** that generates real operating data → run the
-**WORKFLOW AUDIT (AUD1)** on that real data with the **MUSEUM AUDIT (P15)** riding along → absorb
-control-plane fixes → continue the museum; cross-references **AUD1**, **PM1**, and the museum program, and
-is owner-adjustable. Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA +
-counter in this pass's report.
-
-**Prior update — 2026-07-30 (multi-model design round FOLDED — GPT-5.6 / Gemini 3.1 / DeepSeek)** — A
-DOC-ONLY synthesis + fold of a three-model design round into the queue; **nothing here is built** — every
-item is recorded as a design. Grounded first against the repo + `planning/control-plane/**` to dedup.
-**EXTENDED (no new IDs):** **CPB5** gains its phased build plan (GPT's Node-native vertical-slice ladder —
-the STATE VOCABULARY + UNIFIED ACTION ENVELOPE foundations, then v0.1 decision-loop / v0.2
-live-work+admission / v0.3 resilience, with release gates; the turtle banner + 3-level notify +
-beautiful-TUI additions reconciled, not superseded); **CP5** gains the concrete off-machine WITNESS design
-(ledger-head anchoring + second-opinion remote-SHA verify, Tailscale, separate Pushover token,
-advisory-only); **CPB1** gains the cap-reset ANCHOR + confirmed-live-data framing (`fh`=session %,
-`sd`=weekly all-models %; Sunday 2:59 PM weekly reset owner-anchor; ~5h rolling session; "proxy" upgraded to
-confirmed server data); **REF5** gains session-activity-awareness (don't alarm while the owning session is
-still live). **NET-NEW:** **CPB7** (session circuit breaker — failure classify + recovery budget, the
-formalized thrashing/reaper extension, kill authority stays DG1-gated); **CPB8** (quick-ack bot —
-typed-proposal-only owner approvals, sole-writer + AI-never-actuates preserved); **P16** (automated
-pre-publish PII/secret scanner — hardens the name-scrub gate from human-only to enforced); **P17** (museum
-PREVIEW tab — owner favorite, curation surface extending CPB5 + the publish pipeline). **DECLINED /
-proposals-only:** Agentic Museum Curator and Trivial Lint Auto-Resolver (both stretch AI-never-actuates /
-name-scrub-is-a-gate). **ALREADY-HAVE (not re-filed):** the USAGE ADMISSION GATE rides CPB2's operating
-modes; the phone cockpit + Tailscale transport is CPB5's existing spec; the sole-ledger-writer /
-proposal-only / name-scrub-mandatory invariants are the standing doctrine block. No ID renumbered
-(Protocol 49). Doc-only; pushed via `npm run push` (the wrapper — raw `git push` refused). SHA + counter in
-this pass's report.
-
-**Prior update — 2026-07-30 (DG2 + CPB6 SHIPPED — push-guard enforcement is LIVE)** — Two items shipped in
-one session on the owner's go. **DG2:** raw-`git push` refusal is now ACTIVE in both the app and control
-repos — a push not routed through the controlled-push wrapper (`npm run push`) is refused by a pre-push hook
-(the guard requires the wrapper's env token AND a live L4 process-ancestor, neither forgeable alone).
-**Break-glass, so the owner is never locked out:** `ROBCO_PUSH_OVERRIDE="<reason>" git push` (allowed AND
-logged to the ledger) or `git push --no-verify` (bypasses all hooks — absolute fallback). The app hook
-`[ -f ]`-guards the sibling guard so a public clone is never blocked, and captures git's pre-push payload
-once to feed both the guard and `gate-scope.js` (a Protocol-42 stdin-multiplex fix). **CPB6 (folded into the
-same session on owner directive):** the control repo now runs its own test suite as the wrapper's gate — a
-control-repo wrapper push RUNS `node test/run-tests.js` before pushing and ABORTS on failure, recording
-`gate.passed`, not `gate.skipped`. So the earlier "DG2 activation does NOT fix CPB6" framing is superseded:
-**both** shipped together — routing enforced (DG2) AND the control gate enforced (CPB6). Live red/green
-verified on both repos; app `dev` `05c450b`, control `main` `f0ed42a`; clean-push counter 14/10. Locked by
-app Suite 255 + control groups PG/PH (PH7) on the CP2/CP3 code path. SHAs + counter in this pass's report.
-
-**Prior update — 2026-07-30 (CPB5 fold — three owner additions, doc-only)** — Folded three owner-approved
-additions (all 2026-07-30) into the existing **CPB5** operator-control-CLI entry, no ID renumbered, nothing
-rebuilt: **(1)** a **locked startup-banner decision** — the `robco` CLI opens on a two-tone sea-turtle banner
-(phosphor-green turtle over a blue waterline), GPT's dependency-free `robco-turtle-banner.mjs` renderer,
-truecolor with `NO_COLOR`/unicode/ascii fallback, chosen over Gemini/Fable/hand-drawn; **(2)** a new
-**notification-control capability** — the CLI manages Pushover delivery with a global on/off plus
-per-alert-type toggles (settings-panel style), human-driven with a ledger event per toggle. **Refined same
-day (2026-07-30):** three mute **levels** — normal / standard mute (criticals still break through) / **total
-blackout** (everything off, including criticals) — with an **auto-unmute** safety net on any level, **default
-2h 30m** (configurable), tracked via the supervisor's 5-minute tick (no always-on timer); **(3)** an explicit
-**first-class aesthetic requirement** — a polished TUI at Claude Code CLI finish level (phosphor theme,
-boxes/tables/color, the banner). **Also corrected the stale DG2 counter line to its live value 10/10 —
-threshold MET** (enforcement AVAILABLE, not auto-activated; still gated behind CPB6). Doc-only pass, pushed
-through the CPB4 doc-only fast path. SHA + the post-push DG2 counter are in this pass's report.
-
-**Prior update — 2026-07-30 (CHECKPOINT — consolidation / state-save pass, no code built)** — **A
-checkpoint fold + reconcile + push-verify-all pass; no code feature was built (ACT2 and the control-repo
-push-gate fix are queued, not built here).** Folded: **(a)** a **token-billing framing refinement to CPB1**
-(owner-approved 2026-07-30) — its budget alert (tokens/$) is scoped as a **token-billing guardrail**: stay
-**quiet while the owner is on his MAX subscription** (spend is against a usage allowance, not dollars) and
-speak up **only when actually on pay-as-you-go tokens** (the rare fallback); the trigger gates on being in a
-token-billing state. Recorded as framing only — CPB1 is not rebuilt. **(b)** CPB5's phone-cockpit entry now
-**explicitly names Tailscale as the private transport** (it was already stated; reinforced so the mechanism
-is unambiguous). **(c)** a **new item CPB6** — the control-repo push-gate gap: the controlled-push wrapper
-records `gate.skipped` for the control repo because it has **no enforced gate hook** (its tests run via a
-manual `node test/run-tests.js`), so control-plane pushes rely on **discipline, not enforcement**; the fix
-(to BUILD later, not now) wires the control repo's test runner into the wrapper or a real pre-push hook so
-those pushes are genuinely gated and record `gate.passed`. Filed near the DG2 / push-gate items. **(d)**
-**ACT2 marked owner-greenlit (2026-07-30) — the next build after this checkpoint.** Also reconciled:
-`planning/control-plane/CONTROL_PLANE_STATUS.md` brought current with shipped reality (CPB4/ACT3/CPB1/CPB2
-shipped; CPB2 LIVE not dormant), and the **DG2 clean-push counter corrected to its live value 8/10 at this
-checkpoint** — _since advanced to **10/10, threshold MET** (2026-07-30, the CPB5-fold push was #10); DG2
-enforcement is now AVAILABLE but NOT auto-activated, still gated behind CPB6 wiring the control-repo gate_
-(the `3/10` snapshots below are the ACT3-dogfood-day value, left in place as dated history). No ID renumbered
-(Protocol 49); doc-only pass. **Verified remote SHAs** and the post-push counter are in this pass's report.
-
-**Prior update — 2026-07-30 (ACT3 BUILT + SHIPPED, dogfooded live)** — **ACT3 is shipped: this
-project's pushes now route through the controlled-push wrapper, and the ≥10-clean-pushes counter that gates
-DG2 is moving.** `npm run push` (app repo `scripts/robco-push.js`) routes a push through the control plane's
-`controlled-push.js` (resolved via `$ROBCO_CONTROL_PUSH` or the `../_RobCo-Control` sibling; degrades to a
-plain `git push` if absent). **CPB4 coexistence — the interaction was resolved, not ignored:** the launcher
-passes `ROBCO_PUSH_DELEGATE_GATE=1`, so the wrapper DELEGATES the gate to this repo's own pre-push hook
-instead of double-running `npm run gate` — the hook stays the one gate authority and CPB4's doc-only fast
-path is preserved (a doc-only push through the wrapper still skips the browser checks). The wrapper adds the
-L4 lock + a push.intent/push.result receipt + `git ls-remote` verification + the clean-push counter on top.
-**Dogfooded end-to-end:** the control-repo commits (`0f452f9`, `e4e5965`) and this app-repo commit
-(`5433648`) were all pushed _through the wrapper_ — the counter read **3/10** afterward (7 to go before DG2
-can be considered). ⚠ **One defect was found and fixed during verification (Protocol 42):** a delegated gate
-runs the FULL Playwright gate inside the pre-push hook, and the wrapper's old flat 120 s push timeout killed
-the first real app-code push mid-gate (`spawnSync git ETIMEDOUT`); fixed to a gate-covering 20 min default
-(`ROBCO_PUSH_TIMEOUT_MS`), locked by control-repo test group **PT**. **Scope held:** ACT3 is routing only —
-raw-push refusal stays **DG2**, and a plain `git push` still works, unrefused. App-repo wiring locked by
-**Suite 254**; control-repo behavior by groups **GD** (delegation) + **PC** (counter) + **PT** (timeout).
-Marked ✅ SHIPPED below; no ID renumbered (Protocol 49). The counter reader lives at
-`_RobCo-Control/code/lib/push-count.js` (`npm run push-count`), derived live from the ledger.
-
-**Prior update — 2026-07-30 (later still — CPB4 BUILT + SHIPPED)** — **CPB4 is now shipped, not just
-filed.** `scripts/gate-scope.js` reads the git pre-push payload and prints `DOCS_ONLY` only when it can
-prove every changed file is a doc (`*.md` / `planning/**`), else `FULL` — fail-closed; the pre-push hook
-then runs the new `gate:docs` mode (lint + format + the Node runner + static checks, NO browser) on a
-doc-only push, and the FULL gate on anything touching app code, a mixed diff, or a renamed/moved/deleted
-code file. Locked by **Suite 253** (static wiring + unit classification + a real-git-repo integration proof
-of all four required cases). Marked ✅ SHIPPED in the READY-TO-BUILD entry and recorded in the SHIPPED
-section; no ID renumbered (Protocol 49). ⓘ **Protocol 2a note:** the owner's dispatch asked to bump
-hardcoded test counts across the docs — but Protocol 2a is RETIRED and no test count is tracked anywhere
-(Suite 28 guards against reintroducing one), so no counts were added; the runner's exit status is the
-signal.
-
-**Prior update — 2026-07-30 (later still — CPB4 filed: doc-only gate fast path)** — **New item CPB4**
-scopes the pre-push gate so a commit whose diff touches ONLY docs (`QUEUE.md`, `QUEUE_LOG.md`,
-`planning/**`, `*.md`, README/CHANGELOG/ARCHITECTURE) auto-skips the Playwright render/boot-smoke +
-app-integrity checks; any diff touching app code still runs the FULL gate unchanged. Filed in the READY
-TO BUILD list right after **CPB3**, ties into the existing gate-scoping precedent from the blind-review
-pass (Protocol 41's `eslint .` → tracked-manifest scoping fix). **Also — this same pass's own reposition
-push (below) was made with the pre-push gate intentionally skipped (`--no-verify`), owner-authorized for
-this one doc-only commit specifically** (`git diff --stat` confirmed QUEUE.md was the only changed file
-before the flag was used) — CPB4 exists precisely so this stops being a manual judgment call. Doc-only,
-no ID renumbered (Protocol 49).
-
-**Prior update — 2026-07-30 (later still — git-bisect/AST inspector repositioned)** — **Owner call: the
-git-bisect runner and the AST inspector (Code-session conveniences, NOT control-plane) no longer sit in
-MCP2's low-priority tool-family tail** — moved to their own short note directly after the **MCP1**
-(`robco-control`) block, right before **MCP2** begins, since both are control-plane-**adjacent** in
-priority even though neither is a control-plane deliverable. Descriptions unchanged; nothing else in the
-MCP1/MCP2 section moved. Doc-only, no ID renumbered (Protocol 49).
-
-**Prior update — 2026-07-30 (later still — MCP1/MCP2 filed, external review synthesis)** — **Two
-independent MCP-review passes (GPT-5.6, Gemini 3.1) converged on the same end-state and are folded in as a
-new section right after RB6: TWO MCP servers, not six.** New family prefix **MCP1-MCP2** (RB1-RB6 / HG1-HG2
-/ CPB / ACT / OD / SP / DG / REF / AUD / PM / P all already spoken for). **MCP1** (`robco-control`) hardens
-**RB4**'s seven-tool contract into a six-op-family shape (`state.snapshot` / `changes.since(cursor)` /
-`events.list` / `event.ack_receipt` / `proposal.validate|submit|status` / `job.result`) and folds
-usage/telemetry in as decision-shaped queries (unblocks **CPB1/CPB2**) rather than building a separate
-telemetry server. **MCP2** (`robco-evidence`, NEW) is a read-only server (`context.resolve` /
-`evidence.search` / `reference.trace`) feeding the museum's Visual Web (**P11/P15**) and a
-dangling-reference audit — deterministic search only, no AI-curated writable graph (explicitly rejects
-Gemini's official `memory`-server route as a second source of truth, per Protocol 51(b)), gated on a
-brutal retrospective acceptance test ("if it's just prettier search, kill it"). **Hard rules landing
-across the whole control plane:** the supervisor stays the sole ledger-writer, proposals stay enumerated
-job-kinds only, name-scrub stays a mandatory gate never an AI-callable tool, Fallout data ships as a
-pinned snapshot never a live wiki query, and **museum MCP is killed as a server** — regen/query/scrub
-route through the CLI gate + MCP2 instead, cross-referencing **P15**. **⚠ Flagged, not yet resolved:**
-Gemini's review leans on a claimed 2026-07-28 MCP spec (MRTR/Tasks/statelessness/MCP-Apps/list-caching SEP
-numbers) that is **unverified on our side** — GPT's architecture, which depends on none of them, is the
-backbone until that's confirmed. Doc-only pass, no control-plane code touched, no ID renumbered
-(Protocol 49).
-
-**Prior update — 2026-07-30 (later still — REF4 + PM1 filed)** — **Two items folded into the just-tidied
-CONTROL-PLANE board, both owner-approved 2026-07-30, neither previously tracked.** **REF4** (new) refines the
-shadow-only thrashing detector against two more false-ish positives seen 2026-07-29/30, distinct from the
-`53a3bb89` case `15c17d0` already fixed: **(i)** a session frozen mid-read with zero activity is
-**POSSIBLY_STALLED**, not thrashing — different state, different wording; **(ii)** the slow-pre-push-gate /
-push-retry pattern (repeated push attempts timing out at the tool level, no file changes between them) must
-**not** be flagged as thrashing — a session mid-push isn't stuck. Stays shadow/alert-only, feeds **DG1**'s
-promotion gate, no kill authority added. **PM1** (new family prefix) is a three-angle post-mortem/retrospective
-of the whole project — plain-language overview, technical/architecture retrospective, lessons-learned —
-sequenced deliberately **right before THE MUSEUM PROGRAM begins** (owner's call: reflect, then build the
-exhibit), and doubles as museum source material for P8's corpus. Doc-only pass, no control-plane code
-touched, no ID renumbered (Protocol 49). Full account →
-[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730b).
-
-**Prior update — 2026-07-30 (later still — CP board consolidated)** — **The sprawling CONTROL-PLANE
-(workflow) section is TIDIED — status, grouping and dedup only, no ID renumbered (Protocol 49).** Marked
-SHIPPED, out of the pending buckets, with SHAs: kernel ranks 1/2/4/5 (`8eab8fd`/`dd49ed4`/`9fd751d`/
-`32c0fbc`), rank 3's backup mirror + restore test now **BUILT AND ACTIVATED** (`e4384e5` build, `78acfd5`
-activation — wired into daily housekeeping, its own scheduled task registered, the Ledger repo already
-receiving mirror commits `d001a38`/`79afc2e`), the idle-session reaper (shadow, `643ebb8`), all nine
-Pushover alerts, the thrashing recalibration (`15c17d0`), the usage-measurement spike, and **REF1** — the
-session-aware uncommitted-work alert — now BUILT (`a1df1b3`). **Deduped:** the activation-checklist's
-CPK/CPB/ACT/OD/SP/DG index is now explicitly a pointer layer over CP1-CP5/RB1-RB6/HG1-HG2 (light cross-refs
-added at CP2's push-wrapper stage → **ACT3/DG2**, and CP3's usage-relay mitigation → **CPB1/CPB2**), not a
-second copy. **Tightened into one execution list:** ready-to-build (**ACT3** wiring the wrapper NEXT, then
-**CPB1/CPB2/HG1/HG2/RB1/RB2/RB3/CPB3**) → activation switches (**ACT1** — its rank-3 half already done via
-`78acfd5` — then **ACT2**) → owner decisions (**OD1** now practically resolved by the shipped daily default,
-**OD2** still open) → spikes (**SP1**, RB4's own MCP-load-check, **RB5**, **RB6**) → data-gated (**DG1-DG5**,
-self-collecting via **REF3**'s auto-verdict). **New tracked item filed: AUD1** — a post-implementation
-multi-model (GPT/Gemini/DeepSeek) audit on coherence/interconnect and frontier questions, explicitly gated
-on the ready batch running live long enough to produce real data, with a "highest-leverage next, not
-maximize features" guardrail recorded per tonight's own over-building talk-downs. **Small museum touch:**
-P15 is now explicitly slotted into P11's build order (P15 part 1 feeds P11 Stage 0; parts 2-3 close out
-around Stage 3). Doc edits + git only, nothing killed, no control-plane code touched. Full account →
-[`QUEUE_LOG.md`](QUEUE_LOG.md#cpconsolidate0730).
-
-**Prior update — 2026-07-30 (later still — RB3 watcher)** — **RB3's mechanism is now specified: a LIVE 24/7
-`fs.watch` watcher, not the supervisor's 5-minute poll.** The moment Dispatch produces substantive assistant
-TEXT that didn't go through the messaging tool, the watcher fires a Pushover within **~1 second** — a
-detector/alarm only, it cannot prevent the leak. **OFF BY DEFAULT** (idle footprint ~0% CPU / ~40MB, but
-only useful while the owner is actively using Dispatch), controlled by trigger words **"watcher on" /
-"watcher off."** ⚠ **[SUPERSEDED 2026-07-31 — the default is now ON/ARMED.** This paragraph is left as dated
-history per the queue's own convention; the reasoning that flipped it, and the REJECTED auto-arm option, are
-in the RB3 entry itself.**]** The existing 5-minute supervisor loop babysits it — a dead watcher process is caught on the
-supervisor's next pass and raises its own incident. Removes the owner's prior manual workaround of
-re-reading working-notes on the Claude website to catch these leaks himself. **Also recorded — a small
-control-plane note, no build needed:** the supervisor's own kill-switch is already wired to trigger words
-too — "supervisor on" / "supervisor off" map onto the existing `state\DISABLE` file (off creates it = instant
-stop, on removes it) — this works TODAY. Doc-only pass, no control-plane code touched. Full account →
-[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730c).
-
-**Prior update — 2026-07-30 (later still)** — **Two more owner-approved additions folded into REF2/REF3 — a
-concrete plan threshold, and a bidirectional auto-verdict with a safety asymmetry.** **REF2** (the reaper's
-safe-lifecycle design) now pins the interactive/Dispatch idle-reap threshold at a concrete **2h30m (150
-minutes)** — explicitly a PLAN value, NOT live; reaping interactive sessions stays shadow-gated until the
-reaper proves itself, nothing auto-kills at 150 minutes today. **REF2 + REF3** together now also require the
-reaper's shadow tracking to watch for **over-aggression**, not only readiness to graduate: a session it would
-have flagged as reapable that later resumes activity is a measured false positive, and a high false-positive
-rate at the current threshold produces its own **"too aggressive → recommend widening to ~X"** verdict,
-Pushovered the same way a graduate-ready verdict is. **⭐ The safety asymmetry this establishes, recorded
-because it generalizes to every data-gated mechanism, not just DG3:** the system MAY auto-apply a
-**loosening** change on its own (widen a threshold, err further toward not acting) since that direction is
-always safe — but **tightening always requires explicit owner approval**, the same bar as any shadow → live
-promotion. Fail-safe direction automatic; risky direction gated. Doc-only pass, no control-plane code
-touched. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730b).
-
-**Prior update — 2026-07-30 (later)** — **Three owner-approved refinements folded into the CP activation
-checklist, plus one small addition to CPB1.** New family prefix **REF1-REF3** (single letters and all prior
-CP-program families now spoken for): **REF1** makes the LIVE **backup-unhealthy** alert session-aware — it
-must not fire on uncommitted work while an active session still owns that tree (files mid-build are
-_supposed_ to be uncommitted), only on uncommitted work that is orphaned or has sat stale past a threshold
-with no active session. **REF2** is a safe-lifecycle-reaping design for **DG3** (the idle reaper's
-shadow→actual-reap promotion): two clean "done" signals (a verified-terminal job contract, or an owner-set
-idle deadline) behind three hard guards (long-idle only; never reap uncommitted work — flag + hold instead;
-snapshot via the **CPK4** continuation packet before any reap), keeping the proven `(pid, procStart)`
-echo-and-confirm kill intact and never batched. **REF3** gives every data-gated promotion (**DG1-DG5**) an
-explicit evidence threshold defined up front, with the **ACT1** daily/weekly housekeeping pass tracking
-progress toward each automatically and Pushovering the owner a ready-computed recommendation the instant a
-threshold is met — the owner's own principle, verbatim: "nothing that needs data collection should require
-me to do it — it should be automatic." **Also folded in — CPB1** now specs including the usage-cap
-reset/window-end timestamp when the usage data carries one verbatim, else computed from the ~5-hour rolling
-session window plus the weekly cycle. All three refinements are OWNER-APPROVED (2026-07-30) but **NOT YET
-BUILT** — this is a doc-only pass, no control-plane code touched, nothing killed. Full account →
-[`QUEUE_LOG.md`](QUEUE_LOG.md#cprefine0730).
-
-**Prior update — 2026-07-30** — **Every owner-gated / activation / to-implement step of the control-plane
-program consolidated into one tracked checklist** — "⭐ CONTROL-PLANE ACTIVATION & OWNER-GATED CHECKLIST",
-filed directly after HG2, above. Fourteen new items across six new family prefixes (**CPK1-CPK5** retroactive
-IDs for the kernel ranks; **CPB1-CPB3** the next build batch — budget alert, usage→operating-modes, the
-"backup-all" script; **ACT1-ACT3** activation switches, including new **ACT3** "wire the controlled-push
-wrapper into the real push path" — owner-approved the same day as the concrete first step toward the
-≥10-real-pushes gate; **OD1-OD2** owner decisions, including the auth-folder secure-backup call filed as its
-own item; **SP1** live-confirming the two documented-contract-only hook alerts; **DG1-DG5** the data-gated
-promotions, unified from scattered mentions across CP2/CONVERGENCE/CONTROL_PLANE_STATUS). Existing IDs
-(RB1-RB6, HG1-HG2, P15) are cross-linked, not renumbered. Read-only reads + doc edits only — no control-plane
-code touched, nothing killed. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpactivation0730).
-
-**Prior update — 2026-07-29 (later still)** — **RB4 and RB5 expanded with GPT's detailed design, and a new
-RB6 filed.** RB4 now specs a full V1 seven-tool contract (`control_get_inbox` / `control_get_job` /
-`control_get_event` / `control_get_health` / `control_ack_event` / `control_submit_intent` /
-`control_get_intent_status`), proposal-only verbs, idempotency, generation checks, and two corrections
-against GPT's original design (the intake dir must resolve via `lib/paths.js`, not a hand-built
-`%LOCALAPPDATA%` path — the MSIX-virtualization trap — and a prerequisite MCP-load spike comes first).
-RB5 now specs the full bounded wake-spike protocol (anchor nonce, 5-minute hands-off window, strict
-4-criteria PASS, seven named failure classifications) and states plainly that even a full pass proves
-only session→Dispatch wake, never the AI-free supervisor→Dispatch wake this program actually needs. **New
-RB6** (near-term, buildable now): a Pushover → Dispatch Android deep-link so the owner's tap on the
-notification opens straight into the conversation — friction reduction on the existing "owner is the
-wake" fallback, not a wake mechanism itself. Full detail →
-[`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md). Also
-this pass: the private control-plane backup repo (rank 3, item below) was renamed from the placeholder
-`RobCo-Control-Backup` to `RobCo-Control-Ledger` — same empty PRIVATE repo, clearer name.
-
-**Prior update — 2026-07-29 (later)** — **Kernel ranks 4 and 5 SHIPPED and pushed**, on top of ranks 1-2
-below: rank 4, the deterministic continuation packet (commit `9fd751d`), and rank 5, incident lifecycle +
-daily housekeeping (commit `32c0fbc`), both in the private `RobCo-Control` repo. **Wiring status verified
-and corrected against the claim this pass started from (Protocol 51 dissent — full account →
-[`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729)):** rank 1 (job contract + reconciler) and rank 5's
-incident-lifecycle module are **already live** in the supervisor's polling loop — confirmed by direct
-`require()`/call-site inspection of `supervisor.js` and by a live Task Scheduler check
-(`RobCo-Control-Supervisor`, State: Ready, last run succeeded minutes before this pass, next run minutes
-after) plus a same-minute ledger write. Rank 2's publisher, rank 4's continuation-packet generator, and
-rank 5's daily-housekeeping pass are built and callable but **not** auto-invoked by anything — no
-scheduled task calls them, so "owner-gated activation" only accurately describes the write-side actions,
-not the detect/alert path, which is already running against real jobs every ~5 minutes. **Five new queue
-items filed — RB1-RB5**, a new family prefix under the CP program, folding in the plan-only Dispatch
-Return Bus design pass
-([`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md)): the
-Dispatch inbox projection (RB1), launch + structured completion receipts (RB2), the mobile-hidden-response
-detector (RB3), the custom control-plane MCP for delivery+ack (RB4), and the bounded `send_message` WAKE
-spike (RB5 — flagged **BLOCKED BY PLATFORM**, no wake mechanism exists today). All five are plan-stage,
-nothing built. Rank 3 is unchanged from the entry directly below — spec'd, blocked on the owner creating
-the private backup repo. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#rb0729).
-
-**Prior update — 2026-07-29** — **Control-plane kernel RANKS 1-2 SHIPPED** in the private `RobCo-Control`
-repo: job contract + reconciler (commit `8eab8fd`) and the transactional exact-SHA verifier/publisher with
-a fail-closed break-glass + fault-injection tests (commit `dd49ed4`). **Five new Pushover alerts** landed
-alongside (commits `f14499d` + `bac032a`), on top of the four already live: "needs your input" and
-"session died/errored" are documented-contract only (their hooks are unverified-live, not wired); ⭐
-**backup-unhealthy** is LIVE and already caught a real problem on a real run; deadline-exceeded (wall-clock
-only) and break-glass-used are both LIVE — all five demoed to the owner's phone. **The thrashing detector
-was recalibrated** (commit `15c17d0`): a "nearby-progress" gate fixed a real false positive (session
-`53a3bb89`); it stays shadow-only, never kills. **The usage-measurement accuracy spike ran**
-([`planning/control-plane/USAGE_MEASUREMENT_SPIKE.md`](planning/control-plane/USAGE_MEASUREMENT_SPIKE.md),
-read-only): per-job cost/tokens ARE measurable, even under concurrency, via OTLP or a headless job's own
-`-p` JSON result — so the deadline/budget alert's budget half is UNBLOCKED for dollar/token budgets, still
-blocked for "% of the weekly cap" (the global usage file carries no session id — structurally
-unobservable, not just imprecise). **Rank 3 (off-machine durability) now has a SPEC, not a build**
-([`planning/control-plane/RANK3_BACKUP_REPO_SPEC.md`](planning/control-plane/RANK3_BACKUP_REPO_SPEC.md)) —
-gated on the owner creating the private backup repo. **A new museum item, P15, is filed:** the museum's
-scope predates the control plane becoming the top program, so P15 is now a precondition on "museum done" —
-fold the control-plane's own arcs into P8's corpus, give the self-maintaining-system thesis a prominent
-room, and confirm P11's Visual Web includes them. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp0729).
-
-**Prior update — 2026-07-28** — **CP2's spec moved to v2.3: S7 ran for real and came back NEGATIVE — Stage
-4b (real unattended push notifications from a headless task) is CLOSED, a platform limit rather than a
-build gap. A one-time Claude scheduled task fired on time while the owner was away, but had no direct
-proactive-notify-to-phone tool and hung on an unattended permission prompt before it could even complete.
-The permanent design is PULL (a live agent + a status-file read at the next check-in), not push. Also
-folded in: a docs-grounded finding that genuine unattended launch autonomy exists at the headless/SDK
-level but not on the Dispatch launch path — tracked, gated on the existing S12-T non-local-transport
-re-verify. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cp2v23); CP2's entry below updated to match. **Also
-recorded:** the owner re-confirmed 2026-07-28 that the museum finishes BEFORE 2.9.0 starts — the execution
-order already had it that way; the re-confirmation now carries its own date (Protocol 50 a-date).
-
-**Prior update — 2026-07-28 (late) — ⭐ THREE-MODEL CONTROL-PLANE REVIEW CONVERGED (Gemini + DeepSeek + GPT).**
-Analysis only; **nothing built or approved from it** (owner: "fold into queue until you've analyzed all 3;
-don't run anything"). Full converged reading → [`planning/control-plane/reviews/CONVERGENCE_2026-07-28.md`](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md).
-Headline: we built a strong **flight recorder** (OBSERVE) and a weak **actuator** — several planned/built items
-turn weak inference into destructive action. The reframe replaces CP2's stage order as the _working_ plan with a
-**trusted-action-kernel** build order: **(1) job contract + reconciler → (2) transactional exact-SHA
-verifier/publisher + fault-injection tests → (3) recovery inventory + off-machine durability + restore test →
-(4) deterministic continuation packet → (5) incident lifecycle + daily housekeeping.** **De-prioritized /
-narrowed:** the generic idle reaper (BUILT tonight, `643ebb8`) → re-scope to _verified-terminal_ job cleanup, not
-idle-inference; thrashing → **alert-only, never graduate to kill** (kill only on an owner-approved envelope);
-headless-AI-for-sync/reap/tests → **CUT** (deterministic, run directly); auto-restart → decouple from repo sync;
-`--no-verify` tripwire → low-leverage telemetry only; usage 50/80/85/90/95 → **operating modes ✅ APPROVED
-(owner, 2026-07-28)** — Normal / Conserve / Reserve-for-owner / Stop-unattended-AI, notify only on a mode change,
-exact % stays in `status.json`; worktrees → defer, prefer a per-repo mutating **lease** first. **Doctrine tweak:**
-fail-open/shadow-first is not universal — keep the _owner's_ path always available (break-glass) but let
-_automation's_ safety-critical paths fail **closed**; simplicity = 4–5 executable invariants, not a pile of
-detectors. **Before any build:** verify which Gemini-cited mechanisms (`PROCESS_WRAPPER`, native OTLP, Channels,
-`SessionEnd`, native worktree/timeouts) actually exist on the installed CLI build. **⭐ SEQUENCING (owner,
-2026-07-28): this whole trusted-action-kernel program runs BEFORE the museum and before 2.9.0.** **Separate trust domain for unattended
-jobs → folded as DEFERRED, laptop-leaning (owner, 2026-07-28).** Not scheduled; the kernel needs no separate trust
-domain (the exact-SHA publisher + credential separation + restore-proof carry the safety). Revisit once unattended
-autonomy is in regular use; when built, the **spare laptop** is preferred over a separate Windows account — a real
-machine boundary that also doubles as the rank-3 off-machine durability. Aligns with **CP5** (laptop-witness) and
-the earlier software-fixes-first deferral of the spare laptop. **Reconciled into the CP1-CP5 entries below in
-this same-day pass** — see the new overlay directly under the program header (**"⭐ The CP program's BUILD
-ORDER — CURRENT"**), CP2's superseded-order note, CP1's narrowed-termination addendum, and CP5's
-deferred-trust-domain addendum. Full account → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpkernel0728).
-
-**Prior update — 2026-07-27** — **⭐ THE BIG REORGANIZATION: the WORKFLOW / CONTROL-PLANE program is now the
-top priority (owner's explicit call), and the museum sits directly under it.** A long work session produced
-more than the queue could hold, so this pass folds all of it in and re-orders the board. **New at the top —
-a whole new program (CP1-CP5):** the empirical spike campaign that must prove or kill hook-based containment
-before anything is built, the staged build gated on it, an immediate-mitigations track that needs no control
-layer at all, the broader sync audit, and the laptop-witness inventory. **⚠ Everything in that program is
-PROPOSED / PLANNED / gated — nothing of it is built or operating; it is written that way deliberately.**
-**The museum moved up** out of the 2.8.5 tail into its own top-level section, gaining five new items:
-**P10** (⭐ drop the hardcoded 10-stop tab bar and redo the nav — the "no 11th slot" constraint is VOID),
-**P11** (the Visual Web build on P8's structure), **P12** (the Article Room), **P13** (⚠ a SECURITY scan-list
-gap P8 found) and **P14** (the live museum is stale — the republish). **Shipped this session and moved to the
-log:** **V** (the archive-sync repair — a silent-push-failure fixed), **W** (archive/museum organization
-fixes), **X** (the Exhibit folder relocated into `!RobCo`) and **P8**'s completed account. **A3/A4 stay in
-this file on purpose** — a test fixture pins them here; the reason is recorded in the shipped list below.
-**Two owner wrap-up asks are now tracked:** **Y** (the memory-for-the-story reconciliation) and
-**Z** (the evidence-grounded workflow explanation). The ordering overlay below is rewritten to match.
-
-**Prior update — 2026-07-27** — **Item L's private view is now owner-confirmed.** The owner opened the
-generated `queue-view/queue-view.html` on his own phone and confirmed it reads right ("it looks good",
-2026-07-27) — the sign-off L's private half was waiting on (Dispatch's own 360px verification had already
-passed). L's private-view account moved to [QUEUE_LOG.md#l](QUEUE_LOG.md#l); L stays open, narrowed to only
-the still-deferred player-facing public view (post-P2).
-
-**Prior update — 2026-07-27** — **Item U — the generate-vs-hand-maintain audit — CLOSED, all four batches
-shipped.** Batch 4 (the closing batch) landed the audit's remaining low-priority tail — File Map
-reverse-completeness (Suite 252.1, which immediately found and fixed real drift: about a dozen
-undocumented scripts/tests plus the vendored OCR bundle), CHANGELOG category-heading ordering (252.2),
-README's css-file count (252.3), and README's version-vs-CHANGELOG check (252.4) — plus the one candidate
-left as an owner judgment call: README's third hand-copy of the script load-order list is now **deleted**
-in favour of a pointer at `rules/file-layout.md`'s guarded original (owner chose the audit's own
-recommendation over adding a third check). Batch 3 (Protocol 53, `library/CODE_MAP.md`'s three generated
-sections) had also landed but was never written up here at the time — folded in retroactively. Every
-actionable GENERATE candidate from the audit is now shipped; full account moved to
-[QUEUE_LOG.md#u](QUEUE_LOG.md#u).
-
-**Prior update — 2026-07-27** — **D is DONE — the TEST_CATALOG generator (Protocol 47).**
-`library/TEST_CATALOG.md` is now GENERATED from `tests/robco-diagnostics.js`'s own suite headers
-(`scripts/generate-test-catalog.js`, `npm run test-catalog` / `test-catalog:check`), never hand-typed —
-the gitignored-`library/` gate-diff tension resolved the same way Protocol 46 resolved it for
-`library/MANIFEST.txt` (absent → pass, present-and-stale → fail). Wired into `scripts/gate.js` on both
-`gate:fast` and `gate`; Suite 247 proves the real extraction end-to-end. The Atlas (item I) reuses this
-plumbing directly. Full account in [QUEUE_LOG.md#d](QUEUE_LOG.md#d).
-
-**Prior update — 2026-07-26** — **A4 is DONE — the real-Firebase-emulator round-trip is built and
-red-then-green PROVEN.** With the JDK blocker cleared (2026-07-23) and `firebase-tools` committed as a
-dev-only dependency, A4 upgrades A3's modeled cloud-serialization guard from _modelled_ to _verified_:
-`scripts/emulator-round-trip-check.js` (`npm run test:emulator`) runs the real Firebase client SDK against
-the local Firestore + Auth emulator, self-derives the save payload from the live `state` literal (reusing
-A3's extractor, Protocol 22), writes it via the real additive `addDoc()` path, reads it back, and asserts
-field-level fidelity. **Red-then-green proven against the real emulator, both directions:** a clean payload
-round-trips every field equal; a planted directly-nested array and a planted `undefined` field each
-correctly make the write fail. **A genuine finding, not just a confidence upgrade:** the real emulator
-showed A3's model was wrong about the mechanism — an `undefined` field does not get silently stripped by
-Firestore, it makes the **whole write throw** (the Web SDK rejects it client-side by default, since
-`cloud.js` never sets `ignoreUndefinedProperties`) — safer than modeled, but the modeled guard's comments
-said otherwise, so they're corrected in the same pass. Standalone only (`npm run test:emulator`), **not**
-wired into `scripts/gate.js` — needs a JDK + firebase-tools that the normal gate/CI can't assume, and A4 was
-never a release blocker (owner decision 2026-07-21, unchanged). Full account in **A4** below; A3's record
-also updated to point at it.
-
-**Prior update — 2026-07-22** — **2.8.5 "Foundations & Fidelity" is SHIPPED to production.** The
-`dev → main` release merge was performed with `--no-ff` (a fast-forward makes the tip shared with `dev`,
-which makes GitHub Pages reject the production deploy — recorded lesson), the release workflow
-auto-created the `v2.8.5` tag on CI-green `main` and deployed to GitHub Pages. `APP_VERSION` 2.8.0→2.8.5,
-cache `robco-terminal-v2.8.5-r1`, the `[Unreleased]` block consolidated into a dated `## [v2.8.5]` block
-with a fresh empty `[Unreleased]` opened, and ARCHITECTURE/README brought current. **No tag was pushed by
-hand** — pushing one would make `release.yml` see the tag already exists and skip the deploy. Owed to the
-owner: the real-device installed-PWA update check (Android). Owed to Dispatch: the post-release ritual
-(archive sync + museum regeneration).
-
-**Also 2026-07-22 — a Protocol 50 recording pass (no build, recording only):** six owner-approved decisions
-folded into their existing items — **P4** bug records move to **find-time** (OPEN → IN-FLIGHT → SEALED; an
-editable issues-board explicitly declined); **P** gains the museum-wide **curation law** (capture everything,
-exhibit a curated subset) and its ONE exemption, the **Visual Web "Magnum Opus"** (complete-but-navigable);
-**P2** gains three verified **intent-vs-reality publication blockers** + the serve-and-look audit lesson;
-**R5** gains the reinforced **branch-protection** candidate (PRs rejected); and a new item **Q** records the
-**planning-folder hygiene** standing rule + the owed cleanup task.
-
-**Prior update — 2026-07-21:** an **A3 build attempt** that hit a feasibility wall and surfaced a premise
-correction; built nothing, recorded both in **A3** in place (Protocol 50). **(1)** The Firebase emulator
-**cannot run here** — the Firestore/Auth emulators are Java processes and there is **no JVM** on the
-machine (`java` absent, `JAVA_HOME` unset, no JDK/JRE/JBR anywhere, `firebase-tools` not installed), so the
-emulator-backed round-trip could not be run or verified, and A3's own red-then-green Hard rule forbids
-shipping a cloud-safety test green-but-unrun. **Unblock:** owner installs a **JDK/JRE 11+** (a system
-install, not a dev npm dep) then `npm i -D firebase-tools` (dev-only, never precached). **(2) Premise
-correction:** the "field added to `state` but missed in the cloud **sync mapping**" failure A3 was written
-to catch **does not exist in the current code** — `cloud.js` stores the whole `robco_v8` container
-wholesale, and the load path (`sanitizeImportedContainer` + `migrateState`) passes unknown fields through,
-so a new plain field round-trips losslessly; the only residual silent-drop is the **Firestore
-serialization boundary** (undefined-strip / nested-array-reject / doc-size), exactly what needs the real
-emulator. A non-emulator round-trip substitute would pass for any field and catch nothing, so none was
-shipped. **Owner decision (same day): build the modeled guard NOW, no JDK — and A3 is CLEARED as a release
-blocker.** Shipped `scripts/cloud-serialization-check.js` (`npm run cloud-check`): self-derives the field
-set from the real `state` literal, flags Firestore-hostile values (`undefined` / nested arrays / oversize),
-red-then-green proven on the real literal (caught both a planted `[[1,2]]` and an `undefined`), with
-a built-in positive control and NO silent-skip path; now WIRED INTO THE GATE (step 4b, fast+full) later the
-same day per the owner's "wire it" — see A3. The premise correction (state stored WHOLESALE +
-pass-through loads → a forgotten field-mapping **cannot** silently drop data) drops the true emulator test
-from release-blocker to the **optional post-2.8.5 item A4** (needs a JDK/JRE 11+ + dev-only
-`firebase-tools`). **A3 was the last thing gating 2.8.5; it is now resolved — nothing data-safety blocks the
-ship.** Cache bumped r55→r56 (the precached `CHANGELOG.md` changed); no `APP_VERSION` bump (Under-the-Hood,
-not user-visible). Earlier passes — the QUEUE.md header-mangle fix,
-the seven- and six-decision recording passes, the cross-cutting **EXECUTION SEQUENCE** — are in the
-running history chain in
-[`QUEUE_LOG.md`](QUEUE_LOG.md#update-history--the-running-last-updated-chain).
+**⏬ Older header chain — 2026-07-30 and earlier — lives in the LOG.** On 2026-08-01 this running
+"Prior update" chain had grown to ~870 lines sitting **above** "Where we are right now", so a phone reader
+scrolled past the entire history of the project to reach the queue. Everything dated 2026-07-30 or earlier
+was moved **verbatim** to
+[`QUEUE_LOG.md` → Appendix II](QUEUE_LOG.md#appendix2)
+— nothing rewritten, summarised or dropped. This file keeps the 2026-07-31 round onward.
 
 ---
 
 ## Where we are right now (the real 5-second version)
 
+- **⭐⏭️ WHAT TO DO NEXT — see [⭐ OWNER-GREENLIT — READY TO BUILD](#greenlit), just below.** Four owner-greenlit
+  items in build order: **CP5** the off-machine witness → **CPB2**'s 95/80-94 threshold refinement →
+  **close SP2** (`ultrathink` answered) → **retire the DG2 counter metric**. Consolidated 2026-08-01 because
+  the answer to "what has the owner actually said go on?" was previously spread across four sections.
 - **▶ STATUS — DEVELOPMENT IS ACTIVE AGAIN (2026-07-27).** The pause held for two days, not the expected
   multi-week gap: the owner bought a one-month Pro stint on 2026-07-25 and is **back on Max 5x as of
   2026-07-27**, so the budget scrimping that shaped 2026-07-26/27 no longer applies. **This supersedes the
@@ -917,8 +386,9 @@ running history chain in
   this reconcile): the **durable job ledger** and reconciler (CPK1), the **transactional verifier/publisher**
   (CPK2), **off-machine backup and restore test** (CPK3), **continuation packets** (CPK4), **incident
   lifecycle and daily housekeeping** (CPK5); the **controlled-push wrapper** routing every push (ACT3) with
-  **raw-push refusal ACTIVE in both repos** (DG2, counter **44/10**) and the control repo's own pushes
-  genuinely gated (CPB6); the **budget alert** (CPB1, dormant until fed) and **usage→operating-modes** (CPB2,
+  **raw-push refusal ACTIVE in both repos** (DG2 — its clean-push counter is no longer quoted here; read it
+  live with `npm run push-count`, see the retirement note in the greenlit section) and the control repo's own
+  pushes genuinely gated (CPB6); the **budget alert** (CPB1, dormant until fed) and **usage→operating-modes** (CPB2,
   **live**); the **operator control CLI** (CPB5 v0.1); the **provenance spine** (WB1 v0.1) and the
   **tamper-evident hash chain** (WB6 v0.1, observed writing at seq 1820); the **pre-publish PII gate**, built
   and **mounted**
@@ -926,14 +396,21 @@ running history chain in
   (platform-locked), the **return bus / MCP channel** (RB1-RB4, MCP1-MCP2), the **headless launcher** (CPB9,
   no owner go), CPB5 **v0.2/v0.3**, and CPB7/CPB8. CP1's spike campaign did its job — it proved rather than
   killed the approach, and the build followed.
-- **⚠ LIVE USAGE STATE AT THIS RECONCILE (2026-07-31, read from the ledger, not assumed): weekly `sd` = 91%,
-  session `fh` = 81%, and the machine has been sitting in `Stop-unattended-AI` mode all afternoon** (153
-  `usage.mode` events today, the last six consecutive all `Stop-unattended-AI`). Under the **shipped**
-  thresholds `>= 90` is Stop; under **CPB2's owner-approved-but-UNBUILT refinement** (Stop moves to 95,
-  Reserve-for-owner widens to 80-94) today would instead read **Reserve-for-owner**. ⭐ **So that refinement
-  is no longer theoretical — it is being exercised right now**, and the gap between the shipped default and
-  the approved one is currently deciding whether unattended work may start at all. Recorded as live evidence,
-  dated; it is an argument for building the refinement, not a licence to assume it.
+- **⚠ LIVE USAGE STATE — re-read 2026-08-01T04:39Z from `status.json`, not assumed: weekly `sd` = 100%,
+  session `fh` = 9%, mode `Stop-unattended-AI` driven by `sd`.** The weekly cap is **exhausted**; the session
+  window has rolled over and is nearly empty, which is why the two numbers point opposite ways. The mode is
+  correct and is doing its job.
+  ⚠ **A CORRECTION TO THIS BULLET'S OWN PRIOR ARGUMENT, kept rather than quietly overwritten (Protocol 50
+  a-date).** On 2026-07-31 this bullet read _"weekly 91% / session 81% … under CPB2's approved-but-unbuilt
+  refinement today would instead read **Reserve-for-owner** … the refinement is being exercised right now."_
+  **That argument has expired.** At `sd` = 100 the refinement changes nothing — 100 is above the proposed 95
+  just as it is above the shipped 90 — so the shipped default and the approved one now agree, and the
+  "it would unblock work this minute" claim is simply no longer true. ⭐ **What does NOT change: the
+  refinement stays owner-approved and stays FIRST in the greenlit build order.** Only the live-evidence
+  argument for it evaporated, not the decision. Recorded this way on purpose: a queue that lets a flattering
+  argument outlive its evidence is how a stale-positive is born, and this one had a 24-hour half-life.
+  **The durable version of the point stands:** the band between 90 and 95 is where the shipped default and
+  the owner's call genuinely differ, and the machine passes through it every week.
 - **2.8.0 "The Physical Machine" is SHIPPED and live on production.** The whole New Vegas hardware
   overhaul, offline native calculators, Diagnostic Shell, ambient runtime — all live.
 - **2.8.5 "Foundations & Fidelity" is SHIPPED and live on production (2026-07-22).** The code+test-health
@@ -1033,6 +510,168 @@ unchanged.
 
 ---
 
+<a id="greenlit"></a>
+
+# ⭐ OWNER-GREENLIT — READY TO BUILD (consolidated 2026-08-01, in build order)
+
+**This is the answer to "what do I actually do next."** Four items, owner-greenlit, in the order the owner set
+them. They were previously scattered across four different sections of this file — CP5 near the top, CPB2's
+refinement buried inside a shipped item's entry, SP2 down in SPIKES, the DG2 counter in three places at once —
+so "what has the owner actually said go on?" could not be answered without reading the whole document. It can
+now be answered by reading this section.
+
+**⛔ What this section is NOT.** It does **not** renumber, re-file or duplicate anything (Protocol 49) — each
+item's full entry stays exactly where it is and remains its one home; these are pointers with the decision and
+the order attached. It contains **only** work with an owner go on file. Nothing was promoted into it to make it
+look fuller:
+
+- **The still-PARKED programs stay parked, untouched** — Fallout 4 / 3.0, WASTELAND UPLINK, the 2.9.0 gameplay
+  and OS-services round, the museum tail, item T's autonomous triggers, and everything else in the lower bands.
+  None of these is greenlit and none moved.
+- **The two PROPOSED sets stay `[DECISION]`-pending and were deliberately NOT promoted** — the **HARNESS AUDIT
+  (HA1-HA5)** block and the **`BR` multi-AI brainstorm** block, including Round 3. A proposal being written
+  down is what Protocol 50 requires of it; it is explicitly not what approval looks like.
+
+**Ordering note (Protocol 50 a-date).** The CP program's build-order overlay above carries a **derived** order
+offered for confirmation on 2026-07-31, which ranked CPB2's refinement first. **The owner's own greenlit order
+supersedes it for these four items** and is recorded here with its own date. The derived order's remaining
+ranks (RB1 → CPB5 v0.2 → RB3 → CPB3 → RB2/channel → museum tail) are unaffected and pick up after this batch.
+
+---
+
+### ⭐ G1. CP5 — the off-machine WITNESS framework _(full entry: **CP5**, in the CP program below)_
+
+**What is greenlit:** the witness **framework** — the concrete design already folded into CP5 on 2026-07-30 and
+recorded there as "the 'begin as a witness' recommendation made CONCRETE, NOT a new item." A tiny zero-cost
+agent on a **separate device**, reachable over **Tailscale**, reading only the read-only evidence surface and
+the **public git remote** — never the control repo, never the ledger writer. Two checks, both **pure advisory
+alarms that never write the ledger and never act**: **ledger-head anchoring** (offset from the supervisor's
+own tick, so the two cannot fail together) and a **second-opinion remote-SHA verify** against the push receipt.
+Its own **separate Pushover token**, so a witness alarm can never be mistaken for a supervisor alarm.
+
+**Why it is first, and it is not arbitrary.** This is the direct answer to the failure that started the entire
+control-plane arc — **nobody was watching** — and it is the only item in the batch that adds a genuinely
+independent observer rather than another thing the same machine says about itself. A witness can be wrong
+without breaking anything, which is what makes it cheap to start with; promotion from witness to **controller**
+stays a later, separately-argued decision and is **not** greenlit by this.
+
+**⚠ CP5 carries a precondition the build must not skip:** the laptop **inventory** and the **archive-clone
+privacy call** (⛔ the private archive's git history retains `memory/` — cloning it onto a second device is a
+privacy decision, not a convenience one). The witness design does not require the archive, so the honest
+sequence is inventory → topology decision → witness, and the privacy call must be **made explicitly and
+recorded with its date**, per CP5's own "Done means".
+
+**⭐ A convergence worth knowing before this is built (recorded, not a scope change).** Round 3's cut audit —
+folded below as PROPOSED, not approved — independently landed on the rule _"no component may be the sole
+detector for its own non-execution,"_ and named the 3am daily job as the live instance: it is healthy-silent by
+design, so a **dead** job and a **healthy** job look identical from inside the machine. An external observer is
+the only thing that can tell those apart, and CP5's witness is the natural place such an observer would live.
+⛔ **This does not add an external-deadline observer to CP5's greenlit scope** — that is a BR proposal awaiting
+an owner call. It is flagged so that whoever builds the witness knows a second, larger job may want to ride on
+the same framework, and does not design it shut.
+
+---
+
+### ⭐ G2. CPB2 refinement — Stop-unattended-AI moves to 95, Reserve-for-owner widens to 80-94 _(full entry: under **CPB2** in READY TO BUILD)_
+
+**What is greenlit:** change the shipped default band map from `>= 90 → Stop-unattended-AI` to
+`>= 95 → Stop-unattended-AI`, widening `Reserve-for-owner` to **80-94**. The other two bands are unchanged
+(`< 50` Normal, `50-79` Conserve). **Verified this pass, not assumed:** `lib/usage-mode.js`'s
+`DEFAULT_MODE_THRESHOLDS` really is `90 / 80 / 50 / 0` today.
+
+**Why:** 90 halts unattended work while a genuinely useful slice of the cap is still on the table, and the last
+stretch is exactly where the owner wants room for his own final changes — which `Reserve-for-owner` already
+means. 95 makes **Stop** the true last resort instead of a second, earlier reserve band.
+
+**⚠ Two things that must not drift with it** (unchanged from the full entry): the four-mode **coarsening**
+stands — this moves one boundary and does **not** bring back the five per-threshold phone alerts CPB2 retired;
+and the exact readings are not lost, because they stay in `status.json` and in the untouched `usage.crossing` /
+`usage.level` ledger events.
+
+**⚠ Honest note on the live evidence, corrected 2026-08-01.** The 2026-07-31 argument for building this
+_right now_ was that the machine was sitting at 91% weekly, a band the refinement would reclassify. **That
+specific argument has expired** — the live reading is now `sd` **100%**, where the shipped default and the
+approved refinement agree and neither would admit unattended work. **The decision is unaffected** (it is
+owner-approved on its merits), and the durable form of the argument stands: the 90-95 band is where the shipped
+default and the owner's call genuinely differ, and the machine passes through it every week. Recorded this way
+because an expired argument left standing is how the next stale-positive gets born.
+
+**Also worth knowing, unchanged:** the bands are **already owner-tunable live** via the `modeThresholds` key in
+the usage-thresholds config — so the owner can move the boundary today without waiting for this. Changing the
+shipped **default** is the recorded build task.
+
+---
+
+### ⭐ G3. CLOSE SP2 — the `ultrathink` half is ANSWERED _(full entry: **SP2**, in SPIKES)_
+
+**SP2's second mechanism came back, and the answer is: `ultrathink` is a PER-TURN REASONING REMINDER, not an
+effort-tier change. The two are different mechanisms and must never be treated as substitutes.** With this,
+**both** of SP2's mechanisms are answered and **SP2 CLOSES**.
+
+**The evidence, and its epistemic strength — stated precisely, because SP2's whole design was about not
+rounding an answer up.** This is **VERIFIED**, at the same strength as the `/effort` half and by the same kind
+of witness: **the harness itself**, not a session's account of itself.
+
+- **`/effort max`** produced a **system state-change report** naming the level **and its scope**:
+  `Set effort level to max (this session only)`. Scope: **the session**.
+- **`ultrathink`** produced a **system note scoped to the turn**: _"The user included the keyword 'ultrathink',
+  requesting deeper reasoning on **this turn**."_ Scope: **the turn**. No level is named, no state is changed,
+  and nothing persists past the turn.
+
+**Two different scopes, two different mechanisms, observed first-hand in the same session** — which is the
+clean A/B control arm SP2 said it would need if this half came back negative. It did not come back negative,
+exactly: it came back **"real, but a different thing than the question assumed."**
+
+**What this means for CPB9 — the reason this closure is a build input and not trivia.** A launcher must **never
+use `ultrathink` as a tier mechanism.** It sets no tier, so there is nothing to record and nothing to verify —
+a launcher that used it would satisfy CPB9's verify-the-applied-tier requirement with **`UNOBSERVABLE`
+forever**, while looking like it had done something. **The two-message `/effort` pattern remains the only
+confirmed way to set a tier**, and its ⛔ never-inline rule and ⭐ wait-for-idle sequencing rule are unchanged.
+`ultrathink` stays useful for what it actually is — a per-turn nudge on a session already running — and that is
+all it may be recorded as.
+
+**Consistency check against a standing decision (no conflict):** the harness-audit block's **E3** already says
+do not adopt `ultracode` as a **default tier**. That is about a tier on the `/effort` ladder and is untouched
+by this; `ultrathink` is not on that ladder at all. Two different things that read similarly — noted so a
+future session does not collapse them.
+
+**Done means:** SP2's status moves from 🔄 HALF-ANSWERED to ✅ **CLOSED**, with both mechanisms answered and
+their divergent scopes recorded. Nothing is built by this closure.
+
+---
+
+### ⭐ G4. RETIRE the "DG2 X/10" headline metric _(Protocol 49 retirement, in place)_
+
+**Retired 2026-08-01.** The clean-push counter is **no longer quoted as a value anywhere in this file.** Read it
+live: **`npm run push-count`** in the control repo, derived from the ledger.
+
+**Why it earns retirement — the risk it covered no longer exists.** The counter existed for exactly one job: to
+be DG2's **data gate**, the ≥10 observed clean wrapper pushes that had to accumulate before raw-push refusal
+could be switched on. **That threshold was MET on 2026-07-30 and DG2 shipped and is ACTIVE.** Since then the
+number has gated nothing — it is pure telemetry that happens to be printed in prose.
+
+**And it was actively rotting, which is the argument that settles it.** A written counter is a number that must
+be hand-copied to stay true, and it did not stay true: it was written `3/10`, then `8/10`, then `10/10`, then
+`11/10`, then `44/10`, and **this pass found it at `49/10` one day after `44` was written.** Two consecutive
+reconciles have now spent effort chasing a figure that decides nothing. **That is precisely the failure mode
+Protocol 2a was retired for** — a number repeated across files, hand-synced, teaching no engineering fact — and
+the same reasoning applies here.
+
+**Enforcement removed in the same change** (Protocol 49 requires it, not just the prose): the three quoted
+values are gone — from the "Where we are right now" roll-up, from the ACT3 entry, and from the SHIPPED DG2
+line — each replaced by a pointer to the live reader. **The reader itself is deliberately KEPT.**
+`lib/push-count.js` / `npm run push-count` is a live derivation off the ledger, costs nothing, and is not what
+rotted; what rotted was transcribing its output into a document.
+
+**What coverage is genuinely lost, said plainly rather than pretending the removal is free.** A reader skimming
+this file could previously see at a glance that the wrapper was still being used and still clean — a weak but
+real "is the plumbing alive?" signal. That is gone from the prose. **Mitigation:** it is one command
+(`npm run push-count`), and CPB5's Work view already surfaces push state with its epistemic marking, which is
+strictly better than a stale integer. **The DG2 ID, entry and history are untouched** — nothing is renumbered
+and the number is not reused (Protocol 49); only the practice of quoting a live counter in prose is retired.
+
+---
+
 ## The execution SEQUENCE of the 2.8.5 round (decided 2026-07-21 — the owner asked Dispatch to sequence, then approved: "go with recs"; steps 1-3 are now DONE, kept for its reasoning)
 
 **This is a cross-cutting ORDER laid over the readiness groups below — it does NOT re-file anything.** Each
@@ -1097,11 +736,38 @@ generator) — **D shipped 2026-07-27** (Protocol 47), so that dependency is now
 
 # ⭐ TOP PRIORITY — the WORKFLOW / CONTROL-PLANE program (CP1-CP5, new 2026-07-27)
 
-> **⛔ READ THIS BEFORE ANY LINE BELOW. NOTHING IN THIS PROGRAM IS BUILT.** Every mechanism named here —
-> hooks, leases, ledgers, wrappers, notifications, termination, worktree routing — is **PROPOSED or PLANNED**,
-> and the load-bearing ones are **gated on CP1's spikes actually firing them**. A future session must not read
-> this section as a description of something that operates. It is a design under test. Where a claim has been
-> mechanism-supported but never executed, it says so.
+> **⛔ CORRECTED 2026-08-01 — THIS BANNER USED TO SAY "NOTHING IN THIS PROGRAM IS BUILT". IT WAS THE MOST
+> MISLEADING SENTENCE IN THIS FILE AND IT IS RETIRED IN PLACE.**
+>
+> The original text read: _"Every mechanism named here — hooks, leases, ledgers, wrappers, notifications,
+> termination, worktree routing — is **PROPOSED or PLANNED** … A future session must not read this section as
+> a description of something that operates. It is a design under test."_ **That was true when written
+> (2026-07-27) and has been false since roughly 2026-07-29.** The ledger holds **78,627 records** across six
+> day-files and is written every five minutes; the controlled-push wrapper routes **every** push in both
+> repos; seven Pushover alerts are live; two scheduled tasks run unattended. The **identical** claim was
+> corrected one section above on 2026-07-31 ("Where we are right now") and **this copy was missed** — which
+> is precisely why a reconcile must sweep the file rather than fix the line someone happened to notice. It is
+> corrected here rather than deleted because the banner's _caution_ was right and is worth keeping.
+>
+> **✅ WHAT IS BUILT AND OPERATING** (each verified this pass against git + the live machine): the durable
+> **job ledger + reconciler** (CPK1 `8eab8fd`), the **transactional exact-SHA publisher** (CPK2 `dd49ed4`),
+> **off-machine backup + restore test** (CPK3 `e4384e5`/`78acfd5`), **continuation packets** (CPK4 `9fd751d`),
+> **incident lifecycle + daily housekeeping** (CPK5 `32c0fbc`), the **write-side activation** (ACT2 `7ca220c`),
+> the **push wrapper** (ACT3) with **raw-push refusal ON** (DG2) and the control gate enforced (CPB6), the
+> **operator CLI** (CPB5 v0.1 `ff11244`), the **provenance spine** (WB1 v0.1 `d36ad1d`), the **tamper-evident
+> hash chain** (WB6 v0.1 `79e8fea`), the **pre-publish PII gate** built and mounted (P16 `0917d20` +
+> `b90304fb`), plus ND1, REF1 and REF5's three legs.
+>
+> **⛔ WHAT IS STILL GENUINELY UNBUILT, and the caution still applies to all of it:** **WAKE**
+> (platform-locked — nothing to build), the **return bus / MCP channel** (RB1-RB4, MCP1-MCP2), the **headless
+> launcher** (CPB9 — no owner go), **CPB5 v0.2/v0.3**, **CPB7**, **CPB8**, and every **DG** promotion still
+> shadow-only. **Leases, containment hooks, verified termination and worktree routing specifically remain
+> PROPOSED** — those were the load-bearing gated items and none of them shipped, so read CP2's stage 3/5/6
+> text below exactly as sceptically as the original banner demanded.
+>
+> **CP1's spikes did their job: they proved rather than killed the approach, and the build followed.** Where a
+> claim below is mechanism-supported but never executed, it still says so — that convention is unchanged and
+> is the part of this banner worth preserving.
 
 **Where this came from — the arc, recorded because it IS the story (2026-07-27).** Over one heavy work day
 the phone-facing orchestrator (Dispatch) kept hitting its own control-plane limits, and instead of papering
@@ -1154,6 +820,15 @@ full account of this reconciliation pass → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpker
 > load-bearing argument in this file. **The trusted-action-kernel thesis was correct and the kernel is
 > built** — so what follows is the ORDER FOR WHAT REMAINS.
 >
+> **⛔ SUPERSEDED IN PART, 2026-08-01 (Protocol 50 a-date).** The order below was **derived and offered for
+> confirmation** on 2026-07-31. The owner has since greenlit a specific batch in a specific order — **CP5
+> witness → CPB2 refinement → close SP2 → retire the DG2 metric** — recorded at
+> [⭐ OWNER-GREENLIT — READY TO BUILD](#greenlit)
+> near the top of this file. **That batch takes precedence for the items it names** (chiefly rank 1 below,
+> which the owner ranked second, behind CP5). **Ranks 2-7 below are unaffected** and pick up after it. Kept in
+> place rather than rewritten, because a derived recommendation and an owner call are different kinds of
+> record and collapsing them destroys the weaker one's provenance.
+>
 > **⭐ THE CURRENT ORDER (derived at this reconcile from what is already recorded as priority + what the
 > kernel now unblocks — offered for owner confirmation, NOT an owner mandate; nothing here overrides a
 > standing call):**
@@ -1163,6 +838,10 @@ full account of this reconciliation pass → [`QUEUE_LOG.md`](QUEUE_LOG.md#cpker
 >    band the owner has already approved re-classifying as Reserve-for-owner. It is owner-approved, tiny, and
 >    **currently deciding whether unattended work may start at all**. The bands are even tunable via config
 >    today — but changing the shipped default is the recorded build task.
+>    ⚠ **2026-08-01: this rank's live-evidence argument has EXPIRED** — `sd` is now **100%**, where the
+>    shipped 90 and the proposed 95 agree and neither admits unattended work. **The item is still greenlit**
+>    (on its merits, and it is **G2** in the owner's batch); only the "it would help this minute" case is
+>    gone. Corrected rather than left standing — see the live-usage bullet in "Where we are right now".
 > 2. **RB1 — the Dispatch INBOX projection.** Still the biggest leverage per unit of work and needs no wake,
 >    no channel, and no platform change: one derived delta off the ledger that already exists, plus the
 >    read-at-turn-start rule. Everything later plugs into it.
@@ -1546,7 +1225,23 @@ not an answer.
 **Done means:** a written per-surface coverage/timing/enforcement table with the gaps named, each gap either
 fixed, queued with an ID, or explicitly accepted with a reason.
 
-### CP5. ⬜ Laptop-witness inventory → then the deployment-topology decision (PROPOSED; CP1 partly depends on it)
+### CP5. ⭐⏭️ OWNER-GREENLIT (2026-08-01) — the off-machine WITNESS framework · laptop-witness inventory → then the deployment-topology decision (CP1 partly depends on it)
+
+> **⭐ GREENLIT AND FIRST IN THE BUILD ORDER (owner, 2026-08-01).** This entry was `⬜ PROPOSED`; the owner
+> has greenlit the **witness framework** — the concrete design at the end of this entry — and placed it
+> **first** in the current batch. Decision and ordering: **G1** in
+> [⭐ OWNER-GREENLIT — READY TO BUILD](#greenlit).
+> **This entry stays CP5's one home** for the inventory, the topology decision and the witness design.
+>
+> **⚠ Greenlit ≠ unconditional — two things in this entry are preconditions, not optional preamble:** the
+> **inventory** below, and the **archive-clone PRIVACY call** (⛔ the private archive's git history retains
+> `memory/`). The witness design does not need the archive, so the honest sequence is
+> **inventory → topology decision → witness**, with the privacy call made explicitly and recorded with its
+> date, exactly as this entry's own "Done means" already requires.
+>
+> **⛔ What is NOT greenlit: promotion from WITNESS to CONTROLLER.** That stays a later, separately-argued
+> decision, per this entry's own recommendation. A witness observes and can be wrong harmlessly; a controller
+> takes actions on a repo.
 
 **What it is.** A short, concrete inventory of the spare laptop before any decision about its role, because
 the topology decision is unanswerable without it: **OS**; **uptime** (is it actually on?); **network relation
@@ -1598,8 +1293,13 @@ program takes its own prefix rather than force-fitting into CP6+ (same reasoning
 below).** Filed from a plan-only pressure-test of GPT's "Dispatch Return Bus" idea against the control
 plane that actually exists — full design and reasoning in
 [`planning/control-plane/DISPATCH_RETURN_BUS.md`](planning/control-plane/DISPATCH_RETURN_BUS.md).
-**Nothing here is built.** All five items are ASSIST-tier, plan-stage — recorded so the recommended build
-sequence has stable homes, not because any of them has started.
+**Nothing here is built** (re-verified 2026-08-01 — still true, and the only section of the CP program for
+which the original "nothing is built" banner survives intact). **All SIX items** are ASSIST-tier, plan-stage —
+recorded so the recommended build sequence has stable homes, not because any of them has started.
+_(Said "all five" until 2026-08-01: RB6 was filed later in the same 2026-07-29 pass and the count was never
+updated, while the very next paragraph correctly enumerates six. Corrected because a count that disagrees with
+the list beside it is the cheapest possible kind of wrong, and it is the kind that makes a reader stop
+trusting the counts that matter.)_
 
 **The problem.** The supervisor can notify the OWNER (Pushover) and write a status file, but has no way to
 inform or wake DISPATCH itself — the loop has only half. Three distinct capabilities are in play:
@@ -2700,9 +2400,10 @@ Existing IDs (**RB1-RB6**, **HG1-HG2**, **P15**) are reused here, never reassign
   **DG2** (push-guard enforcement) could never advance. Now `npm run push` (app repo `scripts/robco-push.js`)
   routes a push through `controlled-push.js`, delegating the gate to the pre-push hook so CPB4's fast path is
   preserved (see the SHIPPED entry below for SHAs, the delegation/timeout detail, and the **3/10 counter as
-  it read on ACT3's dogfood day** — ⚠ corrected 2026-07-31: that figure was labelled "live" here, which it
-  has not been since 2026-07-30. It is a **dated snapshot**; the **live** value is **44/10, threshold long
-  since MET**).
+  it read on ACT3's dogfood day** — a **dated snapshot**, never a live figure. ⚠ **2026-08-01: this line no
+  longer quotes a live counter value at all** — it read `44/10` for one day and was already `49/10` at the
+  next pass. The counter is **retired as a written metric**; read it live with `npm run push-count`. See the
+  retirement note in the greenlit section).
   **Scope held exactly:** this was ONLY the routing step. Raw-push refusal (actually blocking a bypass) stays
   **DG2** — a separate, later, data-gated promotion after 10 clean wrapper pushes are observed. Wiring the
   wrapper in did NOT turn on enforcement; a plain `git push` still works, unrefused.
@@ -2742,7 +2443,14 @@ structurally`UNOBSERVABLE` (the global file carries no session id). OWNER-PROVID
   only on a mode _change_, exact % stays in `status.json`. **LIVE, not dormant** (unlike CPB1) — it rides the
   same live account-wide `fh`/`sd` usage file the supervisor already reads every run, so it lights up on real
   usage today. Full record in the SHIPPED section below.
-  **REFINEMENT — Stop-unattended-AI moves to 95% (owner-approved 2026-07-31; NOT yet built).** The shipped
+  **REFINEMENT — Stop-unattended-AI moves to 95% ⭐ OWNER-GREENLIT, second in the current build order (owner
+  2026-07-31, ordered 2026-08-01); NOT yet built.** Decision + ordering: **G2** in
+  [⭐ OWNER-GREENLIT — READY TO BUILD](#greenlit);
+  this entry stays its one home for the reasoning. ⚠ **2026-08-01 — the live-evidence argument that briefly
+  ranked this FIRST has expired:** `sd` is now **100%**, where the shipped 90 and the proposed 95 agree, so
+  the refinement would change nothing today. **The decision is unaffected** — it was approved on its merits,
+  and the durable point stands: 90-95 is the band where the shipped default and the owner's call genuinely
+  differ, and the machine crosses it every week. The shipped
   default band map is `>= 90 -> Stop-unattended-AI`, `80-89 -> Reserve-for-owner` (verified in
   `lib/usage-mode.js`'s `DEFAULT_MODE_THRESHOLDS`, not assumed). The owner's call: **clamp to Stop only at
   95**, widening **Reserve-for-owner to 80-94**. The other two bands are unchanged (`< 50` Normal, `50-79`
@@ -3238,8 +2946,9 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
   negative, this requirement does not disappear: it applies to whatever mechanism replaces prompt-embedded
   effort.
   **✅ UN-GATED (2026-07-31) — SP2 mechanism (1) came back POSITIVE, so the tier is REACHABLE and this
-  feature does not need rescoping.** Full write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md`.
-  Four things this hands CPB9, and the last two are hard build requirements, not notes:
+  feature does not need rescoping. ✅ FULLY UN-GATED (2026-08-01) — SP2 is now CLOSED, both mechanisms
+  answered.** Full write-up: `planning/control-plane/EFFORT_CONTROL_SPIKE.md`.
+  Five things this hands CPB9, and the last three are hard build requirements, not notes:
   - **The mechanism is TWO MESSAGES, not one.** A message that is exactly `/effort <level>` and nothing
     else (0 turns, session idles), **then** the task as a separate follow-up. **⛔ Inlining the directive
     with the task makes the slash command swallow the task — 0 turns, nothing runs.**
@@ -3257,6 +2966,13 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
     no-op**, not an error: a session that consumed a launch slot, reported back, and did nothing. For an
     unattended launcher that is the single worst failure shape available, and it is now known to be
     reachable by one plausible mistake in prompt construction.
+  - **⛔ NEVER use `ultrathink` as the tier mechanism (SP2 mechanism (2), answered 2026-08-01).** It is a
+    **per-turn reasoning reminder scoped to the TURN**, not a session-scoped tier: `/effort` reports
+    `…(this session only)`, `ultrathink` reports `…on this turn`. It names no level and changes no state, so
+    a launcher built on it would have **nothing to record and nothing to corroborate** — satisfying this
+    item's own verify-the-applied-tier requirement with **`UNOBSERVABLE` forever** while looking like it had
+    configured something. That is the same silent-no-op shape as the inline failure above, and it is the
+    second known way to get this wrong. **The two-message `/effort` pattern is the only confirmed mechanism.**
     **Where the verified tier is RECORDED: the WB1 envelope's `effort` field** (see WB1 above) — the tier
     and its verification state ride the provenance envelope every job record already carries, rather than
     becoming a second place the fact lives (Protocol 22). The admission gate's arithmetic and the job's own
@@ -3361,8 +3077,32 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
 - **RB5.** Bounded `send_message` WAKE spike — full entry above; **BLOCKED BY PLATFORM**, owner approval
   required before running regardless.
 - **RB6.** Pushover → Dispatch Android deep-link test — full entry above.
-- **SP2. 🔄 HALF-ANSWERED — mechanism (1) CONFIRMED POSITIVE 2026-07-31; mechanism (2) still open. (NEW ID,
-  filed 2026-07-31.)** Full write-up: **`planning/control-plane/EFFORT_CONTROL_SPIKE.md`** (local-only).
+- **SP2. ✅ CLOSED (2026-08-01) — BOTH mechanisms answered.** _(Was 🔄 HALF-ANSWERED; mechanism (1) confirmed
+  positive 2026-07-31, mechanism (2) answered 2026-08-01. NEW ID, filed 2026-07-31.)_ Full write-up:
+  **`planning/control-plane/EFFORT_CONTROL_SPIKE.md`** (local-only).
+  **✅ MECHANISM (2) — `ultrathink` — ANSWERED: it is a PER-TURN REASONING REMINDER, not an effort-tier
+  change.** Not a negative result and not a positive one in the terms the spike posed: it is **real, but a
+  different mechanism than the question assumed**, and the two must never be treated as substitutes.
+  **VERIFIED at the same strength as mechanism (1), by the same kind of witness — the harness itself, not a
+  session's account of itself — and observed first-hand in ONE session, which is the control arm this spike
+  said it would need:** `/effort max` printed a **system state-change report** naming the level _and its
+  scope_, `Set effort level to max (this session only)` → scope **SESSION**; `ultrathink` produced a **system
+  note scoped to the turn** — "the user included the keyword 'ultrathink', requesting deeper reasoning on
+  **this turn**" → scope **TURN**, no level named, no state changed, nothing persisting. Two scopes, two
+  mechanisms.
+  **⛔ THE CONSEQUENCE FOR CPB9, which is why this closure is a build input rather than trivia: a launcher
+  must NEVER use `ultrathink` as a tier mechanism.** It sets no tier, so there is nothing to record and
+  nothing to corroborate — a launcher built on it would satisfy CPB9's verify-the-applied-tier requirement
+  with **`UNOBSERVABLE` forever** while appearing to have done something, which is the same silent-no-op
+  shape as the inline-`/effort` failure this spike already flagged as RED. **The two-message `/effort`
+  pattern stays the only confirmed way to set a tier**, with its ⛔ never-inline rule and its ⭐
+  wait-for-acknowledgement sequencing rule unchanged. `ultrathink` remains useful for exactly what it is — a
+  per-turn nudge to a session already running — and may be recorded as nothing more.
+  **⚠ Do not collapse this with harness-audit item E3**, which says do not adopt **`ultracode`** as a default
+  tier: that is a rung on the `/effort` ladder and is untouched here. `ultrathink` is not on that ladder at
+  all. Two similar-looking words, two unrelated decisions.
+  **Cross-ref: the greenlit batch (G3) at the top of this file carries the closure decision;** this entry is
+  its one home for the evidence and the reasoning.
   **✅ THE ANSWER (mechanism 1): Dispatch CAN set a spawned session's effort tier, per session, at will —
   but NOT the way this spike assumed it would be done.** The working mechanism is **two messages**: send a
   message that is **exactly `/effort <level>` and nothing else** (it parses as a slash command, runs **0
@@ -3421,11 +3161,15 @@ only): …`, which is a **system** state-change report naming both the level and
   exhibit, and **PM1**'s retrospective) — the system's own reasoning being audited and corrected, with the
   fix becoming standing workflow. Recorded here so the arc is not lost; **no museum work is queued by this
   note.**
-  **⚠ Still OPEN — mechanism (2), the `ultrathink` keyword, was NOT tested.** SP2 stays open on that half;
-  it is a separate mechanism and assuming it behaves like (1) is exactly how this spike said a negative
-  result gets missed. **The interactive control arm is now MOOT for mechanism (1)** — it existed to
-  disambiguate a **negative** ("the launch path strips it" vs "the directive does nothing anywhere"), and a
-  positive result needs no such disambiguation. It is still required if `ultrathink` comes back negative.
+  ~~**⚠ Still OPEN — mechanism (2), the `ultrathink` keyword, was NOT tested.**~~ **← ANSWERED 2026-08-01,
+  see the closure at the top of this entry.** The caution it carried was **right and was vindicated**: it
+  warned that "assuming it behaves like (1) is exactly how a negative result gets missed" — and mechanism (2)
+  turned out **not** to behave like (1) at all (turn-scoped reminder vs session-scoped tier). Had this spike
+  assumed the two were the same, CPB9 could have been built on a mechanism that sets nothing. Kept in place
+  as the record of a caution that paid for itself. **The interactive control arm was MOOT for mechanism (1)**
+  (it existed to disambiguate a negative, and a positive needs no such disambiguation) **and turned out
+  unnecessary for (2) as well** — the two mechanisms' system-level scope strings differ so plainly, in one
+  session, that no comparison arm was needed to tell them apart.
   **⚠ And a launcher gap worth knowing: `start_code_task` exposes NO effort field** — schema is
   `cwd`/`model`/`prompt`/`title` only, no args passthrough, no env. The clean "launch it at a tier the way
   you launch it with a model" route **needs a launcher change and is PARKED, not built** (earn-condition:
@@ -3533,10 +3277,16 @@ turned. Four parts, and they are a workflow rule rather than a build:
    Max/Ultracode in a conserve-class mode (CPB2's EFFORT DIMENSION). Unattended work only; never the owner's
    own interactive session.
 
-⚠ **Its eventual home is `CLAUDE.md` Protocol 8**, beside the model-per-stage rule it extends. **Flagged, not
-done** — this fold was scoped to the QUEUE and the control-plane docs, and editing a protocol is the owner's
-call, not a side effect of a doc pass. Recorded here so it is a live rule in the meantime rather than a
-remembered one (Protocol 50).
+✅ **LANDED IN `CLAUDE.md` PROTOCOL 8 — `055b586` (2026-07-31). Corrected 2026-08-01.** This paragraph read
+_"Its eventual home is `CLAUDE.md` Protocol 8 … **Flagged, not done** — editing a protocol is the owner's
+call, not a side effect of a doc pass."_ **The owner made that call the same day and it shipped.** Verified
+this pass, not assumed: `CLAUDE.md` Protocol 8 now carries the entry
+_"**Effort tier — the second dial, set per session (owner-approved 2026-07-31)**"_ with the full ladder, the
+two-message mechanism, the ⛔ never-inline rule, and the plan-decides / Dispatch-announces discipline — i.e.
+all four parts below, in the protocol's own voice. **A stale-negative of exactly the class this pass was sent
+to hunt:** a doc claiming work is undone when it is done is as corrosive as the reverse, because it invites a
+future session to do it a second time. The four parts stay recorded here as the queue-side record and the
+reasoning behind them; **`CLAUDE.md` is now the authority.**
 
 ### Logged decision — "a WATCHER changes the effort tier" is ⛔ DEAD (2026-07-31)
 
@@ -3737,7 +3487,7 @@ verified"). Folding it into QUEUE.md satisfies Protocol 50 (a decision/proposal 
 gets written down in the same session), while the `[DECISION]`/PROPOSED tags on every item keep a future
 session from reading any of HA1-HA5 as already approved or already scheduled.
 
-## ⭐ CANDIDATE SET `BR` — MULTI-AI BRAINSTORM PROPOSALS (filed 2026-07-31; ⛔ NOT approved, NOT scheduled, NOT a mandate)
+## ⭐ CANDIDATE SET `BR` — MULTI-AI BRAINSTORM PROPOSALS (rounds 1-2 filed 2026-07-31 · ROUND 3 folded 2026-08-01; ⛔ NOT approved, NOT scheduled, NOT a mandate)
 
 ⛔ **READ THIS BEFORE READING ANYTHING BELOW IT. Every `BR` item in this section is a PROPOSAL, not a
 decision.** Nothing here has an owner go, a spec, or a slot. A future session must **never** read a `BR`
@@ -3756,6 +3506,13 @@ external models plus an **in-house repo-aware pass** whose stated edge was readi
 docs, and the **live machine** rather than a summary. This block is that in-house report folded in whole —
 its candidate set, its build order, and its dissent — because a brainstorm that lives only in a conversation
 is not a plan, it is a memory (Protocol 50).
+
+**⏭ ROUND 3 IS FOLDED IN BELOW (2026-08-01), and it INVERTS this block's question.** Rounds 1-2 (the BR items
+here) asked what to **ADD**; **Round 3** asked what to **CUT**, and where the system **fails silently**. Its
+headline — _"RobCo is over-recording health and under-proving coverage"_ — reframes how the whole candidate set
+should be read, so it sits **immediately after the ground-truth table** rather than at the end: the
+measurements it argues from are the same ones in that table. **It is PROPOSED on exactly the same terms as
+everything else here** — see **⭐ ROUND 3 ADDENDUM**, below.
 
 **⚠ Epistemics of this block, stated up front because the two halves are NOT the same strength
 (Protocol 51(a)/(b)):**
@@ -3803,6 +3560,172 @@ are recorded here because **the measurements outlive the proposals**.
 | Live sessions in one tree         | **9** co-resident; `finding.tree-collision` fired 2,653×                 | ⭐ The "measured collision rate" that gates worktrees (**DG5**) is **constant** — see BR14                                                             |
 | `state/manifests/`                | **does not exist. Zero jobs tracked, ever.**                             | ⭐ CPK1/CPK2/CPK4 + ACT2 + CPB1 are ALL dormant behind **one missing producer** — see BR8                                                              |
 | Both scheduled tasks              | Registered, `Ready`, `Enabled`, **Last Result 0**                        | ACT1 corrected above                                                                                                                                   |
+
+**⏱ Re-read 2026-08-01 (the accuracy pass) — the table above stays as its dated 2026-07-31 snapshot; these are
+the deltas, so nobody quotes a moved number as current.** Ledger **77,063 → 78,627** records (six day-files
+now; 2026-07-31 closed at 28,273 records / 15 MB, and 2026-08-01 was already accumulating within hours). Chain
+coverage **17.3% → 19.0%** — and the informative half is that the **unchained count is frozen at exactly
+63,696**, because that backlog is fixed forever by design and coverage rises only as new records accrue.
+`state/manifests/` **still does not exist** — BR8's premise holds unchanged. Live usage **has swung hard**:
+`fh` 19% → **9%**, `sd` 96% → **100%**, mode still `Stop-unattended-AI`. Both scheduled tasks re-verified
+`Ready` / `Enabled` / `Last Result 0`, the daily job's Last Run reading exactly `2026-07-31 03:15:01`.
+
+---
+
+## ⭐ ROUND 3 ADDENDUM — THE CUT / FRAGILITY ROUND (folded 2026-08-01; ⛔ PROPOSED, NOT approved, NOT scheduled)
+
+⛔ **Same posture as the whole `BR` block: everything here is a PROPOSAL.** No owner go, no spec, no slot.
+Rounds 1 and 2 asked what to ADD; **Round 3 flips it** and asks what to REMOVE, SIMPLIFY or MERGE, and where
+the system most likely **fails silently** — looking fine when it isn't. It exists because of a gap the project
+named itself: _the system creates pressure to add and none to remove._ Protocol 49 is the rulebook's answer to
+that; this round is the same instinct pointed at the **control plane's telemetry** instead of its rules.
+
+### ⭐ THE HEADLINE (GPT) — the one sentence this round is worth remembering for
+
+> **RobCo is OVER-RECORDING HEALTH and UNDER-PROVING COVERAGE.** Optimize for **how much each record PROVES**,
+> not how much it records.
+
+**Three doctrine lines follow from it, and each names a live gap in the ground truth above:**
+
+- **recorded ≠ chain-protected.** 78,627 records exist; **~81% carry no hash chain**. Volume was mistaken for
+  integrity.
+- **silent ≠ healthy.** The 3am job sends nothing on a healthy night **by design** — so a **dead** job and a
+  **healthy** job produce byte-identical evidence.
+- **detector-ran ≠ detector-can-fire.** One finding is **41% of the entire ledger** and has produced **zero**
+  alerts and **zero** decisions across its whole life. A detector that has never been positive has never
+  demonstrated it _can_ be.
+
+### GPT's SCOPED FEATURE-FREEZE proposal — three cheap "truth debts" first
+
+**Proposed:** no new control-plane **ASSURANCE** features until three debts are paid. ⚠ **Read the scope
+narrowly, because a mis-read of this would be expensive:** it covers _new assurance machinery on the control
+plane only._ **App development (2.9.0, the museum, the game) is explicitly UNAFFECTED**, and so is any
+already-greenlit work. It is not a stop-work order; it is "stop adding proofs until the ones you have tell the
+truth."
+
+1. **Render chain coverage HONESTLY — never a bare green.** Show it as **"protected / out-of-scope"**, so an
+   unchained record reads as _outside the guarantee_ rather than as _covered_. _(GPT wrote this as
+   "17% / 83%"; live it is now **19% / 81%** — the shape of the proposal is what matters, and it is precisely
+   the shape that survives the number moving.)_ **Cheap:** WB6 already computes coverage and already reports
+   `unchained` honestly in its verifier; this is a rendering rule, not new machinery.
+2. **Back up the scrub POLICY, and fail closed without it.** The scrub list guards the **one boundary that
+   cannot be un-crossed** (private → public), exists on exactly one disk, and is deliberately not backed up.
+   **⚠ See the caveat below before anyone implements this** — the naive fix is self-defeating.
+3. **Give the 3am job an EXTERNAL missed-deadline observer.** Something _off the machine_ must notice the job
+   did not run. Anything on the machine is subject to the same failure.
+
+**Dispatch's recommendation, recorded as a recommendation (Protocol 51(a)):** these three should jump **ahead
+of the `BR` build order** below. **⛔ It is NOT adopted** — the `BR` build order stands as written until the
+owner rules. Recorded so the recommendation is on file with its date rather than surfacing later as if it had
+always been the plan.
+**⭐ Note the alignment, without promoting anything:** debt (3) is the same need the greenlit **CP5 witness**
+framework would naturally host. CP5 is greenlit; **this debt is not** — the flag exists so the witness is not
+designed shut against it.
+
+### ⭐ THE TOP CUT — four-source convergence: kill per-tick "still-fine" events
+
+**The cut:** stop writing a record every tick that says nothing changed. **The replacement, and it is the whole
+reason this is a cut rather than a loss: a COVERAGE-WINDOW CERTIFICATE.** One record per window that proves
+**N checks expected · N observed · no gap exceeded the limit · no result differed** — which carries the _same
+guarantee_ as the per-tick stream while replacing thousands of records with one. **A gauge repeated 288 times
+a day proves nothing a certificate does not; the certificate additionally proves the checks were not
+MISSING**, which the stream never did.
+
+**⛔ The append-only rule this must obey, stated up front because it is the trap:** an append-only ledger can
+**never** be rewritten, so a semantic change takes effect at a **declared CUTOVER INDEX** — future records
+carry the new meaning, past records keep the old, and the boundary is itself a record. **Never a migration,
+never a backfill.** This is the identical discipline WB1 already used (lineage **derived, not assigned**, so
+62,000 pre-existing records joined with no migration) and WB6 after it (`unchained` is reported as _coverage_,
+never as a break). The mechanism is proven twice; this would be its third use.
+
+**Two more cuts in the same family:**
+
+- **Delete the 41% never-positive finding — but keep a positive CANARY.** Removing a detector that has never
+  fired removes the evidence that it _could_. So the deletion ships with a deliberate, synthetic positive that
+  proves the path still works. **This is exactly the red-then-green discipline the gate already requires**
+  (a guard that has never been shown to fail red has not been shown to work), applied to telemetry.
+- **Collapse the 74% alert family into incident EPISODES.** One episode with a lifecycle, not N notifications.
+  ⛔ **Dedup at the STATE MODEL, never at the Pushover layer** — a delivery-layer filter makes a noisy system
+  _look_ quiet while the noise is still there, which is strictly worse than the noise (it destroys the signal
+  that the model is wrong). The incident lifecycle CPK5 already shipped is the right home.
+
+**The merge-map — the whole telemetry surface reduces to FOUR abstractions:** **canonical transitions** ·
+**coverage windows** · **incident episodes** · **external obligations**. That is the durable output of this
+round even if every individual cut is declined.
+
+### ⭐ THE DEEPEST INSIGHT — a hash chain proves non-REWRITE, not non-OMISSION
+
+**WB6 proves nobody EDITED the record. It cannot prove nobody FAILED TO WRITE one.** A chain over records that
+exist says nothing about records that never existed — and **truncation is the visible corner of this**, which
+is why WB6 already needed an external high-water witness for that one case. **The general problem is bigger
+than truncation and WB6 has no partner for it: WB6 needs a COMPLETENESS partner.**
+
+⭐ **This is the formal root of BOTH problems above, which is why it is the deepest thing this round produced.**
+The 3am job's silent death and the 81% unchained gap are not two issues — they are one issue seen twice:
+**absence is invisible to a system that only records presence.**
+
+> **THE RULE: no component may be the sole detector for its own non-execution.**
+
+**A completeness proof needs an EXPECTATION** — the count that _should_ exist — from a source independent of
+the thing being counted. Which is why the coverage-window certificate above and the external observer in debt
+(3) are the same idea at two scales, and why an **off-machine witness** is the load-bearing primitive under all
+of it.
+
+### ⚠ SCRUB-LIST CAVEAT — the naive backup is SELF-DEFEATING
+
+**The scrub list is itself PII.** It is a list of the owner's real names, usernames, absolute paths and
+internal terms — it exists to be matched against, not to be published. **So "back up the scrub list" as
+plaintext copies the exact secret to a second location**, doubling the blast radius of the loss it was meant to
+prevent. Anyone implementing debt (2) must not take the obvious route.
+
+**Two proposed shapes that do not have this problem:**
+
+- **FINGERPRINT it — verify without storing.** Back up a **count plus salted hashes**, not the values. That
+  proves the list is _present and unmodified_ (which is what fail-closed actually needs) while storing nothing
+  readable. ⭐ **This project already owns the idiom:** WB6's `self` hash proves a record is intact without
+  reproducing it, and P16's own findings carry a hash plus a redacted snippet **and never the matched value**.
+  This is that pattern applied one layer out.
+- **GPT's versioned DECLASSIFICATION POLICY.** Invert it: instead of backing up what must be hidden, maintain a
+  versioned policy that consumes an **allow-listed release bundle** — so the durable artifact is the _rule_
+  (publishable, backup-able, reviewable) and the sensitive list becomes derived state.
+
+⛔ **Whichever shape is chosen, fail-closed is non-negotiable and already shipped:** P16 blocks on a missing
+**or hollowed-out** scrub list today. The debt is durability, not enforcement.
+
+### GPT's 5 NORTH-STAR THEOREMS + one wildcard
+
+Five properties the system could aim to **prove** rather than test. **All PROPOSED / north-star; none costed.**
+
+1. ⭐ **SILENCE (GPT's #1).** Prove that silence means healthy — i.e. that a quiet system is _provably_ quiet
+   rather than _possibly dead_. This is debt (3) and the 3am problem, raised to a theorem.
+2. **COMPLETE-HISTORY.** No omissions, not merely no rewrites — the WB6 completeness partner above.
+3. **PRIVATE→PUBLIC NONINTERFERENCE.** Prove nothing private can reach the public surface: the Archive↔Exhibit
+   boundary as a formal property rather than a scanner.
+4. **OWNER-SOVEREIGNTY (= AI-NON-AUTHORITY).** Prove the AI cannot actuate — the invariant the whole control
+   plane is built on, made checkable instead of conventional.
+5. **EVIDENCE-DENSITY.** ⭐ **Prove the subtraction was LOSSLESS** — that a cut removed volume without removing
+   any guarantee. **This is the theorem that makes Round 3 safe to act on**, and it is the reason this round
+   is more than an appetite for deletion.
+
+**DeepSeek's fresh swing — the COVENANT NETWORK:** a **witness-peering mesh**, several independent witnesses
+attesting to each other rather than one witness watching one machine. Recorded as the wild version of CP5's
+single witness; **⛔ not near-term** and it strains the free/≤$10 rule.
+
+### ⛔ GPT's "CUTS NOT TO MAKE" — guardrails binding the WHOLE cut set
+
+**⭐ Recorded because of what they are, not merely what they say: asked what must NOT be cut, an external model
+independently reconstructed this project's own standing invariants.** That is strong evidence they are real
+constraints rather than local habit — and it is the single most reassuring result in the round.
+
+- **NEVER merge Archive and Exhibit.** Private and public stay physically separate repos.
+- **MCP is NEVER canonical.** It is a surface over the truth, never the truth.
+- **KEEP the epistemic vocabulary.** VERIFIED / OBSERVED / CLAIMED / … is not ceremony; it is what stops
+  `UNKNOWN` rendering as healthy and `CLAIMED` rendering as done.
+- **NEVER let an AI summarize the ledger.** A summary is not evidence, and an AI-written one is a claim
+  wearing evidence's clothes.
+
+⛔ **These bind every cut above.** No proposal in this round may be implemented in a way that violates one —
+if a cut appears to require it, the cut is wrong, not the guardrail.
 
 ---
 
@@ -4395,7 +4318,10 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   auto-resolve** the alert once the commit actually lands on the remote, so a since-pushed commit doesn't
   leave a stale "not backed up" open. **Note:** **CPB4** already shrinks this window for doc-only pushes
   (~30s fast path), but code pushes still take the full gate, so the tune is still worth doing.
-  OWNER-APPROVED (2026-07-30), NOT YET BUILT.
+  ~~OWNER-APPROVED (2026-07-30), NOT YET BUILT.~~ **← SUPERSEDED — this is the original design text, kept in
+  place per Protocol 50 a-date. It BUILT + SHIPPED the same day; see the shipped record at the end of this
+  entry.** _(Marked 2026-08-01: the entry ships at its own top and ships again at its own bottom, but read
+  twice in the middle as unbuilt — a legibility hazard on a phone, not a factual error.)_
   **Extended 2026-07-30 (owner-approved; multi-model round) — make it SESSION-ACTIVITY-AWARE, the same
   discipline REF1 applied to the backup-unhealthy alert.** Beyond the grace period and push-in-progress
   awareness above, the unbacked-work / push-not-confirmed alerts must **not fire at all while the session
@@ -4404,7 +4330,8 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
   unbacked**, and **auto-retract the moment the work is committed + pushed**. **Why:** the owner received the
   uncommitted-work notification **twice during a single long, still-active session** — a false alarm on work
   that was simply in progress. Reuses the supervisor's existing active-session / tree co-residency tracking
-  (as REF1 does), not a second tracker. OWNER-APPROVED (2026-07-30), NOT YET BUILT.
+  (as REF1 does), not a second tracker. ~~OWNER-APPROVED (2026-07-30), NOT YET BUILT.~~ **← SUPERSEDED, same
+  as above — shipped `e3706db`, with the third leg at `99fd90a`.**
   **BUILT + SHIPPED 2026-07-30 — control repo `e3706db`** (full shipped record below; the design reasoning
   above is kept here since this is REF5's one home). All four parts landed, for BOTH detectors and BOTH
   repos, in one shared module (`lib/push-window.js`) so the two can never drift apart on what "in flight"
@@ -4457,12 +4384,37 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
 
 ## SHIPPED — for the record, with SHAs
 
+> **✅ RE-VERIFIED 2026-08-01 (the accuracy pass) — ALL 38 SHAs IN THIS SECTION PASS, ZERO EXCEPTIONS.**
+> Every SHA was checked again with `git cat-file -e` **and** `git merge-base --is-ancestor <sha> HEAD` in its
+> own repository: **27 control-repo · 11 app-repo**, plus the ARCHIVE repo's `b90304fb` and the Ledger repo's
+> `d001a38` / `79afc2e`. Every one exists **and** is genuinely in its branch's history — none is merely
+> quoted. **Three items were added to the roll-up this pass** (below); the roll-up itself had not fallen
+> behind again. _Checking a claim and finding it TRUE is half of what a reconcile is for, so it is recorded
+> as a result rather than as silence._
+>
 > **⚠ RECONCILED 2026-07-31 — this roll-up had fallen SEVEN items behind.** Every item below the divider was
 > already marked ✅ at its own full entry, but was missing from this index, which is the one place a reader
-> goes for "what shipped, with the SHA". **Every SHA in this section was re-verified this pass** against
+> goes for "what shipped, with the SHA". **Every SHA in this section was re-verified that pass** against
 > `git cat-file` **and** `git merge-base --is-ancestor` in its own repo — so each one provably exists **and**
 > is genuinely in its branch's history, not merely quoted. Where a claim could be checked against the live
 > control-plane **ledger** as well, it was; those are marked **ledger-confirmed**.
+
+**── Added by the 2026-08-01 accuracy pass (SHAs verified this pass) ──**
+
+- **Protocol 8 gains the EFFORT TIER** — ✅ SHIPPED `055b586` (app repo, `CLAUDE.md`). The standing effort
+  workflow moved from the queue into its natural home beside Protocol 8's model-per-stage rule: the ladder,
+  the two-message mechanism, the ⛔ never-inline rule, and plan-decides / Dispatch-announces. **Recorded here
+  because the queue was still claiming this was "flagged, not done" a day after it landed** — a stale-negative
+  this pass corrected at its entry. Doc-only; nothing was built.
+- **Stale code header corrected** — ✅ SHIPPED `7bb9e1b` (control repo). `lib/daily-housekeeping.js`'s module
+  header still read _"NOT registered as a scheduled task by this build … a separate, owner-gated follow-up"_,
+  false since 2026-07-30. The BR housekeeping block described this fix but **never recorded its SHA**; it is
+  recorded now. The _"not wired into supervisor.js"_ half of that header is **true and was deliberately kept**
+  — the daily pass is its own scheduled task on purpose, not a supervisor step.
+- **The two proposal-set folds** — ✅ `93c97be` (HARNESS AUDIT / HA1-HA5) + `3ff9de0` (CANDIDATE SET `BR`), app
+  repo, doc-only. ⛔ **Listed here as SHAs a reader can find, NOT as approved work** — both sets are
+  `[DECISION]`-pending and neither is scheduled. Recorded on the same precedent as the SP2/effort fold below:
+  the commits are real, so a reader should be able to locate them.
 
 **── Added by the 2026-07-31 reconcile (all SHAs verified this pass) ──**
 
@@ -4484,8 +4436,11 @@ push-count` in the control repo, live off the ledger). **Owner explicitly greenl
 - **HG2.** Bootstrap isolation — per-phase boot guards, fatal-vs-degradable — ✅ SHIPPED `aef7da4` (app
   repo).
 - **DG2 ACTIVATION.** Raw-push refusal turned ON — ✅ SHIPPED `05c450b` (app repo) + `ec4acfb` (control
-  repo). **Ledger-confirmed LIVE:** the clean-push counter read **44/10, threshold MET** on this pass's own
-  pushes, and every push this session routed through the wrapper.
+  repo). **Ledger-confirmed LIVE:** the clean-push counter read **44/10** at the 2026-07-31 reconcile (a
+  dated snapshot, not a standing figure — it read **49/10** one day later), and every push routes through the
+  wrapper. ⚠ **The counter is retired as a written metric 2026-08-01** — the threshold was MET on 2026-07-30,
+  DG2 shipped, and the number now gates nothing. `npm run push-count` is the live source of truth. Full
+  retirement reasoning in the greenlit section.
 - **SP2 / the effort fold.** Per-session effort control ANSWERED and folded — ✅ `72134e6` + `040885c` (app
   repo, doc-only). Dispatch **can** set a spawned session's tier via the two-message pattern; the design
   consequences landed on CPB2/CPB5 v0.2 (effort ceiling), WB1 (`effort` envelope field) and CPB9. **Nothing
