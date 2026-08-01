@@ -3268,24 +3268,46 @@ freshnessDeadline, reasonCode}` across all eight states, and the three hard rule
 
 ## ACTIVATION SWITCHES — built, waiting on the owner to flip on
 
-- **ACT1.** Register the daily-housekeeping pass (**CPK5**'s daily half — `scripts/daily-housekeeping.js`)
-  as a Windows scheduled task. **Note — the rank-3 half of this is already done:** CPK3's activation commit
-  (`78acfd5`) wired the backup mirror into daily housekeeping AND registered its own scheduled task (see
-  SHIPPED below) — but ACT1 itself, registering the FULL daily-housekeeping pass (ledger maintenance,
-  adapter/schema drift, state hygiene, the README-staleness nudge below), is still open. **Folded in
-  (owner-approved, 2026-07-30): a doc/README staleness check.** As part of the same daily/weekly housekeeping
-  pass, add a low-frequency automated nudge — via the same **incident/backup-unhealthy alert path** (the
-  Pushover "backup unhealthy" alert already approved in the
-  [convergence review](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md)) — if a repo's `README.md`
-  or another key doc looks out of date relative to its recent changes (e.g. commits touching a surface with
-  no matching doc update in the same window). **The PRIMARY mechanism does not change:** Protocol 2 (update
-  the doc in the SAME commit as the change it describes, `CLAUDE.md`) stays the enforcement point — this
-  housekeeping check is only the drift **safety net**, catching a Protocol 2 miss after the fact, never a
-  replacement for the same-commit discipline. **Record this plainly: keeping READMEs current is NOT a new
-  trigger word** — it is Protocol 2 plus this housekeeping check, and no session should read this item as
-  license to defer a doc update to a nightly job. **REF1 (the alert's session-awareness) is now shipped** —
-  see SHIPPED below — so this nudge no longer waits on that; **see REF3** for the auto-verdict tracking this
-  same daily/weekly pass owes the data-gated promotions.
+- **ACT1. ⚠️ CORRECTED 2026-07-31 — the REGISTRATION half is DONE; only the README/doc-staleness nudge
+  remains.** This entry read "Register the daily-housekeeping pass … as a Windows scheduled task", with the
+  registration described as "still open". **That has been untrue since at least 2026-07-30, and it is the
+  same stale-positive class the 2026-07-31 reconcile caught three of.** Proven directly (`schtasks /query
+/V /FO LIST`, run 2026-07-31 late evening, not inferred from a doc):
+  - `\RobCo-Control-DailyHousekeeping` — Status `Ready` · Scheduled Task State `Enabled` · Last Run Time
+    `7/31/2026 3:15:01 AM` · Last Result `0` · Next Run Time `8/1/2026 3:15:00 AM` · Task To Run
+    `node scripts\daily-housekeeping.js` — i.e. the FULL pass (ledger growth, adapter drift, state hygiene,
+    disk pressure, rollup accumulator, backup mirror + restore test), not merely rank 3's half.
+  - `\RobCo-Control-Supervisor` — Status `Ready` · Scheduled Task State `Enabled` · Last Run Time
+    `7/31/2026 11:49:00 PM` · Last Result `0` · Next Run Time `7/31/2026 11:53:59 PM` · repeat every
+    5 minutes.
+    Corroborated by the live ledger (`housekeeping.completed`, `mirror.completed`, `restore-test.completed`
+    events) and by `state/weekly-rollup.json` accumulating day-rows.
+    **⛔ Silence is CORRECT, not evidence of a dead task — the owner should NOT expect a nightly notification.**
+    Confirmed by reading `lib/daily-housekeeping.js`, not assumed: the module header states the pass is
+    "OBSERVE-ONLY / AI-FREE. Kills nothing, enforces nothing, launches nothing, deletes nothing", and the only
+    two `reconcileIncidentSet` calls in the file are **`adapter-drift`** and **`disk-pressure`** — the file's
+    own comment reads "the two the brief named 'alert'; the rest of this pass is report-only". The remaining
+    alertable conditions come from the rank-3 modules' own **`backup-mirror`** incident type (a mirror failure
+    or a failed restore test). **A healthy night therefore sends nothing at all, by design.** A _positive_
+    nightly digest is not currently built — it is proposed as **BR18** in the CANDIDATE SET below, and is not
+    approved.
+    **What ACT1's REMAINING scope actually is: the README/doc-staleness nudge ONLY.** Everything below this
+    line is unchanged and still open. **Note — the rank-3 half was already done:** CPK3's activation commit
+    (`78acfd5`) wired the backup mirror into daily housekeeping AND registered its own scheduled task (see
+    SHIPPED below). **Folded in
+    (owner-approved, 2026-07-30): a doc/README staleness check.** As part of the same daily/weekly housekeeping
+    pass, add a low-frequency automated nudge — via the same **incident/backup-unhealthy alert path** (the
+    Pushover "backup unhealthy" alert already approved in the
+    [convergence review](planning/control-plane/reviews/CONVERGENCE_2026-07-28.md)) — if a repo's `README.md`
+    or another key doc looks out of date relative to its recent changes (e.g. commits touching a surface with
+    no matching doc update in the same window). **The PRIMARY mechanism does not change:** Protocol 2 (update
+    the doc in the SAME commit as the change it describes, `CLAUDE.md`) stays the enforcement point — this
+    housekeeping check is only the drift **safety net**, catching a Protocol 2 miss after the fact, never a
+    replacement for the same-commit discipline. **Record this plainly: keeping READMEs current is NOT a new
+    trigger word** — it is Protocol 2 plus this housekeeping check, and no session should read this item as
+    license to defer a doc update to a nightly job. **REF1 (the alert's session-awareness) is now shipped** —
+    see SHIPPED below — so this nudge no longer waits on that; **see REF3** for the auto-verdict tracking this
+    same daily/weekly pass owes the data-gated promotions.
 - **ACT2. ✅ SHIPPED (2026-07-30), control repo `7ca220c`.** The write-side kernel actions — **CPK2**'s
   publisher and **CPK4**'s continuation-packet generator — are now wired into the live supervisor loop, via
   a new decision layer `lib/write-side.js`. **The two halves are activated to deliberately different
@@ -3714,6 +3736,542 @@ exactly the Protocol 51(a) case ("a mechanism/architecture/repo fact from Dispat
 verified"). Folding it into QUEUE.md satisfies Protocol 50 (a decision/proposal reached in conversation
 gets written down in the same session), while the `[DECISION]`/PROPOSED tags on every item keep a future
 session from reading any of HA1-HA5 as already approved or already scheduled.
+
+## ⭐ CANDIDATE SET `BR` — MULTI-AI BRAINSTORM PROPOSALS (filed 2026-07-31; ⛔ NOT approved, NOT scheduled, NOT a mandate)
+
+⛔ **READ THIS BEFORE READING ANYTHING BELOW IT. Every `BR` item in this section is a PROPOSAL, not a
+decision.** Nothing here has an owner go, a spec, or a slot. A future session must **never** read a `BR`
+item as approved work, and must never start building one because it is written down in the queue — being
+written down is what Protocol 50 requires of a proposal, and is explicitly _not_ what approval looks like.
+The `[DECISION]`-pending precedent is the **HARNESS AUDIT** block directly above; this section uses the same
+posture and the same reasoning for it.
+
+**New family prefix `BR`** (brainstorm), per this file's own rule — single letters are exhausted and every
+existing family (CP/RB/MCP/WB/ND/HG/CPK/CPB/ACT/OD/SP/DG/REF/AUD/HA) is already assigned. **No existing ID
+is renumbered, re-lettered or reused** (Protocol 49). `BR1`-`BR26` are **grouping IDs, not a ranking** — the
+ranking lives in **THE BUILD ORDER** below.
+
+**Where it came from.** A four-way ideation round on what to build next on the AI-free control plane: three
+external models plus an **in-house repo-aware pass** whose stated edge was reading the real code, the real
+docs, and the **live machine** rather than a summary. This block is that in-house report folded in whole —
+its candidate set, its build order, and its dissent — because a brainstorm that lives only in a conversation
+is not a plan, it is a memory (Protocol 50).
+
+**⚠ Epistemics of this block, stated up front because the two halves are NOT the same strength
+(Protocol 51(a)/(b)):**
+
+- The **MEASUREMENTS** in the ground-truth table below are **VERIFIED** — read first-hand off the live
+  ledger, the live `status.json`, the live scheduled tasks and the live backup mirror on 2026-07-31 (late
+  evening local; ledger timestamps read `2026-08-01T03:24Z`). They are the most durable thing here and
+  remain useful even if every proposal is rejected.
+- The **PROPOSALS** are **PROPOSED** — one session's judgement, un-reviewed, un-costed, un-approved.
+- The **feasibility tags** (BUILT / HALF-BUILT / PLANNED / NET-NEW) were assigned by reading the named files
+  and are **OBSERVED**, but a build session must **re-verify the named file still does what this says**
+  before designing around it (Protocol 51(b): a prose claim about an artifact is a locator, not evidence).
+
+**Earn-condition for the whole set (Protocol 50 a-form, stated once at block level rather than 26 times):**
+an item leaves this block only on an **owner go plus a spec**, at which point it takes a real ID in
+**READY TO BUILD** (or is folded into the existing item it extends — several of these are extensions, not
+new items, and folding beats duplicating per Protocol 22). Until then every `BR` entry is a proposal with
+no version and no slot, and that is a deliberate state, not a vague drawer.
+
+**Scoring format** (carried verbatim from the source report, so the four-way synthesis can be reassembled):
+`A: cool N · purpose N | B: novel N · leverage N`, each out of 5. Axis **A** is coolness × purpose
+(buildable, high-value, on-theme). Axis **B** is novelty × leverage (genuinely new AND compounds the
+project's strongest primitives — the AI-free deterministic supervisor, the hash-chained tamper-evident
+ledger + off-machine witness, the epistemic state vocabulary, typed auditable proposals, provenance/
+lineage, usage governance).
+
+### ⚠ THE GROUND TRUTH THIS SET WAS BUILT ON (VERIFIED 2026-07-31 — the durable half of this block)
+
+Read off the machine, not off a doc. Several of these change which proposals are worth anything, and they
+are recorded here because **the measurements outlive the proposals**.
+
+| Fact                              | Value                                                                    | Why it matters                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ledger records, all time          | **77,063** across 5 day-files                                            | Big enough to replay against — the premise of BR5                                                                                                      |
+| `finding.unattributed-enrollment` | **31,507 (40.9%)**, payload `childSessionId:"1"`, `action:"LOGGED ONLY"` | **The largest single thing in the ledger is a finding that has never produced an alert or a decision** (0 of 69 `notify.sent`, 0 of 105 incident keys) |
+| `session.observed`                | 20,156 (26.2%)                                                           | With the above: **67% of the record is restated present-tense state, not events**                                                                      |
+| Records written in one day        | **27,612**                                                               | ~27k/day                                                                                                                                               |
+| Day-file growth                   | 3.6 → 8.5 → 12.0 → **14.7 MB/day**, accelerating                         | Mirror repo already **30 MB after 4 commits**; the weekly restore test clones it                                                                       |
+| Chained records (WB6)             | 13,367 of 77,063 (**17.3%**)                                             | 63,696 permanently `unchained` — honest and documented, but the chain is one day old                                                                   |
+| `notify.sent`, all time           | **69**                                                                   | Five days of phone alerts, total                                                                                                                       |
+| …of which **backup-family**       | **51 of 69 = 74%**                                                       | ⭐ **REF1 _and_ REF5 were both built to tune this one alert and it is still three-quarters of all traffic**                                            |
+| …thrash                           | 4 (all documented false positives)                                       | DG1's evidence bar, unaggregated                                                                                                                       |
+| …stranded-push                    | 6                                                                        |                                                                                                                                                        |
+| Live usage at read time           | `fh` **19%**, `sd` **96%**, mode **`Stop-unattended-AI`**                | CPB2's approved-but-unbuilt 95 refinement is deciding behaviour _right now_                                                                            |
+| Live sessions in one tree         | **9** co-resident; `finding.tree-collision` fired 2,653×                 | ⭐ The "measured collision rate" that gates worktrees (**DG5**) is **constant** — see BR14                                                             |
+| `state/manifests/`                | **does not exist. Zero jobs tracked, ever.**                             | ⭐ CPK1/CPK2/CPK4 + ACT2 + CPB1 are ALL dormant behind **one missing producer** — see BR8                                                              |
+| Both scheduled tasks              | Registered, `Ready`, `Enabled`, **Last Result 0**                        | ACT1 corrected above                                                                                                                                   |
+
+---
+
+### BR0. ⬜ THE PROOF SPINE — the north star all four sources independently converged on
+
+**⛔ PROPOSED / NORTH STAR. Not a build item. Tier (a) is the only near-term half.**
+
+**The convergence, recorded because four independent sources landing on one framing is the strongest signal
+this process produces.** The in-house pass and all three external models arrived — separately, from
+different starting points — at the same north star: **independently PROVE that the supervisor operated
+correctly, rather than trusting that it did.** That is the same instinct the codebase already encodes
+everywhere (`completion-evidence.js`'s "a session cannot mark its own work done"; the exact-SHA publisher;
+`isBlind()`), pointed at the supervisor itself. It resolves into **three tiers of increasing cost and
+decreasing near-term realism**, and the tiers must not be collapsed:
+
+- **(a) CHEAP / NOW — the deterministic REPLAY ENGINE.** = **BR5** below. Replay the real recorded ledger
+  through a candidate pure detector and diff its decisions against what actually happened. **Independently
+  reached by three of the four sources** (in-house #5, GPT-R1 #12, DeepSeek #9), which is why it is the
+  tier with a build order attached. Needs no new authority, no new dependency, no money. **This is the only
+  tier anyone should be costing right now.**
+- **(b) MEDIUM — FORMAL PROOF of the core rules.** Gemini's proposal to run a model checker (Kani) over the
+  **epistemic state machine**, and GPT's "Epistemic Proof Kernel" / "AI Non-Authority theorem" — two
+  descriptions of one idea: express the small, load-bearing core (`epistemic.js`'s eight states, `derive()`
+  taking the weakest input, `canRenderComplete`/`canRenderHealthy`/`isBlind`, and the no-AI-executor
+  invariant) in a **proof-checkable form, likely Rust**, and machine-prove the properties instead of
+  testing samples of them. **Scoped to the core — explicitly NOT a rewrite of the control plane**, and that
+  scoping is the whole feasibility argument. ⚠ Introduces a second language and a second implementation of
+  rules that already exist in JS, which is a **Protocol 22 tension** (parallel implementation) that must be
+  argued, not waved through: the honest framing is _a proof artifact derived from the JS core_, not a
+  second core. **No owner go; no spec; not costed.**
+- **(c) MOONSHOT — ZERO-KNOWLEDGE ATTESTATION of the whole governance history.** Gemini's zkPoE, DeepSeek's
+  UVCAL, and GPT's ZK edge all describe proving the governance record is intact and rule-abiding **without
+  revealing its contents** — which is genuinely attractive here, because the raw ledger carries the owner's
+  name and absolute paths and therefore _cannot_ be published (the Archive↔Exhibit boundary, and exactly
+  why ruling C declined the live control-room feed). **⛔ NORTH STAR ONLY, NOT NEAR-TERM.** It is heavy, it
+  fights the **free / ≤$10** rule, and it would be the most expensive possible way to reach a boundary the
+  existing curated-static-snapshot answer already reaches. **Recorded so it is not re-litigated as a
+  near-term idea, and not deleted, because the framing is genuinely good.**
+
+**Cross-ref within this block: BR5** (tier a, the buildable one), **BR12** (epistemic transitions — the
+data tier (b) would formalise), **BR13** (the append-only external witness — the cheap, real version of the
+"unrewritable record" instinct tier (c) chases), **BR20** (verify-without-storing, already this project's
+own idiom for a zero-knowledge-shaped problem solved cheaply).
+
+---
+
+### BR1-BR4 — the four the external models converged on (in-house grounded verdicts)
+
+- **BR1. ⬜ Visual ops HUD** — a browser dashboard for the control plane. `A: cool 4 · purpose 5 | B: novel 1
+· leverage 4` · **HALF-BUILT.** **Verdict: worth building, but it is a RENDERER, not an app** — that
+  distinction is the entire cost difference. CPB5 v0.1 already shipped `lib/cli/projection.js` (the ONE
+  projection), `verdict.js`, `views.js` and **three** renderers (`render-tui`/`render-plain`/`render-json`),
+  with **GATE-8** locking "all renderers from one projection". So this is `lib/cli/render-html.js` plus one
+  supervisor line, served over **Tailscale** (never the public origin) — which is already the specced shape
+  of CPB5's phone cockpit, so this **folds into CPB5, it is not a new item**. ⛔ **The trap:** implementing
+  it as a small web server that reads the ledger itself **breaks GATE-8** and creates the second data path
+  the CLI architecture exists to prevent. It must `require` the projection. ⭐ **What makes it non-generic:**
+  every field carries `epistemicState`, so this HUD can render **BLIND as an actual visual state** — a
+  dashboard that can say _"I cannot see"_, which off-the-shelf ops dashboards cannot.
+- **BR2. ⬜ Physical Fallout terminal** — `A: cool 5 · purpose 2 | B: novel 2 · leverage 2` · **NET-NEW
+  (hardware).** **Verdict: renderer #5. It costs real money and delivers no capability the phone cockpit
+  doesn't.** Software cost genuinely small (same projection); hardware is a weekend and $60-150, which
+  brushes the **free / ≤$10** rule and is an owner call, not an assumption. WB9 **already logs** "a USB
+  status lamp … a harmless read-only physical renderer" and "terminal-boot-sequence-varies-by-real-health"
+  as museum/cockpit flavour, explicitly not control-plane items — the external models re-derived something
+  already filed and already correctly classified. **The version with real leverage is a different device
+  doing a different job → BR26.** See **REJECTS/DEFERS**.
+- **BR3. ⬜ Generic typed MCP proposals** — `A: cool 3 · purpose 3 | B: novel 1 · leverage 3` · **PLANNED
+  (already RB4 + MCP1).** **Verdict: correct design, wrong time — and this queue already reached that
+  conclusion twice.** RB4/MCP1 specify it in more detail than the round produced. Three grounded
+  corrections the external models could not have: it **must be REMOTE Streamable-HTTP** (local stdio MCP
+  does not work in Cowork/claude.ai — corrected 2026-07-31 against Anthropic's docs); it **does not solve
+  WAKE**, and remote connectors additionally lack subscriptions/sampling and time out at 5 minutes; and
+  **its main motivator is gone** (effort is solved free by SP2's two-message pattern). See
+  **REJECTS/DEFERS**.
+- **BR4. ⬜ Adversarial / chaos drills → the DRILL RUNNER** — `A: cool 4 · purpose 5 | B: novel 3 ·
+leverage 5` · **HALF-BUILT.** **Verdict: the strongest of the four, and ~60% already there.** Red-then-
+  green mutation proof is already _culture_ here (PW/PWE take a real L4 lock; DTW runs a **two-way**
+  mutation; WS/WSI run a real sandboxed supervisor; P16 has a red-then-green leak probe; GATE-9 proves it
+  is not vacuous), and `lib/mirror-restore-test.js` is **literally a recurring restore drill** on a weekly
+  self-gated cadence. **The real gap, precisely: every drill in this project is a BUILD-TIME unit test; not
+  one runs against the LIVE system on a schedule.** The net-new part is a drill runner on the existing
+  daily-housekeeping cadence. ⛔ **Shape matters — see CONTRARIAN C3: fire drills, not a chaos monkey.**
+  Candidate drills, each testing a claim a doc already makes: stale `status.json` → Home must flip **BLIND**;
+  delete `chain-head.json` in a clone → truncation must report **UNOBSERVABLE**, never "fine"; mutate one
+  record in a _cloned_ ledger → `verifyChainLive` must **name that exact record**; hollow out the scrub list
+  in a sandbox → P16 must **BLOCK**; break Pushover creds → `notify.js` must degrade, **never fabricate a
+  send**; kill the supervisor task mid-run → does the L4 lock release and does housekeeping notice. Every
+  drill appends a ledger record, so **the absence of drills becomes visible** — the same trick
+  `finding.unpushed-window` already uses to make a quiet run legible.
+
+### BR5-BR13 — the high-leverage core (proof, measurement, and the dormant-kernel unlock)
+
+- **BR5. ⬜ The Ledger Replay Bench** — replay the real ledger through a **candidate** pure detector and diff
+  its decisions against what actually happened. `A: cool 4 · purpose 5 | B: novel 5 · leverage 5` ·
+  **NET-NEW mechanism over BUILT purity.** ⭐ **Tier (a) of BR0, and the single strongest item in this set —
+  strong because of an accident of how this codebase was written.** Every detector was deliberately split
+  into `computeXxx` (pure, no I/O, injected `nowIso`) + a thin `readXxx` wrapper — `usage-mode.js`,
+  `thrash-detect.js`, `push-window.js`, `uncommitted-ownership.js`, `budget-check.js`, `incident.js`,
+  `backup-health.js`, `daily-housekeeping.js` — and the ledger is complete, append-only and now
+  hash-chained. **That means the entire history is a replayable test corpus and nobody has ever replayed
+  it.** Unlocks **DG1** (replay 137 `thrashing.detected` + the 4 alerts against a candidate gate), **DG3**,
+  the `--no-verify` tripwire, **CPB2's 95 refinement** (replay 946 `usage.reading` events and report exactly
+  how many mode changes it would have produced), and `incident.js`'s cooldown choices (against 105 real
+  `incident.transition` events). **Reuses:** `ledger.js`'s `readAll` already takes an `opts.dir` override,
+  added for the restore test. **Invariants:** reads only, no executor, no new authority, AI-free, free.
+  ⚠ **WB9's "shadow-supervisor replay harness" is the seed of this**, filed as one bullet in a six-item
+  low-priority cluster — the proposal is that it is dramatically undervalued there and should be promoted
+  rather than duplicated (Protocol 22).
+- **BR6. ⬜ Alert Accounting — measure the notification channel itself** — a deterministic report over
+  `notify.sent` + `incident.transition`: what fired, what auto-resolved with no owner action, what recurred.
+  `A: cool 3 · purpose 5 | B: novel 4 · leverage 5` · **NET-NEW report over BUILT data.** **The argument is
+  the measurement:** this whole program runs on measure-then-enforce (DG2 waited for 10 clean pushes and got
+  44), and **the one channel never measured is the one the owner actually lives in** — 69 alerts, **74% one
+  family**, after _two_ tuning rounds (REF1, REF5). An incident that opens and auto-resolves with the owner
+  doing nothing is, by definition, one that did not need to fire; `incident.transition` already distinguishes
+  `resolved` from `reopened`, and `notify.sent` is already delivery-confirmed separately from send-intent.
+  Pure function over existing records, no new writes. **Feeds** CPB5 v0.3's notification-mute design and
+  WB9's quiet-hours item. **Pairs with BR7**, which gives it ground truth.
+- **BR7. ⬜ `robco ack` — the one-bit human signal (CLI action #2)** — record "I saw this, and it was / wasn't
+  worth telling me." `A: cool 3 · purpose 5 | B: novel 4 · leverage 5` · **HALF-BUILT.** CPB5 v0.1 shipped
+  the entire action machinery for **one** action — `envelope.js` (frozen target version + ledger index,
+  derived idempotency key, postcondition as _data_), `actions.js` as sole write path (GATE-9), echo +
+  typed-confirm, hold-until-postcondition, receipts — so **the marginal cost of action #2 is small**.
+  `session.stop` is the queue's next action but it is the destructive one needing `process-terminated` /
+  `(pid, procStart)` work; `ack` is non-destructive. ⭐ **Why it is more than QoL:** this system has an
+  unusually careful vocabulary for _how the machine knows things_ and **none at all for what the human
+  thought of it** — adding a one-bit human verdict is the natural extension, and it converts BR6's heuristic
+  into ground truth. **Invariants:** human-interactive only (`assertHumanInteractive`), appends via the one
+  `appendMany`, supervisor still sole writer of **autonomous** records.
+- **BR8. ⬜ The Manifest Shim — feed five dormant systems without a launcher** — materialise a job manifest
+  from the session enrollment that already happens. `A: cool 3 · purpose 5 | B: novel 4 · leverage 5` ·
+  **HALF-BUILT.** ⭐ **`state/manifests/` does not exist; zero jobs have ever been tracked** — that one
+  absence is why CPK1's reconciler, CPK2's publisher, CPK4's continuation packets, ACT2's whole write-side
+  and CPB1's budget alert are all "dormant until fed", waiting on **CPB9, which has no spec and no owner
+  go**. **The insight: you do not need approvalless launching to get job records — you need a job id.**
+  `hooks/session-start-enroll.js` already fires on every real session; `admission-reconciler.js` already
+  binds on `CLAUDE_CODE_HOST_SESSION_ID` (exact match only); `job-contract.js` already writes manifests
+  write-once/exclusive-create. So: a session **declares** a queue item id (`ROBCO_JOB_ID`, or a parsed
+  session title — with the honest caveat that title-readability must be **verified on disk, not assumed**,
+  exactly as CPB5's session-roster entry demands), the hook **records the declaration**, and the
+  **supervisor materialises the manifest on its next tick** — which preserves sole-writer instead of adding
+  a second manifest author. **This is most of CPB9's value with none of its authority.** ⚠ Does **not**
+  approve CPB9 and must not be read as doing so.
+- **BR9. ⬜ Signal Retirement — Protocol 49 applied to TELEMETRY, not guards** — a "top talkers" report plus
+  a rule that a finding exceeding N% of ledger volume must be acted on, demoted to a gauge, or retired.
+  `A: cool 3 · purpose 5 | B: novel 5 · leverage 4` · **NET-NEW (small code + one doctrine line).**
+  Protocol 36b adds guards, Protocol 49 retires them, and the pair is explicitly designed so weight tracks
+  risk **in both directions** — **but that discipline has never been pointed at signals.** The data is the
+  argument: `finding.unattributed-enrollment` is **40.9% of the entire ledger**, carries a degenerate
+  `childSessionId:"1"`, is marked `LOGGED ONLY`, and has **never informed a decision**. ⚠ **That is not a
+  bug report** — the finding may be perfectly correct; it is a governance gap, because a signal that has
+  never informed a decision while consuming 41% of the record is failing the same cost/benefit test
+  Protocol 49 already applies to guards. **Novel because everybody retires rules; nobody retires
+  observations.** ⚠ Any doctrine change here is an owner call (a `CLAUDE.md`/Protocol edit is never a side
+  effect of a queue fold).
+- **BR10. ⬜ Gauge / event split — stop writing "still true" 27,000 times a day** — separate the append-only
+  **event** ledger from a rotating **gauge** stream; write gauges on change plus a heartbeat.
+  `A: cool 2 · purpose 5 | B: novel 3 · leverage 5` · **NET-NEW, forward-only.** 67% of the ledger is
+  restated present-tense state, growth is **accelerating** (3.6→8.5→12.0→14.7 MB/day), each day's file is
+  mirrored whole into the free Ledger repo (**30 MB after 4 commits**), and the weekly restore test
+  **clones that repo**. ⛔ **Forward-only is mandatory** — the ledger is append-only and nothing may be
+  rewritten; the change is that new gauge-class records go to a separate stream, with the chain and the
+  event ledger untouched. **Compounds:** cheaper WB6 verification, smaller mirror, faster restore test, and
+  the 69 records that mattered stop being buried under 77,000. Pairs with **BR9** (which decides what is a
+  gauge) and **BR25**.
+- **BR11. ⬜ Mutual-Witness — a dead-man's switch for free, from tasks that already exist** — the supervisor
+  and the daily-housekeeping task each check the other's last tick. `A: cool 3 · purpose 5 | B: novel 4 ·
+leverage 4` · **PLANNED (WB7) — but much cheaper than filed.** WB7 proposes "a tiny independent
+  watchdog"; **the grounded version needs no new process at all**, because two independent Windows
+  Scheduled Tasks are confirmed registered and running (proven under ACT1 above) and each already reads the
+  ledger. Housekeeping notices a supervisor that stopped ticking; the supervisor notices housekeeping
+  hasn't landed in >26h — which matters, because with only a handful of `housekeeping.completed` events
+  ever written, **a silent stop currently looks identical to normal**. ✅ **Honest framing kept from WB7:**
+  a same-machine witness cannot survive the machine dying — that is CP5's job — but it closes the far more
+  likely failure at **zero new processes and zero new authority**.
+- **BR12. ⬜ Epistemic Transition Tracking — "how I know things" changed** — alert and report on changes to a
+  field's `epistemicState`, not its value. `A: cool 4 · purpose 5 | B: novel 5 · leverage 4` · **NET-NEW
+  over BUILT vocabulary.** Every projected field carries `{value, epistemicState, observedAt, sourceRef,
+freshnessDeadline, reasonCode}`; `derive()` floors a computed field to its **weakest input**;
+  `applyFreshness()` is the one path by which a field decays — **and all of it is computed per-render and
+  then thrown away.** But _"backup health went from VERIFIED to UNKNOWN"_ is a **more** alarming event than
+  any value change: it means the machine stopped being able to see, which is exactly what the BLIND verdict
+  exists to honour, and nothing currently records that transition. **The purest "compounds our strongest
+  primitive" item in the set** — no new source of truth, no new authority, and it makes the epistemic
+  vocabulary **historical** instead of momentary. Gives **BR5** a second dimension to diff on and is the
+  data **BR0 tier (b)** would formalise.
+- **BR13. ⬜ The Append-Only External Witness — anchor the chain where the machine can't rewrite it**
+  — publish only the chain head into a store the control machine can append to but cannot rewrite.
+  `A: cool 4 · purpose 5 | B: novel 5 · leverage 5` · **extends BUILT (WB6).** WB6 is admirably honest about
+  its own ceiling — _"evidence against partial tampering … not proof against an attacker who rewrites the
+  whole file and recomputes every hash forward"_ — and `chain-head.json` is correctly the one `state/` file
+  that IS mirrored, because _"a witness the local machine can rewrite at will is only half a witness."_
+  ⭐ **But the mirror is pushed by the same machine with the same credentials, so one actor can rewrite
+  both.** The upgrade is cheap and inside free/≤$10: put the witness where **force-push is disabled**
+  (branch protection on a free private repo), so a rewrite of local history produces a **provable
+  divergence** from an anchor the machine had no ability to alter. **That converts WB6 from
+  tamper-evident-against-edits to tamper-evident-against-the-machine** — the actual threat model for a
+  single-machine system, and the cheap, real version of what BR0 tier (c) chases. Much of it is policy, not
+  code.
+
+### BR14-BR26 — the rest of the set (grouped, unranked)
+
+- **BR14. ⬜ Collision-Consequence Detector — measure harm, not co-residency** — `A: cool 3 · purpose 5 |
+B: novel 4 · leverage 5` · **HALF-BUILT.** Worktrees (Stage 6 / **DG5**) are deferred until "Stage 1's
+  measured collision rate decides … if collisions are ~zero, we build nothing more here, on purpose."
+  ⭐ **The measured rate is not near zero — it is always:** 9 live sessions in one tree, `tree-collision`
+  2,653×, `probable-duplicate-launch` 7,386×. **The detector answers a question whose answer never varies,
+  so it cannot inform the decision it was built to inform.** The decision-grade question is **consequence**:
+  did two sessions write the same file within N seconds, did a lock refusal actually occur
+  (`lock.observed` = 17), did a gate fail on a sibling's untracked file — the exact incident Protocol 41's
+  concurrency fix and the `eslint .` scoping fix exist to prevent. **Precedent already in the code:** REF5's
+  `dirtyFingerprint` proved a _hash of what changed_ answers what a _count_ structurally cannot. Same
+  lesson one layer up; also de-noises the ledger (BR9/BR10).
+- **BR15. ⬜ `robco quiet` — the inverse of `why`** — show every alert suppressed this run and the exact
+  signal that suppressed it. `A: cool 4 · purpose 4 | B: novel 4 · leverage 3` · **HALF-BUILT.**
+  `push-window.js` already writes `finding.unpushed-window` per repo per run recording which of its four
+  signals suppressed the alert, explicitly _"purely observational … so a quiet run is legible rather than
+  merely silent"_; REF5's ownership leg does the same. **That excellent pattern exists for two detectors and
+  nowhere else.** `why` explains the verdict; `quiet` explains **why you weren't told** — the question that
+  actually erodes trust in a system that spent two refinement rounds learning to stay silent. A sixth view
+  over the existing projection.
+- **BR16. ⬜ Effort ceiling as a pure module — buildable today, no launcher required** — `A: cool 3 ·
+purpose 4 | B: novel 2 · leverage 4` · **PLANNED (CPB2's EFFORT DIMENSION).** The design is fully specced
+  (monotonically falling ceiling; caps **down**, never up; binds unattended work only, never the owner), but
+  its enforcement point (CPB5 v0.2's admission gate) and its consumer (CPB9) both do not exist. **The pure
+  comparator is small**, sits beside `usage-mode.js`'s existing pure `computeOperatingMode`, and displaying
+  it costs nothing — and today's live state makes it immediately legible (`sd` 96%, mode
+  `Stop-unattended-AI` → _"ceiling: unattended work refused"_). **Ship the dial's readout before the dial
+  has a governor**; zero authority added, and it makes the newly-adopted "Dispatch announces the tier"
+  workflow checkable against the machine rather than on the honour system.
+- **BR17. ⬜ Effort provenance — record the tier as CLAIMED, starting now** — `A: cool 2 · purpose 4 |
+B: novel 3 · leverage 4` · **NET-NEW (tiny).** SP2's epistemic table is scrupulous: tier-**SET** is
+  VERIFIED, _"a high tier deepens reasoning"_ is **CLAIMED**. CPB9 will require the tier recorded **applied
+  and verified**, and CPB2's ceiling makes "requested ≠ applied" the **normal** case by design — yet nothing
+  records any of it today. Cheapest honest move: record the announced tier as **CLAIMED**, never rounded up,
+  so a real series exists later. ⛔ **The A/B experiment that would move SP2's fourth row off CLAIMED should
+  NOT be run now** — weekly usage is at **96%**, and a two-arm controlled run spends the one resource that is
+  currently scarce. Recording the series is free; measuring it waits for a fresh week.
+- **BR18. ⬜ The RobCo Morning Report — deterministic, AI-FREE, in the house voice** — a templated overnight
+  digest built from the housekeeping numbers, pushed once a day. `A: cool 5 · purpose 5 | B: novel 3 ·
+leverage 3` · **HALF-BUILT.** ⭐ **This is the direct answer to "the owner has gotten no notification":**
+  a healthy night is _correctly_ silent (see ACT1 above), so the owner's entire phone relationship with the
+  control plane is **69 alarms in five days, 51 of them the same one**, and no positive signal ever.
+  Meanwhile `daily-housekeeping.js` already computes ledger growth, adapter drift, lock hygiene, disk
+  pressure, mirror result and restore-test status, and `accumulateRollup` already writes them to
+  `weekly-rollup.json`. A deterministic template over data that already exists — no model, no usage,
+  following `notify-messages.js`'s existing one-formatter-per-type discipline — rendered as a terminal log.
+  ⭐ _**"Nothing needs you" is the sentence this whole control plane was built to be able to say honestly,
+  and right now it can only say it to a terminal the owner isn't looking at.**_ Highest coolness-per-hour in
+  the set, and the natural first consumer of BR1's cockpit. ⚠ Must respect the existing dedupe/mute design
+  and not become a 70th alert nobody reads — it is a **digest**, not an alert.
+- **BR19. ⬜ Boot-Sequence-as-Diagnostic** — the CLI's startup sequence **is** the health check; a
+  safety-critical BLIND field **halts the boot**. `A: cool 5 · purpose 4 | B: novel 3 · leverage 2` ·
+  **HALF-BUILT.** WB9 logs "terminal-boot-sequence-varies-by-real-health" as decoration; the version worth
+  building isn't. `theme.detectCaps()`, the phosphor ramp and GPT's turtle raster already ship, and
+  `verdict.js` already names its `SAFETY_CRITICAL` fields **with a `why` string each** — render those as the
+  ROM check. Makes the health check the thing you cannot skip past, which is a usability property, not a
+  skin. Fallout-native by construction.
+- **BR20. ⬜ Scrub-List Fingerprint — verify the PII list without ever storing it** — `A: cool 3 · purpose 5
+| B: novel 5 · leverage 4` · **extends BUILT (P16).** P16 is mounted and fails closed on a missing **or
+  hollowed-out** list, and `state/museum-scrub-list.txt` is correctly **PII itself**, correctly **not on the
+  mirror whitelist**. ⚠ **The consequence nobody has written down: a machine loss destroys the only thing
+  standing between the private Archive and the public Exhibit.** Fail-closed means you cannot publish (good)
+  — but you also cannot **know** whether a hand-rebuilt list is complete. The fix is this project's own
+  idiom: record the list's **shape** (term count + salted hash), never its contents — exactly the discipline
+  P16 already applies to its allow-list (SHA-256, never plaintext) and its findings (redacted snippet +
+  hash, **never the matched value**). **Verify without storing.** Belongs in **WB4**'s recovery runbook;
+  cross-ref **OD2**.
+- **BR21. ⬜ Proof-Carrying Continuation Packets** — every packet carries the chain sequence range and
+  content-store refs covering its own evidence. `A: cool 4 · purpose 4 | B: novel 5 · leverage 4` ·
+  **extends BUILT (CPK4 + WB6).** Packets already do the hard part (two never-blended halves,
+  `independentlyObserved` vs `agentClaims`); WB6 gives every new record `chain:{seq,prev,self}` and
+  `content-store.js` **refuses content that no longer hashes to its own name**. Bolted together, a packet
+  becomes **self-verifying**: the next session can confirm the ledger span it was built from is unaltered
+  **without trusting the packet's author**. Makes the observed/claimed split enforceable rather than merely
+  honest; composes into **RB2**'s structured completion receipts.
+- **BR22. ⬜ Radroach Scan — deterministic reference-graph lint across the docs** — every `Protocol N`, item
+  id, SHA and path referenced in the governing docs must resolve. `A: cool 4 · purpose 4 | B: novel 3 ·
+leverage 4` · **HALF-BUILT.** `scripts/knowledge-graph.js` (R11) already extracts typed nodes/edges with
+  per-extractor `parser_status` and an explicit acceptance floor (_"a run reporting zero gaps means the
+  parser is lying"_), and is **un-gated until it demonstrably catches real drift** — extending it to resolve
+  cross-references is the cheapest way to give it that proof. **The need is documented in this file's own
+  corrections:** the enforce-half paragraph that was untrue for a day, ACT3's counter labelled "live" when it
+  was a dated snapshot, a shipped item sitting in "to build" for two days — **and ACT1, corrected today.**
+  _A stale positive claim is worse than an omission_, and that class is mechanically detectable. MCP2's
+  "reference-graph lint" is the eventual query surface; the scanner needs no MCP at all. ⚠ Sibling of
+  ACT1's remaining README-staleness nudge — and per **BR9**, it must route through the **existing** incident
+  path, never a new one.
+- **BR23. ⬜ Session roster with real names (read-only)** — `A: cool 4 · purpose 4 | B: novel 2 · leverage 3`
+  · **HALF-BUILT.** Already scoped as a v0.1-extendable projection. **Grounded urgency:** 9 live sessions in
+  one tree right now, and `finding.tree-collision`'s live payload already carries
+  `{sessionId, pid, version, entrypoint, name, procStartIso}` per session — **including a `name` field**
+  (observed value `"robco-uos-03"`). ⚠ **That is entrypoint-adjacent and is NOT proven to be the UI title the
+  owner sees.** The existing caveat stands and must be honoured — verify title-readability on disk against
+  the three candidate stores, or degrade to id + cwd and **say so** — but the honest read is that this is
+  closer to done than its entry assumes.
+- **BR24. ⬜ Two-Message Launch Primitive — make the silent no-op impossible** — a small tested helper that
+  sends `/effort <level>`, **waits for the acknowledgement and idle state**, then sends the brief, and
+  treats **"0 turns" as RED**. `A: cool 2 · purpose 5 | B: novel 3 · leverage 4` · **NET-NEW (small).**
+  SP2 nailed the failure: inlining makes the slash command swallow the task — **0 turns, nothing runs, no
+  error** — and the **sequencing** rule is sharper than the message count, since firing both back-to-back is
+  a **race** that re-creates the inline failure by accident. **That is currently protected only by prose in
+  three documents.** One tested helper removes the most plausible way CPB9 gets built wrong **before** CPB9
+  exists, and is useful to Dispatch today under the standing effort workflow.
+- **BR25. ⬜ Ledger retention tiers — with a proof of what was dropped** — hot (raw) → warm (compacted
+  gauges) → cold (chain head + daily digest), where every compaction publishes a **chained digest of exactly
+  what it removed**. `A: cool 3 · purpose 4 | B: novel 4 · leverage 3` · **NET-NEW.** The consequence half of
+  **BR10**. `daily-housekeeping.js` already computes growth, near-cap files and a runaway-writer flag and
+  deliberately **reports rather than compresses** — correct for its observe-only mandate, which is precisely
+  why the report currently has nowhere to go. ⛔ **The load-bearing constraint:** append-only is sacred, and
+  WB6 already found the lexicographic sort bug that would have raised _a tamper alarm on a ledger nobody
+  touched_ — so compaction must be **forward-only and provable**, or you have built the thing WB6 exists to
+  detect.
+- **BR26. ⬜ Off-Machine Witness Device — the honest version of the physical terminal** — a cheap always-on
+  second device that observes the primary machine from outside. `A: cool 5 · purpose 4 | B: novel 4 ·
+leverage 5` · **PLANNED-adjacent (CP5's laptop-witness).** CP5 is filed as "inventory → then the
+  deployment-topology decision"; WB7 admits a same-machine watchdog _"cannot survive the machine itself
+  dying — that is CP5's job."_ ⭐ **This is the same instinct that produced BR2, pointed at a job worth
+  doing.** A _display_ renders state you can already see; a _witness_ holds an independent observation the
+  primary machine cannot fabricate or rewrite. Paired with **BR13**'s unrewritable anchor it becomes a
+  genuine two-party integrity story. **If the owner wants a Fallout terminal, this is how it earns its
+  keep** — the enclosure is the fun, the witnessing is the reason. ⚠ Hardware cost still needs an explicit
+  owner call against the **free / ≤$10** rule.
+
+---
+
+### ⭐ THE BUILD ORDER — if any of this is ever approved (PROPOSED ranking, not a schedule)
+
+⚠ **This is the source report's own recommendation, recorded verbatim in substance. It is a proposal about
+sequence, not a commitment to build any of it.** It is ordered for the **real** state of the code and for
+one live constraint: **weekly usage was at 96% and the machine was in `Stop-unattended-AI` when this was
+written**, which argues hard for cheap, read-mostly work first.
+
+1. **BR6 Alert Accounting + BR7 the `ack` action.** _First._ Every promotion here is data-gated, and the one
+   channel never measured is the one the owner lives in (**51 of 69 alerts are one family, after two tuning
+   rounds**). BR6 is a pure function over existing records; BR7 is action #2 on machinery already built and
+   gate-locked for action #1. Cheapest item with the largest behavioural payoff.
+2. **BR5 The Ledger Replay Bench.** Highest leverage available, and it exists because of an accident nobody
+   planned: **every detector is already pure and the ledger is already complete.** Converts four separate
+   data-gated stalemates from "wait and hope" into "replay and diff". **Start with the CPB2 threshold
+   replay** — small, against 946 real readings, and today's live 96% makes it immediately decision-relevant.
+3. **BR8 The Manifest Shim.** One missing producer is why **five shipped systems are dormant**. Delivers
+   most of CPB9's value with **none** of its authority. Highest ratio of unlocked-shipped-code to new-code
+   in the set.
+4. **BR18 Morning Report + BR1's HTML renderer (the cockpit).** Together they fix the owner's actual daily
+   experience: phone-first, currently receiving **only alarms**. One deterministic AI-free in-voice digest
+   plus a Tailscale-served page that can render **BLIND**, both riding `projection.js` so GATE-8 survives.
+5. **BR4 The Drill Runner (fire drills) + BR11 Mutual-Witness.** Moves red-then-green from build-time to
+   run-time on a cadence that already exists, and gets a dead-man's switch out of **two scheduled tasks
+   already registered** — zero new processes.
+6. **BR13 The Append-Only External Witness.** Mostly policy plus a little code; upgrades WB6 from
+   tamper-evident-against-edits to **tamper-evident-against-the-machine**. Correct threat model for a
+   single-machine system and the strongest museum material in the program.
+
+**Honourable mentions, cheap, slot anywhere:** **BR16** (effort-ceiling readout — makes the new standing
+workflow checkable), **BR20** (scrub-list fingerprint — closes a real machine-loss gap on the one boundary
+that cannot be un-crossed), **BR24** (kills a known silent-failure mode before the thing that would hit it
+is built).
+
+---
+
+### ⛔ CONTRARIAN — the dissent, recorded verbatim so it cannot be smoothed away (Protocol 51(c))
+
+**This section is the in-house pass's disagreement with the round's own consensus. It is recorded in full,
+in its own voice, because a brainstorm that keeps only its agreements is worthless.**
+
+- **C1. MCP is the most expensive way to buy the least right now — and the queue already knows it.** It
+  doesn't solve WAKE; remote connectors can't push or subscribe and time out at 5 minutes; its main
+  motivator (setting the effort tier) evaporated on 2026-07-31 when the two-message pattern turned out to
+  be free; and it puts a public endpoint on the machine holding every repo and secret here. The payload it
+  would deliver **already exists locally**. **Build RB1's inbox** — the design doc's own "smallest useful
+  thing" — and let the owner keep being the wake. If it ever _is_ built: **outbound pull first**, and honour
+  the durability trap the doc flags, that "disposable relay" means replaceable _infrastructure_, never
+  lossy _delivery_.
+- **C2. The physical terminal is an exhibit wearing an ops costume.** It renders state a phone can already
+  show, costs real money against a free/≤$10 project, and is already logged in WB9 as museum flavour. The
+  only version with leverage (**BR26**) is a _different device doing a different job_. Don't let a shared
+  enclosure make them look like one project — and **if the terminal is built for joy, call it joy. That is
+  a legitimate reason; disguising it as infrastructure is not.**
+- **C3. "Chaos" is the wrong word and the wrong shape here.** Random fault injection is a fleet technique
+  for systems with redundancy. This is **one machine, one developer, owner-first, with a standing invariant
+  that a false denial locks the owner out — worse than no guard.** Random faults here are self-inflicted
+  outages. The right shape is a **fire drill**: named, deterministic, scheduled, expected-outcome, run
+  against clones. Everything else about the converged idea is right.
+- **C4. The reflex is to add a guard; the need is to measure the ones you have.** Protocol 36b's own
+  revision already says permanent enforcement is earned, not automatic. Right now: **69 alerts, 74% one
+  family, 4 known false positives, 137 thrash detections that have never authorised anything, 31,507
+  findings that have never informed a decision, and four promotions blocked on evidence nobody is
+  aggregating.** **The highest-leverage build on this entire board is a report, not a mechanism.** Protocol
+  49 has never been pointed at telemetry (**BR9**) — it should be.
+- **C5. Do NOT build a "claims ledger" for Dispatch's hypotheses.** It is the obvious-looking way to
+  mechanise Protocol 51(a), it _will_ be proposed, and **it is one of the two named anti-patterns
+  Dispatch's own designs already produced** and that a repo-aware session had to push back on (the other
+  being a hand-maintained manifest). Protocol 51 is enforced **at the edge** — brief template, planning
+  output, independent audit — deliberately _not_ by a bespoke guard, because a semantic guard could only
+  ever prove the headings exist, never that a hypothesis was tested. Same reason **WB2** must be
+  **generated** from enforcement points and never hand-authored: this project has already retired one rule
+  (**2a**) for exactly that failure mode.
+- **C6. Don't build the headless launcher to unblock the launcher-blocked things.** CPB9 has no spec, no
+  owner go, and carries real authority questions. **BR8** delivers the dependency using a hook that already
+  fires and a manifest writer that already exists. **Take the unlock; leave the authority.**
+- **C7. A HUD that can't say "I cannot see" is a downgrade from the CLI it replaces.** `verdict.js` returns
+  BLIND — _"not 'probably fine'"_ — and the codebase is explicit that a green light generated by an absence
+  of information is the single most dangerous output an operator console can produce. Dashboard work drifts
+  toward green/red because that is what dashboards look like. **If the HUD can't render BLIND, don't ship
+  it.**
+- **C8. More ledger is not more truth.** Volume is currently _hurting_: 67% restated gauges, accelerating
+  15 MB/day, inflating a mirror the weekly restore test has to clone, diluting a hash chain, and burying
+  the 69 records that mattered under 77,000 that didn't. The instinct on a system this careful is to record
+  more. **The evidence says the next win is recording less, better** — BR9/BR10/BR25.
+- **C9. ✅ ACTIONED, not merely recorded.** ACT1 claimed the daily-housekeeping scheduled task was
+  unregistered. Both tasks are registered, `Ready`, `Enabled`, `Last Result 0`. **Corrected in place at
+  ACT1 above (2026-07-31), and the matching stale code header fixed in the control repo in the same
+  pass** — see HOUSEKEEPING below. It is the same stale-positive class the 2026-07-31 reconcile caught
+  three of, and exactly what **BR22** would detect mechanically.
+
+---
+
+### ⛔ REJECTS / DEFERS — recorded so they are not re-litigated
+
+Each of these was **considered in this round and deliberately not taken**. Recorded as decisions with
+reasons rather than left as absences, so they cannot quietly return as fresh good ideas (the Protocol 49 /
+"logged decision" discipline this file already uses for the watcher-adjusts-effort idea).
+
+- **⛔ MCP server NOW — DEFERRED.** Build **RB1**'s local inbox projection instead. Full reasoning: **C1**
+  and **BR3**. ⚠ This does **not** kill RB4/MCP1/MCP2 — those entries stand unchanged with their own
+  sequencing ("when the channel reaches its own scheduled point"). It rejects **pulling them forward now**.
+- **⛔ Physical terminal AS INFRASTRUCTURE — REJECTED.** Two honest alternatives, and they are different
+  things: build it **as joy** and say so, or build **BR26** (the off-machine witness), which is a different
+  device with a different job. Full reasoning: **C2**. WB9's status-lamp/boot-sequence flavour entries are
+  untouched.
+- **⛔ LLM anywhere in the museum pipeline — REJECTED.** Two independent disqualifiers, either sufficient:
+  it breaks the **AI-FREE** invariant on the one gate that guards an **irreversible** leak (P16's own rule —
+  _"if the agent chooses whether to scrub, it isn't a gate"_, and it has **no `--force`**), and it puts the
+  owner's real name and absolute paths through a model on the way to a **public** origin. The
+  Archive↔Exhibit boundary is absolute. Consistent with the already-recorded museum-MCP kill and with
+  ruling C's decline of a live control-room feed.
+- **⛔ The zk / attestation stack NEAR-TERM — DEFERRED to BR0 tier (c) as NORTH STAR only.** Heavy, fights
+  **free / ≤$10**, and reaches a boundary the curated-static-snapshot answer already reaches far more
+  cheaply. **Not deleted** — the framing is genuinely good and **BR13** is its cheap, real, buildable
+  cousin.
+- **⛔ A claims-ledger for Dispatch hypotheses — REJECTED.** Full reasoning: **C5**. Already a named
+  Dispatch anti-pattern; Protocol 51 is enforced at the edge on purpose.
+
+---
+
+### 🧹 HOUSEKEEPING — corrections and cleanups this round surfaced
+
+- **The ledger-hygiene cluster (BR9 + BR10 + BR25) is one problem in three parts, and should be considered
+  as one** if it is ever taken up: _what deserves to be recorded_ (BR9, signal retirement), _where it should
+  be written_ (BR10, gauge/event split), _and how long it is kept_ (BR25, retention tiers). Taking any one
+  alone leaves the other two paying for it. ⚠ All three are **PROPOSED**; the doctrine half of BR9 is an
+  owner call, since a Protocol edit is never a side effect of a queue fold.
+- **✅ ACT1 CORRECTED (2026-07-31) — done in this pass, see the entry above.** Both scheduled tasks proven
+  registered/`Ready`/`Enabled`/`Last Result 0` by direct `schtasks /query /V /FO LIST`, corroborated by
+  ledger events and the accumulating `weekly-rollup.json`. **ACT1's remaining scope is ONLY the
+  README/doc-staleness nudge.** Also recorded there: **a healthy night is correctly silent** — verified in
+  `lib/daily-housekeeping.js`, whose only two `reconcileIncidentSet` calls are `adapter-drift` and
+  `disk-pressure`, with rank 3's `backup-mirror` type covering mirror/restore failure. The owner receiving
+  no nightly notification is the design working, not a dead task. A positive digest is **BR18**, unapproved.
+- **✅ Stale CODE HEADER corrected in the same pass (control repo).** `lib/daily-housekeeping.js`'s module
+  header still read _"NOT wired into supervisor.js and NOT registered as a scheduled task by this build …
+  actually registering a daily Task Scheduler entry is a separate, owner-gated follow-up"_. The registration
+  half of that has been false since 2026-07-30. Corrected in place with the proof; the _"not wired into
+  supervisor.js"_ half is **true and was kept** (the daily pass is deliberately its own task, not a
+  supervisor step). ⚠ The control repo's own `CLAUDE.md` was **already correct** ("registered as a Windows
+  Scheduled Task") — the drift was code-only, which is exactly why **BR22** would have caught it and a
+  doc-only audit would not.
 
 ## DATA-GATED — wait on measured evidence, not a decision (self-collecting via REF3's auto-verdict)
 
