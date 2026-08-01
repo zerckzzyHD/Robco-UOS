@@ -5965,6 +5965,8 @@ the swarm omission stated in the room's own copy — and no external content rep
 
 ### P13. ⚠️⏭️ SECURITY — add `planning/2.8.0/plans/DEPLOY_STAGING_PLAN.md` to the publish name/PII scan list (P8 finding, 2026-07-27)
 
+> ⚠ **BLOCKED: see [PX1](#px) — museum publishing is FROZEN until the allow-list / fail-closed rework lands** (2026-08-01).
+
 **What it is — and why it is a security item rather than a chore.** P8's corpus, while mapping where the
 archive retains real identity, found a **live, lookup-able email address in
 `planning/2.8.0/plans/DEPLOY_STAGING_PLAN.md`** (three occurrences, as the single identity in a proposed Zero
@@ -5992,6 +5994,8 @@ proven red-then-green against the real value (never committing it), and no repub
 is true.
 
 ### P14. ⬜ The live public museum is STALE against its source — the republish that ends "finish the museum" (2026-07-27)
+
+> ⚠ **BLOCKED: see [PX1](#px) — museum publishing is FROZEN until the allow-list / fail-closed rework lands** (2026-08-01).
 
 **What it is.** The public exhibit at **https://robco-exhibit.pages.dev/** was published **2026-07-24** and has
 not been regenerated since; the archive has moved under it (the P8 audit, the archive organization fixes at
