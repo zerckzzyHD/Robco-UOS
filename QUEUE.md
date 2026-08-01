@@ -363,6 +363,14 @@ was moved **verbatim** to
 
 ## Where we are right now (the real 5-second version)
 
+- **🚨 MUSEUM PUBLISHING IS FROZEN (2026-08-01) — no shipped museum update until [PX1](#px) lands.** A
+  2026-08-01 near-miss found the museum publish walk is **public-by-default** (a deny-list: everything tracked
+  is published unless someone remembered to exclude it), so brainstorm material under `planning/` would have
+  auto-published **without passing the P16 PII gate**. Verified at source. A stopgap quarantine shipped
+  (archive `dce854d0`); **the polarity flaw stands.** PX1 flips it to a fail-closed allow-list and is the
+  **top MUSEUM-TRACK priority** — ⭐ **the control plane remains the overall #1**, so the greenlit batch below
+  still runs first. The freeze binds **shipping**, not museum building/design/audit work. Full block:
+  **[PX1-PX3](#px)**.
 - **⭐⏭️ WHAT TO DO NEXT — see [⭐ OWNER-GREENLIT — READY TO BUILD](#greenlit), just below.** Four owner-greenlit
   items in build order: **CP5** the off-machine witness → **CPB2**'s 95/80-94 threshold refinement →
   **close SP2** (`ultrathink` answered) → **retire the DG2 counter metric**. Consolidated 2026-08-01 because
@@ -4698,6 +4706,149 @@ batch lands.
 actual code/git history rather than asserted from memory (Protocol 3/27 discipline); the lessons-learned pass
 names real incidents with dates, not vague characterizations; and the museum's next content pass can cite it
 as source material.
+
+---
+
+<a id="px"></a>
+
+# 🚨 PX1-PX3 — THE PUBLISH-EXPOSURE NEAR-MISS (incident-driven, filed 2026-08-01; ⛔ PROPOSED)
+
+⛔ **PROPOSED, not approved and not scheduled** — same posture as the `HA` and `BR` blocks. What is **not**
+proposed is **PX1's standing freeze**: that is a policy in force from today, recorded below.
+
+**⚠ APPEND-ONLY BLOCK.** Filed by a scoped append pass on the owner's instruction; **the existing brainstorm
+blocks (`BR` incl. the Round 3 addendum, `HA`, and the Round 4/5 material) were deliberately NOT reconciled or
+deduped by this pass.** That is the post-Round-5 job. Anything here that overlaps a slate candidate is
+cross-referenced by slate ID rather than merged, so the reconcile has both identities to work from.
+
+**New family prefix `PX`** (publish exposure) — verified unused in `QUEUE.md` and `QUEUE_LOG.md` before
+assignment; no existing ID is renumbered, re-lettered or reused (Protocol 49).
+
+### What happened (2026-08-01)
+
+Backing the brainstorm raw material into the **private archive** surfaced that the museum's publish walk is
+**public-by-default**. **Brainstorm text filed under `planning/` would have been walked into the museum
+manifest and auto-published — without ever passing the P16 PII gate.** It was caught before anything shipped.
+
+**⚠ VERIFIED AT SOURCE THIS PASS, not taken from the brief (Protocol 51(a)).** `walk()` in
+`_RobCo-Archive/museum/generate.mjs` starts from **`git ls-files`** — i.e. **every tracked file in the
+archive** — and drops only three prefixes: `museum/`, `.claude/`, and (as of the stopgap) `raw-capture/`.
+Everything else falls through into the manifest. **`planning/` is not merely un-excluded, it is explicitly
+classified IN** — `CLASSIFY_RULES` lists `planning/<version>/`, `planning/_standing/` and
+`planning/<anything-else>/` as museum areas. **Scale of the near-miss: 609 tracked files under `planning/`
+today.**
+
+**Interim stopgap — SHIPPED, and it is a quarantine, not a fix.** Archive commit **`dce854d0`** (verified: it
+is the archive's current `HEAD`) adds a `raw-capture/` root excluded at `walk()`, holding **119 files** of
+verbatim, uncurated source material — raw model responses, screenshots, and PII-dense `.jsonl` transcripts.
+⛔ **The underlying polarity flaw is untouched by it.** The stopgap moves one pile of material behind the
+boundary; it does not change which side of the boundary new material lands on by default.
+
+**The generator's own comment already states the principle this block acts on** — _"Excluding at the walk
+fails closed; scanning at the end fails open."_ PX1 is that sentence applied to the whole walk instead of to
+one directory.
+
+---
+
+### PX1. 🚨 [MUSEUM P0 — PUBLISH-FROZEN] Publish polarity rework: deny-list → allow-list, fail-closed
+
+**Slate cross-ref: candidates D1 / D2** (and **D6** for the third layer). Recorded, deliberately **not**
+merged — see the append-only note above.
+
+**The flaw.** The walk is a **deny-list**: a path is **public by default** and private only if someone
+remembered to exclude it. Every new directory, every new artifact class, every new brainstorm round starts
+life **publishable**, and the only thing standing between it and the public tree is whether a human thought
+to add an exclusion first. **A deny-list fails OPEN on the one path nobody thought to list** — and on this
+boundary, failing open is unrecoverable: git history is permanent and exposure does not undo.
+
+**The rework — flip the polarity.** Nothing enters the manifest or the public tree unless its path is
+**explicitly allow-listed**. Unknown path → **excluded**, silently and by construction. The layered target:
+
+1. **Allow-list paths — PRIMARY, structural, fail-closed.** The load-bearing layer. A new directory is
+   invisible to the museum until someone deliberately admits it.
+2. **P16 PII scan as a SECOND gate on allow-listed files.** ⚠ Second, never first: **P16 can only match
+   identifiers it was handed** — it cannot see a name it was never told about, which is precisely why it
+   cannot be the primary defence. _(Verified: P16 is mounted at `runPublishPrep()` and runs over
+   `preparePublish()`'s **output** — i.e. downstream of the walk, exactly as the layering above assumes.)_
+3. **Pre-publish DECLASSIFICATION DIFF for owner sign-off** — slate item **D6**. What is about to become
+   public that was not public before, shown as a diff a human approves.
+
+**⛔ STANDING POLICY, IN FORCE FROM 2026-08-01: no shipped museum update until this lands.** Not a proposal —
+a freeze. It binds the museum's publish path, **including P14** (the stale-site republish) and anything that
+would move the public exhibit. It does **not** freeze museum _building_, design, or audit work; it freezes
+**shipping**.
+
+**⭐ PRIORITY FLAG: this is the top MUSEUM-TRACK priority. The CONTROL PLANE remains the overall #1** — the
+greenlit batch (**G1-G4**) is unaffected and still runs first. PX1 is the head of the museum queue, not the
+head of the board.
+
+**Evidence:** the 2026-08-01 near-miss above, verified at source this pass.
+
+---
+
+### PX2. ⬜ [Ops] Automate the transcript + uploads snapshot into daily housekeeping
+
+**What exists:** a **one-time manual snapshot**, run 2026-08-01 into the private archive's `raw-capture/`.
+**What is proposed:** make it recurring — fold a periodic snapshot of session transcripts (`.jsonl`) plus
+uploads into the **daily 03:15 housekeeping task** (`\RobCo-Control-DailyHousekeeping`, verified `Ready` /
+`Enabled` / `Last Result 0`).
+
+**⚠ SOURCE PATH — use the MSIX PHYSICAL path, not the virtual one:**
+
+```
+%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\...
+```
+
+**✅ CORRECTED AGAINST MEASUREMENT (Protocol 51(a)) — the recommendation is right, the usual reason for it is
+not.** The brief filed this as "the virtual `AppData\Roaming\Claude` path is invisible to on-host processes."
+**Measured both ways this pass, and it is context-dependent, not universally invisible:**
+
+| Path                                              | Bash-launched shell (user `kadyn`)                                                                        | PowerShell tool sandbox (`rog-ally\kadyn`) |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Virtual `%APPDATA%\Claude\...`                    | **visible** — and resolves to the _same directory_ (identical device:inode `1349154606:6755399441088449`) | **absent** (`Test-Path` → `False`)         |
+| Physical MSIX `...\LocalCache\Roaming\Claude\...` | **visible**                                                                                               | **visible** (`Test-Path` → `True`)         |
+
+**So the physical path is the SUPERSET — it works from every context tested; the virtual path works from only
+some.** MSIX filesystem virtualization makes the virtual path resolve for processes inside the package's
+view and simply not exist outside it. **A scheduled task runs in a context you cannot assume is inside that
+view, so the physical path is the only one it can rely on** — which is a stronger argument for the same
+conclusion than "invisible to on-host processes", and it is why the distinction must not be quietly dropped
+when this is built. _(This also explains the long-standing Protocol 48 quirk that the archive sync must run
+via the Bash tool, never the PowerShell tool: same virtualization, same asymmetry.)_
+
+**⬜ OPEN SUB-DECISION, recorded rather than assumed (Protocol 50 a-form): CAPTURE SCOPE.** Brainstorm-window
+only, or the **full RobCo transcript history**? Either way, **exclude unrelated projects** — the session store
+is shared across everything the owner runs, and a RobCo backup that silently hoovers up unrelated work is a
+privacy problem of its own making. **Earn-condition:** the scope call is made before this is built; it changes
+the volume, the retention question, and what the archive is being asked to hold forever.
+
+⛔ **Whatever is captured lands in `raw-capture/` and stays quarantined** — PX2 must never widen the walk. It
+is a **producer** into the quarantine, and the quarantine is what makes automating it safe at all.
+
+---
+
+### PX3. ⬜ [Museum-audit scope] Primary-source-as-exhibit curation
+
+**⚠ This is a museum-audit SUB-QUESTION, not a build item.** Filed so the question has a home, not because
+anything is queued.
+
+**The question.** How do you surface **PII-dense primary sources** — raw transcripts, the brainstorm rounds,
+the model responses — as **public exhibits**, without exposing the PII? The material is genuinely the best
+exhibit content the project has (it is the actual reasoning, not a retelling), and it is simultaneously the
+most dangerous content it holds.
+
+**Candidate shapes to design against:** curated **excerpts**; **scrubbed replays**; and
+**failure → lesson → measure cards** — the shape that fits this project's own house style, where an incident
+is exhibited as what broke, what was learned, and the measure that now prevents it. _(This block is itself a
+clean instance of that card: a near-miss, a polarity lesson, and PX1 as the measure.)_
+
+**Hard constraints, non-negotiable:** **P16 fail-closed** on anything that reaches the public tree, and
+**PX1's allow-list** underneath it — curation must be a deliberate act of moving material **out** of
+quarantine, never a default. **Tie: gated on PX1.** Designing an exhibit pipeline on top of a deny-list walk
+would be designing on the flaw.
+
+**Cross-ref:** the museum audit (**P15**), the museum program below, and **PM1**'s retrospective — all three
+want this material, and none of them can have it until PX1 lands.
 
 ---
 
