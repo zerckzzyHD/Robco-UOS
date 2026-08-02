@@ -9,13 +9,282 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b)
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)**
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="r50802"></a>
+
+### 2026-08-02 — ⭐⭐ THE ROUND 5 RECONCILIATION: the brainstorm rounds judged, merged into eight abstractions, and the kills recorded
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No app code, no control-plane code, no
+enforcement flipped on, no cache bump (`QUEUE.md`/`QUEUE_LOG.md` are not served files). **Nothing was
+approved** — a Round-5 verdict of SURVIVES is not an owner go.
+
+**What Round 5 was.** The adversarial gate over everything rounds 1-4 produced: Gemini as a genuinely
+independent research adversary (Deep Research, external-literature lens), GPT as the operational judge (the
+same thread that authored the report and Round 4), and DeepSeek as a proof adversary — **self-contaminated**,
+because it was re-run in its own prior chat and echoed its earlier GPT-lens answer ~95% verbatim, so it is
+counted as **one correlated data point, not an independent third**. Dispatch's reconciliation
+(`Round5-Synthesis.md`, local-only, one level above the repo) is the authority; this pass **applied it as
+written and did not re-derive any judgement.**
+
+**⭐ The signal that actually carries weight, recorded because it is easy to mis-state as "three models
+agreed":** Gemini (independent, literature lens) and GPT (operational lens) converged on **substantially the
+same spine, the same kills and the same merge shapes from different methods.** That cross-derivation
+agreement is the evidence. DeepSeek adds correlated weight only, and GPT itself flagged that Cluster K's
+agreement with Round 4 is **not an independent vote** (shared ancestry) — its sophistication earns scrutiny,
+not evidentiary weight.
+
+**The headline ruling.** The accumulated future was **coherent only after aggressive merging, and was
+overgrown by roughly 5-10×.** The deterministic core is sound, but its _displayed_ assurance runs ahead of its
+_observed_ assurance in three decisive places: the private→public boundary, silent supervisor/housekeeping
+death, and ledger completeness presented through a valid 19% chain suffix.
+
+---
+
+#### What landed in `QUEUE.md`
+
+A new **[⭐⭐ ROUND 5 SPINE](QUEUE.md#r5)** section carrying: the **reduced North Star** (adopted as the
+project's stated direction), the **complexity admission rule** (adopted as standing doctrine), the **three
+founding fixes**, the **nine decisive experiments `EXP1`-`EXP9`** as the near-term actionable list, the **eight
+canonical abstractions `AB1`-`AB8`** as the organizing spine, a **verdict for every Round-4 slate candidate
+`SL-*`**, the signature-demo verdict, the phased sequence, and the **de-duplication map** binding every
+existing `BR`/`HA`/Round-3 entry to its canonical home.
+
+**Three new family prefixes, all verified unused before assignment; no existing ID renumbered, re-lettered or
+reused (Protocol 49):** `AB` (the eight abstractions), `SL` (the Round-4 consolidated-slate candidates), `EXP`
+(the nine decisive experiments).
+
+**⛔ Why `SL-` is mandatory and not cosmetic.** The raw slate letters collide head-on with live queue IDs:
+slate `G1`-`G4` are the epistemic candidates while queue **G1-G4** are the owner-greenlit batch; slate `C1` is
+the alternate-history explorer while queue **C1** is the cloud warm-up gate; slate `A3`/`A4`, `D`, `E`, `F`,
+`H`, `I`, `J`, `K` and `L` all collide too. A bare letter would resolve to the wrong item for any future
+session — the prefix is what keeps both identities intact, which is the same reason the `PX` block was told to
+cross-reference by slate ID rather than merge.
+
+**Placement decision, recorded because it was a real trade-off.** The spine section sits **below** the
+owner-greenlit batch rather than at the top. The 2026-08-01 pass moved 539 lines of header out of the way
+specifically so a phone reader reaches "what do I build next" quickly; leading with a ~450-line spine would
+have undone that in one commit. "Where we are right now" gained a pointer bullet instead.
+
+---
+
+#### ⛔ THE KILLS — what is lost, and why that loss is acceptable
+
+Recorded in full because a kill with no stated loss is how a decision gets re-litigated six weeks later as a
+fresh good idea.
+
+- **The current public-by-default publish walk → DEAD.** ⭐ **The single most important cut in the entire
+  round.** _What is lost:_ the convenience of new material being publishable by default — every new directory
+  now needs a deliberate admission before the museum can see it. _Why acceptable:_ the loss is the point. A
+  deny-list **fails OPEN on the one path nobody thought to list**, and on this boundary failing open is
+  unrecoverable — git history is permanent and exposure does not undo. **PX1**'s positive allow-list is the
+  replacement, and the 2026-08-01 near-miss (609 tracked files under `planning/`, classified IN) is the
+  measured evidence rather than a hypothetical.
+- **`SL-E5` dead-man's switch / mutual-witness → EFFECT AUTHORITY DEAD** (all three models agree; contains
+  **BR11**). _What is lost:_ automatic action when a heartbeat is missed — the machine cannot take a corrective
+  step on its own when it notices the other task stopped. _Why acceptable:_ the **detection** survives intact
+  as an external missed-heartbeat **notification** through `SL-I5`, which is the part that closes the measured
+  3am gap. The killed half was authority, not observation, and this project's standing invariant is that a
+  false denial or a wrong autonomous action is worse than no guard.
+- **Cluster K's standalone Governed Learning Plane → DEAD.** _What is lost:_ a coherent always-on learned
+  service with its own registry, authority zone and "proof-carrying prediction" story. _Why acceptable:_ every
+  genuinely useful part of it survives as the **Learned Scout Contract** merged into existing abstractions —
+  batch artifact, frozen episode manifest, release-separated evaluation, deterministic baseline,
+  provenance/expiry/abstention, DERIVED output only, typed proposal only, automatic retirement. What died is
+  the **plane**: a new authority zone, a standing service, and the claim that a calibrated prediction is a
+  proof. None of those was load-bearing for anything measured.
+- **Cluster K — owner-attention learner → DEAD** (triple convergence). _What is lost:_ automatic ranking of
+  what the owner should look at first. _Why acceptable:_ it acquires **de facto authority through
+  presentation** — what a learned ranker demotes, the owner stops seeing, which is indistinguishable from the
+  ranker deciding. `SL-I4`'s strictly deterministic digest delivers the same daily value with **no learned
+  suppression of deterministic severity**.
+- **Cluster K — session hazard / stuckness predictor → DEAD.** _What is lost:_ early warning that a session is
+  going wrong. _Why acceptable:_ the failures are **too rare to calibrate** — a confident model on a rare
+  class is confidently wrong — and the existing deterministic signals (thrash detection, tree collision, idle
+  tracking) already cover the actionable path.
+- **Cluster K do-not-build set → DEAD** (all three models agree): a local coding LLM as infrastructure ·
+  end-to-end neural anomaly detector · RL controlling sessions or policy · neural supervisor/witness/chain
+  replacement · writable vector memory / AI fact graph · LLM publish-or-privacy gate · full fine-tune ·
+  federated / swarm / blockchain ML · multi-agent-for-its-own-sake · auto-generated policies. _What is lost:_
+  the most ambitious version of "the control plane learns." _Why acceptable:_ each one either puts a model
+  inside a gate that exists **because** a model must not decide it (the publish gate, the supervisor, the
+  chain), or spends real money and maintenance against the free/≤$10 rule for a capability nothing measured
+  needs. The publish-gate case is the clearest: **P16's own rule is that if the agent chooses whether to
+  scrub, it isn't a gate.**
+- **Conditional kills, recorded now so the outcome is not re-argued later:** `SL-A1` tier (b) — the **formal
+  Kani tier dies** unless its bounded experiment catches a seeded defect normal tests miss at maintainable
+  cost. `SL-J2` — the **manifest shim dies** (and the unsupported dormant claims are retired) if manifests can
+  only be created manually or the downstream paths go unused. `SL-J4` — **provider-exit dies as stated** if the
+  continuation turns out to need anything the portable capsule does not carry, keeping only a narrow
+  artifact-export claim.
+
+**And one thing that is NOT a kill but is easy to mis-file as one:** `SL-B1` — _"the ledger IS the OS"_ is
+**UNPROVABLE-AS-STATED**, narrowed to its strongest honest claim: the ledger is the **canonical audit journal
+for governed transitions**, while git, the filesystem and evidence objects stay canonical for their own
+domains. The mechanism survives; the marketing claim does not.
+
+---
+
+#### ⏳ THE DEFERS — each with its exact reopening trigger
+
+A defer with no trigger is a vague drawer (Protocol 50 a-form). Every one below names the concrete condition
+that would earn it a slot.
+
+| Deferred                                                                                                              | Reopening trigger                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SL-A1` tier (c) — zk attestation                                                                                     | An **external verifier must validate a private execution**.                                                                                                                                                              |
+| `SL-A3` — Constitutional Computing                                                                                    | A small-schema version (versioned replayable policy + generated validators) **once the Mission Runtime (AB3) exists**.                                                                                                   |
+| `SL-C1` — alternate-history explorer                                                                                  | Replay Bench stable **AND** ≥20 comparable mission episodes across two worker/provider configs **AND** one real decision needs it.                                                                                       |
+| `SL-E3` — multi-device pool / Covenant beacon                                                                         | A **second genuinely-independent failure domain** exists **AND** measured availability/compromise risk justifies quorum. ⚠ The optional ROG Ally **does not** qualify — it shares owner, network, power and update path. |
+| `SL-F5` — conditional intent escrow / owner-absence                                                                   | **Two observed owner-absence cases** block a repeatable safe operation **AND** a narrow preauth can expire / be revoked / be compensated.                                                                                |
+| `SL-H3` — Hyper-V / TEE enclaves                                                                                      | A real untrusted workload **cannot** be bounded by worktrees / OS accounts / process controls / capability gates **AND** an on-device prototype proves reliable recovery. TEE claims need **measured hardware**.         |
+| `SL-K4` — registry **service/UI** (the manifests themselves survive)                                                  | **≥2 recurring deployed scouts** create real lookup burden.                                                                                                                                                              |
+| Cluster K — causal-effectiveness lab                                                                                  | **≥20 treated + ≥20 control episodes**, verified outcomes, no dominant confound.                                                                                                                                         |
+| Cluster K — cross-release mosaic analyzer                                                                             | **≥3 real public releases** **AND** a concrete threat model.                                                                                                                                                             |
+| Cluster K research-future (contrastive encoder · temporal-graph GNN · world model · contextual bandit · distillation) | Each carries its own concrete **data or hardware** trigger; none is near-term.                                                                                                                                           |
+| Remote transport-only MCP (**RB4**/**MCP1**/**MCP2**, **BR3**)                                                        | Local **RB1** inbox/return completes **3 real missions cleanly** **AND** measured mobile friction remains. **WAKE stays out of scope while platform-blocked.**                                                           |
+
+---
+
+#### 🔬 THE NEEDS-DECISIVE-EVIDENCE ITEMS — experiment + outcome rule for each
+
+**The rule these obey, adopted as Round-5 method:** no experiment may be a generic "add monitoring." Each
+states hypothesis · exact falsifier · setup · injected condition · expected-healthy evidence ·
+expected-broken evidence · cleanup · safety boundary · implementation cost · AI-usage cost · **whether the
+experiment itself can fail silently** · which candidates it resolves.
+
+- **`SL-J2` the manifest shim + the five dormant kernel subsystems → `EXP4`.** _Experiment:_ run ONE real
+  bounded mission from a durable manifest — crash/resume, stale-SHA rejection, an enforced postcondition, low
+  ceremony. _Outcome rule:_ passes → **SURVIVES**, keep the paths the mission actually used; manifests
+  creatable only by hand, or downstream paths unused → **KILL the shim, delete or archive the unused paths,
+  and retire the claims that depend on them.** ⛔ **This is also the correction that matters most in the whole
+  pass:** the five CPK subsystems were being described in `QUEUE.md` as things that "actually exist now."
+  Their **code** exists; the **capability** does not — `state/manifests/` has never existed and zero jobs have
+  ever been tracked. Round 5's wording is deliberate: _"they are unbuilt today, not merely dormant."_ The
+  built/partial/queued/proposed/deferred/rejected/unverified distinction is preserved by fixing that claim,
+  not by softening the verdict.
+- **`SL-J4` provider-exit → `EXP6`(b).** _Experiment:_ continue a frozen mission with a replacement
+  worker/provider **from the portable capsule only**. _Outcome rule:_ succeeds → **SURV-C**; hidden provider
+  dependence → **KILL as stated**, keep a narrow artifact-export claim.
+- **`SL-A1` tier (b) the bounded Kani proof.** _Experiment:_ express the small load-bearing epistemic
+  transition core in a proof-checkable form and machine-prove its properties. _Outcome rule:_ catches a seeded
+  defect normal tests miss, at maintainable cost → **SURV-C for that exact proof only**; otherwise the formal
+  tier is **KILLED**. ⚠ Its Protocol 22 tension (a second implementation of rules that already exist in JS)
+  must be argued as _a proof artifact derived from the JS core_, never waved through as a second core.
+- **The Reaper (`DG3`/`REF2`).** _Experiment:_ seed one genuine orphan **and** one long-valid session.
+  _Outcome rule:_ distinguishes them with kill/compensation safely rehearsed → **SURV-C for narrowly
+  enumerated states**; **any false kill or unprovable ownership → observation only, no auto-action.**
+  `SL-H1`'s pre-signed deterministic safe-reflex catalog is its **only legitimate promotion path** (DeepSeek's
+  KILL of `SL-H1` was overruled precisely on this ground).
+- **Cluster K — semantic idea-genealogy · hybrid retrieval+rerank · context-core optimizer → `EXP9`.**
+  _Outcome rule:_ must **beat a cheap deterministic / FTS / graph baseline on chronologically and
+  release-separated data, or die.** ⛔ The whole cluster sits behind this gate; nothing learned is built, even
+  in shadow, before it passes.
+
+**⚠ `EXP7` — an unresolved slot, flagged rather than invented.** The synthesis's phased sequence names
+experiments **1, 2, 3, 4, 5, 6, 8 and 9** and **never assigns a number 7**. Two decisive experiments exist in
+the document without numbers — the **Reaper test** and the **bounded Kani proof**. Rather than silently bind
+one of them to the empty slot (which would make the numbering look complete while resting on a guess), `EXP7`
+is filed **as explicitly unresolved with both candidates recorded beside it**, for Dispatch or the owner to
+bind. This is the same discipline as flagging an un-adjudicated `BR` item instead of inferring its verdict.
+
+---
+
+#### ⚖️ THE OVERRULES — where a model's verdict was rejected, and why
+
+Recorded because an adjudication that only reports agreement has hidden its hardest calls.
+
+- **`SL-A2` coverage certificates** — DeepSeek's demotion to "a line in the morning report" **overruled**;
+  Gemini + GPT are right that it is a real mechanism, and it is the chain's **completeness partner**.
+- **`SL-A6` guarantee-ceiling gate** — DeepSeek/Gemini's KILL as "unimplementable" **overruled**. It is the
+  operationalization of _"CLAIMED never renders complete"_, it is cheap, and it is core.
+- **`SL-F6` Evidence Court** — DeepSeek/Gemini's "survives standalone" **overruled** downward: it is a
+  **function of the assurance gate**, not a separate court. A deterministic clerk that checks typed evidence
+  and exposes disagreement, never deciding semantic truth.
+- **`SL-H1` deterministic safe reflexes** — DeepSeek's KILL **overruled**: this is the Reaper's only
+  legitimate promotion path, and killing it would leave the Reaper permanently stuck in shadow with no
+  designed route out.
+- **`SL-I4` morning report** — Gemini's KILL (automation bias / "liability sponge") **overruled**. Gemini's
+  fear is specifically **ML-filtered attention ranking**; a deterministic, action-first digest with **no
+  learned suppression of deterministic severity** answers that fear _and_ closes the silent-death gap.
+- **`SL-I5` obligation registry** — Gemini's KILL rests on a **MISREAD** and is overruled: `SL-I5` watches the
+  **JOB/OBLIGATION from outside the emitting component**, not the operator. It is **the** fix for the measured
+  3am silent death.
+- **The signature demo** — DeepSeek/Gemini's "theater / KILL" **overruled toward GPT's nuance**: it survives
+  **as an integration acceptance test and museum story, never as proof of the doctrine.** ⛔ A memorized path
+  with known injected defects proves only the harness; surviving _variant_ failures and reconstructing state
+  after a reboot is what demonstrates the spine.
+- **`SL-C3` counterexample forge** — Gemini SURV vs DeepSeek KILL vs GPT MERGE: **merge wins**; it is fixture
+  generation, not a standalone system.
+- **`SL-A3` Constitutional Computing** — DeepSeek/Gemini KILL vs GPT SURV-C: **split the difference** as a
+  DEFER with a named trigger. Real value, not near-term, not spine.
+- **`SL-B2` semantic compression** — Gemini's KILL on cryptographic grounds is **honored rather than
+  overruled**, by the containment: _never rewrite canonical history on "semantic equivalence."_
+
+---
+
+#### 🔀 THE MATERIAL PLACEMENT CHANGES — what moved, and why
+
+- **The `BR` block (BR0-BR26) is now a historical record plus pointers, not the live filing.** Every item
+  carries an inline `[R5: …]` disposition; the ones that MERGE live under an abstraction, and the entry below
+  is the reasoning that got them there. **Nothing was deleted** (Protocol 49: retire in place, never renumber,
+  never delete the reasoning). ⚠ **Six items — BR1, BR4, BR14, BR19, BR21, BR23 — were NOT adjudicated by
+  name** and are **flagged as such**, keeping their existing PROPOSED status rather than being handed a
+  verdict by inference. BR1/BR19/BR23 are nonetheless bound by the **Operator-CLI clause**: every renderer and
+  action must be generated from the one catalog + projector **before** a new surface is added.
+- **`BR`'s BUILD ORDER is superseded as the sequencing authority and kept in place as the record.** Its
+  instinct (cheap, read-mostly, measure-before-enforce) survives inside Phase 1, and BR6/BR7, BR5 and BR8 keep
+  their high rank — but **EXP1** and **EXP2** now come first, because they close **measured** assurance gaps
+  rather than merely being cheap.
+- **The Round 3 addendum was vindicated and promoted, not merely filed.** Its diagnosis underwrites two of the
+  three founding fixes, and its deepest line — ⭐ _"no component may be the sole detector for its own
+  non-execution"_ — is now adopted doctrine. Its **scoped feature-freeze was NOT adopted as a stop-work
+  order**; it is answered by _sequencing_ instead, with the three truth debts sitting at Phase 0-1 ahead of
+  every new capability, and app development explicitly unaffected exactly as that round scoped it.
+- **The `HA` block:** HA1/HA2/HA4 **SURV-C → AB6**, admissible **only as executable boundary tests** with
+  positive _and_ negative paths exercised and **generated from canonical rules**; HA3 **MERGED → `SL-D1` →
+  AB7** (⛔ its squash-regenerate clause contained as **incident response only — it cannot un-fetch copies**);
+  **HA5 not adjudicated**, unchanged. HA1's GATE A still binds.
+- **The `PX` block came out on top and is unchanged in substance.** PX1 is **Phase 0** of the spine and the
+  head of the museum track; **the publish FREEZE stays in force**, with its release condition sharpened from
+  "until PX1 lands" to "**until `EXP1` passes** — and even then only under a narrow claim." PX2/PX3 are
+  SURV-C. ⭐ **Round 5 adds one thing to PX1's scope: privacy-policy recovery** — the scrub list is unbacked
+  and lives on exactly one disk, so a machine loss destroys the only guard on the one boundary that cannot be
+  un-crossed. **BR20**'s fingerprint (verify without storing) is the shape.
+- **`AUD2`'s dangling cross-references are RESOLVED, exactly as that entry demanded of the first reconcile
+  to land this material.** `F4` → `SL-F4` (**MERGE → one Resource & Assurance Policy**, AB3) — the synthesis
+  names it explicitly as where AUD2 lands. `Cluster-K` → the `SL-K*` block, behind `EXP9`. The **context-core
+  optimizer** is NDE(EXP9); the **usage/rework forecaster** MERGEs into `SL-F4` with empirical intervals only
+  and never grants budget. ⭐ **And the "alignment scout" now has a concrete referent** — the thing AUD2 said
+  it would have to locate or create: a **deterministic-first Assurance Dependency Auditor** over typed
+  lifecycle edges. **AUD1 and AUD2 are otherwise untouched and still gated.**
+- **`G1` (CP5, the off-machine witness) is CONFIRMED and unchanged in status**, with three build constraints
+  attached: build the **narrowest** observer; **do not import the supervisor's projector/expectation manifest
+  unchanged**; and know that the external missed-obligation observer (`SL-I5`, `EXP2`) may later ride on the
+  same framework — design it so it can. A witness **pool** (`SL-E3`) is deferred.
+- **The roadmap spine gains a reconciliation note** explaining that it sequences **programs** while the
+  Round-5 phased sequence sequences **what must be proven** — with two binding constraints connecting them
+  (the museum may be built but not shipped; "control plane finished" now means `EXP4` has shown a real mission
+  exercises the kernel, not that the code exists).
+
+---
+
+#### What was deliberately NOT done
+
+- **Nothing was promoted or approved.** `BR`, `HA` and `PX2`/`PX3` remain ⛔ PROPOSED with no spec and no slot.
+- **No owner decision was reopened.** The greenlit batch **G1-G4** is untouched and still runs first; **AUD1**
+  and **AUD2** are unchanged and still gated; **PX1**'s freeze is unchanged in force.
+- **No ID was renumbered, re-lettered or reused**, and no shipped account was rewritten (Protocol 49 + this
+  file's ARCHIVE-class rule).
+- **No verdict was invented for an unadjudicated item**, and **no number was invented for `EXP7`.** Both are
+  flagged instead. A queue that quietly interpolates the missing entries reads as complete while resting on
+  guesses — which is the precise failure mode this whole round exists to remove.
 
 <a id="cpconsolidate0730b"></a>
 
