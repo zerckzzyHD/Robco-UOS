@@ -9,13 +9,110 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)**
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)** · **[the seven held BR/HA items adjudicated](#held0802)**
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="held0802"></a>
+
+### 2026-08-02 (later still) — the SEVEN HELD ITEMS adjudicated: six MERGE into an abstraction, one DEFERs, none is a new North Star
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No code, no enforcement, no cache bump.
+**Nothing was approved to BUILD** — a MERGE verdict files an item under its canonical home; the standing
+earn-condition (owner go **plus** a spec) is unchanged.
+
+**How these seven got here.** The Round 5 reconciliation found that **BR1, BR4, BR14, BR19, BR21, BR23 and
+HA5** were **never adjudicated by name** in the synthesis. Rather than infer a verdict from each one's
+nearest abstraction — which would have made the verdict table _look_ complete while resting on guesses — they
+were filed **explicitly flagged**, and the [North Star pass](#ns0802) read each at HEAD and surfaced its
+**exact current text verbatim** to the owner. The owner ruled on all seven the same day. ⭐ **Both flags this
+pass raised were answered within a day, and neither answer was the one a guess would have produced** — the
+same lesson `EXP7` taught (see [the Round 5 ledger](#r50802)).
+
+**⭐ The headline of the set, worth stating before the individual rulings: not one of the seven is a new North
+Star.** Six merge into an existing abstraction and one defers. **Two reinforce North Stars that already
+exist** — BR4 reinforces **NS-C1 (proof-of-execution)**, BR21 serves **NS-K1 (honest continuity)** and
+**NS-K2 (provider-exit)** — and three more (BR1, BR19, BR23) serve **NS-C2 (epistemic-everywhere)** through
+the honesty constraints attached to them. That is the adoption bar in `NORTH_STARS.md` working as designed:
+**a good idea is not a direction.** No change to `NORTH_STARS.md` was needed or made.
+
+#### The rulings
+
+- **BR1 — Visual ops HUD → MERGE → AB2 + CPB5, SURVIVES-WITH-CONTAINMENT.** It is a **RENDERER, not an
+  app**: `lib/cli/render-html.js` over the ONE projection plus one supervisor line, served over Tailscale,
+  **folded into CPB5's phone cockpit — not a new item.** ⛔ **Containment: it must `require` the projection.
+  Reading the ledger itself breaks GATE-8** and creates the second data path the CLI architecture exists to
+  prevent. **The distinctive value is kept and is the reason it survives at all:** every field carries
+  `epistemicState`, so this HUD can render **BLIND** — _a dashboard that can say "I cannot see,"_ which
+  off-the-shelf ops dashboards cannot. **Serves NS-C2.**
+- **BR4 — chaos/adversarial drills → MERGE → AB6 (Replay & Assurance Lab) as the LIVE fire-drill runner on
+  the daily-housekeeping cadence, SURVIVES-WITH-CONTAINMENT.** ⛔ **Containment: FIRE DRILLS, NOT a chaos
+  monkey** — random fault injection stays **KILLED** (contrarian **C3**: this is one machine, one developer,
+  owner-first, where a false denial locks the owner out; random faults here are self-inflicted outages).
+  Enumerated drills, each testing a claim a doc already makes, each **appending a ledger record so the
+  ABSENCE of drills becomes visible**. ⭐ **Why it earned a merge rather than a defer: it is the operational
+  home for running the [decisive experiments'](QUEUE.md#r5exp) positive-path checks on a cadence.** The whole
+  round turned on _"has the positive path ever fired?"_ — a detector never observed positive has never
+  demonstrated it **can** be — and this is the mechanism that answers that question repeatedly instead of
+  once. **Reinforces NS-C1 (proof-of-execution).**
+- **BR14 — Collision-Consequence Detector → MERGE → AB1 (Signal/Event/Obligation Kernel),
+  SURVIVES-WITH-CONTAINMENT.** ⛔ **Containment: measure CONSEQUENCE / HARM — same-file writes within N
+  seconds, actual lock refusals, sibling-gate failures — NOT co-residency.** ⭐ **The argument is a
+  measurement, which is what makes it decisive:** the co-residency count **never varies**
+  (`tree-collision` 2,653×, `probable-duplicate-launch` 7,386×), so the existing detector **answers a
+  question whose answer is always the same and therefore cannot inform the DG5 worktree decision it was
+  built to inform.** **Precedent already in the code: REF5's `dirtyFingerprint`** proved a _hash of what
+  changed_ answers what a _count_ structurally cannot — the same lesson one layer up. **Bonus:** it
+  de-noises the ledger, the same gauge-flood target as `SL-I2`/`SL-I3`. **Decision-grade for DG5.**
+- **BR19 — Boot-Sequence-as-Diagnostic → MERGE → AB2 (bound by the Operator-CLI clause), but ⏳ DEFER THE
+  BUILD.** The **concept is adopted**: boot renders `verdict.js`'s `SAFETY_CRITICAL` fields **and their `why`
+  strings** as the ROM check, and a **BLIND safety-critical field HALTS the boot** — making the health check
+  the thing you cannot skip past, which is a usability property rather than a skin. **Serves NS-C2.**
+  ⚠ **But it is low-leverage polish, not spine, and the ruling says so plainly rather than filing it as
+  work.** ⏳ **Reopening trigger: when the CLI cockpit is being built out** (alongside **CPB5** / **BR1**) —
+  it rides that surface instead of justifying its own pass.
+- **BR21 — Proof-Carrying Continuation Packets → MERGE → AB8 + AB2, SURVIVES-WITH-CONTAINMENT.** Extends
+  **BUILT** work (**CPK4** + **WB6**) rather than adding anything: packets already keep the two never-blended
+  halves (`independentlyObserved` vs `agentClaims`), WB6 gives every new record `chain:{seq,prev,self}`, and
+  `content-store.js` already refuses content that no longer hashes to its own name. Bolted together, **a
+  packet becomes SELF-VERIFYING — the next session confirms the ledger span it was built from is unaltered
+  WITHOUT trusting the packet's author.** ⭐ **That is what promotes it from a nice property to a spine
+  component: it is a piece the portable mission capsule depends on** (`EXP6` / `SL-J4`), so it **serves NS-K1
+  (honest continuity) and NS-K2 (provider-exit)**. Composes into **RB2**. **Low added cost** — it bolts
+  existing pieces together.
+- **BR23 — Session roster (read-only) → MERGE → AB2, SURVIVES-WITH-CONTAINMENT.** A **read-only projection**
+  over the existing session catalog; the data is already collected in the `tree-collision` payload
+  (`{sessionId, pid, version, entrypoint, name, procStartIso}`). ⛔ **Containment, and it is an HONESTY
+  constraint (NS-C2): the `name` field — observed value `"robco-uos-03"` — is entrypoint-adjacent and is NOT
+  proven to be the owner-visible UI title.** Verify title-readability **on disk**, or **degrade to id + cwd
+  and SAY SO**. ⛔ **Never render an unproven name as authoritative.** _A roster that silently shows a
+  plausible-looking wrong name is worse than one that admits it cannot read the title, because a person picks
+  kill targets off it._
+- **HA5 — shared-protocol plugin across the two code-holding repos → ⏳ DEFER.** ⏳ **Reopening trigger:
+  after HA1/HA2/HA3 settle** — they change **what the shared set would even contain**, so building it first
+  would freeze the wrong contents. **⛔ Both load-bearing constraints are preserved VERBATIM and travel with
+  the deferral, because they are the reason this is a defer rather than a kill:** **Control is AI-free by
+  design**, so the plugin is **session-tooling only** and is **never wired into Control's runtime execution
+  path** (plugins ship hooks, and that boundary is easy to violate by accident); and **the plugin repo stays
+  PRIVATE** — two of the five repos are public, and hooks accumulate local paths. **No North Star attaches
+  to this item.**
+
+#### What changed in `QUEUE.md`
+
+Each item's inline `[R5: NOT ADJUDICATED…]` tag was **replaced in place** by its ruling with the containment
+attached, and the three block-level statements that described the seven as un-adjudicated (the running
+header, the de-duplication table preamble, and the `BR`/`HA` disposition headers) were updated to record that
+the flags are **closed**. The de-duplication table rows now carry real verdicts. **No ID was renumbered,
+re-lettered or reused (Protocol 49); no entry's original reasoning was deleted** — the `BR`/`HA` bodies stay
+exactly as written and remain the historical record of how each item reached its abstraction.
+
+**⛔ `NORTH_STARS.md` was NOT changed, and that is the correct outcome rather than an omission** — none of the
+seven is a new North Star, and the two that reinforce existing ones (NS-C1, NS-K1/NS-K2) reinforce them
+without altering their wording, status or serving-primitive lists.
 
 <a id="ns0802"></a>
 
