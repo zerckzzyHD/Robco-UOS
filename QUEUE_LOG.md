@@ -9,13 +9,116 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)** · **[the seven held BR/HA items adjudicated](#held0802)**
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)** · **[the seven held BR/HA items adjudicated](#held0802)** · **[the silent-backup gap — BD1/BD2](#bd0802)**
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="bd0802"></a>
+
+### 2026-08-02 (later still) — the SILENT-BACKUP GAP: the off-machine mirror went a day stale and nothing signalled it (BD1/BD2 filed)
+
+**Scope of this pass: one real mirror run + doc edits + git commit/push.** The mirror run used the **designed
+script**, not a hand-copy. No control-plane code was changed, no enforcement flipped on, no cache bump.
+
+**⭐ Why this entry matters more than its size suggests.** Round 5 adopted **founding fix 2** — _make
+supervisor/housekeeping silence distinguishable from health_ — on 2026-08-02, reasoning from the 3am
+housekeeping job as its example. **Within twenty-four hours the same failure occurred for real, against a
+different and more important subsystem, and was caught by a human rather than by the system.** These two items
+are that instance, filed as concrete near-term work rather than as proposals.
+
+#### The incident, verified three ways rather than inferred
+
+The machine **slept from ~2026-08-01 11:54 to 2026-08-02 11:59 local**, straight across the 03:15 window:
+
+1. `Microsoft-Windows-Power-Troubleshooter` — _"The system has returned from a low power state"_ at
+   **11:59:05 on Aug 2**, with **no reboot since July 22** (so a sleep/resume, not a restart).
+2. A **~24-hour hole in the ledger** — last Aug-1 record `2026-08-01T15:54:02Z`, first Aug-2 record
+   `2026-08-02T16:04:03Z`, the 5-minute supervisor tick resuming **5 minutes after the wake**.
+3. **Zero `housekeeping.*` records on Aug 2**, where Jul 30 / Jul 31 / Aug 1 each carry exactly one.
+
+**The consequence: the off-machine ledger mirror went ~a day stale and NOTHING SIGNALLED IT.** It was found
+only by a manual checkpoint verification. The gap was then filled through the real mechanism —
+`node scripts/backup-mirror.js` → `lib/backup-mirror.js runBackupMirror()`, which owns the whitelist, the
+fail-closed secret scan, the generated manifest, and commit+push via the carved-out `lib/mirror-git.js`.
+Result: `mirror.completed` at `2026-08-02T23:19`, commit **`6c263589f97bc47b88ec97659bb6aa1f363f69c4`** on
+`RobCo-Control-Ledger` (15 files; `ledger/events-2026-08-02.jsonl` at 4,265,832 bytes; `chain-head.json` at
+seq 36601), **manifest receipt re-verified 15/15 against the committed blobs**, remote confirmed by an
+independent `git ls-remote`. ⛔ **Nothing was hand-copied and nothing was hand-written into the ledger** — the
+AI-free script did all the writing, which is the whole point of it existing.
+
+#### ✅ What was ruled OUT — recorded so it is never re-investigated
+
+The starting hypothesis was that the **exhausted weekly Claude cap** stopped the backup. **It did not, and it
+structurally cannot.** The entire housekeeping → mirror call path — `scripts/daily-housekeeping.js`,
+`lib/daily-housekeeping.js`, `lib/backup-mirror.js`, `scripts/backup-mirror.js`, `lib/mirror-git.js`,
+`lib/mirror-restore-test.js` — was searched for `usage-mode` / `usageMode` / `computeOperatingMode` /
+`Stop-unattended` / `Reserve-for-owner` / `budget-check`: **zero hits in all six files.** The mirror's only
+abort conditions are the `state\DISABLE` kill switch, a lock refusal, and the fail-closed secret scan.
+
+⭐ **This is a real result, not a null one.** _"An AI-free backup that skips itself when the AI budget is
+exhausted"_ would have been a serious durability flaw — a backup that stops working exactly when the system is
+under stress. **It does not exist here**, and that is worth recording as a checked-and-cleared fact rather than
+leaving as an open worry that gets re-raised every time a backup is late.
+
+#### BD1 — `backup-health` is BLIND to the ledger mirror
+
+`lib/backup-health.js`'s `DEFAULT_TRACKED_REPOS` hardcodes exactly three repos — **`robco-control`,
+`robco-uos`, `robco-archive`** — and **omits `robco-control-ledger`**. The only thing reporting mirror health
+is **the mirror itself**, so a mirror that never runs reports nothing.
+
+**Proof it is blind rather than merely quiet:** Aug 2 carries **56 `finding.backup-unhealthy` records**, every
+one about a _different_ subject (archive unpushed commits, UOS uncommitted changes), and both backup alerts
+that reached the phone were `backup:robco-archive`. **Not one finding and not one alert concerned the stale
+mirror.** ⚠ **A watcher that is loud about three repos while structurally unable to see the fourth is worse
+than an obviously absent one — the noise reads as coverage.**
+
+**Fix recorded, not built, and BOTH halves are required:** (1) add `robco-control-ledger` to the watched set;
+(2) ⭐ give the mirror an **external** freshness/obligation check with a deadline and an observer **outside the
+mirror's own failure domain**. ⛔ **(1) alone is not sufficient** — it would move the mirror from _unwatched_
+to _self-watched_, which is the exact trap `SL-I5` names.
+
+#### BD2 — `StartWhenAvailable` does not catch up after resume-from-sleep
+
+The task is configured **`StartWhenAvailable: True`** — the setting that exists precisely for a missed window.
+On Aug 2 the machine **woke at 11:59 and stayed up eight hours**, and **the task still never ran**:
+`LastRunTime` stuck at **8/1/2026 3:15:01 AM**, `LastTaskResult` **0**, Windows' own **`NumberOfMissedRuns` =
+1**, and **`WakeToRun: False`**. Windows treats **resume-from-sleep** differently from **boot** for missed-run
+purposes, so the configured catch-up does not fire on the path this machine actually takes.
+
+⚠ **A configured-but-not-working guard is strictly worse than an unconfigured one:** the setting's presence is
+exactly what stops anyone asking whether missed runs are covered. **Net effect: every sleep spanning 03:15
+costs a full backup cycle, silently.**
+
+**Three fix options recorded and deliberately NOT ranked:** `WakeToRun: True` · a resume-triggered catch-up ·
+⭐ a **missed-run obligation alert** (the `SL-I5` shape — report the missed window even if it is not
+recovered; the option that composes with BD1 and fails safe rather than assuming a recovery path works).
+⛔ **None is chosen here** — a scheduled-task configuration change is a real behaviour change on the owner's
+machine and takes an explicit owner call. The entry exists so that choice is made deliberately instead of
+being rediscovered by another manual checkpoint.
+
+#### Why both are filed as CONCRETE work, not proposals
+
+Every other item in the `BR` / `HA` / `PX` / `MX` blocks is ⛔ PROPOSED because it originated in a brainstorm
+or an external audit. **These two originated in a measured failure on this machine, verified at source**, and
+they instantiate doctrine the queue had _already adopted_. Filing them as proposals would have understated
+them. **They remain unbuilt and unscheduled** — "concrete near-term work" describes their standing, not a
+commitment to a date — and **BD2 explicitly needs an owner decision before anything changes.**
+
+**Placement:** their own `BD` block (new prefix, verified unused; nothing renumbered — Protocol 49),
+positioned immediately after the Round-5 spine so they sit beside the doctrine they instantiate, with pointers
+from **founding fix 2** and from "Where we are right now."
+
+#### ⚠ One observability gap found while diagnosing, recorded rather than fixed
+
+The **`Microsoft-Windows-TaskScheduler/Operational` log is DISABLED** on this machine (`IsEnabled: False`), so
+there is **no per-run task history** to read. The diagnosis rests on `Get-ScheduledTaskInfo` counters, power
+events and the ledger's own gaps instead — enough here, and all three agreed, but a genuine limit on what can
+be reconstructed after the fact. Any work on BD2 should decide whether enabling that log is worth it rather
+than rediscovering its absence.
 
 <a id="held0802"></a>
 

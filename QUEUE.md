@@ -423,6 +423,14 @@ was moved **verbatim** to
   [reduced North Star](#r5northstar)**, and the **[complexity admission rule](#r5admission)** is standing
   doctrine: a new persistent component must clear five conditions, and _"it makes the architecture more
   complete"_ is not one of them.
+- **🚨 THE OFF-MACHINE BACKUP WENT A DAY STALE AND NOTHING SAID SO (2026-08-02) — [BD1-BD2](#bd) are filed as
+  concrete near-term work.** The machine slept across the 03:15 window; the ledger mirror missed its cycle and
+  **no finding and no alert fired**, because `backup-health` doesn't watch that repo (**BD1**) and the task's
+  `StartWhenAvailable` catch-up doesn't fire after resume-from-sleep (**BD2**). Caught by a manual checkpoint;
+  the gap is filled (catch-up mirror `6c263589`). ⭐ **Founding fix 2 / `SL-I5` got a live instance within 24
+  hours of being adopted**, against the one mechanism that exists for losing this machine. ✅ **Ruled out and
+  recorded so it isn't re-investigated: the exhausted AI cap had nothing to do with it** — the mirror path has
+  **zero** usage-mode gating (verified across all six files in the call path).
 - **🚨 MUSEUM PUBLISHING IS FROZEN (2026-08-01; condition sharpened 2026-08-02) — no shipped museum update
   until [PX1](#px) lands AND [`EXP1`](#r5exp) passes.** A
   2026-08-01 near-miss found the museum publish walk is **public-by-default** (a deny-list: everything tracked
@@ -861,6 +869,13 @@ gated by its own experiment.
    recorder's own failure domain**. ⭐ **The reasoning is the deepest thing these rounds produced: a valid hash
    chain proves non-REWRITE, never non-OMISSION.** The 3am silent-death gap is a **completeness** gap, not an
    integrity gap, and no amount of chaining closes it. → **Gate: EXP2.** Files under **AB1** + **AB8**.
+   **🚨 THIS FIX NOW HAS TWO LIVE, MEASURED INSTANCES — [BD1 and BD2](#bd)** (filed 2026-08-02, the day after
+   this fix was adopted). On 2026-08-02 the machine slept across the 03:15 window, the **off-machine ledger
+   mirror went ~a day stale, and nothing signalled it** — caught only by a manual checkpoint. `backup-health`
+   is structurally blind to the mirror (**BD1**) and the task's configured missed-run catch-up does not fire
+   after resume-from-sleep (**BD2**). ⭐ **The mechanism whose entire job is surviving the loss of this machine
+   was its own sole liveness reporter, and its failure produced byte-identical evidence to a healthy night.**
+   This fix stopped being theoretical within 24 hours of being written down.
 3. **Stop writing redundant gauges as canonical events; establish declared coverage + omission detection.**
    Gauge/event/snapshot separation, full chaining of _canonical events_ (not gauges), deletion of the 41% dead
    finding **after a positive canary proves its underlying failure is still detectable**, and collapse of the
@@ -1362,6 +1377,133 @@ item under its canonical home; the earn-condition (owner go + spec) is unchanged
 
 **Absence is invisible to a system that only records presence.** The 3am silent death and the unchained-record
 gap are not two problems; they are one problem seen twice — and it is the reason founding fix 2 exists.
+
+---
+
+<a id="bd"></a>
+
+# 🚨 BD1-BD2 — THE SILENT-BACKUP GAP (incident-driven, filed 2026-08-02 · CONCRETE NEAR-TERM WORK under [AB1](#r5ab) / [founding fix 2](#r5founding))
+
+**⭐ These are not brainstorm candidates.** Unlike the `BR` / `HA` / `PX` / `MX` blocks, both items below come
+from a **measured incident on this machine**, verified at source, and they are **live instances of the
+doctrine Round 5 had just finished adopting** — which is why they are filed as concrete near-term work rather
+than as proposals. **They are the first real-world test of [founding fix 2](#r5founding) and they failed it.**
+
+**New family prefix `BD`** (backup durability) — verified unused in `QUEUE.md` and `QUEUE_LOG.md` before
+assignment; no existing ID is renumbered, re-lettered or reused (Protocol 49).
+
+### What happened (2026-08-02) — verified at source, not inferred
+
+The machine **slept from ~2026-08-01 11:54 through 2026-08-02 11:59 local**, straight across the 03:15
+housekeeping window. Corroborated three independent ways: a `Power-Troubleshooter` _"returned from a low
+power state"_ event at **11:59:05** with **no reboot since July 22**; a **~24-hour hole in the ledger**
+(last Aug-1 record `2026-08-01T15:54:02Z` → first Aug-2 record `2026-08-02T16:04:03Z`, the 5-minute
+supervisor tick resuming 5 minutes after the wake); and **zero `housekeeping.*` records on Aug 2** where
+Jul 30 / Jul 31 / Aug 1 each have exactly one.
+
+**So the off-machine ledger mirror went ~a day stale — and NOTHING SIGNALLED IT.** It was caught only by a
+**manual** checkpoint verification, and the gap was filled by running the real mirror script by hand
+(`mirror.completed` at `2026-08-02T23:19`, catch-up commit **`6c263589`** on `RobCo-Control-Ledger`, 15 files,
+manifest re-verified 15/15 against the committed blobs).
+
+**⛔ The thing to hold on to, because it is the whole reason these are filed together:** the mechanism whose
+**entire job is surviving the loss of this machine** went a full day stale, and the failure produced
+**byte-identical evidence to a healthy silent night.** That is `SL-I5` — _no component may be the sole
+detector for its own non-execution_ — reproduced live, against the very subsystem it matters most for.
+
+**✅ What was ruled OUT, so it is not re-investigated.** The owner's initial hypothesis was that the exhausted
+weekly Claude cap stopped the backup. **It did not, and it structurally cannot.** The entire housekeeping →
+mirror call path (`scripts/daily-housekeeping.js`, `lib/daily-housekeeping.js`, `lib/backup-mirror.js`,
+`scripts/backup-mirror.js`, `lib/mirror-git.js`, `lib/mirror-restore-test.js`) was searched for
+`usage-mode` / `usageMode` / `computeOperatingMode` / `Stop-unattended` / `Reserve-for-owner` /
+`budget-check`: **zero hits in all six files.** ⭐ **The AI-free backup does NOT depend on the AI budget**, and
+the durability flaw that would have been (a backup that skips itself when the model budget is exhausted) **does
+not exist**. Recorded as a checked-and-cleared result rather than left as an open worry.
+
+---
+
+### BD1. ⏭️ [AB1 · founding fix 2] `backup-health` is BLIND to the ledger mirror — the off-machine backup has no freshness watcher
+
+**The defect, verified in source.** `lib/backup-health.js`'s `DEFAULT_TRACKED_REPOS` is hardcoded to exactly
+three repos — **`robco-control`, `robco-uos`, `robco-archive`** — and **OMITS `robco-control-ledger`**. So
+nothing watches the off-machine ledger mirror's freshness. **The only thing that reports mirror health is the
+mirror itself** (its own `mirror.completed` record and its `backup-mirror` incident, subject
+`robco-control-ledger`), **so a mirror that never runs reports nothing at all.**
+
+**The proof it is blind, not merely quiet.** Aug 2 carries **56 `finding.backup-unhealthy` records** — every
+one of them about a _different_ subject (`robco-archive` unpushed commits, `robco-uos` uncommitted changes) —
+and the two backup alerts that reached the phone were both `backup:robco-archive`. **Not one finding, and not
+one alert, was about the stale mirror.** The observed `repoSlug` values across the whole period are
+`robco-control` / `robco-uos` / `robco-archive` only. ⚠ **A watcher that is loud about three repos while
+structurally unable to see the fourth is worse than an obviously absent one** — the noise reads as coverage.
+
+**⭐ Why this is the sharpest instance of `SL-I5` on the board.** Every other silent-death candidate is about a
+detector or a job. This one is about **the backup** — the mechanism that exists specifically for the case where
+this machine is gone. A backup whose only liveness signal is emitted **by the backup itself** provides no
+evidence at all in exactly the scenario it was built for.
+
+**The fix — RECORDED, NOT BUILT (both halves are required; the first alone is not sufficient):**
+
+1. **Add `robco-control-ledger` to the watched set** so mirror staleness is a first-class finding.
+2. ⭐ **Give the mirror an EXTERNAL freshness / obligation check — not just its own self-report.** An
+   expected-cadence obligation (`SL-I5`) with a deadline and an observer **outside the mirror's own failure
+   domain**, so _"the mirror did not run"_ is detectable by something that is not the mirror. ⛔ **Half (1)
+   alone would still leave the mirror the sole reporter of its own execution** — it would upgrade the signal
+   from absent to same-domain, which is the trap this whole founding fix exists to name.
+
+**Files:** `_RobCo-Control/code/lib/backup-health.js` (`DEFAULT_TRACKED_REPOS`, line ~65) ·
+`lib/backup-mirror.js` · `lib/daily-housekeeping.js`. **Routes through:** [AB1](#r5ab) ·
+[founding fix 2](#r5founding) · **`SL-I5`** · gated/validated by **[`EXP2`](#r5exp)**.
+
+**Done means:** a deliberately-skipped mirror cycle is **detected and surfaced** by an observer outside the
+mirror, within its declared deadline — the exact shape `EXP2` already specifies, exercised against this
+subsystem.
+
+---
+
+### BD2. ⏭️ [AB1 · founding fix 2] `StartWhenAvailable` does NOT catch up after resume-from-sleep — every sleep across 03:15 silently skips a backup cycle
+
+**The defect, measured not assumed.** `\RobCo-Control-DailyHousekeeping` is configured
+**`StartWhenAvailable: True`** — the setting that exists precisely to run a task that missed its window. On
+Aug 2 the machine **woke at 11:59 AM and stayed up for eight hours**, and **the task still never ran**:
+`LastRunTime` is stuck at **8/1/2026 3:15:01 AM**, `LastTaskResult` **0**, and Windows' own
+**`NumberOfMissedRuns` = 1**. **`WakeToRun` is `False`**, so nothing woke the machine either.
+
+**The mechanism:** Windows treats **resume-from-sleep** differently from **boot** for missed-run purposes, so
+the catch-up that is configured does not fire on the path this machine actually takes. **Net effect: every
+sleep spanning 03:15 costs a full backup cycle, silently.** ⚠ **This is a configured-but-not-working guard,
+which is strictly worse than an unconfigured one** — the setting's presence is exactly what stops anyone
+asking whether missed runs are covered.
+
+**Fix options — RECORDED, NOT BUILT, and deliberately not ranked here:**
+
+- **`WakeToRun: True`** — wake the machine for the window. Simplest; costs a nightly wake.
+- **A resume-triggered catch-up** — an additional trigger on system resume that runs the job if the day's
+  window was missed. Fits the real failure path most precisely.
+- ⭐ **A missed-run OBLIGATION alert** — the `SL-I5` shape: the 03:15 job is an obligation with a deadline and
+  an external observer, so a missed window is _reported_ even if it is not _recovered_. **This is the option
+  that composes with BD1** and the one that fails safe rather than assuming a recovery mechanism works.
+
+⛔ **None of the three is chosen here.** A scheduled-task configuration change is a real behaviour change on
+the owner's machine and takes an explicit owner call; this entry exists so the choice is made deliberately
+rather than discovered again by another manual checkpoint.
+
+**Files:** the `\RobCo-Control-DailyHousekeeping` task registration
+(`_RobCo-Control/code/register-supervisor.ps1` and the mirrored `scheduled-tasks/` XML in
+`RobCo-Control-Ledger`). **Routes through:** [AB1](#r5ab) · [founding fix 2](#r5founding) · **`SL-I5`** ·
+validated by **[`EXP2`](#r5exp)**.
+
+**Done means:** a window missed while the machine sleeps is either **recovered** on resume or **reported** as
+a missed obligation — and which of those it is, is a recorded owner decision rather than an assumption.
+
+---
+
+**⚠ One honest note on observability, recorded because it shaped this diagnosis.** The
+**`Microsoft-Windows-TaskScheduler/Operational` log is DISABLED** on this machine (`IsEnabled: False`), so
+there is **no per-run task history** to read — the diagnosis above rests on `Get-ScheduledTaskInfo`
+counters, power events, and the ledger's own gaps instead. That is enough here, and all three agreed, but it
+is a genuine gap in what can be reconstructed after the fact, and any work on BD2 should decide whether
+enabling that log is worth it rather than rediscovering its absence.
 
 ---
 
