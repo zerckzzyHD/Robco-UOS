@@ -771,6 +771,12 @@ independent research adversary, GPT as the operational judge, DeepSeek as a proo
 reconciliation, which is the authority here. The full source document is `Round5-Synthesis.md` (local-only,
 outside the repo); this section is its application to the queue.
 
+**📄 Its directional mirror is [`NORTH_STARS.md`](NORTH_STARS.md), beside this file** (added 2026-08-02) — the
+North Star inventory that names the _directional commitments_ this spine serves, with every verdict traced to
+the canonical `SL-*` / `AB*` / `EXP*` IDs below. ⛔ **THIS file is executable truth; that one is a mirror. If
+the two ever disagree, `QUEUE.md` wins and `NORTH_STARS.md` is stale.** It is not a second roadmap, and a
+session must never plan from it.
+
 **⛔ Read the epistemics before you read anything below, because the three layers are NOT the same strength:**
 
 - **BINDING** — the reduced North Star, the eight abstractions, the complexity admission rule, the three
@@ -5752,6 +5758,12 @@ the Visual Web actually renders the control-plane arcs AND the project's interlo
 once Stage 3 ships; alongside, **P13 → P14** (security scan-list fix, then the republish) closes the loop on
 the live site, and **P5/P6/P7/P9/P12** plus the Fable design polish land as content passes.
 
+**⭐ Also in this program as of 2026-08-02: [MX1-MX2](#mx), the North-Star exhibits** — a dedicated
+North-Star room and North Stars rendered as nodes in the generated visual graph, filed from
+[`NORTH_STARS.md`](NORTH_STARS.md) §9. ⛔ **Both are PROPOSED and both sit behind the publish freeze** (they
+need **[PX1](#px)** landed **and** **[`EXP1`](#r5exp)** passed) and route through
+**[AB7](#r5ab)**. **MX2 rides P11's renderer** and must be **generated, never hand-maintained**.
+
 **✅ P8 — the story-material + STRUCTURE synthesis audit — SHIPPED 2026-07-27.** Both deliverables are filed
 in the archive (`audits/museum/2026-07-27_P8-story-corpus.md` — **146 canonical arcs** de-duplicated from 175
 raw findings across 15 groups, with a PII firewall; and
@@ -7171,6 +7183,76 @@ UI in front of P16's scanner and P14's republish, not a new publish path. Owner 
 is blocked while any entry is blocked; inspect → inline-scrub → re-scan → approve/deny → publish works
 end-to-end through the controlled-push wrapper with a publish receipt and pointer update; CLI and phone mirror
 share one action layer + the CPB5 guardrails; staging is reachable Tailscale-only.
+
+<a id="mx"></a>
+
+## ⭐ MX1-MX2 — THE NORTH-STAR EXHIBITS (filed 2026-08-02 from `NORTH_STARS.md` §9; ⛔ PROPOSED, gated behind the publish freeze)
+
+⛔ **PROPOSED, not approved and not scheduled** — same posture as the `BR`, `HA` and `PX` blocks. Both items
+below come from **[`NORTH_STARS.md`](NORTH_STARS.md) §9**, where the judgement _"justified"_ was recorded;
+being written down here is what Protocol 50 requires of a proposal and is explicitly **not** what approval
+looks like.
+
+**New family prefix `MX`** (museum exhibit) — verified unused in `QUEUE.md` and `QUEUE_LOG.md` before
+assignment; no existing ID is renumbered, re-lettered or reused (Protocol 49).
+
+**⛔ THE GATE ON BOTH, and it is the binding kind, not preamble.** Neither may ship until **[PX1](#px) has
+landed AND [`EXP1`](#r5exp) has passed.** They are museum **publishing**, so they sit squarely inside the
+standing freeze, and they route through **[AB7 — the Declassification Pipeline](#r5ab)** like every other
+public byte: positive allow-list → exact-set P16 scan → lineage → owner declassification diff. **Design and
+curation work is not frozen; shipping is.**
+
+**⭐ Why they are worth filing rather than waving through as "more museum content."** The museum's own thesis
+(`NS-X1`) is that **the self-maintaining system is the SUBJECT** — failure → lesson → measure → improvement.
+The North Stars are the directional commitments those measures serve, so a room about them is the thesis
+stated directly rather than another gallery. **And the honest half is what makes it good:** it exhibits the
+**pruned, narrowed and rejected** phrasings beside the adopted ones — _"ledger IS the OS"_ narrowed to an
+audit journal, the Governed Learning Plane killed as a plane and kept as a contract, the grand _"sovereign
+proof-bearing software factory"_ cut down to `NS-F1` — as evidence the project **culls its own excitement**.
+A museum that showed only the survivors would be advertising.
+
+### MX1. ⬜ [PROPOSED · publish-frozen] A dedicated NORTH-STAR ROOM
+
+**What it is.** A curated, human-facing narrative room: each **adopted** North Star shown with the
+failure → lesson → measure arcs that actually earned it, and the **pruned / narrowed / rejected** phrasings
+displayed beside them.
+
+**⛔ What it is NOT — the constraint that keeps it a museum and not a second control surface: it is not a
+status dashboard.** No live state, no health colour, no "current phase" readout. The moment a museum room
+renders operational status it becomes a surface people check instead of the real one, and a stale exhibit
+reporting green is exactly the class of failure this project spent Round 3 and Round 5 removing.
+
+**Source:** `NORTH_STARS.md` §9 (MX-1). **Routes through:** [AB7](#r5ab). **Related:** the museum program's
+curation law (capture everything, exhibit a curated subset) — this room is curated, not complete.
+
+### MX2. ⬜ [PROPOSED · publish-frozen] North Stars in the GENERATED visual graph
+
+**What it is.** The planned Visual Web (**P11**) renders North Stars as **nodes** and their **real**
+relationships as **edges**: serving primitives, gating experiments, parent/child chains, and recorded
+contradictions.
+
+**⛔ THE HARD REQUIREMENT, and it is the whole item: the graph is GENERATED from canonical references —
+`NORTH_STARS.md`'s structured cross-refs (`SL-*` / `AB*` / `EXP*`) plus `QUEUE.md` — and is NEVER
+hand-maintained.** A hand-drawn graph drifts into a second roadmap the moment the queue moves; a generated
+one stays honest by construction and **breaks loudly** when a reference stops resolving, which is a feature
+rather than a fault. ⭐ **This project has already retired one rule (Protocol 2a) for exactly the
+hand-maintained-mirror failure**, and the same reasoning made **WB2**'s guard registry and **BR22**'s
+reference lint generated-only. MX2 inherits that constraint rather than re-litigating it.
+
+**Cross-refs:** rides **P11**'s graph renderer (⛔ do not build a second one — Protocol 22); shares the
+generated-edge discipline with **[AB5 — the Provenance & Dependency Graph](#r5ab)** and **BR22**; the
+**item I** Atlas rides the same renderer.
+
+**Source:** `NORTH_STARS.md` §9 (MX-2). **Routes through:** [AB7](#r5ab).
+
+### ⛔ Standing guardrail on both (from `NORTH_STARS.md` §9, adopted with them)
+
+**The Museum / Exhibit remains human-facing OUTPUT. It may _reflect_ the roadmap; it must never _become_ a
+competing planning authority.** Planning lives in **`QUEUE.md`**; **`NORTH_STARS.md`** mirrors its direction;
+the museum renders a **curated, scrubbed projection** of both. Any version of MX1 or MX2 that a session would
+consult to decide what to build next has failed this guardrail, whatever it looks like.
+
+---
 
 ### Declined this round — auto-actuation stretches kept proposals-only (2026-07-30, multi-model round)
 

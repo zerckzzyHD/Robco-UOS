@@ -9,13 +9,113 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)**
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)**
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="ns0802"></a>
+
+### 2026-08-02 (later) — `NORTH_STARS.md` placed in the repo and wired to the queue; MX1/MX2 (the North-Star exhibits) filed under the museum track
+
+**Scope of this pass: doc edits + git commit/push/sync only.** No app code, no control-plane code, no
+enforcement flipped on, no cache bump. **Nothing was approved and nothing was adjudicated** — the seven held
+`BR`/`HA` items were read and surfaced verbatim for the owner, not ruled on.
+
+#### The file, and the rule that governs it
+
+**`NORTH_STARS.md` now lives beside `QUEUE.md` in the app repo**, copied **verbatim** from the authored draft
+one level above the repo (the `-draft` suffix is dropped and the draft path is referenced nowhere inside — it
+was checked, not assumed). **Its judgements were not rewritten**; this pass placed, verified and wired it.
+
+**⛔ The relationship, stated in both files so neither can drift into being the other:** `QUEUE.md` is
+**executable truth**; `NORTH_STARS.md` is its **directional mirror** — it names the commitments the spine
+serves, with every verdict traced to a canonical `SL-*` / `AB*` / `EXP*` ID. **If the two ever disagree,
+`QUEUE.md` wins and `NORTH_STARS.md` is stale.** A session must never plan from the mirror. The pointer sits
+in the Round-5 spine preamble; the reciprocal statement was already in the authored file's own header.
+
+**⭐ Why a mirror is worth having at all, rather than being a second roadmap by another name.** The queue
+records _what is being built and in what order_; it deliberately does **not** say which durable directional
+commitments that order serves, and Round 5 showed the cost of that gap — _"ledger IS the OS"_ and _"sovereign
+proof-bearing software factory"_ survived for months as exciting phrases precisely because nothing tracked
+them as commitments that could be **narrowed or retired**. The inventory's real work is the **honest cull**:
+it holds `NARROWED` / `MERGED` / `REJECTED` rows beside the adopted ones so a pruned phrase cannot quietly
+re-inflate. That is Protocol 49's retire-in-place discipline applied to _directions_ instead of guards.
+
+#### Cross-reference verification — the whole point of placing it under the gate
+
+**Every canonical reference in `NORTH_STARS.md` was resolved against `QUEUE.md` at HEAD, mechanically rather
+than by eye: 44 distinct IDs — `SL-*`, `AB1`-`AB8`, `EXP1`-`EXP9`, `PX1`, `P16` — and every one resolves.
+Zero unresolved, zero invented.**
+
+**⚠ Six shorthand runs were expanded to their canonical `SL-` forms in the same pass. No verdict, status or
+judgement was changed — this is ID hygiene, and it is load-bearing rather than cosmetic**, because a bare
+slate letter resolves to a **different live queue item**:
+
+| Was                                        | Now                                                       | Why it mattered                                                                                                                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `· G1 (SL-G1)`                             | `· epistemic-state-as-code (SL-G1)`                       | Bare **G1** is the owner-greenlit **CP5 witness**, not the epistemic candidate.                                                                                                                                                                  |
+| `SL-K1/K3/K5`                              | `SL-K1`/`SL-K3`/`SL-K5`                                   | Run-together shorthand: only the first token resolved.                                                                                                                                                                                           |
+| `K2/K5 must use …`                         | `SL-K2`/`SL-K5`                                           | Bare cluster letters.                                                                                                                                                                                                                            |
+| `SL-D1/D2/D6`                              | `SL-D1`/`SL-D2`/`SL-D6`                                   | Run-together shorthand.                                                                                                                                                                                                                          |
+| `F2/F4/F6/F7/…/A4/G4/I3` (§7 overlap line) | `SL-F2`/`SL-F4`/`SL-F6`/`SL-F7`/…/`SL-A4`/`SL-G4`/`SL-I3` | ⭐ **The worst of the set.** Bare **A4** is the shipped Firestore round-trip test, bare **G4** is the retired DG2 counter, bare **F**/**I** are shipped single-letter items. Every one of those would have resolved a reader to the wrong entry. |
+
+**This is exactly the collision the `SL-` prefix was introduced for**, and the first outside document written
+against the spine hit it within a day — which is the argument for keeping the prefix mandatory rather than
+treating it as decoration. A verification stamp recording all of this now sits in the file's own header, so a
+future reader knows the references were checked and when.
+
+#### MX1 / MX2 — the North-Star exhibits, filed under the museum track
+
+Both come from `NORTH_STARS.md` §9, where the judgement _"justified"_ was recorded. **New family prefix `MX`**
+(museum exhibit), verified unused before assignment; nothing renumbered or reused (Protocol 49).
+
+- **MX1 — a dedicated NORTH-STAR ROOM.** ⛔ PROPOSED. Curated, human-facing narrative: each adopted North
+  Star with the failure → lesson → measure arcs that earned it, **and the pruned / narrowed / rejected
+  phrasings shown beside them** as evidence the project culls its own excitement. ⛔ **Explicitly NOT a status
+  dashboard** — no live state, no health colour. A museum room that renders operational status becomes a
+  surface people check instead of the real one, and a stale exhibit reporting green is precisely the failure
+  class Rounds 3 and 5 spent themselves removing.
+- **MX2 — North Stars in the GENERATED visual graph.** ⛔ PROPOSED. North Stars as nodes, their real
+  relationships as edges (serving primitives, gating experiments, parent/child, recorded contradictions),
+  riding **P11**'s renderer — ⛔ never a second one (Protocol 22). **⭐ Hard requirement, and it is the whole
+  item: the graph is GENERATED from canonical references (`NORTH_STARS.md`'s structured cross-refs +
+  `QUEUE.md`) and is NEVER hand-maintained.** A hand-drawn graph drifts into a second roadmap the moment the
+  queue moves; a generated one stays honest by construction and **breaks loudly** when a reference stops
+  resolving. **This project has already retired one rule (Protocol 2a) for exactly the hand-maintained-mirror
+  failure**, and the same reasoning made **WB2** and **BR22** generated-only — MX2 inherits that constraint
+  rather than re-litigating it.
+
+**⛔ THE GATE ON BOTH is binding, not preamble: neither may ship until [PX1](QUEUE.md#px) has landed AND
+`EXP1` has passed.** They are museum **publishing**, so they sit inside the standing freeze and route through
+**AB7, the Declassification Pipeline** — positive allow-list → exact-set P16 scan → lineage → owner
+declassification diff. Design and curation work is not frozen; shipping is.
+
+**Standing guardrail adopted with them (from §9):** the Museum/Exhibit remains human-facing **output**. It may
+_reflect_ the roadmap; it must never _become_ a competing planning authority. Planning lives in `QUEUE.md`,
+the inventory mirrors it, the museum renders a curated scrubbed projection. **Any version of MX1 or MX2 that a
+session would consult to decide what to build next has failed this guardrail**, whatever it looks like.
+
+#### The seven held items — READ, SURFACED, NOT adjudicated
+
+**BR1, BR4, BR14, BR19, BR21, BR23, HA5** were read at HEAD and their exact current text surfaced to the owner
+verbatim in the session report. **⛔ None was adjudicated, re-tagged, promoted or moved** — all seven remain
+⛔ PROPOSED / `[DECISION]`-pending exactly as Round 5 left them, and the queue already records that the owner
+holds them for this pass. Dispatch rules on them next; this pass deliberately stopped at surfacing, because
+an item adjudicated by the session that was only asked to read it is the Protocol 51(a) failure in miniature.
+
+#### One thing deliberately NOT done, with the reasoning
+
+**`README.md` was not amended.** Protocol 2's README-currency clause binds when a change makes the README's
+**file structure** section inaccurate — but that section lists the architecture/agent docs (`ARCHITECTURE.md`,
+`CHANGELOG.md`, `CLAUDE.md`, `rules/`) and has **never** listed `QUEUE.md` or `QUEUE_LOG.md`. Adding
+`NORTH_STARS.md` alone would make the listing _less_ consistent, not more. **Recorded rather than left silent
+so the omission reads as a decision, not an oversight** — if the planning docs are ever added to that block,
+this file should go in with them. A row in `CLAUDE.md`'s Reference Pointer Index is an available follow-up and
+was **not** taken unasked (a rulebook edit is never a side effect of a queue fold).
 
 <a id="r50802"></a>
 
