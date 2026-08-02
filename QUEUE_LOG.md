@@ -187,12 +187,37 @@ experiment itself can fail silently** · which candidates it resolves.
   release-separated data, or die.** ⛔ The whole cluster sits behind this gate; nothing learned is built, even
   in shadow, before it passes.
 
-**⚠ `EXP7` — an unresolved slot, flagged rather than invented.** The synthesis's phased sequence names
-experiments **1, 2, 3, 4, 5, 6, 8 and 9** and **never assigns a number 7**. Two decisive experiments exist in
-the document without numbers — the **Reaper test** and the **bounded Kani proof**. Rather than silently bind
-one of them to the empty slot (which would make the numbering look complete while resting on a guess), `EXP7`
-is filed **as explicitly unresolved with both candidates recorded beside it**, for Dispatch or the owner to
-bind. This is the same discipline as flagging an un-adjudicated `BR` item instead of inferring its verdict.
+#### ⭐ `EXP7` — filed as an unresolved slot, then BOUND by the owner the same day (2026-08-02)
+
+**How it went, recorded in both halves because the process is the point.** The synthesis's phased sequence
+names experiments **1, 2, 3, 4, 5, 6, 8 and 9** and **never assigns a number 7**. Two decisive experiments
+existed in the document without numbers — the **Reaper test** and the **bounded Kani proof** — and binding one
+of them to the empty slot would have made the numbering _look_ complete while resting on a guess. So `EXP7`
+was filed **as explicitly unresolved, with both candidates recorded beside it**, and flagged upward.
+
+**The owner supplied the real definition within the hour, and it was neither of them.** ⭐ **`EXP7` = GPT's
+Experiment 7, the OWNER-COMPREHENSION + ALERT-EPISODE test.** _Setup:_ replay a **sanitized** set of recent
+alert families + **seeded critical cases** + several **frozen action envelopes**, comparing the **current
+view** against the proposed **episode/digest view**. _Falsifier — any one of three:_ a deterministic
+**high-severity / privacy / witness** item is **hidden or materially delayed**; the owner **cannot correctly
+identify** target / effect / unknown / irreversible consequence; or an **acknowledgement is mistaken for a
+resolution**. _Outcome rule:_ **a lower alert count WITH complete critical detection AND correct comprehension
+→ the `SL-I4` digest SURVIVES**; ⛔ **any hidden critical item → redesign, WITHOUT learned ranking.**
+_Resolves:_ `SL-I1`-`SL-I4`, `SL-A6`'s presentation half, the owner-root-of-trust risk, the
+**owner-attention-learner KILL**, and `SL-F6`'s framing. Filed at **Phase 1**, since that is where the
+candidates it resolves sit.
+
+**⛔ And the correction that came with it: the Reaper test and the bounded Kani proof are NOT `EXP7`.** They
+are **candidate-specific NDE gates** — attached to the **Reaper** (`DG3`/`REF2`) and to **`SL-A1` tier (b)**
+respectively, deliberately unnumbered, and **outside the spine's phase sequence**. The earlier draft's
+suggestion that one of them might fill the slot is corrected in place at both candidates.
+
+**⭐ Why this is worth a paragraph rather than a silent edit.** `EXP7` is the only experiment in the nine
+whose **subject is the owner rather than the machine**, and it exists because _"fewer alerts"_ is
+indistinguishable from _"the important one was suppressed"_ unless someone measures comprehension directly.
+That makes it the test where the **owner-attention-learner KILL is actually verified instead of asserted** —
+and it would have been lost entirely had the empty slot been filled with a plausible guess. **Flagging the
+gap rather than closing it is what let the real answer arrive.**
 
 ---
 
@@ -234,9 +259,10 @@ Recorded because an adjudication that only reports agreement has hidden its hard
 - **The `BR` block (BR0-BR26) is now a historical record plus pointers, not the live filing.** Every item
   carries an inline `[R5: …]` disposition; the ones that MERGE live under an abstraction, and the entry below
   is the reasoning that got them there. **Nothing was deleted** (Protocol 49: retire in place, never renumber,
-  never delete the reasoning). ⚠ **Six items — BR1, BR4, BR14, BR19, BR21, BR23 — were NOT adjudicated by
-  name** and are **flagged as such**, keeping their existing PROPOSED status rather than being handed a
-  verdict by inference. BR1/BR19/BR23 are nonetheless bound by the **Operator-CLI clause**: every renderer and
+  never delete the reasoning). ⚠ **Six `BR` items — BR1, BR4, BR14, BR19, BR21, BR23 — were NOT adjudicated
+  by name** (plus **HA5**: seven in total) and are **flagged as such**, keeping their existing PROPOSED status
+  rather than being handed a verdict by inference. **The owner holds them for the North Star pass**
+  (2026-08-02) — they are not for a later reconcile to resolve unilaterally. BR1/BR19/BR23 are nonetheless bound by the **Operator-CLI clause**: every renderer and
   action must be generated from the one catalog + projector **before** a new surface is added.
 - **`BR`'s BUILD ORDER is superseded as the sequencing authority and kept in place as the record.** Its
   instinct (cheap, read-mostly, measure-before-enforce) survives inside Phase 1, and BR6/BR7, BR5 and BR8 keep
@@ -282,8 +308,11 @@ Recorded because an adjudication that only reports agreement has hidden its hard
   and **AUD2** are unchanged and still gated; **PX1**'s freeze is unchanged in force.
 - **No ID was renumbered, re-lettered or reused**, and no shipped account was rewritten (Protocol 49 + this
   file's ARCHIVE-class rule).
-- **No verdict was invented for an unadjudicated item**, and **no number was invented for `EXP7`.** Both are
-  flagged instead. A queue that quietly interpolates the missing entries reads as complete while resting on
+- **No verdict was invented for an unadjudicated item**, and **no experiment was invented for the empty
+  `EXP7` slot.** Both were flagged instead — and the `EXP7` flag was **answered by the owner the same day**
+  with a definition no guess would have reached (see above), while the seven un-adjudicated `BR`/`HA` items
+  (BR1, BR4, BR14, BR19, BR21, BR23, HA5) stay ⛔ PROPOSED for the owner to adjudicate **in the North Star
+  pass**. A queue that quietly interpolates the missing entries reads as complete while resting on
   guesses — which is the precise failure mode this whole round exists to remove.
 
 <a id="cpconsolidate0730b"></a>
