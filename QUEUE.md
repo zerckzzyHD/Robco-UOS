@@ -4646,13 +4646,21 @@ overlapped, not a strict serial wait**:
 control plane to have anything to audit, and the museum is the obvious real work — so the two overlap and
 nothing idles. But **do not build the WHOLE museum before the first audit**: build an increment, audit it,
 fix, continue. This reconciles the bands rather than replacing them — **AUD1** (its own "run only after the
-batch has run live long enough to produce real data" gate is exactly what museum-as-workload satisfies),
+batch has run live long enough to produce real data" gate is exactly what museum-as-workload satisfies;
+**AUD2**, filed beside it 2026-08-02, hangs off step 1 instead — it unlocks when the control plane is
+**fully built**, without waiting for the live-data accrual AUD1 needs),
 **PM1** (reflect before the exhibit is built), and **the museum program** (item **P** + family) as the live
 workload itself. **Owner-adjustable — a plan of record, not a lock.**
 
 ---
 
-## POST-IMPLEMENTATION MULTI-MODEL AUDIT — gated on the ready batch running live (new 2026-07-30)
+## POST-IMPLEMENTATION AUDITS — each gated on the control plane actually being built (AUD1 new 2026-07-30 · AUD2 new 2026-08-02)
+
+**Both items here are ⭐ OWNER-REQUESTED and GATED — not brainstorm candidates.** They sit together because
+they share one precondition: neither may run against a paper design. `AUD1` waits on the ready batch having
+**run live long enough to produce real data**; `AUD2` waits on the control plane being **fully built**. Read
+their gates as binding, not as preamble. _(Heading widened 2026-08-02 from "MULTI-MODEL AUDIT — gated on the
+ready batch running live", which described AUD1's gate only, when AUD2 was filed alongside it.)_
 
 - **AUD1. ⬜ GPT/Gemini/DeepSeek pass on the control-plane program, once it's had a real run.** Gated
   explicitly: run this only **after** the "Ready to build" batch above is built, activated, AND has run live
@@ -4670,6 +4678,64 @@ workload itself. **Owner-adjustable — a plan of record, not a lock.**
   **Done means:** the ready-to-build batch (ACT3 through CPB3) is built, activated, and has real live run
   data; the three-model pass runs against that real state (not the plan); both questions are answered with
   a plain-English verdict; any finding is filed as its own queued item rather than acted on inline.
+
+### AUD2. ⭐⏳ OWNER-REQUESTED, GATED (2026-08-02) — Control-plane TOKEN-UTILIZATION study: "how much LLM spend can the deterministic layer absorb?"
+
+> **⏳ GATE — the owner's explicit condition, and the whole reason this is filed rather than started: run this
+> ONLY after the control plane is FULLY BUILT. Do not start it before.** A utilization study run against a
+> half-built deterministic layer measures the wrong denominator — it would price work against machinery that
+> does not exist yet and conclude that the LLM is irreplaceable when the honest answer is "not built yet."
+>
+> **⭐ STATUS TAG — owner-requested and APPROVED-BUT-GATED. This is NOT a `BR` / `HA` / `PX` brainstorm
+> candidate and must not be read as one:** those sets are ⛔ PROPOSED and unapproved; this item is the
+> owner's own ask, waiting on a trigger rather than on a decision. The only thing standing between it and
+> execution is the gate above.
+
+**What it is — and, first, what it is NOT.** It is **not** a generic token/cost trim, not a prompt-shrinking
+pass, and not a "spend less" exercise. It is a **utilization study**: an inventory of how much work Dispatch
+still **pays an LLM to do** that the **deterministic control plane could do for free** — and, per item, the
+verdict on whether moving it is worth doing. The question is not "how do we use fewer tokens," it is **"which
+of the tokens we currently burn are buying judgement, and which are buying arithmetic a script already
+owns?"** Judgement is what an LLM is for; arithmetic billed at LLM rates is the waste this audit is hunting.
+
+**The candidate surfaces the owner named, each pointing at work already described in this file** (named as
+_examples of the shape_, not as an approval of any of them — every `BR` item below is still ⛔ PROPOSED):
+
+- **The replay bench** — test detectors against the real ledger **without re-running sessions**. Today,
+  validating a detector change costs live session time; replay makes it free and deterministic. → **BR5**.
+- **The manifest shim / morning report** — a **deterministic overnight status** instead of asking a session to
+  assemble one. An LLM is currently the reporting layer for facts the ledger already holds. → **BR8** (the
+  shim) + **BR18** (the AI-free morning report).
+- **Coverage-window certificates** — cheap **proven** health, replacing per-tick "still-fine" chatter and the
+  session-time it costs to establish the same confidence. → the coverage-window certificate in the Round-3
+  cut round.
+- **The alignment scout** — catch rework **before** it costs a redo. The most expensive tokens this project
+  spends are the ones spent twice, so preventing a redo is worth more than shaving any single prompt.
+  _(⚠ Unlike the three above, this one has **no existing item ID in this file** as of filing — it is the
+  owner's phrasing, recorded verbatim, and the audit must locate or create its concrete referent rather than
+  assume one exists.)_
+
+**Cross-references — recorded as pointers to CHECK, not as facts (Protocol 51(b)).** The owner names an
+overlap with **F4 (usage-portfolio governance)** and with the **Cluster-K learned token-savers** (context-core
+optimizer; usage/time/rework forecaster) **that go on trial in Round 5**. ⚠ **Neither `F4` nor `Cluster-K`
+resolves to any identifier in `QUEUE.md` as of 2026-08-02** — verified by search this pass, not assumed. They
+belong to the Round-4/5 material that is deliberately **not yet folded** into this file, so the first
+reconcile that lands that material must **bind AUD2 to their real IDs**. **If those Cluster-K savers survive
+their Round-5 trial, THIS audit is where it is decided which of them actually pay for themselves** — that is
+the specific job this item holds open, and it is why the overlap is recorded now instead of discovered later.
+
+**⛔ THE THIRD TOKEN AUDIT — the first two are CLOSED. Do not re-litigate them.** This project has already run
+two passes over token/cost questions and both reached settled outcomes (among them the **rejected
+diegetic-naming** proposal). Those verdicts stand. AUD2 is a **new question against a new artifact** — the
+deterministic control plane, which did not exist when the earlier passes ran — and it inherits none of their
+scope. A session that reopens a closed verdict here is doing the wrong work; the point of numbering it "the
+third" is so nobody mistakes it for a re-run of the first two.
+
+**Done means:** the control plane is fully built (the gate); every recurring LLM-paid task in the Dispatch
+workflow is inventoried with an honest **judgement-vs-arithmetic** call; each arithmetic-side item is either
+moved to the deterministic layer, filed as its own queued item with an ID, or explicitly declined **with the
+reason it is worth paying an LLM for**; the `F4` / Cluster-K cross-references above are resolved to real IDs
+or recorded as nonexistent; and the surviving Round-5 token-savers each get a pays-for-itself verdict.
 
 ---
 
