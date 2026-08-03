@@ -137,4 +137,10 @@ Both proposals below are **PROPOSED** and **gated behind the museum publish free
 
 ## 10. Open items folded in this pass
 
-The seven Round-5-held items (BR1, BR4, BR14, BR19, BR21, BR23, HA5) are adjudicated in QUEUE_LOG under the North Star pass and reflected here only where one turns out to be North-Star-relevant. (Adjudication pending Dispatch ruling — see the reconciliation session's surfaced text.)
+The seven Round-5-held items (BR1, BR4, BR14, BR19, BR21, BR23, HA5) are adjudicated in QUEUE_LOG under the North Star pass and reflected here only where one turns out to be North-Star-relevant.
+
+**✅ RESOLVED 2026-08-02 — the ruling is in, and this line no longer says "pending."** All seven were adjudicated the same day: **six MERGE into an existing abstraction, one DEFERs, and NOT ONE is a new North Star.** Two reinforce North Stars that already exist (**BR4** → `NS-C1` proof-of-execution; **BR21** → `NS-K1` honest continuity + `NS-K2` provider-exit) and three more (**BR1**, **BR19**, **BR23**) serve `NS-C2` (epistemic-everywhere) through the honesty constraints attached to them. Full per-item rulings: [`QUEUE_LOG.md` § the seven held items](QUEUE_LOG.md#held0802).
+
+**⛔ No change to this file was needed or made by that adjudication, and that is the correct outcome rather than an omission** — a MERGE files an item under its canonical home; it does not create a direction. The two that reinforce existing North Stars do so **without altering their wording, status or serving-primitive lists**. That is the adoption bar at the top of this file working as designed: **a good idea is not a direction.**
+
+_(Corrected 2026-08-02 as F07 of the five-repo ground-truth audit. The stale text read "(Adjudication pending Dispatch ruling — see the reconciliation session's surfaced text.)" — a placeholder that outlived its ruling by the length of one session. It is replaced rather than deleted so the correction is legible: a projection that reports "pending" for a decision already made is the exact drift the header warns about, and it is worth more as a worked example than as a silently-fixed line.)_

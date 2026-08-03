@@ -9,13 +9,129 @@
 **Item IDs are stable tags — never renumbered, never reused** (the Protocol 49 retirement discipline, applied to queue IDs). An `A0` / `R3` / `P1` here is the same `A0` / `R3` / `P1` referenced from commit messages, memory files, the workflow-review prompt, and `CHANGELOG.md`. Moving an account into this log does not change its ID.
 
 **Anchor index (for `QUEUE.md`'s one-liner links):** [2.8.0](#v280) · [brain dump](#braindump) · [item 1 spine](#u1) · [item 2](#u2) · [item 3](#u3doc) · [item 4 FO3](#fo3) · [item 5 save integrity](#saveintegrity) · [data provenance](#dataprovenance) · [save L3](#saveintegrityl3) · [UI truthfulness](#uitruthfulness) · [item 6 schematic](#schematic) · [A0](#a0) · [A1](#a1) · [A2](#a2) · [R1](#r1) · [R2](#r2) · [R3](#r3) · [R4](#r4) · [R8](#r8) · [R9](#r9) · [D](#d) · [U](#u) · [E](#e) · [M](#m) · [K](#k) · [O](#o) · [N](#n) · [F](#f) · [G](#g) · [H](#h) · [S](#s) · [App Check](#appcheck) · [L (private view)](#l) · [P8](#p8) · [V](#v) · [W](#w) · [X](#x) · [CP2 → v2.1](#cp2v21) · [CP2 S12 cleared](#cp2s12) · [CP2 → v2.3](#cp2v23) · [CP program kernel reframe](#cpkernel0728) · [HG1/HG2 pull-forward](#hg0728) ·
-[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)** · **[the seven held BR/HA items adjudicated](#held0802)** · **[the silent-backup gap — BD1/BD2](#bd0802)**
+[CP kernel ranks 1-2 shipped, P15](#cp0729) · [RB1-RB5 filed, kernel ranks 4-5 shipped, wiring dissent](#rb0729) · [CP activation checklist consolidated](#cpactivation0730) · [three CP checklist refinements (REF1-REF3)](#cprefine0730) · [REF2/REF3 plan threshold + bidirectional auto-verdict](#cprefine0730b) · [RB3 watcher mechanism + supervisor kill-switch trigger words](#cprefine0730c) · [CP board consolidation: rank 3 + REF1 shipped, AUD1 filed](#cpconsolidate0730) · [REF4 thrashing refinement + PM1 post-mortem filed](#cpconsolidate0730b) · **[⭐⭐ ROUND 5 reconciliation — the kills, defers, NDEs and placement ledger](#r50802)** · **[NORTH_STARS.md placed + MX1/MX2 filed](#ns0802)** · **[the seven held BR/HA items adjudicated](#held0802)** · **[the silent-backup gap — BD1/BD2](#bd0802)** · **[GPT's five-repo ground-truth audit verified + reconciled (Phase A)](#audit0802)**
 
 ---
 
 # Update history — the running "Last updated" chain
 
 _The full original running-header text is preserved verbatim in the appendix at the very bottom of this file. The dated summaries below are the same content, reflowed newest-first for reading (the header had grown into a single multi-thousand-word line that `QUEUE.md` could no longer carry)._
+
+<a id="audit0802"></a>
+
+### 2026-08-02 (latest) — GPT's FIVE-REPO ground-truth audit: verified against the live machine, then reconciled (PHASE A)
+
+**Scope of this pass: doc + code-comment edits only.** No behaviour changed anywhere. No enforcement flipped
+on, no scheduled task altered, no cache bump (nothing served or precached was touched). **Nothing here was
+approved to BUILD** — every gap-finding was mapped onto an **existing** queue item; **no new item ID, family
+prefix or program was created.**
+
+**What this was.** An external model (GPT) audited all five repositories from their **pushed GitHub state**
+and produced twelve findings (F01-F12). It could not see uncommitted work, the Windows scheduler, live hooks,
+or the untracked live control-plane state — so a verification pass re-checked every finding against **the
+machine and the working copies**, then this pass applied the fixes.
+
+**⭐ The audit held up. All five repo HEADs matched the audit boundary exactly** (UOS `86f3375`, Archive
+`255b7594`, Exhibit `2fc7b14`, Control `7bb9e1b`, Ledger `6c263589`), every repo clean with nothing stashed or
+unpushed — so **nothing was stale-at-audit-head, and nothing was contradicted by evidence.** Ten findings
+CONFIRMED, three of those with corrections; F04 is an owner policy decision handled separately (**Phase B —
+untouched by this pass**); BD2's design was an owner decision, now recorded.
+
+**⭐ The three corrections are the most valuable output, because each is a place the audit was believed too
+readily:**
+
+1. **F02 — `orphan-job` is NOT a second contradiction.** The audit read both `stranded-push` and `orphan-job`
+   as "snapshot says unobservable, status says observable." Only the first is that. `status.json` never
+   claims orphan-job is observable — it reports a zero with a **null `unavailableReason`**, which is
+   **undeclared unobservability**: a zero that reads as measured when nothing was measured. Two distinct
+   failures, one root, and collapsing them would have produced a fix aimed at the wrong half.
+2. **F06 — the cited line number was wrong** (Protocol 35 sits ~10 lines earlier than claimed). The substance
+   held; the citation did not. Recorded because a plausible-looking line reference is exactly the kind of
+   thing a later session copies forward without re-checking.
+3. **F11 — the quoted comment was paraphrased inaccurately.** The real text says the operator CLI _does not
+   go through_ either MCP server, not that it "proves an op before exposing it." The underlying defect —
+   present tense presupposing two MCP servers that do not exist — is real either way.
+
+**⭐ And one place the audit UNDERSTATED the problem (F03).** It cited `publisher.js`'s own header as evidence
+that the read-only posture is documented. That comment — _"there is no automated caller of `publishJob`
+anywhere in this repo"_ — is **itself now false**, since `write-side.js` defaults its publish function to
+exactly that and the supervisor calls it every tick. So there were **four** stale read-only artifacts, not
+three. _A stale comment cited as evidence of correctness is the sharpest form of this whole audit's thesis._
+
+**⭐ The live reproduction that outranks all of it: BD2 is no longer a hypothesis.** The scheduler was re-read
+directly. `\RobCo-Control-DailyHousekeeping` had `StartWhenAvailable: True`, the machine had been awake **8+
+hours**, and the missed 08-02 window **still had not run** — `LastRunTime` stuck at `2026-08-01 03:15:01`,
+Windows' own **`NumberOfMissedRuns: 1`**, and `NextRunTime` already advanced to `2026-08-03`. The supervisor
+task on the same machine was perfectly healthy on its 5-minute cadence. **A configured-and-believed guard was
+measured not working, twice, by two independent reads.**
+
+#### What Phase A changed, per finding
+
+**App repo:**
+
+- **F07 — `NORTH_STARS.md`.** The file's final line still said the seven held items were "pending Dispatch
+  ruling"; they were adjudicated the day before (6 MERGE, 1 DEFER, none a new North Star). Replaced with the
+  resolved state, pointing at [#held0802](#held0802), and kept as a **worked example** rather than a silent
+  fix — a projection reporting "pending" for a settled decision is precisely the drift its own header warns
+  about. The "this file is a mirror, QUEUE.md wins" note already existed and was **not** duplicated.
+- **F08 — BD2's `Files:` citation.** It named `register-supervisor.ps1` (wrong script — that one registers
+  the _supervisor_) and "the mirrored `scheduled-tasks/` XML" (**a file that does not exist**). Corrected to
+  `register-daily-housekeeping.ps1`, with the missing XML now connected to the recovery-inventory gap rather
+  than left as a dangling reference.
+- **F01 → BD1 + `EXP6`.** Recorded the verified defect: the mirror exports **one** scheduled-task XML (a
+  single scalar constant, not a set), so the daily housekeeping task — the backup job itself — is **absent
+  from the recovery kit**; and the restore test validates the clone against **the mirror's own manifest**,
+  with an absent task directory returning `ok: true, checked: 0`. **Net: the restore test would pass green
+  against a mirror containing zero scheduled tasks.** Filed as a **recovery-inventory completeness**
+  requirement under BD1 — same failure shape as BD1 one level up (the mirror is the sole authority on what
+  the mirror should contain), gated by `EXP6`, **no new item**.
+- **F02 → founding fix 3 / `EXP3` / `AB1`.** Recorded the static coverage table replayed over live detector
+  results, with the correction above carried explicitly. Folded into `AB1` as four concrete requirements:
+  one **derived** coverage definition, explicit **scope** per claim, omission detection that covers the
+  coverage record itself, and a test that replayed coverage **cannot lag the detector set without declaring
+  itself stale**.
+- **F05 → PX1 / `EXP1`.** Recorded that publish-prep is **not an atomic accepted-output transaction**: the
+  public tree is swapped into place **before** the P16 gate judges it and is **left on disk when rejected**,
+  and a derivation failure **exits 0** (the deliberate "ritual, not gate" catch) leaving an **older** tree
+  behind — so one green exit covers three materially different states. Added as four adversarial acceptance
+  cases (exact-set manifest · freshness + source identity · explicit accepted/rejected state on the artifact
+  · **stale or rejected trees non-consumable by default**). ⭐ Noted in the entry that the code is already
+  **honest** about this — it says outright that the rejected tree was written — so what is missing is the
+  transaction, not the disclosure.
+- **F09 → `AB2` / `EXP5`.** Recorded six distinct deploy outcome types (build-passed · deploy-attempted ·
+  **skipped** · accepted · served-SHA-observed · device-verified) with a ceiling rule: no claim may be
+  reported above the strongest type it has evidence for. The measured instance is the staging workflow's
+  missing-token path, which `exit 0`s to green having deployed nothing. `workflow_dispatch` **keeps** its
+  authority as **receipted break-glass** — same shape as the push override: never removed, always recorded.
+- **F12 → the delta convention.** Appended a new dated delta block rather than editing the frozen 2026-07-31
+  and 2026-08-01 snapshot tables (they stay exactly as they are — history is not an obligation). Ledger
+  **78,627 → 100,206** records, chain coverage **19.0% → 36.4%**, unchained still frozen at **63,696**;
+  usage back to **`Normal`**; `state/manifests/` **still absent** (BR8's premise holds a third time). Every
+  unobservable/partial label reproduced **as-is** — none was upgraded to a measured value. ⚠ Also recorded
+  the reader-side finding: **the published ledger mirror lags live state (~80 min at read time), and the lag
+  grows without bound whenever a housekeeping window is missed** — the same BD1 defect seen from the
+  consuming end.
+- **BD2 — the owner's design decision, recorded.** ⛔ Nightly **`WakeToRun` is REJECTED**: it pays a standing
+  cost for an occasional event and, disqualifyingly, would still leave a miss **undetected** on any night it
+  failed for another reason. The chosen design is **both** remaining options, ordered: **(1) a missed-run
+  OBLIGATION ALERT** — the load-bearing half, an external observer outside the job's failure domain, which
+  composes directly with BD1 — **and (2) a resume-triggered catch-up** for recovery. **The alert must not
+  wait on the catch-up**, because a recovery mechanism that silently stops working is exactly how this defect
+  was created. Still RECORDED, NOT BUILT.
+- **F06 / F10 — the two user-facing doc corrections**, with a plain-English changelog entry: Protocol 35
+  relabelled as a **manual Firebase-console runbook plus a local session-only safeguard** (verified: the flag
+  doc is world-readable and client-writable by nobody, and no workflow or script writes it — so "immediately
+  and automatically" had no actor), and the README's Gemini-key line corrected from "never exposed" to the
+  four things that are actually true. **Neither is a leak**; both were wording that outran the code.
+
+**Control repo** (its own commit + changelog): **F03** — all four stale read-only artifacts corrected to the
+real authority model (passive observation + local enforcement + deterministic decision logic + a **gated,
+fail-closed, currently DORMANT** exact-SHA publish path), with `enforced: false` scoped to **supervisor
+scope** rather than "no enforcement anywhere"; **F11** — the operator CLI's MCP comment made future-tense.
+
+**⛔ F04 (public planning as an unmodeled public sink) was NOT touched by this pass** — no file moved, no
+visibility changed, no relocation of any kind. It is a structural decision with an owner ruling (hybrid) and
+runs as **Phase B**.
 
 <a id="bd0802"></a>
 
