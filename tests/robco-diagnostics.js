@@ -115,7 +115,29 @@ function _jsFileLocation(basename) {
   return _jsLocationCache.get(basename);
 }
 
+// ── F04 (2026-08-02): the PRIVATE planning tree ──────────────────────────────
+// QUEUE.md / QUEUE_LOG.md / NORTH_STARS.md left this PUBLIC repo for the private
+// archive (_RobCo-Archive/!PLANNING/). Suites 220, 246 and 248 read them, so they
+// resolve through the one resolver and SKIP — loudly, with the reason printed —
+// when the tree is not reachable. A public clone has no archive by design, and a
+// gate that hard-failed there would be a gate nobody outside this machine could
+// run. On THIS machine the tree is present and every one of those checks really
+// runs, which is why the skip prints planningPaths.describe() rather than a bare
+// "skipped": a skip that cannot be distinguished from a pass is the exact
+// dishonesty this suite file exists to prevent.
+const planningPaths = require(path.join(__dirname, '..', 'scripts', 'planning-paths.js'));
+const PLANNING_OK = planningPaths.planningAvailable();
+
 function readFile(rel) {
+  // Planning docs are resolved out of the private tree, never from ROOT.
+  if (planningPaths.PLANNING_FILES.includes(rel)) {
+    const text = planningPaths.readPlanningFile(rel);
+    if (text === null) {
+      fail(`Planning file not reachable: ${rel} — ${planningPaths.describe()}`);
+      process.exit(1);
+    }
+    return text;
+  }
   let abs = path.join(ROOT, rel);
   if (!fs.existsSync(abs)) {
     const m = /^js\/([A-Za-z0-9_-]+\.js)$/.exec(rel);
@@ -43680,10 +43702,18 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       ...ruleNoteFiles(), // U-R2: the subsystem notes are rulebook text too
       'ARCHITECTURE.md',
       'README.md',
-      'QUEUE.md',
-      'QUEUE_LOG.md', // the shipped-work archive cites protocol numbers — validate they resolve
+      // F04: the two planning docs are PRIVATE now (see planningPaths above). They
+      // still cite protocol numbers, so they stay in the corpus WHEN reachable —
+      // dropping them permanently would silently shrink this check's coverage on
+      // the one machine where it can actually run.
+      ...(PLANNING_OK ? ['QUEUE.md', 'QUEUE_LOG.md'] : []),
       'skill/SKILL.md', // the pointer-skill cites protocol numbers — validate they resolve
     ];
+    if (!PLANNING_OK) {
+      console.log(
+        `      (220: planning docs excluded from the corpus — ${planningPaths.describe()})`
+      );
+    }
     const refCorpusFiles220 = [
       ...REF_DOCS_220,
       ...allJsFiles().map(f => `js/${f.rel}`),
@@ -51184,11 +51214,33 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
       ].join('\n')
     );
 
+    // F04 (2026-08-02): pin the QUEUE side of this fixture too. The canonical
+    // QUEUE.md is now PRIVATE (_RobCo-Archive/!PLANNING/), so on a public clone it
+    // is simply not reachable — the drift check would then go silent by design and
+    // 242.9's red-then-green proof would fail for a reason that has nothing to do
+    // with the matcher. Pinning ROBCO_QUEUE_PATH at a fixture queue makes the proof
+    // self-contained and machine-independent.
+    // ⭐ This also closes the flake this suite's own comment above already
+    // documents: 242.9 previously broke when real QUEUE.md content coincidentally
+    // matched a fixture token. Depending on the owner's live queue for a
+    // matcher-behaviour proof was always the weaker design; the move forced the
+    // better one (Protocol 42 — fix what verification surfaces).
+    const fixtureQueue242 = path.join(fixtureBase242, 'FIXTURE_QUEUE.md');
+    fs.writeFileSync(
+      fixtureQueue242,
+      '# Fixture queue\n\nContains no fixture memory tokens, on purpose.\n'
+    );
+
     const fixtureRun242 = spawn242('node', ['scripts/queue-drift-check.js'], {
       cwd: ROOT,
       encoding: 'utf8',
       timeout: 20000,
-      env: { ...process.env, ROBCO_MEMORY_BASE: fixtureBase242 },
+      env: {
+        ...process.env,
+        ROBCO_MEMORY_BASE: fixtureBase242,
+        ROBCO_QUEUE_PATH: fixtureQueue242,
+        ROBCO_QUEUE_LOG_PATH: fixtureQueue242,
+      },
     });
     assert(
       fixtureRun242.status === 0,
@@ -51664,9 +51716,14 @@ header('Suite 245 — release receipt served-truth compare core (CLAIM M)');
 //  verification — Protocol 42), and be deterministic (same source → same HTML).
 // ══════════════════════════════════════════════════════════════
 header('Suite 246 — private phone-readable QUEUE view (item L)');
-{
+if (!PLANNING_OK) {
+  console.log(`  SKIP  Suite 246 — ${planningPaths.describe()}`);
+  console.log(
+    '        (the parser/renderer under test is present; only its real-QUEUE.md input is not)'
+  );
+} else {
   const QV = require(path.join(ROOT, 'scripts', 'queue-view.js'));
-  const queueSrc246 = fs.readFileSync(path.join(ROOT, 'QUEUE.md'), 'utf8');
+  const queueSrc246 = planningPaths.readPlanningFile('QUEUE.md');
   const model246 = QV.parseQueue(queueSrc246);
   const items246 = model246.blocks.filter(b => b.type === 'item');
   const byId = id => items246.find(b => b.id === id);
@@ -52002,7 +52059,11 @@ header('Suite 246 — private phone-readable QUEUE view (item L)');
 //  [account](QUEUE_LOG.md#anchor) links resolve, nor that its stable
 //  item IDs stay unique. Both are zero-FP, deterministic, and cheap.
 // ══════════════════════════════════════════════════════════════
-{
+if (!PLANNING_OK) {
+  header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
+  console.log(`  SKIP  Suite 248 — ${planningPaths.describe()}`);
+  console.log('        (anchor + item-ID integrity are properties of the private planning tree)');
+} else {
   header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
 
   const QV248 = require(path.join(ROOT, 'scripts', 'queue-view.js'));

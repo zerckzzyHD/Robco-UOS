@@ -68,6 +68,9 @@ function repoFileExists(relPath) {
   }
 }
 
+// F04: the private planning tree resolver (see scripts/planning-paths.js).
+const _planningKG = require('./planning-paths.js');
+
 // Single-snapshot tracked-tree read (spec §9: no cross-commit diffing, no git
 // rename-similarity heuristic — this is just "what does the current tree contain").
 function getTrackedFiles() {
@@ -143,8 +146,28 @@ function buildNodeRegistry(manifestStubs) {
   }
 
   add('doc:ARCHITECTURE.md', 'doc', repoFileExists('ARCHITECTURE.md') ? 'observed' : 'unavailable');
-  add('doc:QUEUE.md', 'doc', repoFileExists('QUEUE.md') ? 'observed' : 'unavailable');
-  add('doc:QUEUE_LOG.md', 'doc', repoFileExists('QUEUE_LOG.md') ? 'observed' : 'unavailable');
+  // F04 (2026-08-02): QUEUE.md / QUEUE_LOG.md are no longer in this repo — the
+  // canonical copies are PRIVATE, in _RobCo-Archive/!PLANNING/. Resolved via the
+  // one resolver so these nodes stay honestly 'observed' on a machine that has the
+  // archive, and honestly 'unavailable' on a public clone that does not. Reporting
+  // them 'unavailable' everywhere would be the easier change and the wrong one:
+  // "this repo cannot see it" and "it does not exist" are different facts.
+  add('doc:QUEUE.md', 'doc', _planningKG.planningFile('QUEUE.md') ? 'observed' : 'unavailable', {
+    file: '_RobCo-Archive/!PLANNING/QUEUE.md',
+    private: true,
+  });
+  add(
+    'doc:QUEUE_LOG.md',
+    'doc',
+    _planningKG.planningFile('QUEUE_LOG.md') ? 'observed' : 'unavailable',
+    { file: '_RobCo-Archive/!PLANNING/QUEUE_LOG.md', private: true }
+  );
+  add(
+    'doc:NORTH_STARS.md',
+    'doc',
+    _planningKG.planningFile('NORTH_STARS.md') ? 'observed' : 'unavailable',
+    { file: '_RobCo-Archive/!PLANNING/NORTH_STARS.md', private: true }
+  );
 
   add('group:library', 'group', 'observed');
   for (const stub of manifestStubs) {

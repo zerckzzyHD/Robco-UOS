@@ -47,13 +47,21 @@ const MEMORY_BASE =
     'local-agent-mode-sessions'
   );
 
-const QUEUE_PATH = process.env.ROBCO_QUEUE_PATH || path.join(REPO_ROOT, 'QUEUE.md');
+// F04 (2026-08-02): the canonical queue moved OUT of this public repo into the
+// private archive (_RobCo-Archive/!PLANNING/). The explicit ROBCO_QUEUE_PATH
+// override still wins — it predates the move and some machines set it — but the
+// default now resolves through scripts/planning-paths.js instead of this repo's
+// root. If the archive is not reachable the path stays null and this check goes
+// SILENT, exactly as it already did on a machine with no memory store: this is a
+// fail-safe nudge (Protocol 33 DNA) and it must never block a push.
+const _planning = require('./planning-paths.js');
+const QUEUE_PATH = process.env.ROBCO_QUEUE_PATH || _planning.planningFile('QUEUE.md');
 // The "queue record" is TWO files since the 2026-07-21 restructure: QUEUE.md is
 // the lean queue of open work, QUEUE_LOG.md the append-only archive of shipped
 // accounts. A plan is "recorded" if it appears in EITHER — so a shipped item's
 // memory must not start flagging merely because its reasoning moved to the log.
 // QUEUE_LOG.md is optional: a machine without it still gets the QUEUE.md scan.
-const QUEUE_LOG_PATH = process.env.ROBCO_QUEUE_LOG_PATH || path.join(REPO_ROOT, 'QUEUE_LOG.md');
+const QUEUE_LOG_PATH = process.env.ROBCO_QUEUE_LOG_PATH || _planning.planningFile('QUEUE_LOG.md');
 
 function safeExists(p) {
   try {

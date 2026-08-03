@@ -557,7 +557,19 @@ module.exports = {
 
 // ── CLI (only when run directly) ──────────────────────────────────────────────
 if (require.main === module) {
-  const src = fs.readFileSync(path.join(ROOT, 'QUEUE.md'), 'utf8');
+  // F04 (2026-08-02): QUEUE.md is no longer in this repo — the canonical copy is
+  // private, in _RobCo-Archive/!PLANNING/. Resolved through the one resolver
+  // (scripts/planning-paths.js); absent is a clean no-op, not an error, because a
+  // public clone has no archive by design.
+  const planning = require('./planning-paths.js');
+  const src = planning.readPlanningFile('QUEUE.md');
+  if (src === null) {
+    console.log(`[queue-view] SKIPPED — ${planning.describe()}.`);
+    console.log(
+      '[queue-view] The private queue view needs the archive checkout; nothing was written.'
+    );
+    process.exit(0);
+  }
   const hash = crypto.createHash('sha1').update(src).digest('hex').slice(0, 8);
   const model = parseQueue(src);
   const html = renderHtml(model, hash);

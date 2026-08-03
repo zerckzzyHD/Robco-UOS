@@ -39,7 +39,7 @@ Read this file, then read **only** the notes whose surface you are touching.
 | `js/services/api.js` · `js/services/api-directive.js` · `js/services/api-import.js` · `js/services/api-router.js` · the Tri-Node schema | `rules/ai-contract.md` |
 | any `<script>` tag or boot-order change · any file split/add/move/rename/delete · `repomix.config.json` · any file with non-ASCII characters | `rules/file-layout.md` |
 | `tests/` · `scripts/` (except `scripts/cf-staging-build.mjs` → deploy) · `js/dev/test-console.js` · `.github/workflows/` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
-| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · `QUEUE.md` · `QUEUE_LOG.md` · `skill/SKILL.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
+| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · the private `!PLANNING/` tree (`QUEUE.md` · `QUEUE_LOG.md` · `NORTH_STARS.md`) · `skill/SKILL.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
 | the private-archive **restore / rehydrate** path — recovering the orchestrator's memory or the queue after a machine loss, or bringing a fresh Dispatch up to state (Protocol 48's complement) | `rules/memory-restore.md` |
 
 Touching several surfaces means reading several notes. When in doubt, read the note — they are
@@ -61,7 +61,8 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 | Need | Where to look |
 | ---- | ------------- |
 | **Full project reconstruction** — what the app IS, the architecture, the state shape, every subsystem, the protocols and WHY each exists, the recurring gotchas, the owner's hard rules, the workflow, the roadmap | `library/BRAIN_DUMP.md` (gitignored, local-only, Claude-facing — read it from disk) |
-| **Current roadmap / what's built vs. next** (phone-readable, committed) | `QUEUE.md` (repo root) — the QUEUE only; full accounts of shipped/ruled-out work live in `QUEUE_LOG.md` (repo root, append-only archive) |
+| **Current roadmap / what's built vs. next** (phone-readable) | ⛔ **PRIVATE, and no longer in this repo** — `_RobCo-Archive/!PLANNING/QUEUE.md` (the QUEUE only); full accounts of shipped/ruled-out work in `_RobCo-Archive/!PLANNING/QUEUE_LOG.md` (append-only archive); the directional mirror in `_RobCo-Archive/!PLANNING/NORTH_STARS.md`. See the standing note directly below. |
+| **North Stars** — the directional commitments the queue serves | `_RobCo-Archive/!PLANNING/NORTH_STARS.md` — a **mirror** of queue truth, never a second roadmap; where it and `QUEUE.md` disagree, `QUEUE.md` wins |
 | **Canonical protocol & gate rules** | this file (the universal contract) + `rules/*.md` (the subsystem notes) |
 | **"Where does X live"** — function/subsystem → file, without loading whole files: entry points, render functions, native setters, boot phases, event-bus emitters/subscribers, the AI/cloud/OCR paths, the Diagnostic Shell registry | `library/CODE_MAP.md` (gitignored, local-only, derived from code not docs — Protocol 46) |
 | **AI contract** — the Tri-Node JSON schema (`narrative`/`state`/`modal`), the 7 directive builders, `getSystemDirective()`, `autoImportState()`'s round-trip | `library/CODE_MAP.md` § AI Contract (`js/services/api-directive.js` builds the directive and owns `getSystemDirective()`; `js/services/api-import.js` owns `autoImportState()`; `js/services/api.js` is the network-layer hub only) — rules in `rules/ai-contract.md`, design rationale in `ARCHITECTURE.md#ai-integration-pipeline` |
@@ -87,6 +88,47 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 > Note: `library/BRAIN_DUMP.md` is a point-in-time snapshot; the code always wins where they disagree. `library/CODE_MAP.md` is derived directly from source (Protocol 46) and is a snapshot too — a session that finds it disagreeing with the code trusts the code and should flag the drift.
 >
 > **`library/` is gitignored** — a clean checkout contains only `library/MANIFEST.txt`, so any `library/` target named above is often absent. **If a `library/` target is absent, do not infer its contents** — fall back to reading the actual source it points at, and report the missing local-only context rather than guessing.
+
+---
+
+## ⛔ STANDING NOTE — PLANNING IS PRIVATE AND IS NOT IN THIS REPO (F04, 2026-08-02)
+
+**`QUEUE.md`, `QUEUE_LOG.md` and `NORTH_STARS.md` left this repository on 2026-08-02.** This repo is
+**PUBLIC**; those three documents describe control-plane topology, incidents, backup gaps, exact
+scheduled-task timing, mutation-gate design, recovery assumptions and planned security work. None of that
+was a credential or PII leak — it was simply operational detail with no reason to be world-readable, and
+the five-repo ground-truth audit named it a public sink sitting outside the Archive→Exhibit/P16 boundary.
+
+**Canonical location, from now on:**
+
+| Document | Canonical path |
+| -------- | -------------- |
+| `QUEUE.md` | `_RobCo-Archive/!PLANNING/QUEUE.md` |
+| `QUEUE_LOG.md` | `_RobCo-Archive/!PLANNING/QUEUE_LOG.md` |
+| `NORTH_STARS.md` | `_RobCo-Archive/!PLANNING/NORTH_STARS.md` |
+
+**⭐ READ THIS BEFORE TAKING ANY BARE `QUEUE.md` MENTION LITERALLY.** This file and the `rules/*.md` notes
+still cite `QUEUE.md` and `QUEUE_LOG.md` **by name** in many places — in protocol text, in item citations
+("QUEUE.md item U"), and in maintenance rules. **Every one of those now means the private copy above.** The
+names were deliberately NOT rewritten throughout: they are stable identifiers used in commit messages,
+memory files and cross-references going back months, and mass-renaming them would break far more than it
+fixed. **The file moved; its name did not.**
+
+**In code, never hardcode either location — use `scripts/planning-paths.js`.** It resolves
+`ROBCO_PLANNING_DIR` → the `../_RobCo-Archive/!PLANNING` sibling → `null`, and **`null` is a normal
+outcome, not a failure**: a public clone has no archive by design. Consumers degrade rather than break
+(the generators no-op, the Protocol 50 drift nudge stays silent, and gate Suites 246/248 SKIP with the
+reason printed). Same `[ -f ]`-guarded DNA as the push guard's sibling resolution.
+
+**The move is not erasure, and must not be described as one.** The three files remain in this repo's
+**public git history**, which was deliberately **not** rewritten — rewriting shared history would break
+every clone and every commit reference for a benefit the audit explicitly did not claim (F04 was never a
+credential leak). What changed is that planning **stops accumulating publicly from here on**.
+
+**Protocol 48 now genuinely covers the queue.** Planning lives inside the private archive that `sync.ps1`
+backs up, so it is mirrored like `library/` and `planning/`. ⚠ `rules/memory-restore.md`'s restore runbook
+was corrected in the same commit — it previously told a fresh Dispatch that cloning the **public** repo
+recovers the roadmap, which is now false.
 
 ---
 
