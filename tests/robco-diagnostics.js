@@ -51830,6 +51830,49 @@ if (!PLANNING_OK) {
     '246.10: bold spanning two blockquote lines renders as one <strong> (blockquote accumulate-then-inline)'
   );
 
+  // ── The emphasis-pairing regressions (Protocol 13 — the 246.7 gate failure) ──
+  // The old bold rule paired two `**` around a `[^*]+` body, so ANY asterisk
+  // between the markers killed the match. QUEUE.md writes two such forms
+  // constantly, and each left raw `**` AND mis-paired the orphaned markers with
+  // the next bold run, inverting every <strong> after it (85 of 407 blocks).
+  const boldItal246 = QV.mdToHtml(['**A *B* C** tail']);
+  assert(
+    /<strong>A <em>B<\/em> C<\/strong>/.test(boldItal246) && !boldItal246.includes('**'),
+    '246.10b: a single-asterisk italic INSIDE bold renders as <strong>…<em>…</em>…</strong> — no leak (the 246.7 root cause)'
+  );
+  const nested246 = QV.mdToHtml(['**A **B** C**']);
+  assert(
+    /^<p><strong>A <strong>B<\/strong> C<\/strong><\/p>$/.test(nested246),
+    '246.10c: bold nested inside bold pairs each closer with the NEAREST opener (CommonMark) — no leak'
+  );
+  // The counter-case that rules out the tempting greedy fix: two SEPARATE bold
+  // runs in one paragraph must stay separate, not merge into one <strong> that
+  // swallows the plain text between them.
+  const twoRuns246 = QV.mdToHtml(['**A** and **B** end']);
+  assert(
+    /^<p><strong>A<\/strong> and <strong>B<\/strong> end<\/p>$/.test(twoRuns246),
+    '246.10d: two separate bold runs stay separate — the text between them is NOT swallowed into one <strong>'
+  );
+  // An opener the author never closed (QUEUE.md carries two) closes at the end
+  // of its own block rather than printing a raw `**` on the phone page — and it
+  // never bleeds past that block.
+  const unclosed246 = QV.mdToHtml(['**opened but never closed']);
+  assert(
+    /^<p><strong>opened but never closed<\/strong><\/p>$/.test(unclosed246),
+    '246.10e: an unclosed bold opener is closed at the end of its block (never leaks a raw "**", never bleeds onward)'
+  );
+  // Whatever the pairing, the tags it emits must balance in every real block —
+  // an inverted run would otherwise ship unbalanced markup to the page.
+  let unbal246 = 0;
+  for (const b of model246.blocks) {
+    const h = QV.mdToHtml(b.body);
+    if ((h.match(/<strong>/g) || []).length !== (h.match(/<\/strong>/g) || []).length) unbal246++;
+  }
+  assert(
+    unbal246 === 0,
+    '246.10f: every block in the real QUEUE.md emits balanced <strong>/</strong> tags (no inverted or dangling run)'
+  );
+
   // ── titleText strips markdown for display labels ──
   assert(
     QV.titleText('Shipped (accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md))') ===

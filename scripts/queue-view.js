@@ -169,6 +169,73 @@ function parseQueue(md) {
 function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+/**
+ * BOLD — a delimiter scanner, not a single regex.
+ *
+ * The original rule was a single regex pairing two `**` markers around a
+ * `[^*]+` body — a class that forbade ANY asterisk between the markers, and
+ * that is the bug. QUEUE.md writes two things that class cannot
+ * express, both routinely: a single-asterisk italic inside bold
+ * (`**bold with *stress* inside**`), and bold nested inside bold
+ * (`**OUTER — **INNER** — rest**`). Neither matched, so the markers leaked raw
+ * AND — worse — the orphans then paired with the NEXT bold run in the same
+ * block, inverting every <strong> after them. A lazy regex fixes the first case
+ * only; nesting needs real pairing.
+ *
+ * So each `**` is classified by CommonMark's flanking rule (an opener is
+ * followed by a non-space, a closer preceded by one) and each closer is paired
+ * with the NEAREST unmatched opener — which yields flat and nested bold alike.
+ * An opener the source never closed is closed at the end of its own block (see
+ * the note at the pairing loop's end); a marker that can neither open nor close
+ * is not emphasis at all and stays the literal `**` the source wrote.
+ */
+function strongify(s) {
+  const toks = [];
+  const re = /\*\*/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    toks.push({ text: s.slice(last, m.index) });
+    const next = s.charAt(m.index + 2);
+    const prev = m.index > 0 ? s.charAt(m.index - 1) : '';
+    toks.push({
+      delim: true,
+      canOpen: next !== '' && !/\s/.test(next),
+      canClose: prev !== '' && !/\s/.test(prev),
+    });
+    last = m.index + 2;
+  }
+  if (!toks.length) return s;
+  toks.push({ text: s.slice(last) });
+
+  const openers = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (!t.delim) continue;
+    if (t.canClose && openers.length) {
+      toks[openers.pop()].open = true;
+      t.close = true;
+      continue;
+    }
+    if (t.canOpen) openers.push(i);
+  }
+  // An opener the author never closed (a real slip: QUEUE.md carries two) is
+  // closed at the end of this inline run instead of being printed as a raw
+  // `**`. The alternative — CommonMark's literal rendering — puts markup noise
+  // on the phone-readable page and, worse, makes this repo's gate hostage to a
+  // typo in a document that now lives in another repo entirely (F04). Bolding
+  // to the end of the block is what the author evidently meant, and it never
+  // bleeds past the block: inline() is called per paragraph / list item /
+  // blockquote. Openers close in reverse so the nesting stays well-formed.
+  const unclosed = openers.length;
+  for (const i of openers) toks[i].open = true;
+  return (
+    toks
+      .map(t => (!t.delim ? t.text : t.open ? '<strong>' : t.close ? '</strong>' : '**'))
+      .join('') + '</strong>'.repeat(unclosed)
+  );
+}
+
 function inline(raw) {
   const codes = [];
   const stash = c => {
@@ -187,9 +254,12 @@ function inline(raw) {
     const href = u.replace(/"/g, '%22');
     return `<a href="${href}">${t}</a>`;
   });
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  // italic: conservative boundaries so identifiers/paths with _ aren't mangled
+  s = strongify(s);
+  // italic: conservative boundaries so identifiers/paths with _ aren't mangled.
+  // Both spellings — `_x_` and `*x*`; the `*` form is only reached once bold has
+  // been consumed above, so a lone `*` here is genuinely an italic marker.
   s = s.replace(/(^|[\s(])_([^_\n]+?)_(?=[\s.,;:!?)]|$)/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[\s(])\*(?=\S)([^*\n]+?)(?<=\S)\*(?=[\s.,;:!?)]|$)/g, '$1<em>$2</em>');
   s = s.replace(/@@C(\d+)@@/g, (_m, i) => `<code>${codes[+i]}</code>`);
   return s;
 }
