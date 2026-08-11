@@ -219,7 +219,8 @@ function strongify(s) {
     }
     if (t.canOpen) openers.push(i);
   }
-  // An opener the author never closed (a real slip: QUEUE.md carries two) is
+  // An opener the author never closed (a real slip QUEUE.md has carried, and
+  // will again — the four live ones were tidied at source on 2026-08-11) is
   // closed at the end of this inline run instead of being printed as a raw
   // `**`. The alternative — CommonMark's literal rendering — puts markup noise
   // on the phone-readable page and, worse, makes this repo's gate hostage to a
