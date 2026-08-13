@@ -288,6 +288,7 @@ After every meaningful commit, update these files **in the same commit:**
 | `ARCHITECTURE.md` | Version header, any new/changed architecture sections  |
 | `CHANGELOG.md`    | Add entries under the current version block            |
 | `README.md`       | Current State section, feature tables, project history |
+| `ROADMAP.md`      | ⛔ **Nothing — never edit it by hand.** GENERATED-class (`rules/docs-and-library.md`): produced from `QUEUE.md` by `npm run roadmap` into the **private** planning tree, alongside the queue itself (F04 — it is derived from private material and must never land in this public repo). Regenerate it rather than correcting it; if it reads wrong, the fault is in `QUEUE.md` or the generator. It renders **BLIND** rather than partial when the parse is not trustworthy, and `npm run roadmap:check` exits 1 if a blind board is sitting on disk. |
 
 **Version bumps:** Every user-visible change updates `APP_VERSION`, `CACHE_NAME`, and `CHANGELOG` together as one unit. `APP_VERSION` follows semver automatically — PATCH (x.y.Z) for bug/UI/internal fixes, MINOR (x.Y.0) for new user-facing features or panels — no need to ask. MAJOR (X.0.0) bumps (rewrites or breaking changes) still require explicit user confirmation. This replaces the old "always ask before bumping `APP_VERSION`" rule.
 

@@ -166,6 +166,31 @@ function bandOfHeading(content, QV) {
   return { id, band: null, glyph: null };
 }
 
+/**
+ * Closed-item discipline over ID-bearing item blocks: a closed item should
+ * survive in QUEUE.md as a ONE-LINE pointer, with its full account living in
+ * QUEUE_LOG.md.
+ *
+ * ⭐ EXPORTED so Suite 248.3's shadow ratchet measures with the SAME rule the
+ * board reports. A retyped copy is exactly how two counts of the same thing start
+ * disagreeing — the drift class this whole phase exists to close.
+ *
+ * ⚠ `proved` and `violations` are SEPARATE lists and are never summed into one
+ * headline number. The proof-of-concept reported the closed-item COUNT as though
+ * it were the count proved compliant, which read as "8 closed items, all tidy"
+ * when the truth was "8 closed, none tidy". A number that flatters the thing it
+ * measures is worse than no number.
+ */
+function closedDiscipline(idItems) {
+  const closedItems = idItems.filter(b => b.status === 'done');
+  const out = { total: closedItems.length, proved: [], violations: [] };
+  for (const b of closedItems) {
+    const bodyLines = b.body.filter(l => l.trim()).length;
+    (bodyLines <= 1 ? out.proved : out.violations).push({ id: b.id, bodyLines });
+  }
+  return out;
+}
+
 // ── the two document shapes ──────────────────────────────────────────────────
 
 function renderBlind(reasons, provenance) {
@@ -410,13 +435,7 @@ function build(planning) {
   }
 
   // Closed-item discipline — counted, not conflated (see renderBoard).
-  const closedItems = idItems.filter(b => b.status === 'done');
-  const closed = { total: closedItems.length, proved: [], violations: [] };
-  for (const b of closedItems) {
-    const bodyLines = b.body.filter(l => l.trim()).length;
-    if (bodyLines <= 1) closed.proved.push({ id: b.id, bodyLines });
-    else closed.violations.push({ id: b.id, bodyLines });
-  }
+  const closed = closedDiscipline(idItems);
 
   return {
     blind: false,
@@ -441,7 +460,15 @@ function toLf(text) {
   return String(text).replace(/\r\n/g, '\n');
 }
 
-module.exports = { build, bandOfHeading, BLIND_REASONS, STATE_MARKER, OUTPUT_NAME, toLf };
+module.exports = {
+  build,
+  bandOfHeading,
+  closedDiscipline,
+  BLIND_REASONS,
+  STATE_MARKER,
+  OUTPUT_NAME,
+  toLf,
+};
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {

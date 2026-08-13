@@ -52143,6 +52143,18 @@ if (!PLANNING_OK) {
 //  from every consumer without a warning. Its full incident record, the
 //  Protocol 36(b) five-bar justification, and its Protocol 49 retirement
 //  condition sit inline at the assertion.
+//
+//  248.3 / 248.5 / 248.6 (added 2026-08-13, QR1 Phase 0) cover the generated
+//  roadmap board that reads this same document:
+//    · 248.3 is a SHADOW RATCHET, not an inert marker — closed items still
+//      carrying a full account here may not GROW past the measured baseline of
+//      8 during the park. ⛔ It becomes `=== 0` at Phase 3.
+//    · 248.5 locks POSITION over PRESENCE: an item that opens with an open-status
+//      glyph and records a finished HALF later in its heading (the live SEC2
+//      shape) must not read as done.
+//    · 248.6 locks the wiring and, more importantly, that every enumerated BLIND
+//      reason can actually FIRE — the Protocol 42 lock for `no-title`, which was
+//      unreachable when the drills first ran it.
 // ══════════════════════════════════════════════════════════════
 if (!PLANNING_OK) {
   header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
@@ -52275,6 +52287,144 @@ if (!PLANNING_OK) {
       (rawScanIds248.length < 200
         ? ` — only ${rawScanIds248.length} raw IDs found (extraction regression?)`
         : '')
+  );
+
+  const RG248 = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const idItems248 = model248.blocks.filter(b => b.type === 'item' && b.id);
+
+  // ── 248.3  SHADOW RATCHET — closed items still carrying their full account ──
+  //
+  // ⚠ SHADOW, BUT NOT INERT. A closed item should survive in QUEUE.md as a
+  // one-line pointer, its account living in QUEUE_LOG.md. Eight do not, today.
+  // Asserting `=== 0` now would red the very next commit for eight PRE-EXISTING
+  // reasons this phase deliberately is not fixing — a test that is red on arrival
+  // teaches sessions to ignore it. So the bar sits at the measured baseline: it
+  // CANNOT red on the existing 8, and it DOES red the moment a 9th appears. The
+  // park is allowed to persist; it is not allowed to quietly get worse.
+  //
+  // ⛔ AT PHASE 3 THIS BECOMES `=== 0`. That is the point of the migration, and
+  // this line is the instruction to whoever lands it.
+  //
+  // The rule is imported (RG248.closedDiscipline), not retyped — the board and
+  // this ratchet must never be able to disagree about what a violation is.
+  const closed248 = RG248.closedDiscipline(idItems248);
+  const shipped248 = closed248.violations;
+  assert(
+    shipped248.length <= 8,
+    `248.3 [SHADOW RATCHET]: closed items still carrying a full account in QUEUE.md must not GROW during the park — baseline 8, now ${shipped248.length}` +
+      ` [${shipped248.map(v => `${v.id}:${v.bodyLines}L`).join(', ') || 'none'}]` +
+      ` · reported separately and never summed: ${closed248.total} closed, ${closed248.proved.length} PROVED one-liner, ${shipped248.length} violations` +
+      ' · ⛔ replaced by `=== 0` at Phase 3, when the accounts have migrated to QUEUE_LOG.md'
+  );
+
+  // ── 248.5  An open glyph first wins, even with a ✅ later in the heading ──
+  // QUEUE.md routinely records a finished HALF inside an OPEN item's heading —
+  // the live SEC2 opens with ⏭️ and then says "✅ THE ACL HALF IS CLOSED".
+  // POSITION decides, not presence. If mere presence won, every item that
+  // honestly records partial progress would silently read as done — and done is
+  // precisely the band people stop looking at, so the failure hides itself.
+  // Locked for BOTH readers: detectStatus (earliest-positioned glyph over the
+  // whole heading) and the roadmap banding (leading glyph run only).
+  const sec2Shaped248 =
+    'SEC2. ⏭️ 🚨 Confirm `.env` is in `.gitignore` · ✅ **THE ACL HALF IS CLOSED** — owner-run';
+  const phSec2248 = QV248.parseHeading(sec2Shaped248);
+  const bandSec2248 = RG248.bandOfHeading(sec2Shaped248, QV248);
+  assert(
+    phSec2248.id === 'SEC2' &&
+      phSec2248.status === 'ready' &&
+      bandSec2248.id === 'SEC2' &&
+      bandSec2248.band === 'ready' &&
+      // and the inverse still works — a genuinely-done heading is still done
+      QV248.parseHeading('X9. ✅ shipped').status === 'done',
+    '248.5: a heading that OPENS with an open-status glyph and mentions ✅ later in its text does NOT classify as done — both detectStatus (earliest position wins) and the roadmap banding (leading glyph run only) read it as ready, while a genuinely ✅-led heading still reads done' +
+      (phSec2248.status !== 'ready' ? ` — parseHeading said ${phSec2248.status}` : '') +
+      (bandSec2248.band !== 'ready' ? ` — banding said ${bandSec2248.band}` : '')
+  );
+
+  // ── 248.6  Wiring + the BLIND-reason enumeration is REACHABLE ──
+  const pkg248 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const wiring248 =
+    pkg248.scripts['roadmap'] === 'node scripts/roadmap-generate.js' &&
+    pkg248.scripts['roadmap:check'] === 'node scripts/roadmap-generate.js --check';
+
+  // Every enumerated reason must be one a real input can actually TRIGGER, and
+  // must name itself in the rendered reasons table.
+  //
+  // ⚠ THIS IS THE PROTOCOL 42 LOCK FOR A DEFECT FOUND WHILE VERIFYING THIS PHASE.
+  // The blind drills showed `no-title` was UNREACHABLE: parseQueue DEFAULTS the
+  // title to 'Build Queue', so a check written against model.title could never
+  // fire. An enumerated reason nobody can trigger is DEAD ENUMERATION — worse
+  // than an absent one, because the closed list reads as complete. Asserting the
+  // keys exist would not have caught it; only firing them does.
+  //
+  // Six of the eight are reachable from a pure fixture. The remaining two
+  // (parser-unreachable, extraction-regression) need the parser module itself
+  // stubbed, which is too invasive for the gate — they are drill-verified out of
+  // band, and that limit is stated here rather than papered over.
+  const fixture248 = text => ({ readPlanningFile: () => text, describe: () => 'fixture' });
+  const goodQueue248 = (n, extra = '') => {
+    let s = '# Fixture Queue\n\n';
+    for (let i = 1; i <= n; i++) s += `### F${i}. ⬜ item ${i}\n\nbody\n\n`;
+    return s + extra;
+  };
+  const reasonCases248 = [
+    ['source-unreadable', () => RG248.build(fixture248(null))],
+    ['no-title', () => RG248.build(fixture248('### F1. ⬜ item\n\nbody\n'))],
+    ['too-few-items', () => RG248.build(fixture248(goodQueue248(4)))],
+    [
+      'duplicate-ids',
+      () => RG248.build(fixture248(goodQueue248(20, '### F7. ⬜ a second F7\n\nbody\n'))),
+    ],
+    [
+      'unclassifiable-board',
+      () => {
+        let s = '# Fixture Queue\n\n';
+        for (let i = 1; i <= 10; i++) s += `### G${i}. ⬜ classified ${i}\n\nbody\n\n`;
+        for (let i = 1; i <= 5; i++) s += `### U${i}. 📄 unknown ${i}\n\nbody\n\n`;
+        return RG248.build(fixture248(s));
+      },
+    ],
+    [
+      'internal-error',
+      () => {
+        try {
+          return RG248.build({
+            readPlanningFile() {
+              throw new Error('boom');
+            },
+          });
+        } catch {
+          // the CLI's own catch publishes internal-error; mirror that verdict
+          return { blind: true, reasons: [{ key: 'internal-error' }], text: '' };
+        }
+      },
+    ],
+  ];
+  const reasonFailures248 = [];
+  for (const [key, run] of reasonCases248) {
+    let r;
+    try {
+      r = run();
+    } catch (e) {
+      reasonFailures248.push(`${key} (threw: ${e.message})`);
+      continue;
+    }
+    const got = r && r.blind && r.reasons && r.reasons[0] ? r.reasons[0].key : null;
+    if (got !== key) reasonFailures248.push(`${key} → ${got}`);
+    // the rendered doc must name the reason and must NOT leak a partial item list
+    else if (r.text && (!r.text.includes(key) || /^- \*\*F\d/m.test(r.text)))
+      reasonFailures248.push(`${key} (doc did not name it, or leaked a partial list)`);
+  }
+  const keysCovered248 = Object.keys(RG248.BLIND_REASONS);
+  assert(
+    wiring248 &&
+      keysCovered248.length === 8 &&
+      reasonFailures248.length === 0 &&
+      keysCovered248.every(k => typeof RG248.BLIND_REASONS[k] === 'string'),
+    '248.6: package.json exposes `roadmap` + `roadmap:check`, BLIND_REASONS enumerates 8 described reasons, and each fixture-reachable reason actually FIRES with its own key and names itself in the rendered table without leaking a partial item list (the Protocol 42 lock for the unreachable `no-title` found by the blind drills)' +
+      (!wiring248 ? ' — package.json wiring missing/incorrect' : '') +
+      (keysCovered248.length !== 8 ? ` — ${keysCovered248.length} reasons, expected 8` : '') +
+      (reasonFailures248.length ? ' — UNREACHABLE/WRONG: ' + reasonFailures248.join('; ') : '')
   );
 }
 
