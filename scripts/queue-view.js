@@ -36,19 +36,86 @@ const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
 
-// The five real status glyphs (⭐/⛔/★ are emphasis, never statuses). Order is
-// the display order in the filter bar; `key` drives the CSS/JS filter classes.
+// The real status glyphs (⭐/⛔/★ are emphasis, never statuses — see
+// EMPHASIS_GLYPHS below). Order is the display order in the filter bar; `key`
+// drives the CSS/JS filter classes.
+//
+// ⭐ THIS LIST IS THE SINGLE STATUS VOCABULARY FOR THE WHOLE PROJECT. Every
+// consumer — the filter chips, DEFAULT_ON, the per-status CSS, the leading-glyph
+// strip below, and the roadmap generator's banding (scripts/roadmap-generate.js)
+// — DERIVES from it. Nothing retypes a glyph literal. A second hand-typed copy is
+// exactly how the item-ID pattern drifted before (see ITEM_ID_RE), so when a new
+// glyph enters the queue's vocabulary it is added HERE, once, and every consumer
+// picks it up. Adding a key is purely additive: `detectStatus` takes the
+// EARLIEST-positioned glyph, so a new entry can only rescue a heading that
+// previously matched nothing ('none') — it can never re-classify one that
+// already matched. Measured on the live QUEUE.md when ⏳/⏸️/❓ were folded in
+// (2026-08-13): 21 headings moved none→{deferred,parked}, ZERO moved between
+// existing statuses.
+// `color` lives here too so the stylesheet can be GENERATED from this list
+// rather than hand-listed per status (renderHtml). Hand-listing is what made the
+// 5→8 fold a four-site edit in the first place.
 const STATUSES = [
-  { key: 'ready', glyph: '⏭️', label: 'Ready' },
-  { key: 'active', glyph: '🔄', label: 'Active' },
-  { key: 'blocked', glyph: '⚠️', label: 'Attention' },
-  { key: 'todo', glyph: '⬜', label: 'To-do' },
-  { key: 'done', glyph: '✅', label: 'Done' },
+  { key: 'ready', glyph: '⏭️', label: 'Ready', color: '#7ad6ff' },
+  { key: 'active', glyph: '🔄', label: 'Active', color: '#f5c451' },
+  { key: 'blocked', glyph: '⚠️', label: 'Attention', color: '#ff8b6b' },
+  { key: 'todo', glyph: '⬜', label: 'To-do', color: '#9aa7a0' },
+  { key: 'deferred', glyph: '⏳', label: 'Deferred', color: '#a99bd6' },
+  { key: 'parked', glyph: '⏸️', label: 'Parked', color: '#7f8c99' },
+  { key: 'question', glyph: '❓', label: 'Question', color: '#d98cc4' },
+  { key: 'done', glyph: '✅', label: 'Done', color: '#4fb477' },
 ];
+// Emphasis markers. NOT statuses and never filterable — they mark importance,
+// not state. They are listed only so the title strip can drop a leading one
+// (a heading like "BD2. ⭐⏭️ …" should read "…", not "⭐…").
+const EMPHASIS_GLYPHS = ['⭐'];
 // "What's next" surfaces the work actually in motion or ready to start.
+// Deliberately excludes deferred/parked/question — those are explicitly NOT in
+// motion, which is the whole point of having a glyph for them.
 const NEXT_STATUSES = new Set(['active', 'ready']);
 // Shown by default; 'done' is hidden by default (surface the live work first).
-const DEFAULT_ON = new Set(['ready', 'active', 'blocked', 'todo']);
+// The three soft states ARE shown — an item that is deferred, parked or carrying
+// an open question is unfinished work the owner still needs to see.
+const DEFAULT_ON = new Set([
+  'ready',
+  'active',
+  'blocked',
+  'todo',
+  'deferred',
+  'parked',
+  'question',
+]);
+
+/**
+ * The item-ID token at the head of a `###` heading: letters, optional digits,
+ * then ONE optional sub-letter — "A3.", "R10.", "L.", "C1.", "OM2a.".
+ *
+ * ⭐ EXPORTED, AND THE ONLY COPY. The trailing `[a-z]?` is the 2026-08-13 fix:
+ * the previous pattern (`/^([A-Za-z]+[0-9]*)\.\s+/`) could not express a
+ * sub-lettered ID, so `OM2a.`/`OM2b.` parsed as `id: null` and were SILENTLY
+ * DROPPED from the board — not even surfaced as unclassified. The live queue
+ * held 205 ID-bearing items and the parser saw 203.
+ *
+ * ⛔ DO NOT RETYPE THIS PATTERN ANYWHERE. Consumers import the constant. The
+ * generator's raw scan and this parser drifted apart precisely because the
+ * literal was copied once before; the export exists so that cannot recur, and
+ * Suite 248.4 asserts the two counts agree over this same shared constant.
+ *
+ * No `g` flag — the regex is shared across calls, and a sticky lastIndex would
+ * make results depend on call order.
+ */
+const ITEM_ID_RE = /^([A-Za-z]+[0-9]*[a-z]?)\.\s+/;
+
+/**
+ * Strips ONE leading status-or-emphasis glyph from a heading remainder, so the
+ * title reads cleanly. Derived from STATUSES so it can never fall behind the
+ * vocabulary (it previously hardcoded its own six-glyph list, which is the drift
+ * this file is being cured of). Single-strip, not repeated — "OM1. ✅✅ SHIPPED"
+ * keeps its second ✅, exactly as before.
+ */
+const LEADING_GLYPH_RE = new RegExp(
+  `^\\s*(?:${[...STATUSES.map(s => s.glyph), ...EMPHASIS_GLYPHS].join('|')})\\s*`
+);
 
 // The first status glyph to appear in a heading wins (it sits right after the
 // item ID). Returns the status key, or 'none'.
@@ -66,10 +133,14 @@ function detectStatus(text) {
 }
 
 // Parse a heading's content into {id, status, title}. The ID is a leading token
-// like "A3.", "R10.", "P1.", "L.", "C1." (letters then optional digits, then a
-// dot). Not every heading has one (e.g. "WASTELAND UPLINK") — id is then null.
+// like "A3.", "R10.", "P1.", "L.", "C1.", "OM2a." (ITEM_ID_RE). Not every
+// heading has one (e.g. "WASTELAND UPLINK") — id is then null.
+//
+// ⚠ NOTE FOR CONSUMERS: `title` has its leading glyph STRIPPED. Never re-derive
+// a status from it — it is a display string. Use `status` (detected from the raw
+// text, before stripping) or scan the raw heading yourself.
 function parseHeading(text) {
-  const idM = text.match(/^([A-Za-z]+[0-9]*)\.\s+/);
+  const idM = text.match(ITEM_ID_RE);
   let id = null;
   let rest = text;
   if (idM) {
@@ -78,7 +149,7 @@ function parseHeading(text) {
   }
   const status = detectStatus(text);
   // Strip a leading status/emphasis glyph so the title reads cleanly.
-  const title = rest.replace(/^\s*(✅|🔄|⏭️|⚠️|⬜|⭐)\s*/, '').trim() || rest.trim();
+  const title = rest.replace(LEADING_GLYPH_RE, '').trim() || rest.trim();
   return { id, status, title };
 }
 
@@ -134,7 +205,7 @@ function parseQueue(md) {
       const content = h[2].trim();
       if (level === 1 && title === 'Build Queue' && blocks.length === 0 && !cur) {
         // The very first H1 is the document title, not a section.
-        title = content.replace(/^\s*(✅|🔄|⏭️|⚠️|⬜|⭐)\s*/, '').trim() || content;
+        title = content.replace(LEADING_GLYPH_RE, '').trim() || content;
         continue;
       }
       flush();
@@ -458,6 +529,23 @@ function renderHtml(model, sourceHash) {
 
   const defaultBodyClass = [...DEFAULT_ON].map(k => 'show-' + k).join(' ');
 
+  // ── Status CSS is GENERATED from STATUSES, never hand-listed ────────────────
+  // Four rule families used to name every status by hand, so folding a new glyph
+  // into the vocabulary meant remembering four separate edit sites — miss the
+  // filter pair and the new status is chip-visible but permanently hidden (or
+  // permanently shown), which is a silent wrong answer, not a visible break.
+  // Generating them means adding a STATUSES entry is now genuinely one edit.
+  const statusVars = STATUSES.map(s => `--${s.key}:${s.color};`).join(' ');
+  const statusAccents = STATUSES.map(
+    s => `[data-status="${s.key}"] .idb{border-color:var(--${s.key}); color:var(--${s.key})}`
+  ).join('\n');
+  const statusHideAll =
+    STATUSES.map(s => `.item[data-status="${s.key}"]`).join(',') +
+    ',.item[data-status="none"]{display:none}';
+  const statusShow = STATUSES.map(
+    s => `body.show-${s.key} .item[data-status="${s.key}"]{display:block}`
+  ).join('\n');
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -469,7 +557,7 @@ function renderHtml(model, sourceHash) {
 :root{
   --bg:#0c0f0d; --bg2:#121613; --card:#151b17; --card2:#1a221c;
   --ink:#d7e2da; --dim:#8fa295; --line:#26302a; --acc:#43e08a; --acc2:#7ad6ff;
-  --ready:#7ad6ff; --active:#f5c451; --blocked:#ff8b6b; --todo:#9aa7a0; --done:#4fb477;
+  ${statusVars}
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -536,20 +624,12 @@ summary:active{background:#17201a}
 .it-body blockquote{margin:.5em 0; padding:.3em 0 .3em 11px; border-left:2px solid var(--line); color:var(--dim)}
 .it-body .subh{font-weight:700; color:#cfe; margin:.7em 0 .2em}
 .it-body strong{color:#fff}
-/* status accents on the ID badge / glyph */
-[data-status="ready"] .idb{border-color:var(--ready); color:var(--ready)}
-[data-status="active"] .idb{border-color:var(--active); color:var(--active)}
-[data-status="blocked"] .idb{border-color:var(--blocked); color:var(--blocked)}
-[data-status="todo"] .idb{border-color:var(--todo); color:var(--todo)}
-[data-status="done"] .idb{border-color:var(--done); color:var(--done); opacity:.85}
-/* filter: hide a status unless its body class is present */
-.item[data-status="ready"],.item[data-status="active"],.item[data-status="blocked"],
-.item[data-status="todo"],.item[data-status="done"],.item[data-status="none"]{display:none}
-body.show-ready .item[data-status="ready"]{display:block}
-body.show-active .item[data-status="active"]{display:block}
-body.show-blocked .item[data-status="blocked"]{display:block}
-body.show-todo .item[data-status="todo"]{display:block}
-body.show-done .item[data-status="done"]{display:block}
+/* status accents on the ID badge / glyph — generated from STATUSES */
+${statusAccents}
+[data-status="done"] .idb{opacity:.85}
+/* filter: hide a status unless its body class is present — generated from STATUSES */
+${statusHideAll}
+${statusShow}
 .item[data-status="none"]{display:block} /* un-tagged items always show */
 .sec.is-empty{display:none}
 @media (prefers-color-scheme:light){
@@ -624,6 +704,11 @@ module.exports = {
   titleText,
   mdToHtml,
   STATUSES,
+  EMPHASIS_GLYPHS,
+  // ⭐ Exported so no consumer ever retypes the pattern — scripts/roadmap-generate.js
+  // imports THIS constant for its raw scan, and Suite 248.4 asserts the parser's
+  // item count and that raw scan's count agree over it.
+  ITEM_ID_RE,
 };
 
 // ── CLI (only when run directly) ──────────────────────────────────────────────

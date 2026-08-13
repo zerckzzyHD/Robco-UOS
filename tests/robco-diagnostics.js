@@ -51750,23 +51750,41 @@ if (!PLANNING_OK) {
     '246.3: known ### item IDs (R11, L, A3, R5, R10, P, C1, Q) are all parsed from their headings'
   );
 
-  // ── Status detection maps the five glyphs correctly (from live QUEUE.md) ──
+  // ── Status detection maps EVERY glyph in the vocabulary correctly ──
+  // Derived from STATUSES rather than hand-listing the glyphs: the previous form
+  // named five glyph→key pairs by hand, so folding ⏳/⏸️/❓ into the vocabulary
+  // (2026-08-13) would have left the three new keys silently unasserted. Driving
+  // the loop off the exported list means a future addition is covered the moment
+  // it is added, which is the same anti-drift move made in queue-view.js itself.
+  const glyphMisses246 = QV.STATUSES.filter(
+    s => QV.detectStatus(`### X1. ${s.glyph} something`) !== s.key
+  ).map(s => `${s.glyph}→${s.key}`);
   assert(
-    QV.detectStatus('### G. ✅ done') === 'done' &&
-      QV.detectStatus('### R5. ⏭️ ready') === 'ready' &&
-      QV.detectStatus('### B. 🔄 active') === 'active' &&
-      QV.detectStatus('### R6. ⚠️ blocked') === 'blocked' &&
-      QV.detectStatus('### L. ⬜ todo') === 'todo' &&
+    glyphMisses246.length === 0 &&
+      QV.STATUSES.length >= 8 &&
       QV.detectStatus('no glyph here') === 'none',
-    '246.4: detectStatus maps ✅→done ⏭️→ready 🔄→active ⚠️→blocked ⬜→todo (and none)'
+    '246.4: detectStatus maps EVERY STATUSES glyph to its own key (✅→done ⏭️→ready 🔄→active ⚠️→blocked ⬜→todo ⏳→deferred ⏸️→parked ❓→question) and an unglyphed heading to none' +
+      (glyphMisses246.length ? ' — UNMAPPED: ' + glyphMisses246.join(', ') : '') +
+      (QV.STATUSES.length < 8 ? ` — only ${QV.STATUSES.length} statuses in the vocabulary` : '')
   );
-  // The parser assigns real statuses from the live headings — assert the
-  // distribution is sane (decoupled from any single item, which can change
-  // status as work lands): the live queue always has done + active + todo items.
+  // The parser assigns real statuses from the live headings. Two invariants:
+  // (a) the live-work check (done + active + todo always exist), decoupled from
+  // any single item since an item's status changes as work lands; and (b) VOCABULARY
+  // CLOSURE — no parsed status may fall outside STATUSES ∪ {none}, which is the
+  // check that actually catches a glyph entering QUEUE.md that nothing renders.
+  // ⛔ Deliberately NOT asserted: that every key has ≥1 live item. 'question' (❓)
+  // currently has ZERO — measured 2026-08-13, because ❓ is always written AFTER a
+  // ⬜ in the live queue, so ⬜ wins on position. An empty band is honest output,
+  // not a failure, and asserting presence would red the gate on the owner's prose.
   const statusSet246 = new Set(items246.map(b => b.status));
+  const knownStatuses246 = new Set([...QV.STATUSES.map(s => s.key), 'none']);
+  const strayStatuses246 = [...statusSet246].filter(s => !knownStatuses246.has(s));
   assert(
-    ['done', 'active', 'todo'].every(s => statusSet246.has(s)) && !statusSet246.has(undefined),
-    '246.5: parsed items carry real statuses from their headings — done + active + todo all present'
+    ['done', 'active', 'todo'].every(s => statusSet246.has(s)) &&
+      !statusSet246.has(undefined) &&
+      strayStatuses246.length === 0,
+    '246.5: parsed items carry real statuses from their headings — done + active + todo all present, and every parsed status is inside the STATUSES vocabulary (∪ none)' +
+      (strayStatuses246.length ? ' — OUTSIDE VOCABULARY: ' + strayStatuses246.join(', ') : '')
   );
 
   // ── parseHeading splits id/status/title; title strips the leading glyph ──
@@ -51907,6 +51925,23 @@ if (!PLANNING_OK) {
   assert(
     /^queue-view\/$/m.test(gi246),
     '246.15: the generated output dir (queue-view/) is gitignored — generator tracked, HTML regenerated on demand'
+  );
+
+  // ── Sub-lettered item IDs survive the parse (the 2026-08-13 defect) ──
+  // ITEM_ID_RE's old form (`/^([A-Za-z]+[0-9]*)\.\s+/`) could not express a
+  // sub-letter, so "OM2a." matched nothing, parsed as id:null, and the item was
+  // dropped from the board WITHOUT appearing anywhere — not even as unclassified.
+  // Suite 248.4 is the behavioural lock against the LIVE queue; this one locks the
+  // shape of the exported pattern itself, which is what every consumer imports.
+  assert(
+    QV.ITEM_ID_RE instanceof RegExp &&
+      QV.ITEM_ID_RE.global === false &&
+      QV.parseHeading('OM2a. ⏭️ sub-lettered').id === 'OM2a' &&
+      QV.parseHeading('OM2b. ⬜ sub-lettered').id === 'OM2b' &&
+      QV.parseHeading('R10. ⬜ plain').id === 'R10' &&
+      QV.parseHeading('L. ⬜ single letter').id === 'L' &&
+      QV.parseHeading('WASTELAND UPLINK').id === null,
+    '246.16: ITEM_ID_RE is exported, non-global (no sticky lastIndex across shared calls), and matches sub-lettered IDs (OM2a/OM2b) as well as the plain forms — while a heading with no ID token still yields id:null'
   );
 }
 
@@ -52093,14 +52128,21 @@ if (!PLANNING_OK) {
 
 // ══════════════════════════════════════════════════════════════
 //  Suite 248 — QUEUE.md structural integrity (QUEUE_LOG.md anchors +
-//  item-ID uniqueness) — QUEUE.md item U, GENERATE-vs-hand-maintain audit
-//  candidates #4/#5
+//  item-ID uniqueness + no-silent-drop) — QUEUE.md item U,
+//  GENERATE-vs-hand-maintain audit candidates #4/#5
 //
 //  WHY: confirmed by reading the audit directly (planning/2.8.5/audits/
 //  GENERATE_VS_MAINTAIN_AUDIT.md, owner-requested) against the live repo —
 //  nothing before this suite ever checked that QUEUE.md's own
 //  [account](QUEUE_LOG.md#anchor) links resolve, nor that its stable
 //  item IDs stay unique. Both are zero-FP, deterministic, and cheap.
+//
+//  248.4 (added 2026-08-13) extends that from "the IDs are unique" to "no
+//  ID-bearing heading is invisible" — the stronger property, and the one the
+//  sub-lettered-ID defect broke: OM2a/OM2b parsed as id:null and were dropped
+//  from every consumer without a warning. Its full incident record, the
+//  Protocol 36(b) five-bar justification, and its Protocol 49 retirement
+//  condition sit inline at the assertion.
 // ══════════════════════════════════════════════════════════════
 if (!PLANNING_OK) {
   header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
@@ -52173,6 +52215,66 @@ if (!PLANNING_OK) {
     '248.2: every QUEUE.md item ID (A0-A4, B-U, R1-R11, ...) is unique — QUEUE.md\'s own rule is "never renumber, never re-letter, never reuse"' +
       (ids248.length < 15 ? ` — only ${ids248.length} IDs found (extraction regression?)` : '') +
       (dupeIds248.length ? ' — DUPLICATE: ' + [...new Set(dupeIds248)].join(', ') : '')
+  );
+
+  // ── 248.4  Sub-lettered item IDs are never silently dropped ──
+  //
+  // ⭐ PERMANENT. Protocol 13 + 42 regression lock, and the Protocol 36(b)
+  // escape-ratchet record for the defect it guards.
+  //
+  // THE INCIDENT (2026-08-13). parseHeading matched item IDs with
+  // `/^([A-Za-z]+[0-9]*)\.\s+/` — letters, optional digits, dot. QUEUE.md had
+  // meanwhile grown sub-lettered IDs (OM2a, OM2b), which that pattern cannot
+  // express. They did not fail loudly: they matched nothing, parsed as `id: null`,
+  // and vanished from the board — NOT surfaced as unclassified, NOT counted, no
+  // warning. The queue held 205 ID-bearing items; every consumer saw 203.
+  //
+  // 36(b) — WHY A PERMANENT CHECK EARNS ITS KEEP HERE (all five bars):
+  //  · REALISTICALLY RECURS — the queue's own ID convention is owner-authored
+  //    prose that grows new shapes as work subdivides; OM2a/OM2b are the second
+  //    generation already, and nothing stops a third (OM2a-i, OM2.1) appearing.
+  //  · CORRECT LAYER — at the parser's own contract, against the real document,
+  //    not at a UI or a doc-text check that would only see the symptom.
+  //  · ZERO FALSE POSITIVES — it compares two mechanical counts derived from the
+  //    SAME exported constant; it cannot disagree unless one of them is broken.
+  //  · TESTS THE SHIPPED ARTIFACT — the live QUEUE.md through the real parser,
+  //    not a synthetic fixture standing in for it.
+  //  · CHEAPER THAN THE RECURRENCE — one regex + one filter over an already-read
+  //    document, versus a whole class of item that disappears without a trace.
+  // Retirement condition (Protocol 49): retire when item IDs stop being free-form
+  // prose — i.e. when QUEUE.md's IDs are emitted from a structured source that
+  // cannot produce an unparseable one. Until then the risk is live.
+  //
+  // The direct fix alone does NOT remove recurrence: widening the regex to
+  // `[a-z]?` fixes today's two IDs and silently fails the next new shape exactly
+  // as before. What this locks is not "the regex has a `[a-z]?`" but the INVARIANT
+  // that the parser sees every ID-bearing heading the raw document contains.
+  const rawScanIds248 = [];
+  for (const line of queueSrc248.replace(/\r\n/g, '\n').split('\n')) {
+    const h = /^#{3}\s+(.*)$/.exec(line);
+    if (!h) continue;
+    // ⛔ The SAME exported constant the parser uses — never a retyped literal.
+    // A second copy is precisely how the pattern drifted out of sync before, so
+    // a divergence here would be invisible to a test that retyped it.
+    const m = h[1].trim().match(QV248.ITEM_ID_RE);
+    if (m) rawScanIds248.push(m[1]);
+  }
+  const missedIds248 = rawScanIds248.filter(id => !ids248.includes(id));
+  assert(
+    QV248.parseHeading('OM2a. ⏭️ THE PREPARED FIRST MISSION').id === 'OM2a' &&
+      ids248.includes('OM2a') &&
+      ids248.includes('OM2b') &&
+      rawScanIds248.length >= 200 &&
+      ids248.length === rawScanIds248.length &&
+      missedIds248.length === 0,
+    '248.4: NO ID-bearing ### heading is silently dropped — parseHeading resolves sub-lettered IDs (OM2a/OM2b), the live model contains both, and the parser\'s ID count equals a raw scan of the source over the SAME exported ITEM_ID_RE (the 2026-08-13 "205 items, parser sees 203" defect)' +
+      (ids248.length !== rawScanIds248.length
+        ? ` — COUNT MISMATCH: parser ${ids248.length} vs raw scan ${rawScanIds248.length}`
+        : '') +
+      (missedIds248.length ? ' — DROPPED: ' + missedIds248.join(', ') : '') +
+      (rawScanIds248.length < 200
+        ? ` — only ${rawScanIds248.length} raw IDs found (extraction regression?)`
+        : '')
   );
 }
 
