@@ -541,6 +541,40 @@ automated backstop** — stated here rather than given a guard that pretends, be
 conversation-scraping check would be exactly the "guard that pretends" Protocol 49 warns against. Do not
 add one. The rule in (a) stands; adherence is the mechanism.
 
+**(d) On close, MOVE the account to the LOG and PRUNE the queue — and this one IS gated (QR1 Part D,
+2026-08-13).** An item that closes has its full body **moved** to `QUEUE_LOG.md` under a stable
+`<a id="<id-lowercased>">` anchor, and its `###` block **removed** from `QUEUE.md`, leaving a one-line
+**bullet** plus an `[account](QUEUE_LOG.md#<id>)` link in the `# CLOSED — the one-liner index` section.
+This happens **in the same session the item closes** — not batched. ⛔ **Reasoning is never deleted, only
+relocated**, and the moved text is **verbatim**: not summarized, not tidied, not re-worded. A landed
+account is never rewritten to match later reality; a reversal is a NEW item with its own record.
+
+⭐ **The invariant is machine-checked: no `###` item in `QUEUE.md` may LEAD with ✅.** Two enforcement
+points, because `QUEUE.md` does not live in this repo:
+
+- **Rail P — `_RobCo-Archive`'s own pre-commit hook** (`!PLANNING/tools/queue-invariant-check.cjs`,
+  installed by `install-hooks.cjs`). ⭐ **The first gate that repo has ever had.** It is there because a
+  rule about the archive enforced only *here* would be the `WF1` class exactly — described as governing,
+  actually depending on somebody remembering.
+- **Rail S — gate Suite 248.3**, which runs on `gate:fast` and `gate` in this repo.
+
+⚠ **Detection is POSITIONAL and ID-BEARING, never a substring scan** — measured on the real file, **16**
+headings *contain* ✅ but only the ✅-**led** ones are violations; the rest are open items recording a
+finished *half* (the live `SEC2`). Prose sub-headings carry no ID and are exempt, which is why the eight
+`### ✅ Stage N` Round-8 headings are untouched. Both rails import the one rule from
+`scripts/roadmap-generate.js` (`closedDiscipline`) rather than retyping it — a second copy is how two
+counts of one thing begin to disagree.
+
+⚠ **(b) and (d) are different things with opposite polarities, and confusing them will break one of
+them.** (b) is a fail-**safe** drift **NUDGE**: it never blocks, and stays silent wherever its inputs are
+absent. (d) is a fail-**closed GATE**: it blocks, and an unreadable `QUEUE.md` at commit time is a
+failure rather than a skip. The nudge protects a machine that may not have the memory store; the gate
+runs only inside the tree it governs.
+
+⛔ **Why this needed a gate at all:** the 2026-07-21 split established this convention as prose, and it
+**still drifted three times**, leaving eight closed accounts sitting in `QUEUE.md` — because nothing
+measured it. A convention nobody checks decays; a gate that goes red cannot.
+
 ---
 
 ## Protocol 51 — Dispatch Authority Boundary (proposals are hypotheses · memory is a locator · dissent is surfaced)

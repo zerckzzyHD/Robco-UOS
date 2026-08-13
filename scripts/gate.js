@@ -41,6 +41,9 @@
  *   4e. Code-map generated sections currency (Protocol 53 — library/CODE_MAP.md's Diagnostic
  *      Shell table / Render Pipeline lists / Event Bus names vs their live sources; pure Node,
  *      runs on fast + full, no-op where the gitignored library/ file is absent)
+ *   4f. Roadmap board not BLIND (QR1 — !PLANNING/ROADMAP.md's own state marker; asserts
+ *      NON-BLINDNESS rather than currency, because that generator fails closed and still
+ *      exits 0; pure Node, runs on fast + full, no-op where the private tree is absent)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -443,6 +446,25 @@ run(
   'Code-map generated sections currency (Protocol 53)',
   'node scripts/generate-code-map.js --check'
 );
+
+// ── 4f. Roadmap board is not BLIND (QR1 Phase 3, QUEUE.md items QR1/QR2) ─────────
+// !PLANNING/ROADMAP.md is GENERATED from the private QUEUE.md and is the surface the
+// owner reads on a phone. Pure Node, zero external dependency, so it runs on BOTH
+// gate:fast and gate like the checks above.
+//
+// ⚠ THIS ASSERTS SOMETHING DIFFERENT FROM ITS NEIGHBOURS, and the difference is the
+// point. 47/52/53 assert CURRENCY (regenerate and byte-compare). This asserts
+// NON-BLINDNESS: the generator fails CLOSED, so when it cannot trust its parse it
+// publishes a BLIND board rather than a partial one — deliberately exiting 0, because
+// a reporter must never be able to fail a sync or a commit. That safety property has a
+// cost: a board can go blind and simply sit there, unnoticed, looking like a document.
+// `--check` is the one place that refusal is turned into a red. The generator declining
+// to publish a guess only helps if somebody is told.
+//
+// Fail-safe on the private-tree tension, exactly like Protocol 47's TEST_CATALOG.md:
+// a public clone has no !PLANNING/ by design (F04), and no ROADMAP.md on disk exits 0 —
+// there is nothing to verify, so this step can never fail CI or a public checkout.
+run('Roadmap board not BLIND (QR1)', 'node scripts/roadmap-generate.js --check');
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so

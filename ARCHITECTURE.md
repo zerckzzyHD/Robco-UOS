@@ -61,12 +61,13 @@
 32. [Settings & localStorage Keys](#settings-localstorage-keys)
 33. [System Dependency Map](#system-dependency-map)
 34. [Cross-Repo Naming Domains (ND1)](#cross-repo-naming-domains)
-35. [Historical Lessons](#historical-lessons)
-36. [Service Worker Cache Protocol](#service-worker-cache-protocol)
-37. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
-38. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
-39. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
-40. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
+35. [Planning Tree — the four-surface model (QR1)](#planning-tree)
+36. [Historical Lessons](#historical-lessons)
+37. [Service Worker Cache Protocol](#service-worker-cache-protocol)
+38. [Hotfix Rollback (Protocol 16)](#hotfix-rollback)
+39. [Adding a New State Field (Checklist)](#adding-a-new-state-field)
+40. [Adding a New Audio Source (Checklist)](#adding-a-new-audio-source)
+41. [Adding a New UI Panel (Checklist)](#adding-a-new-ui-panel)
 
 <!-- TOC:END -->
 
@@ -3470,6 +3471,31 @@ There is **no code clash today** — the app has never used a control-plane term
 **Two things keep it from rotting into a taxonomy.** First, only distinctive **compounds** are reserved: the bare word `ledger` is on the shared list, because this app has shipped a user-facing Field Ledger panel (`js/ui/ui-render-ledger.js`), a transcript event ledger, and a per-game data parity ledger for months — reserving it would outlaw shipped code. `event`, `receipt`, `incident` and `proposal` are shared for the same reason. Second, both guards prove that **behaviourally**: they run their own scanner over synthetic lines using each shared term and assert nothing is flagged, so a future session that reserves bare "ledger" turns the gate red instead of quietly banning a live panel. Both also run a **red-then-green** proof — a synthetic violating source must be flagged — so a passing scan means something rather than proving the scanner is a no-op.
 
 **Extending it:** add a domain key (the archive and the museum are the expected next two) plus a guard of the same shape in that repo. Do **not** invent reservations for collisions that have not happened. When **WB2** (the machine-readable guard registry) lands, both guards get registry rows.
+
+---
+
+<a id="planning-tree"></a>
+
+## Planning Tree — the four-surface model (QR1)
+
+The roadmap is not one file. It is **four surfaces**, and the split exists because they have genuinely different mutability. Collapsing any two of them is what produced the drift `QR1` was filed to end.
+
+| Surface                         | Class         | Mutability                                          | Contains                                                           |
+| ------------------------------- | ------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
+| `!PLANNING/QUEUE.md`            | **LIVE**      | **MUTABLE** — edited, re-ordered, and items REMOVED | **OPEN items only**, plus a one-line bullet per closed item        |
+| `!PLANNING/QUEUE_LOG.md`        | **ARCHIVE**   | **APPEND-ONLY** — never rewritten                   | The full body of every closed item, under a stable `<a id>` anchor |
+| `!PLANNING/ROADMAP.md`          | **GENERATED** | ⛔ **NEVER hand-edited**                            | A banded projection of `QUEUE.md`, fingerprinted, fail-closed      |
+| The invariant (Protocol 50 (d)) | enforcement   | —                                                   | The one machine-checked rule binding the first two together        |
+
+⛔ **All four live in the PRIVATE archive, not here (F04).** This repo is public; the queue describes control-plane topology, incidents, backup gaps and planned security work. `scripts/planning-paths.js` is the one resolver, and every consumer degrades to a no-op when the tree is absent — a public clone is never blocked by machinery it was never meant to have.
+
+**The generation direction is app → archive, which is unusual and deliberate.** `scripts/roadmap-generate.js` lives _here_ and **writes into the archive**, resolving its target through `planningWritePath()`. It lives here because there is exactly **one** queue parser on this project (`scripts/queue-view.js`), it is unit-tested by Suite 246, and Protocol 22 says extend rather than create. A generator in the archive would have had to fork the parser — a second source of truth about what a queue item _is_, which is precisely the failure the restructure exists to end. The direction of travel is not new: `sync.ps1` already writes app → archive.
+
+⚠ **`ROADMAP.md` is deliberately NOT in `PLANNING_FILES`.** That list is the READ contract, and `planningAvailable()` requires every entry to be readable. Adding a _written_ file to it would make any checkout that simply has not run the generator yet read as a checkout with **no planning tree at all**, silently skipping every queue suite on a machine that has the queue sitting right there — converting a missing OUTPUT into a skipped INPUT check.
+
+**Why the board renders BLIND rather than partial.** A board showing 190 of 205 items looks completely healthy; there is no visual difference between "these are the items" and "these are the items I could parse". That indistinguishability _is_ the defect the phase was built against — the sub-lettered-ID bug, where two items vanished with no warning. So a degraded board is refused, not offered. The eight reasons are enumerated in one place (`BLIND_REASONS`) so the doc and the code cannot drift, and each is proven to actually fire (Suite 248.6) rather than merely to exist.
+
+⭐ **The OUTPUT fails closed; the PROCESS always exits 0.** Two different promises, and conflating them is how reporters become blockers: the generator can never fail a sync, a commit or a push. `npm run roadmap:check` is the separate assertion — gate step 4f — that turns a blind board into a red, because a generator refusing to publish a guess only helps if somebody is told.
 
 ---
 

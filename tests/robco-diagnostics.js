@@ -51726,7 +51726,6 @@ if (!PLANNING_OK) {
   const queueSrc246 = planningPaths.readPlanningFile('QUEUE.md');
   const model246 = QV.parseQueue(queueSrc246);
   const items246 = model246.blocks.filter(b => b.type === 'item');
-  const byId = id => items246.find(b => b.id === id);
 
   // ── Parser: real QUEUE.md yields a title + a non-trivial block set ──
   assert(
@@ -51735,19 +51734,51 @@ if (!PLANNING_OK) {
   );
   assert(items246.length >= 15, '246.2: at least 15 ### items parsed from QUEUE.md');
 
-  // ── Item IDs are extracted (letters+optional digits) ──
-  // These are all genuine ### headings in QUEUE.md. (P1/P2/P3 are **bold**
-  // sub-notes inside P's body, not ### items, so they render within P's card —
-  // the view faithfully reflects the source structure.)
-  // NOTE: this list hardcodes specific item IDs, which is fragile — an item
-  // closing/moving to QUEUE_LOG.md (as H did, and as D did at Protocol 47's
-  // shipment — swapped for Q here for exactly that reason) breaks this
-  // fixture. A sturdier fix (asserting against a dynamically-sampled set of
-  // live ### ids rather than named ones) is left as a future task, not built
-  // here.
+  // ── Item IDs are extracted, and every ID SHAPE in use round-trips ──
+  //
+  // ⭐ RE-FORMED AT QR1 (2026-08-13), AND ITS OWN OLD COMMENT PREDICTED WHY.
+  // This assertion used to hardcode ['R11','L','A3','R5','R10','P','C1','Q'],
+  // with a note saying the list "is fragile — an item closing/moving to
+  // QUEUE_LOG.md (as H did, and as D did) breaks this fixture", and naming the
+  // sturdier fix as future work. QR1's sweep moved `A3` to QUEUE_LOG.md, so a
+  // CORRECT migration turned this red — the predicted failure, arriving. The
+  // named fix is now built rather than deferred again.
+  //
+  // ⚠ QUEUE.md said the same thing from the other side: A3/A4's accounts were
+  // knowingly left in the queue, in violation of its own ahead-only contract,
+  // because moving them reddened this fixture. "The fix belongs in tests/" —
+  // this is that fix, and it is what unblocked the sweep.
+  //
+  // ⛔ NOT A WEAKENING, and the distinction matters: the old form asserted that
+  // eight NAMED items exist (a fact about queue CONTENT, which legitimately
+  // changes). This asserts that ID EXTRACTION works for every ID SHAPE the live
+  // document actually uses — a fact about the PARSER, which must never change.
+  // It is non-vacuous: each live ID is re-fed to parseHeading in a canonical
+  // heading and must come back IDENTICAL, so a pattern that truncated a shape
+  // (dropping the `a` from `OM2a`) fails here. That is precisely the 2026-08-13
+  // defect class, now caught without naming a single item that can close.
+  const liveIds246 = items246.map(b => b.id).filter(Boolean);
+  const shapeOf246 = id =>
+    /^[A-Za-z]+[0-9]+[a-z]$/.test(id)
+      ? 'sub-lettered'
+      : /^[A-Za-z]+[0-9]+$/.test(id)
+        ? 'letters+digits'
+        : /^[A-Za-z]$/.test(id)
+          ? 'single-letter'
+          : 'other';
+  const shapes246 = new Set(liveIds246.map(shapeOf246));
+  const noRoundTrip246 = liveIds246.filter(id => QV.parseHeading(`${id}. ⬜ probe`).id !== id);
+  const missingShapes246 = ['single-letter', 'letters+digits', 'sub-lettered'].filter(
+    s => !shapes246.has(s)
+  );
   assert(
-    ['R11', 'L', 'A3', 'R5', 'R10', 'P', 'C1', 'Q'].every(id => byId(id)),
-    '246.3: known ### item IDs (R11, L, A3, R5, R10, P, C1, Q) are all parsed from their headings'
+    liveIds246.length >= 15 && noRoundTrip246.length === 0 && missingShapes246.length === 0,
+    '246.3: every LIVE item ID round-trips through parseHeading unchanged, and all three ID shapes in use (single-letter, letters+digits, sub-lettered) are represented — sampled from the document instead of naming items that can close (QR1 moved A3 to QUEUE_LOG.md, which is what the old hardcoded list could not survive)' +
+      (noRoundTrip246.length ? ' — DID NOT ROUND-TRIP: ' + noRoundTrip246.join(', ') : '') +
+      (missingShapes246.length ? ' — SHAPE ABSENT: ' + missingShapes246.join(', ') : '') +
+      (liveIds246.length < 15
+        ? ` — only ${liveIds246.length} live IDs (extraction regression?)`
+        : '')
   );
 
   // ── Status detection maps EVERY glyph in the vocabulary correctly ──
@@ -52157,11 +52188,15 @@ if (!PLANNING_OK) {
 //      unreachable when the drills first ran it.
 // ══════════════════════════════════════════════════════════════
 if (!PLANNING_OK) {
-  header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
+  header(
+    'Suite 248 — QUEUE.md structural integrity + the QR1 Part D invariant + the roadmap board'
+  );
   console.log(`  SKIP  Suite 248 — ${planningPaths.describe()}`);
   console.log('        (anchor + item-ID integrity are properties of the private planning tree)');
 } else {
-  header('Suite 248 — QUEUE.md structural integrity (anchor integrity + item-ID uniqueness)');
+  header(
+    'Suite 248 — QUEUE.md structural integrity + the QR1 Part D invariant + the roadmap board'
+  );
 
   const QV248 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
   const queueSrc248 = readFile('QUEUE.md');
@@ -52272,11 +52307,31 @@ if (!PLANNING_OK) {
     if (m) rawScanIds248.push(m[1]);
   }
   const missedIds248 = rawScanIds248.filter(id => !ids248.includes(id));
+  // ⚠ THE SELF-INTEGRITY FLOOR IS DELIBERATELY TRIVIAL (>= 15), NOT TUNED TO
+  // TODAY'S COUNT — corrected at QR1, 2026-08-13.
+  //
+  // It was `>= 200`, calibrated to the 205 items the live queue happened to hold
+  // the day this suite was written. QR1's whole purpose is to make QUEUE.md
+  // SHRINK: the sweep moved eight closed accounts to QUEUE_LOG.md and took the
+  // board to 197, so the guard went red on the migration SUCCEEDING. The plan
+  // had already named this exact trap for the generator — "a floor tuned to
+  // today's items would start blinding the moment QR1 succeeds and the file
+  // shrinks" — and the generator honoured it (TOO_FEW_ITEMS = 10, plus a
+  // relative parser-vs-raw-scan cross-check). This test did not, so the warning
+  // was recorded in one place and violated in another.
+  //
+  // ⛔ NOTHING LOAD-BEARING IS RELAXED. The real assertion is the RELATIVE one on
+  // the next line — parser count === raw-scan count over the SAME exported
+  // ITEM_ID_RE — plus `missedIds248`, and neither depends on the absolute size.
+  // The floor exists only so a total extraction failure cannot pass vacuously
+  // (0 === 0), which `>= 15` catches exactly as well while tracking nothing.
+  // It matches the sibling floors in 248.2 and 246.2 rather than inventing a
+  // third convention.
   assert(
     QV248.parseHeading('OM2a. ⏭️ THE PREPARED FIRST MISSION').id === 'OM2a' &&
       ids248.includes('OM2a') &&
       ids248.includes('OM2b') &&
-      rawScanIds248.length >= 200 &&
+      rawScanIds248.length >= 15 &&
       ids248.length === rawScanIds248.length &&
       missedIds248.length === 0,
     '248.4: NO ID-bearing ### heading is silently dropped — parseHeading resolves sub-lettered IDs (OM2a/OM2b), the live model contains both, and the parser\'s ID count equals a raw scan of the source over the SAME exported ITEM_ID_RE (the 2026-08-13 "205 items, parser sees 203" defect)' +
@@ -52284,7 +52339,7 @@ if (!PLANNING_OK) {
         ? ` — COUNT MISMATCH: parser ${ids248.length} vs raw scan ${rawScanIds248.length}`
         : '') +
       (missedIds248.length ? ' — DROPPED: ' + missedIds248.join(', ') : '') +
-      (rawScanIds248.length < 200
+      (rawScanIds248.length < 15
         ? ` — only ${rawScanIds248.length} raw IDs found (extraction regression?)`
         : '')
   );
@@ -52292,29 +52347,72 @@ if (!PLANNING_OK) {
   const RG248 = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
   const idItems248 = model248.blocks.filter(b => b.type === 'item' && b.id);
 
-  // ── 248.3  SHADOW RATCHET — closed items still carrying their full account ──
+  // ── 248.3  QR1 PART D — ⛔ NO ✅-SHIPPED ITEM MAY EXIST IN QUEUE.md ──
   //
-  // ⚠ SHADOW, BUT NOT INERT. A closed item should survive in QUEUE.md as a
-  // one-line pointer, its account living in QUEUE_LOG.md. Eight do not, today.
-  // Asserting `=== 0` now would red the very next commit for eight PRE-EXISTING
-  // reasons this phase deliberately is not fixing — a test that is red on arrival
-  // teaches sessions to ignore it. So the bar sits at the measured baseline: it
-  // CANNOT red on the existing 8, and it DOES red the moment a 9th appears. The
-  // park is allowed to persist; it is not allowed to quietly get worse.
+  // ⭐ PROMOTED FROM SHADOW TO ASSERTING (2026-08-13, QR1 Phase 3).
   //
-  // ⛔ AT PHASE 3 THIS BECOMES `=== 0`. That is the point of the migration, and
-  // this line is the instruction to whoever lands it.
+  // It shipped as a ratchet pinned to the measured baseline of 8, because
+  // asserting `=== 0` against the un-migrated queue would have been RED ON
+  // ARRIVAL for eight pre-existing reasons — and a test that is red on arrival
+  // teaches sessions to ignore it, or to disable it. Shadow → migrate → promote
+  // is the order this project uses for anything that will eventually enforce.
+  // The migration has now run: all eight accounts live in QUEUE_LOG.md under
+  // stable anchors, the measured baseline is 0, so the bar is 0.
   //
-  // The rule is imported (RG248.closedDiscipline), not retyped — the board and
-  // this ratchet must never be able to disagree about what a violation is.
+  // ⛔ THE BAR IS `total`, NOT `violations` — a deliberate strengthening at the
+  // promotion. QR1's rule is not "a closed item may stay if its body is short
+  // enough"; it is that a closed item's `###` block does not belong in QUEUE.md
+  // AT ALL. Its record here is a one-line BULLET in the CLOSED index, which this
+  // check cannot see BY CONSTRUCTION because it is heading-scoped. Asserting
+  // `violations === 0` would have permitted a ✅-led one-line `###` heading to
+  // sit here indefinitely — which is precisely the shape the 2026-07-21 split
+  // kept drifting back into, three times, and the reason this guard exists.
+  //
+  // 36(b) — WHY A PERMANENT GUARD EARNS ITS KEEP HERE (all five bars):
+  //  · REALISTICALLY RECURS — it already has, three times. The 2026-07-21 split
+  //    WAS the direct fix for this exact drift, it was written down as prose, and
+  //    the queue still accumulated eight closed accounts because nothing measured
+  //    it. That is the definition of a recurrence the direct fix does not remove.
+  //  · CORRECT LAYER — against the real QUEUE.md through the real parser. A doc
+  //    check would only prove the rule is still WRITTEN somewhere, which is
+  //    precisely the thing that already failed.
+  //  · ZERO FALSE POSITIVES — measured on the live file, not argued: 16 ID-bearing
+  //    headings CONTAIN ✅ and only the ✅-LED ones are violations. The other 8 are
+  //    open items recording a finished HALF (the live SEC2), so a naive substring
+  //    scan would have been wrong 50% of the time on day one. 248.5 locks the
+  //    positional half. Prose sub-headings carry no ID and are exempt, which is
+  //    why the 8 Round-8 `### ✅ Stage N` headings are untouched.
+  //  · TESTS THE SHIPPED ARTIFACT — the owner's actual queue, not a fixture.
+  //  · CHEAPER THAN THE RECURRENCE — one filter over an already-parsed document,
+  //    against a file that had grown ~1,600 lines in three days while eight closed
+  //    accounts sat in it.
+  // Retirement condition (Protocol 49): retire when QUEUE.md is no longer
+  // hand-authored — i.e. when closing an item cannot leave its body behind.
+  //
+  // ⚠ THE HOLE THIS RAIL CANNOT CLOSE, named rather than implied: an item that is
+  // genuinely finished but whose author never changed its glyph to ✅ is invisible
+  // here. No heading-scoped check can see that. It is what the checkpoint ritual's
+  // move-closed-to-LOG step exists to catch (!PLANNING/CHECKPOINT-RITUAL.md), which
+  // is why the ritual is part of QR1's "done", not an optional extra.
+  //
+  // The rule is IMPORTED (RG248.closedDiscipline), never retyped: the generated
+  // board, the archive's own pre-commit hook and this assertion must be incapable
+  // of disagreeing about what a violation is.
+  //
+  // `ids248.length >= 15` is the self-integrity conjunct — without it an
+  // extraction that returned nothing would satisfy `=== 0` vacuously, and a guard
+  // that passes hardest when the parser is broken is worse than no guard.
   const closed248 = RG248.closedDiscipline(idItems248);
   const shipped248 = closed248.violations;
   assert(
-    shipped248.length <= 8,
-    `248.3 [SHADOW RATCHET]: closed items still carrying a full account in QUEUE.md must not GROW during the park — baseline 8, now ${shipped248.length}` +
-      ` [${shipped248.map(v => `${v.id}:${v.bodyLines}L`).join(', ') || 'none'}]` +
-      ` · reported separately and never summed: ${closed248.total} closed, ${closed248.proved.length} PROVED one-liner, ${shipped248.length} violations` +
-      ' · ⛔ replaced by `=== 0` at Phase 3, when the accounts have migrated to QUEUE_LOG.md'
+    ids248.length >= 15 && closed248.total === 0,
+    "248.3 [QR1 PART D]: no ✅-shipped item body remains in QUEUE.md — a closed item's account moves to QUEUE_LOG.md under a stable <a id> anchor, and QUEUE.md keeps a one-line BULLET + [account] link in the CLOSED index" +
+      ` · reported separately and never summed: ${closed248.total} closed, ${closed248.proved.length} PROVED one-liner, ${shipped248.length} still carrying a full account` +
+      (closed248.total
+        ? ' — LINGERING: ' +
+          [...closed248.proved, ...shipped248].map(v => `${v.id}:${v.bodyLines}L`).join(', ')
+        : '') +
+      (ids248.length < 15 ? ` — only ${ids248.length} IDs parsed (extraction regression?)` : '')
   );
 
   // ── 248.5  An open glyph first wins, even with a ✅ later in the heading ──
