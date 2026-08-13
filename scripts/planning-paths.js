@@ -105,6 +105,33 @@ function planningAvailable() {
 }
 
 /**
+ * Absolute path for a GENERATED planning artifact — a file this repo WRITES into
+ * the private tree rather than reads from it (currently `ROADMAP.md`, produced by
+ * scripts/roadmap-generate.js). Returns null when the tree is unreachable, which
+ * is the public-clone case: nothing is written and that is not a failure.
+ *
+ * ⛔ A GENERATED FILE IS DELIBERATELY *NOT* IN `PLANNING_FILES`. That list is the
+ * READ contract — `planningAvailable()` requires every entry to be readable, and
+ * the gate's queue suites (246/248) SKIP when it is not. Putting a written file in
+ * it would mean any checkout that simply has not run the generator yet reads as a
+ * checkout with NO PLANNING TREE AT ALL, silently skipping every queue check on a
+ * machine that has the queue right there. That converts a missing OUTPUT into a
+ * skipped INPUT check — the precise "a skip that cannot be told from a pass"
+ * dishonesty the header above exists to prevent. An output is never a
+ * precondition for reading the input.
+ *
+ * The name is validated rather than trusted: this joins onto a real directory, so
+ * a caller passing a traversal ("../../x") or an absolute path must not be able to
+ * write outside the planning tree.
+ */
+function planningWritePath(name) {
+  const dir = planningDir();
+  if (!dir) return null;
+  if (typeof name !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) return null;
+  return path.join(dir, name);
+}
+
+/**
  * One line describing WHICH resolution case we are in — so a skip is never
  * mistaken for a pass. Callers print this next to any skip.
  */
@@ -128,5 +155,6 @@ module.exports = {
   planningFile,
   readPlanningFile,
   planningAvailable,
+  planningWritePath,
   describe,
 };

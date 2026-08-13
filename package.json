@@ -23,6 +23,8 @@
     "test:emulator": "firebase emulators:exec --project demo-robco-uos-test --only firestore,auth \"node scripts/emulator-round-trip-check.js\"",
     "release-receipt": "node scripts/release-receipt.js",
     "queue-view": "node scripts/queue-view.js",
+    "roadmap": "node scripts/roadmap-generate.js",
+    "roadmap:check": "node scripts/roadmap-generate.js --check",
     "test-catalog": "node scripts/generate-test-catalog.js",
     "test-catalog:check": "node scripts/generate-test-catalog.js --check",
     "architecture-toc": "node scripts/generate-architecture-toc.js",
