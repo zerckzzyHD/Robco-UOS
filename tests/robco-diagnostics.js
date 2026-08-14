@@ -52463,25 +52463,33 @@ if (!PLANNING_OK) {
   // (parser-unreachable, extraction-regression) need the parser module itself
   // stubbed, which is too invasive for the gate — they are drill-verified out of
   // band, and that limit is stated here rather than papered over.
+  // ⚠ THE FIXTURE GLYPH IS ⏭️ (ready) AND MUST NOT GO BACK TO ⬜ (backlog).
+  // Protocol 42, found while implementing QR3 and fixed in that same commit: the
+  // anti-leak half of this assertion ("…without leaking a partial item list")
+  // depends on the fixture's items being ones a healthy board WOULD list. Backlog
+  // is now rendered as a COUNT, so a ⬜-only fixture can never produce a `- **F1**`
+  // bullet under ANY code path — which would have left the regex passing forever
+  // while checking nothing. Silently converting a live guard into a vacuous one is
+  // exactly the class of flaw Protocol 42 exists to catch during implementation.
   const fixture248 = text => ({ readPlanningFile: () => text, describe: () => 'fixture' });
   const goodQueue248 = (n, extra = '') => {
     let s = '# Fixture Queue\n\n';
-    for (let i = 1; i <= n; i++) s += `### F${i}. ⬜ item ${i}\n\nbody\n\n`;
+    for (let i = 1; i <= n; i++) s += `### F${i}. ⏭️ item ${i}\n\nbody\n\n`;
     return s + extra;
   };
   const reasonCases248 = [
     ['source-unreadable', () => RG248.build(fixture248(null))],
-    ['no-title', () => RG248.build(fixture248('### F1. ⬜ item\n\nbody\n'))],
+    ['no-title', () => RG248.build(fixture248('### F1. ⏭️ item\n\nbody\n'))],
     ['too-few-items', () => RG248.build(fixture248(goodQueue248(4)))],
     [
       'duplicate-ids',
-      () => RG248.build(fixture248(goodQueue248(20, '### F7. ⬜ a second F7\n\nbody\n'))),
+      () => RG248.build(fixture248(goodQueue248(20, '### F7. ⏭️ a second F7\n\nbody\n'))),
     ],
     [
       'unclassifiable-board',
       () => {
         let s = '# Fixture Queue\n\n';
-        for (let i = 1; i <= 10; i++) s += `### G${i}. ⬜ classified ${i}\n\nbody\n\n`;
+        for (let i = 1; i <= 10; i++) s += `### G${i}. ⏭️ classified ${i}\n\nbody\n\n`;
         for (let i = 1; i <= 5; i++) s += `### U${i}. 📄 unknown ${i}\n\nbody\n\n`;
         return RG248.build(fixture248(s));
       },
@@ -52527,6 +52535,75 @@ if (!PLANNING_OK) {
       (!wiring248 ? ' — package.json wiring missing/incorrect' : '') +
       (keysCovered248.length !== 8 ? ` — ${keysCovered248.length} reasons, expected 8` : '') +
       (reasonFailures248.length ? ' — UNREACHABLE/WRONG: ' + reasonFailures248.join('; ') : '')
+  );
+}
+
+// ── 248.8  QR3 — THE BACKLOG BAND IS A COUNT, AND UNCLASSIFIED IS NOT ───────
+//
+// The restructure plan specified this from the start — *"BACKLOG is a count, not
+// a list, and that is the whole design"* — and the first generator shipped it as a
+// full list of 148 items, ~60% of the document. ⛔ Not a cosmetic drift: the
+// generated board reproducing the exact unreadability its own parent item was
+// filed to end.
+//
+// ⚠ THE HALF THAT ACTUALLY NEEDS GUARDING IS THE ONE NEXT TO IT. "Render this band
+// as a number instead" is a one-line change that reads as a general licence to
+// shorten long bands, and the single most dangerous place to apply it is
+// UNCLASSIFIED — which is precisely the band that must NEVER be truncated, because
+// an item nobody could classify is the item most worth seeing, and hiding it
+// recreates the silent-drop failure the whole surface exists to prevent. QR3 says
+// so in as many words. So this asserts both directions in one place: backlog is
+// counted AND unclassified is listed in full, on the same board, from the same
+// fixture. Testing only the first would lock the easy half.
+//
+// Fixture-driven and tree-independent, same as 248.7 — it runs everywhere.
+{
+  const RG248b = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const QV248b = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+  const backlogGlyph248b = QV248b.STATUSES.find(s => s.key === RG248b.BACKLOG_KEY);
+
+  let src248b = '# Fixture Queue\n\n';
+  for (let i = 1; i <= 12; i++) src248b += `### N${i}. ⏭️ ready ${i}\n\nbody\n\n`;
+  for (let i = 1; i <= 20; i++) src248b += `### B${i}. ⬜ backlog ${i}\n\nbody\n\n`;
+  for (let i = 1; i <= 3; i++) src248b += `### U${i}. 📄 unknown ${i}\n\nbody\n\n`;
+  const built248b = RG248b.build({ readPlanningFile: () => src248b, describe: () => 'fixture' });
+  const txt248b = built248b.blind ? '' : built248b.text;
+
+  const backlogBullets248b = (txt248b.match(/^- \*\*B\d+\*\*/gm) || []).length;
+  const readyBullets248b = (txt248b.match(/^- \*\*N\d+\*\*/gm) || []).length;
+  const unclassBullets248b = (txt248b.match(/^- \*\*U\d+\*\*/gm) || []).length;
+  const countLine248b = new RegExp(`^## ${backlogGlyph248b.glyph} Backlog — 20 items$`, 'm').test(
+    txt248b
+  );
+
+  assert(
+    !built248b.blind &&
+      countLine248b &&
+      backlogBullets248b === 0 &&
+      readyBullets248b === 12 &&
+      unclassBullets248b === 3,
+    '248.8 [QR3]: the BACKLOG band renders as a COUNT with ZERO item bullets, while every in-motion band AND the UNCLASSIFIED band stay listed IN FULL — the count must never be read as licence to truncate unclassified, which is the one band that can never be shortened' +
+      (built248b.blind ? ' — fixture went BLIND (the board never rendered)' : '') +
+      (!countLine248b ? ' — no `## <glyph> Backlog — N items` count heading' : '') +
+      (backlogBullets248b ? ` — ${backlogBullets248b} backlog items still ENUMERATED` : '') +
+      (readyBullets248b !== 12 ? ` — ready band listed ${readyBullets248b}/12` : '') +
+      (unclassBullets248b !== 3 ? ` — ⛔ UNCLASSIFIED listed ${unclassBullets248b}/3` : '')
+  );
+
+  // The label is board-LOCAL on purpose: the plan's word is BACKLOG, the shared
+  // STATUSES vocabulary says 'To-do', and only the board was in QR3's scope. This
+  // locks that split so neither side "tidies" the other by accident — and that the
+  // GLYPH is still derived from the vocabulary rather than retyped here.
+  assert(
+    RG248b.BACKLOG_KEY === 'todo' &&
+      RG248b.BACKLOG_LABEL === 'Backlog' &&
+      backlogGlyph248b !== undefined &&
+      backlogGlyph248b.label === 'To-do' &&
+      txt248b.includes(`## ${backlogGlyph248b.glyph} ${RG248b.BACKLOG_LABEL}`),
+    "248.8b [QR3]: the board's `Backlog` label is a deliberate BOARD-LOCAL override of the shared vocabulary's `To-do` (the plan governs this surface; the phone queue-view's filter chip is a different one), and BACKLOG_KEY still resolves against a real STATUSES entry so the glyph is derived, never retyped" +
+      (backlogGlyph248b === undefined
+        ? ` — BACKLOG_KEY '${RG248b.BACKLOG_KEY}' matches no status`
+        : '')
   );
 }
 

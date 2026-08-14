@@ -87,6 +87,45 @@ const TOO_FEW_ITEMS = 10;
 const UNCLASSIFIABLE_LIMIT = 0.1; // >10% of ID-bearing items
 
 /**
+ * ⭐ THE BACKLOG BAND IS A COUNT, NOT A LIST (QR3, 2026-08-13).
+ *
+ * The restructure plan said so from the start — *"BACKLOG is a count, not a list,
+ * and that is the whole design"* — and the first generator shipped it as a full
+ * list anyway, all 148 of them, which is ~60% of the document. ⛔ That is not a
+ * cosmetic preference: it is the generated board reproducing the exact
+ * unreadability its own parent item was filed to end. The queue got lean; the VIEW
+ * of it did not. A 245-line "roadmap" that is mostly a backlog dump is the
+ * monolith wearing a different hat.
+ *
+ * This board projects the ORDER of the work, not the whole of it. The bands that
+ * describe what is in motion — ready, active, attention, deferred, parked — stay
+ * full lists, because their whole value is naming the items. Backlog's value is
+ * its SIZE.
+ *
+ * ⚠ HIDING ITEMS BEHIND A NUMBER DOES NOT WEAKEN THE DROP DETECTION, and that is
+ * worth stating because it looks like it should. Nothing here decides what EXISTS
+ * — `extraction-regression` still compares the parser against a raw scan of the
+ * source, the header still prints the ID-bearing total, and the band counts still
+ * have to add up to it. A silently dropped backlog item blinds the whole board
+ * exactly as before; it just no longer costs 148 lines to say so.
+ *
+ * ⛔ THE UNCLASSIFIED BAND IS EXPLICITLY NOT COVERED BY THIS. It stays listed in
+ * full, never truncated, never guessed at — an item nobody can classify is the one
+ * most worth seeing, and this rule must never be read as licence to shorten it.
+ *
+ * ⚠ THE LABEL IS DELIBERATELY BOARD-LOCAL, NOT A RENAME OF THE SHARED VOCABULARY.
+ * `STATUSES` (scripts/queue-view.js) calls this band `To-do`, and the plan calls it
+ * `BACKLOG`; QR3 required the board to match the plan. Overriding it HERE changes
+ * the one surface the plan governs, and leaves the phone queue-view's filter chip
+ * — a different surface, on a different page, with the owner's muscle memory
+ * attached — alone. The GLYPH is still derived from `STATUSES`, never retyped; only
+ * the display word is local, and `BACKLOG_KEY` is matched against the vocabulary's
+ * own key so this cannot silently stop matching if the glyph ever changes.
+ */
+const BACKLOG_KEY = 'todo';
+const BACKLOG_LABEL = 'Backlog';
+
+/**
  * The emoji variation selector (U+FE0F). Written as an ESCAPE, never as the
  * literal character: the literal is invisible in an editor, a diff cannot show
  * it, and a well-meant trailing-whitespace cleanup deletes it without trace.
@@ -304,6 +343,16 @@ function renderBoard(data, provenance) {
   // inventing a priority the source never stated.
   for (const s of data.statuses) {
     const rows = banded.get(s.key) || [];
+    if (s.key === BACKLOG_KEY) {
+      lines.push(`## ${s.glyph} ${BACKLOG_LABEL} — ${rows.length} items`);
+      lines.push('');
+      lines.push(
+        `> **A COUNT, deliberately not a list.** This board is a projection of the ORDER of the ` +
+          `work, not a dump of it. Read \`QUEUE.md\` for the ${rows.length} items themselves.`
+      );
+      lines.push('');
+      continue;
+    }
     lines.push(`## ${s.glyph} ${s.label} (${rows.length})`);
     lines.push('');
     if (!rows.length) {
@@ -501,6 +550,8 @@ module.exports = {
   closedDiscipline,
   extractSourceHash,
   sourceHash: sha256,
+  BACKLOG_KEY,
+  BACKLOG_LABEL,
   BLIND_REASONS,
   SOURCE_HASH_RE,
   STATE_MARKER,
