@@ -52186,18 +52186,22 @@ if (!PLANNING_OK) {
 //    · 248.6 locks the wiring and, more importantly, that every enumerated BLIND
 //      reason can actually FIRE — the Protocol 42 lock for `no-title`, which was
 //      unreachable when the drills first ran it.
+//    · 248.7 (added 2026-08-13) locks the `--check` CONTRACT itself, as a real
+//      child process against a THROWAWAY fixture tree. It is deliberately OUTSIDE
+//      the PLANNING_OK guard: the guard's contract is a property of the SCRIPT,
+//      not of this machine's archive, so it must hold on a public clone and in CI
+//      too. It closed two false GREENS living inside the one step whose entire
+//      job is to catch greens that skipped.
 // ══════════════════════════════════════════════════════════════
-if (!PLANNING_OK) {
-  header(
-    'Suite 248 — QUEUE.md structural integrity + the QR1 Part D invariant + the roadmap board'
-  );
-  console.log(`  SKIP  Suite 248 — ${planningPaths.describe()}`);
-  console.log('        (anchor + item-ID integrity are properties of the private planning tree)');
-} else {
-  header(
-    'Suite 248 — QUEUE.md structural integrity + the QR1 Part D invariant + the roadmap board'
-  );
+header('Suite 248 — QUEUE.md structural integrity + the QR1 Part D invariant + the roadmap board');
 
+if (!PLANNING_OK) {
+  console.log(`  SKIP  Suite 248.1-248.6 — ${planningPaths.describe()}`);
+  console.log('        (anchor + item-ID integrity are properties of the private planning tree)');
+  console.log(
+    '        (248.7 is fixture-driven and runs anyway — it tests the script, not the tree)'
+  );
+} else {
   const QV248 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
   const queueSrc248 = readFile('QUEUE.md');
   const logSrc248 = readFile('QUEUE_LOG.md');
@@ -52524,6 +52528,165 @@ if (!PLANNING_OK) {
       (keysCovered248.length !== 8 ? ` — ${keysCovered248.length} reasons, expected 8` : '') +
       (reasonFailures248.length ? ' — UNREACHABLE/WRONG: ' + reasonFailures248.join('; ') : '')
   );
+}
+
+// ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
+//
+// ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the
+// one place the generator's deliberate refusal to publish a guess is turned into
+// a red — the generator always exits 0 on purpose, so if this step is wrong the
+// whole fail-closed design reports nothing to anybody. Two ways it passed when it
+// should not have:
+//
+//   1. NEVER GENERATED → exit 0. An absent artifact printed "nothing to verify"
+//      and passed. ⚠ Read that back: a GREEN-THAT-SKIPPED, living inside the one
+//      gate step whose entire job is to catch greens that skipped. Deleting
+//      ROADMAP.md was a way to make the check pass.
+//   2. STALE → exit 0. The board records the sha256 of the QUEUE.md it was built
+//      from, and nothing ever compared it to the CURRENT source — so a board
+//      generated from a queue three weeks old read exactly like a fresh one. This
+//      is the stale-that-reads-as-current failure the BLIND design already refuses
+//      to commit inside the document, arriving through the back door instead.
+//
+// ⭐ WHY THIS BLOCK SITS OUTSIDE THE `PLANNING_OK` GUARD ABOVE: the contract is a
+// property of the SCRIPT, not of this machine's archive. It is driven entirely by
+// a THROWAWAY fixture tree via ROBCO_PLANNING_DIR, never touching the real
+// !PLANNING/, so it runs identically on the owner's machine, a public clone and
+// CI — the same reason 247.9 overrides its own output path rather than asserting
+// against the developer's real library/.
+//
+// ⚠ 248.7e AND 248.7h ARE THE FALSE-POSITIVE HALF, and they are not filler.
+// 248.7e proves the F04 degrade path (no planning tree at all → exit 0) was NOT
+// converted into a red by fixing (1) — an absent TREE and an absent ARTIFACT are
+// different facts, and only the second is a failure. 248.7h proves the freshness
+// check reads the SOURCE fingerprint only and ignores the `App repo HEAD` stamp:
+// that stamp legitimately changes on every unrelated app commit, so comparing it
+// would red the very next push after any commit. That exact trap already bit this
+// project once, at 247.10 — locked here rather than rediscovered.
+{
+  const os248c = require('os');
+  const { spawnSync: spawn248c } = require('child_process');
+  const gen248c = path.join(ROOT, 'scripts', 'roadmap-generate.js');
+  const tmp248c = fs.mkdtempSync(path.join(os248c.tmpdir(), 'robco-roadmap-248-'));
+  const queuePath248c = path.join(tmp248c, 'QUEUE.md');
+  const boardPath248c = path.join(tmp248c, 'ROADMAP.md');
+
+  // Every run is a REAL child process of the shipped CLI, pointed at the fixture
+  // tree — never an in-process call to build(), which would prove nothing about
+  // the exit code the gate actually observes.
+  const run248c = (dir, args) =>
+    spawn248c(process.execPath, [gen248c, ...args], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: Object.assign({}, process.env, { ROBCO_PLANNING_DIR: dir }),
+    });
+  const check248c = dir => run248c(dir, ['--check']);
+  const generate248c = dir => run248c(dir, []);
+  const fixtureQueue248c = (n, extra = '') => {
+    let s = '# Fixture Queue\n\n';
+    for (let i = 1; i <= n; i++) s += `### F${i}. ⏭️ item ${i}\n\nbody\n\n`;
+    return s + extra;
+  };
+
+  try {
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+
+    // (a) HOLE 1 — the tree is present, the artifact was never generated.
+    const rNever248c = check248c(tmp248c);
+    assert(
+      rNever248c.status === 1,
+      '248.7a: `--check` EXITS 1 when the planning tree is present but ROADMAP.md was never generated — an absent artifact is not a pass, and this is the green-that-skipped that lived inside the guard against greens that skipped' +
+        ` — got exit ${rNever248c.status}`
+    );
+
+    // (b) The ordinary green path still passes, immediately after a generate.
+    generate248c(tmp248c);
+    const rFresh248c = check248c(tmp248c);
+    assert(
+      fs.existsSync(boardPath248c) && rFresh248c.status === 0,
+      '248.7b: `--check` exits 0 on a freshly generated, non-blind board (generate → check are consistent; the fix did not simply make the step always red)' +
+        ` — got exit ${rFresh248c.status}`
+    );
+
+    // (h) FALSE-POSITIVE GUARD — the `App repo HEAD` stamp is provenance, NOT a
+    // freshness input. It changes on every unrelated app commit (the 247.10 trap).
+    const fresh248c = fs.readFileSync(boardPath248c, 'utf8');
+    fs.writeFileSync(
+      boardPath248c,
+      fresh248c.replace(/\*\*App repo HEAD:\*\* `[^`]*`/, '**App repo HEAD:** `0000000`'),
+      'utf8'
+    );
+    const rHead248c = check248c(tmp248c);
+    assert(
+      fresh248c.includes('**App repo HEAD:**') && rHead248c.status === 0,
+      '248.7h: a changed `App repo HEAD` stamp does NOT make the board stale — freshness is measured against the SOURCE fingerprint alone, so an unrelated app commit can never red this step (the 247.10 false-positive trap, locked rather than rediscovered)' +
+        ` — got exit ${rHead248c.status}`
+    );
+
+    // (g) An artifact carrying no readable source fingerprint cannot be PROVED
+    // fresh, and unverifiable is not a pass.
+    fs.writeFileSync(
+      boardPath248c,
+      fresh248c.replace(/^\*\*Source:\*\*.*$/m, '**Source:** hand-edited'),
+      'utf8'
+    );
+    const rNoHash248c = check248c(tmp248c);
+    assert(
+      rNoHash248c.status === 1,
+      '248.7g: `--check` exits 1 when the on-disk board carries no readable source fingerprint (hand-edited or produced by an older generator) — a board that cannot be verified fresh is not reported as fresh' +
+        ` — got exit ${rNoHash248c.status}`
+    );
+
+    // (c) HOLE 2 — the source moved on and the board did not.
+    generate248c(tmp248c);
+    fs.writeFileSync(
+      queuePath248c,
+      fixtureQueue248c(20, '### F21. ⏭️ a new item\n\nbody\n'),
+      'utf8'
+    );
+    const rStale248c = check248c(tmp248c);
+    assert(
+      rStale248c.status === 1,
+      '248.7c: `--check` exits 1 when QUEUE.md has changed since the board was generated — the board records its source sha256 and nothing compared it, so a board built from an older queue read exactly like a fresh one' +
+        ` — got exit ${rStale248c.status}`
+    );
+
+    // (d) …and regenerating clears it. A staleness check that cannot go green
+    // again is a broken gate, not a strict one.
+    generate248c(tmp248c);
+    const rRegen248c = check248c(tmp248c);
+    assert(
+      rRegen248c.status === 0,
+      '248.7d: regenerating after a source change returns `--check` to exit 0 — the staleness red is clearable by the documented action (`npm run roadmap`), never a dead end' +
+        ` — got exit ${rRegen248c.status}`
+    );
+
+    // (f) BLINDNESS still wins, and it is checked BEFORE freshness: a blind board
+    // generated from the current source has a perfectly MATCHING fingerprint, so
+    // an order-of-checks slip would have reported it as a healthy fresh board.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(4), 'utf8');
+    generate248c(tmp248c);
+    const blindText248c = fs.readFileSync(boardPath248c, 'utf8');
+    const rBlind248c = check248c(tmp248c);
+    assert(
+      /ROADMAP-STATE: BLIND/.test(blindText248c) &&
+        rBlind248c.status === 1 &&
+        /BLIND/.test(rBlind248c.stderr),
+      '248.7f: a BLIND board still exits 1, and is reported AS blind — blindness is checked before freshness, so a blind board whose source fingerprint happens to match is never reported as a healthy fresh one' +
+        ` — got exit ${rBlind248c.status}`
+    );
+
+    // (e) FALSE-POSITIVE GUARD — no planning tree at all is the F04 public-clone
+    // case: not a failure, and fixing (a) must not have turned it into one.
+    const rNoTree248c = check248c(path.join(tmp248c, 'no-such-planning-tree'));
+    assert(
+      rNoTree248c.status === 0 && /SKIP/i.test(rNoTree248c.stdout),
+      '248.7e: `--check` still exits 0, printing the resolution case, when there is NO planning tree — an absent TREE (a public clone, by design under F04) and an absent ARTIFACT are different facts and only the second is a failure' +
+        ` — got exit ${rNoTree248c.status}`
+    );
+  } finally {
+    fs.rmSync(tmp248c, { recursive: true, force: true });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

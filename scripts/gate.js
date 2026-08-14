@@ -41,9 +41,12 @@
  *   4e. Code-map generated sections currency (Protocol 53 — library/CODE_MAP.md's Diagnostic
  *      Shell table / Render Pipeline lists / Event Bus names vs their live sources; pure Node,
  *      runs on fast + full, no-op where the gitignored library/ file is absent)
- *   4f. Roadmap board not BLIND (QR1 — !PLANNING/ROADMAP.md's own state marker; asserts
- *      NON-BLINDNESS rather than currency, because that generator fails closed and still
- *      exits 0; pure Node, runs on fast + full, no-op where the private tree is absent)
+ *   4f. Roadmap board present, not BLIND, not STALE (QR1 — !PLANNING/ROADMAP.md's own state
+ *      marker + the source sha256 it records; asserts PRESENCE, NON-BLINDNESS and SOURCE
+ *      FRESHNESS rather than full currency, because that generator fails closed, still
+ *      exits 0, and stamps a git HEAD that changes on every unrelated commit; pure Node,
+ *      runs on fast + full, no-op where the private TREE is absent — but an absent BOARD
+ *      on a machine that HAS the tree is a failure, not a skip)
  *   ── fast commit gate ALSO runs (U1): a tiny headless boot smoke so
  *      commit-green means "the shell boots and paints," not just "greps clean."
  *   5. Playwright Chromium availability check     ← skipped by --fast
@@ -453,18 +456,30 @@ run(
 // gate:fast and gate like the checks above.
 //
 // ⚠ THIS ASSERTS SOMETHING DIFFERENT FROM ITS NEIGHBOURS, and the difference is the
-// point. 47/52/53 assert CURRENCY (regenerate and byte-compare). This asserts
-// NON-BLINDNESS: the generator fails CLOSED, so when it cannot trust its parse it
-// publishes a BLIND board rather than a partial one — deliberately exiting 0, because
-// a reporter must never be able to fail a sync or a commit. That safety property has a
-// cost: a board can go blind and simply sit there, unnoticed, looking like a document.
-// `--check` is the one place that refusal is turned into a red. The generator declining
-// to publish a guess only helps if somebody is told.
+// point. 47/52/53 assert CURRENCY (regenerate and byte-compare). This cannot: the board
+// stamps the app repo's git HEAD, which changes on every unrelated commit, so a
+// byte-compare would red the next push after any commit at all (the 247.10 trap). It
+// asserts the four things it CAN prove — the board EXISTS, is not BLIND, carries a
+// readable source fingerprint, and that fingerprint matches the live QUEUE.md.
 //
-// Fail-safe on the private-tree tension, exactly like Protocol 47's TEST_CATALOG.md:
-// a public clone has no !PLANNING/ by design (F04), and no ROADMAP.md on disk exits 0 —
-// there is nothing to verify, so this step can never fail CI or a public checkout.
-run('Roadmap board not BLIND (QR1)', 'node scripts/roadmap-generate.js --check');
+// The generator fails CLOSED (an untrustworthy parse publishes a BLIND board, never a
+// partial one) while deliberately exiting 0, because a reporter must never be able to
+// fail a sync or a commit. That safety property has a cost: a board can go blind, or go
+// stale, and simply sit there looking like a document. This step is the one place those
+// refusals become a red — the generator declining to publish a guess only helps if
+// somebody is told.
+//
+// ⚠ THE SKIP IS ON THE TREE, NOT THE ARTIFACT — corrected 2026-08-13, and the previous
+// wording of this comment was itself the bug's alibi. A public clone has no !PLANNING/
+// by design (F04) and the script exits 0 on that, so this step still cannot fail CI or a
+// public checkout. But an absent ROADMAP.md on a machine that HAS the tree is now a
+// FAILURE, not a skip: it used to print "nothing to verify" and pass, which made
+// deleting the artifact a way to make its own check green. Suites 248.7a/248.7e lock
+// both halves.
+run(
+  'Roadmap board present, not BLIND, not STALE (QR1)',
+  'node scripts/roadmap-generate.js --check'
+);
 
 // ── Fast commit gate: a tiny browser boot smoke (U1, HEALTH_BATCH_PLAN.md §4) ──
 // The whole point of U1: before this, gate:fast opened zero browsers, so
