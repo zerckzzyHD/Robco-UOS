@@ -253,13 +253,32 @@ function escapeHtml(s) {
  * block, inverting every <strong> after them. A lazy regex fixes the first case
  * only; nesting needs real pairing.
  *
- * So each `**` is classified by CommonMark's flanking rule (an opener is
- * followed by a non-space, a closer preceded by one) and each closer is paired
- * with the NEAREST unmatched opener — which yields flat and nested bold alike.
+ * So each `**` is classified by CommonMark's flanking rule and each closer is
+ * paired with the NEAREST unmatched opener — which yields flat and nested bold
+ * alike.
+ *
+ * ⚠ THE FLANKING RULE IS THE FULL ONE, PUNCTUATION CLAUSE INCLUDED — a shorter
+ * "opener is followed by a non-space, closer is preceded by one" is WRONG, and
+ * wrong in a way that leaks. It mis-reads INTRA-WORD emphasis opening after
+ * punctuation: in `known-**unelevated**` the first marker is preceded by `-`
+ * and followed by `u`, so the short rule calls it a closer, and inside an
+ * already-open bold run it closes THAT run instead of opening its own — the
+ * pairing slips by one and the trailing marker leaks raw. CommonMark says such
+ * a run can only OPEN: it is preceded by punctuation and NOT followed by
+ * whitespace or punctuation, so it is not right-flanking. That is the whole
+ * reason both clauses are spelled out below rather than approximated.
  * An opener the source never closed is closed at the end of its own block (see
  * the note at the pairing loop's end); a marker that can neither open nor close
  * is not emphasis at all and stays the literal `**` the source wrote.
  */
+// CommonMark's flanking predicates need three character classes. The start and
+// end of the string count as whitespace (so '' is whitespace, never punctuation),
+// and "punctuation" is ASCII punctuation plus the Unicode punctuation/symbol
+// categories — which is what makes the queue's ⛔/⭐/⚠ glyphs behave like the
+// prose separators they actually are rather than like word characters.
+const isWs = c => c === '' || /\s/.test(c);
+const isPunct = c => c !== '' && /[\p{P}\p{S}]/u.test(c);
+
 function strongify(s) {
   const toks = [];
   const re = /\*\*/g;
@@ -267,12 +286,22 @@ function strongify(s) {
   let m;
   while ((m = re.exec(s)) !== null) {
     toks.push({ text: s.slice(last, m.index) });
+    // CommonMark treats the start/end of the string as whitespace, so an absent
+    // neighbour is '' and both predicates below read it as whitespace.
     const next = s.charAt(m.index + 2);
     const prev = m.index > 0 ? s.charAt(m.index - 1) : '';
+    const nextWs = isWs(next);
+    const prevWs = isWs(prev);
+    const nextPunct = isPunct(next);
+    const prevPunct = isPunct(prev);
+    // left-flanking  = not followed by whitespace, AND (not followed by
+    //                  punctuation OR preceded by whitespace/punctuation)
+    // right-flanking = not preceded by whitespace, AND (not preceded by
+    //                  punctuation OR followed by whitespace/punctuation)
     toks.push({
       delim: true,
-      canOpen: next !== '' && !/\s/.test(next),
-      canClose: prev !== '' && !/\s/.test(prev),
+      canOpen: !nextWs && (!nextPunct || prevWs || prevPunct),
+      canClose: !prevWs && (!prevPunct || nextWs || nextPunct),
     });
     last = m.index + 2;
   }

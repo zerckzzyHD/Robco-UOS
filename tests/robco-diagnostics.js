@@ -51922,6 +51922,43 @@ if (!PLANNING_OK) {
     '246.10f: every block in the real QUEUE.md emits balanced <strong>/</strong> tags (no inverted or dangling run)'
   );
 
+  // ── 246.10g  INTRA-WORD emphasis opening after punctuation (Protocol 13) ──
+  //
+  // THE INCIDENT (found 2026-08-22, live in GV3). The queue wrote
+  // `known-**unelevated**` — valid CommonMark that GitHub renders bold. The
+  // delimiter scanner classified flanking with a SHORTENED rule ("an opener is
+  // followed by a non-space, a closer is preceded by one"), which drops
+  // CommonMark's punctuation clause. That marker is preceded by `-` and followed
+  // by `u`, so the short rule called it a CLOSER; inside an already-open bold run
+  // it closed THAT run, the pairing slipped by one, and the trailing marker
+  // leaked raw. The real rule says it can only OPEN — preceded by punctuation and
+  // NOT followed by whitespace or punctuation is not right-flanking.
+  //
+  // ⚠ THE STANDALONE FORM WAS ALREADY GREEN and is why this hid: with no open run
+  // on the stack the mis-classified marker falls through to canOpen and renders
+  // correctly. Only the nested-inside-bold form is red, so both are asserted here
+  // — the passing one is the control, not decoration.
+  const intraStandalone246 = QV.mdToHtml(['a known-**unelevated** refusal']);
+  const intraNested246 = QV.mdToHtml(['**OUTER: (ii) a known-**unelevated** REFUSAL, rest**']);
+  assert(
+    /a known-<strong>unelevated<\/strong> refusal/.test(intraStandalone246) &&
+      /<strong>OUTER: \(ii\) a known-<strong>unelevated<\/strong> REFUSAL, rest<\/strong>/.test(
+        intraNested246
+      ) &&
+      !intraNested246.includes('**'),
+    '246.10g: bold opening INTRA-WORD after punctuation (`known-**unelevated**`) opens rather than closing an enclosing run — the full CommonMark flanking rule, punctuation clause included (the GV3 leak)'
+  );
+  // The same defect silently INVERTED a second block without leaking any `**`
+  // (`AUTO-TURN-**ON**.`), so a leak-only check could never have caught it —
+  // hence this asserts the tag SHAPE, not merely the absence of a marker.
+  const intraTail246 = QV.mdToHtml(['**A: SWITCHES MUST NEVER AUTO-TURN-**ON**. rest**']);
+  assert(
+    /<strong>A: SWITCHES MUST NEVER AUTO-TURN-<strong>ON<\/strong>\. rest<\/strong>/.test(
+      intraTail246
+    ),
+    '246.10h: the intra-word case that leaked NO marker but inverted the run (`AUTO-TURN-**ON**.`) nests correctly — asserted on tag shape, which is the only thing that could see it'
+  );
+
   // ── titleText strips markdown for display labels ──
   assert(
     QV.titleText('Shipped (accounts → [`QUEUE_LOG.md`](QUEUE_LOG.md))') ===
@@ -52300,52 +52337,117 @@ if (!PLANNING_OK) {
   // `[a-z]?` fixes today's two IDs and silently fails the next new shape exactly
   // as before. What this locks is not "the regex has a `[a-z]?`" but the INVARIANT
   // that the parser sees every ID-bearing heading the raw document contains.
-  const rawScanIds248 = [];
-  for (const line of queueSrc248.replace(/\r\n/g, '\n').split('\n')) {
-    const h = /^#{3}\s+(.*)$/.exec(line);
-    if (!h) continue;
-    // ⛔ The SAME exported constant the parser uses — never a retyped literal.
-    // A second copy is precisely how the pattern drifted out of sync before, so
-    // a divergence here would be invisible to a test that retyped it.
-    const m = h[1].trim().match(QV248.ITEM_ID_RE);
-    if (m) rawScanIds248.push(m[1]);
+  // ⭐ RE-POINTED 2026-08-22 (OA2) — THE PRESENCE-PIN WAS THE WF9 CLASS.
+  //
+  // As written, this asserted `ids248.includes('OM2a') && ids248.includes('OM2b')`
+  // — that two NAMED items are PRESENT in QUEUE.md. That is not an invariant, it
+  // is a snapshot of where two items happened to sit the day the guard was
+  // written. Both have since shipped, and Protocol 50(d) requires a closed item's
+  // body to MOVE to QUEUE_LOG.md and its `###` block to leave QUEUE.md. So the
+  // pin did not merely go stale — it demanded the exact opposite of the queue
+  // discipline that Suite 248.3 enforces one assertion below. For a shipped
+  // sub-lettered item the two guards were mutually unsatisfiable: 248.3 requires
+  // it out of QUEUE.md, 248.4 required it in. The load-bearing clause (parser
+  // count === raw-scan count) was green throughout, before and after the move.
+  //
+  // ⛔ NOTHING IS RELAXED — THE COVERAGE IS STRICTLY WIDER IN THREE WAYS:
+  //  (1) The invariant now runs over QUEUE.md AND QUEUE_LOG.md. An item that
+  //      closes does not fall out of coverage; it is covered on the other side of
+  //      the move. That is what makes this correct in BOTH states, which the
+  //      pin never was.
+  //  (2) Sub-lettered coverage is now GENERIC — every sub-lettered ID the raw
+  //      scan finds anywhere must resolve, rather than two hardcoded names. Today
+  //      that is five real IDs (MI18w, MI18s, WB4a live; OM2a, OM2b closed)
+  //      instead of two, and a sixth new shape is covered on arrival.
+  //  (3) The floor that keeps it non-vacuous now rests on an APPEND-ONLY file.
+  //      QUEUE_LOG.md never loses an account (Protocol 50(d): reasoning is
+  //      relocated, never deleted), so once a sub-lettered ID lands there the
+  //      `>= 1` floor cannot go red the way a QUEUE.md pin does the moment work
+  //      ships. The old pin's failure mode is structurally unavailable here.
+  //
+  // The synthetic parseHeading('OM2a. …') clause below is KEPT VERBATIM: it reads
+  // a literal, depends on no document state, and is the most direct statement of
+  // the parser contract the incident broke.
+  const rawScanIds248 = src => {
+    const out = [];
+    for (const line of String(src).replace(/\r\n/g, '\n').split('\n')) {
+      const h = /^#{3}\s+(.*)$/.exec(line);
+      if (!h) continue;
+      // ⛔ The SAME exported constant the parser uses — never a retyped literal.
+      // A second copy is precisely how the pattern drifted out of sync before, so
+      // a divergence here would be invisible to a test that retyped it.
+      const m = h[1].trim().match(QV248.ITEM_ID_RE);
+      if (m) out.push(m[1]);
+    }
+    return out;
+  };
+  const parserIds248 = src =>
+    QV248.parseQueue(src)
+      .blocks.filter(b => b.type === 'item' && b.id)
+      .map(b => b.id);
+
+  // Both planning documents carry ID-bearing `###` items: QUEUE.md the OPEN ones,
+  // QUEUE_LOG.md the CLOSED accounts. The parser is the same for both.
+  const docs248 = [
+    { name: 'QUEUE.md', raw: rawScanIds248(queueSrc248), parsed: ids248 },
+    { name: 'QUEUE_LOG.md', raw: rawScanIds248(logSrc248), parsed: parserIds248(logSrc248) },
+  ];
+  const dropped248 = [];
+  const mismatched248 = [];
+  for (const d of docs248) {
+    for (const id of d.raw) if (!d.parsed.includes(id)) dropped248.push(`${d.name}:${id}`);
+    if (d.raw.length !== d.parsed.length) {
+      mismatched248.push(`${d.name} parser ${d.parsed.length} vs raw ${d.raw.length}`);
+    }
   }
-  const missedIds248 = rawScanIds248.filter(id => !ids248.includes(id));
-  // ⚠ THE SELF-INTEGRITY FLOOR IS DELIBERATELY TRIVIAL (>= 15), NOT TUNED TO
-  // TODAY'S COUNT — corrected at QR1, 2026-08-13.
-  //
-  // It was `>= 200`, calibrated to the 205 items the live queue happened to hold
-  // the day this suite was written. QR1's whole purpose is to make QUEUE.md
-  // SHRINK: the sweep moved eight closed accounts to QUEUE_LOG.md and took the
-  // board to 197, so the guard went red on the migration SUCCEEDING. The plan
-  // had already named this exact trap for the generator — "a floor tuned to
-  // today's items would start blinding the moment QR1 succeeds and the file
-  // shrinks" — and the generator honoured it (TOO_FEW_ITEMS = 10, plus a
-  // relative parser-vs-raw-scan cross-check). This test did not, so the warning
-  // was recorded in one place and violated in another.
-  //
-  // ⛔ NOTHING LOAD-BEARING IS RELAXED. The real assertion is the RELATIVE one on
-  // the next line — parser count === raw-scan count over the SAME exported
-  // ITEM_ID_RE — plus `missedIds248`, and neither depends on the absolute size.
-  // The floor exists only so a total extraction failure cannot pass vacuously
-  // (0 === 0), which `>= 15` catches exactly as well while tracking nothing.
-  // It matches the sibling floors in 248.2 and 246.2 rather than inventing a
-  // third convention.
+  const rawAll248 = docs248.flatMap(d => d.raw);
+  // The sub-lettered shape itself — letters, digits, ONE trailing lower-case
+  // letter (OM2a, MI18w, WB4a). Derived from the IDs the shared constant already
+  // extracted, so it cannot disagree with the parser about what an ID is.
+  const subLettered248 = rawAll248.filter(id => /[0-9][a-z]$/.test(id));
+  // ⚠ THE FLOOR IS DELIBERATELY TRIVIAL (>= 15), NOT TUNED TO TODAY'S COUNT —
+  // corrected at QR1, 2026-08-13, after a `>= 200` floor went red on QUEUE.md
+  // SHRINKING as intended. It exists only so a total extraction failure cannot
+  // pass vacuously (0 === 0); the real assertions are the relative ones.
   assert(
     QV248.parseHeading('OM2a. ⏭️ THE PREPARED FIRST MISSION').id === 'OM2a' &&
-      ids248.includes('OM2a') &&
-      ids248.includes('OM2b') &&
-      rawScanIds248.length >= 15 &&
-      ids248.length === rawScanIds248.length &&
-      missedIds248.length === 0,
-    '248.4: NO ID-bearing ### heading is silently dropped — parseHeading resolves sub-lettered IDs (OM2a/OM2b), the live model contains both, and the parser\'s ID count equals a raw scan of the source over the SAME exported ITEM_ID_RE (the 2026-08-13 "205 items, parser sees 203" defect)' +
-      (ids248.length !== rawScanIds248.length
-        ? ` — COUNT MISMATCH: parser ${ids248.length} vs raw scan ${rawScanIds248.length}`
+      rawAll248.length >= 15 &&
+      subLettered248.length >= 1 &&
+      mismatched248.length === 0 &&
+      dropped248.length === 0,
+    '248.4: NO ID-bearing ### heading is silently dropped from EITHER planning document — parseHeading resolves sub-lettered IDs, and in QUEUE.md and QUEUE_LOG.md alike the parser\'s ID count equals a raw scan over the SAME exported ITEM_ID_RE (the 2026-08-13 "205 items, parser sees 203" defect)' +
+      (mismatched248.length ? ' — COUNT MISMATCH: ' + mismatched248.join('; ') : '') +
+      (dropped248.length ? ' — DROPPED: ' + dropped248.join(', ') : '') +
+      (rawAll248.length < 15
+        ? ` — only ${rawAll248.length} raw IDs found across both documents (extraction regression?)`
         : '') +
-      (missedIds248.length ? ' — DROPPED: ' + missedIds248.join(', ') : '') +
-      (rawScanIds248.length < 15
-        ? ` — only ${rawScanIds248.length} raw IDs found (extraction regression?)`
+      (subLettered248.length < 1
+        ? ' — NO sub-lettered ID found in either document: the class this guard exists for is no longer exercised by live data, so the check has gone vacuous'
         : '')
+  );
+
+  // ── 248.4b  The sub-lettered class is REALLY the class that was dropped ──
+  //
+  // 248.4 above proves the parser drops nothing TODAY. This proves the corpus
+  // still contains the shape whose loss was the incident — by running the
+  // PRE-INCIDENT pattern over the same live text and requiring it to miss at
+  // least one ID the current parser resolves. Without this, 248.4 could stay
+  // green forever on a corpus that no longer contains a single sub-lettered ID,
+  // and nobody would notice the guard had stopped guarding anything.
+  //
+  // ⛔ This is the ONE place the retired pattern is written down, deliberately, as
+  // a historical fixture — it is never used to parse anything.
+  const legacyIdRe248 = /^([A-Za-z]+[0-9]*)\.\s+/;
+  const legacyWouldDrop248 = subLettered248.filter(id => {
+    const m = `${id}. x`.match(legacyIdRe248);
+    return !m || m[1] !== id;
+  });
+  assert(
+    legacyWouldDrop248.length >= 1 && legacyWouldDrop248.every(id => rawAll248.includes(id)),
+    '248.4b: the live corpus still exercises the dropped class — the pre-incident ID pattern would silently lose at least one ID that the current parser resolves' +
+      (legacyWouldDrop248.length < 1
+        ? ' — it would lose NONE, so 248.4 is now vacuous on the shape it exists to guard'
+        : ` (would lose: ${legacyWouldDrop248.join(', ')})`)
   );
 
   const RG248 = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
