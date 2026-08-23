@@ -260,8 +260,9 @@ function escapeHtml(s) {
  * ⚠ THE FLANKING RULE IS THE FULL ONE, PUNCTUATION CLAUSE INCLUDED — a shorter
  * "opener is followed by a non-space, closer is preceded by one" is WRONG, and
  * wrong in a way that leaks. It mis-reads INTRA-WORD emphasis opening after
- * punctuation: in `known-**unelevated**` the first marker is preceded by `-`
- * and followed by `u`, so the short rule calls it a closer, and inside an
+ * punctuation: in a phrase of the shape `word-**bold**` the first marker is
+ * preceded by `-` and followed by a letter, so the short rule calls it a
+ * closer, and inside an
  * already-open bold run it closes THAT run instead of opening its own — the
  * pairing slips by one and the trailing marker leaks raw. CommonMark says such
  * a run can only OPEN: it is preceded by punctuation and NOT followed by

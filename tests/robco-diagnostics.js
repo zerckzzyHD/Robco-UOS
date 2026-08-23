@@ -51924,39 +51924,44 @@ if (!PLANNING_OK) {
 
   // ── 246.10g  INTRA-WORD emphasis opening after punctuation (Protocol 13) ──
   //
-  // THE INCIDENT (found 2026-08-22, live in GV3). The queue wrote
-  // `known-**unelevated**` — valid CommonMark that GitHub renders bold. The
-  // delimiter scanner classified flanking with a SHORTENED rule ("an opener is
-  // followed by a non-space, a closer is preceded by one"), which drops
-  // CommonMark's punctuation clause. That marker is preceded by `-` and followed
-  // by `u`, so the short rule called it a CLOSER; inside an already-open bold run
-  // it closed THAT run, the pairing slipped by one, and the trailing marker
-  // leaked raw. The real rule says it can only OPEN — preceded by punctuation and
-  // NOT followed by whitespace or punctuation is not right-flanking.
+  // THE INCIDENT (found 2026-08-22, live in the queue). The source wrote a phrase
+  // of the shape `word-**bold**` — bold opening INTRA-WORD, straight after a
+  // hyphen. That is valid CommonMark and GitHub renders it bold. The delimiter
+  // scanner classified flanking with a SHORTENED rule ("an opener is followed by
+  // a non-space, a closer is preceded by one"), which drops CommonMark's
+  // punctuation clause. That marker is preceded by `-` and followed by a letter,
+  // so the short rule called it a CLOSER; inside an already-open bold run it
+  // closed THAT run, the pairing slipped by one, and the trailing marker leaked
+  // raw. The real rule says it can only OPEN — preceded by punctuation and NOT
+  // followed by whitespace or punctuation is not right-flanking.
+  //
+  // ⚠ THE FIXTURES ARE DELIBERATELY ABSTRACT (owner ruling 2026-08-22). They
+  // carry the SHAPE of the two real passages, not their wording — the defect is
+  // in the flanking classification, so `word-**bold**` exercises it exactly as
+  // the original text did. The RED case proves that: reverting the two flanking
+  // predicates fails these assertions unchanged.
   //
   // ⚠ THE STANDALONE FORM WAS ALREADY GREEN and is why this hid: with no open run
   // on the stack the mis-classified marker falls through to canOpen and renders
   // correctly. Only the nested-inside-bold form is red, so both are asserted here
   // — the passing one is the control, not decoration.
-  const intraStandalone246 = QV.mdToHtml(['a known-**unelevated** refusal']);
-  const intraNested246 = QV.mdToHtml(['**OUTER: (ii) a known-**unelevated** REFUSAL, rest**']);
+  const intraStandalone246 = QV.mdToHtml(['a word-**bold** tail']);
+  const intraNested246 = QV.mdToHtml(['**OUTER: a word-**bold** tail, rest**']);
   assert(
-    /a known-<strong>unelevated<\/strong> refusal/.test(intraStandalone246) &&
-      /<strong>OUTER: \(ii\) a known-<strong>unelevated<\/strong> REFUSAL, rest<\/strong>/.test(
-        intraNested246
-      ) &&
+    /a word-<strong>bold<\/strong> tail/.test(intraStandalone246) &&
+      /<strong>OUTER: a word-<strong>bold<\/strong> tail, rest<\/strong>/.test(intraNested246) &&
       !intraNested246.includes('**'),
-    '246.10g: bold opening INTRA-WORD after punctuation (`known-**unelevated**`) opens rather than closing an enclosing run — the full CommonMark flanking rule, punctuation clause included (the GV3 leak)'
+    '246.10g: bold opening INTRA-WORD after punctuation (`word-**bold**`) opens rather than closing an enclosing run — the full CommonMark flanking rule, punctuation clause included'
   );
-  // The same defect silently INVERTED a second block without leaking any `**`
-  // (`AUTO-TURN-**ON**.`), so a leak-only check could never have caught it —
-  // hence this asserts the tag SHAPE, not merely the absence of a marker.
-  const intraTail246 = QV.mdToHtml(['**A: SWITCHES MUST NEVER AUTO-TURN-**ON**. rest**']);
+  // The same defect silently INVERTED a second real block without leaking any
+  // `**` — the closing marker there is followed by a full stop (`WORD-**BOLD**.`),
+  // which is the variant that produced no visible symptom at all. A leak-only
+  // check could never have caught it, so this asserts the tag SHAPE rather than
+  // the absence of a marker.
+  const intraTail246 = QV.mdToHtml(['**A: a compound WORD-**BOLD**. rest**']);
   assert(
-    /<strong>A: SWITCHES MUST NEVER AUTO-TURN-<strong>ON<\/strong>\. rest<\/strong>/.test(
-      intraTail246
-    ),
-    '246.10h: the intra-word case that leaked NO marker but inverted the run (`AUTO-TURN-**ON**.`) nests correctly — asserted on tag shape, which is the only thing that could see it'
+    /<strong>A: a compound WORD-<strong>BOLD<\/strong>\. rest<\/strong>/.test(intraTail246),
+    '246.10h: the intra-word variant closing before a full stop (`WORD-**BOLD**.`) — it leaked NO marker but inverted the run — nests correctly, asserted on tag shape, which is the only thing that could see it'
   );
 
   // ── titleText strips markdown for display labels ──
@@ -52357,8 +52362,8 @@ if (!PLANNING_OK) {
   //      pin never was.
   //  (2) Sub-lettered coverage is now GENERIC — every sub-lettered ID the raw
   //      scan finds anywhere must resolve, rather than two hardcoded names. Today
-  //      that is five real IDs (MI18w, MI18s, WB4a live; OM2a, OM2b closed)
-  //      instead of two, and a sixth new shape is covered on arrival.
+  //      that is five real IDs across the two documents instead of two hardcoded
+  //      names, and a newly-coined shape is covered the moment it appears.
   //  (3) The floor that keeps it non-vacuous now rests on an APPEND-ONLY file.
   //      QUEUE_LOG.md never loses an account (Protocol 50(d): reasoning is
   //      relocated, never deleted), so once a sub-lettered ID lands there the
@@ -52402,8 +52407,9 @@ if (!PLANNING_OK) {
   }
   const rawAll248 = docs248.flatMap(d => d.raw);
   // The sub-lettered shape itself — letters, digits, ONE trailing lower-case
-  // letter (OM2a, MI18w, WB4a). Derived from the IDs the shared constant already
-  // extracted, so it cannot disagree with the parser about what an ID is.
+  // letter (the `OM2a` shape asserted below). Derived from the IDs the shared
+  // constant already extracted, so it cannot disagree with the parser about what
+  // an ID is.
   const subLettered248 = rawAll248.filter(id => /[0-9][a-z]$/.test(id));
   // ⚠ THE FLOOR IS DELIBERATELY TRIVIAL (>= 15), NOT TUNED TO TODAY'S COUNT —
   // corrected at QR1, 2026-08-13, after a `>= 200` floor went red on QUEUE.md
