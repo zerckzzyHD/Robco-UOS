@@ -282,7 +282,17 @@ npm install        # dev dependencies (ESLint, Prettier, Vite, Playwright)
 npm run dev        # Vite dev server with hot reload (typically http://localhost:5173)
 ```
 
-**Testing on a real phone (the fast inner loop).** The dev server binds to loopback, so a phone cannot reach it directly. With [Tailscale](https://tailscale.com/) on both the PC and the phone, `tailscale serve --bg 5173` puts an HTTPS origin with a valid cert on the tailnet in front of it — open that URL on the phone. The HTTPS is the whole point: Chrome grants secure-context only on `https://`, `localhost` and `127.0.0.1`, so over plain HTTP `navigator.serviceWorker` does not exist at all and the entire PWA layer (service worker, update prompt, offline, install-to-home-screen) is untestable. Two settings in `vite.config.mjs` make this work and **both are required**, because each fixes a different half: `server.allowedHosts` names the tailnet hostname (Vite blocks any Host header it was not told about), and `server.host` pins the bind to `127.0.0.1` (Vite defaults to the bare name `localhost`, which resolves to the IPv6 loopback first, leaving nothing on IPv4 for the proxy to reach). The two failures look alike but are not: a bare **502** means the bind is wrong, a **Blocked request** page means the host list is. Fixing only one leaves it just as broken. A different machine or tailnet needs its own `allowedHosts` entry. Requires `tailscale serve` to be running; the config entry alone does nothing. This **complements** the staging deploy below rather than replacing it — staging is still the route for anything other people need to see.
+**Testing on a real phone (the fast inner loop).** One command starts everything:
+
+```bash
+npm.cmd run dev:start     # start Vite detached + ensure the tailnet proxy
+npm.cmd run dev:status    # running? on which branch? is the proxy aimed at it?
+npm.cmd run dev:stop      # stop it and free the port
+```
+
+`npm.cmd`, not `npm` — PowerShell's execution policy blocks `npm.ps1` over SSH; `node scripts/dev-server.js start` works too. The server is started **detached**, so it survives closing the SSH tab, and `dev:start` is safe to re-run: it no-ops if the server is already up and refuses outright rather than stacking a second one on a busy port. It reports the checked-out **branch** and warns loudly when that is not `dev`, but never switches branches for you. It is a detached process and not a service, so it does **not** survive a reboot, the machine sleeping, or Tailscale dropping — run `dev:start` again after any of those.
+
+The dev server binds to loopback, so a phone cannot reach it directly. With [Tailscale](https://tailscale.com/) on both the PC and the phone, `tailscale serve` puts an HTTPS origin with a valid cert on the tailnet in front of it — `dev:start` re-ensures that proxy every time, and you open that URL on the phone. The HTTPS is the whole point: Chrome grants secure-context only on `https://`, `localhost` and `127.0.0.1`, so over plain HTTP `navigator.serviceWorker` does not exist at all and the entire PWA layer (service worker, update prompt, offline, install-to-home-screen) is untestable. Two settings in `vite.config.mjs` make this work and **both are required**, because each fixes a different half: `server.allowedHosts` names the tailnet hostname (Vite blocks any Host header it was not told about), and `server.host` pins the bind to `127.0.0.1` (Vite defaults to the bare name `localhost`, which resolves to the IPv6 loopback first, leaving nothing on IPv4 for the proxy to reach). The two failures look alike but are not: a bare **502** means the bind is wrong, a **Blocked request** page means the host list is. Fixing only one leaves it just as broken. A different machine or tailnet needs its own `allowedHosts` entry. Requires `tailscale serve` to be running; the config entry alone does nothing. This **complements** the staging deploy below rather than replacing it — staging is still the route for anything other people need to see.
 
 ### First Run
 
@@ -309,6 +319,10 @@ This is a **static site** — no build step to run it.
 npm run lint        # ESLint (zero warnings)
 npm run format      # Prettier
 npm run dev         # Vite dev server
+npm run dev:start   # start the dev server DETACHED (survives closing the tab) + ensure the tailnet proxy;
+                    # idempotent, reports the checked-out branch, never switches it
+npm run dev:stop    # stop the detached dev server and free its port (kills the whole process tree)
+npm run dev:status  # branch + whether it is running + whether the tailnet proxy points at it
 npm run gate        # FULL gate: lint + format + Node runner + boot-smoke + render + a11y + test.html
 npm run gate:fast   # Fast subset run by the pre-commit hook
 npm run gate:docs   # CPB4 doc-only push fast path (lint + format + Node runner + static checks, NO browser); selected automatically by the pre-push hook when a push touches only docs

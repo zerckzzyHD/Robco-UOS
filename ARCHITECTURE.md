@@ -172,6 +172,7 @@
 │   ├── gate-scope.js           CPB4 doc-only gate fast path — reads the git pre-push payload, prints DOCS_ONLY only when every changed file is a doc (fail-closed to FULL), so the hook can run `gate:docs` (no browser) on doc-only pushes
 │   ├── check-boot-chain.js     Boot-chain preflight — validates index.html's script order before the browser gate runs
 │   ├── cloud-serialization-check.js Protocol 34 modeled Firestore-write-safety guard (A3) — self-derives the state literal, flags undefined/nested-array/oversize values
+│   ├── dev-server.js           One-step start/stop/status for the local Vite dev server (`npm run dev:start` / `dev:stop` / `dev:status`) — spawns Vite DETACHED so it survives the SSH tab closing, is idempotent (no-ops when already up, REFUSES rather than stacking a second server on a busy port), re-ensures the `tailscale serve` tailnet proxy, and REPORTS the checked-out branch with a loud warning when it is not `dev` — it never switches or stashes anything. Not a service: does not survive a reboot, sleep, or Tailscale dropping
 │   ├── emulator-round-trip-check.js A4 real-Firebase-emulator save→sync→load round-trip (standalone, `npm run test:emulator`, not gated)
 │   ├── generate-architecture-toc.js Protocol 52 — regenerates this file's own Table of Contents from its real headings
 │   ├── generate-code-map.js    Protocol 53 — regenerates library/CODE_MAP.md's three GENERATED sections
