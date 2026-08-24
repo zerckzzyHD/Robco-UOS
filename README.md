@@ -282,6 +282,8 @@ npm install        # dev dependencies (ESLint, Prettier, Vite, Playwright)
 npm run dev        # Vite dev server with hot reload (typically http://localhost:5173)
 ```
 
+**Testing on a real phone (the fast inner loop).** The dev server binds to loopback, so a phone cannot reach it directly. With [Tailscale](https://tailscale.com/) on both the PC and the phone, `tailscale serve --bg 5173` puts an HTTPS origin with a valid cert on the tailnet in front of it — open that URL on the phone. The HTTPS is the whole point: Chrome grants secure-context only on `https://`, `localhost` and `127.0.0.1`, so over plain HTTP `navigator.serviceWorker` does not exist at all and the entire PWA layer (service worker, update prompt, offline, install-to-home-screen) is untestable. Vite’s DNS-rebinding check blocks any hostname it was not told about, so the tailnet host is named in `server.allowedHosts` in `vite.config.mjs` — a different machine or tailnet needs its own entry there. Requires `tailscale serve` to be running; the config entry alone does nothing. This **complements** the staging deploy below rather than replacing it — staging is still the route for anything other people need to see.
+
 ### First Run
 
 1. Open the terminal and let the boot sequence finish.

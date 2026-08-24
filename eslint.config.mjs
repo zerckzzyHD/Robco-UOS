@@ -569,6 +569,7 @@ export default [
       '_site/',
       '*.min.js',
       'eslint.config.mjs',
+      'vite.config.mjs', // local dev-server config (ESM tooling, never shipped)
       'tests/render-check.mjs',
       'tests/render-integrity.mjs',
       'tests/boot-smoke.mjs',
