@@ -163,6 +163,137 @@ function escapeCell(s) {
   return String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
 }
 
+// ── Plain-English row summaries (DERIVED from the source, never authored here) ─
+//
+// A board that lists rows as an ID plus its own heading is unreadable to anyone
+// who has not memorised the IDs — which, months later and at a glance, includes
+// the person who owns the work. Headings here are written as emphasis-laden
+// shorthand for a reader who already has the context. So every listed row now
+// carries one extra line in ordinary prose: what the item is, and what finishing
+// it actually looks like.
+//
+// ⛔ THERE IS NO LOOKUP TABLE HERE AND THERE MUST NEVER BE ONE. An id→description
+// map maintained in this file would be a SECOND COPY of prose whose original
+// lives in the source document, and a second copy drifts — this repo has shipped
+// hand-copied constants that silently fell out of step with the thing they
+// duplicated more than once, including one that stood wrong for eleven days. The
+// summary is therefore EXTRACTED from the item body, or the row is MARKED as not
+// describing itself.
+//
+// ⛔ THERE IS DELIBERATELY NO THIRD BRANCH. A generator that composes a
+// plausible-sounding description for an item that does not contain one is
+// fabricating, and a confident wrong summary is strictly worse than an honest
+// gap: the gap is visible and becomes a worklist, while the fabrication is
+// indistinguishable from a real one and gets believed.
+//
+// The three fields below are the shapes the source actually uses, in preference
+// order — a completion condition, the answer-shaped field that decision items
+// carry instead, and an explicit self-description where the author wrote one.
+// First hit wins; a field that is present but yields nothing readable falls
+// through to the next rather than emitting a stub.
+//
+// ⚠ THE LABEL MUST START ITS OWN LINE (after any leading quote/emphasis/glyph
+// run). An unanchored search matches the same words used mid-sentence — measured
+// on the live corpus, an ordinary prose aside that merely ENDED in one of these
+// field names, with a choice list directly beneath it, was picked up as though it
+// were the field, and the row then carried a summary the item never actually
+// stated. That is the fabrication mode above, arrived at by accident, so the
+// anchor is load-bearing rather than tidy.
+const SUMMARY_FIELDS = [
+  {
+    key: 'done',
+    label: 'Done when',
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Done means\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+  },
+  {
+    key: 'recommendation',
+    label: 'Recommended',
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Recommendation\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+  },
+  {
+    key: 'whatis',
+    label: 'What it is',
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*What it is\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+  },
+];
+
+// A derived summary must clear these to be printed at all. Both are deliberately
+// crude floors against RESIDUE — a field that cleaned down to a bare cross-
+// reference, a lone glyph run, or two words of connective tissue — not an attempt
+// to judge whether prose reads well. Nothing mechanical can measure that, and
+// pretending otherwise is how a check starts reporting a quality it never tested.
+const SUMMARY_MIN_CHARS = 40;
+const SUMMARY_MIN_LETTERS = 25;
+// Long enough to carry a real clause, short enough to read without scrolling on a
+// phone, which is the surface this board is read on.
+const SUMMARY_MAX_CHARS = 180;
+
+/** Printed in place of a summary when the item does not describe itself. */
+const SUMMARY_MISSING =
+  '⛔ _No plain-English summary in the source — this item does not describe itself yet._';
+
+/**
+ * Markdown/emphasis → flat prose.
+ *
+ * ⚠ Decorative glyphs are stripped by UNICODE PROPERTY, not by a listed set. The
+ * parser's exported vocabularies cover status glyphs and one emphasis marker; the
+ * source uses several more decoratively, and a hand-listed strip set here would
+ * be exactly the drifting second copy this whole surface is written to avoid — a
+ * newly-adopted glyph would start leaking into the board with nothing to notice.
+ * A property test needs no maintenance when the source grows a new one.
+ */
+function toPlainProse(md) {
+  const s = String(md)
+    .replace(/^[ \t]*>[ \t]?/gm, '') // blockquote markers
+    .replace(/`+/g, '') // code spans → their content
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → their text
+    .replace(/[*_]{1,3}/g, '') // bold/italic markers
+    .replace(/[\p{Extended_Pictographic}️‍]/gu, ' ');
+  return s
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[\s—·:;,.-]+/, '');
+}
+
+/** Trim to one glance-sized clause, cutting at a clause boundary where there is one. */
+function firstClause(s, max) {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const stop = Math.max(
+    cut.lastIndexOf('; '),
+    cut.lastIndexOf('. '),
+    cut.lastIndexOf(' — '),
+    cut.lastIndexOf(' · ')
+  );
+  return (stop > max * 0.5 ? cut.slice(0, stop) : cut.replace(/\s+\S*$/, '')) + '…';
+}
+
+/**
+ * Derive one plain-English line from an item body, or null when the body carries
+ * no field this can honestly read. `null` is a RESULT, not a failure — it is what
+ * puts the row on the authoring worklist instead of inventing prose for it.
+ */
+function deriveSummary(body) {
+  const text = Array.isArray(body) ? body.join('\n') : String(body || '');
+  for (const f of SUMMARY_FIELDS) {
+    const m = f.re.exec(text);
+    if (!m) continue;
+    // The field runs to the end of its own paragraph.
+    const para = text.slice(m.index + m[0].length).split(/\n\s*\n/)[0];
+    const plain = toPlainProse(para);
+    const letters = (plain.match(/[a-z]/gi) || []).length;
+    if (plain.length < SUMMARY_MIN_CHARS || letters < SUMMARY_MIN_LETTERS) continue;
+    return { key: f.key, label: f.label, text: firstClause(plain, SUMMARY_MAX_CHARS) };
+  }
+  return null;
+}
+
+/** The sub-line printed under a row — a real summary, or the honest gap marker. */
+function summaryLine(summary) {
+  if (!summary) return `  - ${SUMMARY_MISSING}`;
+  return `  - _${summary.label}:_ ${escapeCell(summary.text)}`;
+}
+
 /**
  * The provenance block, emitted by BOTH document shapes and parsed back by
  * `--check`. ONE emitter over one shape, deliberately: `--check` reads the source
@@ -361,7 +492,10 @@ function renderBoard(data, provenance) {
       lines.push('');
       continue;
     }
-    for (const r of rows) lines.push(`- **${escapeCell(r.id)}** — ${escapeCell(r.title)}`);
+    for (const r of rows) {
+      lines.push(`- **${escapeCell(r.id)}** — ${escapeCell(r.title)}`);
+      lines.push(summaryLine(r.summary));
+    }
     lines.push('');
   }
 
@@ -380,9 +514,55 @@ function renderBoard(data, provenance) {
     for (const r of unclassified) {
       const why = r.glyph ? `unknown glyph \`${escapeCell(r.glyph)}\`` : 'no leading glyph';
       lines.push(`- **${escapeCell(r.id)}** — _(${why})_ — ${escapeCell(r.title)}`);
+      lines.push(summaryLine(r.summary));
     }
   }
   lines.push('');
+
+  // ── Plain-English coverage ────────────────────────────────────────────────
+  // ⚠ REPORTED, NOT JUST APPLIED. The count of rows that could NOT be summarised
+  // is the useful half of this feature: it is the difference between "the board
+  // is readable" and "the board is as readable as its source allows, and here is
+  // exactly where the source runs out". Summarised and marked are kept as two
+  // separate numbers and never summed into a coverage percentage that flatters
+  // the surface it measures — the same rule the closed-item block below follows.
+  lines.push('## Plain-English coverage');
+  lines.push('');
+  lines.push(
+    'Each listed row carries a summary derived from the item itself, or an explicit marker saying ' +
+      'the item does not yet describe itself. ⛔ Nothing here is written by the generator: a row ' +
+      'either quotes its own source or admits it cannot. **The marked list is the authoring ' +
+      'worklist.**'
+  );
+  lines.push('');
+  lines.push('| Band | Rows | With a summary | Marked |');
+  lines.push('| ---- | ---: | ---: | ---: |');
+  const markedByBand = [];
+  for (const s of data.statuses) {
+    const rows = banded.get(s.key) || [];
+    if (!rows.length) continue;
+    const withSummary = rows.filter(r => r.summary).length;
+    const marked = rows.filter(r => !r.summary);
+    const label = s.key === BACKLOG_KEY ? `${BACKLOG_LABEL} _(counted, not listed)_` : s.label;
+    lines.push(`| ${label} | ${rows.length} | ${withSummary} | ${marked.length} |`);
+    if (marked.length && s.key !== BACKLOG_KEY) markedByBand.push({ label: s.label, marked });
+  }
+  if (unclassified.length) {
+    const uMarked = unclassified.filter(r => !r.summary);
+    lines.push(
+      `| UNCLASSIFIED | ${unclassified.length} | ${unclassified.length - uMarked.length} | ${uMarked.length} |`
+    );
+    if (uMarked.length) markedByBand.push({ label: 'UNCLASSIFIED', marked: uMarked });
+  }
+  lines.push('');
+  if (markedByBand.length) {
+    lines.push('Items needing a written summary, by band:');
+    lines.push('');
+    for (const b of markedByBand) {
+      lines.push(`- **${b.label}:** ${b.marked.map(r => `\`${escapeCell(r.id)}\``).join(', ')}`);
+    }
+    lines.push('');
+  }
 
   // ── Closed-item discipline ────────────────────────────────────────────────
   // ⚠ PROVED and VIOLATIONS are reported SEPARATELY and never added together.
@@ -507,8 +687,10 @@ function build(planning) {
     if (!r.id) continue;
     const item = byId.get(r.id);
     const title = item ? item.title : content;
-    if (r.band && banded.has(r.band)) banded.get(r.band).push({ id: r.id, title });
-    else unclassified.push({ id: r.id, title, glyph: r.glyph });
+    // Derived from the item's own body; null when it does not describe itself.
+    const summary = item ? deriveSummary(item.body) : null;
+    if (r.band && banded.has(r.band)) banded.get(r.band).push({ id: r.id, title, summary });
+    else unclassified.push({ id: r.id, title, glyph: r.glyph, summary });
   }
 
   if (unclassified.length / idItems.length > UNCLASSIFIABLE_LIMIT) {
@@ -558,6 +740,12 @@ module.exports = {
   STATE_MARKER,
   OUTPUT_NAME,
   toLf,
+  // ⭐ Exported so the suite drives the REAL derivation rather than a restatement
+  // of it — a test that retypes the rule only ever proves the retyped copy.
+  deriveSummary,
+  toPlainProse,
+  SUMMARY_MISSING,
+  SUMMARY_MAX_CHARS,
 };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────

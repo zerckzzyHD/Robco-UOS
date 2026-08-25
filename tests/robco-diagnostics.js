@@ -52958,6 +52958,137 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 248.9  PLAIN-ENGLISH ROW SUMMARIES — derived, or honestly marked ─────────
+//
+// THE PROBLEM. The board listed each row as an ID plus its own heading, and the
+// headings are emphasis-laden shorthand written for a reader who already has the
+// context. The person who owns the work could not read his own board — which
+// matters because the board is what he picks the next task off. A row that cannot
+// be read is a row that cannot be chosen.
+//
+// ⛔ THE FIX HAD EXACTLY ONE DISHONEST SHAPE AVAILABLE, and these tests exist to
+// keep it unavailable: an id→description table maintained in the generator. That
+// is a second copy of prose whose original lives in the source document, and this
+// repo has shipped hand-copied constants that silently fell out of step with the
+// thing they duplicated. So a summary is EXTRACTED from the item body or the row
+// is MARKED — never composed. 248.9c is the load-bearing one: it proves the
+// extractor refuses text the item did not actually state as its summary.
+//
+// Fixture-driven and tree-independent, like 248.7/248.8 — it runs everywhere,
+// including on a clone with no planning tree.
+{
+  const RG248c = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+
+  const longTail248c =
+    'and then a great deal more qualifying prose that runs well past the cap '.repeat(6);
+  let src248c = '# Fixture Queue\n\n';
+  src248c +=
+    '### D1. ⏭️ a ready item\n\npreamble prose\n\n**Done means:** the widget is rebuilt from its own source and the stale duplicate is deleted, with a recorded before-and-after.\n\n';
+  src248c +=
+    '### D2. ⏭️ an item that never says what it is\n\nprose that names no field of any recognised kind whatsoever.\n\n';
+  // ⚠ THE FALSE-POSITIVE FIXTURE, and it is deliberately ABSTRACT. The shape is a
+  // bolded prose aside that happens to END in the field's own name, with a choice
+  // list directly beneath it. An unanchored search reads those words as a label
+  // and adopts the list as though the item had stated it as its summary — measured
+  // happening on the real corpus before the anchor went in. The defect is in the
+  // ANCHORING, not in any particular wording, so a synthetic passage exercises it
+  // exactly as the original did and no source phrasing needs to travel here.
+  // ⚠ NO BLANK LINE between the aside and the list — that spacing IS the fixture.
+  // An earlier draft put one there and the test passed against a BROKEN extractor:
+  // the blank line made the harvested paragraph empty, so the length floor rejected
+  // it and the anchor was never exercised at all. The re-break caught it — removing
+  // the anchor left this green. A fixture that does not reproduce the defect proves
+  // only that the code runs.
+  src248c +=
+    '### D3. ⏭️ an item whose prose merely mentions the word\n\n**Two ways forward, with a recommendation:**\n- (A) LEAVE IT ALONE — the current value is correct and the note beside it explains why.\n\n';
+  src248c +=
+    '### D4. ⚠️ a decision item\n\n⭐ **Recommendation:** ⭐⭐ **NOW.** It is cheap, it closes a real hole, and both independent reviews landed on the same answer.\n\n';
+  src248c +=
+    '### D5. ⏭️ a noisy item\n\n**Done means:** ⛔ the `renderer` stops leaking **markers** and [the board](QUEUE_LOG.md#x) reads cleanly for somebody who has never seen this identifier before.\n\n';
+  src248c += `### D6. ⏭️ a very long one\n\n**Done means:** ${longTail248c}\n\n`;
+  for (let i = 1; i <= 12; i++)
+    src248c += `### B${i}. ⬜ backlog ${i}\n\n**Done means:** a backlog item that does describe itself in full sentences.\n\n`;
+
+  const built248c = RG248c.build({ readPlanningFile: () => src248c, describe: () => 'fixture' });
+  const txt248c = built248c.blind ? '' : built248c.text;
+  const subLine248c = id => {
+    const m = new RegExp(`^- \\*\\*${id}\\*\\*[^\\n]*\\n([^\\n]*)$`, 'm').exec(txt248c);
+    return m ? m[1] : null;
+  };
+
+  assert(
+    !built248c.blind &&
+      /^ {2}- _Done when:_ the widget is rebuilt from its own source/m.test(
+        subLine248c('D1') || ''
+      ),
+    '248.9a: a row whose item carries a completion condition gains a plain-English sub-line quoting THAT text — the board stops being a list of identifiers only its author can read' +
+      ` — got: ${JSON.stringify(subLine248c('D1'))}`
+  );
+
+  assert(
+    (subLine248c('D2') || '').includes(RG248c.SUMMARY_MISSING),
+    '248.9b: an item that does not describe itself is MARKED as such rather than given invented prose — the gap is printed, because a visible gap becomes an authoring worklist while a fabricated summary is indistinguishable from a real one' +
+      ` — got: ${JSON.stringify(subLine248c('D2'))}`
+  );
+
+  // ⭐ THE LOAD-BEARING ONE. Red-then-green on the real failure mode: without the
+  // line anchor the extractor adopted a prose aside and printed an "answer" the
+  // item never gave.
+  assert(
+    (subLine248c('D3') || '').includes(RG248c.SUMMARY_MISSING) &&
+      !txt248c.includes('LEAVE IT ALONE') &&
+      RG248c.deriveSummary([
+        '**Two ways forward, with a recommendation:**',
+        '- (A) LEAVE IT ALONE — the current value is correct and the note beside it explains why.',
+      ]) === null,
+    '248.9c: a mid-sentence mention of a field name is NOT harvested as that field — the label must open its own line, so the board can never attribute to an item a summary the item never stated (the fabrication mode, reached by accident)' +
+      ` — got: ${JSON.stringify(subLine248c('D3'))}`
+  );
+
+  assert(
+    /^ {2}- _Recommended:_ NOW\./m.test(subLine248c('D4') || ''),
+    '248.9d: a decision item is summarised from its recommendation — the band the owner is asked to act on is served by the field those items actually carry, not left blank because they carry no completion condition' +
+      ` — got: ${JSON.stringify(subLine248c('D4'))}`
+  );
+
+  const noisy248c = subLine248c('D5') || '';
+  assert(
+    noisy248c.includes('the board') &&
+      !noisy248c.includes('QUEUE_LOG.md#x') &&
+      !/[*`>]/.test(noisy248c.replace(/^ {2}- _[^_]*_/, '')) &&
+      !/\p{Extended_Pictographic}/u.test(noisy248c),
+    '248.9e: the derived line is flat prose — emphasis markers, code ticks, quote markers and decorative glyphs are gone and a link keeps its TEXT but loses its target; glyphs are stripped by Unicode property, so a newly-adopted one cannot start leaking through' +
+      ` — got: ${JSON.stringify(noisy248c)}`
+  );
+
+  const long248c = subLine248c('D6') || '';
+  assert(
+    long248c.endsWith('…') && long248c.length < RG248c.SUMMARY_MAX_CHARS + 40,
+    '248.9f: an over-long summary is cut to one glance-sized clause and visibly elided — the board is read on a phone, and an un-trimmed paragraph per row rebuilds the wall of text this whole surface exists to replace' +
+      ` — length ${long248c.length}`
+  );
+
+  // The counted band must stay counted: summaries are computed for it (they feed
+  // the coverage table) but must never re-enumerate the band the QR3 decision
+  // deliberately collapsed — the sub-lines are the obvious way that leaks back in.
+  const backlogSubs248c = (txt248c.match(/^ {2}- _Done when:_ a backlog item/gm) || []).length;
+  assert(
+    backlogSubs248c === 0 && /^## .* Backlog — 12 items$/m.test(txt248c),
+    '248.9g: the counted band emits ZERO summary sub-lines — adding a per-row line must not re-list the one band that is deliberately a number, which is exactly how a collapsed band grows back' +
+      ` — ${backlogSubs248c} leaked`
+  );
+
+  // Coverage is REPORTED, and the two numbers stay separate — a single "% readable"
+  // would flatter the surface it measures, the same reason the closed-item block
+  // never sums proved and violations.
+  assert(
+    /^## Plain-English coverage$/m.test(txt248c) &&
+      /\| Ready \| 5 \| 3 \| 2 \|/.test(txt248c) &&
+      /- \*\*Ready:\*\* `D2`, `D3`/.test(txt248c),
+    '248.9h: the board reports summarised vs MARKED per band and names the marked items — the count of rows the source could not describe is the honest half of this feature, and it is the worklist for writing them'
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the
