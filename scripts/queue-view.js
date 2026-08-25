@@ -338,18 +338,82 @@ function strongify(s) {
   );
 }
 
+/**
+ * CODE SPANS — a backtick-RUN scanner, not two hardcoded regexes.
+ *
+ * The original pass matched double-backtick spans first and single ones second,
+ * because QUEUE.md writes ``code with `backticks` inside`` and pairing singles
+ * first would mis-pair and swallow everything after. That ordering fixed the
+ * two-backtick case by naming it, which means every OTHER run length was still
+ * mis-read — and a run of THREE is the one the corpus actually grew. The double
+ * pass ate two of its backticks and left an orphaned third to pair with the next
+ * single backtick in the block, cutting every following code span one marker out
+ * of phase (see the fenced-block note below — that is how a raw `**` escaped).
+ *
+ * CommonMark's actual rule needs no special cases: a code span opens with a
+ * backtick run of length N and closes at the next run of EXACTLY N. A run with
+ * no equal-length partner is not a delimiter at all and stays literal. One
+ * leading and one trailing space are stripped when both are present and the
+ * content is not all spaces, which is what lets ``` `x` ``` render as `x`.
+ */
+function stashCodeSpans(raw, stash) {
+  let out = '';
+  let i = 0;
+  while (i < raw.length) {
+    if (raw[i] !== '`') {
+      out += raw[i];
+      i++;
+      continue;
+    }
+    let openEnd = i;
+    while (openEnd < raw.length && raw[openEnd] === '`') openEnd++;
+    const run = openEnd - i;
+    let k = openEnd;
+    let close = -1;
+    while (k < raw.length) {
+      if (raw[k] !== '`') {
+        k++;
+        continue;
+      }
+      let e = k;
+      while (e < raw.length && raw[e] === '`') e++;
+      if (e - k === run) {
+        close = k;
+        break;
+      }
+      k = e;
+    }
+    if (close === -1) {
+      // No equal-length partner: these backticks are literal text, not a span.
+      out += raw.slice(i, openEnd);
+      i = openEnd;
+      continue;
+    }
+    let content = raw.slice(openEnd, close);
+    // ⚠ PADDING IS STRIPPED ONLY FOR MULTI-BACKTICK RUNS, and that is deliberate
+    // rather than sloppy CommonMark. The padding space exists to let a span hold
+    // a leading/trailing backtick — ``` `x` ``` → `x` — which is a two-backtick
+    // concern; a single-backtick span has nothing to escape. Applying it to
+    // single spans as well was MEASURED against the live corpus and rewrote nine
+    // blocks whose source carries an unbalanced backtick: already-broken output
+    // becoming differently-broken output, for no readability gain. Restricting it
+    // here keeps the run-length fix below to the two blocks it genuinely repairs.
+    if (run >= 2 && /^[ \n]/.test(content) && /[ \n]$/.test(content) && /[^ \n]/.test(content)) {
+      content = content.slice(1, -1);
+    }
+    out += stash(content);
+    i = close + run;
+  }
+  return out;
+}
+
 function inline(raw) {
   const codes = [];
   const stash = c => {
     codes.push(escapeHtml(c));
     return `@@C${codes.length - 1}@@`;
   };
-  // DOUBLE-backtick code spans FIRST — QUEUE.md uses double-backtick spans to
-  // show inline code that itself contains backticks; matching single-backticks
-  // first would mis-pair and corrupt everything after it (swallowing later bold
-  // into a broken code span). Trim one CommonMark padding space. THEN single.
-  let s = raw.replace(/``\s?([\s\S]+?)\s?``/g, (_m, c) => stash(c));
-  s = s.replace(/`([^`]+)`/g, (_m, c) => stash(c));
+  let s = stashCodeSpans(raw, stash);
   s = escapeHtml(s);
   // links [text](url) — url is attribute-escaped; text keeps its (already escaped) content
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, t, u) => {
@@ -365,6 +429,97 @@ function inline(raw) {
   s = s.replace(/@@C(\d+)@@/g, (_m, i) => `<code>${codes[+i]}</code>`);
   return s;
 }
+
+/**
+ * FENCED CODE BLOCKS — a BLOCK construct, so it must be consumed before any
+ * inline rule ever sees it.
+ *
+ * ⚠ WITHOUT THIS, A ``` FENCE DOES NOT MERELY RENDER UGLY — IT CORRUPTS THE
+ * PROSE AFTER IT. `inline()` stashes double-backtick spans before single ones,
+ * and a three-backtick fence is not a code span at all: the double-backtick
+ * pass matched two of the three, leaving a STRAY THIRD backtick behind. That
+ * orphan then paired with the next single backtick in the same block, so every
+ * following code span was cut one marker out of phase — swallowing whole runs
+ * of prose (bold markers included) into bogus <code> spans until a `**` was
+ * finally left outside one and leaked raw. Found 2026-08-24: the leak surfaced
+ * in ONE block, but the mis-pairing was silently mangling every fence-bearing
+ * block in the corpus, the same way the flanking bug was silently inverting a
+ * second block before it.
+ *
+ * The rule below is deliberately narrow — an opening fence is 3+ BACKTICKS at
+ * the start of a line with an optional info string and no further backticks;
+ * a closing fence is 3+ backticks alone on a line, at least as long as the
+ * opener. Tilde fences are not supported: they are absent from the corpus and,
+ * carrying no backticks, they cannot produce the mis-pairing this exists to
+ * stop. An unclosed fence runs to the end of its block, which is both what
+ * CommonMark does and what an author who forgets a closer evidently meant.
+ *
+ * Fence content is escaped and emitted VERBATIM — never inlined — so nothing a
+ * code block contains can reach the emphasis or code-span scanners at all.
+ */
+const FENCE_RE = /^\s*(`{3,})\s*([^`]*)$/;
+const FENCE_CLOSE_RE = /^\s*(`{3,})\s*$/;
+
+/**
+ * Consume the fenced block that opens at `L[start]`. Returns the rendered HTML
+ * and the index of the first line AFTER the block.
+ */
+function takeFence(L, start) {
+  const marker = FENCE_RE.exec(L[start])[1];
+  const lines = [];
+  let i = start + 1;
+  for (; i < L.length; i++) {
+    const close = FENCE_CLOSE_RE.exec(L[i]);
+    if (close && close[1].length >= marker.length) {
+      i++;
+      break;
+    }
+    lines.push(L[i]);
+  }
+  return { html: `<pre><code>${escapeHtml(lines.join('\n'))}</code></pre>`, next: i };
+}
+
+/**
+ * Render the inside of a blockquote (its `>` markers already stripped).
+ *
+ * A quote's lines are inline()d as ONE run so a bold or code span that wraps
+ * across `>` lines is never split. A fenced code block is the one thing that
+ * cannot go through that run, so the buffer is cut into fence / prose segments
+ * and only the prose segments are inlined.
+ *
+ * ⭐ A quote containing NO fence takes the original single-inline path
+ * unchanged, byte for byte — which is what keeps this fix off every block that
+ * has no code block in it.
+ */
+function quoteInner(buf) {
+  const proseHtml = seg => inline(seg.join('\n')).replace(/\n/g, '<br>');
+  if (!buf.some(l => FENCE_RE.test(l))) return proseHtml(buf);
+  const parts = [];
+  let seg = [];
+  const flushSeg = () => {
+    // Blank lines abutting a fence would otherwise emit a stray <br> against
+    // the <pre>; blanks BETWEEN prose lines still become <br> as before.
+    while (seg.length && /^\s*$/.test(seg[0])) seg.shift();
+    while (seg.length && /^\s*$/.test(seg[seg.length - 1])) seg.pop();
+    if (seg.length) parts.push(proseHtml(seg));
+    seg = [];
+  };
+  let i = 0;
+  while (i < buf.length) {
+    if (FENCE_RE.test(buf[i])) {
+      flushSeg();
+      const f = takeFence(buf, i);
+      parts.push(f.html);
+      i = f.next;
+      continue;
+    }
+    seg.push(buf[i]);
+    i++;
+  }
+  flushSeg();
+  return parts.join('');
+}
+
 function mdToHtml(bodyLines) {
   const out = [];
   let i = 0;
@@ -374,6 +529,13 @@ function mdToHtml(bodyLines) {
     const line = L[i];
     if (isBlank(line)) {
       i++;
+      continue;
+    }
+    // fenced code block — consumed FIRST, before anything can inline it
+    if (FENCE_RE.test(line)) {
+      const f = takeFence(L, i);
+      out.push(f.html);
+      i = f.next;
       continue;
     }
     // sub-heading (#### and deeper) inside a body
@@ -392,7 +554,7 @@ function mdToHtml(bodyLines) {
         buf.push(L[i].replace(/^\s*>\s?/, ''));
         i++;
       }
-      out.push(`<blockquote>${inline(buf.join('\n')).replace(/\n/g, '<br>')}</blockquote>`);
+      out.push(`<blockquote>${quoteInner(buf)}</blockquote>`);
       continue;
     }
     // unordered list (with one level of nesting by indentation)
@@ -418,7 +580,13 @@ function mdToHtml(bodyLines) {
   return out.join('\n');
 }
 function isSpecial(s) {
-  return /^\s*[-*]\s+/.test(s) || /^\s*\d+\.\s+/.test(s) || /^\s*>/.test(s) || /^#{1,6}\s+/.test(s);
+  return (
+    /^\s*[-*]\s+/.test(s) ||
+    /^\s*\d+\.\s+/.test(s) ||
+    /^\s*>/.test(s) ||
+    /^#{1,6}\s+/.test(s) ||
+    FENCE_RE.test(s)
+  );
 }
 // Render a list starting at index `start`; sets renderList.lastIndex to the line
 // after the list. Handles one nesting level via leading-space depth. Each list
@@ -652,6 +820,10 @@ summary:active{background:#17201a}
 .it-body ul,.it-body ol{margin:.4em 0; padding-left:20px}
 .it-body li{margin:.3em 0}
 .it-body blockquote{margin:.5em 0; padding:.3em 0 .3em 11px; border-left:2px solid var(--line); color:var(--dim)}
+.it-body pre{margin:.5em 0; padding:7px 9px; background:#0a0d0b; border:1px solid var(--line);
+  border-radius:4px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+.it-body pre code{background:none; border:0; border-radius:0; padding:0; white-space:pre;
+  word-break:normal; font-size:.84em; line-height:1.45}
 .it-body .subh{font-weight:700; color:#cfe; margin:.7em 0 .2em}
 .it-body strong{color:#fff}
 /* status accents on the ID badge / glyph — generated from STATUSES */
@@ -666,6 +838,7 @@ ${statusShow}
   :root{--bg:#f4f1e8; --bg2:#fff; --card:#fffdf7; --card2:#fbf7ec; --ink:#22281f;
     --dim:#5d6b57; --line:#d9d2bf; --acc:#1f7a45; --acc2:#0b6a8f}
   code{background:#efeadd; color:#245}
+  .it-body pre{background:#efeadd}
   .item[open]{background:#fffdf7}
 }
 </style>

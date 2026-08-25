@@ -52016,6 +52016,131 @@ if (!PLANNING_OK) {
       QV.parseHeading('WASTELAND UPLINK').id === null,
     '246.16: ITEM_ID_RE is exported, non-global (no sticky lastIndex across shared calls), and matches sub-lettered IDs (OM2a/OM2b) as well as the plain forms — while a heading with no ID token still yields id:null'
   );
+
+  // ── 246.17  FENCED CODE BLOCKS (Protocol 13 — the second 246.7 failure) ──
+  // mdToHtml() had no block-level fence handling at all, so a ``` fence reached
+  // inline(). Its double-backtick pass consumed TWO of the three backticks and
+  // left a stray THIRD, which then paired with the next single backtick in the
+  // same block — every following code span cut one marker out of phase, prose
+  // (bold markers included) swallowed into bogus <code> spans, and eventually a
+  // raw `**` left outside one. That is what re-reddened 246.7 on 2026-08-24.
+  //
+  // ⚠ 246.7 is a LIVE-CORPUS assertion: it only sees the defect while a document
+  // in another repo happens to contain the triggering shape. These fixtures are
+  // synthetic on purpose, so the lock survives that document changing again.
+  const FENCE = '`'.repeat(3);
+
+  // (a) The exact AF6 shape: a fence INSIDE a blockquote, prose with bold and
+  //     inline code after it. Before the fix the bold was swallowed whole.
+  const bqFence246 = QV.mdToHtml([
+    '> lead line',
+    '>',
+    '> ' + FENCE,
+    '> --flag : Number(c)',
+    '> ' + FENCE,
+    '>',
+    '> tail with **bold** and `code` after the block',
+  ]);
+  assert(
+    /<pre><code>--flag : Number\(c\)<\/code><\/pre>/.test(bqFence246) &&
+      /<strong>bold<\/strong>/.test(bqFence246) &&
+      /<code>code<\/code>/.test(bqFence246) &&
+      !stripCodeSpans246(bqFence246.replace(/<pre>[\s\S]*?<\/pre>/g, '')).includes('`'),
+    '246.17a: a fenced code block INSIDE a blockquote renders as <pre><code> and the prose AFTER it still resolves its bold and its inline code — the stray third backtick that used to cut every following code span out of phase is gone (the 2026-08-24 AF6 leak)'
+  );
+
+  // (b) The fence is a BLOCK boundary and its info string is not content. A
+  //     ```js opener must not put "js" inside the code, and a fence that abuts
+  //     a paragraph line with no blank between must not be swallowed into it —
+  //     the paragraph gatherer stops at a fence because isSpecial() says so.
+  const infoFence246 = QV.mdToHtml(['prose line', FENCE + 'js', 'const x = 1;', FENCE]);
+  assert(
+    /<p>prose line<\/p>/.test(infoFence246) &&
+      /<pre><code>const x = 1;<\/code><\/pre>/.test(infoFence246) &&
+      !/js\s*const x/.test(infoFence246),
+    '246.17b: a fence is a BLOCK boundary — an abutting paragraph is closed rather than swallowing it, and the ```js info string is consumed as the opener rather than emitted as the first line of code'
+  );
+
+  // (c) Fence content is emitted VERBATIM — never inlined. A `**` or a backtick
+  //     inside a code block is data, and must not reach the emphasis scanner.
+  const verbatim246 = QV.mdToHtml([FENCE, 'not **bold** and `not code` <b>escaped</b>', FENCE]);
+  assert(
+    /<pre><code>not \*\*bold\*\* and `not code` &lt;b&gt;escaped&lt;\/b&gt;<\/code><\/pre>/.test(
+      verbatim246
+    ),
+    '246.17c: fence content is escaped and emitted verbatim — "**", backticks and HTML inside a code block stay literal and never reach the inline scanners'
+  );
+
+  // (d) The non-regression lock, and the reason this fix is safe on a corpus it
+  //     cannot fully eyeball: a block with NO fence takes the ORIGINAL path,
+  //     byte for byte. Measured across the live corpus the change touched only
+  //     the fence-bearing blocks (9 of 506 in QUEUE.md); this pins the rule.
+  const noFence246 = [
+    '> quoted **bold that',
+    '> wraps** across lines with `code`',
+    '',
+    '- a list item with **bold**',
+    '',
+    'a paragraph with `code` and **bold**',
+  ];
+  assert(
+    QV.mdToHtml(noFence246) ===
+      [
+        '<blockquote>quoted <strong>bold that<br>wraps</strong> across lines with <code>code</code></blockquote>',
+        '<ul><li>a list item with <strong>bold</strong></li></ul>',
+        '<p>a paragraph with <code>code</code> and <strong>bold</strong></p>',
+      ].join('\n'),
+    '246.17d: a block containing NO fence renders exactly as it did before fence support existed — blockquote wrap, list and paragraph output byte-identical, so the fence branch can never be a silent rewrite of prose it was not meant to touch'
+  );
+
+  // (e) An unclosed fence runs to the end of its own block (CommonMark), rather
+  //     than leaking its marker or bleeding into the next block — the same
+  //     end-of-block containment 246.10e gives an unclosed bold opener.
+  const unclosedFence246 = QV.mdToHtml(['intro', '', FENCE, 'still code', 'still code 2']);
+  assert(
+    /<pre><code>still code\nstill code 2<\/code><\/pre>$/.test(unclosedFence246) &&
+      !unclosedFence246.replace(/<pre>[\s\S]*?<\/pre>/g, '').includes('`'),
+    '246.17e: an unclosed fence is closed at the end of its own block and never leaks its backticks — the containment 246.10e gives an unclosed bold opener, applied to the block construct'
+  );
+
+  // ── 246.18  CODE SPANS PAIR BY RUN LENGTH (Protocol 42) ──
+  // Found while building 246.17: the fence branch stops a ``` fence reaching
+  // inline(), but the mis-pairing UNDERNEATH it was still there. inline() paired
+  // double-backtick spans with one regex and single ones with another, so it had
+  // hardcoded exactly two run lengths and mis-read every other. CommonMark's rule
+  // is one rule: a run of N opens, the next run of EXACTLY N closes, and a run
+  // with no equal-length partner is literal text. Verdict: REAL shipped path, not
+  // a harness artifact — rendering the live corpus through the fixed scanner
+  // repairs two blocks that were silently mangled (one of them losing a <strong>
+  // outright) and changes nothing else.
+  const spans246 = QV.mdToHtml(['a `one` and ``two `inner` two`` and `three` done']);
+  assert(
+    /<code>one<\/code>/.test(spans246) &&
+      /<code>two `inner` two<\/code>/.test(spans246) &&
+      /<code>three<\/code>/.test(spans246) &&
+      !spans246.replace(/<code>[\s\S]*?<\/code>/g, '').includes('`'),
+    '246.18a: single- and double-backtick code spans in one line each pair with their own equal-length partner — the double span keeps its inner backticks and no stray backtick is left outside a <code>'
+  );
+  const oddRun246 = QV.mdToHtml(['x `a ' + FENCE + ' b` y']);
+  assert(
+    /<code>a ``` b<\/code>/.test(oddRun246) &&
+      !oddRun246.replace(/<code>[\s\S]*?<\/code>/g, '').includes('`'),
+    '246.18b: a longer backtick run INSIDE a single-backtick span is content, not a delimiter — the span closes at the next run of length 1, which is the pairing the two-regex pass could not express and the reason a stray backtick used to escape'
+  );
+  const lonely246 = QV.mdToHtml(['a `unpaired backtick run stays literal']);
+  assert(
+    /^<p>a `unpaired backtick run stays literal<\/p>$/.test(lonely246),
+    '246.18c: a backtick run with no equal-length partner is literal text, never an unterminated span that swallows the rest of the block'
+  );
+  // The padding rule is deliberately NOT CommonMark-wide — see the note at the
+  // strip. It exists so a span can HOLD a backtick, which is a multi-run
+  // concern; widening it to single spans was measured to rewrite nine
+  // already-malformed corpus blocks for no gain, so this pins both halves.
+  const pad246 = QV.mdToHtml(['see `` `x` `` and also ` y ` here']);
+  assert(
+    /<code>`x`<\/code>/.test(pad246) && /<code> y <\/code>/.test(pad246),
+    '246.18d: one padding space is stripped from a MULTI-backtick span (so `` `x` `` can hold its backticks) and deliberately NOT from a single-backtick span — the divergence from CommonMark is the measured one, kept so the fix touches no already-malformed block'
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
