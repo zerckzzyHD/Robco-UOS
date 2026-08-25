@@ -203,17 +203,17 @@ const SUMMARY_FIELDS = [
   {
     key: 'done',
     label: 'Done when',
-    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Done means\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Done means\b[ \t]*(\([^)\n]*\))?[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
   },
   {
     key: 'recommendation',
     label: 'Recommended',
-    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Recommendation\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*Recommendation\b[ \t]*(\([^)\n]*\))?[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
   },
   {
     key: 'whatis',
     label: 'What it is',
-    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*What it is\b[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
+    re: /^[ \t>*_\p{Extended_Pictographic}️‍]*What it is\b[ \t]*(\([^)\n]*\))?[ \t]*[:.]?[ \t]*(?:\*\*)?/imu,
   },
 ];
 
@@ -244,15 +244,30 @@ const SUMMARY_MISSING =
  */
 function toPlainProse(md) {
   const s = String(md)
+    // ⛔ STRUCK-THROUGH TEXT IS REMOVED HERE, AS THE FLOOR OF THE DEFENCE. The
+    // source strikes a clause when that clause has been DISCHARGED, so struck
+    // words are the one kind of text that must never reach a summary: a row
+    // rendering crossed-out prose where the remaining work belongs reads as
+    // "nothing is left on this item", which is the opposite of true. Stripping it
+    // in the shared cleaner means no future harvesting path can reintroduce the
+    // leak by forgetting; the clause-level rule in deriveSummary is the sharper
+    // instrument layered on top, not the only thing standing between the two.
+    .replace(/~~[\s\S]*?~~/g, ' ') // struck spans → gone, not unwrapped
+    .replace(/~~/g, '') // an unpaired marker never survives as punctuation
     .replace(/^[ \t]*>[ \t]?/gm, '') // blockquote markers
     .replace(/`+/g, '') // code spans → their content
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // links → their text
     .replace(/[*_]{1,3}/g, '') // bold/italic markers
     .replace(/[\p{Extended_Pictographic}️‍]/gu, ' ');
-  return s
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[\s—·:;,.-]+/, '');
+  return (
+    s
+      .replace(/\s+/g, ' ')
+      // Glyph removal leaves gaps against brackets ("( rescued …"); close them up.
+      .replace(/\(\s+/g, '(')
+      .replace(/\s+\)/g, ')')
+      .trim()
+      .replace(/^[\s—·:;,.-]+/, '')
+  );
 }
 
 /** Trim to one glance-sized clause, cutting at a clause boundary where there is one. */
@@ -273,17 +288,105 @@ function firstClause(s, max) {
  * no field this can honestly read. `null` is a RESULT, not a failure — it is what
  * puts the row on the authoring worklist instead of inventing prose for it.
  */
+/** Field label, carrying the source's own scope qualifier when it stated one. */
+function label(field, pick) {
+  return pick.scope ? `${field.label} ${pick.scope}` : field.label;
+}
+
 function deriveSummary(body) {
-  const text = Array.isArray(body) ? body.join('\n') : String(body || '');
-  for (const f of SUMMARY_FIELDS) {
-    const m = f.re.exec(text);
-    if (!m) continue;
-    // The field runs to the end of its own paragraph.
-    const para = text.slice(m.index + m[0].length).split(/\n\s*\n/)[0];
-    const plain = toPlainProse(para);
+  const lines = Array.isArray(body) ? body : String(body || '').split('\n');
+  /** Cleaned text, or null when it does not clear the residue floors. */
+  const usable = raw => {
+    const plain = toPlainProse(raw);
     const letters = (plain.match(/[a-z]/gi) || []).length;
-    if (plain.length < SUMMARY_MIN_CHARS || letters < SUMMARY_MIN_LETTERS) continue;
-    return { key: f.key, label: f.label, text: firstClause(plain, SUMMARY_MAX_CHARS) };
+    if (plain.length < SUMMARY_MIN_CHARS || letters < SUMMARY_MIN_LETTERS) return null;
+    return plain;
+  };
+  for (const f of SUMMARY_FIELDS) {
+    // Every line this label opens, with the indent that says whether it is the
+    // ITEM's own field or one belonging to a nested sub-item beneath it.
+    const hits = [];
+    lines.forEach((line, i) => {
+      const m = f.re.exec(line);
+      if (m) {
+        hits.push({
+          i,
+          indent: (line.match(/^[ \t]*/) || [''])[0].length,
+          after: line.slice(m[0].length),
+          // ⭐ The label's own parenthetical SCOPE, where it carries one. Surfaced
+          // rather than swallowed: an item may state several completion conditions,
+          // each scoped to a different part of itself, and a row showing one of them
+          // unlabelled reads as though it were the whole item's condition. Printing
+          // the author's own qualifier is the difference between a partial answer
+          // and a wrong one — and it is the item's text, never the generator's.
+          scope: m[1] ? toPlainProse(m[1]) : '',
+        });
+      }
+    });
+    if (!hits.length) continue;
+    // ⭐ TOP-LEVEL WINS OVER DOCUMENT ORDER. A long item can carry a sub-item that
+    // states its OWN completion condition, and first-match-wins then describes the
+    // whole item by a nested detail — measured live, one item was summarised by a
+    // sub-item's clause while its own sat further down the same body.
+    //
+    // ⚠ INDENTATION WAS VERIFIED AS THE DISCRIMINATOR BEFORE BEING TRUSTED, not
+    // assumed: across the live corpus these labels land at column 0 in all but a
+    // handful of cases, the distribution is bimodal rather than graded, and NO item
+    // has only indented labels — so preferring column 0 can never strand an item
+    // that would otherwise have had a summary. `|| hits[0]` keeps that promise
+    // structural rather than statistical: if such an item ever appears, it falls
+    // back to the nested clause instead of silently losing its row.
+    //
+    // ⚠ AMONG TOP-LEVEL CLAUSES, DOCUMENT ORDER WINS — EXCEPT WHERE THE AUTHOR
+    // SAID OTHERWISE, and "otherwise" is read from their word, never inferred.
+    // An item may carry a later clause that AMENDS an earlier one, and the two
+    // relationships look identical structurally while meaning opposite things: a
+    // clause marked as SUPERSEDING replaces the earlier text (showing the earlier
+    // one then asserts an approach the item has retracted — the same harm as
+    // printing struck-through work), while one marked as ADDED extends it and
+    // reads as a non-sequitur if shown alone. Measured across the live corpus,
+    // both shapes are in use, so "prefer the last" and "prefer the first" are each
+    // wrong on real rows: last-wins repairs the superseded case and breaks the
+    // additive ones. Only an explicit supersession marker is honoured, and only
+    // from the author's own qualifier.
+    const topLevel = hits.filter(h => h.indent === 0);
+    const superseding = topLevel.filter(h => /supersed/i.test(h.scope));
+    const pick = superseding.length ? superseding[superseding.length - 1] : topLevel[0] || hits[0];
+    // The field runs to the end of its own paragraph.
+    const para = [pick.after];
+    for (let k = pick.i + 1; k < lines.length && lines[k].trim(); k++) para.push(lines[k]);
+    const raw = para.join('\n');
+
+    if (!raw.includes('~~')) {
+      const plain = usable(raw);
+      if (!plain) continue;
+      return { key: f.key, label: label(f, pick), text: firstClause(plain, SUMMARY_MAX_CHARS) };
+    }
+
+    // ── Discharged work is removed at CLAUSE granularity ────────────────────
+    // A strike marks a clause as discharged, and the annotation trailing it
+    // ("— done at <ref>") belongs to that clause, so removing only the struck
+    // SPAN leaves orphaned credit for finished work sitting where the remaining
+    // work should be — still misleading, just no longer visibly crossed out.
+    // Dropping the whole clause surfaces what is actually still owed.
+    const kept = raw
+      .split('·')
+      .filter(seg => !seg.includes('~~'))
+      .join(' · ');
+    // ⚠ THE FALLBACK IS NOT COSMETIC. Some items strike each clause and then
+    // summarise the state in prose INSIDE the last struck clause ("those three are
+    // done; still owed are these"). Clause-dropping deletes that summary too, so
+    // when nothing survives it, span-removal is tried before giving up — it keeps
+    // the sentence that says work remains.
+    const plain = usable(kept) || usable(raw);
+    // ⛔ A DELIBERATE STOP, NOT A FALLTHROUGH. If the field is struck through with
+    // nothing readable left, the row is MARKED and the remaining field kinds are
+    // NOT tried. The item did state this field and it has been discharged; reaching
+    // past it to a different field would describe the item by something it never
+    // offered as its summary, which is the fabrication mode this whole surface is
+    // built to refuse. An admitted gap is the honest output.
+    if (!plain) return null;
+    return { key: f.key, label: label(f, pick), text: firstClause(plain, SUMMARY_MAX_CHARS) };
   }
   return null;
 }

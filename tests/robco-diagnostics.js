@@ -53089,6 +53089,153 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 248.10  WHICH CLAUSE THE SUMMARY COMES FROM, AND WHAT IT REFUSES ─────────
+//
+// 248.9 proved a row gets a summary or an honest marker. These two defects are
+// the other half: a row that gets a summary which is WRONG. Both were found by a
+// reader looking at the real board, not by any check, and both are worse than the
+// marker case — a marked row admits it says nothing, while a badly-summarised row
+// asserts something false in the same voice as a correct one.
+//
+//  1. FIRST-MATCH-WINS DOES NOT SURVIVE SUB-ITEMS. A long item can contain a
+//     nested sub-item that states its own completion condition. Taking the first
+//     match then describes the whole item by a nested detail while its own clause
+//     sits further down the same body.
+//  2. STRUCK-THROUGH TEXT WAS BEING HARVESTED. The source strikes a clause when it
+//     is DISCHARGED. Harvesting it put crossed-out markup on the board exactly
+//     where the remaining work belongs — a reader could reasonably conclude
+//     nothing was left on the item. This is the most dangerous defect this surface
+//     can have: not an absent answer, but a confidently wrong one.
+//
+// Fixture-driven and shape-only — the defects live in the SELECTION, not in any
+// wording, so nothing from the source needs to travel into this public repo.
+{
+  const RG248d = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const S = '~~';
+
+  // ── Defect 1: the item's own clause outranks a nested one ────────────────
+  const nested248d = [
+    'preamble prose about the item as a whole.',
+    '',
+    '- a nested sub-item living inside this item',
+    '  **Done means:** the nested sub-part redirects its old name to the new one.',
+    '',
+    '**Done means:** the item itself produces its output from the archive structure.',
+  ];
+  const pickedTop = RG248d.deriveSummary(nested248d);
+  assert(
+    pickedTop &&
+      /the item itself produces its output/.test(pickedTop.text) &&
+      !/nested sub-part/.test(pickedTop.text),
+    "248.10a: a nested sub-item's completion clause does NOT summarise the whole item — the item's own top-level clause wins over document order, so a long item is never described by a detail buried inside it" +
+      ` — got: ${JSON.stringify(pickedTop && pickedTop.text)}`
+  );
+
+  // ⚠ The preference must never COST a row. Indentation was verified bimodal on
+  // the live corpus with no item carrying only indented labels — but that is a
+  // measurement of today, so the fallback is structural rather than statistical.
+  const onlyNested248d = [
+    'preamble.',
+    '',
+    '- a nested sub-item',
+    '  **Done means:** the only completion clause this item has is this indented one.',
+  ];
+  const pickedNested = RG248d.deriveSummary(onlyNested248d);
+  assert(
+    pickedNested && /the only completion clause/.test(pickedNested.text),
+    '248.10b: when an item has ONLY an indented clause it is still used — preferring top-level must never turn a row that had a summary into a marked one, so the preference degrades to document order rather than to nothing' +
+      ` — got: ${JSON.stringify(pickedNested && pickedNested.text)}`
+  );
+
+  // ── Defect 2: discharged work is removed at CLAUSE granularity ───────────
+  const struckClauses248d = [
+    `**Done means:** ${S}the first thing is delivered${S} — DONE at an earlier checkpoint · ` +
+      `${S}the second thing is measured${S} — MEASURED already · the third thing still has no home and is owed.`,
+  ];
+  const clauseDrop = RG248d.deriveSummary(struckClauses248d);
+  assert(
+    clauseDrop &&
+      /the third thing still has no home/.test(clauseDrop.text) &&
+      !clauseDrop.text.includes(S) &&
+      !/DONE at an earlier checkpoint/.test(clauseDrop.text),
+    '248.10c: a struck clause is dropped WHOLE, annotation and all — removing only the crossed-out span leaves orphaned credit for finished work sitting where the remaining work should be, so what surfaces is what is still owed' +
+      ` — got: ${JSON.stringify(clauseDrop && clauseDrop.text)}`
+  );
+
+  // Some items strike every clause and then state the position in prose INSIDE the
+  // last struck clause. Clause-dropping deletes that too, so span-removal is tried
+  // before giving up — otherwise the row loses a sentence that says work remains.
+  const struckWithTail248d = [
+    `**Done means:** ${S}the first ruling is made${S} · ${S}the second ruling is made${S} · ` +
+      `${S}the ruling is recorded with its date${S} — those three are now DONE, and the item stays open on exactly two remaining questions.`,
+  ];
+  const tailRescue = RG248d.deriveSummary(struckWithTail248d);
+  assert(
+    tailRescue &&
+      /those three are now DONE/.test(tailRescue.text) &&
+      /stays open on exactly two/.test(tailRescue.text) &&
+      !tailRescue.text.includes(S),
+    '248.10d: when dropping the struck clauses would empty the field, span-removal rescues the surviving prose — an item that strikes each clause and then says what remains still reports that work is outstanding' +
+      ` — got: ${JSON.stringify(tailRescue && tailRescue.text)}`
+  );
+
+  // ⛔ THE DELIBERATE STOP. Stated as a choice, not arrived at as a fallthrough.
+  const allStruck248d = [
+    `**Done means:** ${S}every clause this item had is discharged and struck out${S}`,
+    '',
+    '**What it is.** a completely different description that must NOT be borrowed to fill the gap.',
+  ];
+  const stopped = RG248d.deriveSummary(allStruck248d);
+  assert(
+    stopped === null,
+    '248.10e: a field struck through with nothing readable left MARKS the row and does NOT fall through to another field kind — the item did state this field and it is discharged, so reaching past it would describe the item by something it never offered as its summary' +
+      ` — got: ${JSON.stringify(stopped)}`
+  );
+
+  // ── Amendment: the author's word decides, and only an explicit one ────────
+  const superseded248d = [
+    '**Done means:** the first approach generates one file from the other.',
+    '',
+    '**Done means (amended, superseding the clause above):** neither file is generated from the other.',
+  ];
+  const added248d = [
+    '**Done means:** the original clause stands on its own and reads correctly alone.',
+    '',
+    '**Done means (ADDED to the clauses above):** one further condition that is meaningless in isolation.',
+  ];
+  const sup = RG248d.deriveSummary(superseded248d);
+  const add = RG248d.deriveSummary(added248d);
+  assert(
+    sup &&
+      /neither file is generated/.test(sup.text) &&
+      add &&
+      /the original clause stands on its own/.test(add.text),
+    '248.10f: a later clause marked as SUPERSEDING replaces the earlier one, while one marked as ADDED does not — the two look identical structurally and mean opposite things, so neither "prefer first" nor "prefer last" is correct and only the author\'s own qualifier is honoured' +
+      ` — superseded→${JSON.stringify(sup && sup.text)} added→${JSON.stringify(add && add.text)}`
+  );
+
+  assert(
+    sup.label.includes('superseding') && !sup.text.includes('superseding'),
+    "248.10g: a clause's scope qualifier is surfaced in the LABEL rather than left as residue at the front of the prose — an item may state several conditions scoped to different parts of itself, and an unlabelled one reads as though it were the whole item's" +
+      ` — label: ${JSON.stringify(sup.label)}`
+  );
+
+  // ⭐ THE BOARD-WIDE BACKSTOP. The two rules above are aimed at how the clause is
+  // CHOSEN; this asserts the property that actually matters, over every row the
+  // real generator emits, so a future harvesting path cannot reintroduce the leak
+  // by taking a route neither rule covers.
+  let leaked248d = 0;
+  for (const b of [nested248d, struckClauses248d, struckWithTail248d, superseded248d]) {
+    const s = RG248d.deriveSummary(b);
+    if (s && (s.text.includes(S) || s.label.includes(S))) leaked248d++;
+  }
+  assert(
+    leaked248d === 0 && !RG248d.toPlainProse(`a ${S}struck${S} b`).includes('struck'),
+    '248.10h: struck-through text never reaches a summary by ANY path — the shared cleaner drops the spans outright, so a harvesting route that forgets the clause-level rule still cannot put discharged work on the board' +
+      ` — ${leaked248d} leak(s)`
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the
