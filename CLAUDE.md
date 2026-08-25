@@ -144,7 +144,7 @@ git push origin dev  # dev is the working branch (Protocol 43); main is release-
 ```
 
 - **The runner must exit clean.** Any failure is a real failure — investigate before committing. Do not track or assert a test COUNT (Protocol 2a, retired): the exit status is the signal.
-- **Bump `CACHE_NAME` when a staged file is in the served/precached set** (`index.html`, `sw.js`, `manifest.json`, icons, `css/`, `js/`) — the full rule and the automated commit-time guard (the staged `CACHE_NAME` must differ from this branch's own HEAD value; non-served commits bypass it) live in **Protocol 1** (`rules/deploy-and-cache.md`).
+- **Bump `CACHE_NAME` when a staged file is in the served/precached set** — ⛔ **the set is NOT enumerated here on purpose.** This line used to carry its own hand-copied copy of it, and that copy was a SUBSET: it omitted `CHANGELOG.md` (runtime-precached by `sw.js` for the in-app viewer) and said "icons" where the real classifier matches all of `assets/`. A reader trusting it would conclude no bump was needed and ship an update installed users never see. The single enumeration now lives in **Protocol 1** (`rules/deploy-and-cache.md`), inside a `SERVED-SET-GUARD` block that Suite 30.3g checks against `SERVED_RE` in `scripts/cache-bump-guard.js` — so it cannot drift from the code the way this line did. The full rule and the automated commit-time guard (the staged `CACHE_NAME` must differ from this branch's own HEAD value; non-served commits bypass it) are there too. ⭐ If you only remember one thing: **a doc-only-looking commit that touches `CHANGELOG.md` still needs a bump.**
 - **Never use `--no-verify`** unless the user explicitly authorizes it for a stated emergency.
 
 ---

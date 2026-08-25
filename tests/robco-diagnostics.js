@@ -2459,6 +2459,79 @@ guards(htmlSource, [
   );
 }
 
+// 30.3g  …and the DOCS must name that same set. This is the third link in the chain:
+//   sw.js  →(30.3f)→  SERVED_RE  →(30.3g)→  the prose a session actually reads.
+//
+//   ⭐ WHY THIS EXISTS. The two links above were already checked; the doc was not, and
+//   it was WRONG — CLAUDE.md's Protocol 1 line enumerated the served set as
+//   "index.html, sw.js, manifest.json, icons, css/, js/", omitting CHANGELOG.md and
+//   saying "icons" where the classifier matches all of assets/. It was a hand-copy of
+//   the install-time ASSETS array, so it inherited that array's blind spot: CHANGELOG.md
+//   is precached at RUNTIME, not in ASSETS. The failure mode is quiet and real — a
+//   session reads the list, sees a changelog-only change, concludes no bump is needed,
+//   and ships an update that cached users never receive. Found 2026-08-25 when the guard
+//   fired on a commit whose only served file was CHANGELOG.md; the guard was right and
+//   the documentation was wrong.
+//
+//   ⛔ THE FIX IS NOT A CORRECTED HAND-COPY. Editing the prose to match today's code
+//   reproduces the original mistake with fresher values — the list drifted precisely
+//   because it was maintained by hand. So the set is enumerated ONCE, in Protocol 1's own
+//   note, inside a marker block, and this asserts SET EQUALITY BOTH DIRECTIONS against
+//   SERVED_RE. A token added to the regex and not the block fails; a token in the block
+//   that the regex does not match fails too (a doc claiming coverage that the guard does
+//   not actually enforce is the more dangerous direction).
+//
+//   ⚠ AND IT CHECKS THE COPY STAYS DELETED. Suite 30.3g's second half asserts CLAUDE.md
+//   does not re-grow a competing enumeration, because the cheapest future "fix" is
+//   someone helpfully pasting the list back where it used to be.
+{
+  const guardSrc30g = readFile('scripts/cache-bump-guard.js');
+  const reM30g = /const SERVED_RE\s*=\s*\/\^\(([^)]*)\)\//m.exec(guardSrc30g);
+  // Unescape the regex alternation into plain path tokens: index\.html → index.html.
+  const fromCode30g = reM30g
+    ? reM30g[1]
+        .split('|')
+        .map(t => t.replace(/\\/g, '').trim())
+        .filter(Boolean)
+        .sort()
+    : null;
+
+  const noteSrc30g = readFile('rules/deploy-and-cache.md');
+  const blockM30g = /SERVED-SET-GUARD:BEGIN([\s\S]*?)SERVED-SET-GUARD:END/.exec(noteSrc30g);
+  const fromDoc30g = blockM30g
+    ? [...blockM30g[1].matchAll(/^-\s+`([^`]+)`\s*$/gm)].map(m => m[1]).sort()
+    : null;
+
+  assert(
+    fromCode30g !== null && fromCode30g.length > 0,
+    "30.3g (setup): SERVED_RE's alternation parsed out of scripts/cache-bump-guard.js — anti-vacuous, an unparsed regex would make every comparison below trivially true"
+  );
+  assert(
+    fromDoc30g !== null && fromDoc30g.length > 0,
+    '30.3g (setup): the SERVED-SET-GUARD block in rules/deploy-and-cache.md was found and is non-empty'
+  );
+  if (fromCode30g && fromDoc30g) {
+    const onlyCode30g = fromCode30g.filter(t => !fromDoc30g.includes(t));
+    const onlyDoc30g = fromDoc30g.filter(t => !fromCode30g.includes(t));
+    assert(
+      onlyCode30g.length === 0 && onlyDoc30g.length === 0,
+      '30.3g: the documented served/precached set EQUALS SERVED_RE exactly (docs ⇄ classifier, both directions — Protocol 1)' +
+        (onlyCode30g.length ? ' — in the CODE but not documented: ' + onlyCode30g.join(', ') : '') +
+        (onlyDoc30g.length
+          ? ' — DOCUMENTED but not matched by the guard: ' + onlyDoc30g.join(', ')
+          : '')
+    );
+  }
+  // The deleted hand-copy must stay deleted. Matches the shape of the old line — a
+  // parenthesised run naming index.html and css/ together — rather than any mention of
+  // the words, so ordinary prose about caching is unaffected.
+  const claudeMd30g = readFile('CLAUDE.md');
+  assert(
+    !/\([^)]*`index\.html`[^)]*`css\/`[^)]*\)/.test(claudeMd30g),
+    '30.3g: CLAUDE.md has not re-grown its own enumeration of the served/precached set — the one list lives in rules/deploy-and-cache.md and is checked above'
+  );
+}
+
 // 30.4 saveState() contains proactive quota warning
 assert(
   /_quotaWarnShown/.test(stateSource),

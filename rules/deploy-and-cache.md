@@ -25,6 +25,32 @@ Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **se
 
 **Why:** The SW is cache-first. Without a new `CACHE_NAME`, cached users silently run the old build and never see the "REBOOT TERMINAL" update prompt. Bumping only when served files change keeps the signal meaningful and avoids spurious update prompts on doc-only or CI-only pushes.
 
+**The served/precached set — ⭐ THE ONE ENUMERATION, AND IT IS MACHINE-CHECKED.**
+
+<!-- SERVED-SET-GUARD:BEGIN — Suite 30.3g parses SERVED_RE out of scripts/cache-bump-guard.js and asserts it matches this list EXACTLY, both directions. ⛔ Do not hand-edit this list to match today's code: change SERVED_RE (and sw.js, which 30.3f checks against it) and let this follow. -->
+
+- `index.html`
+- `sw.js`
+- `manifest.json`
+- `CHANGELOG.md`
+- `assets/`
+- `css/`
+- `js/`
+
+<!-- SERVED-SET-GUARD:END -->
+
+⚠ **`CHANGELOG.md` is in the set and is the one people miss** — including this document, which
+omitted it until 2026-08-25. It is not in the install-time `ASSETS` array; `sw.js` precaches it at
+runtime (`cache.add('./CHANGELOG.md')`) for the in-app changelog viewer, so a changelog edit with no
+`CACHE_NAME` bump means installed users never see the new entry. The prose list here was hand-copied
+from the `ASSETS` array and inherited exactly that blind spot: it read as authoritative, and it was
+a subset. That is why this block is now checked rather than maintained.
+
+⛔ **Do not confuse this with the retrieval-map routing rows** (in `CLAUDE.md` and this note's own
+"Load this when touching" header). Those answer _"which note governs this surface?"_ and are policed
+separately by Suite 220.15 — `CHANGELOG.md` routes to `rules/docs-and-library.md`, not here.
+A file can be served without this note governing it. The two lists differ **on purpose**.
+
 **Automated guard:** The pre-commit hook delegates to `scripts/cache-bump-guard.js` (Node, so it is testable behaviourally — Suite 30). If any staged file is in that served/precached set, the guard requires the staged `CACHE_NAME` to **differ from this branch's own HEAD value** (`git show HEAD:sw.js`). This "must differ from HEAD" invariant is **branch-agnostic** — it holds identically on `dev`, `main`, and any future branch, because it never compares against another branch. (This replaced the earlier monotonic-rev check, which compared against `origin/main` and was therefore inert on `dev`, where the local rev is always ahead of the release-only `main` — the guard passed unconditionally no matter what was staged.) If the HEAD baseline is unreachable (fresh repo, or `sw.js` not yet committed), the guard **warns and passes** (fail-safe — a missing baseline never blocks a commit). Non-served commits (doc-only, CI, tests) skip the cache check entirely.
 
 ---
