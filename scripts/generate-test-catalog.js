@@ -38,6 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 const RUNNER_PATH = path.join(ROOT, 'tests', 'robco-diagnostics.js');
@@ -260,7 +261,9 @@ function main() {
     process.exit(1);
   }
 
-  fs.writeFileSync(OUTPUT_PATH, buildMarkdown(suites, realMeta), 'utf8');
+  // WF12 — atomic, never truncating. library/ is gitignored, so a truncation here is
+  // recoverable only from the private archive's last sync (Protocol 48).
+  writeFileAtomic(OUTPUT_PATH, buildMarkdown(suites, realMeta), { encoding: 'utf8' });
   console.log(`[test-catalog] Wrote library/TEST_CATALOG.md (${suites.length} suites).`);
 }
 

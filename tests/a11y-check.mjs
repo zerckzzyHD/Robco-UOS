@@ -23,6 +23,9 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
+// CJS helper, named-imported from ESM (Node resolves the named export via
+// cjs-module-lexer). WF12: never truncate a durable file to write it.
+import { writeFileAtomic } from '../scripts/atomic-write.js';
 
 installFailureCapture('a11y');
 
@@ -121,7 +124,9 @@ for (const v of blocking) {
 
 // ── Baseline-diff ─────────────────────────────────────────────────────────────
 if (!fs.existsSync(BASELINE_PATH)) {
-  fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, 2) + '\n');
+  // WF12 — atomic, never truncating. A tracked baseline; a truncated one reads as
+  // "no known violations" and silently disarms the diff.
+  writeFileAtomic(BASELINE_PATH, JSON.stringify(current, null, 2) + '\n');
   console.log('[a11y] No baseline found — wrote tests/a11y-baseline.json');
   const ruleCount = Object.keys(current).length;
   console.log(

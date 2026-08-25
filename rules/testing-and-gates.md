@@ -49,6 +49,57 @@ machine's archive, and it drives that entirely from a throwaway fixture tree via
 
 | **248.8** | ⭐ **QR3 — the BACKLOG band is a COUNT, and UNCLASSIFIED is NOT.** The plan specified a count from the start (_"BACKLOG is a count, not a list, and that is the whole design"_) and the first generator shipped a full list of 148 items — ~60% of the document, the board reproducing the exact unreadability its parent item was filed to end. ⚠ **The half that actually needed guarding is the one next to it.** "Render this band as a number instead" reads as a general licence to shorten long bands, and the single most dangerous place to apply it next is `UNCLASSIFIED` — the one band that must never be truncated, because an item nobody could classify is the item most worth seeing and hiding it recreates the silent-drop failure the whole surface exists to prevent. So 248.8 asserts **both directions from one fixture**: backlog counted, in-motion bands and `UNCLASSIFIED` listed in full. Locking only the first would lock the easy half. `248.8b` pins the `Backlog` label as a deliberate **board-local** override of the shared vocabulary's `To-do` (the plan governs the board; the phone queue-view's chip is a different surface) and checks the key still resolves against a real `STATUSES` entry, so the glyph stays derived rather than retyped. Fixture-driven, so it runs everywhere. |
 
+### Suite 259 — WF12: no tool here truncates a durable file to write it
+
+| Suite           | What it locks                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **259.1–259.9** | ⭐ **BEHAVIOURAL — every one of these RUNS a real write against a real tmpdir file.** `scripts/atomic-write.js`'s contract: exact bytes land; an existing target is **replaced** (the win32 `renameSync`-over-existing semantic, **measured** rather than assumed, since the whole design rests on it); a fault mid-write leaves the target **byte-for-byte unchanged**; a **short** write still lands the complete body (the loop resumes at the byte already written); a **zero-progress** write is refused **by name** rather than fsync'ed, closed and renamed over a good target; no `.tmp` residue on either the success or the failure path; the scratch file is a **sibling** of the target (a cross-volume rename is a copy-then-delete, which re-opens the very window the helper closes — a correctness property, not tidiness); and a nullish body is refused rather than stringified over a durable file. ⭐ **`259.3` is the demonstration, both sides on identical fixtures** — the truncating shape leaves the target at **zero bytes**, the atomic shape leaves it untouched.                            |
+| **259.10**      | ⭐ **THE CALL-SITE PROOF, AND IT IS BEHAVIOURAL.** Everything above tests the helper; this tests that the flagged generator actually **uses** it. The real `scripts/roadmap-generate.js` runs in a **child process** with a write fault injected via `--require`, against a throwaway planning tree carrying a sentinel `ROADMAP.md`. Revert the call site to `fs.writeFileSync` and the sentinel is destroyed and this goes red — which a path regex cannot talk its way out of. ⚠ **`259.10a` is the anti-vacuous half**: it asserts the injected fault genuinely reached the generator, so a run where nothing was exercised cannot read as a pass. Fixture-driven end to end, so it runs on a public clone exactly as it runs here. A **spawn** failure is reported as a spawn failure, never as an atomic-write failure.                                                                                                                                                                                                                                                                                             |
+| **259.11**      | ⚠ **THE COVERAGE HALF — the one source-level check here, and its blind spot is named rather than glossed.** Every first-party file in `scripts/` and `tests/` that writes a file must classify itself **DURABLE** (uses the helper, carries no truncating write) or **EPHEMERAL** (disposable/rebuildable output, with the reason recorded). It scans the **directories**, never a curated list — a list that only names the files it already knows about cannot detect a new one, which is how a coverage check silently stops covering anything. ⚠ **It is blind to exactly what the archive's own Lens A was blind to**: an ad-hoc script an agent writes, runs, and never commits — which is where the original incident actually came from. It reduces the chance of the class being **committed** here; it cannot stop it being **run** here. `259.11e` proves the block-comment stripper removes a _mention_ but keeps a real _call_, so the scan cannot be blinded by it — added because this suite first went red against its own helper, whose header names `fs.writeFileSync` a dozen times and calls it zero. |
+
+⛔ **`scripts/atomic-write.js` is a DELIBERATE reimplementation of `_RobCo-Archive/!PLANNING/tools/atomic-write.cjs`, never an import.** A cross-repo `require` would make this **public** repo depend on a **private** sibling checkout being present, inverting the boundary and breaking the one thing every other private-tree dependency here gets right (`scripts/planning-paths.js` — absent tree is a **skip**, never a failure). The cost is stated in the helper's own header rather than glossed: **three** copies of this logic now exist across three repos and they can drift — the archive's carried the WF15 short-write bug for a day after the control plane's was fixed. A defect found in any one means checking the other two.
+
+### ⭐ A guard that matches its own documentation — the shape, and why the cheap fix is the dangerous one
+
+Written down because it happened here, on 2026-08-25, and because the tempting repair would have
+quietly disarmed the guard it was repairing.
+
+**What happened.** Suite `259.11` scans `scripts/` and `tests/` for `writeFileSync(` and demands every
+hit classify itself. It went red on **`scripts/atomic-write.js`** — the helper that exists to abolish that
+call, and which contains **zero** of them. It tripped on its own header, which names `fs.writeFileSync`
+a dozen times explaining the hazard.
+
+**Three properties make this worth a name.**
+
+1. **It punishes the best-documented code.** The false positive lands precisely on whichever file explains
+   the hazard most thoroughly. A guard whose noise scales with documentation quality quietly taxes the
+   thing we want more of.
+2. **The hit was invented, not found.** Nothing was wrong. The detector manufactured a finding out of
+   prose. That is categorically different from a false positive on ambiguous _code_ — there was no code
+   at all, only a sentence _about_ code.
+3. ⛔ **The one-line escape was the dangerous one.** The obvious fix was to add `atomic-write.js` to the
+   allowlist. That would have granted **the file that governs every durable write in this repo** a
+   permanent exemption from the check that governs durable writes — issued for a _comment_, and silently
+   covering any real truncating write added to that file later. ⭐ **That is how allowlists rot: not from
+   bad judgment, but from a real red that had no real cause.** The entry would even have looked reasonable
+   to the next reader, because the red was genuine.
+
+**What was done instead.** The _detector_ was fixed — strip `/* … */` before scanning, since a live call
+cannot hide inside a block comment, so it cannot produce a false negative (`//` lines are deliberately
+left in: a URL’s `//` inside a string would eat the rest of a real line). Then the repair itself was
+guarded: **`259.11e`** proves the stripper removes a _mention_ but keeps a real _call_, so the fix cannot
+silently become the blinding.
+
+⚠ **The same shape recurred twice more the same night**, which is why it is a class and not an anecdote:
+a shell command whose pattern matched its own needle, and a check for _“does my change touch any archive
+file?”_ that matched **`scripts/roadmap-generate.js`** — the word `ROADMAP` in its own filename. The common
+thread: **a check that matches its own subject matter rather than the thing it is looking for.** Cheap to
+catch when the result is absurd on its face; invisible when it merely looks plausible.
+
+**The rule to carry forward.** When a guard goes red on a file that _documents_ the hazard rather than
+_commits_ it, fix the detector, never the allowlist — and add the case that proves the fixed detector can
+still see a real instance.
+
 ✅ **`roadmap:check` IS wired into `scripts/gate.js` — step 4f, since QR1 Phase 3 (2026-08-13).** It was
 held back deliberately until then: wiring it earlier would have reddened the gate against the
 un-migrated queue. It runs on `gate:fast` and `gate` alike (pure Node, no browser), and no-ops where the

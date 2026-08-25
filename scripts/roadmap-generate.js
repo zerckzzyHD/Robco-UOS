@@ -48,6 +48,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 const OUTPUT_NAME = 'ROADMAP.md';
@@ -682,7 +683,10 @@ if (require.main === module) {
   }
 
   const text = toLf(result.text.endsWith('\n') ? result.text : result.text + '\n');
-  fs.writeFileSync(outPath, text, 'utf8');
+  // WF12 — atomic, never truncating. A crash between truncate and completion would
+  // otherwise leave a zero-byte or half-written board, and a half-written board reads
+  // exactly like a real one, which is the failure this whole generator exists to end.
+  writeFileAtomic(outPath, text, { encoding: 'utf8' });
   console.log(
     `[roadmap] Wrote ${outPath} — ${result.blind ? '⛔ BLIND' : 'board OK'} (${text.length} bytes, LF).`
   );

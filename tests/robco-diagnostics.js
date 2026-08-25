@@ -51856,6 +51856,51 @@ if (!PLANNING_OK) {
     stripCodeSpans246('<p>oops **still raw** outside code</p>').includes('**'),
     '246.7c: the code-span carve-out does not blind the check — a genuine "**" sitting outside any <code> span is still caught'
   );
+  // ── 246.7d–g  ORPHAN DELIMITERS — a delimiter that pairs with NOTHING ───────
+  //
+  // Found live 2026-08-25 in the private queue, in an item whose blockquote ends
+  // on a trailing `**`. strongify() classified that marker right-flanking
+  // (preceded by punctuation, followed by end-of-string) so it could only CLOSE
+  // — and there was no opener, so it matched nothing and fell through to a
+  // literal `**` on the page.
+  //
+  // ⭐ THE CLASS IS "PAIRS WITH NOTHING", NOT ONE ITEM'S SENTENCE. The generator
+  // already repaired the mirror case (an opener the author never closed bolds to
+  // the end of its block) and that repair is what made this one easy to miss:
+  // the obvious unclosed-bold shapes all rendered fine, so the gap only showed on
+  // the one arrangement where the marker has nothing after it. A case pinned to
+  // that item's prose would be defeated by the next item somebody writes, so
+  // these pin the two ways a delimiter can orphan, on SYNTHETIC input — the
+  // wording is neutralised on purpose (the shape is the test, the words never
+  // were), and there is no dependency on the live queue, so they run on a public
+  // clone too.
+  const orphanClose246 = QV.mdToHtml(['> a `token` and a trailing marker.**']);
+  assert(
+    !stripCodeSpans246(orphanClose246).includes('**') && /<code>token<\/code>/.test(orphanClose246),
+    '246.7d: a CLOSER with no opener (trailing "**" at end of a block) is dropped, not printed raw — and the code span beside it still renders (the shape found live)'
+  );
+  assert(
+    !stripCodeSpans246(QV.mdToHtml(['a trailing marker.**'])).includes('**'),
+    '246.7e: the same orphan closer in a plain paragraph — the leak is not blockquote-specific, so neither is the fix'
+  );
+  assert(
+    !stripCodeSpans246(QV.mdToHtml(['a ** b'])).includes('**'),
+    '246.7f: a marker that can NEITHER open nor close (whitespace both sides — not emphasis at all per CommonMark) is dropped rather than printed'
+  );
+  // ⚠ The false-positive half, and it is the one that matters: dropping orphans
+  // must not eat a marker that legitimately pairs, and must not disturb the
+  // unclosed-OPENER repair that was already correct.
+  const pairs246 = QV.mdToHtml([
+    '**bold** and **OUTER — **INNER** — rest** and word-**intraword** and **open to end.',
+  ]);
+  assert(
+    /<strong>bold<\/strong>/.test(pairs246) &&
+      /<strong>INNER<\/strong>/.test(pairs246) &&
+      /<strong>intraword<\/strong>/.test(pairs246) &&
+      /<strong>open to end\.<\/strong>/.test(pairs246) &&
+      !stripCodeSpans246(pairs246).includes('**'),
+    '246.7g: dropping orphans does not touch delimiters that DO pair — flat, nested, intraword-after-punctuation and unclosed-opener bold all still render'
+  );
   // Targeted red-then-green: a DOUBLE-backtick code span containing backticks,
   // with bold AFTER it, renders the code AND the bold — never swallowing one
   // into the other (the exact corruption that leaked `**`).
@@ -54904,6 +54949,474 @@ if (!PLANNING_OK) {
         /_renderBootFatal\(err\)/.test(shell258),
       '258.19: the Diagnostic Shell registers SIMULATE DEGRADED BOOT FAULT and SIMULATE FATAL BOOT SCREEN, both driving the real _bootPhase/_flushBootFaults/_renderBootFatal (Protocol 44 + 22)'
     );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 259 — WF12: no tool in this repo TRUNCATES a durable file to write it
+//
+//  THE CLASS. `fs.writeFileSync(p, text)` destroys the destination before the
+//  replacement bytes exist — the open-for-write truncates at the moment it is
+//  called. The exposure window is therefore not a narrow tail around the write;
+//  it is EVERY instruction between the truncation and a completed write. Any
+//  exception, crash, kill, or full disk in that window is a total loss of the
+//  previous content, with nothing to roll back to.
+//
+//  This is filed in the sibling private archive as WF12, and it is not
+//  theoretical: `!PLANNING/QUEUE.md` was truncated to ZERO BYTES on 2026-08-23
+//  by exactly this shape. The archive built an atomic-write helper and a lint in
+//  response — but BOTH live in that repo and neither can see this one, which is
+//  why the class was still open here. scripts/atomic-write.js is this repo's own
+//  deliberate reimplementation (NOT an import — see its header for why, and for
+//  the cost of the three copies that now exist).
+//
+//  ⭐ WHY THIS SUITE RUNS THE WRITE INSTEAD OF READING THE SOURCE. A source lint
+//  can only prove that a spelling is absent. It cannot prove the replacement
+//  actually holds its promise — and the archive's own helper is the cautionary
+//  case: it passed every source check for a day while carrying the WF15
+//  short-write bug, because a lint looking for `writeFileSync` has nothing to say
+//  about a `writeSync` whose return value is discarded. So 259.1–259.10 execute
+//  real writes against real files in a real tmpdir, including 259.3's
+//  side-by-side demonstration that the truncating shape loses the target's bytes
+//  where the atomic one does not, and 259.10's run of the REAL generator CLI in a
+//  subprocess with a write fault injected into it.
+//
+//  ⚠ 259.11 IS THE ONE SOURCE-LEVEL CHECK, AND ITS BLIND SPOT IS NAMED RATHER
+//  THAN GLOSSED. It is the coverage half — it exists so a NEW durable write
+//  cannot be added without classifying itself. It sees only tracked first-party
+//  code in this repo, so it is blind to exactly what the archive's Lens A was
+//  blind to: an ad-hoc script an agent writes, runs, and never commits. That is
+//  where the original incident actually came from. 259.11 reduces the chance of
+//  the class being COMMITTED here; it does not and cannot stop it being RUN here.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 259 — WF12 atomic durable writes (no truncating write)');
+
+  const os259 = require('os');
+  const { spawnSync: spawnSync259 } = require('child_process');
+  const { writeFileAtomic: atomic259 } = require(path.join(ROOT, 'scripts', 'atomic-write.js'));
+
+  const dir259 = fs.mkdtempSync(path.join(os259.tmpdir(), 'robco-atomic-259-'));
+  const OLD259 = 'PREVIOUS CONTENTS — must survive every failure below.\n'.repeat(40);
+  const NEW259 = 'replacement contents\n'.repeat(40);
+  const strays259 = () => fs.readdirSync(dir259).filter(f => f.endsWith('.tmp'));
+
+  // Swap in a faulty fs primitive for exactly one call, then always restore. The
+  // helper reaches its primitives through the shared `fs` object, so patching that
+  // object is what makes these genuinely behavioural rather than simulated.
+  function withPatch259(name, impl, fn) {
+    const real = fs[name];
+    fs[name] = impl(real);
+    try {
+      return fn();
+    } finally {
+      fs[name] = real;
+    }
+  }
+
+  try {
+    // 259.1  the plain contract: exact bytes land, and the call reports where.
+    {
+      const p = path.join(dir259, 'plain.md');
+      const ret = atomic259(p, NEW259);
+      assert(
+        fs.readFileSync(p, 'utf8') === NEW259 && ret === p,
+        '259.1: writeFileAtomic writes the exact bytes and returns the absolute path'
+      );
+    }
+
+    // 259.2  rename-over-an-EXISTING-target actually replaces it on this platform.
+    //        MEASURED, not assumed: this is the documented win32 sharp edge (a naive
+    //        MoveFile throws EEXIST here), and the whole design rests on it working.
+    {
+      const p = path.join(dir259, 'replace.md');
+      fs.writeFileSync(p, OLD259, 'utf8');
+      atomic259(p, NEW259);
+      assert(
+        fs.readFileSync(p, 'utf8') === NEW259,
+        '259.2: an existing target is REPLACED, not refused — fs.renameSync over an existing destination works on this platform'
+      );
+    }
+
+    // 259.3  ⭐ THE DEMONSTRATION, BOTH SIDES, ON IDENTICAL FIXTURES. The truncating
+    //        shape loses everything; the atomic shape loses nothing. This is the test
+    //        that would have caught the original incident.
+    {
+      const trunc = path.join(dir259, 'demo-truncating.md');
+      const atom = path.join(dir259, 'demo-atomic.md');
+      fs.writeFileSync(trunc, OLD259, 'utf8');
+      fs.writeFileSync(atom, OLD259, 'utf8');
+
+      // The truncating shape, spelled out — this is precisely what writeFileSync does
+      // internally: open for write (DESTRUCTION HAPPENS HERE), then write. The fault
+      // arrives after the open and before any bytes.
+      let truncThrew = false;
+      try {
+        const fd = fs.openSync(trunc, 'w');
+        try {
+          throw new Error('injected: the process dies here');
+        } finally {
+          fs.closeSync(fd);
+        }
+      } catch {
+        truncThrew = true;
+      }
+
+      // The same fault, through the atomic helper.
+      let atomThrew = false;
+      withPatch259(
+        'writeSync',
+        () => () => {
+          throw new Error('injected: the process dies here');
+        },
+        () => {
+          try {
+            atomic259(atom, NEW259);
+          } catch {
+            atomThrew = true;
+          }
+        }
+      );
+
+      assert(
+        truncThrew && fs.statSync(trunc).size === 0,
+        '259.3a: RED SIDE — the truncating shape leaves the target at ZERO BYTES when the write faults (this is WF12, reproduced)'
+      );
+      assert(
+        atomThrew && fs.readFileSync(atom, 'utf8') === OLD259,
+        '259.3b: GREEN SIDE — the same fault through writeFileAtomic leaves the target byte-for-byte UNCHANGED'
+      );
+    }
+
+    // 259.4  WF15, the half that is not about truncation at all: a SHORT WRITE is
+    //        not an error. It returns a smaller count and raises nothing. The loop
+    //        must resume at the byte already written and still land the whole body.
+    {
+      const p = path.join(dir259, 'shortwrite-progress.md');
+      fs.writeFileSync(p, OLD259, 'utf8');
+      withPatch259(
+        'writeSync',
+        real =>
+          function (fd, buf, off, len, pos) {
+            // Never write more than 16 bytes at a time — legal, silent, and exactly
+            // what a single discarded-return-value call would truncate on.
+            return real.call(fs, fd, buf, off, Math.min(16, len), pos);
+          },
+        () => atomic259(p, NEW259)
+      );
+      assert(
+        fs.readFileSync(p, 'utf8') === NEW259,
+        '259.4: a capped (short) writeSync still lands the COMPLETE body — the write loop resumes at the byte already written (WF15)'
+      );
+    }
+
+    // 259.5  …and a write making NO progress is refused BY NAME rather than being
+    //        fsync'ed, closed and renamed over a good target while every syscall
+    //        reports success. That silent path is the entire WF15 defect.
+    {
+      const p = path.join(dir259, 'shortwrite-zero.md');
+      fs.writeFileSync(p, OLD259, 'utf8');
+      let msg = '';
+      withPatch259(
+        'writeSync',
+        () => () => 0,
+        () => {
+          try {
+            atomic259(p, NEW259);
+          } catch (e) {
+            msg = e.message;
+          }
+        }
+      );
+      assert(
+        /short-write: no progress/.test(msg) && fs.readFileSync(p, 'utf8') === OLD259,
+        '259.5: a zero-progress writeSync is REFUSED by name and the target keeps its old bytes — never a silently-renamed partial file'
+      );
+    }
+
+    // 259.6/259.7  the only residue this design can leave is an inert sibling temp,
+    //              and it is cleaned up on both paths.
+    {
+      assert(
+        strays259().length === 0,
+        '259.6: no .tmp residue is left behind after the successful writes above'
+      );
+      const p = path.join(dir259, 'residue.md');
+      fs.writeFileSync(p, OLD259, 'utf8');
+      withPatch259(
+        'writeSync',
+        () => () => {
+          throw new Error('injected');
+        },
+        () => {
+          try {
+            atomic259(p, NEW259);
+          } catch {
+            /* expected */
+          }
+        }
+      );
+      assert(
+        strays259().length === 0,
+        '259.7: the scratch file is cleaned up when the write FAILS too — a fault leaves no debris'
+      );
+    }
+
+    // 259.8  the temp file is a SIBLING of the target, never in %TEMP%. A rename
+    //        across volumes is a copy-then-delete, which re-opens the exact window
+    //        this helper exists to close — so this is a correctness property, not
+    //        tidiness.
+    {
+      const p = path.join(dir259, 'sibling.md');
+      const opened = [];
+      withPatch259(
+        'openSync',
+        real =>
+          function (t, ...rest) {
+            if (typeof t === 'string' && t.endsWith('.tmp')) opened.push(t);
+            return real.call(fs, t, ...rest);
+          },
+        () => atomic259(p, NEW259)
+      );
+      assert(
+        opened.length === 1 && path.dirname(opened[0]) === path.dirname(p),
+        '259.8: the scratch file is created in the TARGET’s own directory — a cross-volume rename would not be atomic'
+      );
+    }
+
+    // 259.9  refuse a nullish body outright. Writing `undefined` over a durable file
+    //        is the stringified-"undefined" flavour of the same data loss.
+    {
+      const p = path.join(dir259, 'nullish.md');
+      fs.writeFileSync(p, OLD259, 'utf8');
+      let threw = 0;
+      for (const bad of [undefined, null]) {
+        try {
+          atomic259(p, bad);
+        } catch {
+          threw++;
+        }
+      }
+      assert(
+        threw === 2 && fs.readFileSync(p, 'utf8') === OLD259,
+        '259.9: a null/undefined body is REFUSED and the target is untouched — never stringified over a durable file'
+      );
+    }
+
+    // 259.10  ⭐ THE CALL-SITE PROOF, BEHAVIOURAL. Everything above tests the helper.
+    //         This tests that the flagged generator actually USES it: the REAL
+    //         scripts/roadmap-generate.js runs in a subprocess with a write fault
+    //         injected via --require, against a throwaway planning tree carrying a
+    //         sentinel ROADMAP.md. If the generator is ever reverted to a truncating
+    //         write, the sentinel is destroyed and this goes red — which a path regex
+    //         cannot talk its way out of.
+    //
+    //         Fixture-driven end to end (its own QUEUE.md), so it runs on a public
+    //         clone with no archive exactly as it runs here.
+    {
+      const planDir259 = path.join(dir259, 'plan');
+      fs.mkdirSync(planDir259, { recursive: true });
+      fs.writeFileSync(
+        path.join(planDir259, 'QUEUE.md'),
+        '# Queue\n\n## 9.9.9 — fixture\n\n### FX1 — ⏭️ a fixture item\n\nbody\n',
+        'utf8'
+      );
+      const sentinel259 = 'SENTINEL BOARD — this file must survive an injected write fault.\n';
+      const boardPath259 = path.join(planDir259, 'ROADMAP.md');
+      fs.writeFileSync(boardPath259, sentinel259, 'utf8');
+
+      // Surgical fault injection: only fds/paths naming ROADMAP.md are affected, so
+      // node's own startup and stdio are untouched. Patches BOTH the atomic helper's
+      // primitive AND fs.writeFileSync — the latter faithfully truncating first, the
+      // way the real call does, so a reverted call site really does lose the file.
+      const preload259 = path.join(dir259, 'inject.cjs');
+      fs.writeFileSync(
+        preload259,
+        [
+          "'use strict';",
+          "const fs = require('fs');",
+          'const HIT = /ROADMAP\\.md/;',
+          'const realOpen = fs.openSync;',
+          'const marked = new Set();',
+          'fs.openSync = function (p, ...a) {',
+          '  const fd = realOpen.apply(fs, [p, ...a]);',
+          "  if (typeof p === 'string' && HIT.test(p)) marked.add(fd);",
+          '  return fd;',
+          '};',
+          'const realWriteSync = fs.writeSync;',
+          'fs.writeSync = function (fd, ...a) {',
+          "  if (marked.has(fd)) throw new Error('INJECTED_WRITE_FAULT');",
+          '  return realWriteSync.apply(fs, [fd, ...a]);',
+          '};',
+          'const realWriteFileSync = fs.writeFileSync;',
+          'fs.writeFileSync = function (p, ...a) {',
+          "  if (typeof p === 'string' && HIT.test(p)) {",
+          '    try { fs.closeSync(realOpen.apply(fs, [p, "w"])); } catch { /* ignore */ }',
+          "    throw new Error('INJECTED_WRITE_FAULT');",
+          '  }',
+          '  return realWriteFileSync.apply(fs, [p, ...a]);',
+          '};',
+          '',
+        ].join('\n'),
+        'utf8'
+      );
+
+      const run259 = spawnSync259(
+        process.execPath,
+        ['--require', preload259, path.join(ROOT, 'scripts', 'roadmap-generate.js')],
+        {
+          cwd: ROOT,
+          encoding: 'utf8',
+          env: Object.assign({}, process.env, { ROBCO_PLANNING_DIR: planDir259 }),
+        }
+      );
+
+      // A process-creation failure on a loaded machine is not a defect in the thing
+      // under test. Say so rather than reporting a phantom.
+      if (run259.error) {
+        assert(
+          false,
+          '259.10: could not spawn the roadmap generator (' +
+            run259.error.message +
+            ') — re-run; this is a spawn failure, not an atomic-write failure'
+        );
+      } else {
+        assert(
+          /INJECTED_WRITE_FAULT/.test((run259.stderr || '') + (run259.stdout || '')),
+          '259.10a: the injected write fault really did reach the generator (guards against a vacuous pass where nothing was exercised)'
+        );
+        assert(
+          fs.readFileSync(boardPath259, 'utf8') === sentinel259,
+          '259.10b: the REAL roadmap generator, faulted mid-write, leaves ROADMAP.md byte-for-byte intact — the call site uses the atomic helper, not a truncating write'
+        );
+      }
+    }
+
+    // 259.11  ⚠ THE COVERAGE HALF — a source check, with the blind spot named in the
+    //         suite header. Every first-party script that writes a file must classify
+    //         itself as DURABLE (uses the helper, no raw truncating write) or
+    //         EPHEMERAL (writes only disposable/rebuildable output, with the reason
+    //         recorded here). A new, unclassified writeFileSync fails this — which is
+    //         the point: the author has to say which it is.
+    {
+      const DURABLE259 = [
+        ['scripts/roadmap-generate.js', 'the generated roadmap board'],
+        ['scripts/generate-architecture-toc.js', 'ARCHITECTURE.md — tracked, read-modify-write'],
+        ['scripts/generate-code-map.js', 'library/CODE_MAP.md — gitignored, read-modify-write'],
+        ['scripts/generate-test-catalog.js', 'library/TEST_CATALOG.md — gitignored'],
+        [
+          'scripts/knowledge-graph.js',
+          'library/knowledge-graph.json — a half-written JSON does not parse at all',
+        ],
+        ['scripts/queue-view.js', 'the phone queue page'],
+        ['tests/arch-conformance-check.js', 'the Protocol 23 baseline — the Protocol 49 keep-case'],
+        ['tests/a11y-check.mjs', 'the tracked a11y baseline'],
+      ];
+      const EPHEMERAL259 = [
+        [
+          'scripts/cf-staging-build.mjs',
+          'writes only into the disposable staging build dir, rebuilt from source every run',
+        ],
+        [
+          'scripts/prod-strip-devshell.mjs',
+          'operates on a staged deploy COPY, never the repo working tree',
+        ],
+        [
+          'scripts/gate.js',
+          'per-step gate logs, already try/caught so logging can never break the gate',
+        ],
+        [
+          'scripts/dev-server.js',
+          'the dev-server PID/state file — ephemeral runtime state, recreated on next start',
+        ],
+        ['tests/browser-server.mjs', 'the Playwright ws-endpoint handoff file — lives for one run'],
+        ['tests/artifacts.mjs', 'failure-capture console logs — disposable test output'],
+        [
+          'tests/robco-diagnostics.js',
+          'this runner: every writeFileSync here targets an os.tmpdir() fixture',
+        ],
+      ];
+
+      const classified259 = new Set(DURABLE259.map(r => r[0]).concat(EPHEMERAL259.map(r => r[0])));
+
+      // ⚠ Strip BLOCK comments before detecting. Found by this suite failing on its own
+      // helper: scripts/atomic-write.js names `fs.writeFileSync` a dozen times in its
+      // header — explaining the class it exists to prevent — and contains not one call.
+      // A guard that cannot tell a WRITE from a SENTENCE ABOUT a write generates noise
+      // at exactly the files that documented the hazard best, and noise is what gets a
+      // guard weakened. Only `/* … */` is stripped: a live call cannot hide inside one,
+      // so this cannot produce a false negative, whereas stripping `//` lines would
+      // (a URL's `//` inside a string would eat the rest of a real line).
+      const stripBlockComments259 = s => s.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+      // Scan BOTH directories rather than a curated file list — a list that only names
+      // the files it already knows about cannot detect a new one, which is how a
+      // coverage check silently stops covering anything.
+      const scanned259 = [];
+      for (const sub of ['scripts', 'tests']) {
+        const abs = path.join(ROOT, sub);
+        if (!fs.existsSync(abs)) continue;
+        for (const f of fs.readdirSync(abs)) {
+          if (!/\.(js|mjs|cjs)$/.test(f)) continue;
+          const rel = sub + '/' + f;
+          const src = stripBlockComments259(fs.readFileSync(path.join(abs, f), 'utf8'));
+          if (/\bwriteFileSync\s*\(/.test(src) || /\bcreateWriteStream\s*\(/.test(src)) {
+            scanned259.push(rel);
+          }
+        }
+      }
+
+      // The stripper must not be able to blind the scan wholesale — if it ever ate
+      // real code, every file would read as write-free and 259.11b would pass
+      // vacuously. Proven on a fixture rather than trusted.
+      assert(
+        /\bwriteFileSync\s*\(/.test(
+          stripBlockComments259('/* mentions fs.writeFileSync(x) */\nfs.writeFileSync(p, d);')
+        ) &&
+          !/\bwriteFileSync\s*\(/.test(
+            stripBlockComments259('/* mentions fs.writeFileSync(x) only */\nconst a = 1;')
+          ),
+        '259.11e: the block-comment stripper removes a MENTION but keeps a real call — the scan cannot be blinded by it'
+      );
+
+      assert(
+        scanned259.length > 0,
+        '259.11a: the file-writer scan found files to classify (anti-vacuous — a scan matching nothing would pass every assertion below for the wrong reason)'
+      );
+
+      const unclassified259 = scanned259.filter(r => !classified259.has(r));
+      assert(
+        unclassified259.length === 0,
+        '259.11b: every file-writing script in scripts/ and tests/ is classified DURABLE or EPHEMERAL' +
+          (unclassified259.length
+            ? ' — UNCLASSIFIED: ' +
+              unclassified259.join(', ') +
+              '. Add it to Suite 259.11: if it writes a durable file use scripts/atomic-write.js; if its output is disposable, say so with a reason.'
+            : '')
+      );
+
+      for (const [rel, why] of DURABLE259) {
+        const abs = path.join(ROOT, rel);
+        if (!fs.existsSync(abs)) {
+          assert(
+            false,
+            `259.11c: declared durable writer ${rel} no longer exists — update this list`
+          );
+          continue;
+        }
+        const src = stripBlockComments259(fs.readFileSync(abs, 'utf8'));
+        assert(
+          /writeFileAtomic\s*\(/.test(src) && !/\bwriteFileSync\s*\(/.test(src),
+          `259.11d: ${rel} writes ${why} through writeFileAtomic and carries NO truncating write`
+        );
+      }
+    }
+  } finally {
+    try {
+      fs.rmSync(dir259, { recursive: true, force: true });
+    } catch {
+      /* best effort — a tmpdir left behind is inert */
+    }
   }
 }
 

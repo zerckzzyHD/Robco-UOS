@@ -30,6 +30,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 // Overridable so the regression suite can exercise the real CLI against a throwaway copy
@@ -135,7 +136,10 @@ function main() {
     process.exit(1);
   }
 
-  fs.writeFileSync(DOC_PATH, updated, 'utf8');
+  // WF12 — atomic, never truncating. This is a READ-MODIFY-WRITE of ARCHITECTURE.md:
+  // the file is its own input, so a truncating write that died mid-way would destroy
+  // the only copy on disk. `updated` is fully formed above, before anything is opened.
+  writeFileAtomic(DOC_PATH, updated, { encoding: 'utf8' });
   console.log(
     `[architecture-toc] Wrote ARCHITECTURE.md's Table of Contents (${entries.length} entries).`
   );

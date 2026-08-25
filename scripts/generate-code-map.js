@@ -34,6 +34,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 const TEST_CONSOLE_PATH = path.join(ROOT, 'js', 'dev', 'test-console.js');
@@ -289,7 +290,10 @@ function main() {
     process.exit(1);
   }
 
-  fs.writeFileSync(OUTPUT_PATH, updated, 'utf8');
+  // WF12 — atomic, never truncating. READ-MODIFY-WRITE of a hybrid doc that is its own
+  // input, and library/ is gitignored: a truncation here is NOT recoverable by
+  // `git checkout`, only from the private archive's last sync (Protocol 48).
+  writeFileAtomic(OUTPUT_PATH, updated, { encoding: 'utf8' });
   console.log(
     `[code-map] Wrote library/CODE_MAP.md's generated sections ` +
       `(${blocks.stats.tools} tools, ${blocks.stats.renderFiles} render files, ` +

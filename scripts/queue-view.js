@@ -33,6 +33,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -268,9 +269,9 @@ function escapeHtml(s) {
  * a run can only OPEN: it is preceded by punctuation and NOT followed by
  * whitespace or punctuation, so it is not right-flanking. That is the whole
  * reason both clauses are spelled out below rather than approximated.
- * An opener the source never closed is closed at the end of its own block (see
- * the note at the pairing loop's end); a marker that can neither open nor close
- * is not emphasis at all and stays the literal `**` the source wrote.
+ * An opener the source never closed is closed at the end of its own block, and
+ * a delimiter that pairs with NOTHING is DROPPED rather than printed. See the
+ * note at the pairing loop's end for why both halves exist and what each costs.
  */
 // CommonMark's flanking predicates need three character classes. The start and
 // end of the string count as whitespace (so '' is whitespace, never punctuation),
@@ -331,10 +332,29 @@ function strongify(s) {
   // blockquote. Openers close in reverse so the nesting stays well-formed.
   const unclosed = openers.length;
   for (const i of openers) toks[i].open = true;
+  // ⭐ THE ORPHAN HALF — the mirror of the repair above, and the half that was
+  // missing. A delimiter can end up neither `open` nor `close` two ways, and
+  // BOTH used to fall through to a literal `**` on the page:
+  //   1. a CLOSER WITH NO OPENER — a trailing `**` at the very end of a block.
+  //      It is right-flanking (preceded by punctuation) so it can only close,
+  //      and there is nothing to close. Found live in the private queue, 2026-08-25.
+  //   2. a marker that can NEITHER open nor close — `a ** b`, whitespace on both
+  //      sides, which CommonMark says is not emphasis at all.
+  // Dropping them is the SAME judgement the unclosed-opener repair above already
+  // made, applied to the mirror case: a stray marker in a document that lives in
+  // ANOTHER repo (F04) must not put markup noise on the phone-readable page, and
+  // must not redden this repo's gate. ⚠ THE COST, STATED: a `**` the author
+  // genuinely meant as literal text disappears instead of showing. That is
+  // accepted because a bare literal `**` outside a code span is ALREADY a leak by
+  // this project's own rule (Suite 246.7) — inside code it is stashed long before
+  // strongify runs, which is why the `css/**` glob carve-out is untouched.
+  // ⛔ Dropping is deliberately preferred over the other symmetric option —
+  // bolding from the start of the block — because that INVENTS emphasis across
+  // text the author never marked, a far larger and more visible fabrication than
+  // removing two characters.
   return (
-    toks
-      .map(t => (!t.delim ? t.text : t.open ? '<strong>' : t.close ? '</strong>' : '**'))
-      .join('') + '</strong>'.repeat(unclosed)
+    toks.map(t => (!t.delim ? t.text : t.open ? '<strong>' : t.close ? '</strong>' : '')).join('') +
+    '</strong>'.repeat(unclosed)
   );
 }
 
@@ -935,7 +955,9 @@ if (require.main === module) {
   const outDir = path.join(ROOT, 'queue-view');
   fs.mkdirSync(outDir, { recursive: true });
   const outPath = path.join(outDir, 'queue-view.html');
-  fs.writeFileSync(outPath, html, 'utf8');
+  // WF12 — atomic, never truncating. Regenerable, but a half-written page is a page
+  // the owner reads on a phone with no way to tell it is incomplete.
+  writeFileAtomic(outPath, html, { encoding: 'utf8' });
   const items = model.blocks.filter(b => b.type === 'item').length;
   const sections = model.blocks.filter(b => b.type === 'section').length;
   console.log(

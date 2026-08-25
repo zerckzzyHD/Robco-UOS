@@ -29,6 +29,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic } = require('../scripts/atomic-write.js');
 
 const ROOT = path.join(__dirname, '..');
 const BASELINE_PATH = path.join(__dirname, 'arch-conformance-baseline.json');
@@ -234,7 +235,10 @@ if (require.main === module) {
         'event bus. Regenerate with: node tests/arch-conformance-check.js --write-baseline',
       ...current,
     };
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(doc, null, 2) + '\n', 'utf8');
+    // WF12 — atomic, never truncating. This baseline is the ONLY thing holding
+    // Protocol 23's layering up until the 3.0 ES-modules migration (the Protocol 49
+    // keep-case); a truncated baseline would silently stop enforcing it.
+    writeFileAtomic(BASELINE_PATH, JSON.stringify(doc, null, 2) + '\n', { encoding: 'utf8' });
     console.log('[arch] wrote baseline →', path.relative(ROOT, BASELINE_PATH));
     for (const rule of RULES)
       console.log(`  ${rule.key}: ${ruleTotal(current[rule.key])} call site(s)`);

@@ -30,6 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { writeFileAtomic } = require('./atomic-write.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_PATH =
@@ -777,7 +778,9 @@ function main() {
   const graph = buildGraph();
   printReport(graph);
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(graph, null, 2) + '\n', 'utf8');
+  // WF12 — atomic, never truncating. A half-written JSON graph does not merely lose
+  // data, it fails to parse, so every consumer breaks at once.
+  writeFileAtomic(OUTPUT_PATH, JSON.stringify(graph, null, 2) + '\n', { encoding: 'utf8' });
   console.log(`\nWrote ${OUTPUT_PATH}`);
   if (graph.graph_status !== 'healthy') {
     process.exitCode = 1;
