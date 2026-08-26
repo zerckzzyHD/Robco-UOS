@@ -53692,12 +53692,24 @@ if (!PLANNING_OK) {
     '249.10b: every band is rendered with the count the board states, and rows are carried through — structure and default open-state do the work of making this readable, so nothing is dropped to achieve it'
   );
 
-  // ⭐ The number that answers the question, and its scope is honest.
+  // ⭐ SUPERSEDED 2026-08-26, AND THE OLD ASSERTION IS RECORDED RATHER THAN
+  // SILENTLY SWAPPED. This previously required the tile to be counted over the
+  // board's LISTED rows and to SAY SO ("listed rows only"), on the reasoning that a
+  // counted band cannot be inspected. That reasoning was sound about the board and
+  // wrong about the tile: the fix is not to declare the gap, it is to stop having
+  // one — the queue itself can be read, so the whole set is available. Declaring a
+  // censored denominator in a hint string is not honesty, because nobody reads a
+  // hint string, and the shrunken number reads exactly like good news.
+  //
+  // The tile now covers every item or prints UNOBSERVABLE, and this asserts the
+  // NEW contract: when no queue is supplied, the renderer must refuse a number
+  // rather than fall back to the rows it happens to have. Suite 261 owns the
+  // predicate itself.
   assert(
-    /<span class="n">1<\/span><span class="k">already finished but still filed as open/.test(
+    /<span class="n">UNOBSERVABLE<\/span><span class="k">finished but still filed as open/.test(
       html249j
-    ) && /listed rows only/.test(html249j),
-    '249.10c: rows whose own text reports finished work while still filed open are COUNTED and named — the board disagreeing with reality is the honest part of "how much is left" — and the count states that it covers listed rows only, because a counted band cannot be inspected'
+    ) && !/listed rows only/.test(html249j),
+    '249.10c: with no queue supplied the tile prints UNOBSERVABLE rather than a number derived from the board rows alone — a metric that cannot see its whole subject must not print an integer'
   );
 
   // Freshness is shown, and the render is a pure function of what it was handed.
@@ -56528,6 +56540,89 @@ if (!PLANNING_OK) {
         withStyle260.includes(extra260) &&
         withStyle260.length === without260.length + extra260.length,
       '260.6: page() emits an extra stylesheet only when given one — the no-style output is unchanged byte-for-byte and never contains the string "undefined"'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 261 — the honesty tile: whole set, LEADS-with, or UNOBSERVABLE
+//
+//  The dashboard tile counting "finished but still filed as open" shipped wrong
+//  in BOTH directions at once, which is why it is worth its own suite:
+//
+//   · CENSORED DENOMINATOR — it counted over the board's LISTED rows. The backlog
+//     is a count on that board rather than a list, so roughly a third of the items
+//     were never inspected. The exclusion was declared in a hint string, and
+//     nobody reads a hint string. A shrunken denominator reads exactly like good
+//     news, and this is the one metric whose job is measuring honesty.
+//   · WRONG PREDICATE — it tested whether a heading CONTAINS the done-mark.
+//     Measured on the real file, most headings containing it are NOT finished
+//     items: they record a state change, or a genuinely closed HALF of a
+//     still-open item. Only a heading that LEADS with the mark is closed.
+//
+//  Fixture-driven, so none of this reads the private tree and it runs anywhere.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 261 — honesty tile (whole set, leads-with, or UNOBSERVABLE)');
+
+  const RV261 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const q261 = [
+    '# Queue',
+    '',
+    '### AA1. ⏭️ a normal open item',
+    '',
+    'body',
+    '',
+    // ⭐ The row that matters: a BACKLOG item. The board renders that band as a
+    // number, so an implementation reading the board could never see this one.
+    '### AA2. ⬜ a backlog item the board renders as a count, not a row',
+    '',
+    'body',
+    '',
+    '### AA3. ✅ leads with the done-mark, still filed in the open queue',
+    '',
+    'x',
+    '',
+    '### AA4. ⏭️ open, and records a ✅ finished half later in its own heading',
+    '',
+    'body',
+    '',
+  ].join('\n');
+
+  const r261 = RV261.closedOverWholeQueue(q261);
+
+  assert(
+    r261.observable === true && r261.total === 4,
+    '261.1 (setup): all four fixture items were parsed — including the backlog row, which is the one a board-derived count cannot see'
+  );
+  assert(
+    r261.observable && r261.count === 1 && r261.ids.join(',') === 'AA3',
+    '261.2: only the heading that LEADS with the done-mark counts — the item merely CONTAINING one later is a closed half of open work, not a finished item'
+  );
+  // GOES RED IF: somebody reverts to a contains-test. That predicate scores AA4 as
+  // a hit, which is the measured ~50% error rate the guard at commit time already
+  // documents.
+  assert(
+    !r261.ids.includes('AA4'),
+    '261.3: an item recording a finished HALF is not reported as finished — the exact case a contains-test gets wrong'
+  );
+  // GOES RED IF: the tile starts printing a number it cannot stand behind.
+  for (const bad of ['', null, undefined, '   ']) {
+    const u = RV261.closedOverWholeQueue(bad);
+    assert(
+      u.observable === false && typeof u.why === 'string' && u.why.length > 0,
+      `261.4: an unreadable queue yields UNOBSERVABLE with a stated reason rather than a number (${JSON.stringify(bad)})`
+    );
+  }
+  // The rule is IMPORTED, never restated — a second copy is how two counts of one
+  // thing begin to disagree. GOES RED IF: someone inlines a done-mark test here.
+  {
+    const src261 = readFile('scripts/report-view.js');
+    assert(
+      /require\('\.\/roadmap-generate\.js'\)/.test(src261) &&
+        /closedDiscipline/.test(src261) &&
+        !/DONE_MARK\s*\)\s*\)/.test(src261.replace(/^.*const DONE_MARK.*$/m, '')),
+      '261.5: the closed-item rule is imported from the board generator, not retyped in the renderer'
     );
   }
 }

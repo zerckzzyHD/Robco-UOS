@@ -317,11 +317,49 @@ function bandOf(heading) {
 const DONE_MARK = String.fromCodePoint(0x2705);
 
 /**
+ * Count items that LEAD with the done-mark while still filed in the open queue,
+ * across the WHOLE queue — or report that it could not be measured.
+ *
+ * ⭐ The two rules this needs already exist and are both imported rather than
+ * restated: the queue parser (which resolves an item's status from its EARLIEST
+ * glyph, so "leads with" falls out of it) and `closedDiscipline` from the board
+ * generator, which the commit-time guard uses for the same question. Retyping
+ * either would create a second answer to one question.
+ *
+ * @returns {{observable: true, count: number, ids: string[], total: number}
+ *          |{observable: false, why: string}}
+ */
+function closedOverWholeQueue(queueMd) {
+  if (typeof queueMd !== 'string' || !queueMd.trim()) {
+    return { observable: false, why: 'the queue itself is not readable from here' };
+  }
+  try {
+    // Required lazily: this is the only place the board generator is needed, and
+    // it must not become a load-time dependency of the renderer.
+    const { parseQueue } = require('./queue-view.js');
+    const { closedDiscipline } = require('./roadmap-generate.js');
+    const items = parseQueue(queueMd).blocks.filter(b => b.type === 'item' && b.id);
+    if (!items.length) {
+      return { observable: false, why: 'the queue parsed to no items' };
+    }
+    const r = closedDiscipline(items);
+    return {
+      observable: true,
+      count: r.total,
+      ids: [...r.proved, ...r.violations].map(x => x.id),
+      total: items.length,
+    };
+  } catch (e) {
+    return { observable: false, why: 'the queue could not be parsed (' + e.message + ')' };
+  }
+}
+
+/**
  * Render the board as the headline of the reports page.
  * @param {string} md   the generated board, read fresh
  * @param {Date}   when when it was last regenerated
  */
-function renderRoadmapSection(md, when) {
+function renderRoadmapSection(md, when, queueMd) {
   const sections = splitSections(md);
   const bands = new Map();
   for (const s of sections) {
@@ -331,19 +369,43 @@ function renderRoadmapSection(md, when) {
 
   // ⭐ "HOW MUCH IS LEFT" IS THE QUESTION, so the numbers answer it directly.
   const n = k => (bands.get(k) ? bands.get(k).count : 0);
-  const listedRows = [];
-  for (const [label, b] of bands) {
-    for (const line of b.lines) {
-      const r = /^- \*\*([A-Za-z0-9]+)\*\*\s+—\s+(.*)$/.exec(line);
-      if (r) listedRows.push({ band: label, id: r[1], title: r[2] });
-    }
-  }
+  // ⛔ The board's LISTED rows are deliberately no longer scraped here. That scrape
+  // existed only to feed the honesty tile, and feeding it from the board was the
+  // defect: the backlog is a count rather than a list, so a third of the items were
+  // never inspected. The tile reads the whole queue instead. Nothing else wanted
+  // these rows, so collecting them would now be work whose only product is a
+  // shorter denominator.
   // ⚠ DERIVED FROM THE BOARD, AND ITS SCOPE IS STATED. These are rows whose own
   // text already reports finished work while the row is still filed as open —
   // the board disagreeing with reality. It can only be counted over LISTED rows:
   // the backlog is a count on this board, not a list, so its rows cannot be
   // inspected here and are honestly excluded rather than guessed at.
-  const disagreeing = listedRows.filter(r => r.title.includes(DONE_MARK));
+  // ⭐⭐ FINISHED-BUT-STILL-OPEN — computed over the WHOLE queue, or not at all.
+  //
+  // ⛔ THIS TILE HAD TWO DEFECTS AT ONCE, and both are the same disease this page
+  // exists to treat.
+  //
+  //  1. A CENSORED DENOMINATOR. It counted over the board's LISTED rows — about a
+  //     third of the items — because the backlog is a count here rather than a
+  //     list. The exclusion was declared honestly in a hint string, and nobody
+  //     reads a hint string. ⚠ A shrunken denominator reads exactly like good
+  //     news, and a censored one inside the single metric whose job is measuring
+  //     honesty is the sharpest possible version of the problem.
+  //  2. THE PREDICATE DID NOT MEASURE THE LABEL. It tested whether a heading
+  //     CONTAINS the done-mark. Measured on the live file, headings that contain
+  //     it are mostly NOT finished items: they record a state change
+  //     (`UNPARKED`, `UNBLOCKED`, `trigger has FIRED`) or a genuinely closed HALF
+  //     of a still-open item. Only a heading that LEADS with the mark is a closed
+  //     item, and a naive contains-test was wrong about half the time.
+  //
+  // ⭐ THE CORRECT RULE IS NOT RETYPED HERE. It already exists as `closedDiscipline`
+  // in the board generator, is enforced on every commit, and is imported — because
+  // a second copy of a rule is how two counts of one thing begin to disagree.
+  //
+  // ⛔ AND IF THE WHOLE SET CANNOT BE READ, THIS PRINTS `UNOBSERVABLE` RATHER THAN
+  // A SMALLER NUMBER. A metric that cannot see its whole subject must not print an
+  // integer.
+  const closed = closedOverWholeQueue(queueMd);
   const inMotion = n('Active') + n('Ready');
   const total = [...bands.values()].reduce((a, b) => a + b.count, 0);
 
@@ -352,37 +414,42 @@ function renderRoadmapSection(md, when) {
     (hint ? `<span class="h">${escapeHtml(hint)}</span>` : '') +
     `</li>`;
 
+  // ⛔ EVERY LABEL STATES THE QUESTION IT ACTUALLY ANSWERS. None of these numbers
+  // was ever wrong; one of them was wearing the wrong question. `before it is done`
+  // read as the answer to "how much is left" while measuring active + ready —
+  // a WORKLOAD measure under a COMPLETION label. Measured against what finishing
+  // actually requires, it was wrong in BOTH directions at once: it omitted most of
+  // the required work (which sits in the backlog) and included work that is not
+  // required at all. A number wrong in both directions, under a label stating the
+  // project's central question, is worse than no number — so it now says what it
+  // measures and nothing more.
   const counts =
     `<ul class="stats">` +
-    stat(n('Active'), 'in flight', 'being worked on now') +
-    stat(n('Attention'), 'need you', 'a decision only you can make') +
-    stat(n('Ready'), 'ready to start', 'specified and unblocked') +
-    stat(inMotion, 'before it is done', 'active + ready, the work that remains in motion') +
+    stat(n('Active'), 'being worked on now', 'started, not finished') +
+    stat(n('Attention'), 'need you', 'flagged as waiting on you') +
+    stat(n('Ready'), 'startable now', 'specified and unblocked') +
+    stat(inMotion, 'startable or in flight', 'active + ready — a workload, not a finish line') +
     stat(
       n('Backlog') + n('Parked') + n('Deferred'),
       'filed for later',
       'backlog, parked and deferred'
     ) +
     stat(
-      disagreeing.length,
-      'already finished but still filed as open',
-      'the board disagreeing with reality — counted over the ' +
-        listedRows.length +
-        ' listed rows only'
+      closed.observable ? closed.count : 'UNOBSERVABLE',
+      'finished but still filed as open',
+      closed.observable
+        ? 'headings that LEAD with the done-mark, across all ' + closed.total + ' items'
+        : 'not counted over the whole queue, so no number is shown — ' + closed.why
     ) +
     `</ul>`;
 
-  const disagreeList = disagreeing.length
-    ? `<details class="drift"><summary>Which ${disagreeing.length} disagree (${disagreeing.length} of ${listedRows.length} listed)</summary>` +
-      `<ul>${disagreeing
-        .map(
-          r =>
-            `<li><code>${escapeHtml(r.id)}</code> <span class="k">${escapeHtml(r.band)}</span></li>`
-        )
-        .join('')}</ul>` +
-      `<p class="note">Each of these says somewhere in its own text that work is finished, while still sitting in an open band. ` +
-      `The backlog is a count on this board rather than a list, so its items are not included in this check.</p></details>`
-    : '';
+  const disagreeList =
+    closed.observable && closed.count
+      ? `<details class="drift"><summary>Which ${closed.count} of ${closed.total}</summary>` +
+        `<ul>${closed.ids.map(id => `<li><code>${escapeHtml(id)}</code></li>`).join('')}</ul>` +
+        `<p class="note">Each of these leads with the done-mark while still filed in the open queue. ` +
+        `Read across every item, not only the ones this board lists.</p></details>`
+      : '';
 
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
     .map(k => {
@@ -421,7 +488,7 @@ function renderRoadmapSection(md, when) {
  * being opened first — "how much is left" is the standing question, and a link
  * to the answer is not the answer.
  */
-function renderIndex(names, note, board) {
+function renderIndex(names, note, board, queueMd) {
   const reports = names.length
     ? `<h2 id="reports">Reports</h2>\n<ul class="reports">${names
         .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
@@ -431,7 +498,7 @@ function renderIndex(names, note, board) {
 sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
 
   const roadmap = board
-    ? renderRoadmapSection(board.text, board.mtime)
+    ? renderRoadmapSection(board.text, board.mtime, queueMd)
     : `<h1>Roadmap</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
@@ -457,4 +524,14 @@ function renderNotFound() {
   });
 }
 
-module.exports = { renderReport, renderIndex, renderNotFound, page, escapeHtml, buildToc };
+module.exports = {
+  renderReport,
+  renderIndex,
+  renderNotFound,
+  page,
+  escapeHtml,
+  buildToc,
+  // ⭐ Exported so the suite drives the REAL derivation rather than a restatement
+  // of it — a test that retypes the rule only ever proves the retyped copy.
+  closedOverWholeQueue,
+};

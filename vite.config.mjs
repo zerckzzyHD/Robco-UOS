@@ -108,7 +108,14 @@ function reportsRoute() {
           // the current one -- which defeats the only thing the board is for.
           return send(
             200,
-            view.renderIndex(paths.listReports(), paths.describeReports(), paths.readRoadmap())
+            view.renderIndex(
+              paths.listReports(),
+              paths.describeReports(),
+              paths.readRoadmap(),
+              // ⛔ The WHOLE queue, so the honesty tile is never computed over a
+              // subset. Read here, at request time, like everything else.
+              paths.readPlanningFile('QUEUE.md')
+            )
           );
         // ⛔ The name is validated inside planning-paths (pattern + containment).
         // A rejected name is indistinguishable here from a missing one, on purpose.
