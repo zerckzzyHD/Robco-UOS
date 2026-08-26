@@ -53814,6 +53814,198 @@ if (!PLANNING_OK) {
   }
 }
 
+// ── 262  THE TWO READ-ONLY OPERATIONAL VIEWS ────────────────────────────────
+//
+// Two dev-only pages read state that lives OUTSIDE this repository: a generated
+// snapshot, and a set of append-only hash-chained logs measured at ~739 MB
+// across 42 files, largest single file ~32 MB.
+//
+// ⭐ EACH ASSERTION BELOW NAMES WHAT TURNS IT RED OTHER THAN THIS CODE BEING
+// REVERTED. A check whose only failure mode is "somebody undid the commit that
+// added it" is a tautology wearing a test's clothes, and it earns nothing.
+{
+  const os = require('os');
+  const CS = require(path.join(ROOT, 'scripts', 'control-state.js'));
+  const SV = require(path.join(ROOT, 'scripts', 'status-view.js'));
+  // The resolver reads its override at CALL time, but the module caches nothing
+  // else — so a fresh load is only needed to be certain the probe below is not
+  // reading a directory decided when this suite first required it.
+  const freshLoad262 = id => {
+    delete require.cache[require.resolve(id)];
+    return require(id);
+  };
+
+  // ── 262.1  The tail is BOUNDED, whatever the file grows to ───────────────
+  //
+  // ⛔ THE SAFETY PROPERTY, NOT A PREFERENCE. A whole-file read of the largest
+  // log would allocate tens of megabytes per request on a machine that is also
+  // serving the app — one refresh could take the server down.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: anyone "simplifying" the offset read into a
+  // readFileSync, anyone raising the window to something unbounded, or any
+  // refactor that loses the seek. This is measured against a synthetic file far
+  // larger than the window, so it cannot pass by the file happening to be small.
+  const big262 = path.join(os.tmpdir(), 'robco-tail-probe.jsonl');
+  const line262 = JSON.stringify({ type: 'probe', pad: 'x'.repeat(200) });
+  fs.writeFileSync(big262, Array.from({ length: 4000 }, () => line262).join('\n') + '\n', 'utf8');
+  const probeSize262 = fs.statSync(big262).size;
+  let bounded262;
+  const origDir262 = process.env.ROBCO_CONTROL_STATE;
+  process.env.ROBCO_CONTROL_STATE = os.tmpdir();
+  try {
+    const CS2 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js'));
+    bounded262 = CS2.tailLog('robco-tail-probe.jsonl');
+  } finally {
+    if (origDir262 === undefined) delete process.env.ROBCO_CONTROL_STATE;
+    else process.env.ROBCO_CONTROL_STATE = origDir262;
+  }
+  const readBytes262 = bounded262 ? bounded262.size - bounded262.fromOffset : Infinity;
+  assert(
+    bounded262 !== null &&
+      probeSize262 > 256 * 1024 &&
+      readBytes262 <= CS.TAIL_BYTES &&
+      bounded262.truncated === true &&
+      bounded262.lines.length > 0 &&
+      bounded262.lines.every(l => {
+        try {
+          JSON.parse(l);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    '262.1: a log tail reads a BOUNDED window regardless of file size, and every line it returns parses — the leading partial record a seek lands in is discarded, which is what makes the rest trustworthy' +
+      ` — probe ${probeSize262}B, read ${readBytes262}B, cap ${CS.TAIL_BYTES}B`
+  );
+  try {
+    fs.unlinkSync(big262);
+  } catch {
+    /* a leftover probe file in the temp dir is not worth failing a run over */
+  }
+
+  // ── 262.2  A requested log name cannot escape the directory ──────────────
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: any loosening of the name pattern — adding a
+  // subdirectory feature, accepting an absolute path for convenience, dropping
+  // the containment check as "already covered by the regex".
+  // ⛔⛔ THE TARGET OF THE TRAVERSAL MUST ACTUALLY EXIST, and the first version of
+  // this assertion got that wrong. It probed `../status.json`, which resolves to
+  // a path where no such file sits — so the reader returned null because the
+  // file was ABSENT, not because the name was refused. Measured: removing BOTH
+  // the name pattern AND the containment check left this test green. A check
+  // that survives the deletion of the thing it exists to prove is worse than no
+  // check, because it is counted as coverage.
+  //
+  // ⭐ So the probe is built where the outcome is unambiguous: a real file is
+  // planted in the PARENT of the state directory, and the only thing that can
+  // refuse a traversal reaching it is the guard being tested.
+  const sandbox262 = fs.mkdtempSync(path.join(os.tmpdir(), 'robco-guard-'));
+  const inner262 = path.join(sandbox262, 'state');
+  fs.mkdirSync(inner262);
+  fs.writeFileSync(path.join(sandbox262, 'reachable.jsonl'), '{"probe":true}\n', 'utf8');
+  fs.writeFileSync(path.join(inner262, 'allowed.jsonl'), '{"ok":true}\n', 'utf8');
+  const prev262 = process.env.ROBCO_CONTROL_STATE;
+  let leaked262;
+  let controlResolved262;
+  process.env.ROBCO_CONTROL_STATE = inner262;
+  try {
+    const CS3 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js'));
+    const hostile262 = [
+      '../reachable.jsonl', // ⭐ EXISTS — the whole point
+      '..\\reachable.jsonl',
+      path.join(sandbox262, 'reachable.jsonl'), // absolute, exists
+      'sub/other.jsonl',
+      '/etc/passwd',
+      '.hidden.jsonl',
+      'notes.txt',
+      '..',
+      '',
+    ];
+    leaked262 = hostile262.filter(n => CS3.logFile(n) !== null);
+    // The positive control: a legitimate name in the directory MUST resolve, or
+    // this whole assertion could pass by refusing everything.
+    controlResolved262 = CS3.logFile('allowed.jsonl');
+  } finally {
+    if (prev262 === undefined) delete process.env.ROBCO_CONTROL_STATE;
+    else process.env.ROBCO_CONTROL_STATE = prev262;
+    try {
+      fs.rmSync(sandbox262, { recursive: true, force: true });
+    } catch {
+      /* a leftover sandbox in the temp dir is not worth failing a run over */
+    }
+  }
+  assert(
+    leaked262.length === 0 && controlResolved262 !== null,
+    '262.2: a traversal aimed at a file that REALLY EXISTS outside the directory is refused, while a legitimate name inside it still resolves — this reader opens paths outside the repository, so an unchecked name is a read-anything primitive reachable over the network' +
+      (leaked262.length ? ` — RESOLVED: ${leaked262.join(', ')}` : '') +
+      (controlResolved262 === null
+        ? ' — ⛔ CONTROL FAILED: it refuses everything, including valid names'
+        : '')
+  );
+
+  // ── 262.3  The reader has no write capability at all ────────────────────
+  //
+  // ⛔ The logs are hash-chained: a write would not merely corrupt a file, it
+  // would break the verifiability of every earlier record.
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody adds a "prune old logs" or
+  // "mark as read" convenience to the same module.
+  const csSrc262 = fs.readFileSync(path.join(ROOT, 'scripts', 'control-state.js'), 'utf8');
+  const writeApis262 = ['writeFile', 'appendFile', 'truncate', 'unlink', 'rename', 'rm(', 'mkdir'];
+  const foundWrites262 = writeApis262.filter(a => csSrc262.includes('fs.' + a));
+  assert(
+    foundWrites262.length === 0 && !/openSync\([^)]*['"][aw]/.test(csSrc262),
+    '262.3: the state reader exposes no filesystem write path — not append, not truncate, not unlink — so there is no "safe write" for a future change to reach for on an append-only chained log' +
+      (foundWrites262.length ? ` — FOUND: ${foundWrites262.join(', ')}` : '')
+  );
+
+  // ── 262.4  A structured value is not reported as unknown ─────────────────
+  //
+  // ⛔ THIS WAS A REAL DEFECT IN THE FIRST VERSION OF THIS PAGE, caught by
+  // measuring the rendered output against the source: eighteen rows read
+  // UNOBSERVABLE while the snapshot carried real values for every one of them.
+  // That is the same lie as an omitted row, pointing the other way — it invents
+  // doubt about things that were measured.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: any future "simplification" of the value
+  // renderer that treats structured values uniformly, which is exactly how the
+  // original defect arose.
+  const structured262 = SV.val({ reposChecked: 9, unhealthyCount: 1 });
+  const counted262 = SV.val({ count: 3, windowMs: 1000 });
+  const nested262 = SV.val({ a: { b: 1 }, c: { d: 2 } });
+  const sourceSaysNo262 = SV.val({ observable: false, reason: 'launch-ledger-absent' });
+  const absent262 = SV.val(undefined);
+  assert(
+    structured262.unknown === false &&
+      counted262.unknown === false &&
+      counted262.text === '3' &&
+      nested262.unknown === false &&
+      absent262.unknown === true &&
+      sourceSaysNo262.unknown === true &&
+      String(sourceSaysNo262.why).includes('launch-ledger-absent'),
+    '262.4: a structured value is rendered from what it contains, while a field the snapshot did not carry — and only that — reads UNOBSERVABLE; where the source states its OWN inability to measure, its reason is carried through rather than replaced with our word for it'
+  );
+
+  // ── 262.5  A snapshot with no timestamp cannot render as current ─────────
+  //
+  // ⛔ THE FAILURE THIS PAGE EXISTS TO PREVENT. The file is generated on a
+  // schedule, so reading it per request makes the READ fresh, not the DATA.
+  // ⭐ GOES RED WITHOUT A REVERT: the day the snapshot format drops or renames
+  // its timestamp field. Today it carries one, so nothing here would notice a
+  // silent regression to "assume it is current" — except this.
+  const noStamp262 = SV.renderStatus({ enforced: true }, new Date(), 'probe');
+  const withStamp262 = SV.renderStatus(
+    { enforced: true, generatedAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString() },
+    new Date(),
+    'probe'
+  );
+  assert(
+    noStamp262.includes(SV.UNOBSERVABLE) &&
+      /how old it is cannot be established/.test(noStamp262) &&
+      /hours ago/.test(withStamp262),
+    '262.5: a snapshot carrying no timestamp is rendered as of UNKNOWN AGE rather than as current, and one carrying a timestamp leads with the age in words — a snapshot presented as live is the single most misleading thing this surface could do'
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the

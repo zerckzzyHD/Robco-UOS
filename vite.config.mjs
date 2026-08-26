@@ -32,6 +32,8 @@ const VIEW_CHAIN = [
   './scripts/queue-view.js', // markdown renderer — deepest
   './scripts/report-view.js', // page shell + report rendering
   './scripts/home-view.js', // landing page
+  './scripts/status-view.js', // operational snapshot
+  './scripts/ledger-view.js', // append-only log window
 ];
 function freshRequire(entry) {
   for (const id of VIEW_CHAIN) {
@@ -174,6 +176,73 @@ function homeRoute() {
         res.setHeader('Referrer-Policy', 'no-referrer');
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
         res.end(req.method === 'HEAD' ? '' : html);
+      });
+
+      // ── Shared response shape for the two read-only operational views ──────
+      const sendHtml = (req, res, code, html) => {
+        res.statusCode = code;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        res.end(req.method === 'HEAD' ? '' : html);
+      };
+
+      /**
+       * `/status` — the operational snapshot.
+       *
+       * ⛔ The file read here is GENERATED ON A SCHEDULE. Reading it per request
+       * makes the read fresh, not the data, and the renderer leads with how old
+       * the data is for exactly that reason. Nothing is cached on this side
+       * either, so the age shown is always the real one.
+       */
+      server.middlewares.use('/status', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        if (rest) return next(); // only the mount point; deeper paths are not this page
+        const control = freshRequire('./scripts/control-state.js');
+        const snap = control.readStatus();
+        const html = freshRequire('./scripts/status-view.js').renderStatus(
+          snap ? snap.data : null,
+          new Date(),
+          control.describeState()
+        );
+        return sendHtml(req, res, snap ? 200 : 404, html);
+      });
+
+      /**
+       * `/ledger` — a bounded window onto the append-only logs.
+       *
+       * ⛔⛔ TAIL ONLY, AND THAT IS A SAFETY PROPERTY, NOT A FEATURE CHOICE. The
+       * largest of these files is tens of megabytes; a whole-file read per
+       * request would allocate that much on a machine that is also serving the
+       * app. The reader this calls has no whole-file mode to reach for.
+       *
+       * ⛔ Read-only throughout: the logs are chained, so a write from a viewer
+       * would break the verifiability of every earlier record.
+       */
+      server.middlewares.use('/ledger', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        const control = freshRequire('./scripts/control-state.js');
+        const view = freshRequire('./scripts/ledger-view.js');
+        if (!rest) {
+          return sendHtml(
+            req,
+            res,
+            200,
+            view.renderLedgerIndex(control.listLogs(), control.describeState())
+          );
+        }
+        // ⛔ The name is validated inside the reader (pattern + containment).
+        // A rejected name is indistinguishable here from a missing one.
+        const tail = control.tailLog(rest);
+        return sendHtml(
+          req,
+          res,
+          tail ? 200 : 404,
+          view.renderLedgerTail(tail, control.describeState())
+        );
       });
     },
   };
