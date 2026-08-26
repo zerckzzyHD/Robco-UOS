@@ -53497,14 +53497,118 @@ if (!PLANNING_OK) {
   } catch (e) {
     statusOut249h = (e && e.stdout) || '';
   }
+  // ⚠ ASSERTED AGAINST THE UNCOVERED CASE, NOT AGAINST ONE BRANCH'S WORDING. An
+  // earlier version of this test pinned the literal "does NOT survive", and
+  // installing the logon trigger turned it red — the trigger changes which cases
+  // are covered, so that sentence is correctly no longer printed. A test that
+  // pins today's phrasing goes stale exactly like the caveat it guards, which is
+  // the failure this whole change exists to fix. What must always be true is that
+  // SLEEP is named as uncovered: the trigger fires at logon, and waking a
+  // sleeping handheld fires nothing.
   assert(
-    /does NOT survive/.test(statusOut249h) &&
-      /the machine sleeping/.test(statusOut249h) &&
+    /sleeping/i.test(statusOut249h) &&
       statusBody249h.includes('printBounds()') &&
       /npm run dev:start/.test(statusBody249h) &&
       /NOT SERVING RIGHT NOW/.test(statusBody249h),
     '249.8: `dev:status` prints the server\'s own mortality — that it does not survive a reboot, a sleep or the tailnet dropping — and names the revive command when nothing is listening, so the answer to "is it up?" carries the reason it may not be' +
       (statusOut249h ? '' : ' — status produced no output')
+  );
+}
+
+// ── 249.9  THE LOGON TRIGGER IS BOUNDED, VISIBLE, AND REMOVABLE ─────────────
+//
+// This is the one piece of PERSISTENT MACHINE STATE this repo installs. The
+// owner asked for it so the dev server is there when he needs it rather than
+// something he has to remember to summon. Everything asserted here is a bound on
+// what it may become:
+//
+//  · ONE command, ONCE per logon — no interval, no retry, no watchdog. ⛔ A thing
+//    that resurrects itself is worse than one that stays down: it overrides a
+//    deliberate stop, and "I stopped it and it came back" is a fight nobody wins.
+//  · NO NEW AUTHORITY. Its action is this repo's own `dev-server.js start`.
+//  · REMOVABLE IN ONE COMMAND. ⭐ Reducing machine state must never be harder than
+//    adding it, or a machine silently accretes things nobody can account for.
+//  · VISIBLE FROM `dev:status`, because state you cannot see from the command you
+//    would naturally run is state you will forget you installed.
+//
+// ⚠ These are PURE checks — they read the generated launcher and package.json and
+// never install or remove anything, so running the gate cannot change what is on
+// the machine.
+{
+  const AS249 = require(path.join(ROOT, 'scripts', 'dev-autostart.js'));
+  const launcher249 = AS249.launcherScript();
+  const pkg249 = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+
+  // ONE action, and no shape that could loop or retry.
+  const runCount249 = (launcher249.match(/\.Run /g) || []).length;
+  const loopish249 = /\b(Do While|Do Until|While |For |GoTo|WScript\.Quit\s*\(?\s*[^0])/i.test(
+    launcher249
+  );
+  assert(
+    runCount249 === 1 &&
+      !loopish249 &&
+      launcher249.includes(path.join(ROOT, 'scripts', 'dev-server.js')) &&
+      /dev-server\.js"" start/.test(launcher249),
+    "249.9a: the logon launcher runs EXACTLY ONE command — this repo's own dev-server start — with no loop, retry or watchdog anywhere in it, so a server stopped on purpose stays stopped until the next logon" +
+      ` — Run calls=${runCount249}${loopish249 ? ', loop-shaped construct present' : ''}`
+  );
+
+  // It cannot fight a hand-started server — inherited, not reimplemented.
+  const devSrc249i = fs.readFileSync(path.join(ROOT, 'scripts', 'dev-server.js'), 'utf8');
+  assert(
+    /REFUSED/.test(devSrc249i) &&
+      /ALREADY RUNNING/.test(devSrc249i) &&
+      !/taskkill/i.test(AS249.launcherScript()) &&
+      !/taskkill/i.test(fs.readFileSync(path.join(ROOT, 'scripts', 'dev-autostart.js'), 'utf8')),
+    '249.9b: the trigger cannot displace a server it did not start — its action is the start command, which already reports ALREADY RUNNING for its own and REFUSES a port held by anything else, and nothing in the trigger path can kill a process'
+  );
+
+  // Removable in one command, and that command is documented where it is installed.
+  assert(
+    typeof pkg249.scripts['dev:autostart'] === 'string' &&
+      typeof pkg249.scripts['dev:autostart:off'] === 'string' &&
+      typeof pkg249.scripts['dev:autostart:status'] === 'string' &&
+      /dev:autostart:off/.test(launcher249),
+    '249.9c: installing, removing and inspecting the trigger are each ONE command, and the removal command is written into the installed file itself — so somebody who finds it on the machine can undo it without finding this repo first'
+  );
+
+  // Visible from the command anybody would actually run, and never a second copy
+  // of the identifier.
+  const statusBody249i = devSrc249i.slice(
+    devSrc249i.indexOf('async function cmdStatus()'),
+    devSrc249i.indexOf('function usage()')
+  );
+  // ⚠ ASSERTED ON REAL OUTPUT, NOT ON THE SOURCE TEXT — found by re-breaking. A
+  // source scan for "logon start" passed even with the reporting line deleted,
+  // because the same words survived in the module's own error branch. Running the
+  // command cannot be fooled that way: either the line is printed or it is not.
+  let statusOut249i;
+  try {
+    statusOut249i = require('child_process').execFileSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts', 'dev-server.js'), 'status'],
+      { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+  } catch (e) {
+    statusOut249i = (e && e.stdout) || '';
+  }
+  assert(
+    /logon start\s*:/.test(statusOut249i) &&
+      /dev-autostart/.test(statusBody249i) &&
+      !statusBody249i.includes(AS249.TASK_NAME),
+    '249.9d: `dev:status` reports whether the logon trigger is installed, and asks the module that owns it rather than retyping its name — persistent machine state that is invisible to the status command is state nobody remembers installing'
+  );
+
+  // And the status probe itself must never throw, on any machine.
+  let threw249 = false;
+  try {
+    AS249.triggerStatus();
+  } catch {
+    threw249 = true;
+  }
+  assert(
+    !threw249,
+    '249.9e: the trigger probe never throws — a machine where it cannot be determined reports UNKNOWN rather than crashing the status command or, worse, claiming confidently that nothing is installed'
   );
 }
 
@@ -55951,6 +56055,11 @@ if (!PLANNING_OK) {
         [
           'scripts/dev-server.js',
           'the dev-server PID/state file — ephemeral runtime state, recreated on next start',
+        ],
+        [
+          'scripts/dev-autostart.js',
+          'the logon-trigger launcher in the user Startup folder — machine state, not repo ' +
+            'data, and rewritten wholesale by install / deleted by uninstall',
         ],
         ['tests/browser-server.mjs', 'the Playwright ws-endpoint handoff file — lives for one run'],
         ['tests/artifacts.mjs', 'failure-capture console logs — disposable test output'],

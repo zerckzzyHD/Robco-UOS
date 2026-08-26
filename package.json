@@ -33,7 +33,10 @@
     "architecture-toc": "node scripts/generate-architecture-toc.js",
     "architecture-toc:check": "node scripts/generate-architecture-toc.js --check",
     "code-map": "node scripts/generate-code-map.js",
-    "code-map:check": "node scripts/generate-code-map.js --check"
+    "code-map:check": "node scripts/generate-code-map.js --check",
+    "dev:autostart": "node scripts/dev-autostart.js install",
+    "dev:autostart:off": "node scripts/dev-autostart.js uninstall",
+    "dev:autostart:status": "node scripts/dev-autostart.js status"
   },
   "repository": {
     "type": "git",

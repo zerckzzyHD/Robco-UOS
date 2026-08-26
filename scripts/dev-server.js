@@ -205,13 +205,48 @@ function reportBranch() {
   console.log('');
 }
 
+/**
+ * ⚠ THIS TEXT IS DERIVED FROM WHETHER THE LOGON TRIGGER IS ACTUALLY INSTALLED,
+ * not written once and trusted. It used to say flatly that this server does not
+ * survive a reboot. With the trigger installed that is FALSE — and a stale
+ * caveat is worse than no caveat, because it is believed. It is also worse than
+ * an over-broad one, because the reader stops checking the cases it names.
+ *
+ * ⛔ THE UNCOVERED CASES ARE NAMED INDIVIDUALLY RATHER THAN SUMMARISED. "Mostly
+ * covered" is the reading that gets somebody stuck on a phone with a dead URL:
+ * the trigger fires at LOGON, so waking a sleeping handheld does not fire it,
+ * and neither does stopping the server by hand. Those are the two most common
+ * ways it will actually be down, and they stay the reader's problem.
+ */
 function printBounds() {
+  let trigger = { installed: null };
+  try {
+    trigger = require('./dev-autostart.js').triggerStatus();
+  } catch {
+    /* the module is optional to this display; unknown is reported as unknown */
+  }
   console.log('');
-  console.log('  This is a detached process, not a service. It does NOT survive:');
-  console.log('    - a reboot');
-  console.log('    - the machine sleeping (this is a handheld, and it sleeps)');
-  console.log('    - Tailscale dropping, or logging out of the tailnet');
-  console.log('  After any of those, run start again.');
+  if (trigger.installed === true) {
+    console.log('  Logon trigger INSTALLED -- this comes back on its own after:');
+    console.log('    - a reboot (at the next logon, ~30s after)');
+    console.log('    - logging out and back in');
+    console.log('  ⛔ It does NOT come back after:');
+    console.log('    - the machine sleeping and waking (no logon happens, so nothing fires)');
+    console.log('    - stopping it by hand -- deliberately: nothing resurrects a');
+    console.log('      server you chose to stop');
+    console.log('    - Tailscale dropping (the server survives; the tailnet URL does not)');
+    console.log('  After any of those, run start again.');
+    console.log('  remove trigger : npm run dev:autostart:off');
+  } else {
+    console.log('  This is a detached process, not a service. It does NOT survive:');
+    console.log('    - a reboot');
+    console.log('    - the machine sleeping (this is a handheld, and it sleeps)');
+    console.log('    - Tailscale dropping, or logging out of the tailnet');
+    console.log('  After any of those, run start again.');
+    if (trigger.installed === false) {
+      console.log('  start it automatically at logon : npm run dev:autostart');
+    }
+  }
 }
 
 function printUrls(port, phoneReachable) {
@@ -382,6 +417,26 @@ async function cmdStatus() {
     console.log('  recorded    : nothing (not started by this script)');
   }
   console.log('  port ' + port + '   : ' + (listening ? 'listening' : 'nothing listening'));
+
+  // ⭐ PERSISTENT MACHINE STATE MUST BE VISIBLE FROM THE COMMAND SOMEBODY ASKS.
+  // The logon trigger is a thing installed on this machine that starts a server
+  // on its own. If `status` reported only whether the process is up, that state
+  // would be invisible to the one question anybody asks about it — and invisible
+  // machine state is how a box accumulates things nobody can account for. The
+  // name comes from the module that owns it, never retyped here.
+  try {
+    const t = require('./dev-autostart.js').triggerStatus();
+    console.log(
+      '  logon start : ' +
+        (t.installed === true
+          ? 'INSTALLED (starts at logon; remove with npm run dev:autostart:off)'
+          : t.installed === false
+            ? 'not installed (npm run dev:autostart to enable)'
+            : 'UNKNOWN -- ' + t.detail)
+    );
+  } catch {
+    console.log('  logon start : UNKNOWN (trigger module unreadable)');
+  }
 
   if (listening && !alive) {
     console.log('');
