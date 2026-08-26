@@ -26,6 +26,35 @@ library/*
 # is not served/precached so there is no cache concern.
 queue-view/
 
+# Credential shapes — never committed. This repository is PUBLIC, and a pushed
+# secret cannot be recalled: deleting it later leaves it in the history and in
+# every clone, so the only cheap moment is before the first commit.
+#
+# Verified when these were added: no file of any of these shapes was tracked or
+# present on disk, so this is preventive rather than a lid on an existing leak.
+# That distinction matters — .gitignore has NO effect on a file that is already
+# tracked, so a pattern added over a committed secret would look like a fix while
+# changing nothing at all.
+#
+# The real credential store for this machine lives outside every repository by
+# design, and nothing here should be read as making it safe to move one in.
+.env
+.env.*
+# ...but a committed EXAMPLE is a normal thing to want, and it holds no values.
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+.netrc
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*credentials.json
+*-creds.json
+
 # Dependencies
 node_modules/
 

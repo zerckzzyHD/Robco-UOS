@@ -53714,6 +53714,94 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 249.11  CREDENTIAL SHAPES CANNOT BE COMMITTED TO THIS PUBLIC REPO ───────
+//
+// This repository is PUBLIC and a pushed secret cannot be recalled — deleting it
+// later leaves it in the history and in every clone. The only cheap moment is
+// before the first commit, which makes this a preventive check rather than a
+// detective one.
+//
+// ⭐ IT ASKS GIT, IT DOES NOT READ THE FILE. Reading `.gitignore` for a pattern
+// proves the pattern is written down; it does not prove git AGREES, and the two
+// come apart easily — an earlier negation, an ordering mistake, or a directory
+// rule that shadows a later line. `git check-ignore` is the same decision git
+// makes when somebody types `git add`, so it is the only answer worth asserting.
+//
+// ⛔ AND IT CHECKS A CONTROL. A predicate that returns "ignored" for everything
+// would pass a shapes-only test while quietly ignoring the whole repository, so
+// ordinary tracked paths are asserted NOT ignored in the same breath.
+//
+// ⚠ THREE-VALUED, NEVER A SILENT PASS. Where git cannot be consulted at all, the
+// strong half is reported UNOBSERVABLE rather than assumed — and the weak half (is
+// the pattern even written?) still runs, so the check degrades to a lesser claim
+// instead of to a green.
+{
+  const { execFileSync } = require('child_process');
+  const SHAPES = [
+    '.env',
+    '.env.local',
+    'sub/dir/.env',
+    'server.pem',
+    'tls/private.key',
+    'cert.p12',
+    'cert.pfx',
+    'id_rsa',
+    'id_rsa.pub',
+    '.netrc',
+    'app-credentials.json',
+    'service-creds.json',
+  ];
+  // Ordinary paths that must stay committable — the control against a predicate
+  // that says "ignored" to everything. `.env.example` is here deliberately: a
+  // valueless template is a normal thing to commit, and the negation that allows
+  // it is exactly the kind of line that can invert a rule by accident.
+  const CONTROLS = ['.env.example', 'index.html', 'js/core/state.js', 'README.md'];
+
+  let gitUsable249k = true;
+  const isIgnored249k = p => {
+    try {
+      execFileSync('git', ['check-ignore', '-q', '--', p], {
+        cwd: ROOT,
+        stdio: ['ignore', 'ignore', 'ignore'],
+      });
+      return true; // exit 0 → ignored
+    } catch (e) {
+      // exit 1 is the documented "not ignored" answer; anything else means the
+      // question could not be asked, and that is NOT an answer.
+      if (e && e.status === 1) return false;
+      gitUsable249k = false;
+      return null;
+    }
+  };
+
+  const notIgnored249k = SHAPES.filter(p => isIgnored249k(p) === false);
+  const wronglyIgnored249k = gitUsable249k ? CONTROLS.filter(p => isIgnored249k(p) === true) : [];
+
+  // The weaker half, which runs even where git cannot be consulted. Fixed-string
+  // containment, never a pattern match — a regex probe on this kind of text is how
+  // a check reports a confident zero it did not earn.
+  const ignoreText249k = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
+  const WRITTEN = ['.env', '*.pem', '*.key', '.netrc', 'id_rsa'];
+  const missingPatterns249k = WRITTEN.filter(p => !ignoreText249k.split('\n').includes(p));
+
+  if (gitUsable249k) {
+    assert(
+      notIgnored249k.length === 0 && wronglyIgnored249k.length === 0,
+      '249.11: git itself refuses to stage credential-shaped files in this PUBLIC repo — asserted by asking `git check-ignore`, the same decision `git add` makes, and paired with ordinary paths proved still committable so a blanket-ignore cannot pass as success' +
+        (notIgnored249k.length ? ` — NOT IGNORED: ${notIgnored249k.join(', ')}` : '') +
+        (wronglyIgnored249k.length
+          ? ` — ⛔ CONTROL WRONGLY IGNORED: ${wronglyIgnored249k.join(', ')}`
+          : '')
+    );
+  } else {
+    assert(
+      missingPatterns249k.length === 0,
+      '249.11 [UNOBSERVABLE — git could not be consulted, so this is the WEAKER claim]: the credential patterns are present in .gitignore, but whether git agrees was NOT verified here' +
+        (missingPatterns249k.length ? ` — MISSING: ${missingPatterns249k.join(', ')}` : '')
+    );
+  }
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the
