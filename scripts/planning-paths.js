@@ -205,6 +205,32 @@ function readReport(name) {
   }
 }
 
+/**
+ * The generated roadmap board, read from the planning tree AT THE MOMENT OF USE.
+ *
+ * ⛔ NEVER CACHED, and that is the whole contract. The board is regenerated as
+ * work closes — sometimes while a page is being read — so a snapshot held in
+ * memory would show a stale picture while presenting it as the current one. That
+ * is worse than showing nothing: the entire point of the board is that it matches
+ * reality. Returns {text, mtime} so the reader can judge freshness themselves,
+ * or null when the tree is unreachable.
+ *
+ * ⚠ ROADMAP.md is deliberately NOT in PLANNING_FILES — see planningWritePath().
+ * It is an OUTPUT of this repo, and requiring it to exist would make a checkout
+ * that simply has not generated it yet read as a checkout with no planning tree.
+ */
+function readRoadmap() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'ROADMAP.md');
+  if (!safeIsFile(full)) return null;
+  try {
+    return { text: fs.readFileSync(full, 'utf8'), mtime: fs.statSync(full).mtime };
+  } catch {
+    return null;
+  }
+}
+
 /** The reports-tree counterpart of describe() — printed next to any empty state. */
 function describeReports() {
   const dir = reportsDir();
@@ -249,5 +275,6 @@ module.exports = {
   reportFile,
   listReports,
   readReport,
+  readRoadmap,
   describeReports,
 };

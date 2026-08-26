@@ -53612,6 +53612,84 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 249.10  THE BOARD ON THE REPORTS PAGE ───────────────────────────────────
+//
+// The owner reads this to answer one standing question: how much is left. That
+// makes two properties load-bearing.
+//
+//  ⛔ FRESH, NEVER CACHED. The board is regenerated as work closes — sometimes
+//    while the page is being read. A snapshot held in memory would present a
+//    stale picture as the current one, which defeats the only thing the board is
+//    for. It is read at request time and the page states when it was rebuilt, so
+//    the reader can judge freshness rather than trust it.
+//  ⛔ NOTHING HIDDEN. "Digestible" is solved with ORDER and DEFAULT STATE, never
+//    by dropping rows: every band appears with its true count and every row is
+//    reachable. A view that quietly shortened a band would be the generated board
+//    reproducing the unreadability it was built to end.
+{
+  const RVj = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const DONE = String.fromCodePoint(0x2705);
+  const board249j = [
+    '# Board',
+    '',
+    '**7** ID-bearing items',
+    '',
+    '## 🔄 Active (2)',
+    '',
+    '- **AA1** — doing a thing',
+    '  - _Done when:_ the thing is done and recorded somewhere durable.',
+    '- **AA2** — ' + DONE + ' shipped already but still filed open',
+    '',
+    '## ⚠️ Attention (1)',
+    '',
+    '- **BB1** — a decision only you can make',
+    '',
+    '## ⬜ Backlog — 4 items',
+    '',
+    '> A COUNT, deliberately not a list.',
+    '',
+  ].join('\n');
+  const when249j = new Date(2026, 7, 25, 21, 42);
+  const html249j = RVj.renderIndex([], 'note', { text: board249j, mtime: when249j });
+
+  assert(
+    /<h1>Roadmap<\/h1>/.test(html249j) &&
+      html249j.indexOf('<h1>Roadmap</h1>') < html249j.indexOf('<h2>Reports</h2>'),
+    '249.10a: the board is the HEADLINE of the page rather than a link on it — it is the thing being opened first, and a link to the answer is not the answer'
+  );
+
+  // Every band present with its real count, and the counted band not re-listed.
+  assert(
+    /Active <span class="c">2<\/span>/.test(html249j) &&
+      /Attention <span class="c">1<\/span>/.test(html249j) &&
+      /Backlog <span class="c">4<\/span>/.test(html249j) &&
+      /AA1/.test(html249j) &&
+      /BB1/.test(html249j),
+    '249.10b: every band is rendered with the count the board states, and rows are carried through — structure and default open-state do the work of making this readable, so nothing is dropped to achieve it'
+  );
+
+  // ⭐ The number that answers the question, and its scope is honest.
+  assert(
+    /<span class="n">1<\/span><span class="k">already finished but still filed as open/.test(
+      html249j
+    ) && /listed rows only/.test(html249j),
+    '249.10c: rows whose own text reports finished work while still filed open are COUNTED and named — the board disagreeing with reality is the honest part of "how much is left" — and the count states that it covers listed rows only, because a counted band cannot be inspected'
+  );
+
+  // Freshness is shown, and the render is a pure function of what it was handed.
+  const again249j = RVj.renderIndex([], 'note', { text: board249j, mtime: when249j });
+  const other249j = RVj.renderIndex([], 'note', {
+    text: board249j.replace('Active (2)', 'Active (9)'),
+    mtime: when249j,
+  });
+  assert(
+    /Rebuilt <strong>2026-08-25 21:42<\/strong>/.test(html249j) &&
+      again249j === html249j &&
+      other249j !== html249j,
+    '249.10d: the page states when the board was rebuilt, and the render reflects the text it was given rather than anything remembered — the same input renders identically and a changed board renders differently, which is what "read fresh every time" has to mean'
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the

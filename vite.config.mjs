@@ -59,7 +59,14 @@ function reportsRoute() {
         };
         // `req.url` is already relative to the mount point.
         const raw = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
-        if (!raw) return send(200, view.renderIndex(paths.listReports(), paths.describeReports()));
+        if (!raw)
+          // ⛔ Both read AT REQUEST TIME. The board is regenerated as work closes,
+          // sometimes mid-read, so a cached copy would present a stale picture as
+          // the current one -- which defeats the only thing the board is for.
+          return send(
+            200,
+            view.renderIndex(paths.listReports(), paths.describeReports(), paths.readRoadmap())
+          );
         // ⛔ The name is validated inside planning-paths (pattern + containment).
         // A rejected name is indistinguishable here from a missing one, on purpose.
         const md = paths.readReport(raw);

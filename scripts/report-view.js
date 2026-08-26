@@ -119,6 +119,29 @@ ul.reports li { margin:0; border-bottom:1px solid var(--line); }
 ul.reports a { display:block; padding:1rem .25rem; min-height:44px;
   text-decoration:none; font-weight:600; }
 .note { color:var(--dim); font-size:.9rem; }
+/* Counts strip. auto-fit rather than a fixed column count: at 375px it settles
+   into two columns without a media query, and widens on its own. */
+ul.stats { list-style:none; padding:0; margin:1rem 0 1.25rem; display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(9.5rem, 1fr)); gap:.5rem; }
+ul.stats li { margin:0; background:var(--code); border:1px solid var(--line);
+  border-radius:8px; padding:.65rem .7rem; }
+ul.stats .n { display:block; font-size:1.6rem; font-weight:700; line-height:1.1;
+  color:var(--acc); }
+ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
+ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
+details.band, details.drift { border:1px solid var(--line); border-radius:8px;
+  margin:.6rem 0; background:var(--bg); }
+details.band > summary, details.drift > summary { cursor:pointer; font-weight:700;
+  padding:.85rem .75rem; min-height:44px; display:flex; align-items:center;
+  gap:.5rem; justify-content:space-between; }
+details.band > summary .c { background:var(--code); border:1px solid var(--line);
+  border-radius:999px; padding:.1rem .55rem; font-size:.85rem; color:var(--fg); }
+details.band > *:not(summary), details.drift > *:not(summary) { padding:0 .75rem; }
+details.band > p.note { margin-top:0; }
+details.band ul { padding-left:1.15rem; }
+details.drift { border-color:var(--hi); }
+details.drift code { font-weight:700; }
+hr + h2 { margin-top:1.2rem; }
 .empty { border:1px dashed var(--line); border-radius:8px; padding:1rem; }
 `;
 
@@ -188,19 +211,203 @@ function renderReport(name, markdown) {
   });
 }
 
-/** Render the index of available reports. */
-function renderIndex(names, note) {
-  const body = names.length
-    ? `<h1>Reports</h1>\n<ul class="reports">${names
+/**
+ * ⭐ THE BOARD, ORDERED THE WAY THE QUESTION IS ASKED.
+ *
+ * The brief is "digestible AND fully understandable", and those pull against each
+ * other. ⛔ It is NOT solved by hiding: every band is present, with its real
+ * count, and nothing is truncated. It is solved by ORDER and by DEFAULT STATE —
+ * the bands describing work in motion, and the ones waiting on a decision, are
+ * open on first paint; the long inert ones are collapsed but one tap away and
+ * still announce their size. A reader sees the shape of the whole thing without a
+ * wall of text, and can reach every row without leaving the page.
+ *
+ * ⚠ The band ORDER here is this surface's own, not the generator's. The board
+ * lists bands in the shared status vocabulary's order; a person opening this at
+ * 7am wants "what is moving", "what needs me", "what is next" first, and the
+ * parked/backlog mass last. Reordering a VIEW is not disagreeing with the source
+ * — no row moves band, and no count changes.
+ */
+const BAND_ORDER = [
+  'Active',
+  'Attention',
+  'Ready',
+  'Deferred',
+  'Parked',
+  'Backlog',
+  'UNCLASSIFIED',
+];
+// ⚠ WHICH BANDS OPEN ON THEIR OWN WAS MEASURED AT 375px, NOT CHOSEN BY TASTE.
+// Opening Ready too put 156 rows and ~28,800px on first paint — about thirty-five
+// phone screens, which is the wall of text this page exists to replace. Open are
+// the two bands that are ACTIONABLE RIGHT NOW (being worked on; waiting on a
+// decision) plus UNCLASSIFIED, which is tiny and is the one band whose whole
+// point is being seen. ⛔ Nothing is hidden by this: every other band is present,
+// carries its true count in its header, and is one tap from fully listed.
+const BAND_OPEN = new Set(['Active', 'Attention', 'UNCLASSIFIED']);
+const BAND_BLURB = {
+  Active: 'Being worked on right now.',
+  Attention: 'Waiting on you — a decision, a ruling, or a question to answer.',
+  Ready: 'Specified and unblocked. Could be started next.',
+  Deferred: 'Deliberately put off, with a reason.',
+  Parked: 'Stopped on purpose. Not abandoned, not scheduled.',
+  Backlog: 'Everything else that is filed but not yet in motion.',
+  UNCLASSIFIED:
+    'Carries no recognised status — worth a look precisely because nothing could file it.',
+};
+
+/** Split the generated board into its `## ` sections, preserving body lines. */
+function splitSections(md) {
+  const out = [];
+  let cur = null;
+  for (const line of String(md).replace(/\r\n/g, '\n').split('\n')) {
+    const h = /^##\s+(.*)$/.exec(line);
+    if (h) {
+      cur = { heading: h[1].trim(), lines: [] };
+      out.push(cur);
+    } else if (cur) {
+      cur.lines.push(line);
+    }
+  }
+  return out;
+}
+
+/** `## ⏭️ Ready (43)` → {label:'Ready', count:43}; `## ⬜ Backlog — 187 items` too. */
+function bandOf(heading) {
+  const paren = /^(.*?)\s*\((\d+)\)\s*$/.exec(heading);
+  const dash = /^(.*?)\s*—\s*(\d+)\s+items?\s*$/.exec(heading);
+  const m = paren || dash;
+  if (!m) return null;
+  const label = m[1].replace(/[\p{Extended_Pictographic}️‍]/gu, '').trim();
+  return { label, count: Number(m[2]) };
+}
+
+const DONE_MARK = String.fromCodePoint(0x2705);
+
+/**
+ * Render the board as the headline of the reports page.
+ * @param {string} md   the generated board, read fresh
+ * @param {Date}   when when it was last regenerated
+ */
+function renderRoadmapSection(md, when) {
+  const sections = splitSections(md);
+  const bands = new Map();
+  for (const s of sections) {
+    const b = bandOf(s.heading);
+    if (b) bands.set(b.label, { ...b, lines: s.lines });
+  }
+
+  // ⭐ "HOW MUCH IS LEFT" IS THE QUESTION, so the numbers answer it directly.
+  const n = k => (bands.get(k) ? bands.get(k).count : 0);
+  const listedRows = [];
+  for (const [label, b] of bands) {
+    for (const line of b.lines) {
+      const r = /^- \*\*([A-Za-z0-9]+)\*\*\s+—\s+(.*)$/.exec(line);
+      if (r) listedRows.push({ band: label, id: r[1], title: r[2] });
+    }
+  }
+  // ⚠ DERIVED FROM THE BOARD, AND ITS SCOPE IS STATED. These are rows whose own
+  // text already reports finished work while the row is still filed as open —
+  // the board disagreeing with reality. It can only be counted over LISTED rows:
+  // the backlog is a count on this board, not a list, so its rows cannot be
+  // inspected here and are honestly excluded rather than guessed at.
+  const disagreeing = listedRows.filter(r => r.title.includes(DONE_MARK));
+  const inMotion = n('Active') + n('Ready');
+  const total = [...bands.values()].reduce((a, b) => a + b.count, 0);
+
+  const stat = (v, label, hint) =>
+    `<li><span class="n">${v}</span><span class="k">${escapeHtml(label)}</span>` +
+    (hint ? `<span class="h">${escapeHtml(hint)}</span>` : '') +
+    `</li>`;
+
+  const counts =
+    `<ul class="stats">` +
+    stat(n('Active'), 'in flight', 'being worked on now') +
+    stat(n('Attention'), 'need you', 'a decision only you can make') +
+    stat(n('Ready'), 'ready to start', 'specified and unblocked') +
+    stat(inMotion, 'before it is done', 'active + ready, the work that remains in motion') +
+    stat(
+      n('Backlog') + n('Parked') + n('Deferred'),
+      'filed for later',
+      'backlog, parked and deferred'
+    ) +
+    stat(
+      disagreeing.length,
+      'already finished but still filed as open',
+      'the board disagreeing with reality — counted over the ' +
+        listedRows.length +
+        ' listed rows only'
+    ) +
+    `</ul>`;
+
+  const disagreeList = disagreeing.length
+    ? `<details class="drift"><summary>Which ${disagreeing.length} disagree (${disagreeing.length} of ${listedRows.length} listed)</summary>` +
+      `<ul>${disagreeing
+        .map(
+          r =>
+            `<li><code>${escapeHtml(r.id)}</code> <span class="k">${escapeHtml(r.band)}</span></li>`
+        )
+        .join('')}</ul>` +
+      `<p class="note">Each of these says somewhere in its own text that work is finished, while still sitting in an open band. ` +
+      `The backlog is a count on this board rather than a list, so its items are not included in this check.</p></details>`
+    : '';
+
+  const bandHtml = BAND_ORDER.filter(k => bands.has(k))
+    .map(k => {
+      const b = bands.get(k);
+      const open = BAND_OPEN.has(k) && b.count > 0 ? ' open' : '';
+      return (
+        `<details class="band"${open}><summary>${escapeHtml(k)} <span class="c">${b.count}</span></summary>` +
+        `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
+        mdToHtml(b.lines) +
+        `</details>`
+      );
+    })
+    .join('\n');
+
+  const stamp = when
+    ? `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`
+    : 'unknown';
+
+  return (
+    `<h1>Roadmap</h1>` +
+    `<p class="note">${total} items on the board. Rebuilt <strong>${escapeHtml(stamp)}</strong> — ` +
+    `read fresh from the file every time this page loads, never cached.</p>` +
+    counts +
+    disagreeList +
+    `<h2>The whole board</h2>` +
+    `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
+    `the rest are one tap away — nothing is hidden or shortened.</p>` +
+    bandHtml
+  );
+}
+
+/**
+ * The landing page: the BOARD first, the reports under it.
+ *
+ * ⭐ The roadmap is the headline rather than a link, because it is the thing
+ * being opened first — "how much is left" is the standing question, and a link
+ * to the answer is not the answer.
+ */
+function renderIndex(names, note, board) {
+  const reports = names.length
+    ? `<h2>Reports</h2>\n<ul class="reports">${names
         .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
         .join('')}</ul>`
-    : `<h1>Reports</h1>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
+    : `<h2>Reports</h2>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
 <p class="note">The reports live outside this repository by design, so a checkout without the private
 sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
+
+  const roadmap = board
+    ? renderRoadmapSection(board.text, board.mtime)
+    : `<h1>Roadmap</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
+<p class="note">The board is generated into the private planning tree, which a public clone does not
+have. That is the normal state, not an error.</p></div>`;
+
   return page({
-    title: 'Reports',
+    title: 'Roadmap',
     crumb: '',
-    body: `${body}\n<p class="note">${escapeHtml(note || '')}</p>`,
+    body: `${roadmap}\n<hr>\n${reports}\n<p class="note">${escapeHtml(note || '')}</p>`,
   });
 }
 
