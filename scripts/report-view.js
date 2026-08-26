@@ -1,0 +1,216 @@
+#!/usr/bin/env node
+/**
+ * scripts/report-view.js — renders a private markdown report into ONE
+ * self-contained, phone-readable HTML page.
+ *
+ * ── ⛔ THIS FILE IS A RENDERER. IT CONTAINS NO REPORT CONTENT, AND MUST NOT ───
+ * The reports themselves are private and live OUTSIDE this repo (resolved by
+ * scripts/planning-paths.js). This module never writes anything: it takes
+ * markdown in and returns an HTML string, which the dev-server middleware puts
+ * straight into a response body. Nothing is generated into the checkout, so there
+ * is nothing here for a commit — or a static file server — to pick up.
+ *
+ * ⚠ Do not add an "output to disk" mode. The moment a rendered report exists as a
+ * file, the question changes from "can this leak?" (no — it is never on disk) to
+ * "is the directory it lands in excluded from everything?", which is a promise a
+ * single forgotten exclusion entry breaks. That failure has already happened once
+ * on this project with a generator's exclusion list.
+ *
+ * ── Markdown is rendered by scripts/queue-view.js's mdToHtml (Protocol 22) ────
+ * That is the project's one markdown renderer, already hardened for fenced code,
+ * code-span pairing, emphasis flanking and strikethrough. Growing a second
+ * renderer here would mean two different answers to "what does this markdown
+ * mean", and the older surface would quietly keep the bugs the newer one fixed.
+ */
+'use strict';
+
+const { mdToHtml } = require('./queue-view.js');
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * The page's stylesheet, inline.
+ *
+ * ⚠ EVERY RULE HERE IS AIMED AT A PHONE AT 7AM, not at looking like the app. The
+ * reports are long-form prose read once, on a small screen, in one sitting:
+ *
+ *  · a MEASURE cap (~34em) so lines stay readable — the default full-bleed width
+ *    on a wide phone in landscape is the single worst thing for long prose;
+ *  · a system font stack, because a webfont is a network round-trip this page
+ *    must not need (it is served off a laptop over a tailnet, sometimes slowly);
+ *  · `word-break` on code, since these reports quote long paths and hashes that
+ *    would otherwise push the whole page sideways;
+ *  · tables in their own horizontal scroller (emitted by the renderer) — a wide
+ *    table is the one block that genuinely cannot reflow;
+ *  · generous tap targets on the contents links and headings, which are the only
+ *    interactive elements on the page;
+ *  · both colour schemes honoured, because the phone decides, not this file.
+ *
+ * ⭐ THE ⭐/⚠/⛔ MARKERS ARE LOAD-BEARING PUNCTUATION IN THESE DOCUMENTS and must
+ * survive legibly. They are left in the text (never stripped, never replaced with
+ * a class) and the body font-size is kept large enough that they read as
+ * distinct glyphs rather than grey smudges at arm's length.
+ */
+const STYLE = `
+:root { color-scheme: light dark; --bg:#0f1210; --fg:#d7e2d8; --dim:#8b9a8d;
+        --acc:#6fdc8c; --line:#2a332c; --code:#141915; --hi:#f5c451; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#f7f9f7; --fg:#1b211c; --dim:#5b665d; --acc:#1f7a43;
+          --line:#d8e0d9; --code:#eef2ee; --hi:#8a6d1f; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin:0; background:var(--bg); color:var(--fg);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
+.wrap { max-width: 34em; margin: 0 auto; padding: 1rem 1.05rem 4rem; }
+header.top { position: sticky; top:0; z-index:5; background:var(--bg);
+  border-bottom:1px solid var(--line); padding:.6rem 1.05rem;
+  display:flex; gap:.75rem; align-items:baseline; }
+header.top a { color:var(--acc); text-decoration:none; font-weight:600;
+  padding:.5rem 0; min-height:44px; display:inline-flex; align-items:center; }
+header.top .name { color:var(--dim); font-size:.85rem; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+h1 { font-size:1.5rem; line-height:1.25; margin:1.2rem 0 .6rem; }
+h2 { font-size:1.25rem; line-height:1.3; margin:2rem 0 .5rem;
+  padding-top:.4rem; border-top:1px solid var(--line); scroll-margin-top:4rem; }
+h3 { font-size:1.08rem; margin:1.5rem 0 .4rem; scroll-margin-top:4rem; }
+h4, p.subh { font-size:1rem; font-weight:700; margin:1.2rem 0 .3rem; color:var(--fg); }
+p { margin:.7rem 0; overflow-wrap:break-word; }
+ul, ol { margin:.6rem 0; padding-left:1.35rem; }
+li { margin:.35rem 0; }
+blockquote { margin:.8rem 0; padding:.5rem .85rem; border-left:3px solid var(--acc);
+  background:var(--code); color:var(--fg); border-radius:0 6px 6px 0; }
+code { background:var(--code); padding:.12em .35em; border-radius:4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:.88em; overflow-wrap:anywhere; word-break:break-word; }
+pre { background:var(--code); padding:.75rem .85rem; border-radius:8px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; }
+pre code { background:none; padding:0; white-space:pre; overflow-wrap:normal;
+  word-break:normal; }
+.tablewrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:.9rem 0;
+  border:1px solid var(--line); border-radius:8px; }
+table { border-collapse:collapse; width:100%; font-size:.92rem; }
+th, td { border-bottom:1px solid var(--line); padding:.5rem .6rem;
+  text-align:left; vertical-align:top; }
+th { background:var(--code); font-weight:700; white-space:nowrap; }
+tr:last-child td { border-bottom:none; }
+hr { border:none; border-top:1px solid var(--line); margin:2rem 0; }
+a { color:var(--acc); overflow-wrap:anywhere; }
+strong { color:var(--fg); }
+nav.toc { background:var(--code); border:1px solid var(--line); border-radius:8px;
+  padding:.35rem .5rem; margin:1rem 0 1.5rem; }
+nav.toc summary { cursor:pointer; padding:.55rem .35rem; font-weight:600;
+  min-height:44px; display:flex; align-items:center; }
+nav.toc ol { list-style:none; margin:.2rem 0 .4rem; padding-left:.35rem; }
+nav.toc li { margin:0; }
+nav.toc a { display:block; padding:.6rem .35rem; min-height:44px;
+  text-decoration:none; border-top:1px solid var(--line); }
+nav.toc li:first-child a { border-top:none; }
+nav.toc .lvl3 { padding-left:1.2rem; color:var(--dim); font-size:.94rem; }
+ul.reports { list-style:none; padding:0; }
+ul.reports li { margin:0; border-bottom:1px solid var(--line); }
+ul.reports a { display:block; padding:1rem .25rem; min-height:44px;
+  text-decoration:none; font-weight:600; }
+.note { color:var(--dim); font-size:.9rem; }
+.empty { border:1px dashed var(--line); border-radius:8px; padding:1rem; }
+`;
+
+/** Wrap rendered body HTML in the full document shell. */
+function page({ title, crumb, body }) {
+  return `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>${escapeHtml(title)}</title>
+<style>${STYLE}</style>
+</head><body>
+<header class="top"><a href="/reports/">&#8592; Reports</a><span class="name">${escapeHtml(crumb || '')}</span></header>
+<main class="wrap">
+${body}
+</main></body></html>`;
+}
+
+/**
+ * Build a tappable contents list from the rendered HTML's own headings.
+ *
+ * ⚠ Derived from the OUTPUT, not from a second parse of the markdown. A separate
+ * pass over the source would be a second reader of the same document, free to
+ * disagree with the one that produced the page — the anchors would drift from the
+ * headings they point at and the contents would quietly stop working.
+ */
+function buildToc(html) {
+  const items = [];
+  const withIds = html.replace(/<(h[23])>([\s\S]*?)<\/\1>/g, (m, tag, inner) => {
+    const text = inner.replace(/<[^>]*>/g, '').trim();
+    if (!text) return m;
+    const id = 's' + (items.length + 1);
+    items.push({ id, tag, text });
+    return `<${tag} id="${id}">${inner}</${tag}>`;
+  });
+  if (items.length < 3) return { html: withIds, toc: '' };
+  const lis = items
+    .map(
+      it =>
+        `<li><a class="${it.tag === 'h3' ? 'lvl3' : ''}" href="#${it.id}">${escapeHtml(it.text)}</a></li>`
+    )
+    .join('');
+  const toc = `<nav class="toc"><details><summary>Contents (${items.length})</summary><ol>${lis}</ol></details></nav>`;
+  return { html: withIds, toc };
+}
+
+/** Render one report's markdown into a complete page. */
+function renderReport(name, markdown) {
+  const lines = String(markdown).replace(/\r\n/g, '\n').split('\n');
+  // The document's own leading `# ` line becomes the page title rather than a
+  // second heading stacked under the one the shell already shows.
+  let title = name;
+  let start = 0;
+  while (start < lines.length && !lines[start].trim()) start++;
+  const h1 = /^#\s+(.*)$/.exec(lines[start] || '');
+  if (h1) {
+    title = h1[1].replace(/[*_`]/g, '').trim();
+    start++;
+  }
+  const rendered = mdToHtml(lines.slice(start));
+  const { html, toc } = buildToc(rendered);
+  return page({
+    title,
+    crumb: name,
+    body: `<h1>${escapeHtml(title)}</h1>\n${toc}\n${html}`,
+  });
+}
+
+/** Render the index of available reports. */
+function renderIndex(names, note) {
+  const body = names.length
+    ? `<h1>Reports</h1>\n<ul class="reports">${names
+        .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
+        .join('')}</ul>`
+    : `<h1>Reports</h1>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
+<p class="note">The reports live outside this repository by design, so a checkout without the private
+sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
+  return page({
+    title: 'Reports',
+    crumb: '',
+    body: `${body}\n<p class="note">${escapeHtml(note || '')}</p>`,
+  });
+}
+
+/** The 404 page — deliberately says nothing about what does exist. */
+function renderNotFound() {
+  return page({
+    title: 'Not found',
+    crumb: '',
+    body: `<h1>Not found</h1><p>No report by that name.</p>`,
+  });
+}
+
+module.exports = { renderReport, renderIndex, renderNotFound, page, escapeHtml, buildToc };

@@ -558,11 +558,36 @@ function mdToHtml(bodyLines) {
       i = f.next;
       continue;
     }
+    // ⛔ TOP-LEVEL HEADING (# .. ###) — THIS BRANCH IS A HANG FIX, NOT A FEATURE.
+    // `isSpecial()` counts every `#`-led line as special, so the paragraph gather
+    // below refuses to consume one; with no branch above it claiming `#`..`###`,
+    // the loop pushed an empty <p> and never advanced `i` — an infinite loop that
+    // pins a CPU. It was unreachable only because the queue view feeds this
+    // function ITEM BODIES, and an item's own `###` heading is stripped by
+    // parseQueue before it gets here. The moment any other document is rendered
+    // through this renderer, the first `##` in it hangs the caller. Rendering the
+    // heading is the fix; leaving the sub-heading rule below untouched keeps the
+    // queue view's existing output byte-identical.
+    const th = /^(#{1,3})\s+(.*)$/.exec(line);
+    if (th) {
+      const level = th[1].length + 1; // h2..h4 — the PAGE owns <h1>
+      out.push(`<h${level}>${inline(th[2].trim())}</h${level}>`);
+      i++;
+      continue;
+    }
     // sub-heading (#### and deeper) inside a body
     const sh = /^(#{4,6})\s+(.*)$/.exec(line);
     if (sh) {
       out.push(`<p class="subh">${inline(sh[2].trim())}</p>`);
       i++;
+      continue;
+    }
+    // GFM table — a header row followed by a delimiter row. Both are required, so
+    // a line that merely contains pipes stays a paragraph.
+    if (isTableStart(L, i)) {
+      const t = takeTable(L, i);
+      out.push(t.html);
+      i = t.next;
       continue;
     }
     // blockquote — accumulate ALL the quote lines and inline() ONCE (joined by
@@ -595,6 +620,19 @@ function mdToHtml(bodyLines) {
       buf.push(L[i].trim());
       i++;
     }
+    // ⛔ PROGRESS GUARANTEE — the renderer is TOTAL, by construction rather than by
+    // the branch list happening to be complete. `isSpecial()` only claims that some
+    // branch above SHOULD have consumed this line; when none actually did, the
+    // gather above matches nothing, `i` never advances, and the loop spins forever
+    // pushing empty paragraphs. That is not hypothetical: it was live for `#`..`###`
+    // (unreachable only because item bodies never contain one) and was recreated
+    // immediately by adding table rows to `isSpecial`. Falling back to "treat it as
+    // ordinary text" makes an unclaimed line a cosmetic problem instead of a hang,
+    // and means the next line added to `isSpecial` cannot resurrect this.
+    if (!buf.length) {
+      buf.push(L[i].trim());
+      i++;
+    }
     out.push(`<p>${inline(buf.join(' '))}</p>`);
   }
   return out.join('\n');
@@ -605,8 +643,50 @@ function isSpecial(s) {
     /^\s*\d+\.\s+/.test(s) ||
     /^\s*>/.test(s) ||
     /^#{1,6}\s+/.test(s) ||
+    /^\s*\|/.test(s) ||
     FENCE_RE.test(s)
   );
+}
+
+/**
+ * A GFM table needs BOTH a header row and the `| --- |` delimiter under it. Two
+ * lines, not one: the source uses a leading `|` inside ordinary prose often
+ * enough that treating any pipe-led line as a table would swallow paragraphs.
+ */
+const TABLE_DELIM_RE = /^\s*\|?[\s:-]*-[\s|:-]*\|?\s*$/;
+function isTableStart(L, i) {
+  return (
+    /^\s*\|/.test(L[i] || '') &&
+    /\|/.test(L[i + 1] || '') &&
+    TABLE_DELIM_RE.test(L[i + 1] || '') &&
+    (L[i + 1] || '').includes('-')
+  );
+}
+/** Split one table row into cells, tolerating the optional leading/trailing pipe. */
+function tableCells(line) {
+  let s = String(line).trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  // A pipe escaped as `\|` is DATA, not a cell boundary — the roadmap board emits
+  // exactly that when an item's own title contains one.
+  return s.split(/(?<!\\)\|/).map(c => inline(c.trim().replace(/\\\|/g, '|')));
+}
+function takeTable(L, start) {
+  const head = tableCells(L[start]);
+  let i = start + 2;
+  const rows = [];
+  while (i < L.length && /^\s*\|/.test(L[i])) {
+    rows.push(tableCells(L[i]));
+    i++;
+  }
+  const thead = `<thead><tr>${head.map(c => `<th>${c}</th>`).join('')}</tr></thead>`;
+  const tbody = rows.length
+    ? `<tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`
+    : '';
+  // ⚠ The scroll wrapper is part of the OUTPUT, not the page's styling problem. A
+  // wide table is the one block that cannot reflow on a phone, so it gets its own
+  // horizontally-scrollable container rather than forcing the whole page sideways.
+  return { html: `<div class="tablewrap"><table>${thead}${tbody}</table></div>`, next: i };
 }
 // Render a list starting at index `start`; sets renderList.lastIndex to the line
 // after the list. Handles one nesting level via leading-space depth. Each list

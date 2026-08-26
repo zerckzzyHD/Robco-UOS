@@ -53236,6 +53236,229 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 249  THE PRIVATE REPORTS ARE SERVED, AND CANNOT REACH THIS REPO ─────────
+//
+// The overnight/morning reports are read on a phone over the tailnet. They are
+// NOT publishable — internal architecture, and one documents a live exposure in
+// remediation detail — and THIS REPOSITORY IS PUBLIC. So the design keeps two
+// things apart: a renderer, which is generic and lives here, and the reports,
+// which live outside the checkout and are read at request time.
+//
+// ⛔ THE PROPERTY THESE ASSERT IS "THE CONTENT IS NOT HERE", not "the content is
+// here but excluded". The difference is the whole point: an exclusion list is a
+// promise that one forgotten entry breaks, and that exact near-miss happened on
+// this project when a new folder was not added to a generator's exclusion list —
+// uncurated reports became eligible to publish, and nothing leaked only because
+// publishing was frozen. A dev server would have served them regardless of what
+// git thought. Outside the repo is a property nothing has to remember.
+{
+  const QVr = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+  const PPr = require(path.join(ROOT, 'scripts', 'planning-paths.js'));
+  const RVr = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const { execFileSync } = require('child_process');
+
+  // ── 249.1  THE RENDERER IS TOTAL — the hang that was one document away ────
+  //
+  // ⛔ A REAL DEFECT, NOT A HYPOTHETICAL. mdToHtml's paragraph gather refuses any
+  // line isSpecial() claims, and isSpecial() claimed `#`..`###` while no branch
+  // above consumed them: the loop pushed an empty <p> and never advanced `i`.
+  // Infinite loop, pinning a CPU. It was unreachable ONLY because the queue view
+  // feeds this function item BODIES, whose own heading parseQueue has already
+  // stripped — the first `##` in any other document hangs the caller, and serving
+  // reports through it is exactly that other document. Adding table rows to
+  // isSpecial recreated the same hang within minutes, which is why the fix is a
+  // progress GUARANTEE in the loop rather than one more branch.
+  //
+  // ⚠ Run in a CHILD PROCESS with a timeout, because the failure being guarded is
+  // a hang: asserting it in-process would wedge the gate instead of failing it.
+  //
+  // ⚠ THE LIMIT OF THIS GUARD, MEASURED RATHER THAN ASSUMED. Deleting the HEADING
+  // branch turns this red cleanly. Deleting the PROGRESS GUARANTEE does not — the
+  // whole runner hangs first, because Suite 246 renders the live corpus in-process
+  // and that corpus contains pipe-led lines which land on exactly that fallback.
+  // So the regression signal for the guarantee is a WEDGED GATE rather than a red
+  // line. That is still a hard failure — nothing ships green — but it is a worse
+  // signal than a named assertion, and it is recorded here so the next reader does
+  // not mistake this test for proof that the guarantee itself is covered.
+  const probe249 = [
+    '## a top-level heading',
+    '# another',
+    '| a pipe-led line that is not a table',
+    '#### deep',
+    'ordinary prose',
+  ];
+  let rendered249 = null;
+  let hung249 = false;
+  try {
+    rendered249 = execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `const {mdToHtml}=require(${JSON.stringify(path.join(ROOT, 'scripts', 'queue-view.js'))});` +
+          `process.stdout.write(mdToHtml(${JSON.stringify(probe249)}))`,
+      ],
+      { encoding: 'utf8', timeout: 10000 }
+    );
+  } catch {
+    hung249 = true;
+  }
+  assert(
+    !hung249 &&
+      /<h3>a top-level heading<\/h3>/.test(rendered249 || '') &&
+      /<h2>another<\/h2>/.test(rendered249 || '') &&
+      /<p class="subh">deep<\/p>/.test(rendered249 || '') &&
+      /pipe-led line/.test(rendered249 || ''),
+    '249.1: mdToHtml TERMINATES on every line shape and renders top-level headings — a line isSpecial() claims but no branch consumes used to spin the loop forever, so the renderer is total by construction rather than by the branch list happening to be complete' +
+      (hung249 ? ' — TIMED OUT (the hang is back)' : '')
+  );
+
+  // ── 249.2  Tables render, and pipe-shaped prose does not become one ───────
+  const tbl249 = QVr.mdToHtml(['| A | B |', '| --- | --- |', '| 1 | **2** |']);
+  const notTbl249 = QVr.mdToHtml(['| just prose that happens to start with a pipe']);
+  assert(
+    /<div class="tablewrap"><table>/.test(tbl249) &&
+      /<th>A<\/th>/.test(tbl249) &&
+      /<td><strong>2<\/strong><\/td>/.test(tbl249) &&
+      !/<table>/.test(notTbl249),
+    '249.2: a GFM table renders as a real table inside its own horizontal scroller — a wide table is the one block that cannot reflow on a phone — while a pipe-led line with no delimiter row stays a paragraph, so ordinary prose is never swallowed into a table'
+  );
+
+  // ── 249.3  A REQUESTED NAME CANNOT ESCAPE THE REPORTS DIRECTORY ───────────
+  //
+  // This route reads from a path OUTSIDE the repo, so an unvalidated name is a
+  // read-anything primitive reachable over the network. Two independent barriers:
+  // the pattern, and containment checked AFTER resolution.
+  //
+  // ⚠ WHAT THIS ASSERTION ACTUALLY PROVES, stated because the two barriers are not
+  // equally testable. The PATTERN is what turns every case below away, and
+  // deleting the containment check leaves this test GREEN — measured, by removing
+  // it and re-running. That is not a gap in the check so much as a fact about the
+  // design: no name the pattern admits (`[A-Za-z0-9][A-Za-z0-9._-]*\.md`, no
+  // separators, no leading dot) can escape a directory, so containment is
+  // unreachable while the pattern holds. It is kept anyway, and deliberately: it
+  // is the barrier that still stands if the pattern is ever loosened — the far
+  // likelier future edit — and it costs one line. ⛔ Do not delete it because this
+  // test stays green without it; that is the reason it exists.
+  const hostile249 = [
+    '../QUEUE.md',
+    '..\\QUEUE.md',
+    'sub/dir.md',
+    'sub\\dir.md',
+    '/etc/passwd',
+    'C:\\Windows\\win.ini',
+    '.hidden.md',
+    '..',
+    'report.md.txt',
+    'report.txt',
+    '',
+    '../../secrets.md',
+  ];
+  const accepted249 = hostile249.filter(n => PPr.REPORT_NAME_RE.test(n));
+  const resolved249 = hostile249.filter(n => PPr.reportFile(n) !== null);
+  assert(
+    accepted249.length === 0 && resolved249.length === 0,
+    '249.3: every traversal, absolute path, sub-path, hidden name and non-markdown name is refused — the name is validated against a strict basename pattern AND the resolved path is re-checked to be a direct child, because a pattern alone can be out-thought by an encoding' +
+      (accepted249.length ? ` — pattern accepted: ${accepted249.join(', ')}` : '') +
+      (resolved249.length ? ` — RESOLVED: ${resolved249.join(', ')}` : '')
+  );
+
+  // ── 249.4  NO REPORT CONTENT LIVES IN THIS REPOSITORY ─────────────────────
+  //
+  // ⭐ The structural half of the promise, asserted rather than asserted-in-prose.
+  // If anybody ever copies a report in — or points the resolver at a path inside
+  // the checkout — this goes red.
+  const repoReportDir249 = path.join(ROOT, 'reports');
+  const strayReports249 = [];
+  const walk249 = d => {
+    let ents;
+    try {
+      ents = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of ents) {
+      if (e.name === '.git' || e.name === 'node_modules') continue;
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) walk249(full);
+      else if (/^(OVERNIGHT|MORNING)-(REPORT|NOTES)-\d{4}-\d{2}-\d{2}\.md$/i.test(e.name)) {
+        strayReports249.push(path.relative(ROOT, full));
+      }
+    }
+  };
+  walk249(ROOT);
+  const resolvedDir249 = PPr.reportsDir();
+  const insideRepo249 =
+    resolvedDir249 !== null &&
+    !path.relative(ROOT, resolvedDir249).startsWith('..') &&
+    !path.isAbsolute(path.relative(ROOT, resolvedDir249));
+  assert(
+    !fs.existsSync(repoReportDir249) && strayReports249.length === 0 && !insideRepo249,
+    '249.4: no report-shaped file and no reports/ directory exists anywhere in this PUBLIC checkout, and the resolver points OUTSIDE it — the content is absent rather than present-and-excluded, which is the difference an exclusion list cannot be trusted to hold' +
+      (strayReports249.length ? ` — STRAY: ${strayReports249.join(', ')}` : '') +
+      (insideRepo249 ? ` — resolver points INSIDE the repo: ${resolvedDir249}` : '')
+  );
+
+  // ── 249.5  THE RENDERER NEVER WRITES ─────────────────────────────────────
+  const rvSrc249 = fs.readFileSync(path.join(ROOT, 'scripts', 'report-view.js'), 'utf8');
+  const writes249 = /\bfs\s*\.\s*(write|append|copy|create|mkdir|rm|unlink)/i.test(rvSrc249);
+  assert(
+    !writes249 && !/require\(['"]fs['"]\)/.test(rvSrc249),
+    '249.5: the report renderer has no filesystem write path at all — rendering happens in memory into a response body, so a rendered report never exists as a file for a commit, a static server or a publish walk to find later'
+  );
+
+  // ── 249.6  THE DEV SERVER STAYS LOOPBACK-BOUND AND HOST-PINNED ───────────
+  //
+  // ⚠ THE NAMED COST OF SERVING REPORTS FROM THE APP'S DEV SERVER. Private content
+  // now shares an origin with it, so widening the bind would expose the reports
+  // too. That risk is closed here rather than left to a comment to defend.
+  // ⚠ COMMENTS ARE STRIPPED FIRST. This file documents its own footguns in prose
+  // ("never set `allowedHosts: true`"), so a naive scan reads the WARNING as the
+  // setting and fails on a correct config — which is exactly what it did.
+  const viteSrc249 = fs
+    .readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8')
+    .split('\n')
+    .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join('\n');
+  const hostM249 = /host:\s*'([^']+)'/.exec(viteSrc249);
+  const allowM249 = /allowedHosts:\s*(\[[^\]]*\]|true)/.exec(viteSrc249);
+  assert(
+    hostM249 !== null &&
+      (hostM249[1] === '127.0.0.1' || hostM249[1] === 'localhost') &&
+      allowM249 !== null &&
+      allowM249[1] !== 'true' &&
+      allowM249[1].startsWith('[') &&
+      !allowM249[1].includes('*'),
+    '249.6: the dev server binds a LOOPBACK address and names its allowed hosts explicitly — never 0.0.0.0, never a wildcard, never allowedHosts:true — so the only route in from outside this machine stays the tailnet proxy rather than the local network' +
+      ` — host=${hostM249 && hostM249[1]} allowedHosts=${allowM249 && allowM249[1]}`
+  );
+
+  // ── 249.7  Markers survive, and the page is phone-shaped ─────────────────
+  const md249 = [
+    '# A title',
+    '',
+    '## A section',
+    '',
+    `Prose with ${String.fromCodePoint(0x26d4)} and ${String.fromCodePoint(0x2b50)} markers.`,
+    '',
+    '| A | B |',
+    '| --- | --- |',
+    '| 1 | 2 |',
+  ].join('\n');
+  const page249 = RVr.renderReport('R.md', md249);
+  const picIn = (md249.match(/\p{Extended_Pictographic}/gu) || []).length;
+  const picOut = (page249.match(/\p{Extended_Pictographic}/gu) || []).length;
+  assert(
+    picOut >= picIn &&
+      /<meta name="viewport"[^>]*width=device-width/.test(page249) &&
+      /max-width:\s*34em/.test(page249) &&
+      /<div class="tablewrap">/.test(page249) &&
+      !/<h1>A title<\/h1>[\s\S]*<h1>/.test(page249) &&
+      /<title>A title<\/title>/.test(page249),
+    '249.7: the rendered page is one self-contained phone-readable document — a viewport meta, a capped measure so long prose stays readable, tables in their own scroller — and the emphasis markers the reports lean on are never stripped (they are load-bearing punctuation in these documents)' +
+      ` — markers in=${picIn} out=${picOut}`
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the

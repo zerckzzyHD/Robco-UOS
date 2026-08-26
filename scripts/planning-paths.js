@@ -131,6 +131,91 @@ function planningWritePath(name) {
   return path.join(dir, name);
 }
 
+// ── The private REPORTS tree ─────────────────────────────────────────────────
+//
+// ⛔ THE REPORTS ARE NOT PUBLISHABLE AND MUST NEVER ENTER THIS REPO. They describe
+// internal architecture, and at least one documents a live exposure in
+// remediation detail. This repo is PUBLIC. So they are resolved the same way the
+// planning tree is — an out-of-repo sibling, read at the moment of use — and are
+// never copied, staged, generated into, or cached anywhere inside this checkout.
+//
+// ⚠ THE FAILURE THIS SHAPE IS AVOIDING IS RECENT AND REAL: a new folder was not in
+// a generator's exclusion list, and uncurated reports silently became eligible to
+// be published as pages. Nothing leaked, but only because publishing happened to
+// be frozen. "Inside the repo but excluded" is a promise that one forgotten list
+// entry breaks; OUTSIDE the repo is a property no list can forget. A dev server
+// that serves this checkout would serve anything sitting in it — including a
+// gitignored subdirectory — so the content simply does not live here.
+//
+// The resolution contract is the same three cases as the planning tree, and null
+// is again a NORMAL outcome, not a failure: a public clone has no archive by
+// design and the reports route degrades to an explanatory page.
+const DEFAULT_REPORTS_DIR = path.join(REPO_ROOT, '..', '_RobCo-Archive', 'reports');
+
+/** Absolute path to the private reports directory, or null when unreachable. */
+function reportsDir() {
+  const override = process.env.ROBCO_REPORTS_DIR;
+  if (override) return safeIsDir(override) ? path.resolve(override) : null;
+  return safeIsDir(DEFAULT_REPORTS_DIR) ? path.resolve(DEFAULT_REPORTS_DIR) : null;
+}
+
+/**
+ * ⛔ A REQUESTED NAME IS VALIDATED, NEVER TRUSTED — this joins onto a real
+ * directory that sits OUTSIDE the repo, so an unchecked name is a read-anything
+ * primitive reachable over the network. Two independent barriers, deliberately
+ * not one: the name must be a plain `*.md` basename (no separators, no `..`, no
+ * drive letter, no leading dot), AND the resolved path must still be a direct
+ * child of the reports directory. Either alone would probably do; the pattern
+ * check can be out-thought by an encoding, and the containment check is the one
+ * that holds regardless of how the name was spelled.
+ */
+const REPORT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.md$/;
+function reportFile(name) {
+  const dir = reportsDir();
+  if (!dir) return null;
+  if (typeof name !== 'string' || !REPORT_NAME_RE.test(name)) return null;
+  const full = path.resolve(dir, name);
+  if (path.dirname(full) !== dir) return null; // containment, checked after resolution
+  return safeIsFile(full) ? full : null;
+}
+
+/** The available report basenames, newest-looking first. Never throws. */
+function listReports() {
+  const dir = reportsDir();
+  if (!dir) return [];
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter(n => REPORT_NAME_RE.test(n) && safeIsFile(path.join(dir, n)))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+/** Read one report's markdown, or null. Never throws. */
+function readReport(name) {
+  const full = reportFile(name);
+  if (!full) return null;
+  try {
+    return fs.readFileSync(full, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+/** The reports-tree counterpart of describe() — printed next to any empty state. */
+function describeReports() {
+  const dir = reportsDir();
+  if (!dir) {
+    return process.env.ROBCO_REPORTS_DIR
+      ? `reports tree NOT FOUND at ROBCO_REPORTS_DIR=${process.env.ROBCO_REPORTS_DIR}`
+      : `reports tree NOT PRESENT (no ${DEFAULT_REPORTS_DIR} sibling) — expected in a public clone`;
+  }
+  return `reports tree at ${dir} — ${listReports().length} report(s)`;
+}
+
 /**
  * One line describing WHICH resolution case we are in — so a skip is never
  * mistaken for a pass. Callers print this next to any skip.
@@ -157,4 +242,12 @@ module.exports = {
   planningAvailable,
   planningWritePath,
   describe,
+  // The private reports tree — resolved, never copied in. See the block above.
+  DEFAULT_REPORTS_DIR,
+  REPORT_NAME_RE,
+  reportsDir,
+  reportFile,
+  listReports,
+  readReport,
+  describeReports,
 };

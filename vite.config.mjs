@@ -1,9 +1,80 @@
 import { defineConfig } from 'vite';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+
+/**
+ * `/reports` — the private overnight/morning reports, rendered to phone-readable
+ * HTML on demand.
+ *
+ * ── ⛔ WHY THIS IS A ROUTE AND NOT A FOLDER ──────────────────────────────────
+ * The reports are NOT publishable: they describe internal architecture and one of
+ * them documents a live exposure in remediation detail. This repository is
+ * PUBLIC. So the content is never placed in the checkout at all — not committed,
+ * not staged, not dropped in a gitignored subdirectory. It is read from an
+ * out-of-repo path at request time, rendered in memory, and written only into the
+ * response body. There is no build step, no output directory and no cache: after
+ * a request finishes, nothing of the report exists on this side.
+ *
+ * ⚠ "Gitignored subdirectory" is specifically rejected, not overlooked. A dev
+ * server serves what is in its root regardless of what git thinks of it, so
+ * ignoring a folder would hide the content from commits while leaving it fully
+ * served — and the recent near-miss on this project was exactly an exclusion list
+ * that had not been updated for a new folder. Outside the repo is a property
+ * nothing has to remember.
+ *
+ * ── WHY IT RIDES THE EXISTING DEV SERVER RATHER THAN A SECOND ONE ────────────
+ * The alternative was a small static server on its own port with its own
+ * `tailscale serve` mapping. Rejected on durability of state: a second mapping is
+ * PERSISTENT machine configuration that outlives the feature, and a stale one
+ * pointing at a port that some later process reuses would proxy the tailnet to
+ * whatever now answers there. This route leaves nothing behind — stop the dev
+ * server and it ceases to exist. It also inherits the loopback bind and the
+ * `allowedHosts` entry below, both of which took real debugging to get right; a
+ * second server would have to re-earn them, and a localhost-only check would pass
+ * while it was broken.
+ *
+ * ⚠ THE COST OF THAT CHOICE, NAMED: private content now shares an origin with the
+ * app's dev server, so widening this server's bind would expose the reports too.
+ * That is a real coupling, and it is why the bind is asserted by the gate rather
+ * than left to the comment below to defend.
+ */
+function reportsRoute() {
+  return {
+    name: 'robco-reports',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      const paths = require('./scripts/planning-paths.js');
+      const view = require('./scripts/report-view.js');
+      server.middlewares.use('/reports', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const send = (code, html) => {
+          res.statusCode = code;
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          // Never let an intermediary or the phone keep a copy of private prose.
+          res.setHeader('Cache-Control', 'no-store, max-age=0');
+          res.setHeader('Referrer-Policy', 'no-referrer');
+          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+          res.end(req.method === 'HEAD' ? '' : html);
+        };
+        // `req.url` is already relative to the mount point.
+        const raw = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        if (!raw) return send(200, view.renderIndex(paths.listReports(), paths.describeReports()));
+        // ⛔ The name is validated inside planning-paths (pattern + containment).
+        // A rejected name is indistinguishable here from a missing one, on purpose.
+        const md = paths.readReport(raw);
+        if (md === null) return send(404, view.renderNotFound());
+        return send(200, view.renderReport(raw, md));
+      });
+    },
+  };
+}
 
 // Vite dev-server config. This file exists ONLY for local development -- the app
 // itself is a static site with no build step (see README "Hosting & Release Flow"),
 // so nothing here affects staging or production. Vite never builds this project.
 export default defineConfig({
+  plugins: [reportsRoute()],
   server: {
     // --- Real-device (phone) testing over Tailscale --------------------------
     //
