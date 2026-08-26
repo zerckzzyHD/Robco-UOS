@@ -76,7 +76,7 @@ function renderLedgerIndex(logs, note) {
           .join('')}</ul>`
       : `<div class="empty"><p><strong>No logs are reachable.</strong></p>` +
         `<p class="note">${escapeHtml(note || '')}</p></div>`);
-  return page({ title: 'Activity log', crumb: '', nav: '<a href="/home">&#8592; Home</a>', body });
+  return page({ title: 'Activity log', crumb: '', body });
 }
 
 /**

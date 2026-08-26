@@ -171,9 +171,32 @@ function homeRoute() {
         // ⛔ Read AT REQUEST TIME, never cached — the counts are the only thing
         // making this page's freshness claim true.
         const board = paths.readRoadmap();
+        // ⛔ The SNAPSHOT'S OWN STAMP, not this read's clock. Reading the file now
+        // makes the READ fresh, never the DATA, and the tile has to carry the
+        // second fact rather than the first — which is why `generatedAt` is what
+        // travels and the read time is discarded here.
+        //
+        // ⚠ Costed before adding, not assumed: this parses the snapshot on every
+        // home load, measured at ~3ms. That buys the landing page an age it would
+        // otherwise have to invent or omit, and an omitted age is what lets a
+        // stale reading pass for a current one.
+        const control = freshRequire('./scripts/control-state.js');
+        const snap = control.readStatus();
+        const stamp = snap && snap.data ? new Date(snap.data.generatedAt) : null;
         const html = freshRequire('./scripts/home-view.js').renderHome({
           reportCount: paths.reportsDir() === null ? null : paths.listReports().length,
           boardUpdated: board ? board.mtime : null,
+          statusReachable: snap !== null,
+          statusGeneratedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
+          logCount: control.listLogs().length, // stat only — nothing is opened
+          // ⛔ EMPTY, AND THAT IS A MEASURED CLAIM RATHER THAN AN OVERSIGHT: every
+          // destination this page names is now built and was verified by content
+          // against a nonsense path, not by status code. Anything genuinely
+          // absent belongs in this array, where the renderer will name it as
+          // absent — it must never go back to being a literal inside the
+          // renderer, which is exactly how this page came to insist that two
+          // pages it can now link to did not exist.
+          unbuilt: [],
           // The public companion site. Held here rather than in the renderer so
           // the renderer stays a pure function of what it is handed.
           museumUrl: 'https://robco-exhibit.pages.dev/',

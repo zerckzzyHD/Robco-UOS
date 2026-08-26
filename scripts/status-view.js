@@ -59,10 +59,181 @@ ul.rows .k { color:var(--dim); font-size:.92rem; }
 ul.rows .v { font-weight:700; text-align:right; overflow-wrap:anywhere; }
 ul.rows .v.unk { color:var(--hi); font-weight:800; }
 ul.rows .why { color:var(--dim); font-size:.82rem; font-weight:400; line-height:1.45; display:block; margin-top:.15rem; }
+/* ⚠ The value column wraps rather than overflowing. A right-aligned column that
+   scrolls sideways on a phone is unreadable, and it is how a stray sentence in a
+   value slot went unnoticed — it simply ran off the edge of the screen. */
+ul.rows .v { max-width:60%; }
+.answer { border:2px solid var(--line); border-radius:10px; padding:.9rem;
+  margin:1rem 0 1.25rem; background:var(--code); }
+.answer p.lead { margin:0 0 .3rem; font-size:1.15rem; line-height:1.4; }
+.answer p.ceiling { margin:.5rem 0 0; color:var(--dim); font-size:.88rem; line-height:1.5; }
+h2.rawhead { margin:1.8rem 0 .3rem; font-size:1.05rem; }
 `;
 
 /** The one place a value becomes display text — so "unknown" has ONE spelling. */
 const UNOBSERVABLE = 'UNOBSERVABLE';
+
+/**
+ * ⛔⛔ A SUMMARY LINE MAY CARRY A DATUM, NEVER A SENTENCE — AND NEVER A PATH.
+ *
+ * ── DEFECT 1: DEFINITIONS RENDERED AS STATE (reported from the phone) ───────
+ * A structured value is summarised by joining its first few scalars. Several of
+ * these blocks carry DOCUMENTATION strings alongside their state — prose that
+ * explains what a word means. Joined into a summary line, one produced this:
+ *
+ *   "phase launch-gate-off · ok no · verifiedMeans VERIFIED means the named
+ *    predicates held. It does NOT mean the patch is correct, that anything was
+ *    published, or that any obligation was discharged"
+ *
+ * A paragraph, right-aligned, overflowing sideways, in a slot meant for a value.
+ * ⚠ It is not merely ugly: a definition rendered in a state column READS as
+ * state, so the page appears to report something it never measured.
+ *
+ * ⭐ EXCLUDED BY SHAPE, NOT BY NAME. Listing the two fields visible today would
+ * be a rule that has to be re-remembered for the third — the same reasoning that
+ * made the remainder names-only rather than a list of fields to be careful with.
+ * The shape is simply: PROSE CONTAINS WHITESPACE, A DATUM DOES NOT. Measured
+ * against the live snapshot, that separates cleanly and with no judgement call —
+ * all 32 whitespace-free values are real state (`ok`, `SHADOW`, `launch-gate-off`,
+ * `C0`), and all 8 whitespace-bearing ones are prose.
+ *
+ * ── DEFECT 2: PATHS ARE DATUM-SHAPED, so the prose rule alone would not stop
+ * them. A kill-switch marker, a credentials file and a trust directory are all
+ * single tokens and would sail into a summary line. That is the same hazard the
+ * remainder already refuses, arriving through a different door — so it is refused
+ * here too, by shape, rather than by whoever adds the next field remembering.
+ *
+ * ⛔ NOTHING IS LOST: a value held back here is still carried in full by the raw
+ * section, and the count of what was held back is printed rather than hidden.
+ * This governs SUMMARISATION only — never whether a field exists on the page.
+ */
+function isProse(v) {
+  return typeof v === 'string' && /\s/.test(v);
+}
+function isPathish(v) {
+  return typeof v === 'string' && (/[\\/]/.test(v) || /^[A-Za-z]:/.test(v));
+}
+function summarisable(v) {
+  if (v === null || v === undefined || typeof v === 'object') return false;
+  return !isProse(v) && !isPathish(v);
+}
+
+/**
+ * A field name, made legible — MECHANICALLY.
+ *
+ * ⛔⛔ IT IS TYPOGRAPHY, NOT KNOWLEDGE, AND THE DIFFERENCE IS THE WHOLE POINT.
+ * The obvious way to make `pidRecycled` readable is a table mapping each field to
+ * a written explanation. Two reasons that is refused:
+ *
+ *  1. ⛔ THIS REPOSITORY IS PUBLIC. Those explanations are descriptions of a
+ *     private system's internals; a lookup table of them is that architecture,
+ *     written down here permanently, in exchange for nicer labels.
+ *  2. A hand-written table covers the fields known on the day it was typed and
+ *     silently fails to cover the next one — the same drift that had this page
+ *     detailing nine fields of twenty-four.
+ *
+ * ⭐ Splitting camelCase and kebab-case into words invents nothing, embeds no
+ * internal meaning, and covers every field that will ever exist.
+ *
+ * ⚠ THE CEILING, STATED PLAINLY BECAUSE THE PAGE STATES IT TOO: this makes a
+ * name READABLE, not EXPLAINED. "Pid recycled" is easier to read than
+ * `pidRecycled` and tells you no more than it did. The snapshot carries no human
+ * description of its own findings, so no honest page can supply one — that is a
+ * gap in the SOURCE, and the page says so rather than papering over it with a
+ * guess about what a field means.
+ */
+function humanLabel(key) {
+  const words = String(key)
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    // ⚠ SENTENCE case, not Title Case. Splitting camelCase leaves every interior
+    // word capitalised ("Pid Recycled"), which reads like a product name rather
+    // than a description. An all-caps run is left alone — it was not a word
+    // boundary this split created, so lowercasing it would be destroying
+    // something the source wrote deliberately rather than tidying our own seam.
+    .map((w, i) => (i === 0 || w === w.toUpperCase() ? w : w.toLowerCase()));
+  const s = words.join(' ');
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : String(key);
+}
+
+/**
+ * ⛔⛔ THE FIELDS THIS PAGE OPENS IN DETAIL — declared ONCE, because the list of
+ * what is NOT detailed is DERIVED from it below rather than typed a second time.
+ *
+ * ── THE DEFECT THIS EXISTS TO CLOSE, MEASURED NOT IMAGINED ──────────────────
+ * This page used to enumerate a hand-picked set of fields and then print, under
+ * them, "every field below is printed whether or not it has a value". Measured
+ * against a real snapshot: it detailed NINE of twenty-four top-level fields and
+ * said nothing whatsoever about the other fifteen — so the page carried a
+ * completeness claim that was false by a factor of more than two.
+ *
+ * ⚠ That is this page's OWN stated failure mode, arriving from the inside: a
+ * field that is missing and a field that is fine look identical once the row is
+ * gone. The hand-picked list could only ever drift in one direction, because a
+ * field added upstream becomes invisible here silently — nothing errors, the
+ * page just quietly stops covering it.
+ *
+ * ⭐ So the remainder is computed from the snapshot itself. A field added
+ * upstream tomorrow appears in the list below with no edit here, which is the
+ * only version of this that cannot go stale.
+ */
+const DETAILED_FIELDS = [
+  'generatedAt',
+  'notifyChannel',
+  'enforced',
+  'killSwitch',
+  'liveSessions',
+  'admission',
+  'rateLimit',
+  'adapters',
+  'usage',
+  'findings',
+];
+
+/** Top-level fields the snapshot carries that the sections above do not open. */
+function remainingFields(snap) {
+  if (!snap || typeof snap !== 'object') return [];
+  return Object.keys(snap)
+    .filter(k => !DETAILED_FIELDS.includes(k))
+    .sort();
+}
+
+/**
+ * The remainder, BY NAME ONLY.
+ *
+ * ⛔⛔ IT PRINTS NO VALUE, AND THAT IS STRUCTURAL RATHER THAN A RULE SOMEBODY
+ * HAS TO REMEMBER. The only strings this function can emit for a value are the
+ * literal 'present' and the UNOBSERVABLE constant — there is no path through it
+ * that reaches `snap[name]`'s contents at all.
+ *
+ * ⚠ WHY THAT MATTERS MORE THAN IT LOOKS: several of these blocks record
+ * filesystem locations, and a generic "just render everything that is left"
+ * would put those on the page. Worse, it would keep doing so for every field
+ * added upstream in future, with nobody reviewing the decision. Names-only is
+ * therefore the safe default in BOTH directions — nothing is hidden, and nothing
+ * can be spilled by a change made somewhere else entirely.
+ *
+ * ⭐ It still distinguishes carried from not-carried, because that is the one
+ * honest thing that can be said without opening the value.
+ */
+function remainderRows(snap, names) {
+  return (
+    `<ul class="rows">` +
+    names
+      .map(n => {
+        const carried = snap[n] !== undefined && snap[n] !== null;
+        return (
+          `<li><span class="k">${escapeHtml(humanLabel(n))}</span>` +
+          `<span class="v${carried ? '' : ' unk'}">${carried ? 'present' : UNOBSERVABLE}</span></li>`
+        );
+      })
+      .join('') +
+    `</ul>`
+  );
+}
 
 /**
  * Render one value honestly.
@@ -103,15 +274,31 @@ function val(v) {
   if (typeof v.count === 'number') {
     return { text: String(v.count), unknown: false };
   }
-  const scalars = Object.entries(v).filter(
+  const present = Object.entries(v).filter(
     ([, x]) => x !== null && typeof x !== 'object' && typeof x !== 'undefined'
   );
+  // ⛔ Prose and paths are held back from the LINE, never from the page.
+  const scalars = present.filter(([, x]) => summarisable(x));
+  const held = present.length - scalars.length;
   if (scalars.length) {
     return {
-      text: scalars
-        .slice(0, 3)
-        .map(([k, x]) => `${k} ${typeof x === 'boolean' ? (x ? 'yes' : 'no') : x}`)
-        .join(' · '),
+      text:
+        scalars
+          .slice(0, 3)
+          .map(([k, x]) => `${humanLabel(k)} ${typeof x === 'boolean' ? (x ? 'yes' : 'no') : x}`)
+          .join(' · ') +
+        // ⭐ Held-back values are COUNTED ON THE LINE rather than silently
+        // dropped. A summary that quietly omits things is how this page came to
+        // claim it showed everything while showing a third of it.
+        (held ? ` · +${held} not shown here` : ''),
+      unknown: false,
+    };
+  }
+  // Everything it carries is prose or a path — true, and worth saying, because
+  // "nothing summarisable" is a different fact from "nothing there".
+  if (present.length) {
+    return {
+      text: `${present.length} details, none of them a short value`,
       unknown: false,
     };
   }
@@ -127,7 +314,7 @@ function rows(pairs) {
       .map(([k, v]) => {
         const r = val(v);
         return (
-          `<li><span class="k">${escapeHtml(k)}` +
+          `<li><span class="k">${escapeHtml(humanLabel(k))}` +
           // ⭐ The source's own reason travels with the gap. "Cannot be measured,
           // and here is why" is actionable; a bare UNOBSERVABLE is a shrug.
           (r.unknown && r.why ? `<br><span class="why">${escapeHtml(r.why)}</span>` : '') +
@@ -135,6 +322,79 @@ function rows(pairs) {
           `<span class="v${r.unknown ? ' unk' : ''}">${escapeHtml(r.text)}</span></li>`
         );
       })
+      .join('') +
+    `</ul>`
+  );
+}
+
+/**
+ * Sort the findings into what needs him, what could not be measured, and what
+ * was merely counted.
+ *
+ * ⛔⛔ THE PAGE STILL DECIDES NOTHING. It was tempting to call a non-zero count
+ * a problem and render a red banner — that would be this file inventing a
+ * meaning for numbers it does not understand, on the one surface whose value is
+ * that it never does.
+ *
+ * ⭐ THE SOURCE ALREADY ANSWERS THIS, AND DEFERRING TO IT IS THE HONEST MOVE —
+ * exactly as `observable: false` is deferred to rather than overridden. Some
+ * findings carry their own ALERTING field, which is the producer stating whether
+ * the thing needs a human. Measured on the live snapshot, one reports a count of
+ * one and an alerting count of ZERO — because it is suppressed for a reason it
+ * also records. A page counting "1 problem" there would be manufacturing an
+ * alarm the source explicitly declined to raise.
+ *
+ * ⚠ AND THE CEILING IS REPORTED, NOT BURIED: only a couple of the findings carry
+ * an alerting field at all. So "nothing is flagged" is a far weaker statement
+ * than "nothing is wrong", and the page says which one it is making. That gap is
+ * the ABSENT-versus-UNOBSERVABLE distinction again, one level up: silence from a
+ * finding that has no way to speak is not reassurance.
+ */
+function classifyFindings(findings) {
+  const out = { needsYou: [], unobservable: [], counted: [], quiet: 0, withAlerting: 0, total: 0 };
+  if (!findings || typeof findings !== 'object') return out;
+  for (const key of Object.keys(findings).sort()) {
+    const v = findings[key];
+    out.total++;
+    if (typeof v === 'number') {
+      if (v > 0) out.counted.push({ key, detail: String(v) });
+      else out.quiet++;
+      continue;
+    }
+    if (!v || typeof v !== 'object') {
+      out.quiet++;
+      continue;
+    }
+    if (v.observable === false) {
+      out.unobservable.push({ key, why: String(v.reason || v.note || 'the source did not say') });
+      continue;
+    }
+    // The producer's OWN attention signal, wherever it chose to provide one.
+    const alertKey = Object.keys(v).find(k => /alert/i.test(k) && typeof v[k] === 'number');
+    if (alertKey) {
+      out.withAlerting++;
+      if (v[alertKey] > 0)
+        out.needsYou.push({ key, detail: `${humanLabel(alertKey)} ${v[alertKey]}` });
+      else out.quiet++;
+      continue;
+    }
+    const n = ['count', 'unhealthyCount', 'unknownOwners'].find(k => typeof v[k] === 'number');
+    if (n && v[n] > 0) out.counted.push({ key, detail: `${humanLabel(n)} ${v[n]}` });
+    else out.quiet++;
+  }
+  return out;
+}
+
+function listRows(items, cls) {
+  return (
+    `<ul class="rows">` +
+    items
+      .map(
+        it =>
+          `<li><span class="k">${escapeHtml(humanLabel(it.key))}` +
+          (it.why ? `<br><span class="why">${escapeHtml(it.why)}</span>` : '') +
+          `</span><span class="v${cls || ''}">${escapeHtml(it.detail || UNOBSERVABLE)}</span></li>`
+      )
       .join('') +
     `</ul>`
   );
@@ -159,7 +419,6 @@ function renderStatus(snap, readAt, note) {
     return page({
       title: 'Status',
       crumb: '',
-      nav: '<a href="/home">&#8592; Home</a>',
       body:
         `<style>${STATUS_STYLE}</style>` +
         `<h1>Status</h1>` +
@@ -206,6 +465,13 @@ function renderStatus(snap, readAt, note) {
   const findings = snap.findings && typeof snap.findings === 'object' ? snap.findings : null;
   const usage = snap.usage && typeof snap.usage === 'object' ? snap.usage : null;
   const trend = usage && usage.trend && typeof usage.trend === 'object' ? usage.trend : null;
+  // ⭐ Derived from the snapshot in hand, never from a list kept alongside the
+  // sections — that list is what went stale and produced a false claim before.
+  const rest = remainingFields(snap);
+  const fc = classifyFindings(findings);
+  // ⚠ Its own block, read defensively: an older snapshot may not carry it at
+  // all, and a missing block must read UNOBSERVABLE rather than "never".
+  const nc = snap.notifyChannel && typeof snap.notifyChannel === 'object' ? snap.notifyChannel : {};
 
   const body =
     `<style>${STATUS_STYLE}</style>` +
@@ -214,9 +480,86 @@ function renderStatus(snap, readAt, note) {
     `<div class="armed"><span class="lab">Enforcement</span>` +
     `<span class="val">${escapeHtml(armedTxt)}</span>` +
     `<span class="why">${escapeHtml(armedWhy)}</span></div>` +
-    `<p class="note">Every field below is printed whether or not it has a value. ` +
-    `A row reading ${UNOBSERVABLE} means the snapshot did not carry it — which is not the ` +
-    `same as it being fine, and is why the row is still here.</p>` +
+    // ── THE ANSWER, before any field-by-field anything ────────────────────
+    `<div class="answer">` +
+    (fc.needsYou.length
+      ? `<p class="lead"><strong>${fc.needsYou.length} thing${fc.needsYou.length === 1 ? '' : 's'} the snapshot flags as needing you.</strong></p>` +
+        listRows(fc.needsYou, ' unk')
+      : `<p class="lead"><strong>Nothing is flagged as needing you.</strong></p>`) +
+    // ⛔ THE CEILING TRAVELS WITH THE ANSWER, never as a footnote further down.
+    // Most findings have no way to raise a flag at all, so "nothing flagged" and
+    // "nothing wrong" are different sentences — and the weaker one is the true
+    // one. Reading the first as the second is the whole failure this page exists
+    // to prevent, so it is said in the same breath as the answer itself.
+    `<p class="ceiling">That means: of ${escapeHtml(String(fc.total))} checks, ` +
+    `${escapeHtml(String(fc.withAlerting))} can actually raise a flag. ` +
+    `The rest report numbers without saying whether a number is a problem, ` +
+    `so this line is <strong>not</strong> a clean bill of health — it is the ` +
+    `narrower claim that nothing which can speak up has.</p>` +
+    (fc.unobservable.length
+      ? `<p class="ceiling">${escapeHtml(String(fc.unobservable.length))} could not be measured at all — listed below, with the reason each gave.</p>`
+      : '') +
+    `</div>` +
+    // ── Could not be measured — kept OPEN, because a gap is the finding ────
+    (fc.unobservable.length
+      ? `<details class="band" open><summary>Could not be measured <span class="c">${fc.unobservable.length}</span></summary>` +
+        `<p class="note">Each of these tried and could not answer. That is not the same as ` +
+        `an answer of "fine", which is exactly why they are not folded in with everything else.</p>` +
+        listRows(fc.unobservable, ' unk') +
+        `</details>`
+      : '') +
+    // ── Counted, but the source did not classify them ──────────────────────
+    (fc.counted.length
+      ? section(
+          `Counted, but not called a problem (${fc.counted.length})`,
+          listRows(fc.counted),
+          'These are non-zero numbers the snapshot recorded. It does not say whether any of ' +
+            'them needs doing anything about, and this page will not decide that for it — ' +
+            'a number is not a verdict. They are here so a real one is never invisible.'
+        )
+      : '') +
+    // ── Everything else, closed ────────────────────────────────────────────
+    `<h2 class="rawhead">All raw fields</h2>` +
+    `<p class="note">Nothing below is hidden or filtered — every field the snapshot carries is ` +
+    `reachable from here, including the ${escapeHtml(String(fc.quiet))} checks that came back ` +
+    `quiet. The names are the source's own, made readable but not renamed: this page can make ` +
+    `<em>${escapeHtml(humanLabel('pidRecycled'))}</em> easier to read than <code>pidRecycled</code>, ` +
+    `but the snapshot carries no plain-English description of what its findings mean, so nothing ` +
+    `can honestly supply one here. Long explanatory text and file locations are kept out of the ` +
+    `one-line summaries and shown in full in place.</p>` +
+    section(
+      'Phone alerts',
+      rows([
+        [
+          'last confirmed delivery',
+          nc.lastConfirmedSendAt
+            ? `${ago(new Date(nc.lastConfirmedSendAt)) || 'at an unreadable time'}`
+            : undefined,
+        ],
+        ['credentials readable', nc.state],
+      ]),
+      // ⛔⛔ THE BAR IS DELIVERY, AND IT IS THE SOURCE'S BAR — NOT A NAME I TRUSTED.
+      // The field is called "confirmed", and a field called confirmed is exactly
+      // the kind of thing that turns out to mean "we tried". So it was traced to
+      // what writes it: the record is only ever emitted when the delivery service
+      // itself answered with its own success status — an attempt that is not
+      // acknowledged is written as a FAILURE and can never appear here.
+      //
+      // ⚠ WHAT THIS ROW ASSUMES, SAID OUT LOUD BECAUSE THE ASSUMPTION IS THE PART
+      // THAT GOES WRONG: it assumes a confirmed delivery is recorded durably and
+      // that this reading is not itself stale — the second is why the page leads
+      // with its own age. It does NOT assume the phone rang: a delivery the
+      // service accepted and the handset never showed is indistinguishable from
+      // here, and nothing in this snapshot can close that gap.
+      //
+      // ⛔ A quiet channel is DATA, never a fault. Long gaps are the ordinary
+      // state of a system with nothing to say, so no threshold is applied and no
+      // colour is assigned — inventing an alarm here is the false-alarm generator
+      // that teaches someone to stop reading the real ones.
+      'Only a delivery the service itself acknowledged counts here. An attempt that ' +
+        'was not acknowledged is recorded as a failure and never appears as one of these. ' +
+        'A long gap is not a fault — it means nothing needed saying.'
+    ) +
     section(
       'Kill switch',
       rows([
@@ -274,15 +617,38 @@ function renderStatus(snap, readAt, note) {
         ? 'Counts exactly as recorded. This page does not decide which of them matter.'
         : 'The snapshot carried no findings block.'
     ) +
+    section(
+      `Everything else in this snapshot (${rest.length})`,
+      rest.length
+        ? remainderRows(snap, rest)
+        : `<p class="note">Nothing. Every field the snapshot carries is opened in a section above.</p>`,
+      rest.length
+        ? 'These are named but not opened. They are really there — this page simply does not ' +
+            'detail them, and saying so is the difference between "not shown here" and "not ' +
+            'happening". Names only, deliberately: some of them record file locations, and a ' +
+            'page that printed whatever was left would keep doing so for every field added ' +
+            'later, with nobody deciding that it should.'
+        : null
+    ) +
     `<p class="note">Read at ${escapeHtml(readAt ? readAt.toISOString() : 'an unrecorded time')}; ` +
-    `produced at ${escapeHtml(snap.generatedAt || UNOBSERVABLE)}.</p>`;
+    `produced at ${escapeHtml(snap.generatedAt || UNOBSERVABLE)}. ` +
+    `${escapeHtml(String(DETAILED_FIELDS.length))} fields opened in detail, ` +
+    `${escapeHtml(String(rest.length))} named below them.</p>`;
 
   return page({
     title: 'Status',
     crumb: '',
-    nav: '<a href="/home">&#8592; Home</a>',
     body,
   });
 }
 
-module.exports = { renderStatus, STATUS_STYLE, UNOBSERVABLE, val };
+module.exports = {
+  renderStatus,
+  humanLabel,
+  classifyFindings,
+  STATUS_STYLE,
+  UNOBSERVABLE,
+  val,
+  DETAILED_FIELDS,
+  remainingFields,
+};

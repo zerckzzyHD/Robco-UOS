@@ -130,11 +130,23 @@ function tile({ href, title, what, meta, away }) {
  * @param {Date|null} state.boardUpdated   when the build board last changed, or
  *   null when there is no board to read.
  * @param {string} state.museumUrl         the public site's address.
+ * @param {Date|null} state.statusGeneratedAt  the snapshot's OWN stamp — never
+ *   the time it was read, which is a different and much more flattering number.
+ * @param {boolean} state.statusReachable  whether a snapshot was read at all, so
+ *   an unreadable one and an undated one are not collapsed into one message.
+ * @param {number|null} state.logCount     how many log files are readable.
+ * @param {Array<[string,string]>} state.unbuilt  destinations that do not exist
+ *   yet, as [name, why]. ⛔ Handed in — see the note at its point of use.
  */
 function renderHome(state) {
   const s = state || {};
   const hasReports = typeof s.reportCount === 'number';
   const hasBoard = s.boardUpdated instanceof Date;
+  // ⚠ A stamp that is present but unreadable is NOT the same fact as no snapshot
+  // at all, and the tile says which — "it does not say when" and "there is
+  // nothing there" send you to different places.
+  const hasStatusStamp =
+    s.statusGeneratedAt instanceof Date && Number.isFinite(s.statusGeneratedAt.getTime());
 
   const tiles = [
     tile({
@@ -158,6 +170,36 @@ function renderHome(state) {
           : `${s.reportCount} reports`
         : 'None readable from this machine.',
     }),
+    // ⛔⛔ THE WORD "SNAPSHOT" IS ON THE TILE, NOT SAVED FOR THE PAGE. Someone
+    // deciding at a glance whether to tap has already formed a belief about how
+    // live this is by the time the page loads — so the tile that sets that
+    // belief is where the qualification has to be, not one tap further on.
+    //
+    // ⭐ The age shown here is the snapshot's OWN stamp, read through the same
+    // function the status page uses, at the same moment. The two cannot disagree
+    // because there is one rule and no cached copy on either side.
+    tile({
+      href: '/status',
+      title: 'Live status',
+      what: 'What the control plane last reported: whether enforcement is armed, and what it found.',
+      meta: hasStatusStamp
+        ? `Snapshot taken ${ago(s.statusGeneratedAt)} — not a live reading`
+        : s.statusReachable === true
+          ? 'Readable, but it does not say when it was taken.'
+          : 'Nothing readable from this machine.',
+    }),
+    tile({
+      href: '/ledger',
+      title: 'The record of runs',
+      what: 'The kept history of what ran and when, in the order it happened.',
+      // ⚠ "The end of each file" is stated HERE for the same reason as above: a
+      // tile promising a history, opening onto a window of one, is a small lie
+      // that only shows up as confusion later.
+      meta:
+        typeof s.logCount === 'number' && s.logCount > 0
+          ? `${s.logCount} files — opening one shows the end of it, not all of it`
+          : 'Nothing readable from this machine.',
+    }),
   ];
 
   // ⛔ Only added because the address was confirmed to serve real, DISTINCT pages
@@ -177,26 +219,41 @@ function renderHome(state) {
 
   // Named, not linked — see the header. Same element-not-stylesheet rule as the
   // tiles above: these were run-on too, for the same reason.
-  const unbuilt = [
-    ['Live status', 'Whether everything is running right now. There is no page for it yet.'],
-    [
-      'The record of runs',
-      'The kept history of what ran and when. It exists as data only — nothing reads it back as a page yet.',
-    ],
-  ];
-  const later =
-    `<details class="later"><summary>Not built yet</summary><ul>` +
-    unbuilt
-      .map(
-        ([name, why]) =>
-          `<li><p class="t">${escapeHtml(name)}</p><p class="d">${escapeHtml(why)}</p></li>`
-      )
-      .join('') +
-    `</ul></details>`;
+  //
+  // ⛔⛔ HANDED IN, NEVER HELD HERE — AND THAT IS THE ROOT-CAUSE FIX, NOT A TIDY.
+  // This list used to be a constant inside this function, naming two pages as
+  // "not built yet". Both were then built, and this page went on announcing that
+  // they did not exist — because building a page cannot reach inside a renderer
+  // and update a literal. The page's own governing rule is that it must never
+  // misrepresent what exists; a hardcoded list of absences guarantees it will,
+  // eventually, in the one direction nobody checks. A dead link at least fails
+  // loudly when tapped; "not built yet" about something that IS built fails
+  // silently forever, because there is nothing there to tap and be wrong.
+  //
+  // ⚠ It is now a PARAMETER, which restores the property this file already
+  // claimed for itself in its header — that the renderer holds no addresses of
+  // its own. It held two.
+  const unbuilt = Array.isArray(s.unbuilt) ? s.unbuilt : [];
+  const later = unbuilt.length
+    ? `<details class="later"><summary>Not built yet</summary><ul>` +
+      unbuilt
+        .map(
+          ([name, why]) =>
+            `<li><p class="t">${escapeHtml(name)}</p><p class="d">${escapeHtml(why)}</p></li>`
+        )
+        .join('') +
+      `</ul></details>`
+    : // ⛔ An empty "Not built yet" box is worse than none: it reads as a section
+      // that failed to load rather than as nothing being outstanding.
+      '';
 
   return page({
     title: 'Start here',
     crumb: '',
+    // ⛔ The one page that must NOT offer a way to itself — a control that goes
+    // nowhere costs a tap to find out. Flagged explicitly rather than inferred
+    // from the title, which would break silently the day the title changed.
+    atHome: true,
     style: HOME_STYLE,
     body:
       `<h1>Start here</h1>` +

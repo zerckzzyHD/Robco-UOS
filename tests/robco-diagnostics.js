@@ -54045,6 +54045,500 @@ if (!PLANNING_OK) {
       /hours ago/.test(withStamp262),
     '262.5: a snapshot carrying no timestamp is rendered as of UNKNOWN AGE rather than as current, and one carrying a timestamp leads with the age in words — a snapshot presented as live is the single most misleading thing this surface could do'
   );
+
+  // ── 262.6  NO FIELD OF THE SNAPSHOT CAN BE SILENTLY INVISIBLE ────────────
+  //
+  // ⛔ A REAL DEFECT, MEASURED AGAINST THE LIVE SNAPSHOT (2026-08-26): the page
+  // detailed NINE of twenty-four top-level fields while printing, underneath
+  // them, "every field below is printed whether or not it has a value". Fifteen
+  // fields were absent with no trace — which is this page's OWN stated failure
+  // mode arriving from the inside, since a field that is missing and a field
+  // that is fine look identical once the row is gone.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT, AND THIS IS THE WHOLE POINT OF THE FIXTURE:
+  // the probe field names below appear NOWHERE in this repository or in any
+  // snapshot that exists today. So this cannot pass by coincidence and cannot be
+  // satisfied by any hardcoded enumeration — only by the remainder genuinely
+  // being derived from the data in hand. It goes red the day somebody replaces
+  // that derivation with a list of known fields, which is precisely the shape
+  // the original defect had.
+  const future262 = {
+    generatedAt: new Date().toISOString(),
+    enforced: true,
+    zzFieldInventedAfterThisPageWasWritten: { deep: 1 },
+    zzAnotherUnknownBlock: 42,
+  };
+  const futureHtml262 = SV.renderStatus(future262, new Date(), 'probe');
+  const named262 = ['zzFieldInventedAfterThisPageWasWritten', 'zzAnotherUnknownBlock'];
+  // ⚠ The row label is the field name made READABLE, so this compares against
+  // that form — but it must not become a tautology by re-running the same
+  // function and agreeing with itself. It ALSO proves the label is a mechanical
+  // transform OF THIS KEY: strip the spaces and the key comes back,
+  // case-insensitively. A lookup table, or a renamer that substituted a friendly
+  // word, fails that identity while still satisfying a compare-to-itself check.
+  const unnamed262 = named262.filter(
+    n => !futureHtml262.includes(`<span class="k">${SV.humanLabel(n)}</span>`)
+  );
+  const notMechanical262 = named262.filter(
+    n => SV.humanLabel(n).replace(/\s/g, '').toLowerCase() !== n.toLowerCase()
+  );
+  // The completeness identity itself: detailed + remainder must account for ALL.
+  const covered262 =
+    SV.DETAILED_FIELDS.filter(k => k in future262).length + SV.remainingFields(future262).length;
+  assert(
+    unnamed262.length === 0 &&
+      notMechanical262.length === 0 &&
+      covered262 === Object.keys(future262).length,
+    '262.6: a top-level field this page has never heard of is still NAMED on it — the set it does not detail is derived from the snapshot rather than enumerated, so a field added upstream cannot become invisible here without anybody being told' +
+      (unnamed262.length ? ` — SILENTLY DROPPED: ${unnamed262.join(', ')}` : '') +
+      (notMechanical262.length
+        ? ` — ⛔ LABEL IS NOT A MECHANICAL TRANSFORM OF THE KEY: ${notMechanical262.join(', ')}`
+        : '') +
+      ` — accounted for ${covered262}/${Object.keys(future262).length}`
+  );
+
+  // ── 262.7  THE REMAINDER NAMES, AND CANNOT PRINT A VALUE ─────────────────
+  //
+  // ⛔⛔ WHY NAMES-ONLY IS A SAFETY PROPERTY AND NOT A STYLE CHOICE. The obvious
+  // way to make 262.6 pass is to render whatever is left generically. Measured
+  // against the live snapshot, that would have put a filesystem path to a
+  // credentials file onto the page — and, worse, would have kept doing it for
+  // every field added upstream afterwards, with nobody reviewing the decision.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody "improves" the remainder to
+  // show what is in each field, which is a completely reasonable-looking change
+  // to make and is exactly the one that must not pass. The positive control on
+  // the NAME is load-bearing — without it this assertion would be satisfied by a
+  // remainder that rendered nothing at all, which is the defect 262.6 exists to
+  // forbid. The two assertions pin each other in opposite directions.
+  const secret262 = 'ZZ-NOT-FOR-A-PAGE-8f3a11';
+  const leaky262 = {
+    generatedAt: new Date().toISOString(),
+    enforced: false,
+    zzUndetailedBlock: { path: `/somewhere/${secret262}/file.json`, nested: { also: secret262 } },
+    zzNullBlock: null,
+  };
+  const leakyHtml262 = SV.renderStatus(leaky262, new Date(), 'probe');
+  assert(
+    !leakyHtml262.includes(secret262) &&
+      leakyHtml262.includes(`<span class="k">${SV.humanLabel('zzUndetailedBlock')}</span>`) &&
+      leakyHtml262.includes(`<span class="k">${SV.humanLabel('zzNullBlock')}</span>`),
+    '262.7: an undetailed field is NAMED on the page while nothing of its contents reaches it — several of these blocks record file locations, so a remainder that rendered values would publish them onto a page and go on doing so for fields added later' +
+      (leakyHtml262.includes(secret262) ? ' — ⛔ CONTENTS LEAKED ONTO THE PAGE' : '') +
+      (leakyHtml262.includes(`<span class="k">${SV.humanLabel('zzUndetailedBlock')}</span>`)
+        ? ''
+        : ' — ⛔ CONTROL FAILED: it names nothing, so "no leak" proves nothing')
+  );
+
+  // ── 262.8  THE LANDING PAGE CANNOT HOLD A LIST OF WHAT DOES NOT EXIST ────
+  //
+  // ⛔⛔ A REAL, LIVE DEFECT, CONFIRMED BY REQUEST AGAINST THE RUNNING SERVER
+  // (2026-08-26): both operational pages were built and serving distinct content
+  // — verified by content hash against a deliberate nonsense path, never by
+  // status code — while the landing page went on announcing, under "Not built
+  // yet", that neither existed. The absences were a literal INSIDE the renderer,
+  // so building the pages could not possibly update them.
+  //
+  // ⚠ AND IT IS THE SILENT DIRECTION OF THAT FAILURE THAT MAKES IT WORTH A
+  // GUARD. A dead link fails loudly the moment it is tapped. "Not built yet"
+  // about something that IS built offers nothing to tap, so it never announces
+  // itself — the page is simply believed, indefinitely.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day anybody moves an absence back inside
+  // the renderer, or adds a destination without a caller supplying it. The
+  // second half proves the mechanism still WORKS when handed something, so this
+  // cannot be satisfied by deleting the feature outright.
+  const HV262 = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const homeSrc262 = fs.readFileSync(path.join(ROOT, 'scripts', 'home-view.js'), 'utf8');
+  const builtHome262 = HV262.renderHome({
+    reportCount: 1,
+    boardUpdated: new Date(),
+    museumUrl: 'https://example.invalid/',
+    statusReachable: true,
+    statusGeneratedAt: new Date(Date.now() - 5 * 3600 * 1000),
+    logCount: 7,
+    unbuilt: [],
+  });
+  const withUnbuilt262 = HV262.renderHome({
+    reportCount: 1,
+    unbuilt: [['A future page', 'Genuinely does not exist.']],
+  });
+  assert(
+    builtHome262.includes('href="/status"') &&
+      builtHome262.includes('href="/ledger"') &&
+      !builtHome262.includes('Not built yet') &&
+      withUnbuilt262.includes('Not built yet') &&
+      withUnbuilt262.includes('A future page') &&
+      // The absences must not be re-hardcoded: the renderer may not name a
+      // destination as missing except through what it was handed.
+      !/There is no page for it yet/.test(homeSrc262),
+    '262.8: the landing page links the operational pages that exist and shows no "not built yet" box when nothing is outstanding, while still rendering absences its CALLER hands it — a list of what does not exist, held inside the renderer, cannot be corrected by building the thing'
+  );
+
+  // ── 262.9  THE LANDING TILE CARRIES THE SNAPSHOT'S AGE, NOT THE READ'S ───
+  //
+  // ⛔ THE TRAP IS ONE CHARACTER WIDE. Reading the file per request makes the
+  // READ fresh, never the DATA, so a tile built from the read's own clock would
+  // say "just now" forever — permanently, confidently wrong, and most wrong
+  // exactly when the generator has stopped and the answer matters.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: any future change that reaches for the current
+  // time here instead of the stamp that travelled in. The five-hour fixture is
+  // what makes the two distinguishable — with a fresh stamp both spellings agree
+  // and the test would prove nothing.
+  const staleTile262 = HV262.renderHome({
+    statusReachable: true,
+    statusGeneratedAt: new Date(Date.now() - 5 * 3600 * 1000),
+    unbuilt: [],
+  });
+  const undatedTile262 = HV262.renderHome({
+    statusReachable: true,
+    statusGeneratedAt: null,
+    unbuilt: [],
+  });
+  assert(
+    /Snapshot taken about 5 hours ago/.test(staleTile262) &&
+      /not a live reading/.test(staleTile262) &&
+      !/just now/.test(staleTile262) &&
+      /does not say when it was taken/.test(undatedTile262),
+    '262.9: the landing tile reports the snapshot\'s OWN age and calls it a snapshot, and a reachable-but-undated one says so rather than borrowing the read\'s clock — a tile built from the read time would read "just now" permanently, including when nothing is being generated at all'
+  );
+
+  // ── 262.10  THE ROUTE ACTUALLY HANDS OVER WHAT THE RENDERER NEEDS ────────
+  //
+  // ⚠ THE GAP EVERY ASSERTION ABOVE IS BLIND TO. renderHome() can satisfy 262.8
+  // and 262.9 perfectly while the route that calls it passes none of it — the
+  // renderer would then degrade to "nothing readable from this machine" on a
+  // machine where everything is readable, and every test here would stay green.
+  // That is a wiring fault, and only the wiring can be asked about it.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody edits the home route and drops
+  // a prop, or renames one on the renderer without following it through. Read
+  // from the config as text on purpose — importing it would execute a Vite
+  // config for no benefit.
+  // ⚠ THE WINDOW IS THE WHOLE /home HANDLER, not the call expression. The first
+  // version of this sliced forward from `renderHome({` and asked whether
+  // `generatedAt` appeared in it — and it does not, because the stamp is derived
+  // on the line ABOVE the call and passed in as a variable. That assertion failed
+  // against correct code, which is the harmless direction of a badly-chosen
+  // window; the same mistake pointed the other way is a test that passes because
+  // it is reading somewhere the defect could never appear.
+  const viteSrc262 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  const handlerStart262 = viteSrc262.indexOf("server.middlewares.use('/home'");
+  const callAt262 = viteSrc262.indexOf('renderHome({');
+  const handler262 =
+    handlerStart262 >= 0 && callAt262 > handlerStart262
+      ? viteSrc262.slice(handlerStart262, callAt262 + 1600)
+      : '';
+  const required262 = ['statusReachable', 'statusGeneratedAt', 'logCount', 'unbuilt'];
+  const notPassed262 = required262.filter(p => !handler262.includes(p + ':'));
+  assert(
+    handler262.length > 0 &&
+      notPassed262.length === 0 &&
+      // ⭐ The stamp must be READ FROM THE SNAPSHOT. `new Date()` with no argument
+      // anywhere in this handler would be a clock started here, which is the one
+      // substitution that makes the tile permanently claim freshness.
+      /snap\.data\.generatedAt/.test(handler262) &&
+      !/new Date\(\s*\)/.test(handler262),
+    "262.10: the home route passes every fact the landing tiles are built from, and takes the age from the snapshot's own stamp with no local clock anywhere in the handler — a renderer that is correct and a caller that hands it nothing produce a page that is wrong in exactly the reassuring direction" +
+      (notPassed262.length ? ` — NOT PASSED: ${notPassed262.join(', ')}` : '') +
+      (handler262.length === 0 ? ' — the /home handler could not be located' : '')
+  );
+
+  // ── 262.11  A SUMMARY LINE CARRIES A DATUM, NEVER A SENTENCE OR A PATH ───
+  //
+  // ⛔ REPORTED FROM THE PHONE (2026-08-26). Structured values are summarised by
+  // joining their scalars, and several blocks carry DOCUMENTATION strings next to
+  // their state. One rendered as a 167-character paragraph inside a right-aligned
+  // value column, overflowing sideways — and a definition sitting in a state
+  // column READS as state, so the page appeared to report something never
+  // measured.
+  //
+  // ⛔⛔ THE PATH HALF IS A SEPARATE HAZARD THE PROSE RULE WOULD NOT CATCH, which
+  // is exactly why it is asserted here rather than assumed to follow: a
+  // credentials path and a trust directory are single tokens with no whitespace,
+  // so they are datum-SHAPED and would sail through a prose-only filter into a
+  // summary line.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: any future "simplify the summariser" that joins
+  // scalars uniformly — which is what it did originally — or any new documentation
+  // or path field added upstream, since the rule is by shape and not a list of the
+  // fields visible today. The positive control is load-bearing: without it this
+  // passes for a summariser that renders nothing at all.
+  const proseVal262 = SV.val({
+    phase: 'launch-gate-off',
+    ok: false,
+    verifiedMeans:
+      'VERIFIED means the named predicates held. It does NOT mean the patch is correct.',
+  });
+  const pathVal262 = SV.val({ present: false, path: 'C:\\Some\\Private\\Place\\MARKER' });
+  const allProse262 = SV.val({ note: 'a sentence and nothing else at all here' });
+  assert(
+    !/VERIFIED means/.test(proseVal262.text) &&
+      /launch-gate-off/.test(proseVal262.text) &&
+      /not shown here/.test(proseVal262.text) &&
+      !/Private|MARKER|\\/.test(pathVal262.text) &&
+      /present no/i.test(pathVal262.text) &&
+      !/a sentence and nothing/.test(allProse262.text) &&
+      allProse262.unknown === false,
+    '262.11: a one-line summary carries only short values — explanatory prose and filesystem paths are held back and COUNTED on the line rather than dropped, and a block made entirely of prose says so instead of rendering blank' +
+      ` — got: ${JSON.stringify(proseVal262.text)} | ${JSON.stringify(pathVal262.text)}`
+  );
+
+  // ── 262.12  THE ANSWER STATES ITS OWN CEILING ────────────────────────────
+  //
+  // ⛔⛔ THE FAILURE THIS FORBIDS IS A REASSURING ONE, which is the kind that
+  // never gets reported. Most findings carry no way to raise a flag at all, so
+  // "nothing is flagged" is a far weaker claim than "nothing is wrong" — and a
+  // page that prints the first while the reader hears the second has done the
+  // ABSENT-versus-UNOBSERVABLE collapse at the top of the page, in one sentence,
+  // after being careful about it everywhere else.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody replaces this with "All
+  // clear" or a green tick, which is the natural thing to write and the one thing
+  // that must not appear. Also red if the alerting signal stops being read from
+  // the source — the fixture's non-zero alerting field must surface, and its
+  // SUPPRESSED sibling must not, which is the distinction the source itself draws.
+  const quiet262 = SV.renderStatus(
+    {
+      generatedAt: new Date().toISOString(),
+      enforced: true,
+      findings: {
+        // count is non-zero but the SOURCE says it is not alerting — suppressed.
+        backupHealth: { unhealthyCount: 1, alertingCount: 0 },
+        plainCount: 3,
+        cannotSee: { observable: false, reason: 'probe-absent' },
+      },
+    },
+    new Date(),
+    'probe'
+  );
+  const loud262 = SV.renderStatus(
+    {
+      generatedAt: new Date().toISOString(),
+      enforced: true,
+      findings: { somethingReal: { count: 2, alerting: 2 } },
+    },
+    new Date(),
+    'probe'
+  );
+  assert(
+    /Nothing is flagged as needing you/.test(quiet262) &&
+      /can actually raise a flag/.test(quiet262) &&
+      /not<\/strong> a clean bill of health|not a clean bill of health/.test(quiet262) &&
+      !/all clear/i.test(quiet262) &&
+      // the suppressed one is NOT promoted to "needs you"…
+      !/1 thing the snapshot flags/.test(quiet262) &&
+      // …but it is still visible as counted, never dropped
+      /Counted, but not called a problem/.test(quiet262) &&
+      // …and a genuinely alerting finding IS promoted
+      /1 thing the snapshot flags as needing you/.test(loud262),
+    '262.12: the answer defers to the source\'s OWN alerting signal — a non-zero count the source declined to flag is shown as counted rather than promoted to an alarm — and it states in the same breath how few checks can raise a flag at all, so "nothing flagged" is never read as "nothing wrong"'
+  );
+
+  // ── 262.13  CLUTTER IS SOLVED BY COLLAPSING, NEVER BY DROPPING ───────────
+  //
+  // ⚠ THE OBVIOUS WAY TO FIX A CLUTTERED PAGE IS TO SHOW LESS OF IT, and that is
+  // precisely the defect 262.6 exists to forbid — this page already shipped once
+  // showing nine fields of twenty-four while claiming to show them all. So the
+  // restructure is asserted to have COST NOTHING: the same completeness identity
+  // must still hold after it.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: any future tidy-up that drops a quiet field, a
+  // zero-valued finding, or a block it judges uninteresting.
+  const cluttered262 = {
+    generatedAt: new Date().toISOString(),
+    enforced: false,
+    findings: { zzQuietZero: 0, zzNoisy: 4 },
+    zzProseOnlyBlock: { note: 'nothing but an explanation lives in here' },
+    zzAnotherUndetailed: { a: 1 },
+  };
+  const cHtml262 = SV.renderStatus(cluttered262, new Date(), 'probe');
+  const accounted262 =
+    SV.DETAILED_FIELDS.filter(k => k in cluttered262).length +
+    SV.remainingFields(cluttered262).length;
+  // The counted tier's own markup, isolated so the assertion below reads it
+  // rather than the whole document.
+  const countedBlock262 =
+    /<details class="band"><summary>Counted, but not called a problem([\s\S]*?)<\/details>/.exec(
+      cHtml262
+    );
+  assert(
+    accounted262 === Object.keys(cluttered262).length &&
+      cHtml262.includes('<span class="k">Zz prose only block</span>') &&
+      cHtml262.includes('<span class="k">Zz another undetailed</span>') &&
+      // the quiet zero is still reachable, not tidied away
+      /Zz quiet zero/.test(cHtml262) &&
+      // ⚠ SCOPED TO THE COUNTED SECTION, and it was not at first. An unscoped
+      // "is `Zz noisy` anywhere on the page" passed even with the counted tier
+      // emptied outright — because findings are ALSO listed in the detail section
+      // further down, so the page-wide search was satisfied by a completely
+      // different element. Measured: deleting the tier left this green. That is a
+      // check whose passing condition has nothing to do with its claim, which is
+      // the shape found three times on this project already.
+      countedBlock262 !== null &&
+      /Zz noisy/.test(countedBlock262[1]) &&
+      !/Zz quiet zero/.test(countedBlock262[1]),
+    '262.13: restructuring for readability drops nothing — every field, including a zero-valued finding and a block made only of prose, is still on the page, because a page that shows less to look calmer is the defect this surface already shipped once' +
+      ` — accounted ${accounted262}/${Object.keys(cluttered262).length}`
+  );
+
+  // ── 262.14  EVERY PAGE THE SHELL BUILDS HAS ONE WAY HOME ─────────────────
+  //
+  // ⛔ MEASURED FIRST: five of the eight pages these renderers produce had no
+  // route back to the landing page — every report page, the reports index, and
+  // both deep log pages — while the three that did carried it as a hand-copied
+  // literal in two files.
+  //
+  // ⚠⚠ WHAT THIS CHECK ASSUMES, AND WHAT MEASURING THE ASSUMPTION TURNED UP.
+  // The tempting claim is "every dev-server page has a way home". That claim is
+  // FALSE and it took one grep to find out: the generated queue board builds its
+  // own complete document and is served as a static file, so it never passes
+  // through the shell at all — confirmed served, by content hash against a
+  // nonsense path, not by status code. Asserting the broad claim would have
+  // produced a guard that passes while a real served page has no way home, and
+  // whose passing would be read as coverage of it.
+  //
+  // ⭐ So the claim is narrowed to what is true and the exception is NAMED — and
+  // the naming is itself asserted, so a THIRD module that starts hand-rolling a
+  // document goes red instead of quietly joining the exception.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: a new page added with its own header markup, a
+  // future edit that makes the shell's link conditional, or a renderer that
+  // reintroduces its own copy of it.
+  {
+    const viewFiles262 = fs
+      .readdirSync(path.join(ROOT, 'scripts'))
+      .filter(f => /-view\.js$/.test(f))
+      .sort();
+    // Files that build a complete document themselves rather than via page().
+    const ownShell262 = viewFiles262.filter(f =>
+      /<html\b/i.test(fs.readFileSync(path.join(ROOT, 'scripts', f), 'utf8'))
+    );
+    // Nobody may hand-write the link any more — one copy, in the shell.
+    const handWritten262 = viewFiles262.filter(
+      f =>
+        f !== 'report-view.js' &&
+        fs.readFileSync(path.join(ROOT, 'scripts', f), 'utf8').includes('href="/home"')
+    );
+    const RV262 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+    const LV262 = require(path.join(ROOT, 'scripts', 'ledger-view.js'));
+    const HV262b = require(path.join(ROOT, 'scripts', 'home-view.js'));
+    const built262 = [
+      ['reports index', RV262.renderIndex([], null, null, null), 1],
+      ['a report', RV262.renderReport('x.md', '# t'), 1],
+      ['reports 404', RV262.renderNotFound(), 1],
+      ['status with data', SV.renderStatus({ enforced: true }, new Date(), 'n'), 1],
+      ['status empty', SV.renderStatus(null, new Date(), 'n'), 1],
+      ['ledger index', LV262.renderLedgerIndex([], 'n'), 1],
+      [
+        'a log tail',
+        LV262.renderLedgerTail(
+          { name: 'a.jsonl', size: 1, fromOffset: 0, lines: ['{}'], truncated: false },
+          'n'
+        ),
+        1,
+      ],
+      ['ledger 404', LV262.renderLedgerTail(null, 'n'), 1],
+      // ⛔ The landing page must NOT link to itself: a control that goes nowhere
+      // costs a tap to discover, which is the same class of defect as a dead link.
+      ['the landing page', HV262b.renderHome({ unbuilt: [] }), 0],
+    ];
+    const wrong262 = built262.filter(
+      ([, html, want]) => (html.match(/href="\/home"/g) || []).length !== want
+    );
+    assert(
+      wrong262.length === 0 &&
+        handWritten262.length === 0 &&
+        ownShell262.length === 2 &&
+        ownShell262.includes('report-view.js') &&
+        ownShell262.includes('queue-view.js'),
+      '262.14: every page the shared shell builds carries exactly one way home and the landing page carries none — emitted by the shell so a new page cannot be built without it, with the ONE module that hand-rolls its own document named here rather than silently counted as covered' +
+        (wrong262.length ? ` — WRONG COUNT: ${wrong262.map(w => w[0]).join(', ')}` : '') +
+        (handWritten262.length ? ` — HAND-WRITTEN COPY IN: ${handWritten262.join(', ')}` : '') +
+        (ownShell262.length !== 2
+          ? ` — a module started building its own document: ${ownShell262.join(', ')}`
+          : '')
+    );
+  }
+
+  // ── 262.15  THE DELIVERY ROW REPORTS DELIVERY, OR SAYS IT CANNOT ─────────
+  //
+  // ⛔⛔ THE BAR IS THE DELIVERY SERVICE'S OWN ACKNOWLEDGEMENT. The notifier
+  // degrades silently rather than throwing, so a record that it TRIED proves
+  // nothing at all — and the field carrying this is named "confirmed", which is
+  // exactly the kind of name that turns out to mean "attempted". It was traced to
+  // what writes it rather than trusted: the record is emitted only on the
+  // service's own success status, and an unacknowledged attempt is written as a
+  // failure that can never appear here.
+  //
+  // ⚠⚠ AND THE ASSUMPTION IS NAMED, because the last three defects on this
+  // project were all a check hardened onto an unmeasured premise. This row
+  // assumes a confirmed delivery is durably recorded and that the reading itself
+  // is not stale — the second is why the page leads with its own age. It does NOT
+  // assume the handset rang, and nothing in this snapshot could establish that.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: an absent record rendering as blank, as "none",
+  // or as a reassuring zero — every one of which reads as "the channel is fine"
+  // when it means "nothing here can tell you". Also red if somebody attaches a
+  // staleness verdict to a quiet channel, which would manufacture an alarm out of
+  // a system that simply had nothing to say.
+  const delivered262 = SV.renderStatus(
+    {
+      generatedAt: new Date().toISOString(),
+      notifyChannel: {
+        state: 'OK',
+        lastConfirmedSendAt: new Date(Date.now() - 7200000).toISOString(),
+      },
+    },
+    new Date(),
+    'probe'
+  );
+  const neverSent262 = SV.renderStatus(
+    {
+      generatedAt: new Date().toISOString(),
+      notifyChannel: { state: 'OK', lastConfirmedSendAt: null },
+    },
+    new Date(),
+    'probe'
+  );
+  const noBlock262 = SV.renderStatus(
+    { generatedAt: new Date().toISOString() },
+    new Date(),
+    'probe'
+  );
+  const rowOf262 = html => {
+    const m = /<summary>Phone alerts<\/summary>([\s\S]*?)<\/details>/.exec(html);
+    return m ? m[1] : null;
+  };
+  // ⚠ THE VALUE CELL, NOT THE WHOLE SECTION — and the first version of this got
+  // that wrong in the direction that at least fails loudly. The section carries an
+  // explanatory note which legitimately contains the words "never" and "failure",
+  // so a forbidden-words check run across the whole block matches its own caption
+  // and can never pass. The claim is about what the VALUE says, so the value is
+  // what gets read.
+  const valueOf262 = html => {
+    const r = rowOf262(html);
+    if (r === null) return null;
+    // ⚠ An UNOBSERVABLE row carries the source's reason in a nested span between
+    // the label and the value, so the extractor must not assume the label closes
+    // straight into the value — it did, and matched only the happy path, which is
+    // the case least in need of testing.
+    const m = /Last confirmed delivery[\s\S]*?<span class="v[^"]*">([^<]*)</.exec(r);
+    return m ? m[1] : null;
+  };
+  assert(
+    valueOf262(delivered262) === 'about 2 hours ago' &&
+      // absent record → UNOBSERVABLE in the VALUE, never blank, "none", or a zero
+      valueOf262(neverSent262) === SV.UNOBSERVABLE &&
+      // an entirely absent block is still a ROW, not a missing section
+      valueOf262(noBlock262) === SV.UNOBSERVABLE &&
+      // a quiet channel is never dressed as a fault — checked on the value, and
+      // on the emphasis class the page uses to mark something as wanting action
+      !/stale|overdue|problem/i.test(String(valueOf262(delivered262))) &&
+      !/agewarn/.test(String(rowOf262(delivered262))),
+    '262.15: the phone-alert row reports the last delivery the service itself acknowledged, and an absent record reads UNOBSERVABLE rather than blank, "none" or a zero — "no delivery found" and "no delivery attempted" are different facts, and only one of them is reassuring'
+  );
 }
 
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
@@ -56606,10 +57100,21 @@ if (!PLANNING_OK) {
   const reportView260 = require(path.join(ROOT, 'scripts', 'report-view.js'));
 
   const MUSEUM260 = 'https://example.invalid/museum/';
+  // ⚠ THE UNBUILT ENTRY IS NOW SUPPLIED BY THIS FIXTURE, and that is a change of
+  // wiring, NOT a weakening of what follows. Absences used to be a literal inside
+  // the renderer — which is exactly why the page went on calling two pages
+  // "not built yet" after both were built and serving. They are handed in now, so
+  // a suite that wants to assert how an absence RENDERS has to hand one over.
+  // Every assertion below is unchanged in substance: an unbuilt entry must still
+  // never become a tappable link, and must still be block elements.
   const full260 = homeView260.renderHome({
     reportCount: 4,
     boardUpdated: new Date(Date.now() - 3600000),
     museumUrl: MUSEUM260,
+    statusReachable: true,
+    statusGeneratedAt: new Date(Date.now() - 3600000),
+    logCount: 5,
+    unbuilt: [['A destination that does not exist', 'Named so its absence is deliberate.']],
   });
 
   // 260.1  GOES RED IF: somebody turns a not-built destination into a link —
@@ -56690,10 +57195,22 @@ if (!PLANNING_OK) {
     const anchors260 = [...full260.matchAll(/<a\b[^>]*class="t[^"]*"[^>]*>([\s\S]*?)<\/a>/g)].map(
       m => m[1]
     );
+    // ⚠ THE EXPECTED COUNT IS DERIVED FROM THE PAGE, NOT TYPED HERE. It used to
+    // be the literal 4, which is a hand-maintained tally of a list that grows —
+    // adding a tile reddened this assertion for no reason connected to what it
+    // tests, and the cheapest way through that is to bump the number, which
+    // quietly trains the next person to bump it again. Counting the tiles the
+    // page actually rendered keeps the real claim — EVERY tile has exactly one
+    // correctly-shaped link — while removing the number that has to be kept in
+    // step. It still goes red for a tile that renders no anchor, or two.
+    const tileBlock260 = /<ul class="tiles">([\s\S]*?)<\/ul>/.exec(full260);
+    const tileCount260 = tileBlock260 ? (tileBlock260[1].match(/<li>/g) || []).length : 0;
     assert(
-      anchors260.length === 4 &&
+      tileCount260 >= 4 &&
+        anchors260.length === tileCount260 &&
         anchors260.every(t => !/<|\.\s|,\s/.test(t) && t.trim().length > 0 && t.length < 40),
-      '260.7: each tile link contains ONLY its short title — no markup, no sentence punctuation, nothing of the description inside the anchor'
+      '260.7: each tile link contains ONLY its short title — no markup, no sentence punctuation, nothing of the description inside the anchor' +
+        ` — ${tileCount260} tiles, ${anchors260.length} title links`
     );
     // …and the description sits in a real block element that is a SIBLING of the
     // link, so the line break survives with no stylesheet at all.

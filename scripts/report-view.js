@@ -169,7 +169,36 @@ h1 { scroll-margin-top:4.5rem; }
  * long-form prose. It is additive only: callers that omit it get exactly the
  * bytes they got before.
  */
-function page({ title, crumb, body, nav, style }) {
+/**
+ * ⛔⛔ THE WAY HOME IS EMITTED BY THE SHELL, NEVER BY THE CALLER.
+ *
+ * Measured before this was written, rather than assumed: FIVE of the eight pages
+ * these renderers produce had no route back to the landing page at all — every
+ * report page, the reports index, and both deep log pages. The three that did
+ * have one carried it as a hand-copied literal in two different files, which is
+ * the same second-copy problem in miniature: three places to edit, and the two
+ * that were forgotten are the ones nobody notices until they are on a phone with
+ * nowhere to go but the back button.
+ *
+ * ⭐ Emitting it HERE means a page cannot be built without it. A sixth page added
+ * next month is covered because it went through this function, not because
+ * somebody remembered — which is the only version of "every page" that stays true.
+ *
+ * ⚠ `atHome` is the single opt-out, and it exists because the landing page
+ * linking to itself is a dead control that costs a tap to discover. It is a
+ * deliberate flag rather than a title comparison: matching on a page's NAME would
+ * silently start or stop working the day that name changed.
+ *
+ * ⛔ THE BOUNDARY OF WHAT THIS COVERS, STATED SO NOBODY READS MORE INTO IT.
+ * This covers every page built on `page()`. It does NOT cover the generated queue
+ * board, which builds its own complete document and is served as a static file —
+ * measured, not assumed, and named in the guard so "every page" is never read as
+ * a claim about that one.
+ */
+const HOME_LINK = '<a href="/home">&#8592; Home</a>';
+
+function page({ title, crumb, body, nav, style, atHome }) {
+  const back = atHome === true ? '' : HOME_LINK;
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -178,7 +207,7 @@ function page({ title, crumb, body, nav, style }) {
 <title>${escapeHtml(title)}</title>
 <style>${STYLE}${style || ''}</style>
 </head><body>
-<header class="top">${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
+<header class="top">${back}${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
 <main class="wrap">
 ${body}
 </main></body></html>`;
