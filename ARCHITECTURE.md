@@ -178,6 +178,7 @@
 │   ├── generate-architecture-toc.js Protocol 52 — regenerates this file's own Table of Contents from its real headings
 │   ├── generate-code-map.js    Protocol 53 — regenerates library/CODE_MAP.md's three GENERATED sections
 │   ├── generate-test-catalog.js Protocol 47 — regenerates library/TEST_CATALOG.md from the runner's own suite headers
+│   ├── home-view.js           Renders the dev server's `/home` landing page — one phone-readable screen that reaches every destination. ⛔ Holds NO addresses of its own (Suite 260.3): every destination is passed in by the route, so one reviewable place governs them. ⭐ Its rule is that a destination is linked ONLY when it was verified by CONTENT — a dev server answers unknown paths with the app's index page at the same status and byte length, so "it returned 200" proves nothing. Destinations that do not exist are named as not-built in PLAIN TEXT, never as anchors (Suite 260.1), because a dead link is the page lying. Reuses report-view.js's `page()` shell and palette (Protocol 22) rather than growing a second look
 │   ├── install-hooks.js        Copies the pre-commit AND pre-push hooks into .git/hooks on npm install (`prepare`)
 │   ├── knowledge-graph.js      R11 knowledge-graph / retrieval-topology extractor (Node, manual run) — emits library/knowledge-graph.json (gitignored, generated on demand); un-gated, no Suite/hook, per Protocol 50
 │   ├── planning-paths.js       Resolves the PRIVATE planning tree (`_RobCo-Archive/!PLANNING/`) — the one resolver for QUEUE.md/QUEUE_LOG.md/NORTH_STARS.md (F04)

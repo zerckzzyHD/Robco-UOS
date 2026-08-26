@@ -1,0 +1,210 @@
+#!/usr/bin/env node
+/**
+ * scripts/home-view.js — the landing page: one screen that reaches everything.
+ *
+ * ── ⭐ WHO THIS IS FOR, AND WHY THAT DECIDES EVERY CHOICE BELOW ──────────────
+ * This is read on a phone, half awake, in the dark. That single fact rules out
+ * most of what a "hub page" normally is. So:
+ *
+ *  · EVERY TILE SAYS WHAT THE THING IS, in ordinary words, on the tile. Not a
+ *    short code, not a name only somebody who already knows the project could
+ *    resolve. If a label needs prior knowledge to decode, it has failed the only
+ *    test that matters here.
+ *  · NOTHING IS BEHIND A TAP THAT DOESN'T HAVE TO BE. The destinations are the
+ *    page. Anything supplementary is collapsed and starts CLOSED.
+ *  · BIG TARGETS. A whole tile is the link, not the words inside it.
+ *
+ * ── ⛔ THE RULE THIS PAGE EXISTS TO KEEP: NO LINK TO SOMETHING THAT ISN'T THERE
+ * A dead link on this page is worse than a missing one. A missing destination is
+ * a thing not built yet; a dead link is the page lying, and it costs a tap plus
+ * the confusion of not knowing whether the destination broke or never existed.
+ *
+ * ⚠ AND "IT RETURNED 200" IS NOT EVIDENCE A DESTINATION EXISTS. The dev server
+ * answers unknown paths with the app's own index page — same status, same bytes.
+ * Every destination below was checked by comparing its CONTENT against a
+ * deliberate nonsense path on the same host, never by status code. Two of the
+ * candidates for this page turned out to be nothing at all, and one turned out to
+ * live somewhere entirely different from where it was first looked for.
+ *
+ * ── WHY THE UNBUILT ONES ARE LISTED AT ALL ──────────────────────────────────
+ * Silently omitting them reads as an oversight, and invites the question "did it
+ * break?" every time. They are named, plainly, as not built — and deliberately
+ * rendered as PLAIN TEXT, never as anchors, so there is nothing to tap and
+ * nothing to be disappointed by.
+ *
+ * Rendering reuses report-view.js's page shell and stylesheet rather than growing
+ * a second one, so the two surfaces cannot drift apart in look or behaviour.
+ */
+'use strict';
+
+const { page, escapeHtml } = require('./report-view.js');
+
+/**
+ * Tile styling, passed to the shared shell rather than added to its stylesheet.
+ *
+ * ⚠ Kept OUT of report-view.js's STYLE on purpose: that sheet is documented as
+ * being aimed at long-form prose, and these rules are aimed at a menu. Mixing
+ * them would leave dead selectors on every report page and blur what that sheet
+ * is for. The shared shell supplies the palette, so the two pages still match.
+ */
+const HOME_STYLE = `
+.tiles { list-style:none; margin:1.2rem 0 0; padding:0; }
+.tiles li { margin:0 0 .7rem; border:1px solid var(--line); border-radius:10px;
+  background:var(--code); padding:.8rem 1rem .9rem; }
+.tiles a.t { display:block; text-decoration:none; font-weight:700;
+  font-size:1.12rem; color:var(--acc); padding:.35rem 0; min-height:44px; }
+.tiles p.d { margin:.1rem 0 0; color:var(--fg); font-size:.97rem; line-height:1.5; }
+.tiles p.m { margin:.35rem 0 0; color:var(--dim); font-size:.85rem; }
+.tiles a.away::after { content:" ↗"; font-weight:400; }
+details.later { margin:1.6rem 0 0; border:1px solid var(--line);
+  border-radius:10px; background:var(--code); padding:0 .9rem; }
+details.later summary { cursor:pointer; padding:.85rem .1rem; font-weight:600;
+  min-height:44px; display:flex; align-items:center; color:var(--dim); }
+details.later ul { list-style:none; padding:0; margin:0 0 .8rem; }
+details.later li { margin:0; padding:.65rem .1rem; border-top:1px solid var(--line); }
+details.later p.t { margin:0; font-weight:700; color:var(--fg); font-size:.97rem; }
+details.later p.d { margin:.15rem 0 0; color:var(--dim); font-size:.92rem;
+  line-height:1.5; }
+p.asof { color:var(--dim); font-size:.85rem; margin:1.6rem 0 0; }
+`;
+
+/**
+ * "3 hours ago" — a phone at 4am wants elapsed time, not a timestamp it has to
+ * subtract from a clock it hasn't looked at yet. Falls back to nothing rather
+ * than guessing when the date is unusable.
+ */
+function ago(when) {
+  const t = when instanceof Date ? when.getTime() : NaN;
+  if (!Number.isFinite(t)) return '';
+  const mins = Math.floor((Date.now() - t) / 60000);
+  if (mins < 0) return '';
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} minutes ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs === 1 ? 'about an hour ago' : `about ${hrs} hours ago`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
+}
+
+/**
+ * One destination.
+ *
+ * ⛔ THE LINK TEXT IS THE TITLE AND NOTHING ELSE, and the description and freshness
+ * line are SIBLINGS of the anchor rather than children of it. Both halves of that
+ * were a real defect, reported from a phone:
+ *
+ *  1. Everything used to live inside the anchor, separated only by `display:block`
+ *     on a set of spans. Structure that exists only in a stylesheet is not
+ *     structure — the moment the CSS was not applied, every tile collapsed into
+ *     one run-on sentence ("The terminalThe Fallout companion app itself…") with
+ *     no separator anywhere. So the separation is now carried by ELEMENTS whose
+ *     default rendering is already correct: a paragraph breaks the line with no
+ *     stylesheet at all, a styled span does not.
+ *  2. With the description inside the anchor, the link's accessible name was the
+ *     whole paragraph — a screen reader announced three sentences as the name of
+ *     one link. Now the name is "The terminal".
+ *
+ * ⚠ The tap target moves from the whole card to the title link, which is why that
+ * link is a block with its own padding and a 44px floor. That is a deliberate
+ * trade: a big target is worth less than a page that still reads when the styling
+ * does not arrive, and the target stays comfortably above the minimum either way.
+ */
+function tile({ href, title, what, meta, away }) {
+  const cls = away ? ' class="t away"' : ' class="t"';
+  const rel = away ? ' rel="noreferrer noopener"' : '';
+  return (
+    `<li>` +
+    `<a href="${escapeHtml(href)}"${cls}${rel}>${escapeHtml(title)}</a>` +
+    `<p class="d">${escapeHtml(what)}</p>` +
+    (meta ? `<p class="m">${escapeHtml(meta)}</p>` : '') +
+    `</li>`
+  );
+}
+
+/**
+ * Render the landing page.
+ *
+ * @param {object} state
+ * @param {number|null} state.reportCount  how many reports are readable, or null
+ *   when the private tree is not reachable at all (a plain checkout — normal).
+ * @param {Date|null} state.boardUpdated   when the build board last changed, or
+ *   null when there is no board to read.
+ * @param {string} state.museumUrl         the public site's address.
+ */
+function renderHome(state) {
+  const s = state || {};
+  const hasReports = typeof s.reportCount === 'number';
+  const hasBoard = s.boardUpdated instanceof Date;
+
+  const tiles = [
+    tile({
+      href: '/',
+      title: 'The terminal',
+      what: 'The Fallout companion app itself, running from this machine right now.',
+    }),
+    tile({
+      href: '/reports#roadmap',
+      title: "What's next",
+      what: 'The build board: what is ready to start, what is underway, what is waiting.',
+      meta: hasBoard ? `Updated ${ago(s.boardUpdated)}` : 'No board on this machine yet.',
+    }),
+    tile({
+      href: '/reports#reports',
+      title: 'Written reports',
+      what: 'Full accounts of finished work, newest first.',
+      meta: hasReports
+        ? s.reportCount === 1
+          ? '1 report'
+          : `${s.reportCount} reports`
+        : 'None readable from this machine.',
+    }),
+  ];
+
+  // ⛔ Only added because the address was confirmed to serve real, DISTINCT pages
+  // — not merely to answer. That host returns its front page for unknown paths
+  // too, so "it responded" would have proved nothing.
+  if (s.museumUrl) {
+    tiles.push(
+      tile({
+        href: s.museumUrl,
+        title: 'The museum',
+        what: 'The public site telling the story of how this was built.',
+        meta: 'Opens the public web, outside this private network.',
+        away: true,
+      })
+    );
+  }
+
+  // Named, not linked — see the header. Same element-not-stylesheet rule as the
+  // tiles above: these were run-on too, for the same reason.
+  const unbuilt = [
+    ['Live status', 'Whether everything is running right now. There is no page for it yet.'],
+    [
+      'The record of runs',
+      'The kept history of what ran and when. It exists as data only — nothing reads it back as a page yet.',
+    ],
+  ];
+  const later =
+    `<details class="later"><summary>Not built yet</summary><ul>` +
+    unbuilt
+      .map(
+        ([name, why]) =>
+          `<li><p class="t">${escapeHtml(name)}</p><p class="d">${escapeHtml(why)}</p></li>`
+      )
+      .join('') +
+    `</ul></details>`;
+
+  return page({
+    title: 'Start here',
+    crumb: '',
+    style: HOME_STYLE,
+    body:
+      `<h1>Start here</h1>` +
+      `<p>Everything below is checked each time this page loads.</p>` +
+      `<ul class="tiles">${tiles.join('')}</ul>` +
+      later +
+      `<p class="asof">Nothing here is stored or cached — this page is built fresh on every visit.</p>`,
+  });
+}
+
+module.exports = { renderHome, ago, HOME_STYLE };

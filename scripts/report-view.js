@@ -161,14 +161,22 @@ h1 { scroll-margin-top:4.5rem; }
  * worse than no control — it is found in the first minute and it teaches the
  * reader that the chrome lies.
  */
-function page({ title, crumb, body, nav }) {
+/**
+ * The shared page shell.
+ *
+ * ⚠ `style` is an OPTIONAL extra sheet appended after STYLE, for a sibling
+ * surface whose rules do not belong in a stylesheet documented as being aimed at
+ * long-form prose. It is additive only: callers that omit it get exactly the
+ * bytes they got before.
+ */
+function page({ title, crumb, body, nav, style }) {
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>${escapeHtml(title)}</title>
-<style>${STYLE}</style>
+<style>${STYLE}${style || ''}</style>
 </head><body>
 <header class="top">${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
 <main class="wrap">

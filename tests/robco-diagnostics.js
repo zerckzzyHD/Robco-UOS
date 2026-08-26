@@ -56343,6 +56343,196 @@ if (!PLANNING_OK) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  Suite 260 — the landing page: no dead links, nothing pre-expanded
+//
+//  ⭐ WHAT MAKES EACH OF THESE GO RED THAT ISN'T "SOMEBODY REVERTED THE FEATURE"
+//  — asked deliberately, because a group of checks that only restate the code
+//  they sit next to reads as coverage while proving nothing. Each assertion below
+//  names a specific FUTURE edit that would break it, and the ones that could not
+//  name one were not written.
+//
+//  Every assertion is fed literal arguments, so none of this reads the private
+//  tree and the whole suite runs unchanged on a checkout that has no such tree.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 260 — landing page (no dead links, nothing pre-expanded)');
+
+  const homeView260 = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const reportView260 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+
+  const MUSEUM260 = 'https://example.invalid/museum/';
+  const full260 = homeView260.renderHome({
+    reportCount: 4,
+    boardUpdated: new Date(Date.now() - 3600000),
+    museumUrl: MUSEUM260,
+  });
+
+  // 260.1  GOES RED IF: somebody turns a not-built destination into a link —
+  //        the single failure this page exists to prevent, and the one already
+  //        reported as a bug on the sibling page. The unbuilt entries live in a
+  //        <details>; this asserts that block contains no anchor at all.
+  {
+    const block = /<details class="later">([\s\S]*?)<\/details>/.exec(full260);
+    assert(
+      block !== null && !/<a\b/i.test(block[1]) && /<li>/.test(block[1]),
+      '260.1: the "not built yet" block lists entries and contains NO anchor — an unbuilt destination can never become a tappable dead link'
+    );
+  }
+
+  // 260.2  GOES RED IF: somebody adds `open` to a section. This was an explicit
+  //        correction on the sibling page ("all sections start closed") and the
+  //        cheapest way to undo it is one attribute nobody reviews closely.
+  assert(
+    /<details/.test(full260) && !/<details[^>]*\bopen\b/.test(full260),
+    '260.2: every collapsible section on the page starts CLOSED'
+  );
+
+  // 260.3  GOES RED IF: the renderer starts holding its own addresses. Every
+  //        destination is handed in, so there is exactly ONE place a wrong or
+  //        stale address can enter — reviewable in the route, not buried in
+  //        markup. An http(s) literal appearing in the renderer source is the
+  //        regression; the source is the subject here, so this is a deliberate
+  //        static check rather than a behavioural one.
+  {
+    const src260 = readFile('scripts/home-view.js');
+    const urls260 = (src260.match(/https?:\/\/[^\s'"`)]+/g) || []).filter(
+      u => !/^https?:\/\/(www\.)?(w3|example)\./.test(u)
+    );
+    assert(
+      urls260.length === 0,
+      '260.3: scripts/home-view.js hardcodes no destination address — they are passed in, so one place governs them' +
+        (urls260.length ? ' — found: ' + urls260.join(', ') : '')
+    );
+  }
+  // …and the address handed in is the one that actually reaches the markup.
+  assert(
+    full260.includes(`href="${MUSEUM260}"`),
+    '260.4: the external address passed to the renderer is the one emitted — no rewriting between the route and the page'
+  );
+
+  // 260.5  GOES RED IF: the degraded path starts inventing facts. On a checkout
+  //        with no private tree both counts are absent, and the page must say so
+  //        rather than render "0 reports" — which reads as "there are none today"
+  //        instead of "this machine cannot see them". Same distinction the
+  //        sibling page's empty states already draw.
+  {
+    const bare260 = homeView260.renderHome({ reportCount: null, boardUpdated: null });
+    assert(
+      !/\b0 reports\b/.test(bare260) &&
+        /None readable/.test(bare260) &&
+        !/href="https?:/.test(bare260),
+      '260.5: with no private tree and no museum address, the page states what it cannot see, invents no zero count, and emits no external link'
+    );
+  }
+
+  // 260.7  THE REGRESSION LOCK for a defect reported from a phone: every tile
+  //        rendered as ONE run-on link — "The terminalThe Fallout companion app
+  //        itself…" — because the title, description and freshness line all sat
+  //        INSIDE the anchor, separated only by `display:block` on spans. Two
+  //        distinct faults in one shape:
+  //
+  //          · structure that lives only in a stylesheet is not structure. The
+  //            page was being served without its stylesheet at the time, and with
+  //            no CSS those spans are inline, so every separator vanished.
+  //          · the link's accessible name became the whole paragraph — a screen
+  //            reader announcing three sentences as the name of one link.
+  //
+  //        GOES RED IF: anybody moves the description back inside the anchor, or
+  //        swaps the block elements for styled spans. Asserted on the RENDERED
+  //        OUTPUT, and specifically on the anchor's own inner text, because that
+  //        is the only place the defect was visible — the template read fine.
+  {
+    const anchors260 = [...full260.matchAll(/<a\b[^>]*class="t[^"]*"[^>]*>([\s\S]*?)<\/a>/g)].map(
+      m => m[1]
+    );
+    assert(
+      anchors260.length === 4 &&
+        anchors260.every(t => !/<|\.\s|,\s/.test(t) && t.trim().length > 0 && t.length < 40),
+      '260.7: each tile link contains ONLY its short title — no markup, no sentence punctuation, nothing of the description inside the anchor'
+    );
+    // …and the description sits in a real block element that is a SIBLING of the
+    // link, so the line break survives with no stylesheet at all.
+    // ⚠ Scoped to each anchor's OWN inner text. An unscoped "is there a <p>
+    // somewhere after an <a>" reads across the whole document and is true of any
+    // correct page — it fails for a reason that has nothing to do with nesting.
+    assert(
+      /<li><a\b[^>]*>[^<]*<\/a><p class="d">[^<]+<\/p>/.test(full260) &&
+        anchors260.every(inner => !/<p\b/i.test(inner)),
+      '260.8: the description is a sibling <p> after the link, never nested inside it — the separation survives with no CSS'
+    );
+    // The unbuilt entries carried the same shape and the same fix.
+    assert(
+      /<li><p class="t">[^<]+<\/p><p class="d">[^<]+<\/p><\/li>/.test(full260),
+      '260.9: the not-built entries are block elements too, not a bolded span glued to a sentence'
+    );
+  }
+
+  // 260.10 / 260.11  THE CLASS GUARD, not an instance guard.
+  //
+  //  A long-running dev server caches CommonJS modules per PROCESS, and Vite's
+  //  config restart reuses that process — so a renderer loaded once at setup is
+  //  frozen for days while the file on disk moves on. Nothing reports it: the page
+  //  keeps answering, at the same status, with plausible content. Both routes were
+  //  written that way, and the second was only found because somebody went looking
+  //  for the pattern after fixing the first.
+  //
+  //  GOES RED IF: a future route hoists its renderer to setup again, or a new view
+  //  module is added without joining the chain that gets cleared. Neither is
+  //  "somebody reverted this work" — both are the ordinary way the trap comes back.
+  {
+    const cfg260 = readFile('vite.config.mjs');
+
+    // Any require of a *-view.js that is NOT the freshRequire call itself, and not
+    // an entry in the chain list, is a renderer being held in memory.
+    const bareRequires260 = [...cfg260.matchAll(/(\w*)\s*\(\s*'(\.\/scripts\/[\w-]*view\.js)'/g)]
+      .filter(m => m[1] === 'require')
+      .map(m => m[2]);
+    assert(
+      bareRequires260.length === 0,
+      '260.10: no renderer in vite.config.mjs is loaded with a bare require — every one goes through the re-reading helper, so a dev server cannot serve a module frozen at startup' +
+        (bareRequires260.length ? ' — held: ' + bareRequires260.join(', ') : '')
+    );
+
+    // Clearing only the entry point leaves its dependencies cached, and a freshly
+    // loaded module then closes over a stale one — a partial fix that looks whole.
+    const chainM260 = /const VIEW_CHAIN = \[([\s\S]*?)\]/.exec(cfg260);
+    const chain260 = chainM260
+      ? [...chainM260[1].matchAll(/'([^']+)'/g)].map(m => m[1].replace('./scripts/', ''))
+      : [];
+    const onDisk260 = fs
+      .readdirSync(path.join(ROOT, 'scripts'))
+      .filter(f => /-view\.js$/.test(f))
+      .sort();
+    const missing260 = onDisk260.filter(f => !chain260.includes(f));
+    assert(
+      chain260.length > 0 && missing260.length === 0,
+      '260.11: every scripts/*-view.js is named in VIEW_CHAIN — a view module left out would survive as a stale dependency inside a freshly-loaded one' +
+        (missing260.length ? ' — absent from the chain: ' + missing260.join(', ') : '')
+    );
+  }
+
+  // 260.6  GOES RED IF: the optional stylesheet added to the shared shell starts
+  //        leaking into callers that never asked for one — which would put menu
+  //        rules on every report page. Guards the SHARED surface, not this page.
+  {
+    const without260 = reportView260.page({ title: 'T', crumb: '', body: '<p>b</p>' });
+    const withStyle260 = reportView260.page({
+      title: 'T',
+      crumb: '',
+      body: '<p>b</p>',
+      style: '.zz{color:red}',
+    });
+    const extra260 = '.zz{color:red}';
+    assert(
+      !without260.includes('undefined') &&
+        withStyle260.includes(extra260) &&
+        withStyle260.length === without260.length + extra260.length,
+      '260.6: page() emits an extra stylesheet only when given one — the no-style output is unchanged byte-for-byte and never contains the string "undefined"'
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

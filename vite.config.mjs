@@ -4,6 +4,47 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 /**
+ * ⭐ RE-READ A RENDERER FROM DISK, RATHER THAN TRUSTING THE ONE IN MEMORY.
+ *
+ * ⛔ THE TRAP THIS CLOSES, MEASURED RATHER THAN IMAGINED. Node caches CommonJS
+ * modules per PROCESS, and this dev server runs for DAYS — Vite's config restart
+ * reuses the same process, so it does not clear them either. Once a renderer is
+ * loaded, every later edit to it is invisible here while remaining perfectly
+ * correct on disk.
+ *
+ * That failure mode is the worst available: the page keeps answering, at the same
+ * status, with plausible content — so nothing anywhere reports a problem. It has
+ * already cost this project twice: a defect was debugged after it had been fixed,
+ * and a set of layout measurements was taken against a page that was not the page
+ * in the repository. Neither was noticed by the person reading the page, because
+ * there is nothing to notice.
+ *
+ * ⚠ THE ORDER MATTERS. Clearing only the entry point leaves its dependencies
+ * cached, and a freshly-loaded module then closes over a STALE one — which looks
+ * exactly like a partial fix. So the whole chain is cleared, deepest first, and
+ * only then is the entry required.
+ *
+ * Dev-only (`apply: 'serve'` on both routes below), and the cost is re-parsing a
+ * few small files per request on a personal server. That is not a trade worth
+ * thinking about; being unable to trust what you are looking at is.
+ */
+const VIEW_CHAIN = [
+  './scripts/queue-view.js', // markdown renderer — deepest
+  './scripts/report-view.js', // page shell + report rendering
+  './scripts/home-view.js', // landing page
+];
+function freshRequire(entry) {
+  for (const id of VIEW_CHAIN) {
+    try {
+      delete require.cache[require.resolve(id)];
+    } catch {
+      // A module that cannot be resolved was never cached — nothing to clear.
+    }
+  }
+  return require(entry);
+}
+
+/**
  * `/reports` — the private overnight/morning reports, rendered to phone-readable
  * HTML on demand.
  *
@@ -45,9 +86,11 @@ function reportsRoute() {
     apply: 'serve', // ⛔ dev only — never part of any build output
     configureServer(server) {
       const paths = require('./scripts/planning-paths.js');
-      const view = require('./scripts/report-view.js');
       server.middlewares.use('/reports', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        // ⛔ Per request, never hoisted to setup — see freshRequire's header. This
+        // is the page read most, and it HAS served stale content from memory.
+        const view = freshRequire('./scripts/report-view.js');
         const send = (code, html) => {
           res.statusCode = code;
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -77,11 +120,63 @@ function reportsRoute() {
   };
 }
 
+/**
+ * `/home` — the landing page: one screen that reaches everything.
+ *
+ * ⛔ IT CANNOT LIVE AT `/`, because `/` is the app itself and the app is one of
+ * the things this page has to reach. So it takes a path of its own, and the app
+ * keeps the root it has always had.
+ *
+ * ⚠ EVERY DESTINATION ON THIS PAGE WAS VERIFIED BY CONTENT, NOT BY STATUS CODE.
+ * A dev server answers unknown paths with the app's index page — identical
+ * status, identical bytes — so "it returned 200" says nothing at all. Each
+ * candidate was compared against a deliberate nonsense path on the same host, and
+ * the ones that turned out to be the fallback are named on the page as not built
+ * rather than linked. The renderer holds no addresses of its own except the one
+ * passed in here.
+ *
+ * Same response headers as the reports route, for the same reason: this page
+ * names private destinations, so nothing may cache it or refer onward from it.
+ */
+function homeRoute() {
+  return {
+    name: 'robco-home',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      const paths = require('./scripts/planning-paths.js');
+
+      server.middlewares.use('/home', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        // Only the mount point itself. Anything deeper is not this page, and
+        // falls through rather than being answered with it.
+        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        if (rest) return next();
+        // ⛔ Read AT REQUEST TIME, never cached — the counts are the only thing
+        // making this page's freshness claim true.
+        const board = paths.readRoadmap();
+        const html = freshRequire('./scripts/home-view.js').renderHome({
+          reportCount: paths.reportsDir() === null ? null : paths.listReports().length,
+          boardUpdated: board ? board.mtime : null,
+          // The public companion site. Held here rather than in the renderer so
+          // the renderer stays a pure function of what it is handed.
+          museumUrl: 'https://robco-exhibit.pages.dev/',
+        });
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+        res.end(req.method === 'HEAD' ? '' : html);
+      });
+    },
+  };
+}
+
 // Vite dev-server config. This file exists ONLY for local development -- the app
 // itself is a static site with no build step (see README "Hosting & Release Flow"),
 // so nothing here affects staging or production. Vite never builds this project.
 export default defineConfig({
-  plugins: [reportsRoute()],
+  plugins: [homeRoute(), reportsRoute()],
   server: {
     // --- Real-device (phone) testing over Tailscale --------------------------
     //
