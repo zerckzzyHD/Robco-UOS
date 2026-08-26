@@ -64,6 +64,32 @@ const STATUSES = [
   { key: 'deferred', glyph: '⏳', label: 'Deferred', color: '#a99bd6' },
   { key: 'parked', glyph: '⏸️', label: 'Parked', color: '#7f8c99' },
   { key: 'question', glyph: '❓', label: 'Question', color: '#d98cc4' },
+  // ⚓ SETTLED — adopted by owner ruling, 2026-08-26. "Answered, no work will ever
+  // follow, stays visible."
+  //
+  // ⛔ IT IS NOT 'done' AND MUST NEVER BE FOLDED INTO IT. A settled item shipped
+  // nothing; its condition is already satisfied and is MEANT to stay satisfied.
+  // The whole reason it is a state rather than a closure is VISIBILITY: a settled
+  // item's job is to keep telling its dependents "I permanently constrain you",
+  // which is exactly what 'done' would destroy — closed items stop being read as
+  // live constraints. A settled entry can still be load-bearing on an OPEN one,
+  // and that dependency is the entire argument for keeping it on the board.
+  //
+  // ⛔ AND IT IS NOT 'parked'. Parked means "not being worked on, will resume".
+  // These will not resume; there is no work to resume. One entry sat mis-parked
+  // for want of this key, and before that led with a record-only glyph and parsed
+  // as status 'none' — invisible to every count, every band, and the generated
+  // board. That bug is the argument for putting the state HERE, in the shared
+  // vocabulary, rather than only in the queue's prose.
+  //
+  // ⛔ TWO GUARDS TRAVEL WITH IT (QUEUE.md's legend states both, and they are not
+  // optional): (1) entry requires an EXPLICIT, DATED RULING from the project
+  // owner — never a tool's inference and never a reviewer's judgement; (2) a
+  // settled item STAYS COUNTED in any completion total it was already part of.
+  // Without the second, the state quietly becomes a way to shrink a target by
+  // RELABELLING rather than by finishing, which is worse than having no state at
+  // all — it would make the board look closer to done while nothing moved.
+  { key: 'settled', glyph: '⚓', label: 'Settled', color: '#b9926a' },
   { key: 'done', glyph: '✅', label: 'Done', color: '#4fb477' },
 ];
 // Emphasis markers. NOT statuses and never filterable — they mark importance,
@@ -77,6 +103,13 @@ const NEXT_STATUSES = new Set(['active', 'ready']);
 // Shown by default; 'done' is hidden by default (surface the live work first).
 // The three soft states ARE shown — an item that is deferred, parked or carrying
 // an open question is unfinished work the owner still needs to see.
+//
+// ⭐ 'settled' IS SHOWN BY DEFAULT, and that is the point of the state rather than
+// an incidental choice. It is the one status here that describes finished
+// business, so the instinct is to hide it beside 'done' — but a settled item is
+// a LIVE CONSTRAINT on the items that depend on it, and a constraint nobody sees
+// stops constraining. Default-hiding it would reproduce, one layer down, the very
+// invisibility this status was added to fix.
 const DEFAULT_ON = new Set([
   'ready',
   'active',
@@ -85,6 +118,7 @@ const DEFAULT_ON = new Set([
   'deferred',
   'parked',
   'question',
+  'settled',
 ]);
 
 /**
