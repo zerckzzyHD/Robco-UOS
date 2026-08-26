@@ -53482,6 +53482,17 @@ if (!PLANNING_OK) {
     devSrc249h.indexOf('async function cmdStatus()'),
     devSrc249h.indexOf('function usage()')
   );
+  // ⚠ The mortality wording is printed by printBounds(), which cmdStatus() CALLS —
+  // so it is not inside the slice above, and asserting it there would look for it
+  // in the wrong function. Sliced separately rather than searching the whole file:
+  // a whole-file search would be satisfied by any of these phrases appearing in a
+  // comment, which is how a check passes for a reason that has nothing to do with
+  // what it claims. (Measured while writing this: one clause did match the wrong
+  // slice by coincidence.)
+  const boundsBody249h = devSrc249h.slice(
+    devSrc249h.indexOf('function printBounds('),
+    devSrc249h.indexOf('async function cmdStatus()')
+  );
   // ⚠ Behavioural where it can be: `status` is READ-ONLY — it starts and stops
   // nothing — so the real command is run and its real output asserted. The
   // not-listening branch cannot be forced from here without stopping a server the
@@ -53497,20 +53508,50 @@ if (!PLANNING_OK) {
   } catch (e) {
     statusOut249h = (e && e.stdout) || '';
   }
-  // ⚠ ASSERTED AGAINST THE UNCOVERED CASE, NOT AGAINST ONE BRANCH'S WORDING. An
-  // earlier version of this test pinned the literal "does NOT survive", and
-  // installing the logon trigger turned it red — the trigger changes which cases
-  // are covered, so that sentence is correctly no longer printed. A test that
-  // pins today's phrasing goes stale exactly like the caveat it guards, which is
-  // the failure this whole change exists to fix. What must always be true is that
-  // SLEEP is named as uncovered: the trigger fires at logon, and waking a
-  // sleeping handheld fires nothing.
+  // ⚠⚠ SUPERSEDED 2026-08-26. THE PREVIOUS REASONING IS QUOTED RATHER THAN
+  // DELETED, because it was careful and it was still wrong, and that is the
+  // instructive part.
+  //
+  // It read: "ASSERTED AGAINST THE UNCOVERED CASE, NOT AGAINST ONE BRANCH'S
+  // WORDING. An earlier version of this test pinned the literal 'does NOT
+  // survive', and installing the logon trigger turned it red … A test that pins
+  // today's phrasing goes stale exactly like the caveat it guards … What must
+  // always be true is that SLEEP is named as uncovered: the trigger fires at
+  // logon, and waking a sleeping handheld fires nothing."
+  //
+  // ⭐ THAT WAS THE SECOND ATTEMPT AT THIS TEST, AND IT HARDENED THE WRONG THING.
+  // Having been burned by pinning phrasing, it reached for the underlying
+  // invariant — and picked one that was never true. Measured with `powercfg /a`:
+  // the only standby state this class of machine offers is S0 low-power idle,
+  // which does NOT end processes; S1/S2/S3 are unsupported by the firmware. So
+  // ordinary sleep leaves the server running and takes the NETWORK away instead.
+  // "Sleep is uncovered" was not a timeless property. It was a premise.
+  //
+  // ⛔ SO THE TEST'S PASSING CONDITION HAD BECOME "THE MISLEADING SENTENCE IS
+  // STILL PRINTED": correcting the message turned this red, and the message was
+  // the thing that was wrong. That is the third instance of this shape found in
+  // one day.
+  //
+  // ⭐ WHAT IS ASSERTED NOW IS THE DISTINCTION, which is the thing with real
+  // consequences: hibernation ends the process, ordinary sleep and a tailnet drop
+  // do not, and from the phone all three look identical. Getting that wrong costs
+  // a restart of something that was never down.
+  //
+  // ⚠ Split deliberately: the parts every machine prints are asserted against the
+  // REAL OUTPUT, and the branch-specific wording against the source, because which
+  // branch prints depends on whether the trigger is installed on the machine
+  // running the suite.
   assert(
-    /sleeping/i.test(statusOut249h) &&
+    /hibernat/i.test(statusOut249h) &&
+      /dev:status/.test(statusOut249h) &&
+      !/\bsleeping and waking\b/i.test(statusOut249h) &&
+      /hibernat/i.test(boundsBody249h) &&
+      /(does NOT end|keeps processes running)/.test(boundsBody249h) &&
+      /(server survives|server does not)/.test(boundsBody249h) &&
       statusBody249h.includes('printBounds()') &&
       /npm run dev:start/.test(statusBody249h) &&
       /NOT SERVING RIGHT NOW/.test(statusBody249h),
-    '249.8: `dev:status` prints the server\'s own mortality — that it does not survive a reboot, a sleep or the tailnet dropping — and names the revive command when nothing is listening, so the answer to "is it up?" carries the reason it may not be' +
+    '249.8: `dev:status` distinguishes the case that ENDS the server (hibernation) from the cases that only take the URL away (ordinary sleep, a tailnet drop), and points at a liveness check rather than telling you to restart something that may never have stopped' +
       (statusOut249h ? '' : ' — status produced no output')
   );
 }

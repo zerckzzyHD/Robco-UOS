@@ -225,24 +225,59 @@ function printBounds() {
   } catch {
     /* the module is optional to this display; unknown is reported as unknown */
   }
+  // ⚠ THE SLEEP WORDING IS MEASURED, NOT ASSUMED — and it used to be wrong in a
+  // way that cost a restart every time.
+  //
+  // It previously said the server does not come back after "sleeping and waking".
+  // That reads as "sleep kills the server", and on this class of machine it
+  // usually does not. Measured with `powercfg /a`: the only standby state
+  // available is S0 low-power idle — S1/S2/S3 are reported unsupported by the
+  // firmware — and that state does NOT terminate processes. The same output says
+  // connectivity in standby is unsupported, so the NETWORK drops. The process
+  // survives and the URL does not, which is the identical shape the Tailscale line
+  // below already described.
+  //
+  // The one case that genuinely ends it is HIBERNATION, and that is a real risk
+  // here rather than a theoretical one: the hibernate-after idle timeout is
+  // "never" on mains and one hour on battery, so an unplugged machine left asleep
+  // does eventually lose the process — and waking from hibernate is not a logon,
+  // so a logon trigger cannot cover it.
+  //
+  // ⛔ THE DISTINCTION MATTERS BECAUSE BOTH LOOK THE SAME FROM THE PHONE: a dead
+  // page. Telling them apart is the difference between waiting a moment and
+  // restarting a server that never stopped — which is why the text now points at
+  // the status command instead of saying "run start again".
   console.log('');
   if (trigger.installed === true) {
     console.log('  Logon trigger INSTALLED -- this comes back on its own after:');
     console.log('    - a reboot (at the next logon, ~30s after)');
     console.log('    - logging out and back in');
     console.log('  ⛔ It does NOT come back after:');
-    console.log('    - the machine sleeping and waking (no logon happens, so nothing fires)');
+    console.log('    - HIBERNATING (on battery this machine hibernates after an hour');
+    console.log('      of sleep, which does end the process -- and waking from it is');
+    console.log('      not a logon, so the trigger does not fire)');
     console.log('    - stopping it by hand -- deliberately: nothing resurrects a');
     console.log('      server you chose to stop');
-    console.log('    - Tailscale dropping (the server survives; the tailnet URL does not)');
-    console.log('  After any of those, run start again.');
+    console.log('  ⚠ Ordinary sleep is a DIFFERENT case and looks identical from the');
+    console.log('    phone -- the page is dead either way:');
+    console.log('    - this machine only has low-power-idle sleep, which does NOT end');
+    console.log('      processes, and it disconnects the network while asleep. So the');
+    console.log('      server is normally still running and the URL comes back on its');
+    console.log('      own once the tailnet reconnects. Nothing to restart.');
+    console.log('    - Tailscale dropping is the same shape (the server survives; the');
+    console.log('      tailnet URL does not)');
+    console.log('  ⭐ So check whether it is actually gone before restarting it:');
+    console.log('    npm run dev:status -- if it reports alive, wait for the network.');
     console.log('  remove trigger : npm run dev:autostart:off');
   } else {
     console.log('  This is a detached process, not a service. It does NOT survive:');
     console.log('    - a reboot');
-    console.log('    - the machine sleeping (this is a handheld, and it sleeps)');
-    console.log('    - Tailscale dropping, or logging out of the tailnet');
-    console.log('  After any of those, run start again.');
+    console.log('    - HIBERNATING (on battery, after an hour of sleep)');
+    console.log('  ⚠ Ordinary sleep does NOT end it -- this machine only has');
+    console.log('    low-power-idle sleep, which keeps processes running and');
+    console.log('    disconnects the network. The URL dies; the server does not.');
+    console.log('    Same for Tailscale dropping. Check before restarting:');
+    console.log('    npm run dev:status');
     if (trigger.installed === false) {
       console.log('  start it automatically at logon : npm run dev:autostart');
     }
