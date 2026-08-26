@@ -53459,6 +53459,55 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 249.8  `dev:status` STATES ITS OWN SHELF LIFE ───────────────────────────
+//
+// THE INCIDENT (2026-08-25). A session started the dev server, verified the
+// tailnet URLs, and reported them as working. The process was interrupted about
+// five minutes later. By the time the owner opened the link there was nothing
+// listening: one URL failed to connect, and the other rendered the app UNSTYLED
+// because the browser still held the shell while every request for the rest of it
+// failed — which does not look like a dead server, it looks like a broken app.
+//
+// ⭐ THE FIX IS WHERE THE SENTENCE IS PRINTED, NOT WHAT IT SAYS. `printBounds()`
+// already said this server does not survive a reboot, a sleep or Tailscale
+// dropping — it said it at START, to somebody who was already at the terminal and
+// for whom it was not yet true. The person who needs it is the one asking "is it
+// up?", hours later, usually because something already looks wrong. So `status`
+// prints it too, and when nothing is listening it also names the command that
+// revives it. A caveat in help text is a caveat nobody reads at the moment it
+// matters.
+{
+  const devSrc249h = fs.readFileSync(path.join(ROOT, 'scripts', 'dev-server.js'), 'utf8');
+  const statusBody249h = devSrc249h.slice(
+    devSrc249h.indexOf('async function cmdStatus()'),
+    devSrc249h.indexOf('function usage()')
+  );
+  // ⚠ Behavioural where it can be: `status` is READ-ONLY — it starts and stops
+  // nothing — so the real command is run and its real output asserted. The
+  // not-listening branch cannot be forced from here without stopping a server the
+  // owner may be using, so that half is checked at the source instead, and this
+  // split is stated rather than papered over.
+  let statusOut249h;
+  try {
+    statusOut249h = require('child_process').execFileSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts', 'dev-server.js'), 'status'],
+      { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+  } catch (e) {
+    statusOut249h = (e && e.stdout) || '';
+  }
+  assert(
+    /does NOT survive/.test(statusOut249h) &&
+      /the machine sleeping/.test(statusOut249h) &&
+      statusBody249h.includes('printBounds()') &&
+      /npm run dev:start/.test(statusBody249h) &&
+      /NOT SERVING RIGHT NOW/.test(statusBody249h),
+    '249.8: `dev:status` prints the server\'s own mortality — that it does not survive a reboot, a sleep or the tailnet dropping — and names the revive command when nothing is listening, so the answer to "is it up?" carries the reason it may not be' +
+      (statusOut249h ? '' : ' — status produced no output')
+  );
+}
+
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
 //
 // ⛔ FOUND BY READING THE CODE, NOT BY ANY TEST (2026-08-13). `--check` is the

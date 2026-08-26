@@ -395,6 +395,33 @@ async function cmdStatus() {
     for (const line of p.out.split(/\r?\n/).slice(0, 6)) console.log('      ' + line);
 
   if (listening) printUrls(port, proxyTargetsPort(port, p));
+
+  // ⭐ THE MORTALITY CAVEAT BELONGS HERE, NOT ONLY IN `start`. `printBounds()` has
+  // always said this server does not survive a reboot, a sleep or Tailscale
+  // dropping — but it said it at START, to whoever was already at the terminal.
+  // The person who needs it is the one asking "is it up?", often hours later and
+  // usually because something already looks wrong. A caveat printed at the moment
+  // it stops being true is a caveat nobody reads at the moment it matters.
+  //
+  // ⚠ THIS IS A REAL INCIDENT, NOT TIDINESS. The server was interrupted roughly
+  // five minutes after a session verified the tailnet URLs and reported them as
+  // working. By the time the owner opened the link, nothing was listening: the
+  // phone showed a connection failure for one URL and a stale, unstyled page for
+  // the other, because the browser still had the shell cached while every request
+  // for the rest of it failed. Nothing was broken except that the process was
+  // gone — and no output anywhere said that a passing check has a shelf life.
+  printBounds();
+
+  if (!listening) {
+    console.log('');
+    console.log('  ⛔ NOT SERVING RIGHT NOW. Anything pointed at the tailnet URL gets a');
+    console.log('     connection error or a 502 -- there is no page explaining why, and a');
+    console.log('     browser holding a cached copy of the app will render it unstyled');
+    console.log('     rather than failing outright, which does not look like a dead server.');
+    console.log('');
+    console.log('     Revive it with:  npm run dev:start');
+  }
+
   const recent = tailLog(5);
   if (recent.length) {
     console.log('');
