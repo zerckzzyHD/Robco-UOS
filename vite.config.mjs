@@ -29,6 +29,14 @@ const require = createRequire(import.meta.url);
  * thinking about; being unable to trust what you are looking at is.
  */
 const VIEW_CHAIN = [
+  // ⚠ DATA READERS BELONG IN THIS LIST TOO, and leaving one out is not a
+  // half-measure — it is the whole defect, unchanged. A reader omitted here is
+  // required through the ordinary cache and never cleared, so the freshly-loaded
+  // views above it close over a STALE one and the page looks correct while
+  // reporting from code that is no longer on disk. Caught exactly that way: a
+  // resolver was edited to remove a fallback, the tests agreed it was gone, and
+  // the running server kept resolving through the old copy for another hour.
+  './scripts/control-state.js', // operational state reader — deepest
   './scripts/queue-view.js', // markdown renderer — deepest
   './scripts/report-view.js', // page shell + report rendering
   './scripts/home-view.js', // landing page
