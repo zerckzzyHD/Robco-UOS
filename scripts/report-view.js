@@ -142,11 +142,26 @@ details.band ul { padding-left:1.15rem; }
 details.drift { border-color:var(--hi); }
 details.drift code { font-weight:700; }
 hr + h2 { margin-top:1.2rem; }
+/* Jump menu. Two anchors, no script — the board is long by nature, so reaching
+   the reports must not mean scrolling past all of it. */
+nav.jump { display:flex; gap:.25rem; }
+nav.jump a { padding:.5rem .7rem; border:1px solid var(--line); border-radius:999px;
+  background:var(--code); font-size:.92rem; }
+h1 { scroll-margin-top:4.5rem; }
 .empty { border:1px dashed var(--line); border-radius:8px; padding:1rem; }
 `;
 
-/** Wrap rendered body HTML in the full document shell. */
-function page({ title, crumb, body }) {
+/**
+ * Wrap rendered body HTML in the full document shell.
+ *
+ * ⚠ `nav` is passed in rather than hardcoded because the two page kinds need
+ * DIFFERENT controls, and the header used to render a back-link on both. On a
+ * report that link goes somewhere; on the index it pointed at the page you were
+ * already reading, so it did nothing at all. ⛔ A control that does nothing is
+ * worse than no control — it is found in the first minute and it teaches the
+ * reader that the chrome lies.
+ */
+function page({ title, crumb, body, nav }) {
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -155,7 +170,7 @@ function page({ title, crumb, body }) {
 <title>${escapeHtml(title)}</title>
 <style>${STYLE}</style>
 </head><body>
-<header class="top"><a href="/reports/">&#8592; Reports</a><span class="name">${escapeHtml(crumb || '')}</span></header>
+<header class="top">${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
 <main class="wrap">
 ${body}
 </main></body></html>`;
@@ -207,6 +222,8 @@ function renderReport(name, markdown) {
   return page({
     title,
     crumb: name,
+    // On a report this goes somewhere real: back to the index it was reached from.
+    nav: '<a href="/reports/">&#8592; Roadmap &amp; reports</a>',
     body: `<h1>${escapeHtml(title)}</h1>\n${toc}\n${html}`,
   });
 }
@@ -237,14 +254,21 @@ const BAND_ORDER = [
   'Backlog',
   'UNCLASSIFIED',
 ];
-// ⚠ WHICH BANDS OPEN ON THEIR OWN WAS MEASURED AT 375px, NOT CHOSEN BY TASTE.
-// Opening Ready too put 156 rows and ~28,800px on first paint — about thirty-five
-// phone screens, which is the wall of text this page exists to replace. Open are
-// the two bands that are ACTIONABLE RIGHT NOW (being worked on; waiting on a
-// decision) plus UNCLASSIFIED, which is tiny and is the one band whose whole
-// point is being seen. ⛔ Nothing is hidden by this: every other band is present,
-// carries its true count in its header, and is one tap from fully listed.
-const BAND_OPEN = new Set(['Active', 'Attention', 'UNCLASSIFIED']);
+// ⭐ EVERY BAND STARTS CLOSED — the OWNER'S call, after using the page.
+//
+// ⚠ This reverses a default that was measured and argued for: Active and
+// Attention opened on their own so the actionable work was visible without a tap.
+// The measurement behind that is still valid (opening Ready as well put ~156 rows
+// and ~28,800px — about thirty-five phone screens — on first paint). What it got
+// wrong was the goal. Landing on the page, he wants the SHAPE of the work and a
+// way in, not to be handed the first two bands already unrolled; even 70 rows is
+// something to scroll past on the way to anything else.
+//
+// ⛔ CLOSED IS NOT HIDDEN, and that distinction is what makes this safe: every
+// band is present, in priority order, with its true count on its own header, and
+// one tap from fully listed. The counts strip above answers "how much is left"
+// before any band is touched — which was always the part doing the real work.
+const BAND_OPEN = new Set();
 const BAND_BLURB = {
   Active: 'Being worked on right now.',
   Attention: 'Waiting on you — a decision, a ruling, or a question to answer.',
@@ -370,7 +394,7 @@ function renderRoadmapSection(md, when) {
     : 'unknown';
 
   return (
-    `<h1>Roadmap</h1>` +
+    `<h1 id="roadmap">Roadmap</h1>` +
     `<p class="note">${total} items on the board. Rebuilt <strong>${escapeHtml(stamp)}</strong> — ` +
     `read fresh from the file every time this page loads, never cached.</p>` +
     counts +
@@ -391,10 +415,10 @@ function renderRoadmapSection(md, when) {
  */
 function renderIndex(names, note, board) {
   const reports = names.length
-    ? `<h2>Reports</h2>\n<ul class="reports">${names
+    ? `<h2 id="reports">Reports</h2>\n<ul class="reports">${names
         .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
         .join('')}</ul>`
-    : `<h2>Reports</h2>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
+    : `<h2 id="reports">Reports</h2>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
 <p class="note">The reports live outside this repository by design, so a checkout without the private
 sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
 
@@ -404,9 +428,14 @@ sibling has nothing to show here. That is the normal state, not an error.</p></d
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
 
+  // ⭐ A JUMP MENU, NOT A BACK LINK. The roadmap stays the headline, and the board
+  // is long by nature — so reaching the reports meant scrolling the whole thing.
+  // Two in-page anchors cost nothing, work with no script, and leave the ordering
+  // of the page alone.
   return page({
     title: 'Roadmap',
     crumb: '',
+    nav: `<nav class="jump"><a href="#roadmap">Roadmap</a><a href="#reports">Reports</a></nav>`,
     body: `${roadmap}\n<hr>\n${reports}\n<p class="note">${escapeHtml(note || '')}</p>`,
   });
 }

@@ -53653,9 +53653,33 @@ if (!PLANNING_OK) {
   const html249j = RVj.renderIndex([], 'note', { text: board249j, mtime: when249j });
 
   assert(
-    /<h1>Roadmap<\/h1>/.test(html249j) &&
-      html249j.indexOf('<h1>Roadmap</h1>') < html249j.indexOf('<h2>Reports</h2>'),
-    '249.10a: the board is the HEADLINE of the page rather than a link on it — it is the thing being opened first, and a link to the answer is not the answer'
+    /<h1 id="roadmap">Roadmap<\/h1>/.test(html249j) &&
+      html249j.indexOf('id="roadmap"') < html249j.indexOf('id="reports"') &&
+      /<nav class="jump">[\s\S]*?href="#roadmap"[\s\S]*?href="#reports"[\s\S]*?<\/nav>/.test(
+        html249j
+      ),
+    '249.10a: the board is the HEADLINE of the page rather than a link on it — and a jump menu reaches the reports without scrolling the whole board, which is long by nature'
+  );
+
+  // ⛔ NO DEAD CONTROLS. The header used to render a back-link on BOTH page kinds;
+  // on the index it pointed at the page already being read and did nothing at all.
+  // Found by the owner inside two minutes, which is what a control that lies costs.
+  const reportPage249j = RVj.renderReport('R.md', '# T\n\nbody text that is long enough.\n');
+  assert(
+    !/<header class="top">[\s\S]*?href="\/reports\/"/.test(html249j) &&
+      /<header class="top">[\s\S]*?href="\/reports\/"/.test(reportPage249j),
+    '249.10e: the index carries NO back-link to itself while a report page does — a control that goes nowhere is worse than no control, because it teaches the reader that the page furniture cannot be trusted'
+  );
+
+  // ⭐ Owner ruling after using it: every band starts CLOSED. Closed is not hidden —
+  // the count stays on the header, so "how much is left" survives the collapse.
+  const bandSummaries249j = html249j.match(/<summary>[^<]*<span class="c">\d+<\/span>/g) || [];
+  assert(
+    !/<details class="band" open>/.test(html249j) &&
+      !/<details class="band"\s+open/.test(html249j) &&
+      bandSummaries249j.length >= 3,
+    '249.10f: every band starts collapsed and still shows its count — the counts are what answer "how much is left", so collapsing must never take them with it' +
+      ` — ${bandSummaries249j.length} counted headers`
   );
 
   // Every band present with its real count, and the counted band not re-listed.
