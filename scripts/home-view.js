@@ -87,6 +87,86 @@ function ago(when) {
 }
 
 /**
+ * The same span as `ago()`, worded as a DURATION rather than as a point in the
+ * past — "4 days", not "4 days ago".
+ *
+ * ⛔ IT IS NOT `ago()` WITH THE WORD "AGO" TRIMMED, and that shortcut is exactly
+ * why this exists: `ago()` legitimately answers "yesterday" for a one-day span,
+ * and trimming a suffix that is not there yields "nothing new for yesterday".
+ * ⚠ Two spellings of one span is a duplication risk, so both are derived from the
+ * same minute count rather than one being rewritten out of the other's output.
+ */
+function elapsed(minutes) {
+  const m = Number(minutes);
+  if (!Number.isFinite(m) || m < 0) return '';
+  // ⚠ Zero minutes is a real reading here — a directory written to seconds ago —
+  // and "0 minutes ago" is not a sentence anybody says. It reads as a rendering
+  // fault rather than as the freshest possible answer, which is what it is.
+  if (m < 1) return 'under a minute';
+  if (m < 60) return m === 1 ? '1 minute' : `${m} minutes`;
+  const hrs = Math.round(m / 60);
+  if (hrs < 24) return hrs === 1 ? 'about an hour' : `about ${hrs} hours`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? 'a day' : `${days} days`;
+}
+
+/**
+ * ⭐⭐ HOW OLD IS TOO OLD — ONE RULE, IN THE SAME PLACE AS `ago()`, BECAUSE IT IS
+ * THE SAME QUESTION ASKED FOR A DECISION INSTEAD OF FOR A SENTENCE.
+ *
+ * ── ⛔⛔ THE DEFECT THIS CLOSES, MEASURED ON THE LIVE SNAPSHOT ───────────────
+ * The status page already led with the age in words, and the tile below already
+ * printed it. Both were CORRECT and both were USELESS on 2026-09-01, when the
+ * snapshot's own stamp read 2026-08-28T14:50:39Z — four days — and the surfaces
+ * said, in full: "old enough to be worth double-checking before acting on it".
+ *
+ * ⚠ That sentence is calibrated for a reading that is slightly behind. Applied to
+ * a producer that has emitted nothing for four days it is not merely weak, it
+ * points the wrong way: it advises care about a VALUE when the fact is that the
+ * SOURCE HAS STOPPED. Sixteen minutes and four days rendered identically, so
+ * there was no age at which either surface said anything had gone wrong — and the
+ * freeze went unnoticed for three days by a reader who was looking at the number.
+ *
+ * ⭐ A THRESHOLD, NOT A VERDICT — and the distinction is what makes this legal on
+ * a page whose governing rule is that it decides nothing. The age of this page's
+ * OWN INPUT is arithmetic on a stamp the input carries; it is measured here, not
+ * inferred. Nothing below claims the control plane is unhealthy, broken, or
+ * anything else — only that nothing has been heard from it, which is a fact about
+ * this page's knowledge rather than about the system.
+ *
+ * ⚠ THE NUMBERS, AND WHY THEY CANNOT PLAUSIBLY FIRE EARLY. Sampled from the
+ * project's own kept history, the snapshot's stamp trails the moment it is read by
+ * SECONDS (11 s, 25 s, 25 s on three consecutive days). An hour is over a hundred
+ * times the largest of those. ⛔ The cadence itself is deliberately NOT written
+ * down here — this repository is public, and a threshold this loose needs no
+ * knowledge of it.
+ *
+ * ⭐ AND A LONG GAP IS NOT AUTOMATICALLY A FAULT. A machine that was asleep has
+ * genuinely not been heard from, and saying so is true and useful. Which of the
+ * two it is gets answered by evidence, not by this function: see the state
+ * directory's own last write, carried alongside on the status page.
+ */
+const AGEING_MINUTES = 15;
+const STALE_MINUTES = 60;
+
+/**
+ * @param {Date|null} when the source's OWN stamp — never the read's clock.
+ * @param {number} [nowMs] injectable so a test can drive a boundary exactly.
+ * @returns {{known:boolean, minutes:number|null, phrase:string, tier:'unknown'|'fresh'|'ageing'|'stale'}}
+ */
+function assessAge(when, nowMs) {
+  const t = when instanceof Date ? when.getTime() : NaN;
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+  if (!Number.isFinite(t)) return { known: false, minutes: null, phrase: '', tier: 'unknown' };
+  const minutes = Math.floor((now - t) / 60000);
+  // ⛔ A stamp from the FUTURE is not fresh, it is unusable — a clock disagreement
+  // somewhere, and the one thing that must not happen is reporting it as current.
+  if (minutes < 0) return { known: false, minutes, phrase: '', tier: 'unknown' };
+  const tier = minutes >= STALE_MINUTES ? 'stale' : minutes >= AGEING_MINUTES ? 'ageing' : 'fresh';
+  return { known: true, minutes, phrase: ago(when), tier };
+}
+
+/**
  * One destination.
  *
  * ⛔ THE LINK TEXT IS THE TITLE AND NOTHING ELSE, and the description and freshness
@@ -147,6 +227,9 @@ function renderHome(state) {
   // nothing there" send you to different places.
   const hasStatusStamp =
     s.statusGeneratedAt instanceof Date && Number.isFinite(s.statusGeneratedAt.getTime());
+  // ⭐ ONE assessment, shared by the tile below — and the SAME function the status
+  // page runs, so the two surfaces cannot disagree about what "stale" means.
+  const statusAge = assessAge(hasStatusStamp ? s.statusGeneratedAt : null);
 
   const tiles = [
     tile({
@@ -178,12 +261,32 @@ function renderHome(state) {
     // ⭐ The age shown here is the snapshot's OWN stamp, read through the same
     // function the status page uses, at the same moment. The two cannot disagree
     // because there is one rule and no cached copy on either side.
+    //
+    // ── ⛔⛔ THE TITLE NO LONGER SAYS "LIVE", AND THAT WAS NOT A TIDY ──────────
+    // It read "Live status" for as long as this page has existed, and on
+    // 2026-09-01 it sat above the words "Snapshot taken 4 days ago". ⚠ The tile's
+    // own governing rule is that a label must not need prior knowledge to decode
+    // — but a label that asserts a property the code CANNOT HONOUR is worse than
+    // one that is merely obscure, because it is not ambiguous, it is wrong. The
+    // meta line beneath it was already carrying the correction, and a correction
+    // underneath a claim is read second, if at all.
+    //
+    // ⚠ THE COST IS NAMED: the owner refers to this tile by its name, and the
+    // name has changed. That is a real, small cost, accepted because the word
+    // being removed is the single most misleading token on this page.
     tile({
       href: '/status',
-      title: 'Live status',
+      title: 'Control plane status',
       what: 'What the control plane last reported: whether enforcement is armed, and what it found.',
+      // ⛔⛔ AT THE TOP TIER THE TILE STOPS DESCRIBING AN AGE AND STATES A FACT.
+      // "Snapshot taken 4 days ago" is true, and it is a number the reader has to
+      // interpret before it means anything. "Nothing new for 4 days" is the
+      // interpretation, and it is the one the reader wanted — while still saying
+      // nothing about whether the SYSTEM is well, only about what has been heard.
       meta: hasStatusStamp
-        ? `Snapshot taken ${ago(s.statusGeneratedAt)} — not a live reading`
+        ? statusAge.tier === 'stale'
+          ? `STALE — nothing new for ${elapsed(statusAge.minutes)}. This is the last snapshot, not a live reading.`
+          : `Snapshot taken ${statusAge.phrase} — not a live reading`
         : s.statusReachable === true
           ? 'Readable, but it does not say when it was taken.'
           : 'Nothing readable from this machine.',
@@ -264,4 +367,12 @@ function renderHome(state) {
   });
 }
 
-module.exports = { renderHome, ago, HOME_STYLE };
+module.exports = {
+  renderHome,
+  ago,
+  elapsed,
+  assessAge,
+  AGEING_MINUTES,
+  STALE_MINUTES,
+  HOME_STYLE,
+};

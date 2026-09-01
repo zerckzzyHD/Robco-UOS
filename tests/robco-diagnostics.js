@@ -54186,9 +54186,22 @@ if (!PLANNING_OK) {
   // time here instead of the stamp that travelled in. The five-hour fixture is
   // what makes the two distinguishable — with a fresh stamp both spellings agree
   // and the test would prove nothing.
+  //
+  // ⚠ THE FIXTURE MOVED, AND THE CLAIM DID NOT WEAKEN TO MEET IT (2026-09-01).
+  // This drove a single five-hour stamp, which now sits past the stale line and
+  // no longer renders as an age at all. ⛔ The lazy repair is to shrink the fixture
+  // until the old sentence comes back, which quietly stops testing the tier that
+  // matters most. The same claim is asserted over BOTH tiers instead: an ageing
+  // stamp still reports its own age, a stopped one states the fact, and neither
+  // may borrow the read's clock.
+  const agedTile262 = HV262.renderHome({
+    statusReachable: true,
+    statusGeneratedAt: new Date(Date.now() - 30 * 60 * 1000),
+    unbuilt: [],
+  });
   const staleTile262 = HV262.renderHome({
     statusReachable: true,
-    statusGeneratedAt: new Date(Date.now() - 5 * 3600 * 1000),
+    statusGeneratedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
     unbuilt: [],
   });
   const undatedTile262 = HV262.renderHome({
@@ -54197,11 +54210,23 @@ if (!PLANNING_OK) {
     unbuilt: [],
   });
   assert(
-    /Snapshot taken about 5 hours ago/.test(staleTile262) &&
+    /Snapshot taken 30 minutes ago/.test(agedTile262) &&
+      /not a live reading/.test(agedTile262) &&
+      !/just now/.test(agedTile262) &&
+      // ⭐ At the top tier the tile stops describing an age and states the fact.
+      // "Snapshot taken 4 days ago" is true and has to be interpreted before it
+      // means anything; this is the interpretation the reader actually wanted.
+      /STALE — nothing new for 4 days/.test(staleTile262) &&
       /not a live reading/.test(staleTile262) &&
       !/just now/.test(staleTile262) &&
+      // ⛔ AND THE WORD "LIVE" IS GONE FROM THE TITLE. It read "Live status" above
+      // a line saying "Snapshot taken 4 days ago" — a label asserting a property
+      // the code cannot honour, with its own correction printed underneath it,
+      // where a correction is read second if at all.
+      !/>Live status</.test(staleTile262) &&
+      /Control plane status/.test(staleTile262) &&
       /does not say when it was taken/.test(undatedTile262),
-    '262.9: the landing tile reports the snapshot\'s OWN age and calls it a snapshot, and a reachable-but-undated one says so rather than borrowing the read\'s clock — a tile built from the read time would read "just now" permanently, including when nothing is being generated at all'
+    '262.9: the landing tile reports the snapshot\'s OWN age below the stale line and STATES THE FACT above it, never borrowing the read\'s clock, and its title no longer claims to be "Live" — a tile built from the read time would read "just now" permanently, including when nothing is being generated at all'
   );
 
   // ── 262.10  THE ROUTE ACTUALLY HANDS OVER WHAT THE RENDERER NEEDS ────────
@@ -54538,6 +54563,196 @@ if (!PLANNING_OK) {
       !/stale|overdue|problem/i.test(String(valueOf262(delivered262))) &&
       !/agewarn/.test(String(rowOf262(delivered262))),
     '262.15: the phone-alert row reports the last delivery the service itself acknowledged, and an absent record reads UNOBSERVABLE rather than blank, "none" or a zero — "no delivery found" and "no delivery attempted" are different facts, and only one of them is reassuring'
+  );
+
+  // ── 262.16  THE AGE HAS TIERS, AND THE TOP ONE IS THE HEADLINE ───────────
+  //
+  // ⛔⛔ THE DEFECT, MEASURED ON THE LIVE SNAPSHOT (2026-09-01). This page led with
+  // its age from the day it was written, and that was still not enough: the
+  // threshold was a BOOLEAN at fifteen minutes, so sixteen minutes and FOUR DAYS
+  // rendered the identical sentence — "old enough to be worth double-checking
+  // before acting on it". The snapshot's own stamp read 2026-08-28T14:50:39Z and
+  // its producer had emitted nothing since. ⚠ That sentence advises care about a
+  // VALUE at the moment the fact is that the SOURCE HAS STOPPED, so there was no
+  // age at which this surface said anything HAD gone wrong. It was noticed after
+  // three days, by a reader who was looking straight at the number.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT, IN THREE INDEPENDENT DIRECTIONS: collapsing the
+  // tiers back to one boolean (the fixtures below stop differing); moving the
+  // banner underneath the enforcement block, where a qualifier is read second or
+  // not at all; and dropping the as-of stamp off the answer, which would leave the
+  // one block that gives a verdict written in the present tense.
+  //
+  // ⚠ THE BOUNDARIES COME FROM THE MODULE'S OWN EXPORTED CONSTANTS, never retyped
+  // — a test that restates a threshold only ever proves the restated copy.
+  const HVc262 = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const atAge262 = mins =>
+    SV.renderStatus(
+      {
+        generatedAt: new Date(Date.now() - mins * 60000).toISOString(),
+        enforced: true,
+        findings: { probeCheck: 0 },
+      },
+      new Date(),
+      'probe'
+    );
+  // ⚠ THE STYLESHEET IS STRIPPED BEFORE ANY OF THIS IS ASKED, and that is not
+  // tidiness. `.agewarn` and `.stopped` are SELECTORS in the sheet this page always
+  // emits, so a naive check for either matches every render including the ones
+  // where nothing is warning at all. The first version of this assertion did
+  // exactly that and failed against correct code — the harmless direction of a
+  // badly-chosen window, and the same mistake pointed the other way is a test that
+  // passes because it is reading somewhere the defect could never appear.
+  const bodyOf262 = html => String(html).replace(/<style[\s\S]*?<\/style>/g, '');
+  const freshHtml262 = bodyOf262(atAge262(Math.max(0, HVc262.AGEING_MINUTES - 5)));
+  const ageingHtml262 = bodyOf262(atAge262(HVc262.AGEING_MINUTES + 5));
+  const stoppedHtml262 = bodyOf262(atAge262(HVc262.STALE_MINUTES + 5));
+  const bannerAt262 = stoppedHtml262.indexOf('This page has heard nothing for');
+  const enforcedAt262 = stoppedHtml262.indexOf('<span class="lab">Enforcement</span>');
+  assert(
+    // fresh — no warning of any kind, and certainly no banner
+    !/agewarn/.test(freshHtml262) &&
+      !/heard nothing for/.test(freshHtml262) &&
+      // ageing — the softer clause, which is the RIGHT sentence at this distance
+      /agewarn/.test(ageingHtml262) &&
+      /worth double-checking/.test(ageingHtml262) &&
+      !/heard nothing for/.test(ageingHtml262) &&
+      // stopped — a different statement, not a louder version of the same one
+      bannerAt262 >= 0 &&
+      /as it was then/.test(stoppedHtml262) &&
+      !/worth double-checking/.test(stoppedHtml262) &&
+      // ⛔ ABOVE the enforcement block. The position IS the claim, not decoration.
+      enforcedAt262 > bannerAt262 &&
+      // ⛔ and the verdict block carries its own as-of stamp, so a reader who
+      // scrolls straight to it cannot read it as a statement about now
+      /As it stood .* — not now:/.test(stoppedHtml262) &&
+      !/As it stood/.test(ageingHtml262) &&
+      // ⚠ while still asserting nothing about the SYSTEM — only about what has
+      // reached this page, which is the only thing it measured
+      !/control plane is (down|broken|unhealthy|failing)/i.test(stoppedHtml262),
+    '262.16: the snapshot age has three distinguishable tiers and the top one is the HEADLINE — rendered above enforcement, restating everything below it as of then, while still claiming nothing about whether the system is well; one boolean threshold rendered sixteen minutes and four days identically' +
+      ` — banner@${bannerAt262} enforcement@${enforcedAt262}`
+  );
+
+  // ── 262.17  "MACHINE OFF" AND "PRODUCER DEAD", SEPARATED BY MEASUREMENT ───
+  //
+  // ⛔⛔ AN AGE ALONE CANNOT ANSWER THE QUESTION THAT DECIDES WHAT TO DO. A
+  // four-day-old snapshot in a directory nothing has touched for four days is a
+  // machine that was not running; the same snapshot in a directory written to two
+  // minutes ago is a live machine with a dead producer. Those want opposite
+  // responses, and both rendered identically until 2026-09-01 — when the live case
+  // was the second one: the state directory had been written to seconds before the
+  // read while the snapshot sat four days behind.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the two branches are collapsed into one
+  // sentence, or the day an UNMEASURED directory starts rendering as a quiet one.
+  //
+  // ⚠ THE THIRD FIXTURE IS THE LOAD-BEARING ONE. A caller that could not measure
+  // this must leave the page SILENT about it — "nothing has been written" and
+  // "nobody looked" are different facts and only the first is informative. That is
+  // the ABSENT-versus-UNOBSERVABLE rule this whole file turns on, one level up.
+  const stoppedSnap262 = {
+    generatedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+    enforced: false,
+  };
+  const dirLive262 = SV.renderStatus(
+    stoppedSnap262,
+    new Date(),
+    'probe',
+    new Date(Date.now() - 2 * 60000)
+  );
+  const dirQuiet262 = SV.renderStatus(
+    stoppedSnap262,
+    new Date(),
+    'probe',
+    new Date(Date.now() - 4 * 24 * 3600 * 1000)
+  );
+  const dirUnknown262 = SV.renderStatus(stoppedSnap262, new Date(), 'probe');
+  assert(
+    /a machine that is switched off/.test(dirLive262) &&
+      /still running while this one file has stopped/.test(dirLive262) &&
+      !/the whole of it has been quiet/.test(dirLive262) &&
+      /the whole of it has been quiet/.test(dirQuiet262) &&
+      !/switched off/.test(dirQuiet262) &&
+      // ⛔ unmeasured → NEITHER sentence, and no invented reassuring third one
+      !/switched off/.test(dirUnknown262) &&
+      !/whole of it has been quiet/.test(dirUnknown262) &&
+      // …while still delivering the banner it DOES have evidence for
+      /heard nothing for/.test(dirUnknown262),
+    '262.17: a stopped snapshot beside a LIVE directory and one beside a quiet directory produce different statements, and a directory nobody measured produces neither — an age alone cannot tell a switched-off machine from a dead producer, and inventing the distinction would be worse than the gap'
+  );
+
+  // ── 262.18  THE DIRECTORY MEASUREMENT IS A TIME, AND CARRIES NO NAME ──────
+  //
+  // ⛔⛔ A STRUCTURAL CLAIM, NOT A STYLE ONE: this repository is PUBLIC, and several
+  // entries in the state directory are named after what they hold. A measurement
+  // that returned the newest ENTRY rather than the newest TIME would put one of
+  // those names on a page — and would keep doing so for every file added there
+  // later, with nobody reviewing the decision. That is the same hazard the
+  // remainder section already refuses, arriving through a different door.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody "improves" this to return
+  // { name, mtime } so the page can say WHICH file moved. The fixture's filename
+  // appears nowhere in this repository, so a leak cannot pass by coincidence — and
+  // the positive control is load-bearing, since without it a function that always
+  // returned null would satisfy every negative here.
+  const probeDir262 = fs.mkdtempSync(path.join(os.tmpdir(), 'robco-state-262-'));
+  const leakName262 = 'zz-probe-name-that-must-never-be-rendered.json';
+  let newest262;
+  let unconfigured262;
+  const prevState262 = process.env.ROBCO_CONTROL_STATE;
+  try {
+    fs.writeFileSync(path.join(probeDir262, leakName262), '{}', 'utf8');
+    process.env.ROBCO_CONTROL_STATE = probeDir262;
+    newest262 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js')).newestWrite();
+    delete process.env.ROBCO_CONTROL_STATE;
+    unconfigured262 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js')).newestWrite();
+  } finally {
+    if (prevState262 === undefined) delete process.env.ROBCO_CONTROL_STATE;
+    else process.env.ROBCO_CONTROL_STATE = prevState262;
+    fs.rmSync(probeDir262, { recursive: true, force: true });
+  }
+  const renderedWith262 = SV.renderStatus(stoppedSnap262, new Date(), 'probe', newest262);
+  assert(
+    newest262 instanceof Date &&
+      Number.isFinite(newest262.getTime()) &&
+      // ⛔ null, not a throw and not a fabricated "now", with nothing configured
+      unconfigured262 === null &&
+      // the name cannot reach a page, because it never leaves the module
+      !renderedWith262.includes(leakName262) &&
+      !renderedWith262.includes('zz-probe-name'),
+    '262.18: the directory measurement is a TIME and only a time — no path through it can put a filename on a page in a PUBLIC repository — and an unconfigured checkout gets null rather than a fabricated reading' +
+      ` — got ${Object.prototype.toString.call(newest262)}, unconfigured=${String(unconfigured262)}`
+  );
+
+  // ── 262.19  THE /status ROUTE ACTUALLY MEASURES THE DIRECTORY ─────────────
+  //
+  // ⚠ 262.16–262.18 ARE ALL BLIND TO THIS, exactly as 262.10 is to the home route.
+  // The renderer can be perfect while the route passes three arguments where it now
+  // needs four — and the page would then degrade, silently and permanently, to the
+  // one branch that says nothing about the directory. Every assertion above stays
+  // green while the surface loses the distinction it was built for.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody edits the /status handler and
+  // drops the argument, or renames the reader's export without following it
+  // through. Read from the config as text, like 262.10 — importing it would execute
+  // a Vite config for no benefit.
+  const statusStart262 = viteSrc262.indexOf("server.middlewares.use('/status'");
+  const statusEnd262 = viteSrc262.indexOf("server.middlewares.use('/ledger'");
+  const statusHandler262 =
+    statusStart262 >= 0 && statusEnd262 > statusStart262
+      ? viteSrc262.slice(statusStart262, statusEnd262)
+      : '';
+  assert(
+    statusHandler262.length > 0 &&
+      /renderStatus\(/.test(statusHandler262) &&
+      /newestWrite\(\)/.test(statusHandler262) &&
+      // ⛔ through the SAME fresh-require chain as everything else on this route —
+      // a module cached for the life of a days-long dev server is how a page came
+      // to report from code that was no longer on disk.
+      /freshRequire\('\.\/scripts\/control-state\.js'\)/.test(statusHandler262),
+    '262.19: the /status route measures the state directory and hands the result to the renderer — a renderer that can tell a dead producer from a sleeping machine, called by a route that never measures it, is a page that silently lost the distinction it was built for' +
+      (statusHandler262.length === 0 ? ' — the /status handler could not be located' : '')
   );
 }
 

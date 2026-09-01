@@ -226,6 +226,17 @@ function homeRoute() {
        * makes the read fresh, not the data, and the renderer leads with how old
        * the data is for exactly that reason. Nothing is cached on this side
        * either, so the age shown is always the real one.
+       *
+       * ⭐⭐ THE FOURTH ARGUMENT IS THE ONE THAT ANSWERS "IS THE MACHINE OFF, OR IS
+       * THIS ONE FILE DEAD?" — and it is measured HERE rather than inside the
+       * renderer, because the renderer holds no filesystem of its own (the same
+       * rule that moved every address off the landing page). Costed before adding:
+       * one top-level stat sweep of one directory, on a page nobody loads in a loop.
+       *
+       * ⚠ A caller that skipped it would leave the page unable to tell those two
+       * apart — precisely the state it was in while a four-day freeze went
+       * unnoticed — so it is passed unconditionally, and a null is rendered as
+       * silence rather than as reassurance.
        */
       server.middlewares.use('/status', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -236,7 +247,8 @@ function homeRoute() {
         const html = freshRequire('./scripts/status-view.js').renderStatus(
           snap ? snap.data : null,
           new Date(),
-          control.describeState()
+          control.describeState(),
+          control.newestWrite()
         );
         return sendHtml(req, res, snap ? 200 : 404, html);
       });
