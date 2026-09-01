@@ -515,7 +515,87 @@ function boardCurrency(boardText, queueText) {
   if (!recorded || !live) return { known: false, current: false, recorded, live };
   return { known: true, current: recorded === live, recorded, live };
 }
+
+/** The ID-bearing total a board states about itself, or null. */
+const BOARD_TOTAL_RE = /^\*\*(\d+)\*\* ID-bearing items\b/m;
+function boardItemTotal(text) {
+  const m = BOARD_TOTAL_RE.exec(toLf(String(text || '')));
+  return m ? Number(m[1]) : null;
+}
+
+/** The IDs a board actually LISTS. ⚠ Partial by design — see driftClosed(). */
+function listedIds(text) {
+  const out = new Set();
+  for (const m of toLf(String(text || '')).matchAll(/^- \*\*([A-Za-z][A-Za-z0-9-]*)\*\* —/gm)) {
+    out.add(m[1]);
+  }
+  return out;
+}
+
 /**
+ * ⭐⭐⭐ WHAT A REGENERATE JUST ERASED — reported BY THE REGENERATE ITSELF.
+ *
+ * ── ⛔⛤ THE TAUTOLOGY, AND WHY NO CHECK CAN BREAK IT ────────────────────────
+ * The ritual ran `npm run roadmap && npm run roadmap:check`: rewrite the subject,
+ * then measure it. ⛔ That pair cannot fail on staleness BY CONSTRUCTION, and it
+ * is worth being exact about why, because the obvious response is wrong.
+ *
+ * ⚠ IT IS NOT A WEAKNESS IN THE CHECK, AND STRENGTHENING THE CHECK CANNOT CURE
+ * IT. After a successful regenerate the board genuinely IS current — every
+ * honest predicate of the form "does this artifact agree with the current
+ * source?" must answer YES, including the byte-compare `--check` gained. A
+ * predicate that answered NO there would be a false positive, not a stricter
+ * gate. The tautology is a property of the ORDERING, not of the assertion.
+ *
+ * ⭐ SO THE HARM IS ATTACKED INSTEAD OF THE SYMPTOM. The damage was never that a
+ * check passed — it is that the drift was DESTROYED BEFORE ANYBODY MEASURED IT,
+ * silently, leaving no trace that 59 items had been missing for days. If the
+ * regenerate reports what it replaced, the measurement survives the bad ordering
+ * — which makes the ordering stop being load-bearing. ⛔ Reordering the ritual
+ * (done 2026-09-01) fixes the pair only until somebody tidies it back into one
+ * line; this cannot be tidied away, because the drift is reported by the very
+ * command that closes it.
+ *
+ * ⚠ THE NAMING IS PARTIAL AND SAYS SO. The backlog band is a COUNT rather than a
+ * list, so an item that landed there moves the totals and cannot be named. The
+ * totals are complete; the names are not, and conflating those would be this
+ * generator claiming a completeness it does not have.
+ *
+ * @returns {{known:boolean, drifted:boolean, before:number|null, after:number|null,
+ *            added:string[], removed:string[], namingPartial:boolean}}
+ */
+function driftClosed(previousText, nextText) {
+  const before = boardItemTotal(previousText);
+  const after = boardItemTotal(nextText);
+  if (before === null || after === null) {
+    // ⛔ Unknown, never "nothing drifted" — an unreadable predecessor and an
+    // unchanged one are different facts, and only one of them is reassuring.
+    return {
+      known: false,
+      drifted: false,
+      before,
+      after,
+      added: [],
+      removed: [],
+      namingPartial: true,
+    };
+  }
+  const prevIds = listedIds(previousText);
+  const nextIds = listedIds(nextText);
+  const added = [...nextIds].filter(id => !prevIds.has(id)).sort();
+  const removed = [...prevIds].filter(id => !nextIds.has(id)).sort();
+  return {
+    known: true,
+    // ⚠ A pure re-ordering with identical totals and identical listed IDs is not
+    // drift worth announcing; anything else is.
+    drifted: before !== after || added.length > 0 || removed.length > 0,
+    before,
+    after,
+    added,
+    removed,
+    namingPartial: true,
+  };
+} /**
  * The band for one raw `###` heading, from a RAW SCAN of the source line.
  *
  * ⚠ WHY RAW, AND NOT `parseHeading().title`: parseHeading STRIPS the leading
@@ -918,6 +998,9 @@ module.exports = {
   closedDiscipline,
   extractSourceHash,
   boardCurrency,
+  boardItemTotal,
+  listedIds,
+  driftClosed,
   normalizeForCompare,
   sourceHash: sha256,
   HEAD_STAMP_RE,
@@ -1146,10 +1229,60 @@ if (require.main === module) {
   // WF12 — atomic, never truncating. A crash between truncate and completion would
   // otherwise leave a zero-byte or half-written board, and a half-written board reads
   // exactly like a real one, which is the failure this whole generator exists to end.
+  // ⛔ READ THE PREDECESSOR BEFORE OVERWRITING IT. This is the only moment the
+  // board that is about to be destroyed still exists, and it is the whole measurement.
+  let previous = null;
+  try {
+    previous = fs.readFileSync(outPath, 'utf8');
+  } catch {
+    // No board yet — a first run, which is not drift.
+  }
+
   writeFileAtomic(outPath, text, { encoding: 'utf8' });
   console.log(
     `[roadmap] Wrote ${outPath} — ${result.blind ? '⛔ BLIND' : 'board OK'} (${text.length} bytes, LF).`
   );
+
+  // ── ⭐⭐ WHAT THIS REGENERATE JUST ERASED ────────────────────────────────
+  // See driftClosed()'s header for why this exists rather than a stricter check.
+  if (previous === null) {
+    console.log(
+      '[roadmap] No previous board on disk — nothing to compare, so no drift is claimed.'
+    );
+  } else {
+    const d = driftClosed(previous, text);
+    if (!d.known) {
+      console.log(
+        '[roadmap] ⚠ The board it replaced did not state its own item total, so how far ' +
+          'behind it was cannot be established. That is UNKNOWN, not zero.'
+      );
+    } else if (!d.drifted) {
+      console.log(
+        `[roadmap] The board on disk was already current — nothing had drifted (${d.after} items).`
+      );
+    } else {
+      console.log(
+        `[roadmap] ⛔ DRIFT CLOSED — the board this replaced was ${Math.abs(d.after - d.before)} ` +
+          `item(s) behind (${d.before} → ${d.after}).`
+      );
+      const name = (label, ids) => {
+        if (!ids.length) return;
+        const shown = ids.slice(0, 12);
+        console.log(
+          `[roadmap]    ${label}: ${shown.join(', ')}` +
+            (ids.length > shown.length ? ` (+${ids.length - shown.length} more)` : '')
+        );
+      };
+      name('Newly listed', d.added);
+      name('No longer listed', d.removed);
+      // ⚠ The ceiling travels with the names, never as a footnote elsewhere.
+      console.log(
+        '[roadmap]    ⚠ The totals above are complete; the names are NOT. The backlog band ' +
+          'is a count rather than a list, so an item that landed there moved the totals and ' +
+          'cannot be named here.'
+      );
+    }
+  }
   // Always 0. This is a reporter; it can never fail a sync, a commit or a push.
   process.exit(0);
 }

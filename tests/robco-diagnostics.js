@@ -55134,6 +55134,60 @@ if (!PLANNING_OK) {
       '248.7j: a READABLE board standing over a source the generator can no longer parse exits 1 and is reported as such — the readable artifact is the dangerous one, because it describes a parse nothing can reproduce while reading exactly like a healthy board' +
         ` — got exit ${rWouldBlind248c.status}`
     );
+
+    // ── (k) THE REGENERATE REPORTS WHAT IT ERASED ──────────────────────────
+    //
+    // ⛔⛤ THE TAUTOLOGY, AND THE HONEST ANSWER TO IT. The ritual ran
+    // `npm run roadmap && npm run roadmap:check` — rewrite the subject, then
+    // measure it — which cannot fail on staleness by construction. ⚠ THE REFLEX IS
+    // TO STRENGTHEN THE CHECK UNTIL IT FAILS THERE, AND THAT IS INCOHERENT: after a
+    // successful regenerate the board genuinely IS current, so every honest
+    // predicate must answer YES, the byte-compare 248.7i added included. A
+    // predicate that answered NO in that position would be a false positive, not a
+    // stricter gate. The tautology is a property of the ORDERING, not the assertion.
+    //
+    // ⭐⭐ SO THE HARM IS ATTACKED INSTEAD OF THE SYMPTOM. The damage was never
+    // that a check passed — it is that the drift was DESTROYED BEFORE ANYONE
+    // MEASURED IT, leaving no trace that 59 items had been missing for days. The
+    // regenerate now reports what it replaced, so the measurement survives the bad
+    // ordering. ⛔ Reordering the ritual (done 2026-09-01) fixes the pair only until
+    // somebody tidies it back into one line; this cannot be tidied away, because it
+    // is reported by the very command that closes the drift.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day the predecessor stops being read before
+    // the write (the only moment it still exists), or the day an unreadable
+    // predecessor starts reporting as "nothing drifted" — the reassuring direction,
+    // and therefore the one nobody would report.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(25), 'utf8');
+    const rDrift2 = generate248c(tmp248c); // regenerate over a 5-item-behind board
+    const rSame2 = generate248c(tmp248c); // and again, over a current one
+    // An unreadable predecessor: present, but stating no total of its own.
+    fs.writeFileSync(boardPath248c, 'not a board at all\n', 'utf8');
+    const rUnknown2 = generate248c(tmp248c);
+    assert(
+      // the drift is named, with the direction and the delta
+      /DRIFT CLOSED/.test(rDrift2.stdout) &&
+        /5 item\(s\) behind \(20 → 25\)/.test(rDrift2.stdout) &&
+        /Newly listed: .*F21/.test(rDrift2.stdout) &&
+        // ⛔ and the naming ceiling travels with the names, not as a footnote
+        /backlog band is a count rather than a list/.test(rDrift2.stdout) &&
+        // a current board says so rather than staying silent — silence would be
+        // indistinguishable from the reporting having broken
+        /already current — nothing had drifted \(25 items\)/.test(rSame2.stdout) &&
+        !/DRIFT CLOSED/.test(rSame2.stdout) &&
+        // ⛔ unreadable predecessor → UNKNOWN, never zero
+        /cannot be established/.test(rUnknown2.stdout) &&
+        /UNKNOWN, not zero/.test(rUnknown2.stdout) &&
+        !/nothing had drifted/.test(rUnknown2.stdout) &&
+        // ⚠ and it is still a REPORTER: none of this may fail a checkpoint
+        rDrift2.status === 0 &&
+        rSame2.status === 0 &&
+        rUnknown2.status === 0,
+      '248.7k: `npm run roadmap` reports the drift it just closed — naming the delta, the newly listed items and the limit of that naming — so the measurement survives the `roadmap && roadmap:check` ordering that destroys the subject before measuring it; no check can fail in that position, because after a regenerate the board genuinely IS current' +
+        ` — exits ${rDrift2.status}/${rSame2.status}/${rUnknown2.status}`
+    );
   } finally {
     fs.rmSync(tmp248c, { recursive: true, force: true });
   }
