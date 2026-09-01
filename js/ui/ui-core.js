@@ -663,6 +663,187 @@ function _showReadFaultBanner(kind) {
 // Diagnostic Shell trigger entry point (Protocol 44) — display-only.
 window._showReadFaultBanner = _showReadFaultBanner;
 
+// ── LINK STATE ────────────────────────────────────────────────────────────
+//
+// ⛔⛤ THE DEFECT, REPORTED BY THE OWNER 2026-09-01. He read a dropped Tailscale
+// tunnel as "the dev server is down", and was right to: the terminal showed the
+// same thing for both. ⭐ That is a TWO-VALUED DISPLAY OVER A THREE-STATE WORLD —
+// the identical shape as a snapshot age with one threshold, on the same surface,
+// twice in one day.
+//
+// ⚠ WHAT A BROWSER CAN AND CANNOT ESTABLISH, because the whole value here is not
+// overclaiming:
+//   · navigator.onLine === false is DEFINITIVE about the device having no network.
+//   · navigator.onLine === true is famously WEAK — it means an interface is up,
+//     not that anything is reachable. So it is never reported as "you are online".
+//   · A network-level fetch REJECTION to this origin proves the origin did not
+//     answer. ⛔ It does NOT say WHY. A dead server and a dead route to a live
+//     server are indistinguishable from here, and guessing between them is what
+//     sent the owner to check the wrong system.
+//
+// ⭐⭐ SO THE STATE IS REPORTED AND THE CAUSE IS NOT. Both candidates are named,
+// neither is chosen. That is the honest ceiling, and it is still the whole fix:
+// he could not previously tell "my device is off the network" from "this origin
+// is not answering", and those send you to different places.
+const _LINK_DISCONNECTED_MSG =
+  '> CARRIER LOST — THIS DEVICE REPORTS NO NETWORK. THE TERMINAL IS RUNNING FROM ITS OFFLINE CACHE; NOTHING ON SCREEN IS A LIVE READING. (TAP TO DISMISS)';
+const _LINK_UNREACHABLE_MSG =
+  '> RELAY UNREACHABLE — THIS DEVICE HAS A NETWORK, BUT THE TERMINAL HOST DID NOT ANSWER. THAT IS EITHER THE HOST OR YOUR ROUTE TO IT (VPN / TUNNEL) — THIS TERMINAL CANNOT TELL WHICH. RUNNING FROM CACHE. (TAP TO DISMISS)';
+const _LINK_UNKNOWN_MSG =
+  '> LINK STATE UNKNOWN — THIS TERMINAL COULD NOT ESTABLISH WHETHER ITS HOST IS REACHABLE. THAT IS NOT THE SAME AS A FAULT, AND IT IS NOT AN ALL-CLEAR. (TAP TO DISMISS)';
+
+// _assessLink — PURE, vm-testable. Decides the link state from the two signals
+// and NOTHING else; never touches the DOM or the network.
+//
+// ⛔ `probeOk` is THREE-VALUED on purpose: true (the origin returned an HTTP
+// response), false (the request was rejected at the network layer), null/undefined
+// (no probe settled). ⚠ Collapsing null into false would turn "nobody looked" into
+// "the host is down" — the reassuring-direction mistake pointed the other way, and
+// the one that would put a false alarm in front of the owner.
+function _assessLink({ onLine, probeOk }) {
+  if (onLine === false) return 'disconnected';
+  if (probeOk === true) return 'live';
+  if (probeOk === false) return 'unreachable';
+  return 'unknown';
+}
+window._assessLink = _assessLink;
+
+// _probeOrigin — did THIS ORIGIN answer, right now?
+//
+// ⛔⛔ THE CACHE-FIRST TRAP, AND IT IS THE WHOLE REASON THIS FUNCTION IS NOT ONE
+// LINE. sw.js answers EVERY same-origin request `caches.match(request) ||
+// fetch(request)`. A probe of any precached URL is therefore answered BY THE
+// SERVICE WORKER, from disk, with the host switched off — and would report the
+// origin alive while it is dead. ⚠ That is a guard checking a CLAIM instead of an
+// EFFECT, inside the feature written to fix exactly that confusion.
+//
+// ⭐ The cache is missed by making the URL UNIQUE. `caches.match` is called with
+// no options, so `ignoreSearch` is false and a one-off query string cannot match
+// any precached entry — the SW falls through to a real network fetch.
+// ⚠ `cache: 'no-store'` is NOT the load-bearing part and must not be mistaken for
+// it: the service worker intercepts regardless of that hint. The unique URL is.
+//
+// ⭐ ANY HTTP RESPONSE COUNTS AS REACHED, 404 INCLUDED. A 404 is the origin
+// answering; only a network-layer rejection means it did not. Requiring `res.ok`
+// would report a live host as unreachable the moment the probe path 404s.
+function _probeOrigin(timeoutMs) {
+  try {
+    if (typeof fetch !== 'function' || typeof location === 'undefined') {
+      return Promise.resolve(null); // cannot establish → UNKNOWN, never false
+    }
+    const url =
+      location.origin +
+      location.pathname +
+      '?_linkprobe=' +
+      String(Date.now()) +
+      '.' +
+      Math.random().toString(36).slice(2);
+    let done = false;
+    return new Promise(resolve => {
+      const settle = v => {
+        if (!done) {
+          done = true;
+          resolve(v);
+        }
+      };
+      // ⛔ A hung request resolves UNKNOWN, never false — an unanswered probe and
+      // a refused one are different facts.
+      setTimeout(() => settle(null), Math.max(1000, timeoutMs || 4000));
+      fetch(url, { method: 'GET', cache: 'no-store', credentials: 'omit' }).then(
+        () => settle(true),
+        () => settle(false)
+      );
+    });
+  } catch (_) {
+    return Promise.resolve(null);
+  }
+}
+window._probeOrigin = _probeOrigin;
+
+// Byte-for-byte the banner idiom above (Protocol 22). Idempotent; wrapped so a
+// link banner can never break boot. state: 'disconnected'|'unreachable'|'unknown'.
+//
+// ⛔ 'live' SHOWS NOTHING, and that is deliberate: a healthy link needs no banner,
+// and an all-clear strip is a claim that goes stale the instant it is painted.
+function _showLinkFaultBanner(state) {
+  try {
+    if (state === 'live') return;
+    const existing = document.getElementById('linkFaultBanner');
+    if (existing) existing.remove(); // a CHANGED state replaces, never stacks
+    const tpl = document.getElementById('linkFaultBannerTemplate');
+    if (!tpl) return;
+    const frag = tpl.content.cloneNode(true);
+    const banner = frag.querySelector('#linkFaultBanner');
+    if (banner) {
+      const msg = banner.querySelector('#linkFaultBannerMsg');
+      if (msg) {
+        msg.textContent =
+          state === 'disconnected'
+            ? _LINK_DISCONNECTED_MSG
+            : state === 'unreachable'
+              ? _LINK_UNREACHABLE_MSG
+              : _LINK_UNKNOWN_MSG;
+      }
+      banner.style.display = 'flex';
+      banner.addEventListener('click', () => banner.remove());
+    }
+    document.body.prepend(frag);
+  } catch (_) {
+    /* a link banner must never break boot */
+  }
+}
+// Diagnostic Shell trigger entry point (Protocol 44) — display-only.
+window._showLinkFaultBanner = _showLinkFaultBanner;
+
+// _refreshLinkState — the one place the two signals are gathered and rendered.
+//
+// ⚠ THE OFFLINE EVENT NEEDS NO PROBE. The device has told us; asking the network
+// to confirm it would only add a timeout before saying what we already know.
+//
+// ⛔ IT DOES NOT OWN "A NEWER VERSION EXISTS ON THE HOST." That is a real third
+// state and it is NOT collapsed into this one — the service-worker update prompt
+// (_triggerUpdate, index.html) already owns it, and a second surface claiming the
+// same thing is how two answers to one question begin to disagree (Protocol 22).
+// A reachable host renders nothing here precisely so that prompt is unobstructed.
+function _refreshLinkState() {
+  try {
+    const onLine = typeof navigator === 'undefined' || navigator.onLine !== false;
+    if (!onLine) {
+      _showLinkFaultBanner(_assessLink({ onLine: false, probeOk: null }));
+      return;
+    }
+    _probeOrigin().then(probeOk => {
+      const state = _assessLink({ onLine: true, probeOk });
+      if (state === 'live') {
+        const b = document.getElementById('linkFaultBanner');
+        if (b) b.remove(); // recovered — clear the stale warning
+        return;
+      }
+      _showLinkFaultBanner(state);
+    });
+  } catch (_) {
+    /* never break boot */
+  }
+}
+window._refreshLinkState = _refreshLinkState;
+
+// _initLinkState — the ONE named call the boot phase makes (the window.onload
+// body is a named-call composition and a guard enforces that; inline wiring in a
+// phase body is exactly what it refuses).
+//
+// ⛔ THE BOOT PROBE IS LOAD-BEARING, not belt-and-braces: the connectivity events
+// fire only on a CHANGE, so a session that STARTS already-unreachable — which is
+// the terminal the owner actually opened — would never be told without it.
+//
+// ⚠ Both events, not just 'offline': a banner that outlives its fault teaches the
+// reader to ignore the next one, so recovering has to clear it.
+function _initLinkState() {
+  _refreshLinkState();
+  window.addEventListener('offline', () => _refreshLinkState());
+  window.addEventListener('online', () => _refreshLinkState());
+}
+window._initLinkState = _initLinkState;
+
 // Capture-then-remove — NEVER delete-only (SAVE_LAYER3 hard invariant: no
 // corrupt bytes are destroyed without a preserved copy). The envelope is
 // built from the in-memory string FIRST; the corrupt key is removed BEFORE
@@ -1574,6 +1755,8 @@ const BOOT_PHASE_SEVERITY = {
   'restore-live-container': 'degradable',
   'hydrate-state': 'fatal',
   'persistent-storage': 'degradable',
+  // A link BANNER can never be worth failing a boot over (Protocol 33).
+  'link-state': 'degradable',
   'cold-store-migration': 'degradable',
   'restore-apikey-chat': 'degradable',
   'load-ui': 'fatal',
@@ -1784,6 +1967,9 @@ window.onload = async function () {
     });
     _bootPhase('persistent-storage', () => {
       _requestPersistentStorage(); // SAVE_INTEGRITY_PASS Layer 2: fire-and-forget, never blocks boot
+    });
+    _bootPhase('link-state', () => {
+      _initLinkState();
     });
     _bootPhase('cold-store-migration', () => {
       if (window._migrateColdStoreToIdb) window._migrateColdStoreToIdb(); // P3: fire-and-forget cold-store → IDB migration
