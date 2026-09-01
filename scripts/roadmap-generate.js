@@ -424,6 +424,52 @@ function provenanceLines(provenance) {
 const SOURCE_HASH_RE = /^\*\*Source:\*\* `QUEUE\.md` · sha256 `([0-9a-f]{64})`$/m;
 
 /**
+ * The OTHER provenance line, matched so it can be held out of a byte-compare.
+ *
+ * ⛔ It lives here, next to the emitter and next to its sibling, for the reason
+ * given above: an emitter and a matcher free to drift apart degrade the check
+ * that uses them into a permanent pass, silently.
+ */
+const HEAD_STAMP_RE = /^\*\*App repo HEAD:\*\* `[^`]*`$/m;
+
+/**
+ * ⭐⭐ THE BOARD, REDUCED TO THE PART A REGENERATE MUST REPRODUCE EXACTLY.
+ *
+ * ── ⛔⛔ WHY A BYTE-COMPARE IS AVAILABLE AFTER ALL ──────────────────────────
+ * `--check` proved the board matched its SOURCE and stated, honestly, that it
+ * could not prove the board matched the GENERATOR — because this artifact stamps
+ * the app repo's git HEAD, and that changes on every unrelated commit, so a naive
+ * regenerate-and-compare would red the very next push after any commit at all
+ * (the 247.10 trap, locked by Suite 248.7h).
+ *
+ * ⭐ That reasoning is sound about the STAMP and does not generalise to the
+ * DOCUMENT. The stamp is one line, matched by one anchored pattern already
+ * written down beside its emitter — hold it out and everything remaining is
+ * deterministic by this generator's own stated contract ("Same QUEUE.md →
+ * byte-identical ROADMAP.md. No timestamps."). ⚠ So the false positive the
+ * ceiling was protecting against is removed by construction rather than by
+ * accepting the blind spot: 248.7h still passes, because a changed HEAD stamp is
+ * now normalised away instead of merely being ignored by a weaker comparison.
+ *
+ * ── ⛔ THE GAP THIS CLOSES IS THE ONE THE FINGERPRINT CANNOT SEE ────────────
+ * A fingerprint answers "was this built from the current QUEUE.md?". It cannot
+ * answer "is this what the generator produces?" — so a board rendered by an older
+ * version of this script, or one hand-edited anywhere below the provenance block,
+ * passed. ⚠ Those are the two ways a board can be WRONG while its source has not
+ * moved at all, and a stale-but-verified board reads exactly like a current one,
+ * which is the failure this whole generator exists to end.
+ *
+ * ⛔ NORMALISES ONLY WHAT LEGITIMATELY VARIES. Line endings and the trailing
+ * newline are write-shape, not content; the HEAD stamp is provenance. Nothing
+ * else is touched, because every further exemption is a place a real difference
+ * could hide.
+ */
+const HEAD_STAMP_HELD = '**App repo HEAD:** `<held out of comparison>`';
+function normalizeForCompare(text) {
+  return toLf(String(text)).replace(HEAD_STAMP_RE, HEAD_STAMP_HELD).replace(/\n+$/, '\n');
+}
+
+/**
  * The source fingerprint an on-disk board records, or null when it carries none
  * that can be read. Null is NOT "probably fine" — see the `--check` CLI, which
  * treats an unverifiable board as a failure rather than a pass.
@@ -433,6 +479,42 @@ function extractSourceHash(text) {
   return m ? m[1] : null;
 }
 
+/**
+ * ⭐⭐ IS THIS BOARD CURRENT WITH THIS QUEUE? — the one question the surfaces
+ * that DISPLAY the board never asked.
+ *
+ * ── ⛔⛔ THE DEFECT, MEASURED (2026-09-01) ─────────────────────────────────
+ * The board went 59 items stale — 307 rendered against 366 live — and every page
+ * that showed it went on showing it with no warning of any kind. The reports page
+ * printed "Rebuilt <time> — read fresh from the file every time this page loads,
+ * never cached", and the landing tile printed "Updated 44 minutes ago".
+ *
+ * ⚠ BOTH SENTENCES ARE TRUE AND NEITHER ANSWERS THE QUESTION. They report when
+ * the FILE was written and how fresh the READ was; a reader hears "this is the
+ * current picture". Those are different claims, and the gap between them is where
+ * 59 missing items sat for days in front of somebody who was looking at the page.
+ * It is the same disease as a snapshot age presented without a staleness tier —
+ * the age of an artifact is not its currency.
+ *
+ * ⭐ ONE RULE, ONE HOME, and it is deliberately the WEAKER of the two available.
+ * `--check` also proves the board is byte-for-byte what the generator produces;
+ * that needs a full rebuild, which is ~100 ms and belongs in a gate, not on every
+ * page load. So a viewer asks the fingerprint question only — and the page must
+ * SAY that is the question it asked. ⛔ Claiming the stronger answer from the
+ * cheaper measurement is exactly the substitution these pages exist to refuse.
+ *
+ * ⛔ `known: false` IS A REAL OUTCOME, NOT A FAILURE — an unreadable queue or a
+ * board with no fingerprint. Callers must render it as "cannot tell", never as a
+ * reassuring "current".
+ *
+ * @returns {{known:boolean, current:boolean, recorded:string|null, live:string|null}}
+ */
+function boardCurrency(boardText, queueText) {
+  const recorded = typeof boardText === 'string' ? extractSourceHash(boardText) : null;
+  const live = typeof queueText === 'string' && queueText ? sha256(queueText) : null;
+  if (!recorded || !live) return { known: false, current: false, recorded, live };
+  return { known: true, current: recorded === live, recorded, live };
+}
 /**
  * The band for one raw `###` heading, from a RAW SCAN of the source line.
  *
@@ -835,7 +917,10 @@ module.exports = {
   bandOfHeading,
   closedDiscipline,
   extractSourceHash,
+  boardCurrency,
+  normalizeForCompare,
   sourceHash: sha256,
+  HEAD_STAMP_RE,
   BACKLOG_KEY,
   BACKLOG_LABEL,
   BLIND_REASONS,
@@ -893,13 +978,26 @@ if (require.main === module) {
     //      "stale that reads as current" failure the BLIND renderer already
     //      refuses to commit inside the document, arriving by the back door.
     //
-    // ⚠ WHAT THIS STILL DOES NOT CATCH, stated rather than implied: it proves the
-    // board matches the SOURCE, not that it matches the GENERATOR. A board built
-    // by an older version of this script from an unchanged QUEUE.md passes. The
-    // full regenerate-and-byte-compare that Protocols 47/52/53 use is not
-    // available here, because this artifact stamps the app repo's git HEAD and
-    // that changes on every unrelated commit (the 247.10 trap). Regenerating in
-    // the same commit as any rendering change is the discipline that covers it.
+    //   5. NOT WHAT THE GENERATOR PRODUCES — the board on disk differs from what
+    //      this script builds from this QUEUE.md, once the HEAD stamp is held out.
+    //      ⛔⛔ THIS IS THE GAP THE FINGERPRINT CANNOT SEE, and it was documented
+    //      here as permanent rather than closed. A fingerprint answers "built from
+    //      the current source?"; it cannot answer "is this what the generator
+    //      produces?" — so a board rendered by an OLDER version of this script, or
+    //      hand-edited anywhere below the provenance block, passed every check
+    //      above while being wrong. ⚠ Those are the two ways a board can be stale
+    //      with its source standing perfectly still, which is the harder direction
+    //      to notice: nothing moved, so nothing prompts anybody to look.
+    //
+    // ⭐ THE OLD CEILING SAID A BYTE-COMPARE WAS UNAVAILABLE. It was right about
+    // the STAMP and wrong to generalise from it to the DOCUMENT: the app-repo HEAD
+    // changes on every unrelated commit, so comparing it would red the next push
+    // after anything (the 247.10 trap) — but it is ONE line, matched by ONE
+    // anchored pattern that lives beside its emitter, and holding it out leaves a
+    // document this generator's own contract declares deterministic. ⚠ 248.7h is
+    // unchanged and still passes: a changed stamp is now NORMALISED rather than
+    // merely un-compared, so the false positive is removed by construction instead
+    // of being paid for with a blind spot.
     if (!fs.existsSync(outPath)) {
       console.error(`[roadmap:check] FAIL — no ${OUTPUT_NAME} on disk at ${outPath}.`);
       console.error(`[roadmap:check]   ${planning.describe()}`);
@@ -948,10 +1046,81 @@ if (require.main === module) {
       console.error('[roadmap:check] exactly like one. Run `npm run roadmap`.');
       process.exit(1);
     }
+
+    // ── 5. …AND IT IS WHAT THIS GENERATOR ACTUALLY PRODUCES ──────────────────
+    //
+    // ⛔ EVERY CHECK ABOVE IS SATISFIED BY A BOARD THAT IS WRONG, provided its
+    // source has not moved. This is the one that asks the question the ritual's
+    // step is named for — "is the roadmap current?" — rather than the narrower one
+    // a fingerprint can answer.
+    //
+    // ⚠ A REBUILD THAT THROWS IS A FAILURE, NOT A SKIP. If the generator cannot
+    // build from this source, a regenerate would publish a BLIND board, so the
+    // non-blind one sitting on disk is definitely not what it would produce. ⛔ The
+    // reflex here is to catch and pass "so the check never breaks a commit over its
+    // own bug" — which is precisely how a check becomes a permanent green.
+    let rebuilt = null;
+    let rebuildError = null;
+    try {
+      rebuilt = build(planning);
+    } catch (e) {
+      rebuildError = e;
+    }
+    if (rebuildError) {
+      console.error(
+        `[roadmap:check] FAIL — ${OUTPUT_NAME} could not be re-derived: the generator threw.`
+      );
+      console.error(`[roadmap:check]   ${rebuildError.message}`);
+      console.error('[roadmap:check] The board on disk cannot be what this generator produces,');
+      console.error('[roadmap:check] because right now it produces nothing. Fix the generator.');
+      process.exit(1);
+    }
+    if (rebuilt.blind) {
+      console.error(
+        `[roadmap:check] FAIL — the board on disk is NOT blind, but regenerating it now would be.`
+      );
+      const why5 = (rebuilt.reasons || []).map(r => r.key).join(', ');
+      if (why5) console.error(`[roadmap:check]   reason(s): ${why5}`);
+      console.error('[roadmap:check] So what is on disk is a readable board describing a source');
+      console.error('[roadmap:check] this generator can no longer trust. Fix the cause, then');
+      console.error('[roadmap:check] regenerate — do not leave the readable one standing.');
+      process.exit(1);
+    }
+    const expected5 = normalizeForCompare(rebuilt.text);
+    const actual5 = normalizeForCompare(onDisk);
+    if (expected5 !== actual5) {
+      // The FIRST differing line, because "they differ" over a 69 KB document is
+      // not something anybody can act on.
+      const eL = expected5.split('\n');
+      const aL = actual5.split('\n');
+      let at = 0;
+      while (at < eL.length && at < aL.length && eL[at] === aL[at]) at++;
+      console.error(`[roadmap:check] FAIL — ${OUTPUT_NAME} is not what this generator produces.`);
+      console.error('[roadmap:check]   Its source fingerprint MATCHES, so QUEUE.md has not moved.');
+      console.error('[roadmap:check]   The board itself is out of date with the generator, or was');
+      console.error('[roadmap:check]   edited by hand. Either way it is a board nothing produced.');
+      console.error(`[roadmap:check]   first difference at line ${at + 1}:`);
+      console.error(
+        `[roadmap:check]     on disk:  ${JSON.stringify((aL[at] || '').slice(0, 120))}`
+      );
+      console.error(
+        `[roadmap:check]     expected: ${JSON.stringify((eL[at] || '').slice(0, 120))}`
+      );
+      console.error(`[roadmap:check]   (${aL.length} lines on disk, ${eL.length} expected;`);
+      console.error(
+        '[roadmap:check]    the `App repo HEAD` stamp is held out of this comparison.)'
+      );
+      console.error('[roadmap:check] Run `npm run roadmap`.');
+      process.exit(1);
+    }
+
+    console.log(`[roadmap:check] OK — ${OUTPUT_NAME} is a real board, not a blind one; its source`);
+    console.log(`[roadmap:check]      fingerprint matches the live QUEUE.md (sha256 ${current}),`);
     console.log(
-      `[roadmap:check] OK — ${OUTPUT_NAME} is a real board, not a blind one, and its source`
+      '[roadmap:check]      and it is byte-for-byte what this generator produces from it'
     );
-    console.log(`[roadmap:check]      fingerprint matches the live QUEUE.md (sha256 ${current}).`);
+    console.log('[roadmap:check]      (the `App repo HEAD` stamp held out, since it moves on');
+    console.log('[roadmap:check]      every unrelated commit and is provenance, not freshness).');
     process.exit(0);
   }
 

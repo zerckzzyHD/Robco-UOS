@@ -55,6 +55,13 @@ const HOME_STYLE = `
   font-size:1.12rem; color:var(--acc); padding:.35rem 0; min-height:44px; }
 .tiles p.d { margin:.1rem 0 0; color:var(--fg); font-size:.97rem; line-height:1.5; }
 .tiles p.m { margin:.35rem 0 0; color:var(--dim); font-size:.85rem; }
+/* ⛔⛤ A WARNING IN THE DIM COLOUR IS NOT A WARNING. The freshness line lives in
+   the tile's quietest slot, which is right for "6 reports" and wrong for the one
+   sentence on this page that means STOP. Seen rendered: "⛔ OUT OF DATE — the
+   queue has moved on" arrived in the same grey as every incidental fact around
+   it, on a page read at a glance, in the dark — which is the whole population of
+   readers this page has. The emphasis is the point of saying it at all. */
+.tiles p.m.warn { color:var(--hi); font-weight:700; font-size:.9rem; }
 .tiles a.away::after { content:" ↗"; font-weight:400; }
 details.later { margin:1.6rem 0 0; border:1px solid var(--line);
   border-radius:10px; background:var(--code); padding:0 .9rem; }
@@ -189,14 +196,14 @@ function assessAge(when, nowMs) {
  * trade: a big target is worth less than a page that still reads when the styling
  * does not arrive, and the target stays comfortably above the minimum either way.
  */
-function tile({ href, title, what, meta, away }) {
+function tile({ href, title, what, meta, metaWarn, away }) {
   const cls = away ? ' class="t away"' : ' class="t"';
   const rel = away ? ' rel="noreferrer noopener"' : '';
   return (
     `<li>` +
     `<a href="${escapeHtml(href)}"${cls}${rel}>${escapeHtml(title)}</a>` +
     `<p class="d">${escapeHtml(what)}</p>` +
-    (meta ? `<p class="m">${escapeHtml(meta)}</p>` : '') +
+    (meta ? `<p class="m${metaWarn ? ' warn' : ''}">${escapeHtml(meta)}</p>` : '') +
     `</li>`
   );
 }
@@ -209,6 +216,10 @@ function tile({ href, title, what, meta, away }) {
  *   when the private tree is not reachable at all (a plain checkout — normal).
  * @param {Date|null} state.boardUpdated   when the build board last changed, or
  *   null when there is no board to read.
+ * @param {boolean|null} state.boardCurrent  whether the board still matches the
+ *   queue it renders — TRUE, FALSE, or null for "could not be established".
+ *   ⛔ Three states on purpose: null must not render as true. Measured, never
+ *   inferred from boardUpdated, which is a write time and not a currency.
  * @param {string} state.museumUrl         the public site's address.
  * @param {Date|null} state.statusGeneratedAt  the snapshot's OWN stamp — never
  *   the time it was read, which is a different and much more flattering number.
@@ -237,11 +248,33 @@ function renderHome(state) {
       title: 'The terminal',
       what: 'The Fallout companion app itself, running from this machine right now.',
     }),
+    // ── ⛔⛤ "UPDATED 44 MINUTES AGO" WAS TRUE AND WAS NOT THE ANSWER ──────────
+    // This tile reported the board FILE's modification time, which says when it was
+    // written and nothing whatever about whether it still matches the queue it is a
+    // view of. ⛔⛔ Measured 2026-09-01: the board was 59 items stale — 307 rendered
+    // against 366 live — and this tile said "Updated <recently>", which reads as
+    // reassurance. It is the same mistake as an age with no staleness tier, one tile
+    // over: the age of an artifact is not its currency.
+    //
+    // ⭐ HANDED IN, like every other fact on this page — the renderer measures
+    // nothing and reaches for no file. ⛔ And an UNKNOWN currency is printed as
+    // unknown: a board whose match could not be established is not a board that is
+    // fine, and collapsing the two is how this page would start reassuring again.
     tile({
       href: '/reports#roadmap',
       title: "What's next",
       what: 'The build board: what is ready to start, what is underway, what is waiting.',
-      meta: hasBoard ? `Updated ${ago(s.boardUpdated)}` : 'No board on this machine yet.',
+      // ⛔ ONLY the out-of-date case is emphasised. A tile that shouts on every
+      // state teaches the reader to stop looking at it, which costs more than the
+      // one warning it was built to deliver.
+      metaWarn: hasBoard && s.boardCurrent === false,
+      meta: !hasBoard
+        ? 'No board on this machine yet.'
+        : s.boardCurrent === false
+          ? `⛔ OUT OF DATE — the queue has moved on since this was built ${ago(s.boardUpdated)}.`
+          : s.boardCurrent === true
+            ? `Updated ${ago(s.boardUpdated)} — and it matches the queue`
+            : `Updated ${ago(s.boardUpdated)} — whether it still matches the queue is unknown`,
     }),
     tile({
       href: '/reports#reports',
@@ -278,6 +311,8 @@ function renderHome(state) {
       href: '/status',
       title: 'Control plane status',
       what: 'What the control plane last reported: whether enforcement is armed, and what it found.',
+      // Same rule as the board tile: emphasis on the stopped-source case alone.
+      metaWarn: hasStatusStamp && statusAge.tier === 'stale',
       // ⛔⛔ AT THE TOP TIER THE TILE STOPS DESCRIBING AN AGE AND STATES A FACT.
       // "Snapshot taken 4 days ago" is true, and it is a number the reader has to
       // interpret before it means anything. "Nothing new for 4 days" is the

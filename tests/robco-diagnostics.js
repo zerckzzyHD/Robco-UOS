@@ -53759,11 +53759,65 @@ if (!PLANNING_OK) {
     text: board249j.replace('Active (2)', 'Active (9)'),
     mtime: when249j,
   });
+  // ⚠ THE STAMP MOVED, THE CLAIM DID NOT (2026-09-01). This fixture supplies no
+  // queue, so the page can no longer establish CURRENCY and says so — and the
+  // rebuild stamp travels inside that sentence rather than a "Rebuilt" one. ⛔ It
+  // is still asserted, because dropping the stamp would leave the reader with a
+  // page that says nothing about when what it shows was produced.
   assert(
-    /Rebuilt <strong>2026-08-25 21:42<\/strong>/.test(html249j) &&
+    /rendered <strong>2026-08-25 21:42<\/strong>/.test(html249j) &&
       again249j === html249j &&
       other249j !== html249j,
     '249.10d: the page states when the board was rebuilt, and the render reflects the text it was given rather than anything remembered — the same input renders identically and a changed board renders differently, which is what "read fresh every time" has to mean'
+  );
+
+  // ── 249.10g  CURRENCY IS NOT THE REBUILD TIME ────────────────────────────
+  //
+  // ⛔⛤ THE DEFECT, MEASURED 2026-09-01. This page led with "N items on the board.
+  // Rebuilt <time> — read fresh from the file every time this page loads, never
+  // cached." ⚠ Every word TRUE, and none of it the question the reader is asking:
+  // it reports when the FILE was written and how fresh the READ was, and the reader
+  // hears "this is the current picture". The board was 59 items stale — 307
+  // rendered against 366 live — and this page said exactly that, in that tone, for
+  // days, to somebody looking straight at it.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the currency line is replaced by a
+  // timestamp again, or the day an UNKNOWN currency starts rendering as a current
+  // one — which is the reassuring direction, and therefore the one nobody reports.
+  //
+  // ⚠ THE THIRD CASE IS THE LOAD-BEARING ONE, as everywhere else on these
+  // surfaces: a board whose match could not be established is NOT a board that is
+  // fine, and the two must not render alike.
+  const RG249g = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const queue249g = '# Q\n\n### AA1. x\n\nbody\n';
+  const board249g = [
+    '# Board',
+    '',
+    `**Source:** \`QUEUE.md\` · sha256 \`${RG249g.sourceHash(queue249g)}\``,
+    '',
+    '## 🔄 Active (1)',
+    '',
+    '- **AA1** — a thing',
+  ].join('\n');
+  const at249g = { text: board249g, mtime: when249j };
+  const cur249g = RVj.renderIndex([], 'n', at249g, queue249g);
+  const stale249g = RVj.renderIndex([], 'n', at249g, queue249g + '\n### AA2. later\n\nbody\n');
+  const unk249g = RVj.renderIndex([], 'n', at249g, null);
+  assert(
+    // current — says so, and says WHICH question it answered
+    /built from the queue as it reads right now/.test(cur249g) &&
+      /roadmap:check<\/code> does the stronger comparison/.test(cur249g) &&
+      !/OUT OF DATE/.test(cur249g) &&
+      // stale — the fact, not a timestamp to interpret
+      /THIS BOARD IS OUT OF DATE/.test(stale249g) &&
+      /not on this page/.test(stale249g) &&
+      /as they stood then/.test(stale249g) &&
+      // unknown — neither, and explicitly not reassurance
+      /could not be established/.test(unk249g) &&
+      /not the same as it being fine/.test(unk249g) &&
+      !/OUT OF DATE/.test(unk249g) &&
+      !/built from the queue as it reads right now/.test(unk249g),
+    '249.10g: the board page leads with whether it still MATCHES the queue — current, out of date, or not establishable — rather than with when the file was written; a rebuild time is not a currency, and the page that only had one showed 59 missing items for days without a word'
   );
 }
 
@@ -54754,6 +54808,86 @@ if (!PLANNING_OK) {
     '262.19: the /status route measures the state directory and hands the result to the renderer — a renderer that can tell a dead producer from a sleeping machine, called by a route that never measures it, is a page that silently lost the distinction it was built for' +
       (statusHandler262.length === 0 ? ' — the /status handler could not be located' : '')
   );
+
+  // ── 262.20  THE BOARD TILE REPORTS CURRENCY, NOT A WRITE TIME ────────────
+  //
+  // ⛔⛤ THE SAME DEFECT AS THE SNAPSHOT TILE BESIDE IT, ON A DIFFERENT SOURCE.
+  // "Updated 44 minutes ago" is the board FILE's modification time. It says when
+  // the file was written and NOTHING about whether it still matches the queue it is
+  // a view of. ⛔⛔ Measured 2026-09-01: the board was 59 items stale — 307 rendered
+  // against 366 live — while this tile read "Updated <recently>", which is exactly
+  // the shape of reassurance.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the tile falls back to the timestamp
+  // alone, or the day an UNKNOWN currency renders like a confirmed match — the
+  // reassuring direction, and so the one that would never be reported.
+  //
+  // ⚠ THE THREE-VALUED FIXTURE IS THE POINT. `null` must not collapse into either
+  // of the other two: a board nobody could check is not a board that is fine, and
+  // it is not a board known to be stale either.
+  const boardTile262 = current => {
+    const html = HV262.renderHome({
+      boardUpdated: new Date(Date.now() - 44 * 60 * 1000),
+      boardCurrent: current,
+      unbuilt: [],
+    });
+    // ⚠ Anchored on the HREF, not on the title text. The title carries an
+    // apostrophe, and whether that arrives raw or entity-encoded is an escaping
+    // detail this claim does not care about — a matcher that depends on it fails
+    // for a reason with nothing to do with what is being asserted.
+    //
+    // ⛔⛔ AND IT IS BOUNDED TO THE LIST ITEM, which is not tidiness. The first
+    // version matched `class="m"` exactly and then reached across the tile
+    // boundary the moment an emphasis class was added — so it read the NEXT
+    // tile's line and reported it as this one's. ⚠ That failed loudly here, which
+    // is the lucky direction; the same slack pointed the other way is an
+    // assertion that passes while reading somewhere the defect cannot appear.
+    const m = /href="\/reports#roadmap"(?:(?!<\/li>)[\s\S])*?<p class="m[^"]*">([^<]*)</.exec(html);
+    return m ? m[1] : null;
+  };
+  const tCur262 = boardTile262(true);
+  const tStale262 = boardTile262(false);
+  const tUnk262 = boardTile262(null);
+  // The route half — 262.10 is blind to a prop it does not know to look for, and a
+  // renderer that can report currency, called by a route that never measures it,
+  // degrades permanently and silently to the UNKNOWN branch.
+  const homeStart262 = viteSrc262.indexOf("server.middlewares.use('/home'");
+  const homeEnd262 = viteSrc262.indexOf("server.middlewares.use('/status'");
+  const homeHandler262 =
+    homeStart262 >= 0 && homeEnd262 > homeStart262
+      ? viteSrc262.slice(homeStart262, homeEnd262)
+      : '';
+  assert(
+    tCur262 !== null &&
+      /matches the queue/.test(tCur262) &&
+      /OUT OF DATE/.test(tStale262) &&
+      /moved on/.test(tStale262) &&
+      // ⛔ unknown is its own sentence, not either neighbour
+      /unknown/.test(tUnk262) &&
+      !/OUT OF DATE/.test(tUnk262) &&
+      !/and it matches the queue/.test(tUnk262) &&
+      // ⛔ AND ONLY THE OUT-OF-DATE ONE IS EMPHASISED. Seen rendered: the warning
+      // arrived in the tile's dim meta colour, the same grey as "6 reports", on a
+      // page whose entire readership reads it at a glance in the dark. A warning in
+      // the quiet colour is not a warning. ⚠ And it is only on that one state — a
+      // tile that shouts on every state teaches the reader to stop looking.
+      /<p class="m warn">⛔ OUT OF DATE/.test(
+        HV262.renderHome({ boardUpdated: new Date(), boardCurrent: false, unbuilt: [] })
+      ) &&
+      !/<p class="m warn">Updated/.test(
+        HV262.renderHome({ boardUpdated: new Date(), boardCurrent: true, unbuilt: [] })
+      ) &&
+      // the route actually measures it, and reads BOTH inputs at request time
+      homeHandler262.length > 0 &&
+      /boardCurrent:/.test(homeHandler262) &&
+      /boardCurrency\(/.test(homeHandler262) &&
+      /readPlanningFile\('QUEUE\.md'\)/.test(homeHandler262) &&
+      // ⛔ and the rule it calls is reached through the fresh-require chain, so a
+      // dev server running for days cannot answer from a copy no longer on disk
+      /roadmap-generate\.js/.test(viteSrc262.slice(0, homeStart262)),
+    '262.20: the build-board tile reports whether the board still MATCHES the queue — with `unknown` kept distinct from both `matches` and `stale` — and the route measures it rather than leaving the renderer to infer currency from a file write time' +
+      ` — current=${JSON.stringify(tCur262)} stale=${JSON.stringify(tStale262)} unknown=${JSON.stringify(tUnk262)}`
+  );
 }
 
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
@@ -54845,7 +54979,7 @@ if (!PLANNING_OK) {
     const rHead248c = check248c(tmp248c);
     assert(
       fresh248c.includes('**App repo HEAD:**') && rHead248c.status === 0,
-      '248.7h: a changed `App repo HEAD` stamp does NOT make the board stale — freshness is measured against the SOURCE fingerprint alone, so an unrelated app commit can never red this step (the 247.10 false-positive trap, locked rather than rediscovered)' +
+      '248.7h: a changed `App repo HEAD` stamp does NOT make the board stale — the stamp is provenance and is NORMALISED OUT of every comparison, so an unrelated app commit can never red this step (the 247.10 false-positive trap, locked rather than rediscovered). ⭐ It guarded a fingerprint-only check when it was written; it now guards the byte-compare 248.7i added, which is the assertion that could actually have reintroduced the trap' +
         ` — got exit ${rHead248c.status}`
     );
 
@@ -54909,6 +55043,96 @@ if (!PLANNING_OK) {
       rNoTree248c.status === 0 && /SKIP/i.test(rNoTree248c.stdout),
       '248.7e: `--check` still exits 0, printing the resolution case, when there is NO planning tree — an absent TREE (a public clone, by design under F04) and an absent ARTIFACT are different facts and only the second is a failure' +
         ` — got exit ${rNoTree248c.status}`
+    );
+
+    // ── (i) THE HOLE A FINGERPRINT CANNOT SEE — the board is not what the
+    //        generator produces, while its SOURCE has not moved at all.
+    //
+    // ⛔⛔ THIS FILE DOCUMENTED THE HOLE AS PERMANENT (2026-08-13) rather than
+    // closing it: "it proves the board matches the SOURCE, not that it matches the
+    // GENERATOR … the full regenerate-and-byte-compare is not available here,
+    // because this artifact stamps the app repo's git HEAD". ⚠ That was right about
+    // the STAMP and wrong to generalise from it to the DOCUMENT — the stamp is ONE
+    // line with one anchored pattern, and holding it out leaves something the
+    // generator itself declares deterministic. So a board rendered by an OLDER
+    // version of this script, or hand-edited anywhere below the provenance block,
+    // passed every check there was. ⭐ Those are the two ways a board is wrong while
+    // nothing moved — the harder direction to notice, because no change prompts
+    // anybody to look.
+    //
+    // ⭐⭐ THE ASSERTION PROVES THE **NEW** CAPABILITY, NOT THE OLD ONE, and the
+    // fingerprint identity below is what makes that airtight: it is checked
+    // explicitly and must be TRUE. A red here with a MISMATCHED fingerprint would
+    // only be re-proving 248.7c, and would pass just as happily against the check
+    // exactly as it stood before any of this was written.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day the comparison is weakened back to the
+    // fingerprint, or the day somebody adds a genuinely varying field to the
+    // rendered document and exempts it instead of making it deterministic.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    const goodBoard248c = fs.readFileSync(boardPath248c, 'utf8');
+    const boardLines248c = goodBoard248c.split('\n');
+    const victim248c = boardLines248c.findIndex((l, i) => i > 6 && /^- \*\*F\d+\*\*/.test(l));
+    boardLines248c.splice(victim248c, 1); // one rendered item row, silently gone
+    fs.writeFileSync(boardPath248c, boardLines248c.join('\n'), 'utf8');
+    const RG248c = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+    const fingerprintStillMatches248c =
+      RG248c.extractSourceHash(fs.readFileSync(boardPath248c, 'utf8')) ===
+      RG248c.sourceHash(fs.readFileSync(queuePath248c, 'utf8'));
+    const rDrift248c = check248c(tmp248c);
+    assert(
+      victim248c > 0 &&
+        // ⛔ THE PREMISE, ASSERTED RATHER THAN ASSUMED: the old check's entire
+        // question still answers YES on this board. Without this line the red
+        // below proves nothing new.
+        fingerprintStillMatches248c === true &&
+        rDrift248c.status === 1 &&
+        /not what this generator produces/.test(rDrift248c.stderr) &&
+        // the report has to be actionable over a document this size
+        /first difference at line/.test(rDrift248c.stderr),
+      '248.7i: `--check` exits 1 when the board is not what the generator produces, even though its source fingerprint still MATCHES — a board rendered by an older generator, or edited by hand, is stale with its source standing perfectly still, and a fingerprint can never see that' +
+        ` — got exit ${rDrift248c.status}, fingerprint-matched=${fingerprintStillMatches248c}`
+    );
+
+    // ── (j) A READABLE BOARD OVER A SOURCE THE GENERATOR NO LONGER TRUSTS ──
+    //
+    // ⚠ REACHABLE ONLY THROUGH THIS DOOR, which is why the fixture looks odd. Any
+    // change to QUEUE.md moves its fingerprint, so 248.7c fires first and this
+    // branch is never entered — it exists for the case where the PARSER changed
+    // under an unchanged source, and the honest way to stage that is to point the
+    // board's recorded fingerprint at a source that blinds.
+    //
+    // ⭐ THE POINT: a non-blind board standing over a source that now blinds must be
+    // a FAILURE, not a pass. The READABLE artifact is the dangerous one — it
+    // describes a parse nothing can reproduce, and it reads exactly like a healthy
+    // board. ⛔ GOES RED WITHOUT A REVERT: the day somebody makes the rebuild
+    // failure "fail safe" and pass, which is the natural instinct and turns the one
+    // assertion in this whole file into a permanent green.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    const readable248c = fs.readFileSync(boardPath248c, 'utf8');
+    const blindingQueue248c = fixtureQueue248c(4); // under TOO_FEW_ITEMS
+    fs.writeFileSync(queuePath248c, blindingQueue248c, 'utf8');
+    fs.writeFileSync(
+      boardPath248c,
+      readable248c.replace(
+        RG248c.SOURCE_HASH_RE,
+        `**Source:** \`QUEUE.md\` · sha256 \`${RG248c.sourceHash(blindingQueue248c)}\``
+      ),
+      'utf8'
+    );
+    const rWouldBlind248c = check248c(tmp248c);
+    assert(
+      rWouldBlind248c.status === 1 &&
+        /regenerating it now would be/.test(rWouldBlind248c.stderr) &&
+        /too-few-items/.test(rWouldBlind248c.stderr) &&
+        // ⛔ not reported as a staleness mismatch — the fingerprint agrees here, and
+        // mislabelling the cause sends the reader to regenerate rather than to the
+        // parse that actually broke
+        !/QUEUE\.md has moved on/.test(rWouldBlind248c.stderr),
+      '248.7j: a READABLE board standing over a source the generator can no longer parse exits 1 and is reported as such — the readable artifact is the dangerous one, because it describes a parse nothing can reproduce while reading exactly like a healthy board' +
+        ` — got exit ${rWouldBlind248c.status}`
     );
   } finally {
     fs.rmSync(tmp248c, { recursive: true, force: true });
@@ -57461,12 +57685,17 @@ if (!PLANNING_OK) {
 
     // Any require of a *-view.js that is NOT the freshRequire call itself, and not
     // an entry in the chain list, is a renderer being held in memory.
-    const bareRequires260 = [...cfg260.matchAll(/(\w*)\s*\(\s*'(\.\/scripts\/[\w-]*view\.js)'/g)]
+    // ⛔⛤ BROADENED 2026-09-01 FROM `*-view.js` TO EVERY scripts/ MODULE, because
+    // the narrow version was the hiding place. It policed RENDERERS by filename, so
+    // `planning-paths.js` — the module that decides WHICH FILES GET READ — sat
+    // hoisted at handler setup and pinned for the life of a days-long server, in
+    // plain sight, inside the guard against exactly that.
+    const bareRequires260 = [...cfg260.matchAll(/(\w*)\s*\(\s*'(\.\/scripts\/[\w-]+\.js)'/g)]
       .filter(m => m[1] === 'require')
       .map(m => m[2]);
     assert(
       bareRequires260.length === 0,
-      '260.10: no renderer in vite.config.mjs is loaded with a bare require — every one goes through the re-reading helper, so a dev server cannot serve a module frozen at startup' +
+      '260.10: NOTHING under scripts/ is loaded into vite.config.mjs with a bare require — every one goes through the re-reading helper, so a dev server running for days cannot answer from a module frozen at startup; the rule covers data readers and resolvers, not only renderers, because a stale path resolver is worse than a stale page' +
         (bareRequires260.length ? ' — held: ' + bareRequires260.join(', ') : '')
     );
 
@@ -57485,6 +57714,52 @@ if (!PLANNING_OK) {
       chain260.length > 0 && missing260.length === 0,
       '260.11: every scripts/*-view.js is named in VIEW_CHAIN — a view module left out would survive as a stale dependency inside a freshly-loaded one' +
         (missing260.length ? ' — absent from the chain: ' + missing260.join(', ') : '')
+    );
+
+    // ── 260.12  THE CLOSURE, WHICH A FILENAME RULE CANNOT EXPRESS ──────────
+    //
+    // ⛔⛤ 260.11 ASKS WHETHER EVERY FILE CALLED `*-view.js` IS IN THE CHAIN. That
+    // is a proxy for the real property, and on 2026-09-01 the proxy was hiding a
+    // live instance of the very defect: `queue-view.js` WAS chained, cleared and
+    // re-loaded on every request — and then resolved `planning-paths.js` and
+    // `atomic-write.js` through the ORDINARY cache, so a freshly-loaded parser
+    // closed over a stale path resolver. Two modules, both outside the guard, for
+    // no reason except how they are spelled.
+    //
+    // ⭐ THE REAL PROPERTY IS TRANSITIVE: clearing a module is worthless if
+    // anything it requires survives, because the fresh copy then closes over the
+    // stale one and looks entirely correct. So the rule is the CLOSURE — every
+    // scripts/ module reachable by require from a chained module is itself chained
+    // — and it cannot be escaped by what a file is called.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day any chained module grows a require of
+    // a scripts/ sibling that is not in the list. That is an ordinary edit, not a
+    // revert, and it is how both of the instances above arrived.
+    const chainDeps260 = new Set();
+    const chainRead260 = [];
+    for (const name of chain260) {
+      let src;
+      try {
+        src = fs.readFileSync(path.join(ROOT, 'scripts', name), 'utf8');
+      } catch {
+        continue; // a chain entry naming a file that does not exist is 260.13-shaped
+      }
+      chainRead260.push(name);
+      for (const m of src.matchAll(/require\(\s*'\.\/([\w-]+\.js)'/g)) chainDeps260.add(m[1]);
+    }
+    const unchainedDeps260 = [...chainDeps260].filter(d => !chain260.includes(d)).sort();
+    assert(
+      // ⛔ The positive control matters: with an unreadable chain this would pass
+      // by finding no dependencies at all, which is the shape of a guard that
+      // quietly stopped guarding.
+      chainRead260.length === chain260.length &&
+        chainDeps260.size > 0 &&
+        unchainedDeps260.length === 0,
+      '260.12: VIEW_CHAIN is closed under require — every scripts/ module a chained module depends on is itself chained, so a cleared module can never close over a stale one; policing this by FILENAME left a path resolver and a write helper outside the guard while a chained parser resolved both through the ordinary cache' +
+        (unchainedDeps260.length
+          ? ' — depended on but NOT chained: ' + unchainedDeps260.join(', ')
+          : '') +
+        ` — ${chainRead260.length}/${chain260.length} chain entries readable, ${chainDeps260.size} dependencies seen`
     );
   }
 
