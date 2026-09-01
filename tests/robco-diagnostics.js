@@ -48879,6 +48879,210 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
 //  tests/save-survival.mjs (full push gate).
 // ══════════════════════════════════════════════════════════════
 {
+  {
+    header('Suite 264 — LINK STATE: three states, and the cache-first trap');
+
+    // ⛔⛤ THE DEFECT (owner report, 2026-09-01). He read a dropped VPN tunnel as
+    // "the dev server is down", and was right to — the terminal showed the same
+    // thing for both. ⭐ A TWO-VALUED DISPLAY OVER A THREE-STATE WORLD, which is the
+    // identical shape as a snapshot age with one threshold: same surface, same day.
+    //
+    // ⭐ EACH ASSERTION NAMES WHAT TURNS IT RED OTHER THAN A REVERT.
+    const uiCore264 = readFile('js/ui/ui-core.js');
+    const html264 = readFile('index.html');
+    const sw264 = readFile('sw.js');
+
+    // ── 264.1  THE DECISION IS PURE, AND THREE-VALUED ON THE PROBE ───────────
+    //
+    // ⛔ `probeOk` MUST be three-valued. Collapsing null ("nobody looked") into
+    // false ("the host is down") manufactures an alarm out of a measurement that
+    // never happened — and it is the one direction that would put a FALSE fault in
+    // front of the owner, which is worse than the silence it replaced.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day somebody simplifies the signature to a
+    // boolean, or reorders the branches so an offline device with a stale successful
+    // probe reports 'live'.
+    const assess264 = (() => {
+      const m = /function _assessLink\(\{[\s\S]*?\n\}/.exec(uiCore264);
+      if (!m) return null;
+      const ctx = {};
+      require('vm').createContext(ctx);
+      require('vm').runInContext(m[0], ctx);
+      return ctx._assessLink;
+    })();
+    assert(
+      typeof assess264 === 'function' &&
+        // the device's own word wins, whatever a probe said
+        assess264({ onLine: false, probeOk: null }) === 'disconnected' &&
+        assess264({ onLine: false, probeOk: true }) === 'disconnected' &&
+        // a network the device believes in, and an origin that answered
+        assess264({ onLine: true, probeOk: true }) === 'live' &&
+        // …and one that refused
+        assess264({ onLine: true, probeOk: false }) === 'unreachable' &&
+        // ⛔ nobody looked ≠ the host is down
+        assess264({ onLine: true, probeOk: null }) === 'unknown' &&
+        assess264({ onLine: true }) === 'unknown',
+      '264.1: _assessLink is pure and THREE-VALUED on the probe — an unrun probe reports UNKNOWN rather than a fault, and a device that says it has no network is believed over any probe result; collapsing those would invent an alarm nobody measured'
+    );
+
+    // ── 264.2  THE CACHE-FIRST TRAP — the probe must miss the cache ──────────
+    //
+    // ⛔⛔ THE SHARPEST FAILURE AVAILABLE HERE, and it would have been invisible.
+    // sw.js answers every same-origin request `caches.match(request) ||
+    // fetch(request)`. A probe of any precached URL is therefore answered BY THE
+    // SERVICE WORKER, from disk, with the host switched OFF — reporting the origin
+    // alive while it is dead. ⚠ That is a check reading a CLAIM instead of an
+    // EFFECT, inside the feature written to end exactly that confusion.
+    //
+    // ⭐ The cache is missed by making the URL UNIQUE — `caches.match` is called
+    // with no options, so `ignoreSearch` is false. ⚠ `cache: 'no-store'` is NOT
+    // the load-bearing part and this asserts BOTH, so a future edit that keeps only
+    // the reassuring-looking hint and drops the unique URL goes red.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day the probe is "tidied" to fetch
+    // location.href, or the SW's cache-first strategy changes underneath it.
+    const probeBody264 = (() => {
+      const i = uiCore264.indexOf('function _probeOrigin(');
+      return i < 0 ? '' : uiCore264.slice(i, i + 2200);
+    })();
+    assert(
+      probeBody264.length > 0 &&
+        /_linkprobe=/.test(probeBody264) &&
+        /Math\.random\(\)/.test(probeBody264) &&
+        // the SW really is cache-first, which is WHY the unique URL is required —
+        // asserted here so this test explains itself if the strategy ever changes
+        /caches\.match\(event\.request\)/.test(sw264) &&
+        // ⛔ and the probe must not simply fetch the current document
+        !/fetch\(\s*location\.href/.test(probeBody264),
+      '264.2: the reachability probe uses a UNIQUE, cache-missing URL — sw.js is cache-first for same-origin, so a probe of any precached path is answered by the service worker from disk and reports a dead host as alive; the no-store hint does not prevent that and is not what makes this work'
+    );
+
+    // ── 264.3  ANY HTTP RESPONSE MEANS REACHED — 404 INCLUDED ────────────────
+    //
+    // ⚠ A 404 is the origin ANSWERING. Requiring `res.ok` would report a perfectly
+    // live host as unreachable the moment the probe path returns anything but 200 —
+    // a false alarm that sends the reader to check a system that is fine, which is
+    // the exact harm this feature exists to stop.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day somebody adds an `res.ok` or a status
+    // check to the resolve path, which is the natural thing to write.
+    assert(
+      /\.then\(\s*\(\)\s*=>\s*settle\(true\)/.test(probeBody264) &&
+        !/res\.ok|response\.ok|\.status\s*===/.test(probeBody264),
+      '264.3: the probe treats ANY HTTP response as "the origin answered" and only a network-layer rejection as "it did not" — a 404 is the host answering, and gating on res.ok would report a live host as unreachable'
+    );
+
+    // ── 264.4  THE UNREACHABLE WORDING NAMES BOTH CAUSES AND PICKS NEITHER ───
+    //
+    // ⛔⛔ THIS IS THE WHOLE POINT OF THE ITEM. The browser cannot tell a dead host
+    // from a dead route to a live host. ⚠ Choosing one and printing it is what sent
+    // the owner to check the wrong system — so the copy must name both and commit to
+    // neither, while still being decisive about the part that IS known.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: any future "tighten the copy" that says the
+    // server is down, which is the shorter and more natural sentence.
+    const unreach264 = (() => {
+      const m = /_LINK_UNREACHABLE_MSG\s*=\s*\n?\s*'([^']*)'/.exec(uiCore264);
+      return m ? m[1] : '';
+    })();
+    const disc264 = (() => {
+      const m = /_LINK_DISCONNECTED_MSG\s*=\s*\n?\s*'([^']*)'/.exec(uiCore264);
+      return m ? m[1] : '';
+    })();
+    assert(
+      unreach264.length > 0 &&
+        /VPN|TUNNEL|ROUTE/i.test(unreach264) &&
+        /CANNOT TELL WHICH/i.test(unreach264) &&
+        // ⛔ it must NOT assert the host is down
+        !/HOST IS DOWN|SERVER IS DOWN|HOST OFFLINE/i.test(unreach264) &&
+        // …and the two states must not read alike
+        disc264.length > 0 &&
+        disc264 !== unreach264 &&
+        /NO NETWORK/i.test(disc264),
+      '264.4: the unreachable wording names BOTH the host and the route to it and commits to neither, while the disconnected wording says plainly that the device has no network — the browser cannot distinguish those causes, and printing a guess is what sent the reader to the wrong system'
+    );
+
+    // ── 264.5  THE TEMPLATE IS INERT, AND A HEALTHY LINK SHOWS NOTHING ───────
+    //
+    // ⛔ 'live' must render NO banner. An all-clear strip is a claim nobody asked
+    // for and it is wrong the moment it goes stale — the same reason the status page
+    // refuses to print a clean bill of health.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: a future banner rendered live in the body rather
+    // than cloned from the inert template (the WU-E2 pattern the other five follow),
+    // or a 'live' branch that paints something.
+    const tplIdx264 = html264.indexOf('id="linkFaultBannerTemplate"');
+    const tplBody264 = tplIdx264 < 0 ? '' : html264.slice(tplIdx264, tplIdx264 + 2600);
+    const showerBody264 = (() => {
+      const i = uiCore264.indexOf('function _showLinkFaultBanner(');
+      return i < 0 ? '' : uiCore264.slice(i, i + 1400);
+    })();
+    assert(
+      tplIdx264 > 0 &&
+        /id="linkFaultBanner"/.test(tplBody264) &&
+        /id="linkFaultBannerMsg"/.test(tplBody264) &&
+        /class="storage-warning-banner"/.test(tplBody264) &&
+        /role="alert"/.test(tplBody264) &&
+        // the shower bails out on a healthy link before touching the DOM
+        /if \(state === 'live'\) return;/.test(showerBody264),
+      '264.5: the link banner lives inside an inert <template> and reuses the shared warning look, and a HEALTHY link renders nothing at all — an all-clear strip is a claim that goes stale the instant it is painted'
+    );
+
+    // ── 264.6  IT DOES NOT COLLAPSE "A NEWER VERSION EXISTS" INTO ITSELF ─────
+    //
+    // ⚠ A reachable host that is serving you cache IS a real third state — and it
+    // already has an owner: the service-worker update prompt (_triggerUpdate). ⛔ A
+    // second surface answering the same question is how two answers to one question
+    // begin to disagree (Protocol 22), so a reachable host must leave that prompt
+    // unobstructed rather than editorialising about staleness.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day this feature grows an "update available"
+    // or "showing cached content" wording, which is the tempting next addition.
+    const linkMsgs264 = [disc264, unreach264].join(' ');
+    assert(
+      !/UPDATE AVAILABLE|NEWER VERSION|OUT OF DATE/i.test(linkMsgs264) &&
+        // the boundary is documented at the point of use, not left to be rediscovered
+        /_triggerUpdate/.test(uiCore264.slice(uiCore264.indexOf('function _refreshLinkState'))),
+      '264.6: link state does not claim anything about a newer version existing on the host — that third state is owned by the service-worker update prompt, and the boundary is written at the point of use rather than left to be rediscovered'
+    );
+
+    // ── 264.7  WIRED AT BOOT, AND ON RECOVERY AS WELL AS FAILURE ─────────────
+    //
+    // ⚠ THE GAP EVERY ASSERTION ABOVE IS BLIND TO. The decision can be perfect while
+    // nothing ever calls it. ⛔ The boot probe is load-bearing: the events only fire
+    // on a CHANGE, so a session that STARTS already-unreachable — which is exactly
+    // what the owner opened — would otherwise never be told.
+    //
+    // ⭐ And 'online' must be wired too: a banner that outlives its fault teaches the
+    // reader to ignore the next one.
+    // ⚠ TWO WINDOWS, BECAUSE THE CLAIM HAS TWO HALVES — and the first version of
+    // this read only the phase body, which broke the moment the wiring moved into
+    // a named function to satisfy the named-call-composition guard. It failed
+    // loudly, which is the harmless direction; the same slack pointed the other
+    // way is a test that passes because it reads where the defect cannot appear.
+    const bootBody264 = (() => {
+      const i = uiCore264.indexOf("_bootPhase('link-state'");
+      return i < 0 ? '' : uiCore264.slice(i, i + 200);
+    })();
+    const initBody264 = (() => {
+      const i = uiCore264.indexOf('function _initLinkState()');
+      return i < 0 ? '' : uiCore264.slice(i, i + 600);
+    })();
+    assert(
+      bootBody264.length > 0 &&
+        initBody264.length > 0 &&
+        // the boot phase actually invokes it…
+        /_initLinkState\(\)/.test(bootBody264) &&
+        // …and it probes once, then wires BOTH events
+        /_refreshLinkState\(\)/.test(initBody264) &&
+        /addEventListener\('offline'/.test(initBody264) &&
+        /addEventListener\('online'/.test(initBody264) &&
+        // recovery clears the banner rather than leaving it up
+        /b\.remove\(\)/.test(uiCore264.slice(uiCore264.indexOf('function _refreshLinkState'))),
+      '264.7: the link state is probed once at boot and re-evaluated on BOTH connectivity events, and recovery removes the banner — the events fire only on a change, so a session that started already-unreachable is the case the boot probe exists for'
+    );
+  }
+
   header('Suite 233 — SAVE_LAYER3: read-side fail-loud');
   const uiCore233 = readFile('js/ui-core.js');
   const uiSaves233 = readFile('js/ui-saves.js');

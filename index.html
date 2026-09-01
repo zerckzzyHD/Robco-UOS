@@ -184,6 +184,30 @@
         <span id="readFaultBannerMsg"></span>
       </div>
     </template>
+    <template id="linkFaultBannerTemplate">
+      <!-- LINK STATE (owner report 2026-09-01): he read a dropped VPN tunnel as
+           "the server is down", because the terminal showed the same thing for
+           both. That is a two-valued display over a three-state world — the same
+           defect class as a snapshot age with one threshold.
+           ONE template, THREE wordings, filled at clone time by
+           _showLinkFaultBanner() in the ui-core script:
+             DISCONNECTED       - navigator.onLine is false; the device says so.
+             ORIGIN UNREACHABLE - the device reports a network, but this origin
+                                  did not answer. NAMES BOTH CANDIDATES and picks
+                                  neither: the browser cannot tell a dead server
+                                  from a dead route to it, and a wrong guess sends
+                                  you to check the wrong system, which is exactly
+                                  what happened.
+             UNKNOWN            - the probe could not be run or did not settle.
+           ⛔ There is deliberately no "everything is fine" wording: a healthy link
+           shows NOTHING. A banner that appears to say all-clear is a claim nobody
+           asked for, and it would be wrong the moment it went stale.
+           Reuses the .storage-warning-banner look (Protocol 22). Tap to dismiss.
+           Game-agnostic copy (Protocol 38). -->
+      <div id="linkFaultBanner" class="storage-warning-banner" role="alert">
+        <span id="linkFaultBannerMsg"></span>
+      </div>
+    </template>
     <template id="installBannerTemplate">
       <!-- INSTALL DISCOVERABILITY STRIP (owner: the install action was buried in
            the Module Bay SVC TRAY and never seen). Cloned into the DOM by
