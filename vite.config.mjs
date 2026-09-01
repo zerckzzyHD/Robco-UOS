@@ -36,8 +36,30 @@ const VIEW_CHAIN = [
   // reporting from code that is no longer on disk. Caught exactly that way: a
   // resolver was edited to remove a fallback, the tests agreed it was gone, and
   // the running server kept resolving through the old copy for another hour.
+  // ⛔⛤ THE LEAVES WERE MISSING, AND THAT WAS THIS DEFECT ALREADY LIVE INSIDE
+  // ITS OWN FIX (found 2026-09-01 by widening the guard). `queue-view.js` was
+  // cleared and re-loaded on every request — and then resolved BOTH of these
+  // through the ordinary cache, so a freshly-loaded parser closed over a stale
+  // path resolver. That is the exact failure written up in the header above,
+  // one level deeper than the list reached.
+  //
+  // ⚠ WHY IT HID: Suites 260.10/260.11 policed this by FILENAME — `*-view.js` —
+  // so a data module that does not spell its name that way was outside the
+  // guard entirely. The rule is now the dependency closure (Suite 260.12), which
+  // cannot be escaped by what a file is called.
+  './scripts/planning-paths.js', // path resolver — a leaf, so first
+  './scripts/atomic-write.js', // write helper — a leaf
   './scripts/control-state.js', // operational state reader — deepest
   './scripts/queue-view.js', // markdown renderer — deepest
+  // ⚠ ADDED 2026-09-01, AND IT WAS ALREADY A LIVE HOLE BEFORE THE LINE THAT
+  // NEEDED IT. report-view.js has required this lazily for its closed-item rule
+  // since that rule moved here — and a freshly-loaded report-view was resolving it
+  // through the ORDINARY cache, so an edit to the rule was invisible on a server
+  // that had already served one page. ⛔ That is precisely the defect this chain
+  // exists to close, sitting inside it: a data reader left off the list means the
+  // views above it close over a STALE copy while looking perfectly correct. The
+  // /home route now reads the board-currency rule from here too.
+  './scripts/roadmap-generate.js', // board generator + the board-currency rule
   './scripts/report-view.js', // page shell + report rendering
   './scripts/home-view.js', // landing page
   './scripts/status-view.js', // operational snapshot
@@ -95,9 +117,12 @@ function reportsRoute() {
     name: 'robco-reports',
     apply: 'serve', // ⛔ dev only — never part of any build output
     configureServer(server) {
-      const paths = require('./scripts/planning-paths.js');
       server.middlewares.use('/reports', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        // ⛔ PER REQUEST, like the renderer below it. Hoisting this to setup pinned
+        // the path resolver for the life of a days-long server — the same trap as a
+        // hoisted renderer, on the module that decides WHICH FILES get read.
+        const paths = freshRequire('./scripts/planning-paths.js');
         // ⛔ Per request, never hoisted to setup — see freshRequire's header. This
         // is the page read most, and it HAS served stale content from memory.
         const view = freshRequire('./scripts/report-view.js');
@@ -160,10 +185,10 @@ function homeRoute() {
     name: 'robco-home',
     apply: 'serve', // ⛔ dev only — never part of any build output
     configureServer(server) {
-      const paths = require('./scripts/planning-paths.js');
-
       server.middlewares.use('/home', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        // ⛔ PER REQUEST — see the identical note on the /reports handler.
+        const paths = freshRequire('./scripts/planning-paths.js');
         // Only the mount point itself. Anything deeper is not this page, and
         // falls through rather than being answered with it.
         const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
@@ -171,6 +196,20 @@ function homeRoute() {
         // ⛔ Read AT REQUEST TIME, never cached — the counts are the only thing
         // making this page's freshness claim true.
         const board = paths.readRoadmap();
+        // ⭐⭐ CURRENCY, NOT MTIME — the tile used to report when the board FILE was
+        // written, which is silent about whether it still matches the queue. It was
+        // 59 items stale on 2026-09-01 while saying "Updated 44 minutes ago".
+        //
+        // ⚠ COSTED BEFORE ADDING, NOT ASSUMED: this reads the whole queue and hashes
+        // it, measured at ~16 ms on the real 3.2 MB document, once per visit to a
+        // page one person opens by hand. That buys the tile a claim it otherwise has
+        // to omit — and an omitted currency is exactly what let a stale board pass
+        // for a current one. ⛔ Read at request time like everything else here; a
+        // cached hash would answer for a queue that has since moved.
+        const boardQueue = board ? paths.readPlanningFile('QUEUE.md') : null;
+        const boardCurrency = board
+          ? freshRequire('./scripts/roadmap-generate.js').boardCurrency(board.text, boardQueue)
+          : null;
         // ⛔ The SNAPSHOT'S OWN STAMP, not this read's clock. Reading the file now
         // makes the READ fresh, never the DATA, and the tile has to carry the
         // second fact rather than the first — which is why `generatedAt` is what
@@ -186,6 +225,10 @@ function homeRoute() {
         const html = freshRequire('./scripts/home-view.js').renderHome({
           reportCount: paths.reportsDir() === null ? null : paths.listReports().length,
           boardUpdated: board ? board.mtime : null,
+          // ⛔ null when it could not be established — never coerced to a boolean,
+          // because "unknown" and "fine" are different facts and only one is safe
+          // to print.
+          boardCurrent: boardCurrency && boardCurrency.known ? boardCurrency.current : null,
           statusReachable: snap !== null,
           statusGeneratedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
           logCount: control.listLogs().length, // stat only — nothing is opened
@@ -226,6 +269,17 @@ function homeRoute() {
        * makes the read fresh, not the data, and the renderer leads with how old
        * the data is for exactly that reason. Nothing is cached on this side
        * either, so the age shown is always the real one.
+       *
+       * ⭐⭐ THE FOURTH ARGUMENT IS THE ONE THAT ANSWERS "IS THE MACHINE OFF, OR IS
+       * THIS ONE FILE DEAD?" — and it is measured HERE rather than inside the
+       * renderer, because the renderer holds no filesystem of its own (the same
+       * rule that moved every address off the landing page). Costed before adding:
+       * one top-level stat sweep of one directory, on a page nobody loads in a loop.
+       *
+       * ⚠ A caller that skipped it would leave the page unable to tell those two
+       * apart — precisely the state it was in while a four-day freeze went
+       * unnoticed — so it is passed unconditionally, and a null is rendered as
+       * silence rather than as reassurance.
        */
       server.middlewares.use('/status', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -236,7 +290,8 @@ function homeRoute() {
         const html = freshRequire('./scripts/status-view.js').renderStatus(
           snap ? snap.data : null,
           new Date(),
-          control.describeState()
+          control.describeState(),
+          control.newestWrite()
         );
         return sendHtml(req, res, snap ? 200 : 404, html);
       });

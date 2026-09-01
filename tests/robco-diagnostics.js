@@ -53759,11 +53759,65 @@ if (!PLANNING_OK) {
     text: board249j.replace('Active (2)', 'Active (9)'),
     mtime: when249j,
   });
+  // ⚠ THE STAMP MOVED, THE CLAIM DID NOT (2026-09-01). This fixture supplies no
+  // queue, so the page can no longer establish CURRENCY and says so — and the
+  // rebuild stamp travels inside that sentence rather than a "Rebuilt" one. ⛔ It
+  // is still asserted, because dropping the stamp would leave the reader with a
+  // page that says nothing about when what it shows was produced.
   assert(
-    /Rebuilt <strong>2026-08-25 21:42<\/strong>/.test(html249j) &&
+    /rendered <strong>2026-08-25 21:42<\/strong>/.test(html249j) &&
       again249j === html249j &&
       other249j !== html249j,
     '249.10d: the page states when the board was rebuilt, and the render reflects the text it was given rather than anything remembered — the same input renders identically and a changed board renders differently, which is what "read fresh every time" has to mean'
+  );
+
+  // ── 249.10g  CURRENCY IS NOT THE REBUILD TIME ────────────────────────────
+  //
+  // ⛔⛤ THE DEFECT, MEASURED 2026-09-01. This page led with "N items on the board.
+  // Rebuilt <time> — read fresh from the file every time this page loads, never
+  // cached." ⚠ Every word TRUE, and none of it the question the reader is asking:
+  // it reports when the FILE was written and how fresh the READ was, and the reader
+  // hears "this is the current picture". The board was 59 items stale — 307
+  // rendered against 366 live — and this page said exactly that, in that tone, for
+  // days, to somebody looking straight at it.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the currency line is replaced by a
+  // timestamp again, or the day an UNKNOWN currency starts rendering as a current
+  // one — which is the reassuring direction, and therefore the one nobody reports.
+  //
+  // ⚠ THE THIRD CASE IS THE LOAD-BEARING ONE, as everywhere else on these
+  // surfaces: a board whose match could not be established is NOT a board that is
+  // fine, and the two must not render alike.
+  const RG249g = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const queue249g = '# Q\n\n### AA1. x\n\nbody\n';
+  const board249g = [
+    '# Board',
+    '',
+    `**Source:** \`QUEUE.md\` · sha256 \`${RG249g.sourceHash(queue249g)}\``,
+    '',
+    '## 🔄 Active (1)',
+    '',
+    '- **AA1** — a thing',
+  ].join('\n');
+  const at249g = { text: board249g, mtime: when249j };
+  const cur249g = RVj.renderIndex([], 'n', at249g, queue249g);
+  const stale249g = RVj.renderIndex([], 'n', at249g, queue249g + '\n### AA2. later\n\nbody\n');
+  const unk249g = RVj.renderIndex([], 'n', at249g, null);
+  assert(
+    // current — says so, and says WHICH question it answered
+    /built from the queue as it reads right now/.test(cur249g) &&
+      /roadmap:check<\/code> does the stronger comparison/.test(cur249g) &&
+      !/OUT OF DATE/.test(cur249g) &&
+      // stale — the fact, not a timestamp to interpret
+      /THIS BOARD IS OUT OF DATE/.test(stale249g) &&
+      /not on this page/.test(stale249g) &&
+      /as they stood then/.test(stale249g) &&
+      // unknown — neither, and explicitly not reassurance
+      /could not be established/.test(unk249g) &&
+      /not the same as it being fine/.test(unk249g) &&
+      !/OUT OF DATE/.test(unk249g) &&
+      !/built from the queue as it reads right now/.test(unk249g),
+    '249.10g: the board page leads with whether it still MATCHES the queue — current, out of date, or not establishable — rather than with when the file was written; a rebuild time is not a currency, and the page that only had one showed 59 missing items for days without a word'
   );
 }
 
@@ -54186,9 +54240,22 @@ if (!PLANNING_OK) {
   // time here instead of the stamp that travelled in. The five-hour fixture is
   // what makes the two distinguishable — with a fresh stamp both spellings agree
   // and the test would prove nothing.
+  //
+  // ⚠ THE FIXTURE MOVED, AND THE CLAIM DID NOT WEAKEN TO MEET IT (2026-09-01).
+  // This drove a single five-hour stamp, which now sits past the stale line and
+  // no longer renders as an age at all. ⛔ The lazy repair is to shrink the fixture
+  // until the old sentence comes back, which quietly stops testing the tier that
+  // matters most. The same claim is asserted over BOTH tiers instead: an ageing
+  // stamp still reports its own age, a stopped one states the fact, and neither
+  // may borrow the read's clock.
+  const agedTile262 = HV262.renderHome({
+    statusReachable: true,
+    statusGeneratedAt: new Date(Date.now() - 30 * 60 * 1000),
+    unbuilt: [],
+  });
   const staleTile262 = HV262.renderHome({
     statusReachable: true,
-    statusGeneratedAt: new Date(Date.now() - 5 * 3600 * 1000),
+    statusGeneratedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
     unbuilt: [],
   });
   const undatedTile262 = HV262.renderHome({
@@ -54197,11 +54264,23 @@ if (!PLANNING_OK) {
     unbuilt: [],
   });
   assert(
-    /Snapshot taken about 5 hours ago/.test(staleTile262) &&
+    /Snapshot taken 30 minutes ago/.test(agedTile262) &&
+      /not a live reading/.test(agedTile262) &&
+      !/just now/.test(agedTile262) &&
+      // ⭐ At the top tier the tile stops describing an age and states the fact.
+      // "Snapshot taken 4 days ago" is true and has to be interpreted before it
+      // means anything; this is the interpretation the reader actually wanted.
+      /STALE — nothing new for 4 days/.test(staleTile262) &&
       /not a live reading/.test(staleTile262) &&
       !/just now/.test(staleTile262) &&
+      // ⛔ AND THE WORD "LIVE" IS GONE FROM THE TITLE. It read "Live status" above
+      // a line saying "Snapshot taken 4 days ago" — a label asserting a property
+      // the code cannot honour, with its own correction printed underneath it,
+      // where a correction is read second if at all.
+      !/>Live status</.test(staleTile262) &&
+      /Control plane status/.test(staleTile262) &&
       /does not say when it was taken/.test(undatedTile262),
-    '262.9: the landing tile reports the snapshot\'s OWN age and calls it a snapshot, and a reachable-but-undated one says so rather than borrowing the read\'s clock — a tile built from the read time would read "just now" permanently, including when nothing is being generated at all'
+    '262.9: the landing tile reports the snapshot\'s OWN age below the stale line and STATES THE FACT above it, never borrowing the read\'s clock, and its title no longer claims to be "Live" — a tile built from the read time would read "just now" permanently, including when nothing is being generated at all'
   );
 
   // ── 262.10  THE ROUTE ACTUALLY HANDS OVER WHAT THE RENDERER NEEDS ────────
@@ -54539,6 +54618,276 @@ if (!PLANNING_OK) {
       !/agewarn/.test(String(rowOf262(delivered262))),
     '262.15: the phone-alert row reports the last delivery the service itself acknowledged, and an absent record reads UNOBSERVABLE rather than blank, "none" or a zero — "no delivery found" and "no delivery attempted" are different facts, and only one of them is reassuring'
   );
+
+  // ── 262.16  THE AGE HAS TIERS, AND THE TOP ONE IS THE HEADLINE ───────────
+  //
+  // ⛔⛔ THE DEFECT, MEASURED ON THE LIVE SNAPSHOT (2026-09-01). This page led with
+  // its age from the day it was written, and that was still not enough: the
+  // threshold was a BOOLEAN at fifteen minutes, so sixteen minutes and FOUR DAYS
+  // rendered the identical sentence — "old enough to be worth double-checking
+  // before acting on it". The snapshot's own stamp read 2026-08-28T14:50:39Z and
+  // its producer had emitted nothing since. ⚠ That sentence advises care about a
+  // VALUE at the moment the fact is that the SOURCE HAS STOPPED, so there was no
+  // age at which this surface said anything HAD gone wrong. It was noticed after
+  // three days, by a reader who was looking straight at the number.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT, IN THREE INDEPENDENT DIRECTIONS: collapsing the
+  // tiers back to one boolean (the fixtures below stop differing); moving the
+  // banner underneath the enforcement block, where a qualifier is read second or
+  // not at all; and dropping the as-of stamp off the answer, which would leave the
+  // one block that gives a verdict written in the present tense.
+  //
+  // ⚠ THE BOUNDARIES COME FROM THE MODULE'S OWN EXPORTED CONSTANTS, never retyped
+  // — a test that restates a threshold only ever proves the restated copy.
+  const HVc262 = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const atAge262 = mins =>
+    SV.renderStatus(
+      {
+        generatedAt: new Date(Date.now() - mins * 60000).toISOString(),
+        enforced: true,
+        findings: { probeCheck: 0 },
+      },
+      new Date(),
+      'probe'
+    );
+  // ⚠ THE STYLESHEET IS STRIPPED BEFORE ANY OF THIS IS ASKED, and that is not
+  // tidiness. `.agewarn` and `.stopped` are SELECTORS in the sheet this page always
+  // emits, so a naive check for either matches every render including the ones
+  // where nothing is warning at all. The first version of this assertion did
+  // exactly that and failed against correct code — the harmless direction of a
+  // badly-chosen window, and the same mistake pointed the other way is a test that
+  // passes because it is reading somewhere the defect could never appear.
+  const bodyOf262 = html => String(html).replace(/<style[\s\S]*?<\/style>/g, '');
+  const freshHtml262 = bodyOf262(atAge262(Math.max(0, HVc262.AGEING_MINUTES - 5)));
+  const ageingHtml262 = bodyOf262(atAge262(HVc262.AGEING_MINUTES + 5));
+  const stoppedHtml262 = bodyOf262(atAge262(HVc262.STALE_MINUTES + 5));
+  const bannerAt262 = stoppedHtml262.indexOf('This page has heard nothing for');
+  const enforcedAt262 = stoppedHtml262.indexOf('<span class="lab">Enforcement</span>');
+  assert(
+    // fresh — no warning of any kind, and certainly no banner
+    !/agewarn/.test(freshHtml262) &&
+      !/heard nothing for/.test(freshHtml262) &&
+      // ageing — the softer clause, which is the RIGHT sentence at this distance
+      /agewarn/.test(ageingHtml262) &&
+      /worth double-checking/.test(ageingHtml262) &&
+      !/heard nothing for/.test(ageingHtml262) &&
+      // stopped — a different statement, not a louder version of the same one
+      bannerAt262 >= 0 &&
+      /as it was then/.test(stoppedHtml262) &&
+      !/worth double-checking/.test(stoppedHtml262) &&
+      // ⛔ ABOVE the enforcement block. The position IS the claim, not decoration.
+      enforcedAt262 > bannerAt262 &&
+      // ⛔ and the verdict block carries its own as-of stamp, so a reader who
+      // scrolls straight to it cannot read it as a statement about now
+      /As it stood .* — not now:/.test(stoppedHtml262) &&
+      !/As it stood/.test(ageingHtml262) &&
+      // ⚠ while still asserting nothing about the SYSTEM — only about what has
+      // reached this page, which is the only thing it measured
+      !/control plane is (down|broken|unhealthy|failing)/i.test(stoppedHtml262),
+    '262.16: the snapshot age has three distinguishable tiers and the top one is the HEADLINE — rendered above enforcement, restating everything below it as of then, while still claiming nothing about whether the system is well; one boolean threshold rendered sixteen minutes and four days identically' +
+      ` — banner@${bannerAt262} enforcement@${enforcedAt262}`
+  );
+
+  // ── 262.17  "MACHINE OFF" AND "PRODUCER DEAD", SEPARATED BY MEASUREMENT ───
+  //
+  // ⛔⛔ AN AGE ALONE CANNOT ANSWER THE QUESTION THAT DECIDES WHAT TO DO. A
+  // four-day-old snapshot in a directory nothing has touched for four days is a
+  // machine that was not running; the same snapshot in a directory written to two
+  // minutes ago is a live machine with a dead producer. Those want opposite
+  // responses, and both rendered identically until 2026-09-01 — when the live case
+  // was the second one: the state directory had been written to seconds before the
+  // read while the snapshot sat four days behind.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the two branches are collapsed into one
+  // sentence, or the day an UNMEASURED directory starts rendering as a quiet one.
+  //
+  // ⚠ THE THIRD FIXTURE IS THE LOAD-BEARING ONE. A caller that could not measure
+  // this must leave the page SILENT about it — "nothing has been written" and
+  // "nobody looked" are different facts and only the first is informative. That is
+  // the ABSENT-versus-UNOBSERVABLE rule this whole file turns on, one level up.
+  const stoppedSnap262 = {
+    generatedAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
+    enforced: false,
+  };
+  const dirLive262 = SV.renderStatus(
+    stoppedSnap262,
+    new Date(),
+    'probe',
+    new Date(Date.now() - 2 * 60000)
+  );
+  const dirQuiet262 = SV.renderStatus(
+    stoppedSnap262,
+    new Date(),
+    'probe',
+    new Date(Date.now() - 4 * 24 * 3600 * 1000)
+  );
+  const dirUnknown262 = SV.renderStatus(stoppedSnap262, new Date(), 'probe');
+  assert(
+    /a machine that is switched off/.test(dirLive262) &&
+      /still running while this one file has stopped/.test(dirLive262) &&
+      !/the whole of it has been quiet/.test(dirLive262) &&
+      /the whole of it has been quiet/.test(dirQuiet262) &&
+      !/switched off/.test(dirQuiet262) &&
+      // ⛔ unmeasured → NEITHER sentence, and no invented reassuring third one
+      !/switched off/.test(dirUnknown262) &&
+      !/whole of it has been quiet/.test(dirUnknown262) &&
+      // …while still delivering the banner it DOES have evidence for
+      /heard nothing for/.test(dirUnknown262),
+    '262.17: a stopped snapshot beside a LIVE directory and one beside a quiet directory produce different statements, and a directory nobody measured produces neither — an age alone cannot tell a switched-off machine from a dead producer, and inventing the distinction would be worse than the gap'
+  );
+
+  // ── 262.18  THE DIRECTORY MEASUREMENT IS A TIME, AND CARRIES NO NAME ──────
+  //
+  // ⛔⛔ A STRUCTURAL CLAIM, NOT A STYLE ONE: this repository is PUBLIC, and several
+  // entries in the state directory are named after what they hold. A measurement
+  // that returned the newest ENTRY rather than the newest TIME would put one of
+  // those names on a page — and would keep doing so for every file added there
+  // later, with nobody reviewing the decision. That is the same hazard the
+  // remainder section already refuses, arriving through a different door.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody "improves" this to return
+  // { name, mtime } so the page can say WHICH file moved. The fixture's filename
+  // appears nowhere in this repository, so a leak cannot pass by coincidence — and
+  // the positive control is load-bearing, since without it a function that always
+  // returned null would satisfy every negative here.
+  const probeDir262 = fs.mkdtempSync(path.join(os.tmpdir(), 'robco-state-262-'));
+  const leakName262 = 'zz-probe-name-that-must-never-be-rendered.json';
+  let newest262;
+  let unconfigured262;
+  const prevState262 = process.env.ROBCO_CONTROL_STATE;
+  try {
+    fs.writeFileSync(path.join(probeDir262, leakName262), '{}', 'utf8');
+    process.env.ROBCO_CONTROL_STATE = probeDir262;
+    newest262 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js')).newestWrite();
+    delete process.env.ROBCO_CONTROL_STATE;
+    unconfigured262 = freshLoad262(path.join(ROOT, 'scripts', 'control-state.js')).newestWrite();
+  } finally {
+    if (prevState262 === undefined) delete process.env.ROBCO_CONTROL_STATE;
+    else process.env.ROBCO_CONTROL_STATE = prevState262;
+    fs.rmSync(probeDir262, { recursive: true, force: true });
+  }
+  const renderedWith262 = SV.renderStatus(stoppedSnap262, new Date(), 'probe', newest262);
+  assert(
+    newest262 instanceof Date &&
+      Number.isFinite(newest262.getTime()) &&
+      // ⛔ null, not a throw and not a fabricated "now", with nothing configured
+      unconfigured262 === null &&
+      // the name cannot reach a page, because it never leaves the module
+      !renderedWith262.includes(leakName262) &&
+      !renderedWith262.includes('zz-probe-name'),
+    '262.18: the directory measurement is a TIME and only a time — no path through it can put a filename on a page in a PUBLIC repository — and an unconfigured checkout gets null rather than a fabricated reading' +
+      ` — got ${Object.prototype.toString.call(newest262)}, unconfigured=${String(unconfigured262)}`
+  );
+
+  // ── 262.19  THE /status ROUTE ACTUALLY MEASURES THE DIRECTORY ─────────────
+  //
+  // ⚠ 262.16–262.18 ARE ALL BLIND TO THIS, exactly as 262.10 is to the home route.
+  // The renderer can be perfect while the route passes three arguments where it now
+  // needs four — and the page would then degrade, silently and permanently, to the
+  // one branch that says nothing about the directory. Every assertion above stays
+  // green while the surface loses the distinction it was built for.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day somebody edits the /status handler and
+  // drops the argument, or renames the reader's export without following it
+  // through. Read from the config as text, like 262.10 — importing it would execute
+  // a Vite config for no benefit.
+  const statusStart262 = viteSrc262.indexOf("server.middlewares.use('/status'");
+  const statusEnd262 = viteSrc262.indexOf("server.middlewares.use('/ledger'");
+  const statusHandler262 =
+    statusStart262 >= 0 && statusEnd262 > statusStart262
+      ? viteSrc262.slice(statusStart262, statusEnd262)
+      : '';
+  assert(
+    statusHandler262.length > 0 &&
+      /renderStatus\(/.test(statusHandler262) &&
+      /newestWrite\(\)/.test(statusHandler262) &&
+      // ⛔ through the SAME fresh-require chain as everything else on this route —
+      // a module cached for the life of a days-long dev server is how a page came
+      // to report from code that was no longer on disk.
+      /freshRequire\('\.\/scripts\/control-state\.js'\)/.test(statusHandler262),
+    '262.19: the /status route measures the state directory and hands the result to the renderer — a renderer that can tell a dead producer from a sleeping machine, called by a route that never measures it, is a page that silently lost the distinction it was built for' +
+      (statusHandler262.length === 0 ? ' — the /status handler could not be located' : '')
+  );
+
+  // ── 262.20  THE BOARD TILE REPORTS CURRENCY, NOT A WRITE TIME ────────────
+  //
+  // ⛔⛤ THE SAME DEFECT AS THE SNAPSHOT TILE BESIDE IT, ON A DIFFERENT SOURCE.
+  // "Updated 44 minutes ago" is the board FILE's modification time. It says when
+  // the file was written and NOTHING about whether it still matches the queue it is
+  // a view of. ⛔⛔ Measured 2026-09-01: the board was 59 items stale — 307 rendered
+  // against 366 live — while this tile read "Updated <recently>", which is exactly
+  // the shape of reassurance.
+  //
+  // ⭐ GOES RED WITHOUT A REVERT: the day the tile falls back to the timestamp
+  // alone, or the day an UNKNOWN currency renders like a confirmed match — the
+  // reassuring direction, and so the one that would never be reported.
+  //
+  // ⚠ THE THREE-VALUED FIXTURE IS THE POINT. `null` must not collapse into either
+  // of the other two: a board nobody could check is not a board that is fine, and
+  // it is not a board known to be stale either.
+  const boardTile262 = current => {
+    const html = HV262.renderHome({
+      boardUpdated: new Date(Date.now() - 44 * 60 * 1000),
+      boardCurrent: current,
+      unbuilt: [],
+    });
+    // ⚠ Anchored on the HREF, not on the title text. The title carries an
+    // apostrophe, and whether that arrives raw or entity-encoded is an escaping
+    // detail this claim does not care about — a matcher that depends on it fails
+    // for a reason with nothing to do with what is being asserted.
+    //
+    // ⛔⛔ AND IT IS BOUNDED TO THE LIST ITEM, which is not tidiness. The first
+    // version matched `class="m"` exactly and then reached across the tile
+    // boundary the moment an emphasis class was added — so it read the NEXT
+    // tile's line and reported it as this one's. ⚠ That failed loudly here, which
+    // is the lucky direction; the same slack pointed the other way is an
+    // assertion that passes while reading somewhere the defect cannot appear.
+    const m = /href="\/reports#roadmap"(?:(?!<\/li>)[\s\S])*?<p class="m[^"]*">([^<]*)</.exec(html);
+    return m ? m[1] : null;
+  };
+  const tCur262 = boardTile262(true);
+  const tStale262 = boardTile262(false);
+  const tUnk262 = boardTile262(null);
+  // The route half — 262.10 is blind to a prop it does not know to look for, and a
+  // renderer that can report currency, called by a route that never measures it,
+  // degrades permanently and silently to the UNKNOWN branch.
+  const homeStart262 = viteSrc262.indexOf("server.middlewares.use('/home'");
+  const homeEnd262 = viteSrc262.indexOf("server.middlewares.use('/status'");
+  const homeHandler262 =
+    homeStart262 >= 0 && homeEnd262 > homeStart262
+      ? viteSrc262.slice(homeStart262, homeEnd262)
+      : '';
+  assert(
+    tCur262 !== null &&
+      /matches the queue/.test(tCur262) &&
+      /OUT OF DATE/.test(tStale262) &&
+      /moved on/.test(tStale262) &&
+      // ⛔ unknown is its own sentence, not either neighbour
+      /unknown/.test(tUnk262) &&
+      !/OUT OF DATE/.test(tUnk262) &&
+      !/and it matches the queue/.test(tUnk262) &&
+      // ⛔ AND ONLY THE OUT-OF-DATE ONE IS EMPHASISED. Seen rendered: the warning
+      // arrived in the tile's dim meta colour, the same grey as "6 reports", on a
+      // page whose entire readership reads it at a glance in the dark. A warning in
+      // the quiet colour is not a warning. ⚠ And it is only on that one state — a
+      // tile that shouts on every state teaches the reader to stop looking.
+      /<p class="m warn">⛔ OUT OF DATE/.test(
+        HV262.renderHome({ boardUpdated: new Date(), boardCurrent: false, unbuilt: [] })
+      ) &&
+      !/<p class="m warn">Updated/.test(
+        HV262.renderHome({ boardUpdated: new Date(), boardCurrent: true, unbuilt: [] })
+      ) &&
+      // the route actually measures it, and reads BOTH inputs at request time
+      homeHandler262.length > 0 &&
+      /boardCurrent:/.test(homeHandler262) &&
+      /boardCurrency\(/.test(homeHandler262) &&
+      /readPlanningFile\('QUEUE\.md'\)/.test(homeHandler262) &&
+      // ⛔ and the rule it calls is reached through the fresh-require chain, so a
+      // dev server running for days cannot answer from a copy no longer on disk
+      /roadmap-generate\.js/.test(viteSrc262.slice(0, homeStart262)),
+    '262.20: the build-board tile reports whether the board still MATCHES the queue — with `unknown` kept distinct from both `matches` and `stale` — and the route measures it rather than leaving the renderer to infer currency from a file write time' +
+      ` — current=${JSON.stringify(tCur262)} stale=${JSON.stringify(tStale262)} unknown=${JSON.stringify(tUnk262)}`
+  );
 }
 
 // ── 248.7  THE `--check` CONTRACT — the two false GREENS inside the guard ────
@@ -54630,7 +54979,7 @@ if (!PLANNING_OK) {
     const rHead248c = check248c(tmp248c);
     assert(
       fresh248c.includes('**App repo HEAD:**') && rHead248c.status === 0,
-      '248.7h: a changed `App repo HEAD` stamp does NOT make the board stale — freshness is measured against the SOURCE fingerprint alone, so an unrelated app commit can never red this step (the 247.10 false-positive trap, locked rather than rediscovered)' +
+      '248.7h: a changed `App repo HEAD` stamp does NOT make the board stale — the stamp is provenance and is NORMALISED OUT of every comparison, so an unrelated app commit can never red this step (the 247.10 false-positive trap, locked rather than rediscovered). ⭐ It guarded a fingerprint-only check when it was written; it now guards the byte-compare 248.7i added, which is the assertion that could actually have reintroduced the trap' +
         ` — got exit ${rHead248c.status}`
     );
 
@@ -54694,6 +55043,150 @@ if (!PLANNING_OK) {
       rNoTree248c.status === 0 && /SKIP/i.test(rNoTree248c.stdout),
       '248.7e: `--check` still exits 0, printing the resolution case, when there is NO planning tree — an absent TREE (a public clone, by design under F04) and an absent ARTIFACT are different facts and only the second is a failure' +
         ` — got exit ${rNoTree248c.status}`
+    );
+
+    // ── (i) THE HOLE A FINGERPRINT CANNOT SEE — the board is not what the
+    //        generator produces, while its SOURCE has not moved at all.
+    //
+    // ⛔⛔ THIS FILE DOCUMENTED THE HOLE AS PERMANENT (2026-08-13) rather than
+    // closing it: "it proves the board matches the SOURCE, not that it matches the
+    // GENERATOR … the full regenerate-and-byte-compare is not available here,
+    // because this artifact stamps the app repo's git HEAD". ⚠ That was right about
+    // the STAMP and wrong to generalise from it to the DOCUMENT — the stamp is ONE
+    // line with one anchored pattern, and holding it out leaves something the
+    // generator itself declares deterministic. So a board rendered by an OLDER
+    // version of this script, or hand-edited anywhere below the provenance block,
+    // passed every check there was. ⭐ Those are the two ways a board is wrong while
+    // nothing moved — the harder direction to notice, because no change prompts
+    // anybody to look.
+    //
+    // ⭐⭐ THE ASSERTION PROVES THE **NEW** CAPABILITY, NOT THE OLD ONE, and the
+    // fingerprint identity below is what makes that airtight: it is checked
+    // explicitly and must be TRUE. A red here with a MISMATCHED fingerprint would
+    // only be re-proving 248.7c, and would pass just as happily against the check
+    // exactly as it stood before any of this was written.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day the comparison is weakened back to the
+    // fingerprint, or the day somebody adds a genuinely varying field to the
+    // rendered document and exempts it instead of making it deterministic.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    const goodBoard248c = fs.readFileSync(boardPath248c, 'utf8');
+    const boardLines248c = goodBoard248c.split('\n');
+    const victim248c = boardLines248c.findIndex((l, i) => i > 6 && /^- \*\*F\d+\*\*/.test(l));
+    boardLines248c.splice(victim248c, 1); // one rendered item row, silently gone
+    fs.writeFileSync(boardPath248c, boardLines248c.join('\n'), 'utf8');
+    const RG248c = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+    const fingerprintStillMatches248c =
+      RG248c.extractSourceHash(fs.readFileSync(boardPath248c, 'utf8')) ===
+      RG248c.sourceHash(fs.readFileSync(queuePath248c, 'utf8'));
+    const rDrift248c = check248c(tmp248c);
+    assert(
+      victim248c > 0 &&
+        // ⛔ THE PREMISE, ASSERTED RATHER THAN ASSUMED: the old check's entire
+        // question still answers YES on this board. Without this line the red
+        // below proves nothing new.
+        fingerprintStillMatches248c === true &&
+        rDrift248c.status === 1 &&
+        /not what this generator produces/.test(rDrift248c.stderr) &&
+        // the report has to be actionable over a document this size
+        /first difference at line/.test(rDrift248c.stderr),
+      '248.7i: `--check` exits 1 when the board is not what the generator produces, even though its source fingerprint still MATCHES — a board rendered by an older generator, or edited by hand, is stale with its source standing perfectly still, and a fingerprint can never see that' +
+        ` — got exit ${rDrift248c.status}, fingerprint-matched=${fingerprintStillMatches248c}`
+    );
+
+    // ── (j) A READABLE BOARD OVER A SOURCE THE GENERATOR NO LONGER TRUSTS ──
+    //
+    // ⚠ REACHABLE ONLY THROUGH THIS DOOR, which is why the fixture looks odd. Any
+    // change to QUEUE.md moves its fingerprint, so 248.7c fires first and this
+    // branch is never entered — it exists for the case where the PARSER changed
+    // under an unchanged source, and the honest way to stage that is to point the
+    // board's recorded fingerprint at a source that blinds.
+    //
+    // ⭐ THE POINT: a non-blind board standing over a source that now blinds must be
+    // a FAILURE, not a pass. The READABLE artifact is the dangerous one — it
+    // describes a parse nothing can reproduce, and it reads exactly like a healthy
+    // board. ⛔ GOES RED WITHOUT A REVERT: the day somebody makes the rebuild
+    // failure "fail safe" and pass, which is the natural instinct and turns the one
+    // assertion in this whole file into a permanent green.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    const readable248c = fs.readFileSync(boardPath248c, 'utf8');
+    const blindingQueue248c = fixtureQueue248c(4); // under TOO_FEW_ITEMS
+    fs.writeFileSync(queuePath248c, blindingQueue248c, 'utf8');
+    fs.writeFileSync(
+      boardPath248c,
+      readable248c.replace(
+        RG248c.SOURCE_HASH_RE,
+        `**Source:** \`QUEUE.md\` · sha256 \`${RG248c.sourceHash(blindingQueue248c)}\``
+      ),
+      'utf8'
+    );
+    const rWouldBlind248c = check248c(tmp248c);
+    assert(
+      rWouldBlind248c.status === 1 &&
+        /regenerating it now would be/.test(rWouldBlind248c.stderr) &&
+        /too-few-items/.test(rWouldBlind248c.stderr) &&
+        // ⛔ not reported as a staleness mismatch — the fingerprint agrees here, and
+        // mislabelling the cause sends the reader to regenerate rather than to the
+        // parse that actually broke
+        !/QUEUE\.md has moved on/.test(rWouldBlind248c.stderr),
+      '248.7j: a READABLE board standing over a source the generator can no longer parse exits 1 and is reported as such — the readable artifact is the dangerous one, because it describes a parse nothing can reproduce while reading exactly like a healthy board' +
+        ` — got exit ${rWouldBlind248c.status}`
+    );
+
+    // ── (k) THE REGENERATE REPORTS WHAT IT ERASED ──────────────────────────
+    //
+    // ⛔⛤ THE TAUTOLOGY, AND THE HONEST ANSWER TO IT. The ritual ran
+    // `npm run roadmap && npm run roadmap:check` — rewrite the subject, then
+    // measure it — which cannot fail on staleness by construction. ⚠ THE REFLEX IS
+    // TO STRENGTHEN THE CHECK UNTIL IT FAILS THERE, AND THAT IS INCOHERENT: after a
+    // successful regenerate the board genuinely IS current, so every honest
+    // predicate must answer YES, the byte-compare 248.7i added included. A
+    // predicate that answered NO in that position would be a false positive, not a
+    // stricter gate. The tautology is a property of the ORDERING, not the assertion.
+    //
+    // ⭐⭐ SO THE HARM IS ATTACKED INSTEAD OF THE SYMPTOM. The damage was never
+    // that a check passed — it is that the drift was DESTROYED BEFORE ANYONE
+    // MEASURED IT, leaving no trace that 59 items had been missing for days. The
+    // regenerate now reports what it replaced, so the measurement survives the bad
+    // ordering. ⛔ Reordering the ritual (done 2026-09-01) fixes the pair only until
+    // somebody tidies it back into one line; this cannot be tidied away, because it
+    // is reported by the very command that closes the drift.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day the predecessor stops being read before
+    // the write (the only moment it still exists), or the day an unreadable
+    // predecessor starts reporting as "nothing drifted" — the reassuring direction,
+    // and therefore the one nobody would report.
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(20), 'utf8');
+    generate248c(tmp248c);
+    fs.writeFileSync(queuePath248c, fixtureQueue248c(25), 'utf8');
+    const rDrift2 = generate248c(tmp248c); // regenerate over a 5-item-behind board
+    const rSame2 = generate248c(tmp248c); // and again, over a current one
+    // An unreadable predecessor: present, but stating no total of its own.
+    fs.writeFileSync(boardPath248c, 'not a board at all\n', 'utf8');
+    const rUnknown2 = generate248c(tmp248c);
+    assert(
+      // the drift is named, with the direction and the delta
+      /DRIFT CLOSED/.test(rDrift2.stdout) &&
+        /5 item\(s\) behind \(20 → 25\)/.test(rDrift2.stdout) &&
+        /Newly listed: .*F21/.test(rDrift2.stdout) &&
+        // ⛔ and the naming ceiling travels with the names, not as a footnote
+        /backlog band is a count rather than a list/.test(rDrift2.stdout) &&
+        // a current board says so rather than staying silent — silence would be
+        // indistinguishable from the reporting having broken
+        /already current — nothing had drifted \(25 items\)/.test(rSame2.stdout) &&
+        !/DRIFT CLOSED/.test(rSame2.stdout) &&
+        // ⛔ unreadable predecessor → UNKNOWN, never zero
+        /cannot be established/.test(rUnknown2.stdout) &&
+        /UNKNOWN, not zero/.test(rUnknown2.stdout) &&
+        !/nothing had drifted/.test(rUnknown2.stdout) &&
+        // ⚠ and it is still a REPORTER: none of this may fail a checkpoint
+        rDrift2.status === 0 &&
+        rSame2.status === 0 &&
+        rUnknown2.status === 0,
+      '248.7k: `npm run roadmap` reports the drift it just closed — naming the delta, the newly listed items and the limit of that naming — so the measurement survives the `roadmap && roadmap:check` ordering that destroys the subject before measuring it; no check can fail in that position, because after a regenerate the board genuinely IS current' +
+        ` — exits ${rDrift2.status}/${rSame2.status}/${rUnknown2.status}`
     );
   } finally {
     fs.rmSync(tmp248c, { recursive: true, force: true });
@@ -57246,12 +57739,17 @@ if (!PLANNING_OK) {
 
     // Any require of a *-view.js that is NOT the freshRequire call itself, and not
     // an entry in the chain list, is a renderer being held in memory.
-    const bareRequires260 = [...cfg260.matchAll(/(\w*)\s*\(\s*'(\.\/scripts\/[\w-]*view\.js)'/g)]
+    // ⛔⛤ BROADENED 2026-09-01 FROM `*-view.js` TO EVERY scripts/ MODULE, because
+    // the narrow version was the hiding place. It policed RENDERERS by filename, so
+    // `planning-paths.js` — the module that decides WHICH FILES GET READ — sat
+    // hoisted at handler setup and pinned for the life of a days-long server, in
+    // plain sight, inside the guard against exactly that.
+    const bareRequires260 = [...cfg260.matchAll(/(\w*)\s*\(\s*'(\.\/scripts\/[\w-]+\.js)'/g)]
       .filter(m => m[1] === 'require')
       .map(m => m[2]);
     assert(
       bareRequires260.length === 0,
-      '260.10: no renderer in vite.config.mjs is loaded with a bare require — every one goes through the re-reading helper, so a dev server cannot serve a module frozen at startup' +
+      '260.10: NOTHING under scripts/ is loaded into vite.config.mjs with a bare require — every one goes through the re-reading helper, so a dev server running for days cannot answer from a module frozen at startup; the rule covers data readers and resolvers, not only renderers, because a stale path resolver is worse than a stale page' +
         (bareRequires260.length ? ' — held: ' + bareRequires260.join(', ') : '')
     );
 
@@ -57270,6 +57768,52 @@ if (!PLANNING_OK) {
       chain260.length > 0 && missing260.length === 0,
       '260.11: every scripts/*-view.js is named in VIEW_CHAIN — a view module left out would survive as a stale dependency inside a freshly-loaded one' +
         (missing260.length ? ' — absent from the chain: ' + missing260.join(', ') : '')
+    );
+
+    // ── 260.12  THE CLOSURE, WHICH A FILENAME RULE CANNOT EXPRESS ──────────
+    //
+    // ⛔⛤ 260.11 ASKS WHETHER EVERY FILE CALLED `*-view.js` IS IN THE CHAIN. That
+    // is a proxy for the real property, and on 2026-09-01 the proxy was hiding a
+    // live instance of the very defect: `queue-view.js` WAS chained, cleared and
+    // re-loaded on every request — and then resolved `planning-paths.js` and
+    // `atomic-write.js` through the ORDINARY cache, so a freshly-loaded parser
+    // closed over a stale path resolver. Two modules, both outside the guard, for
+    // no reason except how they are spelled.
+    //
+    // ⭐ THE REAL PROPERTY IS TRANSITIVE: clearing a module is worthless if
+    // anything it requires survives, because the fresh copy then closes over the
+    // stale one and looks entirely correct. So the rule is the CLOSURE — every
+    // scripts/ module reachable by require from a chained module is itself chained
+    // — and it cannot be escaped by what a file is called.
+    //
+    // ⭐ GOES RED WITHOUT A REVERT: the day any chained module grows a require of
+    // a scripts/ sibling that is not in the list. That is an ordinary edit, not a
+    // revert, and it is how both of the instances above arrived.
+    const chainDeps260 = new Set();
+    const chainRead260 = [];
+    for (const name of chain260) {
+      let src;
+      try {
+        src = fs.readFileSync(path.join(ROOT, 'scripts', name), 'utf8');
+      } catch {
+        continue; // a chain entry naming a file that does not exist is 260.13-shaped
+      }
+      chainRead260.push(name);
+      for (const m of src.matchAll(/require\(\s*'\.\/([\w-]+\.js)'/g)) chainDeps260.add(m[1]);
+    }
+    const unchainedDeps260 = [...chainDeps260].filter(d => !chain260.includes(d)).sort();
+    assert(
+      // ⛔ The positive control matters: with an unreadable chain this would pass
+      // by finding no dependencies at all, which is the shape of a guard that
+      // quietly stopped guarding.
+      chainRead260.length === chain260.length &&
+        chainDeps260.size > 0 &&
+        unchainedDeps260.length === 0,
+      '260.12: VIEW_CHAIN is closed under require — every scripts/ module a chained module depends on is itself chained, so a cleared module can never close over a stale one; policing this by FILENAME left a path resolver and a write helper outside the guard while a chained parser resolved both through the ordinary cache' +
+        (unchainedDeps260.length
+          ? ' — depended on but NOT chained: ' + unchainedDeps260.join(', ')
+          : '') +
+        ` — ${chainRead260.length}/${chain260.length} chain entries readable, ${chainDeps260.size} dependencies seen`
     );
   }
 

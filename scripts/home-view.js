@@ -55,6 +55,13 @@ const HOME_STYLE = `
   font-size:1.12rem; color:var(--acc); padding:.35rem 0; min-height:44px; }
 .tiles p.d { margin:.1rem 0 0; color:var(--fg); font-size:.97rem; line-height:1.5; }
 .tiles p.m { margin:.35rem 0 0; color:var(--dim); font-size:.85rem; }
+/* ⛔⛤ A WARNING IN THE DIM COLOUR IS NOT A WARNING. The freshness line lives in
+   the tile's quietest slot, which is right for "6 reports" and wrong for the one
+   sentence on this page that means STOP. Seen rendered: "⛔ OUT OF DATE — the
+   queue has moved on" arrived in the same grey as every incidental fact around
+   it, on a page read at a glance, in the dark — which is the whole population of
+   readers this page has. The emphasis is the point of saying it at all. */
+.tiles p.m.warn { color:var(--hi); font-weight:700; font-size:.9rem; }
 .tiles a.away::after { content:" ↗"; font-weight:400; }
 details.later { margin:1.6rem 0 0; border:1px solid var(--line);
   border-radius:10px; background:var(--code); padding:0 .9rem; }
@@ -87,6 +94,86 @@ function ago(when) {
 }
 
 /**
+ * The same span as `ago()`, worded as a DURATION rather than as a point in the
+ * past — "4 days", not "4 days ago".
+ *
+ * ⛔ IT IS NOT `ago()` WITH THE WORD "AGO" TRIMMED, and that shortcut is exactly
+ * why this exists: `ago()` legitimately answers "yesterday" for a one-day span,
+ * and trimming a suffix that is not there yields "nothing new for yesterday".
+ * ⚠ Two spellings of one span is a duplication risk, so both are derived from the
+ * same minute count rather than one being rewritten out of the other's output.
+ */
+function elapsed(minutes) {
+  const m = Number(minutes);
+  if (!Number.isFinite(m) || m < 0) return '';
+  // ⚠ Zero minutes is a real reading here — a directory written to seconds ago —
+  // and "0 minutes ago" is not a sentence anybody says. It reads as a rendering
+  // fault rather than as the freshest possible answer, which is what it is.
+  if (m < 1) return 'under a minute';
+  if (m < 60) return m === 1 ? '1 minute' : `${m} minutes`;
+  const hrs = Math.round(m / 60);
+  if (hrs < 24) return hrs === 1 ? 'about an hour' : `about ${hrs} hours`;
+  const days = Math.round(hrs / 24);
+  return days === 1 ? 'a day' : `${days} days`;
+}
+
+/**
+ * ⭐⭐ HOW OLD IS TOO OLD — ONE RULE, IN THE SAME PLACE AS `ago()`, BECAUSE IT IS
+ * THE SAME QUESTION ASKED FOR A DECISION INSTEAD OF FOR A SENTENCE.
+ *
+ * ── ⛔⛔ THE DEFECT THIS CLOSES, MEASURED ON THE LIVE SNAPSHOT ───────────────
+ * The status page already led with the age in words, and the tile below already
+ * printed it. Both were CORRECT and both were USELESS on 2026-09-01, when the
+ * snapshot's own stamp read 2026-08-28T14:50:39Z — four days — and the surfaces
+ * said, in full: "old enough to be worth double-checking before acting on it".
+ *
+ * ⚠ That sentence is calibrated for a reading that is slightly behind. Applied to
+ * a producer that has emitted nothing for four days it is not merely weak, it
+ * points the wrong way: it advises care about a VALUE when the fact is that the
+ * SOURCE HAS STOPPED. Sixteen minutes and four days rendered identically, so
+ * there was no age at which either surface said anything had gone wrong — and the
+ * freeze went unnoticed for three days by a reader who was looking at the number.
+ *
+ * ⭐ A THRESHOLD, NOT A VERDICT — and the distinction is what makes this legal on
+ * a page whose governing rule is that it decides nothing. The age of this page's
+ * OWN INPUT is arithmetic on a stamp the input carries; it is measured here, not
+ * inferred. Nothing below claims the control plane is unhealthy, broken, or
+ * anything else — only that nothing has been heard from it, which is a fact about
+ * this page's knowledge rather than about the system.
+ *
+ * ⚠ THE NUMBERS, AND WHY THEY CANNOT PLAUSIBLY FIRE EARLY. Sampled from the
+ * project's own kept history, the snapshot's stamp trails the moment it is read by
+ * SECONDS (11 s, 25 s, 25 s on three consecutive days). An hour is over a hundred
+ * times the largest of those. ⛔ The cadence itself is deliberately NOT written
+ * down here — this repository is public, and a threshold this loose needs no
+ * knowledge of it.
+ *
+ * ⭐ AND A LONG GAP IS NOT AUTOMATICALLY A FAULT. A machine that was asleep has
+ * genuinely not been heard from, and saying so is true and useful. Which of the
+ * two it is gets answered by evidence, not by this function: see the state
+ * directory's own last write, carried alongside on the status page.
+ */
+const AGEING_MINUTES = 15;
+const STALE_MINUTES = 60;
+
+/**
+ * @param {Date|null} when the source's OWN stamp — never the read's clock.
+ * @param {number} [nowMs] injectable so a test can drive a boundary exactly.
+ * @returns {{known:boolean, minutes:number|null, phrase:string, tier:'unknown'|'fresh'|'ageing'|'stale'}}
+ */
+function assessAge(when, nowMs) {
+  const t = when instanceof Date ? when.getTime() : NaN;
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+  if (!Number.isFinite(t)) return { known: false, minutes: null, phrase: '', tier: 'unknown' };
+  const minutes = Math.floor((now - t) / 60000);
+  // ⛔ A stamp from the FUTURE is not fresh, it is unusable — a clock disagreement
+  // somewhere, and the one thing that must not happen is reporting it as current.
+  if (minutes < 0) return { known: false, minutes, phrase: '', tier: 'unknown' };
+  const tier = minutes >= STALE_MINUTES ? 'stale' : minutes >= AGEING_MINUTES ? 'ageing' : 'fresh';
+  return { known: true, minutes, phrase: ago(when), tier };
+}
+
+/**
  * One destination.
  *
  * ⛔ THE LINK TEXT IS THE TITLE AND NOTHING ELSE, and the description and freshness
@@ -109,14 +196,14 @@ function ago(when) {
  * trade: a big target is worth less than a page that still reads when the styling
  * does not arrive, and the target stays comfortably above the minimum either way.
  */
-function tile({ href, title, what, meta, away }) {
+function tile({ href, title, what, meta, metaWarn, away }) {
   const cls = away ? ' class="t away"' : ' class="t"';
   const rel = away ? ' rel="noreferrer noopener"' : '';
   return (
     `<li>` +
     `<a href="${escapeHtml(href)}"${cls}${rel}>${escapeHtml(title)}</a>` +
     `<p class="d">${escapeHtml(what)}</p>` +
-    (meta ? `<p class="m">${escapeHtml(meta)}</p>` : '') +
+    (meta ? `<p class="m${metaWarn ? ' warn' : ''}">${escapeHtml(meta)}</p>` : '') +
     `</li>`
   );
 }
@@ -129,6 +216,10 @@ function tile({ href, title, what, meta, away }) {
  *   when the private tree is not reachable at all (a plain checkout — normal).
  * @param {Date|null} state.boardUpdated   when the build board last changed, or
  *   null when there is no board to read.
+ * @param {boolean|null} state.boardCurrent  whether the board still matches the
+ *   queue it renders — TRUE, FALSE, or null for "could not be established".
+ *   ⛔ Three states on purpose: null must not render as true. Measured, never
+ *   inferred from boardUpdated, which is a write time and not a currency.
  * @param {string} state.museumUrl         the public site's address.
  * @param {Date|null} state.statusGeneratedAt  the snapshot's OWN stamp — never
  *   the time it was read, which is a different and much more flattering number.
@@ -147,6 +238,9 @@ function renderHome(state) {
   // nothing there" send you to different places.
   const hasStatusStamp =
     s.statusGeneratedAt instanceof Date && Number.isFinite(s.statusGeneratedAt.getTime());
+  // ⭐ ONE assessment, shared by the tile below — and the SAME function the status
+  // page runs, so the two surfaces cannot disagree about what "stale" means.
+  const statusAge = assessAge(hasStatusStamp ? s.statusGeneratedAt : null);
 
   const tiles = [
     tile({
@@ -154,11 +248,33 @@ function renderHome(state) {
       title: 'The terminal',
       what: 'The Fallout companion app itself, running from this machine right now.',
     }),
+    // ── ⛔⛤ "UPDATED 44 MINUTES AGO" WAS TRUE AND WAS NOT THE ANSWER ──────────
+    // This tile reported the board FILE's modification time, which says when it was
+    // written and nothing whatever about whether it still matches the queue it is a
+    // view of. ⛔⛔ Measured 2026-09-01: the board was 59 items stale — 307 rendered
+    // against 366 live — and this tile said "Updated <recently>", which reads as
+    // reassurance. It is the same mistake as an age with no staleness tier, one tile
+    // over: the age of an artifact is not its currency.
+    //
+    // ⭐ HANDED IN, like every other fact on this page — the renderer measures
+    // nothing and reaches for no file. ⛔ And an UNKNOWN currency is printed as
+    // unknown: a board whose match could not be established is not a board that is
+    // fine, and collapsing the two is how this page would start reassuring again.
     tile({
       href: '/reports#roadmap',
       title: "What's next",
       what: 'The build board: what is ready to start, what is underway, what is waiting.',
-      meta: hasBoard ? `Updated ${ago(s.boardUpdated)}` : 'No board on this machine yet.',
+      // ⛔ ONLY the out-of-date case is emphasised. A tile that shouts on every
+      // state teaches the reader to stop looking at it, which costs more than the
+      // one warning it was built to deliver.
+      metaWarn: hasBoard && s.boardCurrent === false,
+      meta: !hasBoard
+        ? 'No board on this machine yet.'
+        : s.boardCurrent === false
+          ? `⛔ OUT OF DATE — the queue has moved on since this was built ${ago(s.boardUpdated)}.`
+          : s.boardCurrent === true
+            ? `Updated ${ago(s.boardUpdated)} — and it matches the queue`
+            : `Updated ${ago(s.boardUpdated)} — whether it still matches the queue is unknown`,
     }),
     tile({
       href: '/reports#reports',
@@ -178,12 +294,34 @@ function renderHome(state) {
     // ⭐ The age shown here is the snapshot's OWN stamp, read through the same
     // function the status page uses, at the same moment. The two cannot disagree
     // because there is one rule and no cached copy on either side.
+    //
+    // ── ⛔⛔ THE TITLE NO LONGER SAYS "LIVE", AND THAT WAS NOT A TIDY ──────────
+    // It read "Live status" for as long as this page has existed, and on
+    // 2026-09-01 it sat above the words "Snapshot taken 4 days ago". ⚠ The tile's
+    // own governing rule is that a label must not need prior knowledge to decode
+    // — but a label that asserts a property the code CANNOT HONOUR is worse than
+    // one that is merely obscure, because it is not ambiguous, it is wrong. The
+    // meta line beneath it was already carrying the correction, and a correction
+    // underneath a claim is read second, if at all.
+    //
+    // ⚠ THE COST IS NAMED: the owner refers to this tile by its name, and the
+    // name has changed. That is a real, small cost, accepted because the word
+    // being removed is the single most misleading token on this page.
     tile({
       href: '/status',
-      title: 'Live status',
+      title: 'Control plane status',
       what: 'What the control plane last reported: whether enforcement is armed, and what it found.',
+      // Same rule as the board tile: emphasis on the stopped-source case alone.
+      metaWarn: hasStatusStamp && statusAge.tier === 'stale',
+      // ⛔⛔ AT THE TOP TIER THE TILE STOPS DESCRIBING AN AGE AND STATES A FACT.
+      // "Snapshot taken 4 days ago" is true, and it is a number the reader has to
+      // interpret before it means anything. "Nothing new for 4 days" is the
+      // interpretation, and it is the one the reader wanted — while still saying
+      // nothing about whether the SYSTEM is well, only about what has been heard.
       meta: hasStatusStamp
-        ? `Snapshot taken ${ago(s.statusGeneratedAt)} — not a live reading`
+        ? statusAge.tier === 'stale'
+          ? `STALE — nothing new for ${elapsed(statusAge.minutes)}. This is the last snapshot, not a live reading.`
+          : `Snapshot taken ${statusAge.phrase} — not a live reading`
         : s.statusReachable === true
           ? 'Readable, but it does not say when it was taken.'
           : 'Nothing readable from this machine.',
@@ -264,4 +402,12 @@ function renderHome(state) {
   });
 }
 
-module.exports = { renderHome, ago, HOME_STYLE };
+module.exports = {
+  renderHome,
+  ago,
+  elapsed,
+  assessAge,
+  AGEING_MINUTES,
+  STALE_MINUTES,
+  HOME_STYLE,
+};

@@ -118,6 +118,8 @@ ul.reports { list-style:none; padding:0; }
 ul.reports li { margin:0; border-bottom:1px solid var(--line); }
 ul.reports a { display:block; padding:1rem .25rem; min-height:44px;
   text-decoration:none; font-weight:600; }
+p.note.stale { color:var(--hi); border:2px solid var(--hi); border-radius:10px;
+  padding:.75rem .8rem; background:var(--code); font-size:.97rem; line-height:1.55; }
 .note { color:var(--dim); font-size:.9rem; }
 /* Counts strip. auto-fit rather than a fixed column count: at 375px it settles
    into two columns without a media query, and widens on its own. */
@@ -389,6 +391,10 @@ function closedOverWholeQueue(queueMd) {
  * @param {Date}   when when it was last regenerated
  */
 function renderRoadmapSection(md, when, queueMd) {
+  // ⛔ Required here, not at module load, for the same reason as the rule above:
+  // this is the only place the board generator is needed, and importing it is how
+  // one definition of "does the board match the queue" stays one definition.
+  const { boardCurrency } = require('./roadmap-generate.js');
   const sections = splitSections(md);
   const bands = new Map();
   for (const s of sections) {
@@ -497,10 +503,47 @@ function renderRoadmapSection(md, when, queueMd) {
     ? `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`
     : 'unknown';
 
+  // ── ⛔⛤ CURRENCY LEADS, AND IT IS A DIFFERENT FACT FROM THE REBUILD TIME ──
+  //
+  // This line used to read "N items on the board. Rebuilt <time> — read fresh from
+  // the file every time this page loads, never cached." ⚠ Every word of that is
+  // TRUE and none of it answers the question the reader is asking. It reports when
+  // the FILE was written and how fresh the READ was; the reader hears "this is the
+  // current picture". ⛔⛔ Measured 2026-09-01: the board was 59 items stale — 307
+  // rendered against 366 live — and this page said exactly that sentence, in that
+  // tone, for days, to somebody who was looking straight at it.
+  //
+  // ⭐ The comparison is FREE here: the whole queue is already read for the honesty
+  // tile, so this costs one hash of a string that is in hand.
+  //
+  // ⚠ THE CEILING TRAVELS WITH THE CLAIM. This asks the FINGERPRINT question —
+  // was the board built from this queue — not the stronger one `npm run
+  // roadmap:check` asks, which rebuilds and compares byte for byte and costs too
+  // much for a page load. So the page says which question it asked, rather than
+  // borrowing the credibility of the answer it did not compute.
+  const currency = boardCurrency(md, queueMd);
+  const currencyLine = !currency.known
+    ? `<p class="note stale">⛔ <strong>Whether this board is up to date could not be established.</strong> ` +
+      `Either the queue could not be read from here or the board carries no source fingerprint, so ` +
+      `nothing on this page can tell you whether it matches. That is not the same as it being fine. ` +
+      // ⭐ The rebuild stamp is still a TRUE fact and is still shown — it just no
+      // longer stands in for a currency it never established.
+      `The ${total} item${total === 1 ? '' : 's'} below were rendered <strong>${escapeHtml(stamp)}</strong>.</p>`
+    : currency.current
+      ? `<p class="note">${total} item${total === 1 ? '' : 's'} on the board, and it was built from the queue as it reads ` +
+        `right now. Rebuilt <strong>${escapeHtml(stamp)}</strong>, and re-read from the file on every ` +
+        `visit — nothing here is cached. (Checked by comparing the board's recorded source ` +
+        `fingerprint against the live queue; <code>npm run roadmap:check</code> does the stronger ` +
+        `comparison and rebuilds the whole thing.)</p>`
+      : `<p class="note stale">⛔ <strong>THIS BOARD IS OUT OF DATE.</strong> The queue has changed ` +
+        `since this was built <strong>${escapeHtml(stamp)}</strong>, so anything added, closed or ` +
+        `re-ordered since then is <strong>not on this page</strong> — and a stale board reads exactly ` +
+        `like a current one, which is why this says so instead of leaving you the timestamp to ` +
+        `interpret. The ${total} item${total === 1 ? '' : 's'} below are as they stood then. Run <code>npm run roadmap</code>.</p>`;
+
   return (
     `<h1 id="roadmap">Roadmap</h1>` +
-    `<p class="note">${total} items on the board. Rebuilt <strong>${escapeHtml(stamp)}</strong> — ` +
-    `read fresh from the file every time this page loads, never cached.</p>` +
+    currencyLine +
     counts +
     disagreeList +
     `<h2>The whole board</h2>` +

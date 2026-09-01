@@ -117,6 +117,59 @@ function readStatus() {
   }
 }
 
+/**
+ * ⭐⭐ THE MOST RECENT WRITE ANYWHERE IN THE STATE DIRECTORY — A TIME, AND ONLY A
+ * TIME.
+ *
+ * ── ⛔⛔ WHAT THIS IS FOR, AND WHY A SNAPSHOT'S AGE ALONE WAS NOT ENOUGH ─────
+ * `readStatus()` already tells a caller how old the snapshot is. On 2026-09-01
+ * that number was four days, and it left the only question that matters
+ * unanswered: is this machine switched off, or is the thing that writes this one
+ * file dead while everything around it keeps running? Those are different
+ * problems with different responses, and an age cannot separate them.
+ *
+ * ⭐ THIS SEPARATES THEM BY MEASUREMENT RATHER THAN BY GUESS. A snapshot four days
+ * old sitting in a directory written to two minutes ago is not a quiet system —
+ * it is a live one with a stopped producer, and that is a fact rather than an
+ * inference. The same reading, in a directory nothing has touched for four days,
+ * says the opposite and says it just as plainly.
+ *
+ * ── ⛔ IT RETURNS NO NAME, AND THAT IS STRUCTURAL ───────────────────────────
+ * There is no path through this function that can emit a filename. Several
+ * entries in this directory are named after what they hold, and this repository is
+ * PUBLIC — `listLogs()` may name the hash-chained logs because a caller has to
+ * address one, and nothing here has to address anything. A Date carries no
+ * structure, so this cannot leak one however it is rendered.
+ *
+ * ⚠ TOP LEVEL ONLY, DELIBERATELY. A directory's own mtime moves when an entry is
+ * added to or removed from it, so activity inside a subdirectory is already
+ * visible without walking into it — and a recursive walk over an operational tree
+ * is an unbounded cost on a machine that is also serving the app, which is the
+ * one thing this module refuses everywhere else.
+ *
+ * ⛔ NULL IS A NORMAL OUTCOME (no directory configured, or unreadable), and every
+ * caller must render it as "not established" rather than as "nothing has happened".
+ */
+function newestWrite() {
+  const dir = stateDir();
+  if (!dir) return null;
+  try {
+    let newest = null;
+    for (const name of fs.readdirSync(dir)) {
+      let st;
+      try {
+        st = fs.statSync(path.join(dir, name));
+      } catch {
+        continue; // vanished between readdir and stat — a live directory does that
+      }
+      if (newest === null || st.mtime > newest) newest = st.mtime;
+    }
+    return newest;
+  } catch {
+    return null;
+  }
+}
+
 /** Log files, newest first by modified time. Sizes only — nothing is opened. */
 function listLogs() {
   const dir = stateDir();
@@ -184,6 +237,7 @@ module.exports = {
   describeState,
   logFile,
   readStatus,
+  newestWrite,
   listLogs,
   tailLog,
 };

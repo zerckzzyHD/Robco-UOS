@@ -37,12 +37,25 @@
 const { page, escapeHtml } = require('./report-view.js');
 // ⛔ Imported, not re-implemented. "How long ago" is one rule and it already has
 // a home; a second copy is how two answers to one question begin to disagree.
-const { ago } = require('./home-view.js');
+const { ago, elapsed, assessAge } = require('./home-view.js');
 
 const STATUS_STYLE = `
 p.age { font-size:1.05rem; line-height:1.5; margin:.8rem 0 0; }
 p.age strong { font-size:1.15rem; }
 p.agewarn { color:var(--hi); font-weight:700; }
+/* ⚠ The stopped-source banner is styled like the enforcement block rather than
+   like a note, because it outranks everything under it: if this is showing, no
+   value on the page is a statement about the present. */
+.stopped { border:2px solid var(--hi); border-radius:10px; padding:1rem .9rem;
+  margin:.9rem 0 1.25rem; background:var(--code); }
+.stopped .lab { display:block; font-size:.85rem; color:var(--hi);
+  text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+.stopped .val { display:block; font-size:1.6rem; font-weight:800; line-height:1.2;
+  margin-top:.2rem; color:var(--hi); }
+.stopped .why { display:block; color:var(--fg); font-size:.95rem; margin-top:.55rem;
+  line-height:1.55; }
+.stopped .why.dim { color:var(--dim); font-size:.9rem; }
+p.asof { margin:0 0 .5rem; color:var(--hi); font-weight:700; font-size:.95rem; }
 .armed { border:2px solid var(--line); border-radius:10px; padding:1rem .9rem;
   margin:1rem 0 1.25rem; background:var(--code); }
 .armed .lab { display:block; font-size:.85rem; color:var(--dim);
@@ -413,8 +426,13 @@ function section(title, inner, note) {
  * @param {object|null} snap  parsed snapshot, or null when unreadable
  * @param {Date|null}   readAt when this page read it
  * @param {string}      note  the resolution case, printed when there is nothing
+ * @param {Date|null}   [dirLastWrite] the most recent write anywhere in the state
+ *   directory — HANDED IN, never read here, exactly as every address on the
+ *   landing page is handed in. ⛔ OPTIONAL, and an absent one is rendered as
+ *   nothing at all rather than as "quiet": a caller that could not measure it must
+ *   not leave this page saying it did.
  */
-function renderStatus(snap, readAt, note) {
+function renderStatus(snap, readAt, note, dirLastWrite) {
   if (!snap) {
     return page({
       title: 'Status',
@@ -430,18 +448,76 @@ function renderStatus(snap, readAt, note) {
   }
 
   // ── The age, first, in words ──────────────────────────────────────────────
+  //
+  // ⛔⛔ THE DEFECT THIS SECTION WAS REBUILT TO FIX, MEASURED NOT IMAGINED. Until
+  // 2026-09-01 there was ONE threshold here and it was a boolean: fifteen minutes
+  // and four days rendered the identical sentence, "old enough to be worth
+  // double-checking before acting on it". ⚠ Read that against what had actually
+  // happened — the producer of this file had emitted nothing since 2026-08-28 —
+  // and the sentence points the wrong way: it advises care about a VALUE at the
+  // moment the fact is that the SOURCE HAS STOPPED. The page was never wrong; it
+  // had no age at which it could say anything HAD gone wrong, so the freeze went
+  // unnoticed for three days by a reader looking straight at the number.
+  //
+  // ⭐ THE RULE IS IMPORTED, NEVER RESTATED. `assessAge` lives beside `ago` — one
+  // rule, one home — so this page and the landing tile that links to it cannot
+  // develop two different opinions about what "stale" means.
   const genAt = snap.generatedAt ? new Date(snap.generatedAt) : null;
   const genOk = genAt && Number.isFinite(genAt.getTime());
-  const phrase = genOk ? ago(genAt) : '';
-  const ageMin = genOk ? Math.floor((Date.now() - genAt.getTime()) / 60000) : null;
-  // ⚠ The threshold is a DISPLAY emphasis, not a verdict about the system. It
-  // says the reader should be more careful, never that anything is wrong.
-  const stale = ageMin !== null && ageMin >= 15;
-  const ageLine = genOk
-    ? `<p class="age">This data was produced <strong>${escapeHtml(phrase || 'at an unreadable time')}</strong>. ` +
-      `It is a snapshot, not a live reading${stale ? ' — <span class="agewarn">old enough to be worth double-checking before acting on it</span>' : ''}.</p>`
-    : `<p class="age">⛔ <strong>${UNOBSERVABLE}</strong> — this snapshot does not say when it was produced, ` +
-      `so how old it is cannot be established. Treat every value below as of unknown age.</p>`;
+  const age = assessAge(genOk ? genAt : null);
+  const phrase = age.known ? age.phrase : '';
+  const stopped = age.tier === 'stale';
+
+  // ⭐ THE CROSS-CHECK, AND IT IS THE HALF THAT MAKES THE BANNER ACTIONABLE. An age
+  // alone cannot tell a switched-off machine from a live one whose producer has
+  // died, and those two want opposite responses. Comparing the snapshot's own stamp
+  // against the last write ANYWHERE in the directory it lives in separates them by
+  // MEASUREMENT — no extra threshold, no guess, and still no claim about whether
+  // the system is well.
+  //
+  // ⛔ ABSENT IS RENDERED AS SILENCE, NEVER AS "QUIET" — the ABSENT-versus-
+  // UNOBSERVABLE distinction this whole file turns on, one level up.
+  const dirOk = dirLastWrite instanceof Date && Number.isFinite(dirLastWrite.getTime());
+  const dirAge = dirOk ? assessAge(dirLastWrite) : { known: false, tier: 'unknown', minutes: null };
+  let context = '';
+  if (stopped && dirAge.known) {
+    // ⚠ Judged by the SAME tier rule, never by a second threshold invented here: a
+    // directory that is itself stale is a quiet machine, one that is not is a
+    // running one. Two spellings of one boundary is how the two begin to disagree.
+    context =
+      dirAge.tier === 'stale'
+        ? `<span class="why dim">Nothing else in that directory has been written for ${escapeHtml(elapsed(dirAge.minutes))} either, so the whole of it has been quiet — which is what a machine that has not been running looks like from here.</span>`
+        : `<span class="why dim">⛔ The directory this snapshot lives in was written to ${escapeHtml(elapsed(dirAge.minutes))} ago, so this is <strong>not</strong> a machine that is switched off. Something there is still running while this one file has stopped being produced.</span>`;
+  }
+
+  // ⛔⛔ AT THE TOP TIER THE AGE STOPS BEING A CAVEAT AND BECOMES THE ANSWER. It is
+  // rendered ABOVE enforcement and above the findings, because if it is showing
+  // then no value further down is a statement about the present — and a qualifier
+  // printed after the thing it qualifies is read second, or not at all.
+  //
+  // ⚠ IT STILL CLAIMS NOTHING ABOUT THE SYSTEM. "This page has heard nothing" is a
+  // fact about this page's own input; "the control plane is down" would be a
+  // verdict nothing here measured, and this is the one surface whose whole value is
+  // that it never invents one.
+  const ageLine = !genOk
+    ? `<p class="age">⛔ <strong>${UNOBSERVABLE}</strong> — this snapshot does not say when it was produced, ` +
+      `so how old it is cannot be established. Treat every value below as of unknown age.</p>`
+    : stopped
+      ? `<div class="stopped"><span class="lab">This page has heard nothing for</span>` +
+        `<span class="val">${escapeHtml(elapsed(age.minutes))}</span>` +
+        `<span class="why">The last snapshot was produced <strong>${escapeHtml(phrase)}</strong>, and there has been no newer one since. ` +
+        `Everything below describes the system <strong>as it was then</strong>. It is not a reading of the system now, and nothing on this page can tell you what has happened in between.</span>` +
+        context +
+        `</div>`
+      : `<p class="age">This data was produced <strong>${escapeHtml(phrase || 'at an unreadable time')}</strong>. ` +
+        `It is a snapshot, not a live reading${age.tier === 'ageing' ? ' — <span class="agewarn">old enough to be worth double-checking before acting on it</span>' : ''}.</p>`;
+
+  // ⛔ THE AS-OF STAMP TRAVELS WITH THE ANSWER ITSELF. The banner above is read
+  // first, but a reader who scrolls straight to the one block that gives a verdict
+  // must not find that verdict written in the present tense. Same reasoning as the
+  // ceiling sentence beside it: a qualification belongs in the same breath as the
+  // claim it qualifies, never further up the page.
+  const asOf = stopped ? `<p class="asof">As it stood ${escapeHtml(phrase)} — not now:</p>` : '';
 
   // ── ARMED vs NOT ARMED, the one thing wanted at a glance ──────────────────
   // ⛔ Read from ONE field. It is tempting to combine `enforced` with the
@@ -482,6 +558,7 @@ function renderStatus(snap, readAt, note) {
     `<span class="why">${escapeHtml(armedWhy)}</span></div>` +
     // ── THE ANSWER, before any field-by-field anything ────────────────────
     `<div class="answer">` +
+    asOf +
     (fc.needsYou.length
       ? `<p class="lead"><strong>${fc.needsYou.length} thing${fc.needsYou.length === 1 ? '' : 's'} the snapshot flags as needing you.</strong></p>` +
         listRows(fc.needsYou, ' unk')
