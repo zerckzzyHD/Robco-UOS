@@ -40,6 +40,27 @@ The AI is never the sole source of truth for durable application state. All AI o
 
 ---
 
+## ⚠ The transcript IS replayed — provider-specific, and it is a scheduled tripwire
+
+`transmitMessage()` rebuilds the WHOLE conversation on every send (`js/services/api.js`, the
+`apiContents` loop): each prior turn goes back up as `{ role: msg.sender === 'user' ? 'user' : 'model',
+parts: [{ text: msg.text }] }`. ⭐ **That is transcript replay, not transcript reading**, and it is the
+pattern Anthropic's 2026-09-01 anti-distillation change restricts — editing a model's prior context while
+preserving its thinking transcript.
+
+⛔ **It cannot bite today, for two structural reasons, and both are load-bearing:** the provider is
+**Google Gemini** (`generativelanguage.googleapis.com` is the only model endpoint in the repo; no
+Anthropic surface exists and no model SDK is installed), and **no thinking is ever requested, returned or
+stored** — `generationConfig` carries no `thinkingConfig`, and `chatHistory` entries are `{ text, sender }`,
+a single display string with nowhere to hold a thinking block or a signature.
+
+⇒ ⭐⭐ **The moment this path moves to the Anthropic API, that change lands on us immediately** — and the
+reason will not be obvious to whoever moves it, because the replay reads as ordinary history rebuilding.
+⚠ Measured 2026-09-01; recorded here rather than in the queue so it is found by the person editing this
+file, not by someone reading a board.
+
+---
+
 ## Level ownership
 
 The player owns level. The AI **announces**, it never writes — see the AI/Overseer audit trail
