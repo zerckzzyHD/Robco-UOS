@@ -49980,7 +49980,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
   });
   assert(
     bogus237.status === 0,
-    '237.7: with the archive repo pointed at a non-existent path the nudge exits 0 (cannot determine state, stays silent, push proceeds)'
+    '237.7: with the archive repo pointed at a non-existent path the nudge exits 0 — it never blocks a push. ⚠ It no longer stays SILENT there: an absent archive now PRINTS `NOT CONFIGURED`, because silence was indistinguishable from a passing check and that is what hid three unbacked artifacts (237.13)'
   );
 
   const dflt237 = spawn237('node', ['scripts/backup-nudge.js'], {
@@ -49992,6 +49992,155 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
     dflt237.status === 0,
     '237.8: with default resolution the nudge exits 0 whether or not the private archive is present — it never blocks a push'
   );
+
+  // ── 237.9 – 237.14  THE PREDICATE IS CONTENT EQUIVALENCE ────────────────
+  //
+  // ⛔⛤ WHAT THIS SCRIPT USED TO ASK, AND WHY IT WAS THE WRONG QUESTION. It
+  // compared local MTIMES against THE ARCHIVE'S LAST COMMIT TIMESTAMP — so ANY
+  // commit to the archive discharged it, whether or not that commit backed
+  // anything up. No bug and no race required: two sessions and a clock, which is
+  // this project's ordinary operating state.
+  //
+  // ⚠ MEASURED 2026-09-01, not hypothesised: three artifacts were unbacked while
+  // it reported nothing owed — library/TEST_CATALOG.md, the orchestrator's
+  // MEMORY.md, and a memory file created that same session expressly to preserve
+  // an owner ruling before it was cut from elsewhere. All three predated the
+  // archive's last commit, so the comparison evaluated false.
+  //
+  // ⛔⛔ AND "CHECK PRESENCE" WOULD HAVE BEEN JUST AS SILENT. TEST_CATALOG.md was
+  // PRESENT and 144 bytes stale. ⭐ "The file is there" and "the file is current"
+  // are different questions and a backup answers the second — which is why 237.10
+  // stages a file that is present in the mirror and behind by bytes.
+  //
+  // ⭐ Driven entirely through throwaway fixtures via the four env overrides, so
+  // these run identically on the owner's machine, a public clone and CI, and never
+  // touch the real archive.
+  {
+    const os237 = require('os');
+    const tmp237 = fs.mkdtempSync(path.join(os237.tmpdir(), 'robco-nudge-237-'));
+    const root237 = path.join(tmp237, 'app');
+    const arch237 = path.join(tmp237, 'archive');
+    const empty237 = path.join(tmp237, 'no-memory');
+    const g237 = (cwd, ...a) => spawn237('git', a, { cwd, encoding: 'utf8', timeout: 20000 });
+    const runNudge237 = over =>
+      spawn237('node', ['scripts/backup-nudge.js'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        timeout: 30000,
+        env: Object.assign({}, process.env, {
+          ROBCO_NUDGE_ROOT: root237,
+          ROBCO_BACKUP_REPO: arch237,
+          ROBCO_MEMORY_BASE: empty237,
+          ROBCO_PROJECTS_BASE: empty237,
+          ...(over || {}),
+        }),
+      });
+    try {
+      fs.mkdirSync(empty237, { recursive: true });
+      fs.mkdirSync(path.join(root237, 'library'), { recursive: true });
+      fs.mkdirSync(path.join(arch237, 'library'), { recursive: true });
+      const body237 = 'suite 1\nsuite 2\n';
+      fs.writeFileSync(path.join(root237, 'library', 'CATALOG.md'), body237, 'utf8');
+      fs.writeFileSync(path.join(arch237, 'library', 'CATALOG.md'), body237, 'utf8');
+      g237(arch237, 'init', '-q');
+      g237(arch237, 'config', 'user.email', 'f@f');
+      g237(arch237, 'config', 'user.name', 'fixture');
+      g237(arch237, 'add', '-A');
+      g237(arch237, 'commit', '-qm', 'mirror');
+
+      // ── 237.9  THE GREEN, AND IT IS NOT SILENCE ───────────────────────────
+      // ⭐ An all-good run must SAY it checked. "I checked N things and they are
+      // identical" is a different sentence from saying nothing, and the whole
+      // defect was that those two were indistinguishable.
+      const green237 = runNudge237();
+      assert(
+        green237.status === 0 &&
+          /BACKED UP/.test(green237.stdout) &&
+          String(green237.stdout).trim().length > 0,
+        '237.9: with every watched artifact byte-identical the nudge PRINTS a positive verdict rather than staying silent — an instrument that cannot tell "I checked and it is fine" from "I could not check" is indistinguishable from one that is broken' +
+          ` — exit ${green237.status}`
+      );
+
+      // ── 237.10  RED: PRESENT IN THE MIRROR, BEHIND BY BYTES ───────────────
+      // ⭐ GOES RED WITHOUT A REVERT: the day the predicate is weakened back to
+      // presence or to any clock comparison. This fixture is unmoved by both.
+      fs.writeFileSync(path.join(root237, 'library', 'CATALOG.md'), body237 + 'suite 3\n', 'utf8');
+      const stillPresent237 = fs.existsSync(path.join(arch237, 'library', 'CATALOG.md'));
+      const stale237 = runNudge237();
+      assert(
+        stillPresent237 === true &&
+          stale237.status === 0 &&
+          /NOT BACKED UP/.test(stale237.stdout) &&
+          /CATALOG\.md/.test(stale237.stdout) &&
+          /differs/.test(stale237.stdout),
+        '237.10: a file that is PRESENT in the mirror but behind by bytes is reported as not backed up — the premise is asserted (it really is still present), so a presence check would answer "yes it is there" and say nothing, which is why presence was the wrong repair' +
+          ` — present=${stillPresent237}`
+      );
+
+      // ── 237.11  RED: THE SILENCING MECHANISM ITSELF ───────────────────────
+      // ⛔⛔ THE ACTUAL DEFECT. A fix that passes 237.10 but still goes quiet after
+      // an unrelated archive commit has fixed nothing. The local file's mtime is
+      // pushed BEHIND that commit — the exact condition that discharged the old
+      // predicate — and the verdict must not move.
+      fs.writeFileSync(path.join(arch237, 'UNRELATED.md'), 'mirrors nothing\n', 'utf8');
+      g237(arch237, 'add', 'UNRELATED.md');
+      g237(arch237, 'commit', '-qm', 'unrelated work');
+      const past237 = new Date(Date.now() - 3600 * 1000);
+      fs.utimesSync(path.join(root237, 'library', 'CATALOG.md'), past237, past237);
+      const afterCommit237 = runNudge237();
+      assert(
+        afterCommit237.status === 0 &&
+          /NOT BACKED UP/.test(afterCommit237.stdout) &&
+          /CATALOG\.md/.test(afterCommit237.stdout),
+        '237.11: an UNRELATED commit to the archive does NOT discharge the check, even with the stale local file older than that commit — that combination is exactly what silenced the mtime-vs-last-commit predicate, and it is the defect this rebuild exists to end'
+      );
+
+      // ── 237.12  UNOBSERVABLE WHEN THE ARCHIVE CANNOT BE READ ──────────────
+      // ⛔ Proved, not assumed. An archive that is present but unreadable is a
+      // FAILURE TO MEASURE and must never render as an all-clear.
+      fs.rmSync(path.join(arch237, '.git'), { recursive: true, force: true });
+      fs.mkdirSync(path.join(arch237, '.git'), { recursive: true });
+      const unobs237 = runNudge237();
+      assert(
+        unobs237.status === 0 &&
+          /UNOBSERVABLE/.test(unobs237.stdout) &&
+          !/BACKED UP —/.test(unobs237.stdout),
+        '237.12: an archive that is PRESENT but unreadable reports UNOBSERVABLE and never an all-clear — a failure to measure and a clean result are different facts, and only one of them is reassuring'
+      );
+
+      // ── 237.13  NOT CONFIGURED IS A DIFFERENT FACT, AND STILL PRINTS ──────
+      // ⚠ A checkout with no private archive is normal and by design for a PUBLIC
+      // repo — but it is not evidence of a backup, so it says so rather than
+      // staying quiet. ⛔ It must NOT read as UNOBSERVABLE either: nothing failed.
+      const noArch237 = runNudge237({ ROBCO_BACKUP_REPO: path.join(tmp237, 'absent') });
+      assert(
+        noArch237.status === 0 &&
+          /NOT CONFIGURED/.test(noArch237.stdout) &&
+          !/UNOBSERVABLE/.test(noArch237.stdout) &&
+          !/NOT BACKED UP/.test(noArch237.stdout),
+        '237.13: a machine with no private archive prints NOT CONFIGURED — distinct from UNOBSERVABLE (nothing failed) and from an all-clear (nothing was verified); every path prints, so silence can never again pass for a passing check'
+      );
+
+      // ── 237.14  IT READS THE ARCHIVE WITHOUT EVER TOUCHING ITS INDEX ──────
+      // ⛔ The archive has a LIVE WRITER. `git status` alone takes the index lock
+      // and can strand a lock file that looks exactly like a crashed writer, so no
+      // command here may touch the index — and every one is `--no-optional-locks`.
+      // ⭐ GOES RED WITHOUT A REVERT: the day somebody reaches for status/diff/add
+      // to answer a question the pinned tree already answers.
+      const archCalls237 = [
+        ...nudgeSrc237.matchAll(/'(rev-parse|ls-tree|status|diff|add|commit|fetch|checkout)'/g),
+      ].map(m => m[1]);
+      assert(
+        /--no-optional-locks/.test(nudgeSrc237) &&
+          archCalls237.length > 0 &&
+          archCalls237.every(c => c === 'rev-parse' || c === 'ls-tree'),
+        '237.14: the nudge reads the archive only through index-free commands at a pinned sha (rev-parse + ls-tree, all --no-optional-locks) — the archive has a live writer, and a stray index lock is indistinguishable from a crashed one' +
+          ` — commands used: ${archCalls237.join(', ') || '(none found)'}`
+      );
+    } finally {
+      fs.rmSync(tmp237, { recursive: true, force: true });
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
