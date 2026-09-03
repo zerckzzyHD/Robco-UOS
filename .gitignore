@@ -3,11 +3,14 @@
 # (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
 
-# Codex's local agent files — same reasoning as .claude/ above, and this repo is
-# PUBLIC. AGENTS.md here is a local, machine-generated Claude->Codex substitution of
-# CLAUDE.md (it is NOT a second rulebook and nothing reads it); .codex/ holds local
-# hook wiring. Neither is tracked, and both must stay out of the gate's `git add -A`.
-AGENTS.md
+# Codex's local hook wiring — same reasoning as .claude/ above, and this repo is
+# PUBLIC. .codex/ holds machine-local hook wiring and stays untracked.
+#
+# AGENTS.md is TRACKED since 2026-09-03: it is Codex's hand-written, lean, pointer-only
+# instruction file (owner ruling DOC1, 2026-08-14), not the machine-generated
+# Claude->Codex substitution this rule used to describe. That substitution was
+# untracked because nothing should read it; the pointer file exists to be read, so
+# it is versioned and reviewed like CLAUDE.md. It carries nothing internal.
 .codex/
 
 # Claude-facing local reference library (BRAIN_DUMP.md et al.) — local-only, never
