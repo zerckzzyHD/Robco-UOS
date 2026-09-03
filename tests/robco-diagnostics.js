@@ -58974,6 +58974,181 @@ if (!PLANNING_OK) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 268 — the `/queue` "need you" tile measures what it says (chain entry 8)
+//
+//  The tile printed the size of the ⚠️ Attention band under the label "need you".
+//  The band is assigned from the heading glyph alone; no text is consulted. Live
+//  board, 2026-09-03: 16 in the band, 2 of them open owner decisions per the
+//  project's own census, whose total was 29 — wrong in both directions at once.
+//
+//  The fix uses the convention the board already has instead of inventing one:
+//  item DD1's OD-RULE v1, `!PLANNING/tools/owner-decision-census.cjs`, a declared
+//  set cross-checked against this repo's parser, whose done-when says the count is
+//  "a FRACTION with a stated rule, never a bare number". planning-paths.js runs it
+//  as an external read-only program (the /view route's pattern) and parses the
+//  fraction, the drift counts and the row list; the renderer prints the fraction
+//  under "need you — open owner decisions" with the rule and the declared set's
+//  last-edit date, lists the rows, and gives the ⚠️ band its honest name. A census
+//  that cannot run prints UNOBSERVABLE with the reason — never 0, never the band.
+//
+//  Proven on a FIXTURE planning tree (ROBCO_PLANNING_DIR): a stub census printing
+//  a known fraction and rows, then the same tree with the tool absent, then a tool
+//  that SKIPs, then one that prints no fraction. The tile is read from the
+//  RENDERED HTML, not from the object — a count right in code and wrong on the
+//  page is the defect this suite exists to hold shut.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 268 — the /queue "need you" tile measures what it says (OD-RULE v1 census)');
+  const os268 = require('os');
+  const cp268 = require('child_process');
+  const tree268 = fs.mkdtempSync(path.join(os268.tmpdir(), 'robco-planning-268-'));
+  fs.mkdirSync(path.join(tree268, 'tools'));
+  const board268 = [
+    '<!-- GENERATED -->',
+    '## 🔄 Active (1)',
+    '- **A1** — something',
+    '## ⚠️ Attention (3)',
+    '- **B1** — flagged',
+    '- **B2** — flagged',
+    '- **B3** — flagged',
+    '## ⏭️ Ready (2)',
+    '- **C1** — ready',
+    '- **C2** — ready',
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(tree268, 'ROADMAP.md'), board268);
+  fs.writeFileSync(path.join(tree268, 'QUEUE.md'), '# queue\n\n### A1. 🔄 something\n\nbody\n');
+  const stub268 = [
+    "'use strict';",
+    'const arg = process.argv[2];',
+    "if (arg === '--list') {",
+    "  console.log('CS2    T1   blocked   OWNER-ONLY — hosted settings');",
+    "  console.log('OA5    T1   ready     FILED, NOT DECIDED');",
+    "  console.log('R10    T1x  active    finding L — still open');",
+    '  return;',
+    '}',
+    "console.log('OD-RULE v1 — owner-decision-census (READ-ONLY; not a guard)');",
+    "console.log('ON-BOARD open owner decisions .... 3 of 40 ID-bearing items');",
+    "console.log('CLOSED-SINCE ..... 0  (every declared row is still an open item on the board)');",
+    "console.log('⚠ UNDECLARED — 1 owner-shaped heading(s) not in the declared set:');",
+    "console.log('   DV2    ready     OWNER-ONLY, move the credentials');",
+    '',
+  ].join('\n');
+  const stubPath268 = path.join(tree268, 'tools', 'owner-decision-census.cjs');
+  fs.writeFileSync(stubPath268, stub268);
+
+  // Render through a child so ROBCO_PLANNING_DIR is read fresh by the resolver.
+  const render268 = () =>
+    cp268.spawnSync(
+      'node',
+      [
+        '-e',
+        "const p=require('./scripts/planning-paths.js');const v=require('./scripts/report-view.js');" +
+          "process.stdout.write(v.renderQueue(p.readRoadmap(), p.readPlanningFile('QUEUE.md'), p.readOwnerDecisionCensus()));",
+      ],
+      {
+        cwd: ROOT,
+        env: Object.assign({}, process.env, { ROBCO_PLANNING_DIR: tree268 }),
+        encoding: 'utf8',
+      }
+    );
+  const tiles268 = html =>
+    [
+      ...html.matchAll(
+        /<li><span class="n">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
+      ),
+    ].map(m => ({ n: m[1], k: m[2], h: m[3] || '' }));
+
+  const r1 = render268();
+  const t1 = tiles268(r1.stdout);
+  const needYou1 = t1.find(t => /need you/.test(t.k));
+  const flagged1 = t1.find(t => /flagged/.test(t.k));
+  assert(
+    r1.status === 0 && needYou1 && needYou1.n === '3 of 40' && /OD-RULE v1/.test(needYou1.h),
+    '268.1: RENDERED — "need you — open owner decisions" prints the census FRACTION (3 of 40) with the rule named' +
+      (needYou1 ? ` — got "${needYou1.n}" / "${needYou1.h.slice(0, 60)}"` : ' — tile absent')
+  );
+  assert(
+    flagged1 &&
+      flagged1.n === '3' &&
+      /Attention band/.test(flagged1.h) &&
+      !t1.some(t => t.k === 'need you'),
+    '268.2: RENDERED — the ⚠️ band keeps its count (3) under its honest name "flagged ⚠️"; no tile is labelled bare "need you"'
+  );
+  assert(
+    /declared set last edited \d{4}-\d{2}-\d{2}/.test(needYou1 ? needYou1.h : '') &&
+      /1 owner-shaped heading\(s\) not yet declared/.test(needYou1 ? needYou1.h : ''),
+    "268.3: RENDERED — the tile carries the declared set's last-edit date and the UNDECLARED drift count, so the number expires visibly"
+  );
+  assert(
+    /Which 3 of 40/.test(r1.stdout) &&
+      /<code>CS2<\/code>/.test(r1.stdout) &&
+      /<code>R10<\/code>/.test(r1.stdout) &&
+      /OWNER-ONLY — hosted settings/.test(r1.stdout),
+    '268.4: RENDERED — every declared decision is listed by id with its tier, status and evidence phrase'
+  );
+  assert(
+    /Flagged ⚠️ on the heading\. A flag, not a decision count/.test(r1.stdout),
+    '268.5: the Attention band\'s blurb no longer claims the band is "waiting on you"'
+  );
+
+  // absent tool → UNOBSERVABLE with the reason; never 0, never the band
+  fs.rmSync(stubPath268, { force: true });
+  const r2 = render268();
+  const needYou2 = tiles268(r2.stdout).find(t => /need you/.test(t.k));
+  assert(
+    needYou2 &&
+      needYou2.n === 'UNOBSERVABLE' &&
+      /no tools\/owner-decision-census\.cjs/.test(needYou2.h),
+    '268.6: RENDERED — with no census tool in the tree the tile reads UNOBSERVABLE and says why (not 0, not the band size)'
+  );
+
+  // tool that SKIPs → UNOBSERVABLE with the tool's own reason
+  fs.writeFileSync(
+    stubPath268,
+    "console.log('owner-decision-census: SKIP — parser not reachable at nowhere');\n"
+  );
+  const r3 = render268();
+  const needYou3 = tiles268(r3.stdout).find(t => /need you/.test(t.k));
+  assert(
+    needYou3 &&
+      needYou3.n === 'UNOBSERVABLE' &&
+      /census skipped: parser not reachable/.test(needYou3.h),
+    "268.7: RENDERED — a census that SKIPs is UNOBSERVABLE with the census's own reason"
+  );
+
+  // tool that prints no fraction → UNOBSERVABLE
+  fs.writeFileSync(stubPath268, "console.log('something else entirely');\n");
+  const r4 = render268();
+  const needYou4 = tiles268(r4.stdout).find(t => /need you/.test(t.k));
+  assert(
+    needYou4 && needYou4.n === 'UNOBSERVABLE' && /no fraction line/.test(needYou4.h),
+    '268.8: RENDERED — output without the fraction line is UNOBSERVABLE, not parsed into a number'
+  );
+
+  // static: the band size is no longer under the "need you" label anywhere in the renderer
+  const rv268 = fs.readFileSync(path.join(ROOT, 'scripts', 'report-view.js'), 'utf8');
+  assert(
+    !/stat\(\s*n\('Attention'\),\s*'need you'/.test(rv268) &&
+      /stat\(\s*n\('Attention'\),\s*'flagged ⚠️'/.test(rv268),
+    '268.9: the renderer no longer prints the Attention band under "need you"; the band tile is labelled "flagged ⚠️"'
+  );
+  const pp268 = fs.readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8');
+  assert(
+    /owner-decision-census\.cjs/.test(pp268) &&
+      /ROBCO_APP_DIR/.test(pp268) &&
+      !/BOARD\s*=\s*\[/.test(pp268),
+    "268.10: the resolver runs the planning tree's census with this repo handed over as the parser source, and carries NO declared set of its own (one vocabulary, in the archive)"
+  );
+
+  try {
+    fs.rmSync(tree268, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  } catch {
+    /* harmless leftover */
+  }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════

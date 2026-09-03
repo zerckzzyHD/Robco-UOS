@@ -1,4 +1,4 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r52 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r53 -->
 
 ### Added
 
@@ -9,6 +9,7 @@
 
 - The developer's private reports page said "newest first" and was not: it sorted the file names alphabetically backwards, so a report from August 24th sat at the top while the September 1st one was sixth. It now orders by the date written into each report's name, newest at the top, and a report with no date in its name takes its place by when the file was last written. A test now holds the order.
 - Two places said the local development server does not survive a reboot or the machine sleeping. Neither has been true for a while: a logon trigger brings it back after a reboot, and this machine's sleep keeps the process running and only drops the network. Both descriptions now say what actually ends it (hibernation, or stopping it by hand) and what merely breaks the address while it lives.
+- The private queue page's "need you" number was counting the wrong thing. It printed how many items on the board carried a warning flag in their heading, under a label that promised the number of decisions waiting on the owner. Measured on the live board: sixteen flagged items, two of which were decisions, while the project's own decision census listed twenty-nine — wrong in both directions at once. The tile now runs that census (the one the board already keeps, with a stated rule) and prints its fraction, names the rule, shows the date the declared list was last edited so the number visibly ages, lists every counted decision with the evidence for it, and flags any decision-shaped item the census has not yet ruled on. The flag count is still shown, under its honest name. When the census cannot be run the tile says so instead of showing a zero.
 - Written down, in the one place someone would look for it, that asking the development server for `/index.html` sends you into the terminal app rather than the landing page. That is the web tooling's own behaviour, not a rule of ours, and it is harmless; it just was not documented.
 
 ### Under the Hood

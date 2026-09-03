@@ -322,7 +322,14 @@ function queueRoute() {
           req,
           res,
           200,
-          view.renderQueue(paths.readRoadmap(), paths.readPlanningFile('QUEUE.md'))
+          view.renderQueue(
+            paths.readRoadmap(),
+            paths.readPlanningFile('QUEUE.md'),
+            // The "need you" tile: the planning tree's own owner-decision census
+            // (OD-RULE v1), run fresh per visit like the projection renderer —
+            // never the ⚠️ band's size again.
+            paths.readOwnerDecisionCensus()
+          )
         );
       });
     },

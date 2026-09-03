@@ -251,6 +251,122 @@ function readRoadmap() {
   }
 }
 
+/**
+ * ── OPEN OWNER DECISIONS — read from the planning tree's OWN census, never derived here ──
+ *
+ * ⛔⛤ THE BOARD HAS NO MACHINE-READABLE MARKER FOR "OPEN OWNER DECISION". The
+ * `/queue` tile used to print the size of the ⚠️ Attention band under the label
+ * "need you". Measured 2026-09-03 on the live board: the band held 16 rows, of
+ * which the project's own census counted 2 as open owner decisions — and the
+ * census's total was 29. A count wrong in both directions at once, under the one
+ * label the owner reads to decide whether anything is waiting on him.
+ *
+ * ⭐ THE CONVENTION ALREADY EXISTS AND IS USED, NOT REINVENTED: item DD1's rule
+ * (OD-RULE v1) lives in `!PLANNING/tools/owner-decision-census.cjs` — a declared
+ * set of ids, each with an evidence phrase, cross-checked against THIS repo's
+ * parser on every run, reporting CLOSED-SINCE (a declared id no longer open) and
+ * UNDECLARED (an owner-shaped heading not in the set) as drift. DD1's done-when:
+ * "the count is a FRACTION with a stated rule, never a bare number." So this reads
+ * that fraction, from that tool, and the tile prints it with the rule and the
+ * date the declared set was last edited.
+ *
+ * ⛔ WHAT THIS CANNOT DO, said where the number is made: the declared set is
+ * HAND-MAINTAINED in the archive. The count moves only when someone edits that
+ * table. If a decision is ruled and the row stays, the tile keeps counting it;
+ * if a new decision is filed and no row is added, the tile misses it unless the
+ * heading is owner-shaped enough for the UNDECLARED scan to catch. Both drift
+ * signals are surfaced on the tile rather than hidden, and the tool's last-edit
+ * date is printed so the number expires visibly.
+ *
+ * Runs the tool as an EXTERNAL read-only program per request (the `/view` route's
+ * pattern), from the planning tree, with this repo's path handed over so the
+ * tool imports the same parser the board is built with. Never throws; every
+ * failure is `{ observable: false, why }` — a tile that cannot measure says so.
+ */
+function ownerDecisionCensusPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'owner-decision-census.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+const CENSUS_FRACTION_RE = /ON-BOARD open owner decisions\s*\.*\s*(\d+) of (\d+) ID-bearing items/;
+const CENSUS_ROW_RE = /^(\S+)\s+(T1x?)\s+(\S+)\s+(.*)$/;
+
+function runCensus(tool, args) {
+  const { spawnSync } = require('child_process');
+  const env = {};
+  for (const k of Object.keys(process.env)) env[k] = process.env[k];
+  env.ROBCO_APP_DIR = REPO_ROOT;
+  const r = spawnSync(process.execPath, [tool, ...args], {
+    cwd: path.dirname(tool),
+    env,
+    encoding: 'utf8',
+    timeout: 20000,
+    windowsHide: true,
+  });
+  if (r.error) return { ok: false, out: '', why: String(r.error.message || r.error) };
+  if (r.status !== 0)
+    return {
+      ok: false,
+      out: r.stdout || '',
+      why: 'exit ' + r.status + ' ' + (r.stderr || '').trim(),
+    };
+  return { ok: true, out: r.stdout || '', why: null };
+}
+
+function readOwnerDecisionCensus() {
+  const tool = ownerDecisionCensusPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/owner-decision-census.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  let editedAt;
+  try {
+    editedAt = fs.statSync(tool).mtime;
+  } catch {
+    editedAt = null;
+  }
+  const main = runCensus(tool, []);
+  if (!main.ok) return { observable: false, why: 'census did not run: ' + main.why };
+  if (/^owner-decision-census: SKIP/m.test(main.out)) {
+    const m = main.out.match(/SKIP — (.*)$/m);
+    return {
+      observable: false,
+      why: 'census skipped: ' + (m ? m[1].trim() : 'reason not printed'),
+    };
+  }
+  const frac = main.out.match(CENSUS_FRACTION_RE);
+  if (!frac) return { observable: false, why: 'census output carried no fraction line' };
+  const closedSince = (main.out.match(/^\s+(\S+)\s+(NOT PARSED|status is done)/gm) || []).length;
+  const undeclaredM = main.out.match(/UNDECLARED — (\d+) owner-shaped/);
+  const undeclared = undeclaredM ? Number(undeclaredM[1]) : 0;
+  const list = runCensus(tool, ['--list']);
+  const rows = [];
+  if (list.ok) {
+    for (const line of list.out.split('\n')) {
+      const m = line.match(CENSUS_ROW_RE);
+      if (m) rows.push({ id: m[1], tier: m[2], status: m[3], evidence: m[4].trim() });
+    }
+  }
+  return {
+    observable: true,
+    count: Number(frac[1]),
+    total: Number(frac[2]),
+    rows,
+    rowsObservable: list.ok,
+    closedSince,
+    undeclared,
+    editedAt,
+    rule: 'OD-RULE v1',
+    tool,
+  };
+}
+
 /** The reports-tree counterpart of describe() — printed next to any empty state. */
 function describeReports() {
   const dir = reportsDir();
@@ -297,4 +413,7 @@ module.exports = {
   readReport,
   readRoadmap,
   describeReports,
+  // The planning tree's own owner-decision census (OD-RULE v1) — resolved and RUN, never derived here.
+  ownerDecisionCensusPath,
+  readOwnerDecisionCensus,
 };

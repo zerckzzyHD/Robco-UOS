@@ -305,7 +305,8 @@ const BAND_ORDER = [
 const BAND_OPEN = new Set();
 const BAND_BLURB = {
   Active: 'Being worked on right now.',
-  Attention: 'Waiting on you — a decision, a ruling, or a question to answer.',
+  Attention:
+    'Flagged ⚠️ on the heading. A flag, not a decision count: the open owner decisions are counted above, from the census, and most of them are not in this band.',
   Ready: 'Specified and unblocked. Could be started next.',
   Deferred: 'Deliberately put off, with a reason.',
   Parked: 'Stopped on purpose. Not abandoned, not scheduled.',
@@ -385,7 +386,7 @@ function closedOverWholeQueue(queueMd) {
  * @param {string} md   the generated board, read fresh
  * @param {Date}   when when it was last regenerated
  */
-function renderRoadmapSection(md, when, queueMd) {
+function renderRoadmapSection(md, when, queueMd, census) {
   // ⛔ Required here, not at module load, for the same reason as the rule above:
   // this is the only place the board generator is needed, and importing it is how
   // one definition of "does the board match the queue" stays one definition.
@@ -453,10 +454,40 @@ function renderRoadmapSection(md, when, queueMd) {
   // required at all. A number wrong in both directions, under a label stating the
   // project's central question, is worse than no number — so it now says what it
   // measures and nothing more.
+  // ⛔⛤ "NEED YOU" USED TO PRINT THE SIZE OF THE ⚠️ BAND. The parser assigns the band
+  // from the heading glyph and consults no text, so the number was "how many items
+  // lead with ⚠️" wearing the label "how many decisions are waiting on you".
+  // Measured 2026-09-03 on the live board: 16 in the band, of which the project's
+  // own census counted 2 as open owner decisions; the census's total was 29. Wrong
+  // in both directions at once, under the one label the owner reads to decide
+  // whether to act. ⭐ The fix is to MEASURE WHAT THE LABEL SAYS: the number now
+  // comes from the planning tree's owner-decision census (item DD1, OD-RULE v1 —
+  // a declared set cross-checked against the live parser), printed as the
+  // FRACTION that rule requires, with the rule named and the date the declared
+  // set was last edited, so the number expires visibly. The ⚠️ band keeps its
+  // count under its honest name. ⛔ A census that cannot be run prints
+  // UNOBSERVABLE with the reason — never 0, never the band's size again.
+  const cz = census || { observable: false, why: 'no census was handed to the renderer' };
+  const editedStamp =
+    cz.observable && cz.editedAt ? String(cz.editedAt.toISOString()).slice(0, 10) : null;
+  const censusHint = cz.observable
+    ? `${cz.rule}: declared in the census, cross-checked open on the board · declared set last edited ${editedStamp || 'unknown'}` +
+      (cz.closedSince ? ` · ⛔ ${cz.closedSince} declared row(s) no longer open` : '') +
+      (cz.undeclared ? ` · ⚠ ${cz.undeclared} owner-shaped heading(s) not yet declared` : '')
+    : `not measured — ${cz.why}`;
   const counts =
     `<ul class="stats">` +
     stat(n('Active'), 'being worked on now', 'started, not finished') +
-    stat(n('Attention'), 'need you', 'flagged as waiting on you') +
+    stat(
+      cz.observable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
+      'need you — open owner decisions',
+      censusHint
+    ) +
+    stat(
+      n('Attention'),
+      'flagged ⚠️',
+      'the Attention band — a flag on the heading, not a decision count'
+    ) +
     stat(n('Ready'), 'startable now', 'specified and unblocked') +
     stat(inMotion, 'startable or in flight', 'active + ready — a workload, not a finish line') +
     stat(
@@ -480,6 +511,26 @@ function renderRoadmapSection(md, when, queueMd) {
         `<p class="note">Each of these leads with the done-mark while still filed in the open queue. ` +
         `Read across every item, not only the ones this board lists.</p></details>`
       : '';
+
+  // The owner asked for a MONITOR, and a number he cannot open is a number he
+  // cannot check. Every declared decision is listed with its tier and the
+  // evidence phrase the census carries for it, so a stale row is visible at a
+  // glance rather than buried in a count.
+  const decisionList =
+    cz.observable && cz.rowsObservable && cz.rows.length
+      ? `<details class="drift"><summary>Which ${cz.rows.length} of ${cz.total} — the declared open owner decisions</summary>` +
+        `<ul>${cz.rows
+          .map(
+            r =>
+              `<li><code>${escapeHtml(r.id)}</code> <span class="c">${escapeHtml(r.tier)} · ${escapeHtml(r.status)}</span> — ${escapeHtml(r.evidence)}</li>`
+          )
+          .join('')}</ul>` +
+        `<p class="note">Declared in the planning tree's census with an evidence phrase each; the census ` +
+        `re-checks on every run that the item is still open on the board. A ruled decision whose row ` +
+        `was not removed still appears here — that is the list to prune, not a number to trust.</p></details>`
+      : cz.observable && !cz.rowsObservable
+        ? `<p class="note stale">⛔ The census reported a count but its row list could not be read; the number above stands, the names do not.</p>`
+        : '';
 
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
     .map(k => {
@@ -540,6 +591,7 @@ function renderRoadmapSection(md, when, queueMd) {
     `<h1 id="queue">The queue</h1>` +
     currencyLine +
     counts +
+    decisionList +
     disagreeList +
     `<h2>The whole board</h2>` +
     `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
@@ -557,9 +609,9 @@ function renderRoadmapSection(md, when, queueMd) {
  * board, and it goes with the split. "What needs you" is the Attention count and
  * band on this page — it is not duplicated anywhere else.
  */
-function renderQueue(board, queueMd) {
+function renderQueue(board, queueMd, census) {
   const body = board
-    ? renderRoadmapSection(board.text, board.mtime, queueMd)
+    ? renderRoadmapSection(board.text, board.mtime, queueMd, census)
     : `<h1 id="queue">The queue</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
