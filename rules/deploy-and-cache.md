@@ -76,6 +76,18 @@ removed in a refactor — Protocol 20, in `rules/testing-and-gates.md`.
 
 ---
 
+**Finding (2026-09-03) — a `404` at `/sw.js` does NOT clear an existing registration.** Measured on
+2026-09-01, when the tailnet dev origin's root briefly changed hands: the root answered `404` for `/sw.js`, and a
+phone holding the app's old root-scope registration kept rendering the cached shell (unstyled, because its
+relative asset paths now resolved to nothing) until site data was cleared by hand. With an active worker already
+installed, a failed update check leaves that worker in place. ⭐ What clears it is serving **different bytes at
+the same URL** — a worker with no `fetch` handler that deletes every cache, calls `registration.unregister()`,
+and reloads its clients. That is what the dev server now serves at its root `/sw.js`
+(`scripts/sw-killswitch.js`); the app's own worker lives under `/terminal/sw.js` and is untouched. ⛔ This is a
+dev-origin concern only — production's worker still lives at its origin root and Protocol 1 governs it — but the
+assumption _"just 404 the old worker"_ is the sort of thing the next person will make too, so it is recorded here.
+Queue item `DS10` asks for the gate test that keeps the app's worker cache-match-or-network.
+
 ## Environment split (staging vs production)
 
 `scripts/cf-staging-build.mjs` stamps the staged `index.html` with an explicit staging marker
