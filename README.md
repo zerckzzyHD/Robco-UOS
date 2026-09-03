@@ -239,6 +239,7 @@ CRT scanlines, phosphor persistence ghosting, thermal-load tint while the Direct
 ├── ARCHITECTURE.md         Full system dependency map & patterns
 ├── CHANGELOG.md            Version history (in-app FIRMWARE REVISION LOG reads this)
 ├── CLAUDE.md               Agent rulebook — the universal contract + the retrieval map
+├── SPINE.md                The shared facts, written once: repo map, visibility, doctrine sentences, canonical file locations (every instruction file points here)
 ├── rules/                  Subsystem rule notes, loaded only when that surface is touched
 │   ├── state-and-save.md      State fields, saves, migration, durability
 │   ├── deploy-and-cache.md    Service worker, CACHE_NAME, deploy verification

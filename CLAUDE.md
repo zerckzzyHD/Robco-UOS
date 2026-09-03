@@ -60,6 +60,7 @@ Small map of where the deeper reference lives, so a session is auto-directed rat
 
 | Need | Where to look |
 | ---- | ------------- |
+| **The shared facts** — the repo map (folder → remote → visibility → role), the doctrine sentences, and where every canonical file lives | `SPINE.md` (this repo root) — **the ONE home**, per the owner's `DOC1` ruling (2026-08-14; placed 2026-09-03). Every `CLAUDE.md` and `AGENTS.md` in the RobCo repos points there and none restates it. ⛔ Do not copy its rows into this file or any other: a second copy is where drift lives |
 | **Full project reconstruction** — what the app IS, the architecture, the state shape, every subsystem, the protocols and WHY each exists, the recurring gotchas, the owner's hard rules, the workflow, the roadmap | `library/BRAIN_DUMP.md` (gitignored, local-only, Claude-facing — read it from disk) |
 | **Current roadmap / what's built vs. next** (phone-readable) | ⛔ **PRIVATE, and no longer in this repo** — `_RobCo-Archive/!PLANNING/QUEUE.md` (the QUEUE only); full accounts of shipped/ruled-out work in `_RobCo-Archive/!PLANNING/QUEUE_LOG.md` (append-only archive); the directional mirror in `_RobCo-Archive/!PLANNING/NORTH_STARS.md`. See the standing note directly below. |
 | **North Stars** — the directional commitments the queue serves | `_RobCo-Archive/!PLANNING/NORTH_STARS.md` — a **mirror** of queue truth, never a second roadmap; where it and `QUEUE.md` disagree, `QUEUE.md` wins |

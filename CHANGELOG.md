@@ -1,4 +1,8 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r49 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r50 -->
+
+### Added
+
+- A single "spine" file at the project root that holds, once, the facts every agent instruction file used to repeat: which folder is which repository on GitHub, whether each is public or private (measured, with the date), the handful of principles everything else follows from, and where the planning, memory and reference files actually live. A survey on September 3rd found that map written in six places, disagreeing about which sites were public. From now on the instruction files point at the spine instead of restating it, so there is one place to correct and nothing left to drift. The owner ruled the shape on August 14th and the placement, one spine per project inside its own repository, on September 3rd; Mist got its own the same day.
 
 ### Fixed
 
