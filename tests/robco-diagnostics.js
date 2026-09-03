@@ -58834,6 +58834,109 @@ if (!PLANNING_OK) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 267 — three labels that lied (2026-09-03): the report order, the
+//  dev-server's survival claim, and an undocumented redirect
+//
+//  `/reports` said "newest first" and sorted NAMES alphabetically-descending, so
+//  OVERNIGHT-REPORT-2026-08-24 led and DISPATCH-RUNNING-REPORT-2026-09-01 came
+//  sixth. `scripts/dev-server.js`'s header and its ARCHITECTURE.md File Map line
+//  both said the server survives neither a reboot nor sleep — false since the
+//  logon trigger and Suite 249.8's sleep measurement. `/index.html` 302s into the
+//  app via Vite's base middleware and nothing said so. Each is locked here:
+//  behaviourally for the sort (a fixture directory under ROBCO_REPORTS_DIR),
+//  statically for the two prose claims and the redirect note.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 267 — three labels that lied: report order, survival claim, undocumented redirect');
+  const os267 = require('os');
+  const cp267 = require('child_process');
+
+  // 267.1 behavioural: date-in-name descending, dateless names by mtime, stable ties.
+  const dir267 = fs.mkdtempSync(path.join(os267.tmpdir(), 'robco-reports-267-'));
+  const names267 = [
+    'OVERNIGHT-REPORT-2026-08-24.md',
+    'DISPATCH-RUNNING-REPORT-2026-09-01.md',
+    'DAY-REPORT-2026-08-25.md',
+    'MORNING-REPORT-2026-08-25.md',
+    'WALKTHROUGH.md', // no date in the name → its mtime decides
+  ];
+  for (const n of names267) fs.writeFileSync(path.join(dir267, n), '# x\n');
+  const old267 = new Date('2026-08-20T00:00:00Z');
+  fs.utimesSync(path.join(dir267, 'WALKTHROUGH.md'), old267, old267);
+  const listed267 = cp267.spawnSync(
+    'node',
+    ['-e', "console.log(JSON.stringify(require('./scripts/planning-paths.js').listReports()))"],
+    {
+      cwd: ROOT,
+      env: Object.assign({}, process.env, { ROBCO_REPORTS_DIR: dir267 }),
+      encoding: 'utf8',
+    }
+  );
+  let order267;
+  try {
+    order267 = JSON.parse(listed267.stdout.trim());
+  } catch {
+    order267 = [];
+  }
+  assert(
+    JSON.stringify(order267) ===
+      JSON.stringify([
+        'DISPATCH-RUNNING-REPORT-2026-09-01.md',
+        'DAY-REPORT-2026-08-25.md',
+        'MORNING-REPORT-2026-08-25.md',
+        'OVERNIGHT-REPORT-2026-08-24.md',
+        'WALKTHROUGH.md',
+      ]),
+    '267.1: listReports() is newest FIRST by the date in the name (Sep 1 above Aug 24 whatever the initial letter), ties stable by name, a dateless name placed by its mtime — got ' +
+      order267.join(' ')
+  );
+  // Comments stripped first: the fix's own header quotes the old expression by name.
+  const ppCode267 = fs
+    .readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  assert(
+    !/\.sort\(\)\s*\.reverse\(\)/.test(ppCode267),
+    '267.2: the alphabetical `.sort().reverse()` that produced the wrong order is gone from planning-paths.js (code, comments excluded)'
+  );
+  try {
+    fs.rmSync(dir267, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  } catch {
+    /* harmless leftover */
+  }
+
+  // 267.3 / 267.4 static: the survival claim is corrected in both places it was made.
+  const devSrv267 = fs.readFileSync(path.join(ROOT, 'scripts', 'dev-server.js'), 'utf8');
+  const devHeader267 = devSrv267.slice(0, devSrv267.indexOf('const { spawn, spawnSync }'));
+  assert(
+    !/DOES NOT SURVIVE[^\n]*\n[^\n]*reboot, the machine sleeping/.test(devHeader267) &&
+      /REBOOT, once the logon trigger/.test(devHeader267) &&
+      /HIBERNATE/.test(devHeader267) &&
+      /Suite 249\.8/.test(devHeader267),
+    '267.3: dev-server.js header no longer claims the server survives neither reboot nor sleep — it names the trigger, the S0-sleep measurement, and hibernate as the real ending'
+  );
+  const archLine267 =
+    fs
+      .readFileSync(path.join(ROOT, 'ARCHITECTURE.md'), 'utf8')
+      .split('\n')
+      .find(l => /dev-server\.js\s/.test(l)) || '';
+  assert(
+    !/does not survive a reboot, sleep/.test(archLine267) &&
+      /comes back after a REBOOT/.test(archLine267) &&
+      /SLEEP \(S0 idle\) keeps the process/.test(archLine267),
+    '267.4: the ARCHITECTURE.md File Map line for dev-server.js carries the corrected survival claim'
+  );
+
+  // 267.5 static: the Vite-issued /index.html redirect is written down where the redirect table lives.
+  const cfg267 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  assert(
+    /`\/index\.html`\s*\n?\s*\*?\s*302s to `\/terminal\/`/.test(cfg267.replace(/\n \* /g, ' ')) ||
+      /\/index\.html[^\n]*302s to `\/terminal\/`/.test(cfg267),
+    '267.5: vite.config.mjs documents that `/index.html` 302s to `/terminal/` (Vite base middleware, not the redirect table)'
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════

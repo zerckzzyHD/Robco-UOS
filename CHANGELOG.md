@@ -1,4 +1,10 @@
-## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r48 -->
+## [Unreleased]<!-- Cache: robco-terminal-v2.8.5-r49 -->
+
+### Fixed
+
+- The developer's private reports page said "newest first" and was not: it sorted the file names alphabetically backwards, so a report from August 24th sat at the top while the September 1st one was sixth. It now orders by the date written into each report's name, newest at the top, and a report with no date in its name takes its place by when the file was last written. A test now holds the order.
+- Two places said the local development server does not survive a reboot or the machine sleeping. Neither has been true for a while: a logon trigger brings it back after a reboot, and this machine's sleep keeps the process running and only drops the network. Both descriptions now say what actually ends it (hibernation, or stopping it by hand) and what merely breaks the address while it lives.
+- Written down, in the one place someone would look for it, that asking the development server for `/index.html` sends you into the terminal app rather than the landing page. That is the web tooling's own behaviour, not a rule of ours, and it is harmless; it just was not documented.
 
 ### Under the Hood
 

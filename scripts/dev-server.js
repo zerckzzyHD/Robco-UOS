@@ -29,9 +29,16 @@
  * loudly when it is not `dev`. It NEVER checks out, switches or stashes anything -- the
  * repo state belongs to whoever is working in it.
  *
- * WHAT IT DOES NOT SURVIVE (printed by printBounds): a reboot, the machine sleeping, or
- * Tailscale dropping. This is a convenience wrapper around a foreground process, not a
- * service, and it deliberately does not pretend otherwise.
+ * WHAT IT SURVIVES, AND WHAT IT DOES NOT (printBounds() prints the live, measured
+ * version of this): the SSH tab closing (detached). A REBOOT, once the logon trigger
+ * (`npm run dev:autostart`) is installed — it comes back at the next logon. SLEEP on
+ * this machine — the only standby state is S0 low-power idle, which keeps the process;
+ * only the network drops (Suite 249.8). What genuinely ends it: HIBERNATE (waking from
+ * hibernate is not a logon, so the trigger cannot cover it), and a hand stop. What
+ * makes the URL dead while the process lives: Tailscale dropping, or the network in
+ * standby. ⛔ This header used to say flatly "does not survive a reboot or sleep" —
+ * both false since the trigger and the sleep measurement, corrected 2026-09-03; a
+ * stale caveat is believed, so printBounds() derives its text rather than trusting this.
  */
 
 const { spawn, spawnSync } = require('child_process');

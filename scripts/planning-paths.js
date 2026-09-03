@@ -179,7 +179,26 @@ function reportFile(name) {
   return safeIsFile(full) ? full : null;
 }
 
-/** The available report basenames, newest-looking first. Never throws. */
+/**
+ * The available report basenames, NEWEST FIRST — by the date in the name.
+ *
+ * ⛔ This used to be `.sort().reverse()`: alphabetical-descending on the NAME, which
+ * put OVERNIGHT-REPORT-2026-08-24 above DISPATCH-RUNNING-REPORT-2026-09-01 because
+ * "O" sorts after "D" — while the page above it said "newest first". Measured
+ * 2026-09-03 with the Aug 24 report first and the Sep 1 report sixth. The order is
+ * now the ISO date embedded in the name, descending; a name with no date falls
+ * back to the file's mtime; ties break by name so the list is stable. Suite 267.
+ */
+const REPORT_DATE_RE = /(\d{4}-\d{2}-\d{2})/;
+function reportSortKey(dir, name) {
+  const m = REPORT_DATE_RE.exec(name);
+  if (m) return m[1];
+  try {
+    return fs.statSync(path.join(dir, name)).mtime.toISOString().slice(0, 10);
+  } catch {
+    return '0000-00-00';
+  }
+}
 function listReports() {
   const dir = reportsDir();
   if (!dir) return [];
@@ -187,8 +206,9 @@ function listReports() {
     return fs
       .readdirSync(dir)
       .filter(n => REPORT_NAME_RE.test(n) && safeIsFile(path.join(dir, n)))
-      .sort()
-      .reverse();
+      .map(n => ({ n, k: reportSortKey(dir, n) }))
+      .sort((a, b) => (a.k === b.k ? a.n.localeCompare(b.n) : a.k < b.k ? 1 : -1))
+      .map(x => x.n);
   } catch {
     return [];
   }

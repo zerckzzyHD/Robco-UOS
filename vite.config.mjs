@@ -160,6 +160,11 @@ function sendPlain(req, res, code, text, extraHeaders) {
  *
  * ⛔ A redirect target is never itself a redirect, and never a path Vite would
  * fall through on. Suite 265 checks the table against the handlers.
+ *
+ * ⚠ One redirect is NOT in this table because Vite issues it, not us: `/index.html`
+ * 302s to `/terminal/`. The landing handler takes `/` only, so a request for the
+ * root's `index.html` falls through to Vite's base middleware, which sends any
+ * off-base path to `base`. Harmless (it lands in the app), measured 2026-09-03.
  */
 const REDIRECTS = Object.freeze({
   '/home': '/',
