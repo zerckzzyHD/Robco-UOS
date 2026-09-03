@@ -302,21 +302,45 @@ function worktreeList(cwd) {
   return { observable: true, worktrees: out };
 }
 
+/**
+ * ⛔ EPERM IS NOT "PRESENT" ON WINDOWS. Measured 2026-09-03 after a reboot: two
+ * session records from before the boot named pids 5396 and 5560; `Get-Process`
+ * said both were GONE, and `process.kill(pid, 0)` threw EPERM for both — the
+ * numbers had been handed to processes this user may not open. The first draft
+ * read EPERM as "present" and reported two live writers in repos that had none.
+ * EPERM now reads as INCONCLUSIVE, and the boot-time rule below settles the
+ * pre-reboot case outright.
+ */
 function pidPresent(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return 'unknown';
   try {
     process.kill(pid, 0);
     return 'present';
   } catch (e) {
-    if (e && e.code === 'EPERM') return 'present';
+    if (e && e.code === 'EPERM') return 'inconclusive';
     if (e && e.code === 'ESRCH') return 'gone';
     return 'unknown';
   }
 }
 
-/** Claude Code sessions whose cwd is inside any of `roots`. */
+/** When this machine last booted, from os.uptime() — no shell, no WMI. */
+function bootTimeMs() {
+  return Date.now() - os.uptime() * 1000;
+}
+
+/**
+ * Claude Code sessions whose cwd is inside any of `roots`.
+ *
+ * ⭐ A record whose `startedAt` predates the machine's boot cannot be a live
+ * session whatever its pid says — the process it describes died with the
+ * previous boot, and the pid may since have been recycled. Such a record is
+ * reported STALE (predates boot) and never counted as a writer. `ROBCO_CLAUDE_SESSIONS_DIR`
+ * exists so Suite 266 can prove this on a fixture instead of the real store.
+ */
 function claudeSessions(roots) {
-  const dir = path.join(os.homedir(), '.claude', 'sessions');
+  const dir =
+    process.env.ROBCO_CLAUDE_SESSIONS_DIR || path.join(os.homedir(), '.claude', 'sessions');
+  const boot = bootTimeMs();
   if (!safeStat(dir))
     return {
       observable: true,
@@ -343,6 +367,7 @@ function claudeSessions(roots) {
     if (!rec || !rec.cwd) continue;
     const inRoot = roots.find(r => isInside(rec.cwd, r));
     if (!inRoot) continue;
+    const predatesBoot = typeof rec.startedAt === 'number' && rec.startedAt < boot;
     sessions.push({
       kind: 'claude',
       pid: rec.pid,
@@ -350,7 +375,8 @@ function claudeSessions(roots) {
       root: inRoot,
       startedAt: rec.startedAt ? new Date(rec.startedAt).toISOString() : null,
       name: rec.name || null,
-      liveness: pidPresent(rec.pid),
+      liveness: predatesBoot ? 'stale' : pidPresent(rec.pid),
+      predatesBoot,
     });
   }
   return { observable: true, sessions };

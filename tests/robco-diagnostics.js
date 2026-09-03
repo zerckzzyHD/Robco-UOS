@@ -58815,6 +58815,43 @@ if (!PLANNING_OK) {
       '266.24: git unavailable — guard fails CLOSED with exit 2, preflight still exits 0'
     );
 
+    // ── writers: a session record from BEFORE this boot is STALE, whatever its pid says ──
+    // Measured 2026-09-03 after a reboot: two pre-boot records named pids that
+    // `Get-Process` could not find, yet `process.kill(pid, 0)` threw EPERM and the
+    // first draft printed them as PRESENT writers in repos that had none.
+    const sess266 = fs.mkdtempSync(path.join(os266.tmpdir(), 'robco-sessions-266-'));
+    const boot266 = Date.now() - os266.uptime() * 1000;
+    fs.writeFileSync(
+      path.join(sess266, '4242.json'),
+      JSON.stringify({ pid: 4242, cwd: wt266, startedAt: boot266 - 3600 * 1000 })
+    );
+    fs.writeFileSync(
+      path.join(sess266, String(process.pid) + '.json'),
+      JSON.stringify({ pid: process.pid, cwd: wt266, startedAt: boot266 + 60 * 1000 })
+    );
+    const preSess = run266(preP266, wt266, { ROBCO_CLAUDE_SESSIONS_DIR: sess266 });
+    assert(
+      preSess.status === 0 &&
+        /claude pid 4242\s+STALE \(record predates this boot/.test(preSess.stdout) &&
+        new RegExp('claude pid ' + process.pid + '\\s+PRESENT').test(preSess.stdout) &&
+        !/a Claude session \(pid 4242\)/.test(preSess.stdout) &&
+        new RegExp('a Claude session \\(pid ' + process.pid + '\\) is in this repository').test(
+          preSess.stdout
+        ),
+      '266.25: a session record older than the boot is printed STALE and never counted as a writer; a post-boot record whose pid is alive is PRESENT and counted'
+    );
+    const stateSrcNow266 = fs.readFileSync(stateP266, 'utf8');
+    assert(
+      /EPERM'\)\s*return 'inconclusive'/.test(stateSrcNow266) &&
+        !/EPERM'\)\s*return 'present'/.test(stateSrcNow266),
+      '266.26: EPERM from the pid probe reads as INCONCLUSIVE, never as present (Windows hands dead pids to processes this user cannot open)'
+    );
+    try {
+      fs.rmSync(sess266, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    } catch {
+      /* harmless leftover */
+    }
+
     // cleanup (worktree dirs can hold handles briefly on Windows — retry, then give up silently:
     // a leftover temp dir is harmless; a FATAL that measures nothing is not — Protocol 42)
     for (const d of [norepo266]) {

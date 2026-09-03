@@ -208,13 +208,19 @@ function main() {
             s.pid +
             '  ' +
             s.liveness.toUpperCase() +
-            (s.liveness === 'present' ? ' (pid present — identity not verified)' : '') +
+            (s.liveness === 'present'
+              ? ' (pid present — identity not verified)'
+              : s.liveness === 'stale'
+                ? ' (record predates this boot — the process died with the previous boot)'
+                : s.liveness === 'inconclusive'
+                  ? ' (pid check answered EPERM — may be recycled; not counted as a writer)'
+                  : '') +
             '  cwd ' +
             s.cwd +
             (s.startedAt ? '  started ' + s.startedAt : '') +
             here
         );
-        if (s.liveness !== 'gone')
+        if (s.liveness === 'present')
           moving.push('a Claude session (pid ' + s.pid + ') is in this repository');
       } else {
         say(
