@@ -57822,6 +57822,11 @@ if (!PLANNING_OK) {
           'library/knowledge-graph.json — a half-written JSON does not parse at all',
         ],
         ['scripts/queue-view.js', 'the phone queue page'],
+        [
+          'scripts/worktree-teardown-guard.js',
+          "the rescue copy of a worktree's uncommitted work (patch + untracked files + receipt) — " +
+            'possibly the ONLY surviving copy, written outside every repo (Suite 266)',
+        ],
         ['tests/arch-conformance-check.js', 'the Protocol 23 baseline — the Protocol 49 keep-case'],
         ['tests/a11y-check.mjs', 'the tracked a11y baseline'],
       ];
@@ -58506,6 +58511,327 @@ if (!PLANNING_OK) {
     '265.5: the landing page links exactly the canonical paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
       ` — got ${hrefs265.join(' ')}`
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 266 — Codex worktree hooks: preflight (setup) + teardown guard (cleanup)
+//
+//  Two scripts that Codex's local-environment setup/cleanup boxes point at with
+//  ONE LINE each, so the logic is versioned and gate-tested instead of typed into
+//  a vendor text box with no git history (the file class that produced this
+//  week's instruction-layer failures). `scripts/worktree-state.js` is the shared
+//  read-only measurement; `worktree-preflight.js` REPORTS and never refuses
+//  (a setup hook that fails blocks worktree creation); `worktree-teardown-guard.js`
+//  REFUSES fail-closed (exit 1 = uncommitted work named, exit 2 = unobservable)
+//  and copies the endangered work out before returning, because whether Codex
+//  honours the exit code is unverified (its header says so).
+//
+//  The incident: `C:\Dev\_wt-af14` held 8 modified + 8 untracked files including a
+//  drafted commit message, in a repository with twelve registered worktrees.
+//
+//  What this suite proves, RED BEFORE GREEN on a throwaway repo + linked worktree:
+//  the guard refuses a dirty tree and names every file (including a renamed one
+//  and one with a space), passes the same tree once cleaned, refuses a detached
+//  HEAD whose commit no ref reaches, refuses on a FRESH index.lock but proceeds
+//  past a stranded old one, refuses a non-repo and a missing git (fail-closed),
+//  and writes the rescue copy + receipt; the preflight exits 0 in every one of
+//  those states, sees the MAIN checkout's dirtiness from inside a worktree; and
+//  neither hook creates an index.lock or touches the index mtime (every git call
+//  is `--no-optional-locks` — a preflight that stranded the lock it reports on
+//  would be the embarrassing bug). Static halves: the flag is prepended in the one
+//  runner, the hooks spawn no git of their own, the preflight has no non-zero
+//  exit, and every git verb the three files use is on a read-only allow-list.
+//  Regression locked here: the first porcelain record's path lost its first
+//  character because the runner trimmed stdout (" M lib/x.js" → "M .js").
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 266 — Codex worktree hooks: preflight (setup) + teardown guard (cleanup)');
+  const os266 = require('os');
+  const cp266 = require('child_process');
+  const stateP266 = path.join(ROOT, 'scripts', 'worktree-state.js');
+  const preP266 = path.join(ROOT, 'scripts', 'worktree-preflight.js');
+  const guardP266 = path.join(ROOT, 'scripts', 'worktree-teardown-guard.js');
+  const stateSrc266 = fs.existsSync(stateP266) ? fs.readFileSync(stateP266, 'utf8') : '';
+  const preSrc266 = fs.existsSync(preP266) ? fs.readFileSync(preP266, 'utf8') : '';
+  const guardSrc266 = fs.existsSync(guardP266) ? fs.readFileSync(guardP266, 'utf8') : '';
+
+  assert(
+    stateSrc266 && preSrc266 && guardSrc266,
+    '266.1: scripts/worktree-state.js, worktree-preflight.js and worktree-teardown-guard.js exist'
+  );
+  assert(
+    /spawnSync\(bin,\s*\['--no-optional-locks',\s*\.\.\.args\]/.test(stateSrc266),
+    '266.2: the ONE git runner prepends --no-optional-locks to every invocation'
+  );
+  assert(
+    !/spawnSync|execSync|execFileSync|exec\(/.test(preSrc266) &&
+      !/spawnSync|execSync|execFileSync|exec\(/.test(guardSrc266),
+    '266.3: neither hook spawns a process of its own — all git goes through worktree-state.js'
+  );
+  assert(
+    !/process\.exit\(\s*[1-9]/.test(preSrc266) &&
+      !/exitCode\s*=\s*[1-9]/.test(preSrc266) &&
+      /^try \{/m.test(preSrc266),
+    '266.4: the preflight has no non-zero exit anywhere and a top-level try/catch — it reports, never refuses'
+  );
+  {
+    const allow266 = new Set([
+      'rev-parse',
+      'symbolic-ref',
+      'status',
+      'rev-list',
+      'branch',
+      'diff',
+      'stash list',
+      'worktree list',
+    ]);
+    const verbs266 = [];
+    for (const src of [stateSrc266, preSrc266, guardSrc266]) {
+      for (const m of src.matchAll(/runGit\(\s*\[\s*'([^']+)'(?:\s*,\s*'([^']+)')?/g)) {
+        const v = m[1] === 'stash' || m[1] === 'worktree' ? m[1] + ' ' + (m[2] || '?') : m[1];
+        verbs266.push(v);
+      }
+    }
+    const bad266 = verbs266.filter(v => !allow266.has(v));
+    assert(
+      verbs266.length >= 8 && bad266.length === 0,
+      '266.5: every git verb used by the three files is on the read-only allow-list (no stash/reset/clean/checkout/rm/worktree remove/fetch)' +
+        (bad266.length ? ' — offending: ' + bad266.join(', ') : '')
+    );
+  }
+  assert(
+    new RegExp('node "[^"]*scripts/worktree-preflight\\.js"').test(preSrc266) &&
+      new RegExp('node "[^"]*scripts/worktree-teardown-guard\\.js"').test(guardSrc266) &&
+      /ADVISORY/.test(guardSrc266) &&
+      /19480/.test(guardSrc266),
+    '266.6: each header carries its own one-line invocation, and the guard header labels itself ADVISORY until the exit code is measured (citing issue #19480)'
+  );
+
+  // ── behavioural: throwaway repo + linked worktree ──────────────────────────
+  const env266 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/i.test(k)) env266[k] = process.env[k];
+  const rescue266 = fs.mkdtempSync(path.join(os266.tmpdir(), 'robco-wt-rescue-266-'));
+  env266.ROBCO_WORKTREE_RESCUE_DIR = rescue266;
+  const g266 = (cwd, args) =>
+    cp266.spawnSync('git', args, { cwd, env: env266, encoding: 'utf8', windowsHide: true });
+  const run266 = (script, cwd, extraEnv) =>
+    cp266.spawnSync('node', [script], {
+      cwd,
+      env: Object.assign({}, env266, extraEnv || {}),
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+  const commit266 = (cwd, msg) =>
+    g266(cwd, [
+      '-c',
+      'user.email=t@x',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      msg,
+    ]);
+
+  const tmp266 = fs.mkdtempSync(path.join(os266.tmpdir(), 'robco-wt-266-'));
+  const main266 = path.join(tmp266, 'main');
+  const wt266 = path.join(tmp266, 'wt');
+  let setupErr266 = null;
+  try {
+    fs.mkdirSync(main266);
+    if (g266(main266, ['init', '-q']).status !== 0) throw new Error('git init failed');
+    fs.writeFileSync(path.join(main266, 'a.txt'), 'a\n');
+    fs.writeFileSync(path.join(main266, 'b.txt'), 'b\n');
+    g266(main266, ['add', '.']);
+    if (commit266(main266, 'files').status !== 0) throw new Error('commit failed');
+    const wa = g266(main266, ['worktree', 'add', '-q', wt266, '-b', 'feat']);
+    if (wa.status !== 0) throw new Error('worktree add failed: ' + wa.stderr);
+  } catch (e) {
+    setupErr266 = e;
+  }
+  assert(
+    !setupErr266,
+    '266.7: throwaway repo + linked worktree built (' +
+      (setupErr266 ? setupErr266.message : 'ok') +
+      ')'
+  );
+
+  if (!setupErr266) {
+    const gitDir266 = g266(wt266, ['rev-parse', '--absolute-git-dir']).stdout.trim();
+    const indexP266 = path.join(gitDir266, 'index');
+
+    // GREEN first only to establish the baseline; the proof is RED → GREEN below.
+    const clean0 = run266(guardP266, wt266);
+    assert(
+      clean0.status === 0 && /CLEAN \(exit 0\)/.test(clean0.stdout),
+      '266.8: guard on a freshly cut clean worktree exits 0 and prints CLEAN'
+    );
+
+    // RED: dirty it — modify tracked, rename tracked (staged), add untracked incl. a drafted commit message and a name with a space.
+    fs.writeFileSync(path.join(wt266, 'a.txt'), 'changed\n');
+    g266(wt266, ['mv', 'b.txt', 'c.txt']);
+    fs.writeFileSync(path.join(wt266, 'COMMIT_MSG.txt'), 'feat: the draft nobody saw\n');
+    fs.writeFileSync(path.join(wt266, 'sp ace.txt'), 'x\n');
+    const indexBefore266 = fs.statSync(indexP266).mtimeMs;
+    const red = run266(guardP266, wt266);
+    assert(
+      red.status === 1,
+      '266.9: RED — guard on the dirty worktree exits 1 (got ' + red.status + ')'
+    );
+    assert(
+      /tracked-modified 2 · untracked 2/.test(red.stdout),
+      '266.10: RED — tracked and untracked are COUNTED SEPARATELY (2 tracked: modify + rename; 2 untracked)'
+    );
+    assert(
+      /^\s+M a\.txt$/m.test(red.stdout) &&
+        /^\s+R c\.txt$/m.test(red.stdout) &&
+        /^\s+\?\? COMMIT_MSG\.txt$/m.test(red.stdout) &&
+        /^\s+\?\? sp ace\.txt$/m.test(red.stdout),
+      '266.11: RED — every file is NAMED, including the rename target and the name with a space; the first record keeps its full path (the trim regression)'
+    );
+    assert(
+      !/M \.txt/.test(red.stdout),
+      '266.12: RED — no record has lost its leading character (" M a.txt" must never read "M .txt")'
+    );
+    // rescue + receipt
+    let rescued266;
+    try {
+      const dirs = fs.readdirSync(rescue266);
+      rescued266 = dirs.length ? path.join(rescue266, dirs[0]) : null;
+    } catch {
+      rescued266 = null;
+    }
+    const receipt266 =
+      rescued266 && fs.existsSync(path.join(rescued266, 'RECEIPT.txt'))
+        ? fs.readFileSync(path.join(rescued266, 'RECEIPT.txt'), 'utf8')
+        : '';
+    const patch266 =
+      rescued266 && fs.existsSync(path.join(rescued266, 'tracked-changes.patch'))
+        ? fs.readFileSync(path.join(rescued266, 'tracked-changes.patch'), 'utf8')
+        : '';
+    const copied266 = rescued266 ? path.join(rescued266, 'untracked', 'COMMIT_MSG.txt') : '';
+    assert(
+      !!rescued266 &&
+        /COMMIT_MSG\.txt/.test(receipt266) &&
+        /a\.txt/.test(patch266) &&
+        fs.existsSync(copied266) &&
+        fs.readFileSync(copied266, 'utf8') === 'feat: the draft nobody saw\n',
+      '266.13: RED — the rescue copy exists OUTSIDE the repo: receipt names the files, the patch holds the tracked change, the untracked draft is byte-identical'
+    );
+    assert(
+      /honours this exit code is UNVERIFIED/.test(red.stdout),
+      '266.14: RED — the refusal itself says the host may ignore it (advisory until measured)'
+    );
+
+    // preflight on the dirty worktree: exit 0, reports, sees the main checkout
+    fs.writeFileSync(path.join(main266, 'zz.txt'), 'main is dirty\n');
+    const pre = run266(preP266, wt266);
+    assert(
+      pre.status === 0 &&
+        /tracked-modified 2 · untracked 2/.test(pre.stdout) &&
+        /main tree .*tracked-modified 0 · untracked 1/.test(pre.stdout) &&
+        /\?\? zz\.txt/.test(pre.stdout) &&
+        /TREE IS MOVING/.test(pre.stdout) &&
+        /VERDICT\s+INFORMATIONAL/.test(pre.stdout),
+      "266.15: preflight on the dirty worktree exits 0, counts its own tree, sees the MAIN checkout's untracked file from inside the worktree, and says the tree is moving"
+    );
+    assert(
+      /HEAD\s+[0-9a-f]{40}\s+on feat/.test(pre.stdout) &&
+        /origin\s+no upstream configured/.test(pre.stdout),
+      '266.16: preflight prints HEAD, the branch, and an honest "no upstream" instead of a fabricated parity'
+    );
+
+    // lock non-creation: neither hook touched the index or left a lock
+    const indexAfter266 = fs.statSync(indexP266).mtimeMs;
+    const commonDir266 = g266(wt266, ['rev-parse', '--git-common-dir']).stdout.trim();
+    assert(
+      indexBefore266 === indexAfter266 &&
+        !fs.existsSync(path.join(gitDir266, 'index.lock')) &&
+        !fs.existsSync(path.join(path.resolve(wt266, commonDir266), 'index.lock')),
+      '266.17: after preflight + guard on a dirty tree the index mtime is unchanged and no index.lock exists — the hooks are pure readers'
+    );
+
+    // GREEN: clean it and watch it pass
+    g266(wt266, ['checkout', '-q', '--', '.']);
+    g266(wt266, ['reset', '-q', '--hard']);
+    g266(wt266, ['clean', '-qfd']);
+    const green = run266(guardP266, wt266);
+    assert(
+      green.status === 0 && /CLEAN \(exit 0\)/.test(green.stdout),
+      '266.18: GREEN — the same worktree, cleaned, passes with exit 0'
+    );
+
+    // fresh lock → refuse unobservable; old lock → stranded note, proceed
+    const lockP266 = path.join(gitDir266, 'index.lock');
+    fs.writeFileSync(lockP266, '');
+    const fresh = run266(guardP266, wt266);
+    assert(
+      fresh.status === 2 && /fresh index\.lock/.test(fresh.stdout),
+      '266.19: a FRESH index.lock makes the guard refuse with exit 2 (a writer may be mid-operation)'
+    );
+    const old266 = (Date.now() - 10 * 60 * 1000) / 1000;
+    fs.utimesSync(lockP266, old266, old266);
+    const stale = run266(guardP266, wt266);
+    assert(
+      stale.status === 0 && /stranded \(old\); not created by this guard/.test(stale.stdout),
+      '266.20: an OLD 0-byte index.lock is reported as stranded and the clean tree still passes'
+    );
+    const preLock = run266(preP266, wt266);
+    assert(
+      preLock.status === 0 &&
+        /index\.lock PRESENT/.test(preLock.stdout) &&
+        /stranded index\.lock/.test(preLock.stdout),
+      '266.21: the preflight reports the stranded lock and still exits 0'
+    );
+    fs.rmSync(lockP266, { force: true });
+
+    // detached HEAD with an orphan commit → refuse
+    g266(wt266, ['checkout', '-q', '--detach']);
+    fs.writeFileSync(path.join(wt266, 'o.txt'), 'orphan\n');
+    g266(wt266, ['add', 'o.txt']);
+    commit266(wt266, 'orphan');
+    const orphan = run266(guardP266, wt266);
+    assert(
+      orphan.status === 1 && /reachable from NO branch, remote or tag/.test(orphan.stdout),
+      '266.22: a detached HEAD whose commit no ref reaches is refused — deleting the worktree would lose the commit'
+    );
+
+    // unobservable → refuse (guard) / report (preflight)
+    const norepo266 = fs.mkdtempSync(path.join(os266.tmpdir(), 'robco-wt-norepo-266-'));
+    const gNo = run266(guardP266, norepo266);
+    const pNo = run266(preP266, norepo266);
+    assert(
+      gNo.status === 2 &&
+        /REFUSED \(exit 2\)/.test(gNo.stdout) &&
+        pNo.status === 0 &&
+        /UNOBSERVABLE/.test(pNo.stdout),
+      '266.23: a directory that is not a repo — guard refuses with exit 2, preflight reports UNOBSERVABLE and exits 0'
+    );
+    const gNoGit = run266(guardP266, wt266, { ROBCO_GIT_BIN: 'definitely-not-git-266' });
+    const pNoGit = run266(preP266, wt266, { ROBCO_GIT_BIN: 'definitely-not-git-266' });
+    assert(
+      gNoGit.status === 2 && pNoGit.status === 0 && /UNOBSERVABLE/.test(pNoGit.stdout),
+      '266.24: git unavailable — guard fails CLOSED with exit 2, preflight still exits 0'
+    );
+
+    // cleanup (worktree dirs can hold handles briefly on Windows — retry, then give up silently:
+    // a leftover temp dir is harmless; a FATAL that measures nothing is not — Protocol 42)
+    for (const d of [norepo266]) {
+      try {
+        fs.rmSync(d, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        /* harmless leftover */
+      }
+    }
+  }
+  for (const d of [tmp266, rescue266]) {
+    try {
+      fs.rmSync(d, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    } catch {
+      /* harmless leftover */
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
