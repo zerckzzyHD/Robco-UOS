@@ -54044,15 +54044,24 @@ if (!PLANNING_OK) {
     '',
   ].join('\n');
   const when249j = new Date(2026, 7, 25, 21, 42);
-  const html249j = RVj.renderIndex([], 'note', { text: board249j, mtime: when249j });
+  const html249j = RVj.renderQueue({ text: board249j, mtime: when249j });
+  const reportsIndex249j = RVj.renderReportsIndex(['A.md'], 'note');
 
+  // ⭐ SUPERSEDED 2026-09-03 (owner ruling: one path per thing). The board and the
+  // report list were ONE page, with a jump menu to get past the board. They are
+  // now `/queue` and `/reports`, and the jump menu — which existed only because
+  // two pages shared a URL — went with the split. GOES RED IF: either page grows
+  // the other's content back, or the jump menu returns.
   assert(
-    /<h1 id="roadmap">Roadmap<\/h1>/.test(html249j) &&
-      html249j.indexOf('id="roadmap"') < html249j.indexOf('id="reports"') &&
-      /<nav class="jump">[\s\S]*?href="#roadmap"[\s\S]*?href="#reports"[\s\S]*?<\/nav>/.test(
-        html249j
-      ),
-    '249.10a: the board is the HEADLINE of the page rather than a link on it — and a jump menu reaches the reports without scrolling the whole board, which is long by nature'
+    /<h1 id="queue">The queue<\/h1>/.test(html249j) &&
+      !/id="reports"/.test(html249j) &&
+      !/<nav class="jump">/.test(html249j) &&
+      /<h1 id="reports">Reports<\/h1>/.test(reportsIndex249j) &&
+      /href="\/reports\/A\.md"/.test(reportsIndex249j) &&
+      !/id="queue"/.test(reportsIndex249j) &&
+      !/<ul class="stats">/.test(reportsIndex249j) &&
+      !/<nav class="jump">/.test(reportsIndex249j),
+    '249.10a: the board and the report list are TWO pages — `/queue` carries the board and nothing of the list, `/reports` carries the list and nothing of the board, and the jump menu that existed only because they shared one URL is gone'
   );
 
   // ⛔ NO DEAD CONTROLS. The header used to render a back-link on BOTH page kinds;
@@ -54060,7 +54069,8 @@ if (!PLANNING_OK) {
   // Found by the owner inside two minutes, which is what a control that lies costs.
   const reportPage249j = RVj.renderReport('R.md', '# T\n\nbody text that is long enough.\n');
   assert(
-    !/<header class="top">[\s\S]*?href="\/reports\/"/.test(html249j) &&
+    !/<header class="top">[\s\S]*?href="\/reports\/"/.test(reportsIndex249j) &&
+      !/<header class="top">[\s\S]*?href="\/reports\/"/.test(html249j) &&
       /<header class="top">[\s\S]*?href="\/reports\/"/.test(reportPage249j),
     '249.10e: the index carries NO back-link to itself while a report page does — a control that goes nowhere is worse than no control, because it teaches the reader that the page furniture cannot be trusted'
   );
@@ -54107,8 +54117,8 @@ if (!PLANNING_OK) {
   );
 
   // Freshness is shown, and the render is a pure function of what it was handed.
-  const again249j = RVj.renderIndex([], 'note', { text: board249j, mtime: when249j });
-  const other249j = RVj.renderIndex([], 'note', {
+  const again249j = RVj.renderQueue({ text: board249j, mtime: when249j });
+  const other249j = RVj.renderQueue({
     text: board249j.replace('Active (2)', 'Active (9)'),
     mtime: when249j,
   });
@@ -54153,9 +54163,9 @@ if (!PLANNING_OK) {
     '- **AA1** — a thing',
   ].join('\n');
   const at249g = { text: board249g, mtime: when249j };
-  const cur249g = RVj.renderIndex([], 'n', at249g, queue249g);
-  const stale249g = RVj.renderIndex([], 'n', at249g, queue249g + '\n### AA2. later\n\nbody\n');
-  const unk249g = RVj.renderIndex([], 'n', at249g, null);
+  const cur249g = RVj.renderQueue(at249g, queue249g);
+  const stale249g = RVj.renderQueue(at249g, queue249g + '\n### AA2. later\n\nbody\n');
+  const unk249g = RVj.renderQueue(at249g, null);
   assert(
     // current — says so, and says WHICH question it answered
     /built from the queue as it reads right now/.test(cur249g) &&
@@ -54656,7 +54666,7 @@ if (!PLANNING_OK) {
   // window; the same mistake pointed the other way is a test that passes because
   // it is reading somewhere the defect could never appear.
   const viteSrc262 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
-  const handlerStart262 = viteSrc262.indexOf("server.middlewares.use('/home'");
+  const handlerStart262 = viteSrc262.indexOf("server.middlewares.use('/', (req");
   const callAt262 = viteSrc262.indexOf('renderHome({');
   const handler262 =
     handlerStart262 >= 0 && callAt262 > handlerStart262
@@ -54674,7 +54684,7 @@ if (!PLANNING_OK) {
       !/new Date\(\s*\)/.test(handler262),
     "262.10: the home route passes every fact the landing tiles are built from, and takes the age from the snapshot's own stamp with no local clock anywhere in the handler — a renderer that is correct and a caller that hands it nothing produce a page that is wrong in exactly the reassuring direction" +
       (notPassed262.length ? ` — NOT PASSED: ${notPassed262.join(', ')}` : '') +
-      (handler262.length === 0 ? ' — the /home handler could not be located' : '')
+      (handler262.length === 0 ? ' — the landing (/) handler could not be located' : '')
   );
 
   // ── 262.11  A SUMMARY LINE CARRIES A DATUM, NEVER A SENTENCE OR A PATH ───
@@ -54851,13 +54861,14 @@ if (!PLANNING_OK) {
     const handWritten262 = viewFiles262.filter(
       f =>
         f !== 'report-view.js' &&
-        fs.readFileSync(path.join(ROOT, 'scripts', f), 'utf8').includes('href="/home"')
+        fs.readFileSync(path.join(ROOT, 'scripts', f), 'utf8').includes('href="/"')
     );
     const RV262 = require(path.join(ROOT, 'scripts', 'report-view.js'));
     const LV262 = require(path.join(ROOT, 'scripts', 'ledger-view.js'));
     const HV262b = require(path.join(ROOT, 'scripts', 'home-view.js'));
     const built262 = [
-      ['reports index', RV262.renderIndex([], null, null, null), 1],
+      ['reports index', RV262.renderReportsIndex([], null), 1],
+      ['the queue', RV262.renderQueue(null, null), 1],
       ['a report', RV262.renderReport('x.md', '# t'), 1],
       ['reports 404', RV262.renderNotFound(), 1],
       ['status with data', SV.renderStatus({ enforced: true }, new Date(), 'n'), 1],
@@ -54877,7 +54888,7 @@ if (!PLANNING_OK) {
       ['the landing page', HV262b.renderHome({ unbuilt: [] }), 0],
     ];
     const wrong262 = built262.filter(
-      ([, html, want]) => (html.match(/href="\/home"/g) || []).length !== want
+      ([, html, want]) => (html.match(/href="\/"/g) || []).length !== want
     );
     assert(
       wrong262.length === 0 &&
@@ -55195,7 +55206,7 @@ if (!PLANNING_OK) {
     // tile's line and reported it as this one's. ⚠ That failed loudly here, which
     // is the lucky direction; the same slack pointed the other way is an
     // assertion that passes while reading somewhere the defect cannot appear.
-    const m = /href="\/reports#roadmap"(?:(?!<\/li>)[\s\S])*?<p class="m[^"]*">([^<]*)</.exec(html);
+    const m = /href="\/queue"(?:(?!<\/li>)[\s\S])*?<p class="m[^"]*">([^<]*)</.exec(html);
     return m ? m[1] : null;
   };
   const tCur262 = boardTile262(true);
@@ -55204,7 +55215,7 @@ if (!PLANNING_OK) {
   // The route half — 262.10 is blind to a prop it does not know to look for, and a
   // renderer that can report currency, called by a route that never measures it,
   // degrades permanently and silently to the UNKNOWN branch.
-  const homeStart262 = viteSrc262.indexOf("server.middlewares.use('/home'");
+  const homeStart262 = viteSrc262.indexOf("server.middlewares.use('/', (req");
   const homeEnd262 = viteSrc262.indexOf("server.middlewares.use('/status'");
   const homeHandler262 =
     homeStart262 >= 0 && homeEnd262 > homeStart262
@@ -58272,6 +58283,229 @@ if (!PLANNING_OK) {
       '261.5: the closed-item rule is imported from the board generator, not retyped in the renderer'
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Suite 265 — ONE ORIGIN, ONE PORT: the tailnet route table
+//
+//  ⛔⛤ THE REGRESSION THIS LOCKS (2026-09-01 → 2026-09-03). Two servers came to
+//  claim the root of one tailnet origin: this dev server, and a second one on
+//  another port that a session mapped over `/` (moving the app to `:8443`). This
+//  repo's own logon autostart then re-ran `tailscale serve --bg 5173` at the next
+//  boot and took the root back — so the owner's pages vanished one evening, and
+//  the other server's pages vanished the next morning. Owner ruling: ONE port,
+//  ONE server, everything on it, one canonical path per thing, a redirect for
+//  every retired address, and no route that answers only because Vite falls
+//  through to the app.
+//
+//  ⭐ EACH ASSERTION NAMES WHAT TURNS IT RED OTHER THAN A REVERT. Fixture-driven
+//  and static; nothing here starts a server or reads the private tree.
+// ══════════════════════════════════════════════════════════════
+{
+  header(
+    'Suite 265 — one origin, one port (route table, redirects, kill switch, external renderer)'
+  );
+
+  const cfg265 = readFile('vite.config.mjs');
+  // Comments stripped first — this file documents its own footguns in prose.
+  const code265 = cfg265
+    .split('\n')
+    .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join('\n');
+
+  // ── 265.1  THE APP IS UNDER A BASE PATH, AND UNKNOWN PATHS ARE 404s ────────
+  //
+  // GOES RED IF: somebody removes `base` (the landing page and the app would
+  // fight over `/` again) or sets appType back to 'spa' (every typo and every
+  // retired address would render the app under a different URL, which is the
+  // "it returned 200 proves nothing" trap the old landing page had to hash its
+  // way around).
+  assert(
+    /base:\s*'\/terminal\/'/.test(code265) && /appType:\s*'mpa'/.test(code265),
+    '265.1: the app is served under `/terminal/` and the dev server runs as MPA — the root is free for the landing page, and an unknown path is a 404 rather than the app wearing a different URL'
+  );
+
+  // ── 265.2  EVERY CANONICAL PATH HAS A HANDLER; EVERY RETIRED ONE A REDIRECT ─
+  //
+  // GOES RED IF: a handler is dropped, a retired address stops redirecting, a
+  // redirect points at another redirect (a loop or a hop nobody designed), or a
+  // redirect shadows a real handler.
+  const handlers265 = [
+    "use('/', (req",
+    "use('/queue'",
+    "use('/reports'",
+    "use('/status'",
+    "use('/ledger'",
+  ];
+  const missingHandlers265 = handlers265.filter(h => !cfg265.includes(h));
+  const redirectsM265 = /const REDIRECTS = Object\.freeze\(\{([\s\S]*?)\}\)/.exec(cfg265);
+  const redirects265 = {};
+  if (redirectsM265) {
+    for (const m of redirectsM265[1].matchAll(/'([^']+)':\s*'([^']+)'/g)) {
+      redirects265[m[1]] = m[2];
+    }
+  }
+  const wantRedirect265 = {
+    '/home': '/',
+    '/mist-view': '/view',
+    '/report': '/reports',
+    '/terminal': '/terminal/',
+  };
+  const wrongRedirects265 = Object.entries(wantRedirect265).filter(
+    ([from, to]) => redirects265[from] !== to
+  );
+  const chained265 = Object.values(redirects265).filter(to => to in redirects265);
+  const shadowing265 = Object.keys(redirects265).filter(
+    from => from === '/queue' || from === '/reports' || from === '/status' || from === '/ledger'
+  );
+  const viewFormatsM265 = /const VIEW_FORMATS = Object\.freeze\(\{([\s\S]*?)\}\)/.exec(cfg265);
+  const viewPaths265 = viewFormatsM265
+    ? [...viewFormatsM265[1].matchAll(/'([^']+)':/g)].map(m => m[1])
+    : [];
+  assert(
+    missingHandlers265.length === 0 &&
+      wrongRedirects265.length === 0 &&
+      chained265.length === 0 &&
+      shadowing265.length === 0 &&
+      viewPaths265.includes('/view') &&
+      viewPaths265.includes('/view.json') &&
+      viewPaths265.includes('/view.txt') &&
+      /'\/sw\.js'/.test(cfg265),
+    '265.2: every canonical path has a handler in the config and every retired address redirects to one — no redirect points at another redirect and none shadows a handler — so an address once open on the phone lands on the one page it means' +
+      (missingHandlers265.length ? ` — NO HANDLER: ${missingHandlers265.join(', ')}` : '') +
+      (wrongRedirects265.length
+        ? ` — WRONG: ${wrongRedirects265.map(([f, t]) => `${f}→${t}`).join(', ')}`
+        : '') +
+      (chained265.length ? ` — CHAINED: ${chained265.join(', ')}` : '') +
+      (shadowing265.length ? ` — SHADOWS A HANDLER: ${shadowing265.join(', ')}` : '')
+  );
+
+  // ── 265.3  THE EXTERNAL RENDERER: CONFIGURED-ONLY, WRITE-FREE, NEVER THE APP ─
+  //
+  // ⛔ The projection is owned by a PRIVATE repository, and this one is PUBLIC:
+  // the runner may know it only through one environment variable, exactly as
+  // control-state.js knows the state directory. GOES RED IF: a default path is
+  // written in (a private tree's layout published to save one variable), a second
+  // env var appears, a write verb appears, or an unconfigured machine gets
+  // anything other than a plain 404 that says so.
+  //
+  // ⚠ render() is a promise by design; asserted through a CHILD PROCESS so the
+  // result lands here, in this suite's output, rather than in the deferred tail.
+  const pvSrc265 = fs.readFileSync(path.join(ROOT, 'scripts', 'projection-view.js'), 'utf8');
+  const envReads265 = [...new Set(pvSrc265.match(/process\.env\.\w+/g) || [])];
+  const writes265 = /\bfs\s*\.\s*(write|append|copy|create|mkdir|rm|unlink|rename|truncate)/i.test(
+    pvSrc265
+  );
+  const PV265 = require(path.join(ROOT, 'scripts', 'projection-view.js'));
+  const prevRenderer265 = process.env.ROBCO_VIEW_RENDERER;
+  let unconfigured265;
+  let misconfigured265;
+  try {
+    delete process.env.ROBCO_VIEW_RENDERER;
+    unconfigured265 = { available: PV265.available(), describe: PV265.describe() };
+    process.env.ROBCO_VIEW_RENDERER = path.join(ROOT, 'zz-no-such-renderer-265.mjs');
+    misconfigured265 = { available: PV265.available(), describe: PV265.describe() };
+  } finally {
+    if (prevRenderer265 === undefined) delete process.env.ROBCO_VIEW_RENDERER;
+    else process.env.ROBCO_VIEW_RENDERER = prevRenderer265;
+  }
+  let childOut265;
+  try {
+    childOut265 = require('child_process').execFileSync(
+      process.execPath,
+      [
+        '-e',
+        `delete process.env.ROBCO_VIEW_RENDERER;` +
+          `const pv=require(${JSON.stringify(path.join(ROOT, 'scripts', 'projection-view.js'))});` +
+          `Promise.all([pv.render('html'), pv.render('nope')]).then(r=>process.stdout.write(JSON.stringify(r)))`,
+      ],
+      { encoding: 'utf8', timeout: 20000 }
+    );
+  } catch (e) {
+    childOut265 = (e && e.stdout) || '';
+  }
+  let childRes265;
+  try {
+    childRes265 = JSON.parse(childOut265);
+  } catch {
+    childRes265 = null;
+  }
+  assert(
+    envReads265.length === 1 &&
+      envReads265[0] === 'process.env.ROBCO_VIEW_RENDERER' &&
+      !writes265 &&
+      Boolean(unconfigured265) &&
+      unconfigured265.available === false &&
+      /not set/.test(unconfigured265.describe) &&
+      Boolean(misconfigured265) &&
+      misconfigured265.available === false &&
+      /does not name a readable file/.test(misconfigured265.describe) &&
+      // ⛔ describe() names no path, in either branch — this repo is public.
+      !/zz-no-such-renderer/.test(misconfigured265.describe) &&
+      Boolean(childRes265) &&
+      childRes265[0].ok === false &&
+      childRes265[0].status === 404 &&
+      /no projection renderer is configured/.test(childRes265[0].body) &&
+      /^text\/plain/.test(childRes265[0].type) &&
+      !/<title>/.test(childRes265[0].body) &&
+      childRes265[1].status === 404,
+    '265.3: the projection runner knows its renderer through ONE environment variable and nothing else — no default path, no write verb — and an unconfigured or misconfigured machine gets a plain-text 404 that says which, never a path and never the app' +
+      (envReads265.length !== 1 ? ` — env reads: ${envReads265.join(', ')}` : '') +
+      (childRes265 ? '' : ` — child produced no parseable result: ${childOut265.slice(0, 200)}`)
+  );
+
+  // ── 265.4  THE KILL SWITCH KILLS, AND NOTHING ELSE ─────────────────────────
+  //
+  // The app's old worker at scope `/` answers every same-origin request from its
+  // cache, so a phone that once opened the app at the root would keep rendering
+  // its stale shell over the landing page forever. GOES RED IF: the served worker
+  // gains a fetch handler (it would become the thing it removes), stops clearing
+  // caches or unregistering, is served as anything but JavaScript, becomes
+  // cacheable (a kill switch behind a stale HTTP cache does not run), or the
+  // module starts reading the app's real sw.js.
+  const KS265 = require(path.join(ROOT, 'scripts', 'sw-killswitch.js'));
+  const ksSrc265 = fs.readFileSync(path.join(ROOT, 'scripts', 'sw-killswitch.js'), 'utf8');
+  const worker265 = KS265.SW_KILLSWITCH.replace(/^\s*\/\/.*$/gm, '');
+  assert(
+    !/addEventListener\(\s*['"]fetch['"]/.test(worker265) &&
+      /addEventListener\(\s*['"]activate['"]/.test(worker265) &&
+      /caches\.keys\(\)/.test(worker265) &&
+      /registration\.unregister\(\)/.test(worker265) &&
+      /skipWaiting\(\)/.test(worker265) &&
+      /^text\/javascript/.test(KS265.SW_HEADERS['Content-Type']) &&
+      /no-store/.test(KS265.SW_HEADERS['Cache-Control']) &&
+      !/require\(/.test(ksSrc265.replace(/^\s*(\/\/|\*).*$/gm, '')) &&
+      !/readFileSync/.test(ksSrc265),
+    "265.4: the root-scope kill switch has NO fetch handler, clears every cache and unregisters itself on activate, is served as no-store JavaScript, and reads nothing — least of all the app's real service worker, which now lives under the base path untouched"
+  );
+
+  // ── 265.5  THE LANDING PAGE REACHES EVERY CANONICAL PATH, AND ONLY THOSE ───
+  //
+  // GOES RED IF: a tile points at a retired address (`/home`, `/reports#roadmap`),
+  // at the slash-less app path Vite answers with a hint page, or at a path with no
+  // handler; or the route stops handing the renderer the projection's
+  // availability, so the tile degrades to "not checked" on a machine where it is.
+  const HV265 = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const landing265 = HV265.renderHome({ unbuilt: [], projectionAvailable: true });
+  const hrefs265 = [...landing265.matchAll(/href="([^"]+)"/g)].map(m => m[1]).sort();
+  const want265 = ['/ledger', '/queue', '/reports', '/status', '/terminal/', '/view'];
+  const landingStart265 = cfg265.indexOf("server.middlewares.use('/', (req");
+  const landingEnd265 = cfg265.indexOf("server.middlewares.use('/status'");
+  const landingHandler265 =
+    landingStart265 >= 0 && landingEnd265 > landingStart265
+      ? cfg265.slice(landingStart265, landingEnd265)
+      : '';
+  assert(
+    JSON.stringify(hrefs265) === JSON.stringify(want265) &&
+      /Rendered on every visit/.test(landing265) &&
+      /No renderer is configured/.test(
+        HV265.renderHome({ unbuilt: [], projectionAvailable: false })
+      ) &&
+      /projectionAvailable:\s*projection\.available\(\)/.test(landingHandler265) &&
+      /freshRequire\('\.\/scripts\/projection-view\.js'\)/.test(landingHandler265),
+    '265.5: the landing page links exactly the canonical paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
+      ` — got ${hrefs265.join(' ')}`
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

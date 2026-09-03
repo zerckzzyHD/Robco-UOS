@@ -144,11 +144,6 @@ details.band ul { padding-left:1.15rem; }
 details.drift { border-color:var(--hi); }
 details.drift code { font-weight:700; }
 hr + h2 { margin-top:1.2rem; }
-/* Jump menu. Two anchors, no script — the board is long by nature, so reaching
-   the reports must not mean scrolling past all of it. */
-nav.jump { display:flex; gap:.25rem; }
-nav.jump a { padding:.5rem .7rem; border:1px solid var(--line); border-radius:999px;
-  background:var(--code); font-size:.92rem; }
 h1 { scroll-margin-top:4.5rem; }
 .empty { border:1px dashed var(--line); border-radius:8px; padding:1rem; }
 `;
@@ -197,7 +192,7 @@ h1 { scroll-margin-top:4.5rem; }
  * measured, not assumed, and named in the guard so "every page" is never read as
  * a claim about that one.
  */
-const HOME_LINK = '<a href="/home">&#8592; Home</a>';
+const HOME_LINK = '<a href="/">&#8592; Home</a>';
 
 function page({ title, crumb, body, nav, style, atHome }) {
   const back = atHome === true ? '' : HOME_LINK;
@@ -262,7 +257,7 @@ function renderReport(name, markdown) {
     title,
     crumb: name,
     // On a report this goes somewhere real: back to the index it was reached from.
-    nav: '<a href="/reports/">&#8592; Roadmap &amp; reports</a>',
+    nav: '<a href="/reports/">&#8592; Reports</a>',
     body: `<h1>${escapeHtml(title)}</h1>\n${toc}\n${html}`,
   });
 }
@@ -386,7 +381,7 @@ function closedOverWholeQueue(queueMd) {
 }
 
 /**
- * Render the board as the headline of the reports page.
+ * Render the board — the body of the `/queue` page.
  * @param {string} md   the generated board, read fresh
  * @param {Date}   when when it was last regenerated
  */
@@ -542,7 +537,7 @@ function renderRoadmapSection(md, when, queueMd) {
         `interpret. The ${total} item${total === 1 ? '' : 's'} below are as they stood then. Run <code>npm run roadmap</code>.</p>`;
 
   return (
-    `<h1 id="roadmap">Roadmap</h1>` +
+    `<h1 id="queue">The queue</h1>` +
     currencyLine +
     counts +
     disagreeList +
@@ -554,36 +549,39 @@ function renderRoadmapSection(md, when, queueMd) {
 }
 
 /**
- * The landing page: the BOARD first, the reports under it.
+ * `/queue` — the board, and ONLY the board.
  *
- * ⭐ The roadmap is the headline rather than a link, because it is the thing
- * being opened first — "how much is left" is the standing question, and a link
- * to the answer is not the answer.
+ * ⭐ OWNER RULING 2026-09-03: the queue and the reports are two pages, not one page
+ * with a jump menu. They used to share `/reports`, with the board as the headline
+ * and the report list underneath; the jump menu existed only to get past the
+ * board, and it goes with the split. "What needs you" is the Attention count and
+ * band on this page — it is not duplicated anywhere else.
  */
-function renderIndex(names, note, board, queueMd) {
-  const reports = names.length
-    ? `<h2 id="reports">Reports</h2>\n<ul class="reports">${names
-        .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
-        .join('')}</ul>`
-    : `<h2 id="reports">Reports</h2>\n<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
-<p class="note">The reports live outside this repository by design, so a checkout without the private
-sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
-
-  const roadmap = board
+function renderQueue(board, queueMd) {
+  const body = board
     ? renderRoadmapSection(board.text, board.mtime, queueMd)
-    : `<h1>Roadmap</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
+    : `<h1 id="queue">The queue</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
+  return page({ title: 'Queue', crumb: '', body });
+}
 
-  // ⭐ A JUMP MENU, NOT A BACK LINK. The roadmap stays the headline, and the board
-  // is long by nature — so reaching the reports meant scrolling the whole thing.
-  // Two in-page anchors cost nothing, work with no script, and leave the ordering
-  // of the page alone.
+/**
+ * `/reports` — the report list, and ONLY the list. Newest first, as the resolver
+ * hands them over. No board, no counts, no jump menu.
+ */
+function renderReportsIndex(names, note) {
+  const list = names.length
+    ? `<ul class="reports">${names
+        .map(n => `<li><a href="/reports/${encodeURIComponent(n)}">${escapeHtml(n)}</a></li>`)
+        .join('')}</ul>`
+    : `<div class="empty"><p><strong>No reports are reachable from this checkout.</strong></p>
+<p class="note">The reports live outside this repository by design, so a checkout without the private
+sibling has nothing to show here. That is the normal state, not an error.</p></div>`;
   return page({
-    title: 'Roadmap',
+    title: 'Reports',
     crumb: '',
-    nav: `<nav class="jump"><a href="#roadmap">Roadmap</a><a href="#reports">Reports</a></nav>`,
-    body: `${roadmap}\n<hr>\n${reports}\n<p class="note">${escapeHtml(note || '')}</p>`,
+    body: `<h1 id="reports">Reports</h1>\n${list}\n<p class="note">${escapeHtml(note || '')}</p>`,
   });
 }
 
@@ -598,7 +596,8 @@ function renderNotFound() {
 
 module.exports = {
   renderReport,
-  renderIndex,
+  renderQueue,
+  renderReportsIndex,
   renderNotFound,
   page,
   escapeHtml,

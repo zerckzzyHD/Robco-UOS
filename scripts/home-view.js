@@ -228,6 +228,9 @@ function tile({ href, title, what, meta, metaWarn, away }) {
  * @param {number|null} state.logCount     how many log files are readable.
  * @param {Array<[string,string]>} state.unbuilt  destinations that do not exist
  *   yet, as [name, why]. ⛔ Handed in — see the note at its point of use.
+ * @param {boolean|null} state.projectionAvailable  whether the external
+ *   projection renderer is configured on this machine — TRUE, FALSE, or null for
+ *   "not checked". ⛔ Three states, like every other fact here.
  */
 function renderHome(state) {
   const s = state || {};
@@ -243,8 +246,10 @@ function renderHome(state) {
   const statusAge = assessAge(hasStatusStamp ? s.statusGeneratedAt : null);
 
   const tiles = [
+    // ⛔ THE TRAILING SLASH IS LOAD-BEARING. The app is served under a base path,
+    // and Vite answers the slash-less form with a 404 hint page, not the app.
     tile({
-      href: '/',
+      href: '/terminal/',
       title: 'The terminal',
       what: 'The Fallout companion app itself, running from this machine right now.',
     }),
@@ -261,9 +266,9 @@ function renderHome(state) {
     // unknown: a board whose match could not be established is not a board that is
     // fine, and collapsing the two is how this page would start reassuring again.
     tile({
-      href: '/reports#roadmap',
-      title: "What's next",
-      what: 'The build board: what is ready to start, what is underway, what is waiting.',
+      href: '/queue',
+      title: 'The queue',
+      what: 'The build board: what needs you, what is underway, what is ready to start, and what is parked.',
       // ⛔ ONLY the out-of-date case is emphasised. A tile that shouts on every
       // state teaches the reader to stop looking at it, which costs more than the
       // one warning it was built to deliver.
@@ -277,7 +282,7 @@ function renderHome(state) {
             : `Updated ${ago(s.boardUpdated)} — whether it still matches the queue is unknown`,
     }),
     tile({
-      href: '/reports#reports',
+      href: '/reports',
       title: 'Written reports',
       what: 'Full accounts of finished work, newest first.',
       meta: hasReports
@@ -307,6 +312,20 @@ function renderHome(state) {
     // ⚠ THE COST IS NAMED: the owner refers to this tile by its name, and the
     // name has changed. That is a real, small cost, accepted because the word
     // being removed is the single most misleading token on this page.
+    // ⭐ THE PROJECTION IS RENDERED BY A SEPARATE PROGRAM, PER VISIT. This tile
+    // says so, and says when that program is not there — handed in like every
+    // other fact here, never probed from the renderer.
+    tile({
+      href: '/view',
+      title: 'Control plane view',
+      what: 'A read-only projection of the control plane, rendered fresh on every visit. Every value carries how old it is, and it can say it does not know.',
+      meta:
+        s.projectionAvailable === true
+          ? 'Rendered on every visit — nothing is cached'
+          : s.projectionAvailable === false
+            ? 'No renderer is configured on this machine.'
+            : 'Whether a renderer is configured was not checked.',
+    }),
     tile({
       href: '/status',
       title: 'Control plane status',

@@ -4,6 +4,40 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ROUTE TABLE — one origin, one port, one canonical path per thing.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⛔⛤ OWNER RULING 2026-09-03, after a two-day regression. Two servers had come
+ * to claim the root of one tailnet origin: this dev server, and a second one on
+ * another port that a session mapped over `/` (moving the app to `:8443`). This
+ * repo's own logon autostart then re-ran `tailscale serve --bg 5173` at the next
+ * boot and took the root back. So the owner's pages vanished one evening and the
+ * other server's pages vanished the next morning, and nobody had designed either
+ * state. The ruling: ONE port, ONE server, everything on it, one path per thing,
+ * redirects for every retired address, and no route that answers only because
+ * Vite falls through to the app.
+ *
+ *   /             the landing page — links to everything below (was `/home`)
+ *   /terminal/    the app itself. ⛔ It moved OFF the root so the root can be a
+ *                 landing page; Vite's `base` does the moving, dev-only. The
+ *                 trailing slash is load-bearing — see the redirect table.
+ *   /queue        the build board, and only the board (was the top of `/reports`)
+ *   /reports      the private report list, and only the list; /reports/<name>.md
+ *   /view         the read-only control-plane projection, rendered by an EXTERNAL
+ *                 program on every request (scripts/projection-view.js). Also
+ *                 /view.json and /view.txt — the same projection, other formats.
+ *   /status       the operational snapshot         (unchanged)
+ *   /ledger       a window onto the append-only logs (unchanged)
+ *   /sw.js        a service-worker KILL SWITCH for the root scope — see
+ *                 scripts/sw-killswitch.js for why the app's move requires it
+ *
+ * ⭐ WHY THIS SURVIVES A REBOOT, WHICH IS THE ACCEPTANCE TEST. Everything above
+ * is served by the one process the logon trigger starts, and the one Tailscale
+ * mapping that trigger re-ensures (`/` → 5173) now reaches all of it. There is no
+ * second process to keep alive and no second mapping to lose.
+ */
+
+/**
  * ⭐ RE-READ A RENDERER FROM DISK, RATHER THAN TRUSTING THE ONE IN MEMORY.
  *
  * ⛔ THE TRAP THIS CLOSES, MEASURED RATHER THAN IMAGINED. Node caches CommonJS
@@ -24,7 +58,7 @@ const require = createRequire(import.meta.url);
  * exactly like a partial fix. So the whole chain is cleared, deepest first, and
  * only then is the entry required.
  *
- * Dev-only (`apply: 'serve'` on both routes below), and the cost is re-parsing a
+ * Dev-only (`apply: 'serve'` on every route below), and the cost is re-parsing a
  * few small files per request on a personal server. That is not a trade worth
  * thinking about; being unable to trust what you are looking at is.
  */
@@ -58,12 +92,14 @@ const VIEW_CHAIN = [
   // that had already served one page. ⛔ That is precisely the defect this chain
   // exists to close, sitting inside it: a data reader left off the list means the
   // views above it close over a STALE copy while looking perfectly correct. The
-  // /home route now reads the board-currency rule from here too.
+  // landing route reads the board-currency rule from here too.
   './scripts/roadmap-generate.js', // board generator + the board-currency rule
-  './scripts/report-view.js', // page shell + report rendering
+  './scripts/report-view.js', // page shell + report + board rendering
   './scripts/home-view.js', // landing page
   './scripts/status-view.js', // operational snapshot
   './scripts/ledger-view.js', // append-only log window
+  './scripts/projection-view.js', // runs the EXTERNAL projection renderer
+  './scripts/sw-killswitch.js', // the root-scope service-worker kill switch
 ];
 function freshRequire(entry) {
   for (const id of VIEW_CHAIN) {
@@ -77,8 +113,114 @@ function freshRequire(entry) {
 }
 
 /**
+ * The request path, decoded, without the query — or null when it cannot be
+ * decoded, so a malformed escape falls through to Vite's 404 instead of throwing
+ * inside a middleware.
+ */
+function pathOf(req) {
+  try {
+    return decodeURIComponent((req.url || '/').split('?')[0]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ── Shared response shape for every HTML page this file serves ──────────────
+ * Never let an intermediary or the phone keep a copy of private prose, never
+ * refer onward from it, never let a crawler index it. One helper, so a new route
+ * cannot forget a header.
+ */
+function sendHtml(req, res, code, html) {
+  res.statusCode = code;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  res.end(req.method === 'HEAD' ? '' : html);
+}
+
+function sendPlain(req, res, code, text, extraHeaders) {
+  res.statusCode = code;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  for (const [k, v] of Object.entries(extraHeaders || {})) res.setHeader(k, v);
+  res.end(req.method === 'HEAD' ? '' : text);
+}
+
+/**
+ * ── Retired addresses → their canonical path ────────────────────────────────
+ * ⭐ Every address that was ever open on the owner's phone keeps working; none of
+ * them is a second copy of a page. `/home` was the landing page before it moved
+ * to the root; `/mist-view` and `/report` were the other server's aliases for the
+ * projection and for a report that now lives in the report list; `/terminal`
+ * without its slash is what a person types, and Vite answers it with a hint page
+ * rather than the app.
+ *
+ * ⛔ A redirect target is never itself a redirect, and never a path Vite would
+ * fall through on. Suite 265 checks the table against the handlers.
+ */
+const REDIRECTS = Object.freeze({
+  '/home': '/',
+  '/home/': '/',
+  '/mist-view': '/view',
+  '/mist-view/': '/view',
+  '/mist-view/report': '/reports',
+  '/report': '/reports',
+  '/report/': '/reports',
+  '/terminal': '/terminal/',
+});
+
+function redirectsRoute() {
+  return {
+    name: 'robco-redirects',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const p = pathOf(req);
+        const to = p === null ? undefined : REDIRECTS[p];
+        if (!to) return next();
+        res.statusCode = 301;
+        res.setHeader('Location', to);
+        // ⚠ Browsers cache a 301 unless told not to. These ARE permanent, but a
+        // cached redirect that outlives a later change of table is the kind of
+        // machine state nobody can find; no-store keeps the table the only copy.
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+        res.end();
+      });
+    },
+  };
+}
+
+/**
+ * `/sw.js` — the root-scope service-worker KILL SWITCH.
+ *
+ * ⛔ Root only. The app's real worker is `/terminal/sw.js`, served by Vite from
+ * `sw.js` like any other file under the base; this route never touches it. See
+ * scripts/sw-killswitch.js for the whole story.
+ */
+function killSwitchRoute() {
+  return {
+    name: 'robco-sw-killswitch',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (pathOf(req) !== '/sw.js') return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const ks = freshRequire('./scripts/sw-killswitch.js');
+        res.statusCode = 200;
+        for (const [k, v] of Object.entries(ks.SW_HEADERS)) res.setHeader(k, v);
+        res.end(req.method === 'HEAD' ? '' : ks.SW_KILLSWITCH);
+      });
+    },
+  };
+}
+
+/**
  * `/reports` — the private overnight/morning reports, rendered to phone-readable
- * HTML on demand.
+ * HTML on demand. ⭐ The LIST and the individual reports, and nothing else — the
+ * board that used to headline this page has its own path now (`/queue`).
  *
  * ── ⛔ WHY THIS IS A ROUTE AND NOT A FOLDER ──────────────────────────────────
  * The reports are NOT publishable: they describe internal architecture and one of
@@ -101,13 +243,13 @@ function freshRequire(entry) {
  * `tailscale serve` mapping. Rejected on durability of state: a second mapping is
  * PERSISTENT machine configuration that outlives the feature, and a stale one
  * pointing at a port that some later process reuses would proxy the tailnet to
- * whatever now answers there. This route leaves nothing behind — stop the dev
- * server and it ceases to exist. It also inherits the loopback bind and the
- * `allowedHosts` entry below, both of which took real debugging to get right; a
- * second server would have to re-earn them, and a localhost-only check would pass
- * while it was broken.
+ * whatever now answers there. ⛔⛤ That prediction came true on 2026-09-01, with
+ * a second server rather than a static one — see the route table above. This
+ * route leaves nothing behind — stop the dev server and it ceases to exist. It
+ * also inherits the loopback bind and the `allowedHosts` entry below, both of
+ * which took real debugging to get right.
  *
- * ⚠ THE COST OF THAT CHOICE, NAMED: private content now shares an origin with the
+ * ⚠ THE COST OF THAT CHOICE, NAMED: private content shares an origin with the
  * app's dev server, so widening this server's bind would expose the reports too.
  * That is a real coupling, and it is why the bind is asserted by the gate rather
  * than left to the comment below to defend.
@@ -126,86 +268,177 @@ function reportsRoute() {
         // ⛔ Per request, never hoisted to setup — see freshRequire's header. This
         // is the page read most, and it HAS served stale content from memory.
         const view = freshRequire('./scripts/report-view.js');
-        const send = (code, html) => {
-          res.statusCode = code;
-          res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          // Never let an intermediary or the phone keep a copy of private prose.
-          res.setHeader('Cache-Control', 'no-store, max-age=0');
-          res.setHeader('Referrer-Policy', 'no-referrer');
-          res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-          res.end(req.method === 'HEAD' ? '' : html);
-        };
         // `req.url` is already relative to the mount point.
-        const raw = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
-        if (!raw)
-          // ⛔ Both read AT REQUEST TIME. The board is regenerated as work closes,
-          // sometimes mid-read, so a cached copy would present a stale picture as
-          // the current one -- which defeats the only thing the board is for.
-          return send(
+        const raw = (pathOf(req) || '/').replace(/^\/+/, '');
+        if (!raw) {
+          // ⛔ Read AT REQUEST TIME. The list changes as reports land.
+          return sendHtml(
+            req,
+            res,
             200,
-            view.renderIndex(
-              paths.listReports(),
-              paths.describeReports(),
-              paths.readRoadmap(),
-              // ⛔ The WHOLE queue, so the honesty tile is never computed over a
-              // subset. Read here, at request time, like everything else.
-              paths.readPlanningFile('QUEUE.md')
-            )
+            view.renderReportsIndex(paths.listReports(), paths.describeReports())
           );
+        }
         // ⛔ The name is validated inside planning-paths (pattern + containment).
         // A rejected name is indistinguishable here from a missing one, on purpose.
         const md = paths.readReport(raw);
-        if (md === null) return send(404, view.renderNotFound());
-        return send(200, view.renderReport(raw, md));
+        if (md === null) return sendHtml(req, res, 404, view.renderNotFound());
+        return sendHtml(req, res, 200, view.renderReport(raw, md));
       });
     },
   };
 }
 
 /**
- * `/home` — the landing page: one screen that reaches everything.
+ * `/queue` — the build board, and only the board.
  *
- * ⛔ IT CANNOT LIVE AT `/`, because `/` is the app itself and the app is one of
- * the things this page has to reach. So it takes a path of its own, and the app
- * keeps the root it has always had.
+ * ⭐ "What needs you" lives HERE, once: the Attention count in the strip and the
+ * Attention band below it. It used to be the headline of `/reports`; the owner
+ * ruled the two apart on 2026-09-03 so that each path is one thing.
  *
- * ⚠ EVERY DESTINATION ON THIS PAGE WAS VERIFIED BY CONTENT, NOT BY STATUS CODE.
- * A dev server answers unknown paths with the app's index page — identical
- * status, identical bytes — so "it returned 200" says nothing at all. Each
- * candidate was compared against a deliberate nonsense path on the same host, and
- * the ones that turned out to be the fallback are named on the page as not built
- * rather than linked. The renderer holds no addresses of its own except the one
- * passed in here.
+ * ⛔ Both inputs are read AT REQUEST TIME. The board is regenerated as work
+ * closes, sometimes mid-read, so a cached copy would present a stale picture as
+ * the current one — which defeats the only thing the board is for. The WHOLE
+ * queue is read alongside it, so the honesty tile is never computed over a
+ * subset and the currency line can say whether the board still matches.
+ */
+function queueRoute() {
+  return {
+    name: 'robco-queue',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      server.middlewares.use('/queue', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const rest = (pathOf(req) || '/').replace(/^\/+/, '');
+        if (rest) return next(); // only the mount point; deeper paths are not this page
+        const paths = freshRequire('./scripts/planning-paths.js');
+        const view = freshRequire('./scripts/report-view.js');
+        return sendHtml(
+          req,
+          res,
+          200,
+          view.renderQueue(paths.readRoadmap(), paths.readPlanningFile('QUEUE.md'))
+        );
+      });
+    },
+  };
+}
+
+/**
+ * `/view` — the read-only control-plane projection, rendered by an EXTERNAL
+ * program on every request. Plus `/view.json` and `/view.txt`.
+ *
+ * ── ⛔⛔ WHAT CROSSES THE BOUNDARY, AND WHAT DOES NOT ─────────────────────────
+ * The projection is built and owned by a separate, private repository. This
+ * route does not import it. It runs a configured script (`ROBCO_VIEW_RENDERER`)
+ * with a format flag and streams its stdout into the response — the whole
+ * contract is one command line. Unconfigured means a plain-text 404 that says so.
+ * ⛔ It NEVER falls through to the app, and it NEVER serves a previous render,
+ * because there is none: a stale projection wearing a fresh timestamp is the
+ * exact defect the projection exists to make impossible.
+ *
+ * ── ⛔ READ-ONLY, ENFORCED HERE AS WELL AS THERE ──────────────────────────────
+ * Anything other than GET or HEAD is answered 405 and its body is never read.
+ * The projection's own rule is that it renders and never acts; being served by
+ * the app's dev server must not quietly give it a write path, so the refusal
+ * lives on this side too. The response carries the projection's own headers: no
+ * store, a policy that loads nothing and embeds nowhere, no referrer.
+ */
+const VIEW_FORMATS = Object.freeze({
+  '/view': 'html',
+  '/view/': 'html',
+  '/view.json': 'json',
+  '/view.txt': 'txt',
+});
+
+function projectionRoute() {
+  return {
+    name: 'robco-projection',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const p = pathOf(req);
+        const format = p === null ? undefined : VIEW_FORMATS[p];
+        if (!format) return next();
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          return sendPlain(
+            req,
+            res,
+            405,
+            'METHOD NOT ALLOWED.\n\n' +
+              'The projection is read-only. It renders state; it never writes it.\n' +
+              'There is no endpoint here that accepts anything, and this request body was not read.\n',
+            { Allow: 'GET, HEAD' }
+          );
+        }
+        // ⛔ Per request, like every other module here — see freshRequire's header.
+        const projection = freshRequire('./scripts/projection-view.js');
+        projection
+          .render(format)
+          .then(r => {
+            res.statusCode = r.status;
+            res.setHeader('Content-Type', r.type);
+            res.setHeader('Cache-Control', 'no-store, max-age=0');
+            res.setHeader(
+              'Content-Security-Policy',
+              "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+            );
+            res.setHeader('Referrer-Policy', 'no-referrer');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('X-Frame-Options', 'DENY');
+            res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+            res.end(req.method === 'HEAD' ? '' : r.body);
+          })
+          .catch(err => {
+            // ⛔ AN ERROR IS RENDERED AS AN ERROR, never as an empty page and never
+            // as the app.
+            sendPlain(
+              req,
+              res,
+              500,
+              'the projection could not be rendered.\n\n' + String((err && err.stack) || err) + '\n'
+            );
+          });
+      });
+    },
+  };
+}
+
+/**
+ * `/` — the landing page: one screen that reaches everything, plus the two
+ * read-only operational views (`/status`, `/ledger`) that share its readers.
+ *
+ * ⭐ IT LIVES AT THE ROOT NOW. It could not before, because the app was the root;
+ * the app is under `/terminal/` (Vite's `base`) precisely so this can be the
+ * front door. `/home` redirects here.
+ *
+ * ⚠ EVERY DESTINATION ON THIS PAGE IS A HANDLER IN THIS FILE, not a path that
+ * merely answers. Under `appType: 'mpa'` with a base path, a path with no handler
+ * is a 404, so a dead tile fails loudly rather than rendering the app — which is
+ * the trap the previous version of this page had to defend against by hashing
+ * content against a nonsense path.
  *
  * Same response headers as the reports route, for the same reason: this page
  * names private destinations, so nothing may cache it or refer onward from it.
  */
-function homeRoute() {
+function landingRoute() {
   return {
-    name: 'robco-home',
+    name: 'robco-landing',
     apply: 'serve', // ⛔ dev only — never part of any build output
     configureServer(server) {
-      server.middlewares.use('/home', (req, res, next) => {
+      server.middlewares.use('/', (req, res, next) => {
+        if (pathOf(req) !== '/') return next();
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
         // ⛔ PER REQUEST — see the identical note on the /reports handler.
         const paths = freshRequire('./scripts/planning-paths.js');
-        // Only the mount point itself. Anything deeper is not this page, and
-        // falls through rather than being answered with it.
-        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
-        if (rest) return next();
         // ⛔ Read AT REQUEST TIME, never cached — the counts are the only thing
         // making this page's freshness claim true.
         const board = paths.readRoadmap();
         // ⭐⭐ CURRENCY, NOT MTIME — the tile used to report when the board FILE was
         // written, which is silent about whether it still matches the queue. It was
         // 59 items stale on 2026-09-01 while saying "Updated 44 minutes ago".
-        //
-        // ⚠ COSTED BEFORE ADDING, NOT ASSUMED: this reads the whole queue and hashes
-        // it, measured at ~16 ms on the real 3.2 MB document, once per visit to a
-        // page one person opens by hand. That buys the tile a claim it otherwise has
-        // to omit — and an omitted currency is exactly what let a stale board pass
-        // for a current one. ⛔ Read at request time like everything else here; a
-        // cached hash would answer for a queue that has since moved.
+        // Costed: reading and hashing the whole queue is ~16 ms on the real 3.2 MB
+        // document, once per visit to a page one person opens by hand.
         const boardQueue = board ? paths.readPlanningFile('QUEUE.md') : null;
         const boardCurrency = board
           ? freshRequire('./scripts/roadmap-generate.js').boardCurrency(board.text, boardQueue)
@@ -214,53 +447,34 @@ function homeRoute() {
         // makes the READ fresh, never the DATA, and the tile has to carry the
         // second fact rather than the first — which is why `generatedAt` is what
         // travels and the read time is discarded here.
-        //
-        // ⚠ Costed before adding, not assumed: this parses the snapshot on every
-        // home load, measured at ~3ms. That buys the landing page an age it would
-        // otherwise have to invent or omit, and an omitted age is what lets a
-        // stale reading pass for a current one.
         const control = freshRequire('./scripts/control-state.js');
         const snap = control.readStatus();
         const stamp = snap && snap.data ? new Date(snap.data.generatedAt) : null;
+        // ⭐ Whether the external projection renderer is configured — asked of the
+        // module that owns that question, never guessed from a path.
+        const projection = freshRequire('./scripts/projection-view.js');
         const html = freshRequire('./scripts/home-view.js').renderHome({
           reportCount: paths.reportsDir() === null ? null : paths.listReports().length,
           boardUpdated: board ? board.mtime : null,
           // ⛔ null when it could not be established — never coerced to a boolean,
-          // because "unknown" and "fine" are different facts and only one is safe
-          // to print.
+          // because "unknown" and "fine" are different facts.
           boardCurrent: boardCurrency && boardCurrency.known ? boardCurrency.current : null,
           statusReachable: snap !== null,
           statusGeneratedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
           logCount: control.listLogs().length, // stat only — nothing is opened
-          // ⛔ EMPTY, AND THAT IS A MEASURED CLAIM RATHER THAN AN OVERSIGHT: every
-          // destination this page names is now built and was verified by content
-          // against a nonsense path, not by status code. Anything genuinely
-          // absent belongs in this array, where the renderer will name it as
-          // absent — it must never go back to being a literal inside the
-          // renderer, which is exactly how this page came to insist that two
-          // pages it can now link to did not exist.
+          projectionAvailable: projection.available(),
+          // ⛔ EMPTY, AND THAT IS A MEASURED CLAIM: every destination this page
+          // names is a handler in this file. Anything genuinely absent belongs in
+          // this array, where the renderer names it as absent — never as a literal
+          // inside the renderer, which is how this page once insisted two live
+          // pages did not exist.
           unbuilt: [],
           // The public companion site. Held here rather than in the renderer so
           // the renderer stays a pure function of what it is handed.
           museumUrl: 'https://robco-exhibit.pages.dev/',
         });
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store, max-age=0');
-        res.setHeader('Referrer-Policy', 'no-referrer');
-        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        res.end(req.method === 'HEAD' ? '' : html);
+        return sendHtml(req, res, 200, html);
       });
-
-      // ── Shared response shape for the two read-only operational views ──────
-      const sendHtml = (req, res, code, html) => {
-        res.statusCode = code;
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store, max-age=0');
-        res.setHeader('Referrer-Policy', 'no-referrer');
-        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-        res.end(req.method === 'HEAD' ? '' : html);
-      };
 
       /**
        * `/status` — the operational snapshot.
@@ -283,7 +497,7 @@ function homeRoute() {
        */
       server.middlewares.use('/status', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        const rest = (pathOf(req) || '/').replace(/^\/+/, '');
         if (rest) return next(); // only the mount point; deeper paths are not this page
         const control = freshRequire('./scripts/control-state.js');
         const snap = control.readStatus();
@@ -309,7 +523,7 @@ function homeRoute() {
        */
       server.middlewares.use('/ledger', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-        const rest = decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/+/, '');
+        const rest = (pathOf(req) || '/').replace(/^\/+/, '');
         const control = freshRequire('./scripts/control-state.js');
         const view = freshRequire('./scripts/ledger-view.js');
         if (!rest) {
@@ -338,7 +552,27 @@ function homeRoute() {
 // itself is a static site with no build step (see README "Hosting & Release Flow"),
 // so nothing here affects staging or production. Vite never builds this project.
 export default defineConfig({
-  plugins: [homeRoute(), reportsRoute()],
+  // ⭐ THE APP LIVES UNDER `/terminal/` ON THE DEV ORIGIN, so the root can be the
+  // landing page. Dev-only: `base` shapes what this server serves and nothing else
+  // — production is a static site at its own origin's root, unchanged. The app's
+  // own relative paths (`css/…`, `sw.js`, `manifest.json`, `start_url: "./"`) all
+  // resolve under the base, and its service worker registers at scope
+  // `/terminal/`. ⚠ Every path in this file that is NOT under the base is served
+  // by the plugins above, BEFORE Vite's base middleware sees the request.
+  base: '/terminal/',
+  // ⛔ NO SPA FALLBACK. An unknown path is a 404, not the app's index page under a
+  // different URL. The app has no client-side routing (its only history call
+  // rewrites the current pathname), so nothing is lost — and "it returned 200"
+  // becomes evidence again.
+  appType: 'mpa',
+  plugins: [
+    redirectsRoute(),
+    killSwitchRoute(),
+    landingRoute(),
+    queueRoute(),
+    reportsRoute(),
+    projectionRoute(),
+  ],
   server: {
     // --- Real-device (phone) testing over Tailscale --------------------------
     //
