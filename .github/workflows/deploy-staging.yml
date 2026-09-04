@@ -6,9 +6,12 @@ name: Deploy Staging (Cloudflare Pages)
 # problem - the project is a direct-upload Pages project that can't be
 # Git-connected, so this Action runs the same build + deploy the owner ran by hand.
 #
-# Requires one repo secret: CLOUDFLARE_API_TOKEN (Cloudflare Pages:Edit on this
-# account). If the secret is absent the deploy is SKIPPED with a warning (the job
-# still succeeds), so this workflow is safe to land before the secret is set.
+# Requires two repo secrets: CLOUDFLARE_API_TOKEN (Cloudflare Pages:Edit on this
+# account) and CLOUDFLARE_ACCOUNT_ID. If CLOUDFLARE_API_TOKEN is absent the deploy
+# is SKIPPED with a warning (the job still succeeds). CLOUDFLARE_ACCOUNT_ID has no
+# such guard -- it must exist BEFORE this workflow next fires on a push to dev, or
+# the deploy step runs with an empty account ID and fails live (this workflow has
+# no dry-run path). See the PR that introduced this comment for the merge order.
 on:
   push:
     branches: [dev]
@@ -43,7 +46,7 @@ jobs:
       - name: Deploy to Cloudflare Pages (staging)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: c89063a03a708175fc29b0487543dfcf
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::warning::CLOUDFLARE_API_TOKEN secret is not set - skipping staging deploy."
