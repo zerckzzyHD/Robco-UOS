@@ -3,6 +3,13 @@
 # (test-count / Protocol 38 / Protocol 40 guards), so they must stay in the repo.
 .claude/
 
+# Project-scope MCP config (MCP2) — machine-local absolute paths into the PRIVATE
+# control plane (e.g. _RobCo-Control/code/mcp/robco-evidence.js). Never committed:
+# this repo is PUBLIC, and the path both exposes that private repo's internal
+# layout and is meaningless on any other machine (points at a directory a clone
+# won't have). Works fine locally, untracked, which is all it needs to do.
+.mcp.json
+
 # Codex's local hook wiring — same reasoning as .claude/ above, and this repo is
 # PUBLIC. .codex/ holds machine-local hook wiring and stays untracked.
 #
