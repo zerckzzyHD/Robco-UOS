@@ -88,9 +88,65 @@ function runGit(args, cwd) {
   };
 }
 
+/**
+ * ⛔ A LEXICAL COMPARE IS NOT AN ANSWER TO "IS THIS THE SAME DIRECTORY".
+ *
+ * The two sides of every comparison in this module come from different
+ * producers that spell the same place differently. A session record's `cwd` is
+ * a plain string a session wrote down — on Windows, whatever `TEMP` literally
+ * says. `roots` come from `git worktree list`, which git reports only after its
+ * own `real_path()` has expanded short names and followed junctions. Compared
+ * as strings the two read as different directories, every session in that tree
+ * is filtered out, and the preflight prints "no session has its cwd inside a
+ * worktree of this repository" — a false NEGATIVE, in the one module whose
+ * whole doctrine is that an unreadable source is UNOBSERVABLE and never "no
+ * writers" (see the header). ⚠ The wrong answer here is the confident one.
+ *
+ * ⭐ MEASURED ON THE RUNNER, 2026-09-04, not reasoned about: GitHub Actions'
+ * `windows-latest` hands out `os.tmpdir()` = `C:\Users\RUNNER~1\AppData\Local\
+ * Temp` — the 8.3 SHORT form — while git reports `C:/Users/runneradmin/...`.
+ * That is why Suite 266's `266.25` failed on `windows-latest` on 9 of 9 runs
+ * from the moment it landed while `ubuntu-latest` passed all 9 (there,
+ * `/tmp` is already canonical). ⛔ It was NOT the clock: the same probe measured
+ * the boot-time recomputation moving 9 ms across the child spawn, on a VM 122 s
+ * old — the exact fresh-VM condition the clock-skew hypothesis named.
+ *
+ * `fs.realpathSync.native` is the OS call (`GetFinalPathNameByHandle` on
+ * Windows), so — unlike `fs.realpathSync` — it also expands 8.3 short names.
+ * A path that does not exist cannot be resolved at all, so resolve the longest
+ * ancestor that DOES and re-append the rest; if nothing on it exists (a stale
+ * record naming a deleted worktree) fall back to the lexical form, which is
+ * what this function did for everything before.
+ */
+const REAL_CACHE = new Map(); // these are one-shot CLI runs: one answer per path per run
+
+function realPathish(p) {
+  const key = String(p);
+  const hit = REAL_CACHE.get(key);
+  if (hit !== undefined) return hit;
+  const resolved = path.resolve(key);
+  let cur = resolved;
+  const tail = [];
+  let out = resolved;
+  for (;;) {
+    try {
+      const real = fs.realpathSync.native(cur);
+      out = tail.length ? path.join(real, ...tail.reverse()) : real;
+      break;
+    } catch {
+      const parent = path.dirname(cur);
+      if (parent === cur) break; // hit the root with nothing resolvable — keep the lexical form
+      tail.push(path.basename(cur));
+      cur = parent;
+    }
+  }
+  REAL_CACHE.set(key, out);
+  return out;
+}
+
 function normPath(p) {
   if (!p) return '';
-  let s = path.resolve(String(p)).replace(/[\\/]+$/, '');
+  let s = realPathish(p).replace(/[\\/]+$/, '');
   if (process.platform === 'win32') s = s.replace(/\//g, '\\').toLowerCase();
   return s;
 }

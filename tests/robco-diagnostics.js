@@ -59052,6 +59052,56 @@ if (!PLANNING_OK) {
         !/EPERM'\)\s*return 'present'/.test(stateSrcNow266),
       '266.26: EPERM from the pid probe reads as INCONCLUSIVE, never as present (Windows hands dead pids to processes this user cannot open)'
     );
+
+    // ── the same directory, spelled a second way, is still the same directory ──
+    // The record's cwd and the roots come from DIFFERENT producers: a session
+    // writes down a string, git reports what its own real_path() resolved. When
+    // the two spellings differ, a lexical compare says "different directory" and
+    // the writers list comes back EMPTY — a confident false negative, which is
+    // exactly what this module's header forbids.
+    // This is not hypothetical: it is why 266.25 failed on GitHub Actions'
+    // windows-latest on 9 of 9 runs (os.tmpdir() there is the 8.3 short form
+    // C:\Users\RUNNER~1\..., git reports C:/Users/runneradmin/...) while
+    // ubuntu-latest passed all 9. The fixture uses a junction/symlink rather
+    // than an 8.3 alias so it proves the SAME class on both platforms and does
+    // not depend on 8.3 being enabled on the volume (it is not, everywhere).
+    const alias266 = path.join(tmp266, 'wt-alias');
+    let aliasErr266 = null;
+    try {
+      fs.symlinkSync(wt266, alias266, 'junction');
+    } catch (e) {
+      aliasErr266 = e;
+    }
+    if (aliasErr266) {
+      assert(
+        false,
+        '266.27: a second spelling of the worktree path could not be created (' +
+          aliasErr266.message +
+          ') — the path-form invariant went UNMEASURED, which is not the same as passing'
+      );
+    } else {
+      const sessAlias266 = fs.mkdtempSync(path.join(os266.tmpdir(), 'robco-sessions-alias-266-'));
+      fs.writeFileSync(
+        path.join(sessAlias266, String(process.pid) + '.json'),
+        JSON.stringify({ pid: process.pid, cwd: alias266, startedAt: boot266 + 60 * 1000 })
+      );
+      const preAlias = run266(preP266, wt266, { ROBCO_CLAUDE_SESSIONS_DIR: sessAlias266 });
+      assert(
+        preAlias.status === 0 &&
+          new RegExp('claude pid ' + process.pid + '\\s+PRESENT').test(preAlias.stdout) &&
+          new RegExp('a Claude session \\(pid ' + process.pid + '\\) is in this repository').test(
+            preAlias.stdout
+          ) &&
+          !/no Claude or Codex session has its cwd inside/.test(preAlias.stdout),
+        '266.27: a session whose cwd reaches this worktree by a DIFFERENT SPELLING of the same path (junction/symlink, or an 8.3 short name on Windows) is still counted — paths are canonicalised before they are compared, never compared as strings'
+      );
+      try {
+        fs.rmSync(sessAlias266, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        /* harmless leftover */
+      }
+    }
+
     try {
       fs.rmSync(sess266, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
     } catch {
