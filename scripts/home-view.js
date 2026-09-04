@@ -48,6 +48,20 @@ const { page, escapeHtml } = require('./report-view.js');
  * is for. The shared shell supplies the palette, so the two pages still match.
  */
 const HOME_STYLE = `
+/* ⛔⤴ THE RETIRED-INSTALL NOTICE — CSS-ONLY, and hidden by default.
+   The display-mode:standalone query is true ONLY when this page was opened from an
+   INSTALLED app rather than a browser tab. That is exactly, and only, the person
+   this notice is for: somebody whose home-screen icon used to open the terminal
+   and now opens this page, because the app moved off this origin's root on
+   2026-09-03 (commit 7a42e82). ⭐ A tab visitor never sees it, so it costs the normal
+   reader nothing. No script — this page measures nothing and runs nothing. */
+.retired { display:none; }
+@media (display-mode: standalone) { .retired { display:block; } }
+.retired { border:2px solid var(--hi); border-radius:10px; background:var(--code);
+  padding:.85rem 1rem .95rem; margin:0 0 1.2rem; }
+.retired h2 { margin:0 0 .4rem; font-size:1.05rem; color:var(--hi); }
+.retired p { margin:.35rem 0 0; font-size:.97rem; line-height:1.5; }
+.retired a { color:var(--acc); font-weight:700; }
 .tiles { list-style:none; margin:1.2rem 0 0; padding:0; }
 .tiles li { margin:0 0 .7rem; border:1px solid var(--line); border-radius:10px;
   background:var(--code); padding:.8rem 1rem .9rem; }
@@ -232,6 +246,27 @@ function tile({ href, title, what, meta, metaWarn, away }) {
  *   projection renderer is configured on this machine — TRUE, FALSE, or null for
  *   "not checked". ⛔ Three states, like every other fact here.
  */
+/**
+ * ⛔ The notice an OLD home-screen icon lands on.
+ *
+ * Until 2026-09-03 the terminal was served at this origin's ROOT, so an install
+ * made from here has `start_url` and `scope` of `/` — and `/` is this landing
+ * page now. ⚠ A PWA install is BOUND to the start_url and scope it was created
+ * with; there is no server-side way to move one. So the honest fix is to say so
+ * and point at the new address, rather than leave a home-screen icon that opens
+ * a page with no explanation of why the app is not there.
+ */
+const RETIRED_INSTALL_NOTICE =
+  `<section class="retired">` +
+  `<h2>This installed app is out of date</h2>` +
+  `<p>You opened this from a home-screen icon that was installed when the terminal ` +
+  `lived at this address. It moved on 3 September, so this icon now opens the index ` +
+  `instead of the app.</p>` +
+  `<p>Open <a href="/terminal/">the terminal</a>, then install it again from there. ` +
+  `The new one is called <strong>RobCo DEV</strong> and has an amber icon, so you can ` +
+  `tell it apart from the published app. You can delete this icon afterwards.</p>` +
+  `</section>`;
+
 function renderHome(state) {
   const s = state || {};
   const hasReports = typeof s.reportCount === 'number';
@@ -413,6 +448,7 @@ function renderHome(state) {
     atHome: true,
     style: HOME_STYLE,
     body:
+      RETIRED_INSTALL_NOTICE +
       `<h1>Start here</h1>` +
       `<p>Everything below is checked each time this page loads.</p>` +
       `<ul class="tiles">${tiles.join('')}</ul>` +
@@ -423,6 +459,7 @@ function renderHome(state) {
 
 module.exports = {
   renderHome,
+  RETIRED_INSTALL_NOTICE,
   ago,
   elapsed,
   assessAge,

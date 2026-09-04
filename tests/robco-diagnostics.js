@@ -54272,6 +54272,204 @@ if (!PLANNING_OK) {
   }
 }
 
+// ── 249.12  THE DEV TOOLS EXIST ON THE DEV ORIGIN, AND NOWHERE ELSE ─────────
+//
+// ⛔ THE BUG: the Diagnostic Shell mounted at 127.0.0.1 and was INVISIBLE over
+// the tailnet dev origin, which serves byte-identical HTML. `_isStagingEnv()`
+// had three signals — the Cloudflare staging meta, a global nothing in this
+// repository sets, and a hostname list written before this origin existed — and
+// the tailnet host matched none of them. The owner's only real-device surface
+// silently had no dev tools, on the right branch, from live source.
+//
+// The fix makes the DEV SERVER emit the marker, so the predicate becomes "served
+// by a dev server" instead of "answering to a name on a list". This repo is
+// PUBLIC and the museum is generated from it, so the assertions below are about
+// the leak direction every bit as much as the fix.
+//
+// ⭐ EACH ONE NAMES WHAT TURNS IT RED OTHER THAN SOMEBODY UNDOING THIS COMMIT.
+{
+  const DEM = require(path.join(ROOT, 'scripts', 'dev-env-marker.js'));
+  const viteSrc24912 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  const indexSrc24912 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const uiCoreSrc24912 = fs.readFileSync(path.join(ROOT, 'js', 'ui', 'ui-core.js'), 'utf8');
+  const cfSrc24912 = fs.readFileSync(path.join(ROOT, 'scripts', 'cf-staging-build.mjs'), 'utf8');
+
+  // (a) THE EMITTER MATCHES THE CONSUMER — the drift that silently re-breaks the
+  // panel with nothing failing anywhere: rename the meta or change the value in
+  // _isStagingEnv() and the dev server keeps cheerfully stamping a tag nobody
+  // reads. Asserted against the PREDICATE'S OWN SOURCE rather than a second copy
+  // of the strings kept here, because a copy is exactly what cannot detect drift.
+  const envFn24912 = uiCoreSrc24912.slice(
+    uiCoreSrc24912.indexOf('function _isStagingEnv()'),
+    uiCoreSrc24912.indexOf('function _visibleChangelog(')
+  );
+  const tag24912 = DEM.devEnvMarkerTag();
+  assert(
+    envFn24912.length > 0 &&
+      envFn24912.includes('meta[name="' + DEM.ENV_META_NAME + '"]') &&
+      envFn24912.includes("'" + DEM.ENV_STAGING + "'") &&
+      tag24912.tag === 'meta' &&
+      tag24912.attrs.name === DEM.ENV_META_NAME &&
+      tag24912.attrs.content === DEM.ENV_STAGING,
+    "249.12a: the marker the dev server STAMPS is the same one _isStagingEnv() READS — asserted against the predicate's own source, so renaming the meta or changing the value on either side goes red instead of quietly leaving the dev origin with no dev tools again" +
+      ` — emits name=${tag24912.attrs.name} content=${tag24912.attrs.content}`
+  );
+
+  // (b) ⛔⛤ THE LEAK GUARD, and the assertion here most able to go red with
+  // nobody having touched this commit. The marker must NOT appear in the tracked
+  // source: production (GitHub Pages, from `main`) serves index.html straight out
+  // of this repository, and the museum generator reads these same files. A marker
+  // hardcoded into the source — by a later session "fixing" this the obvious way
+  // — ships the full staging tier, every cheat and reset tool included, to the
+  // public site.
+  assert(
+    !new RegExp('name=["\'`]' + DEM.ENV_META_NAME).test(indexSrc24912) &&
+      !/__ROBCO_ENV__\s*=[^=]/.test(indexSrc24912),
+    '249.12b: the environment marker is ABSENT from the tracked index.html and nothing in it assigns the __ROBCO_ENV__ global — the public site inherits no staging signal, so the dev tools cannot reach a published surface by way of the source file'
+  );
+
+  // (c) IT CANNOT REACH A BUILD OUTPUT EITHER. `apply: 'serve'` is why (b) stays
+  // true even if this project ever gains a build step. Red if that guard is
+  // dropped, or if the plugin is registered but not applied at serve time.
+  const pluginBody24912 = viteSrc24912.slice(
+    viteSrc24912.indexOf('function devEnvMarkerRoute()'),
+    viteSrc24912.indexOf('function killSwitchRoute()')
+  );
+  assert(
+    pluginBody24912.length > 0 &&
+      /apply:\s*'serve'/.test(pluginBody24912) &&
+      /devEnvMarkerRoute\(\)/.test(viteSrc24912.slice(viteSrc24912.indexOf('plugins: ['))),
+    "249.12c: the marker is injected by a REGISTERED apply:'serve' plugin — it exists only inside a running dev server and never in a build output, which is what makes the leak guard structural instead of a matter of remembering"
+  );
+
+  // (d) ONE MARKER, NOT TWO. The Cloudflare staging build injects this same tag.
+  // Two independent spellings of one signal is how two records of one thing begin
+  // to disagree, and the failure is silent on whichever side drifted.
+  assert(
+    cfSrc24912.includes('name="' + DEM.ENV_META_NAME + '" content="' + DEM.ENV_STAGING + '"'),
+    '249.12d: the dev server and the Cloudflare staging build stamp the IDENTICAL marker — the dev origin is not a special case carrying a signal of its own, so a change to one spelling cannot leave the other quietly unrecognised'
+  );
+}
+
+// ── 249.13  TWO INSTALLED APPS, TELLABLE APART — AND THE PUBLISHED ONE UNTOUCHED ─
+//
+// ⛔ THE REGRESSION BEHIND THIS. On 2026-09-03 (7a42e82) the terminal moved off
+// the tailnet origin's ROOT to /terminal/ so the root could be a landing page.
+// A PWA install is BOUND to the start_url and scope it was made with, and the
+// owner's dev install was made from the root — so his home-screen icon now opens
+// the landing page, and the root-scope kill switch shipped in the same commit
+// cleared the worker it had been using. Measured 2026-09-04 at the root: title
+// "Start here", not the app, no manifest, not controlled.
+//
+// Re-installing from /terminal/ is the only real fix — nothing server-side can
+// move an install. ⭐ But re-installing produced a SECOND problem: both apps read
+// the same manifest, so both installed as "RobCo U.O.S." with the same icon, and
+// opening the wrong one makes every conclusion drawn afterwards wrong.
+//
+// ⭐ EACH ASSERTION NAMES WHAT TURNS IT RED OTHER THAN SOMEBODY UNDOING THIS.
+{
+  const PWA = require(path.join(ROOT, 'scripts', 'dev-pwa-identity.js'));
+  const HV = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const realText24913 = fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8');
+  const real24913 = JSON.parse(realText24913);
+  const viteSrc24913 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+
+  // (a) DERIVED, NEVER FORKED — driven with a KNOWN fixture rather than by
+  // re-reading the same file and comparing it to itself, so this measures the
+  // transform. Red the day somebody keeps a second copy of the manifest for the
+  // dev server: a fork stops inheriting, silently, and the first thing it stops
+  // inheriting is a fix.
+  const fixture24913 = JSON.stringify({
+    name: 'X',
+    short_name: 'Y',
+    start_url: './',
+    scope: './',
+    display: 'standalone',
+    theme_color: '#123456',
+    icons: [{ src: 'a.png', sizes: '192x192', type: 'image/png' }],
+    shortcuts: [{ name: 'S', url: './#go=s' }],
+  });
+  const derived24913 = PWA.devManifest(fixture24913);
+  const overridden24913 = ['name', 'short_name', 'icons'];
+  const carried24913 = Object.keys(JSON.parse(fixture24913)).filter(
+    k => !overridden24913.includes(k)
+  );
+  const lost24913 = carried24913.filter(
+    k => JSON.stringify(derived24913[k]) !== JSON.stringify(JSON.parse(fixture24913)[k])
+  );
+  assert(
+    lost24913.length === 0 && carried24913.length >= 5,
+    '249.13a: the dev manifest is DERIVED from the real one — driven with a known fixture, every field except name/short_name/icons is carried through untouched, so a later change to the real manifest is inherited by the dev app instead of quietly missed' +
+      (lost24913.length ? ` — DROPPED/ALTERED: ${lost24913.join(', ')}` : '')
+  );
+
+  // (b) ⛔ start_url AND scope ARE NOT REWRITTEN. They are './', which resolves
+  // against the MANIFEST's own URL — so at /terminal/manifest.json they already
+  // resolve to /terminal/. Chrome's own parser reported zero errors with both
+  // resolving there. Rewriting them to an absolute path is the obvious-looking
+  // "fix" that would break installability, and it is exactly what a session
+  // reading only the regression above would reach for.
+  assert(
+    derived24913.start_url === JSON.parse(fixture24913).start_url &&
+      derived24913.scope === JSON.parse(fixture24913).scope &&
+      real24913.start_url === './' &&
+      real24913.scope === './',
+    '249.13b: the dev manifest leaves start_url and scope exactly as the real manifest states them — they are relative and already resolve correctly under the base path, so rewriting them could only break the scope match that makes the app installable at all'
+  );
+
+  // (c) ⛔⛤ THE LEAK GUARD. The tracked manifest.json is what PRODUCTION serves,
+  // straight from this PUBLIC repository. If the dev name or dev icon is ever
+  // written into it, the published app on real home screens becomes the DEV app.
+  // Goes red with nobody having touched this commit.
+  assert(
+    real24913.name !== PWA.DEV_NAME &&
+      real24913.short_name !== PWA.DEV_SHORT_NAME &&
+      !realText24913.includes(PWA.DEV_ICON_FILE) &&
+      !/\[DEV\]/.test(realText24913),
+    '249.13c: the tracked manifest.json carries the PUBLISHED identity and no trace of the dev one — production serves that file from this repository, so a dev name or dev icon written into it would rename the app on every real home screen'
+  );
+
+  // (d) AND IT CANNOT REACH A BUILD OUTPUT — the same serve-only guard the
+  // environment marker relies on, asserted on this route in its own right.
+  const idBody24913 = viteSrc24913.slice(
+    viteSrc24913.indexOf('function devPwaIdentityRoute()'),
+    viteSrc24913.indexOf('function killSwitchRoute()')
+  );
+  assert(
+    idBody24913.length > 0 &&
+      /apply:\s*'serve'/.test(idBody24913) &&
+      /devPwaIdentityRoute\(\)/.test(viteSrc24913.slice(viteSrc24913.indexOf('plugins: ['))),
+    '249.13d: the dev identity is served by a REGISTERED serve-only route — it exists only inside a running dev server, so what production publishes is the repository file and nothing else'
+  );
+
+  // (e) THEY ARE ACTUALLY DIFFERENT — the entire point. A later tidy-up that
+  // "restores" the real name, or points the dev icon back at assets/icon.png,
+  // puts two identical icons on one home screen again and this goes red.
+  assert(
+    PWA.DEV_NAME !== real24913.name &&
+      PWA.DEV_SHORT_NAME !== real24913.short_name &&
+      derived24913.icons.length > 0 &&
+      derived24913.icons.every(i => i.src !== real24913.icons[0].src) &&
+      /svg/i.test(PWA.devIconSvg().slice(0, 60)),
+    '249.13e: the dev app name, short name and icon all differ from the published app — two installs of one manifest render as two identical home-screen icons, and opening the wrong one makes every conclusion after it wrong' +
+      ` — dev "${PWA.DEV_SHORT_NAME}" vs published "${real24913.short_name}"`
+  );
+
+  // (f) THE RETIRED-INSTALL NOTICE IS GATED, not merely present. An ungated
+  // notice would tell every ordinary tab visitor their install is out of date,
+  // which is false for them — so the gate is the part worth asserting. Chromium
+  // was separately observed keeping that media rule in its CSSOM with the
+  // condition text intact, which an unsupported media feature would not survive.
+  assert(
+    /class="retired"/.test(HV.RETIRED_INSTALL_NOTICE) &&
+      /\/terminal\//.test(HV.RETIRED_INSTALL_NOTICE) &&
+      new RegExp(PWA.DEV_SHORT_NAME).test(HV.RETIRED_INSTALL_NOTICE) &&
+      /\.retired\s*\{\s*display:\s*none/.test(HV.HOME_STYLE) &&
+      /@media\s*\(display-mode:\s*standalone\)/.test(HV.HOME_STYLE),
+    '249.13f: the landing page carries a retired-install notice that is HIDDEN by default and revealed only for a visitor arriving from an installed app — it names the new address and the dev app new name, and an ordinary tab visitor is never told their install is stale'
+  );
+}
+
 // ── 262  THE TWO READ-ONLY OPERATIONAL VIEWS ────────────────────────────────
 //
 // Two dev-only pages read state that lives OUTSIDE this repository: a generated
@@ -58492,7 +58690,15 @@ if (!PLANNING_OK) {
   // availability, so the tile degrades to "not checked" on a machine where it is.
   const HV265 = require(path.join(ROOT, 'scripts', 'home-view.js'));
   const landing265 = HV265.renderHome({ unbuilt: [], projectionAvailable: true });
-  const hrefs265 = [...landing265.matchAll(/href="([^"]+)"/g)].map(m => m[1]).sort();
+  // ⭐ THE SET OF DESTINATIONS, NOT THE COUNT OF LINKS — deduplicated on purpose.
+  // This check is about WHERE the page can send you (its own note above says so:
+  // a retired address, the slash-less app path, a path with no handler). It is not
+  // about how many times a canonical path is offered, and requiring exactly one
+  // link each would forbid a legitimate second reference — which is what the
+  // retired-install notice adds when it points somebody whose home-screen icon
+  // landed here at the app's real address. ⛔ Deduplicating does not weaken it: a
+  // retired or unhandled path still enters this set and still fails.
+  const hrefs265 = [...new Set([...landing265.matchAll(/href="([^"]+)"/g)].map(m => m[1]))].sort();
   const want265 = ['/ledger', '/queue', '/reports', '/status', '/terminal/', '/view'];
   const landingStart265 = cfg265.indexOf("server.middlewares.use('/', (req");
   const landingEnd265 = cfg265.indexOf("server.middlewares.use('/status'");
@@ -58508,7 +58714,7 @@ if (!PLANNING_OK) {
       ) &&
       /projectionAvailable:\s*projection\.available\(\)/.test(landingHandler265) &&
       /freshRequire\('\.\/scripts\/projection-view\.js'\)/.test(landingHandler265),
-    '265.5: the landing page links exactly the canonical paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
+    '265.5: the landing page reaches exactly the canonical set of paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
       ` — got ${hrefs265.join(' ')}`
   );
 }
