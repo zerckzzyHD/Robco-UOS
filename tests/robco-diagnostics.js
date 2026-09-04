@@ -54272,6 +54272,85 @@ if (!PLANNING_OK) {
   }
 }
 
+// ── 249.12  THE DEV TOOLS EXIST ON THE DEV ORIGIN, AND NOWHERE ELSE ─────────
+//
+// ⛔ THE BUG: the Diagnostic Shell mounted at 127.0.0.1 and was INVISIBLE over
+// the tailnet dev origin, which serves byte-identical HTML. `_isStagingEnv()`
+// had three signals — the Cloudflare staging meta, a global nothing in this
+// repository sets, and a hostname list written before this origin existed — and
+// the tailnet host matched none of them. The owner's only real-device surface
+// silently had no dev tools, on the right branch, from live source.
+//
+// The fix makes the DEV SERVER emit the marker, so the predicate becomes "served
+// by a dev server" instead of "answering to a name on a list". This repo is
+// PUBLIC and the museum is generated from it, so the assertions below are about
+// the leak direction every bit as much as the fix.
+//
+// ⭐ EACH ONE NAMES WHAT TURNS IT RED OTHER THAN SOMEBODY UNDOING THIS COMMIT.
+{
+  const DEM = require(path.join(ROOT, 'scripts', 'dev-env-marker.js'));
+  const viteSrc24912 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  const indexSrc24912 = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const uiCoreSrc24912 = fs.readFileSync(path.join(ROOT, 'js', 'ui', 'ui-core.js'), 'utf8');
+  const cfSrc24912 = fs.readFileSync(path.join(ROOT, 'scripts', 'cf-staging-build.mjs'), 'utf8');
+
+  // (a) THE EMITTER MATCHES THE CONSUMER — the drift that silently re-breaks the
+  // panel with nothing failing anywhere: rename the meta or change the value in
+  // _isStagingEnv() and the dev server keeps cheerfully stamping a tag nobody
+  // reads. Asserted against the PREDICATE'S OWN SOURCE rather than a second copy
+  // of the strings kept here, because a copy is exactly what cannot detect drift.
+  const envFn24912 = uiCoreSrc24912.slice(
+    uiCoreSrc24912.indexOf('function _isStagingEnv()'),
+    uiCoreSrc24912.indexOf('function _visibleChangelog(')
+  );
+  const tag24912 = DEM.devEnvMarkerTag();
+  assert(
+    envFn24912.length > 0 &&
+      envFn24912.includes('meta[name="' + DEM.ENV_META_NAME + '"]') &&
+      envFn24912.includes("'" + DEM.ENV_STAGING + "'") &&
+      tag24912.tag === 'meta' &&
+      tag24912.attrs.name === DEM.ENV_META_NAME &&
+      tag24912.attrs.content === DEM.ENV_STAGING,
+    "249.12a: the marker the dev server STAMPS is the same one _isStagingEnv() READS — asserted against the predicate's own source, so renaming the meta or changing the value on either side goes red instead of quietly leaving the dev origin with no dev tools again" +
+      ` — emits name=${tag24912.attrs.name} content=${tag24912.attrs.content}`
+  );
+
+  // (b) ⛔⛤ THE LEAK GUARD, and the assertion here most able to go red with
+  // nobody having touched this commit. The marker must NOT appear in the tracked
+  // source: production (GitHub Pages, from `main`) serves index.html straight out
+  // of this repository, and the museum generator reads these same files. A marker
+  // hardcoded into the source — by a later session "fixing" this the obvious way
+  // — ships the full staging tier, every cheat and reset tool included, to the
+  // public site.
+  assert(
+    !new RegExp('name=["\'`]' + DEM.ENV_META_NAME).test(indexSrc24912) &&
+      !/__ROBCO_ENV__\s*=[^=]/.test(indexSrc24912),
+    '249.12b: the environment marker is ABSENT from the tracked index.html and nothing in it assigns the __ROBCO_ENV__ global — the public site inherits no staging signal, so the dev tools cannot reach a published surface by way of the source file'
+  );
+
+  // (c) IT CANNOT REACH A BUILD OUTPUT EITHER. `apply: 'serve'` is why (b) stays
+  // true even if this project ever gains a build step. Red if that guard is
+  // dropped, or if the plugin is registered but not applied at serve time.
+  const pluginBody24912 = viteSrc24912.slice(
+    viteSrc24912.indexOf('function devEnvMarkerRoute()'),
+    viteSrc24912.indexOf('function killSwitchRoute()')
+  );
+  assert(
+    pluginBody24912.length > 0 &&
+      /apply:\s*'serve'/.test(pluginBody24912) &&
+      /devEnvMarkerRoute\(\)/.test(viteSrc24912.slice(viteSrc24912.indexOf('plugins: ['))),
+    "249.12c: the marker is injected by a REGISTERED apply:'serve' plugin — it exists only inside a running dev server and never in a build output, which is what makes the leak guard structural instead of a matter of remembering"
+  );
+
+  // (d) ONE MARKER, NOT TWO. The Cloudflare staging build injects this same tag.
+  // Two independent spellings of one signal is how two records of one thing begin
+  // to disagree, and the failure is silent on whichever side drifted.
+  assert(
+    cfSrc24912.includes('name="' + DEM.ENV_META_NAME + '" content="' + DEM.ENV_STAGING + '"'),
+    '249.12d: the dev server and the Cloudflare staging build stamp the IDENTICAL marker — the dev origin is not a special case carrying a signal of its own, so a change to one spelling cannot leave the other quietly unrecognised'
+  );
+}
+
 // ── 262  THE TWO READ-ONLY OPERATIONAL VIEWS ────────────────────────────────
 //
 // Two dev-only pages read state that lives OUTSIDE this repository: a generated

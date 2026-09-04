@@ -199,6 +199,30 @@ function redirectsRoute() {
 }
 
 /**
+ * The ENVIRONMENT MARKER — what makes the dev tools exist on this origin.
+ *
+ * Stamps <meta name="robco-env" content="staging"> into the HTML this server
+ * serves, which is the signal `_isStagingEnv()` (js/ui/ui-core.js) already looks
+ * for. Without it the Diagnostic Shell mounted at 127.0.0.1 and was invisible
+ * over the tailnet, because the only other signal it had was a hostname list
+ * written before this origin existed.
+ *
+ * ⛔ `apply: 'serve'` — dev only, never part of any build output, and the
+ * on-disk index.html is untouched, so the PUBLIC site cannot inherit this. The
+ * whole account, including why this is a marker rather than one more hostname:
+ * scripts/dev-env-marker.js. Guarded by Suite 249.12.
+ */
+function devEnvMarkerRoute() {
+  return {
+    name: 'robco-dev-env-marker',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    transformIndexHtml() {
+      return [freshRequire('./scripts/dev-env-marker.js').devEnvMarkerTag()];
+    },
+  };
+}
+
+/**
  * `/sw.js` — the root-scope service-worker KILL SWITCH.
  *
  * ⛔ Root only. The app's real worker is `/terminal/sw.js`, served by Vite from
@@ -578,6 +602,7 @@ export default defineConfig({
   // becomes evidence again.
   appType: 'mpa',
   plugins: [
+    devEnvMarkerRoute(),
     redirectsRoute(),
     killSwitchRoute(),
     landingRoute(),
