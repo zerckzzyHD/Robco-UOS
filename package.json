@@ -51,7 +51,7 @@
   },
   "homepage": "https://github.com/zerckzzyHD/Robco-UOS#readme",
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.0",
     "firebase": "12.17.1",
