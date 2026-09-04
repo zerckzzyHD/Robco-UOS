@@ -54351,6 +54351,125 @@ if (!PLANNING_OK) {
   );
 }
 
+// ── 249.13  TWO INSTALLED APPS, TELLABLE APART — AND THE PUBLISHED ONE UNTOUCHED ─
+//
+// ⛔ THE REGRESSION BEHIND THIS. On 2026-09-03 (7a42e82) the terminal moved off
+// the tailnet origin's ROOT to /terminal/ so the root could be a landing page.
+// A PWA install is BOUND to the start_url and scope it was made with, and the
+// owner's dev install was made from the root — so his home-screen icon now opens
+// the landing page, and the root-scope kill switch shipped in the same commit
+// cleared the worker it had been using. Measured 2026-09-04 at the root: title
+// "Start here", not the app, no manifest, not controlled.
+//
+// Re-installing from /terminal/ is the only real fix — nothing server-side can
+// move an install. ⭐ But re-installing produced a SECOND problem: both apps read
+// the same manifest, so both installed as "RobCo U.O.S." with the same icon, and
+// opening the wrong one makes every conclusion drawn afterwards wrong.
+//
+// ⭐ EACH ASSERTION NAMES WHAT TURNS IT RED OTHER THAN SOMEBODY UNDOING THIS.
+{
+  const PWA = require(path.join(ROOT, 'scripts', 'dev-pwa-identity.js'));
+  const HV = require(path.join(ROOT, 'scripts', 'home-view.js'));
+  const realText24913 = fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8');
+  const real24913 = JSON.parse(realText24913);
+  const viteSrc24913 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+
+  // (a) DERIVED, NEVER FORKED — driven with a KNOWN fixture rather than by
+  // re-reading the same file and comparing it to itself, so this measures the
+  // transform. Red the day somebody keeps a second copy of the manifest for the
+  // dev server: a fork stops inheriting, silently, and the first thing it stops
+  // inheriting is a fix.
+  const fixture24913 = JSON.stringify({
+    name: 'X',
+    short_name: 'Y',
+    start_url: './',
+    scope: './',
+    display: 'standalone',
+    theme_color: '#123456',
+    icons: [{ src: 'a.png', sizes: '192x192', type: 'image/png' }],
+    shortcuts: [{ name: 'S', url: './#go=s' }],
+  });
+  const derived24913 = PWA.devManifest(fixture24913);
+  const overridden24913 = ['name', 'short_name', 'icons'];
+  const carried24913 = Object.keys(JSON.parse(fixture24913)).filter(
+    k => !overridden24913.includes(k)
+  );
+  const lost24913 = carried24913.filter(
+    k => JSON.stringify(derived24913[k]) !== JSON.stringify(JSON.parse(fixture24913)[k])
+  );
+  assert(
+    lost24913.length === 0 && carried24913.length >= 5,
+    '249.13a: the dev manifest is DERIVED from the real one — driven with a known fixture, every field except name/short_name/icons is carried through untouched, so a later change to the real manifest is inherited by the dev app instead of quietly missed' +
+      (lost24913.length ? ` — DROPPED/ALTERED: ${lost24913.join(', ')}` : '')
+  );
+
+  // (b) ⛔ start_url AND scope ARE NOT REWRITTEN. They are './', which resolves
+  // against the MANIFEST's own URL — so at /terminal/manifest.json they already
+  // resolve to /terminal/. Chrome's own parser reported zero errors with both
+  // resolving there. Rewriting them to an absolute path is the obvious-looking
+  // "fix" that would break installability, and it is exactly what a session
+  // reading only the regression above would reach for.
+  assert(
+    derived24913.start_url === JSON.parse(fixture24913).start_url &&
+      derived24913.scope === JSON.parse(fixture24913).scope &&
+      real24913.start_url === './' &&
+      real24913.scope === './',
+    '249.13b: the dev manifest leaves start_url and scope exactly as the real manifest states them — they are relative and already resolve correctly under the base path, so rewriting them could only break the scope match that makes the app installable at all'
+  );
+
+  // (c) ⛔⛤ THE LEAK GUARD. The tracked manifest.json is what PRODUCTION serves,
+  // straight from this PUBLIC repository. If the dev name or dev icon is ever
+  // written into it, the published app on real home screens becomes the DEV app.
+  // Goes red with nobody having touched this commit.
+  assert(
+    real24913.name !== PWA.DEV_NAME &&
+      real24913.short_name !== PWA.DEV_SHORT_NAME &&
+      !realText24913.includes(PWA.DEV_ICON_FILE) &&
+      !/\[DEV\]/.test(realText24913),
+    '249.13c: the tracked manifest.json carries the PUBLISHED identity and no trace of the dev one — production serves that file from this repository, so a dev name or dev icon written into it would rename the app on every real home screen'
+  );
+
+  // (d) AND IT CANNOT REACH A BUILD OUTPUT — the same serve-only guard the
+  // environment marker relies on, asserted on this route in its own right.
+  const idBody24913 = viteSrc24913.slice(
+    viteSrc24913.indexOf('function devPwaIdentityRoute()'),
+    viteSrc24913.indexOf('function killSwitchRoute()')
+  );
+  assert(
+    idBody24913.length > 0 &&
+      /apply:\s*'serve'/.test(idBody24913) &&
+      /devPwaIdentityRoute\(\)/.test(viteSrc24913.slice(viteSrc24913.indexOf('plugins: ['))),
+    '249.13d: the dev identity is served by a REGISTERED serve-only route — it exists only inside a running dev server, so what production publishes is the repository file and nothing else'
+  );
+
+  // (e) THEY ARE ACTUALLY DIFFERENT — the entire point. A later tidy-up that
+  // "restores" the real name, or points the dev icon back at assets/icon.png,
+  // puts two identical icons on one home screen again and this goes red.
+  assert(
+    PWA.DEV_NAME !== real24913.name &&
+      PWA.DEV_SHORT_NAME !== real24913.short_name &&
+      derived24913.icons.length > 0 &&
+      derived24913.icons.every(i => i.src !== real24913.icons[0].src) &&
+      /svg/i.test(PWA.devIconSvg().slice(0, 60)),
+    '249.13e: the dev app name, short name and icon all differ from the published app — two installs of one manifest render as two identical home-screen icons, and opening the wrong one makes every conclusion after it wrong' +
+      ` — dev "${PWA.DEV_SHORT_NAME}" vs published "${real24913.short_name}"`
+  );
+
+  // (f) THE RETIRED-INSTALL NOTICE IS GATED, not merely present. An ungated
+  // notice would tell every ordinary tab visitor their install is out of date,
+  // which is false for them — so the gate is the part worth asserting. Chromium
+  // was separately observed keeping that media rule in its CSSOM with the
+  // condition text intact, which an unsupported media feature would not survive.
+  assert(
+    /class="retired"/.test(HV.RETIRED_INSTALL_NOTICE) &&
+      /\/terminal\//.test(HV.RETIRED_INSTALL_NOTICE) &&
+      new RegExp(PWA.DEV_SHORT_NAME).test(HV.RETIRED_INSTALL_NOTICE) &&
+      /\.retired\s*\{\s*display:\s*none/.test(HV.HOME_STYLE) &&
+      /@media\s*\(display-mode:\s*standalone\)/.test(HV.HOME_STYLE),
+    '249.13f: the landing page carries a retired-install notice that is HIDDEN by default and revealed only for a visitor arriving from an installed app — it names the new address and the dev app new name, and an ordinary tab visitor is never told their install is stale'
+  );
+}
+
 // ── 262  THE TWO READ-ONLY OPERATIONAL VIEWS ────────────────────────────────
 //
 // Two dev-only pages read state that lives OUTSIDE this repository: a generated
@@ -58571,7 +58690,15 @@ if (!PLANNING_OK) {
   // availability, so the tile degrades to "not checked" on a machine where it is.
   const HV265 = require(path.join(ROOT, 'scripts', 'home-view.js'));
   const landing265 = HV265.renderHome({ unbuilt: [], projectionAvailable: true });
-  const hrefs265 = [...landing265.matchAll(/href="([^"]+)"/g)].map(m => m[1]).sort();
+  // ⭐ THE SET OF DESTINATIONS, NOT THE COUNT OF LINKS — deduplicated on purpose.
+  // This check is about WHERE the page can send you (its own note above says so:
+  // a retired address, the slash-less app path, a path with no handler). It is not
+  // about how many times a canonical path is offered, and requiring exactly one
+  // link each would forbid a legitimate second reference — which is what the
+  // retired-install notice adds when it points somebody whose home-screen icon
+  // landed here at the app's real address. ⛔ Deduplicating does not weaken it: a
+  // retired or unhandled path still enters this set and still fails.
+  const hrefs265 = [...new Set([...landing265.matchAll(/href="([^"]+)"/g)].map(m => m[1]))].sort();
   const want265 = ['/ledger', '/queue', '/reports', '/status', '/terminal/', '/view'];
   const landingStart265 = cfg265.indexOf("server.middlewares.use('/', (req");
   const landingEnd265 = cfg265.indexOf("server.middlewares.use('/status'");
@@ -58587,7 +58714,7 @@ if (!PLANNING_OK) {
       ) &&
       /projectionAvailable:\s*projection\.available\(\)/.test(landingHandler265) &&
       /freshRequire\('\.\/scripts\/projection-view\.js'\)/.test(landingHandler265),
-    '265.5: the landing page links exactly the canonical paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
+    '265.5: the landing page reaches exactly the canonical set of paths — the app under its base with the slash, the queue, the reports, the projection, the snapshot, the logs — and the route hands it whether the projection renderer is configured rather than leaving the tile to guess' +
       ` — got ${hrefs265.join(' ')}`
   );
 }

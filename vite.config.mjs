@@ -100,6 +100,8 @@ const VIEW_CHAIN = [
   './scripts/ledger-view.js', // append-only log window
   './scripts/projection-view.js', // runs the EXTERNAL projection renderer
   './scripts/sw-killswitch.js', // the root-scope service-worker kill switch
+  './scripts/dev-env-marker.js', // the dev-server environment marker
+  './scripts/dev-pwa-identity.js', // the dev app's own name + icon
 ];
 function freshRequire(entry) {
   for (const id of VIEW_CHAIN) {
@@ -218,6 +220,49 @@ function devEnvMarkerRoute() {
     apply: 'serve', // ⛔ dev only — never part of any build output
     transformIndexHtml() {
       return [freshRequire('./scripts/dev-env-marker.js').devEnvMarkerTag()];
+    },
+  };
+}
+
+/**
+ * THE DEV APP'S OWN IDENTITY — so it is not mistaken for the published one.
+ *
+ * Serves a DERIVED manifest at `/terminal/manifest.json` (dev name + dev icon,
+ * every other field inherited from the real file) and the generated icon beside
+ * it. Two installs of the same manifest render as two identical home-screen
+ * icons, and opening the wrong one makes every conclusion after it wrong.
+ *
+ * ⛔ `apply: 'serve'` — dev only. The tracked manifest.json is untouched, so
+ * production serves it from the repository exactly as before. The reasoning,
+ * including why the icon is a generated SVG rather than a committed PNG:
+ * scripts/dev-pwa-identity.js. Guarded by Suite 249.13.
+ */
+function devPwaIdentityRoute() {
+  const BASE = '/terminal/';
+  return {
+    name: 'robco-dev-pwa-identity',
+    apply: 'serve', // ⛔ dev only — never part of any build output
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const p = pathOf(req);
+        const id = freshRequire('./scripts/dev-pwa-identity.js');
+        if (p === BASE + 'manifest.json') {
+          if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+          const body = JSON.stringify(id.devManifest(), null, 2);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          return res.end(req.method === 'HEAD' ? '' : body);
+        }
+        if (p === BASE + id.DEV_ICON_FILE) {
+          if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          return res.end(req.method === 'HEAD' ? '' : id.devIconSvg());
+        }
+        return next();
+      });
     },
   };
 }
@@ -603,6 +648,7 @@ export default defineConfig({
   appType: 'mpa',
   plugins: [
     devEnvMarkerRoute(),
+    devPwaIdentityRoute(),
     redirectsRoute(),
     killSwitchRoute(),
     landingRoute(),
