@@ -367,6 +367,172 @@ function readOwnerDecisionCensus() {
   };
 }
 
+/**
+ * ── THE HORIZON AXIS'S GRAMMAR — imported from the archive, never re-implemented ──
+ *
+ * The `horizon` field lives inside an ```accept``` block in an item's BODY, and the
+ * grammar for that block is `!PLANNING/tools/item-format-check.cjs` — the check that
+ * REFUSES a malformed block on the archive's own pre-commit. Its `parseAccept` and its
+ * `HORIZON` vocabulary are exported precisely so a consumer imports them.
+ *
+ * ⭐ THIS DIRECTION IS THE MIRROR OF ONE THAT ALREADY EXISTS: that check imports THIS
+ * repo's `parseQueue` (via `ROBCO_APP_DIR`) rather than writing a second board parser.
+ * Importing its block grammar back is the same discipline pointed the other way, and it
+ * is the whole reason a `horizon:` typo cannot mean one thing to the gate and another to
+ * this page.
+ *
+ * ⚠ REQUIRED, not spawned — unlike the census, which is an external PROGRAM whose
+ * product is a report. This is a pure grammar with a `require.main` guard and no
+ * load-time side effects, so requiring it is both cheaper and honest about what it is.
+ * The require is wrapped: a tree present but carrying a broken or absent tool is
+ * `observable:false` with the reason, never a silent fallback to a home-grown parser.
+ *
+ * ⛔ There is deliberately NO local fallback grammar. An absent tool must make the axis
+ * UNOBSERVABLE, not "every item is UNSET" — those are different facts and only one of
+ * them is about the board.
+ */
+function itemFormatToolPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'item-format-check.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+function loadItemFormat() {
+  const tool = itemFormatToolPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/item-format-check.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  try {
+    const mod = require(tool);
+    if (typeof mod.parseAccept !== 'function' || !Array.isArray(mod.HORIZON)) {
+      return {
+        observable: false,
+        why: 'tools/item-format-check.cjs is missing parseAccept or HORIZON',
+      };
+    }
+    return { observable: true, mod, tool, vocabulary: mod.HORIZON.slice() };
+  } catch (e) {
+    return { observable: false, why: 'tools/item-format-check.cjs threw on load: ' + e.message };
+  }
+}
+
+/**
+ * `BLOCKER-GRAPH.json` — the per-item `actor` classification behind DECIDE vs DO.
+ *
+ * ⚠ It is a MEASURED SNAPSHOT with its own timestamp, not a live view, so the caller
+ * prints `measuredAt` beside anything derived from it. Never throws; a tree with no
+ * graph, or an unparsable one, is `observable:false` with the reason — the /queue tiles
+ * then say UNOBSERVABLE rather than showing a lane with nothing in it, which would read
+ * as "nothing needs you".
+ */
+function readBlockerGraph() {
+  const dir = planningDir();
+  if (!dir) return { observable: false, why: 'no planning tree on this machine' };
+  const full = path.join(dir, 'BLOCKER-GRAPH.json');
+  if (!safeIsFile(full))
+    return { observable: false, why: 'the planning tree has no BLOCKER-GRAPH.json' };
+  try {
+    const graph = JSON.parse(fs.readFileSync(full, 'utf8'));
+    if (!graph || typeof graph.items !== 'object' || graph.items === null) {
+      return { observable: false, why: 'BLOCKER-GRAPH.json carries no items map' };
+    }
+    return { observable: true, graph };
+  } catch (e) {
+    return { observable: false, why: 'BLOCKER-GRAPH.json could not be parsed (' + e.message + ')' };
+  }
+}
+
+/**
+ * ── THE PROJECT AXIS — read from the planning tree's OWN domain census ───────────
+ *
+ * ⛔⛤ THE FIELD THE OWNER ASKED FOR DOES NOT EXIST, AND THIS SAYS SO RATHER THAN
+ * INVENTING IT. `QUEUE.md` has no `project:` field; the item format's key set is closed
+ * and its R2 rule REFUSES an unknown key, so a `project:` line in an accept block is a
+ * commit-time refusal in the archive until that key set gains it. What DOES exist, at
+ * full coverage, is `!PLANNING/tools/cp-domain-census.cjs` — CP-RULE v1, which assigns a
+ * DOMAIN per ID-family with per-item overrides, each carrying its reason.
+ *
+ * ⚠⚠ AND ITS VOCABULARY IS FOUR VALUES WHERE THE OWNER NAMED SIX. CP-RULE v1 knows
+ * CP · MIST · MUSEUM · APP (+ UNASSIGNED). The requested axis is *the app · the control
+ * plane · the harness · Mist · the museum · Binder*. So the HARNESS is folded inside CP,
+ * and BINDER has no bucket at all — its items are scattered (PJ→CP, MI→MIST) by a rule
+ * whose own text excludes Binder from CP. Rendering this under the label "project" would
+ * therefore be a number wearing a different question's label, which is the exact defect
+ * the `/queue` tiles have twice been rebuilt to remove. The caller prints it under
+ * CP-RULE v1's own name and states the gap.
+ *
+ * ONE spawn, aggregate only. Per-item domains would need one `--list <DOMAIN>` spawn per
+ * value (measured 2026-09-05: 0.94s for five, against 0.19s for one) because the tool
+ * has no all-items mode and no exports — a full second added to a page read on a phone
+ * over a tailnet, for a filter. The cheap fix is a `--json` mode in that tool; it is
+ * named here rather than paid for here.
+ */
+const DOMAIN_LINE_RE = /^by domain\s*\.*\s*(.+)$/m;
+const DOMAIN_PAIR_RE = /([A-Z][A-Z-]*)\s+(\d+)/g;
+const DOMAIN_TOTAL_RE = /^ID-bearing items \(parser\)\s*\.*\s*(\d+)/m;
+
+function domainCensusPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'cp-domain-census.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+function readDomainCensus() {
+  const tool = domainCensusPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/cp-domain-census.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  let editedAt = null;
+  try {
+    editedAt = fs.statSync(tool).mtime;
+  } catch {
+    // an unreadable mtime is not a failure — the tile prints 'unknown'
+  }
+  const r = runCensus(tool, []);
+  if (!r.ok) return { observable: false, why: 'domain census did not run: ' + r.why };
+  if (/^cp-domain-census: SKIP/m.test(r.out)) {
+    const m = r.out.match(/SKIP — (.*)$/m);
+    return {
+      observable: false,
+      why: 'domain census skipped: ' + (m ? m[1].trim() : 'reason not printed'),
+    };
+  }
+  const line = DOMAIN_LINE_RE.exec(r.out);
+  const totalM = DOMAIN_TOTAL_RE.exec(r.out);
+  if (!line || !totalM) {
+    return { observable: false, why: 'domain census output carried no "by domain" line' };
+  }
+  const counts = {};
+  DOMAIN_PAIR_RE.lastIndex = 0;
+  let m;
+  while ((m = DOMAIN_PAIR_RE.exec(line[1])) !== null) counts[m[1]] = Number(m[2]);
+  if (!Object.keys(counts).length) {
+    return { observable: false, why: 'the "by domain" line parsed to no domains' };
+  }
+  const summed = Object.values(counts).reduce((a, b) => a + b, 0);
+  return {
+    observable: true,
+    counts,
+    total: Number(totalM[1]),
+    summed,
+    editedAt,
+    rule: 'CP-RULE v1',
+    tool,
+  };
+}
+
 /** The reports-tree counterpart of describe() — printed next to any empty state. */
 function describeReports() {
   const dir = reportsDir();
@@ -416,4 +582,10 @@ module.exports = {
   // The planning tree's own owner-decision census (OD-RULE v1) — resolved and RUN, never derived here.
   ownerDecisionCensusPath,
   readOwnerDecisionCensus,
+  // The two NEW board axes' sources — each resolved from the archive, none re-implemented here.
+  itemFormatToolPath,
+  loadItemFormat,
+  readBlockerGraph,
+  domainCensusPath,
+  readDomainCensus,
 };

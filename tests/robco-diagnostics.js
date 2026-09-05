@@ -58322,9 +58322,25 @@ if (!PLANNING_OK) {
 
     // Clearing only the entry point leaves its dependencies cached, and a freshly
     // loaded module then closes over a stale one — a partial fix that looks whole.
+    // ⚠ THE TRAILING COMMENTS ARE STRIPPED BEFORE THE QUOTE SCAN, and that is a
+    // repair, not a tidy-up (Protocol 42, found 2026-09-05 while adding an entry).
+    // VIEW_CHAIN's entries carry prose comments, prose contains APOSTROPHES, and a
+    // naive quote-pair scan reads an apostrophe as a string delimiter — so the two
+    // apostrophes in one added comment paired with each other and SWALLOWED THE
+    // REAL ENTRY BETWEEN THEM, yielding phantom "entries" like ", // the two board
+    // axes" while the genuine './scripts/board-axes.js' vanished from the guard's
+    // view of the list it was checking.
+    //
+    // ⭐ HARNESS-ONLY, and it FAILED CLOSED — which is why this is a repair rather
+    // than an incident: a swallowed entry is unreadable as a file, so
+    // `chainRead260.length === chain260.length` goes red and the run stops. The
+    // guard could not have gone quiet from this, only noisy. But a red that blames
+    // the wrong thing costs a diagnosis every time somebody writes a possessive in
+    // a comment, so the reader is fixed instead of the prose.
     const chainM260 = /const VIEW_CHAIN = \[([\s\S]*?)\]/.exec(cfg260);
+    const chainBody260 = chainM260 ? chainM260[1].replace(/\/\/[^\n]*/g, '') : '';
     const chain260 = chainM260
-      ? [...chainM260[1].matchAll(/'([^']+)'/g)].map(m => m[1].replace('./scripts/', ''))
+      ? [...chainBody260.matchAll(/'([^']+)'/g)].map(m => m[1].replace('./scripts/', ''))
       : [];
     const onDisk260 = fs
       .readdirSync(path.join(ROOT, 'scripts'))
@@ -59635,6 +59651,367 @@ if (!PLANNING_OK) {
     } catch {
       /* harmless leftover */
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 270 — the two NEW board axes on `/queue`: HORIZON and PROJECT
+//
+//  The owner's diagnosis, 2026-09-05: one list was carrying six projects and every
+//  time horizon at once. Two fields answer that, and each brings its own way to
+//  lie, so each is held here by a test that would fail if it lied.
+//
+//  ⛔⛔ THE RULE THE HORIZON AXIS EXISTS FOR: a SOMEDAY-IF item MUST NOT APPEAR IN
+//  A BACKLOG COUNT AT ALL. "If it still counts, the axis bought nothing."
+//
+//  ⭐⭐ AND THAT RULE IS WHY THIS SUITE IS BUILT AROUND A POSITIVE CONTROL RATHER
+//  THAN A SPOT-CHECK. Measured on the live queue on the day this landed: ZERO items
+//  carry SOMEDAY-IF, so the exclusion changes not one number on the real board. A
+//  test that only rendered the live corpus would therefore pass whether the rule
+//  worked or was never wired at all — the exact "a probe that returns 0 is evidence
+//  about the probe" failure the board's own item format warns about, four measured
+//  instances deep. So the fixture MANUFACTURES a someday item whose exclusion must
+//  be visible, and 270.7 proves the instrument detects its own subject by removing
+//  the horizon line and watching the count go back up. Red, then green.
+//
+//  ⚠ THE SECOND LIE THIS GUARDS is quieter: "the field is unset on every item" and
+//  "the field could not be read at all" print the same reassuring shape — a big
+//  UNSET number — while meaning entirely different things. 270.4 holds them apart.
+//
+//  Everything is driven through the REAL resolver and the REAL renderer in a child
+//  process against a FIXTURE planning tree (ROBCO_PLANNING_DIR), and read out of
+//  the RENDERED HTML — a count right in code and wrong on the page is the defect
+//  this whole page keeps being rebuilt for.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 270 — HORIZON + PROJECT axes on /queue (someday excluded, unset never defaulted)');
+  const os270 = require('os');
+  const cp270 = require('child_process');
+  const A270 = require(path.join(ROOT, 'scripts', 'board-axes.js'));
+
+  // ── A stub of the archive's accept-block grammar ───────────────────────────
+  // ⚠ A STUB, and the reason is stated so nobody upgrades it into a second real
+  // parser: the fixture must run on a machine with NO archive, and the scenarios
+  // here need to be constructed rather than found. What keeps the stub from
+  // becoming a private truth is 270.11, which asserts production reads the
+  // ARCHIVE's module and that this repo carries no accept-block grammar of its own.
+  const fmtStub270 = [
+    "'use strict';",
+    "const HORIZON = ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF'];",
+    'function parseAccept(bodyLines) {',
+    '  const L = Array.isArray(bodyLines) ? bodyLines : String(bodyLines || "").split("\\n");',
+    '  const out = []; let i = 0;',
+    '  while (i < L.length) {',
+    '    if (!/^\\s*```accept\\b/.test(L[i])) { i++; continue; }',
+    '    const fields = {}; i++;',
+    '    while (i < L.length && !/^\\s*```\\s*$/.test(L[i])) {',
+    '      const kv = /^([a-z-]+):\\s*(.*)$/.exec(L[i]);',
+    '      if (kv) fields[kv[1]] = kv[2].trim();',
+    '      i++;',
+    '    }',
+    '    out.push({ fields }); i++;',
+    '  }',
+    '  return out;',
+    '}',
+    'module.exports = { parseAccept, HORIZON };',
+    '',
+  ].join('\n');
+
+  // ── The fixture tree ───────────────────────────────────────────────────────
+  const tree270 = fs.mkdtempSync(path.join(os270.tmpdir(), 'robco-axes-270-'));
+  fs.mkdirSync(path.join(tree270, 'tools'));
+  const board270 = [
+    '<!-- GENERATED -->',
+    '## ⏭️ Ready (2)',
+    '- **R1** — a real ready item',
+    '- **R2** — a someday thought filed as ready',
+    '',
+    '## 🔄 Active (1)',
+    '- **A1** — in flight',
+    '',
+    '## ⚠️ Attention (1)',
+    '- **W1** — flagged',
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(tree270, 'ROADMAP.md'), board270);
+
+  // ⭐ R2 is the POSITIVE CONTROL: a ready item that is explicitly SOMEDAY-IF.
+  // If the exclusion is wired, "startable now" must read 1 and the band must say so.
+  const queueWith = r2horizon =>
+    [
+      '# queue',
+      '',
+      '### R1. ⏭️ a real ready item',
+      '',
+      'body',
+      '',
+      '### R2. ⏭️ a someday thought filed as ready',
+      '',
+      '```accept',
+      'kind:       CAPTURE',
+      'reason:     a captured thought',
+      'actor:      SESSION',
+      ...(r2horizon ? [`horizon:    ${r2horizon}`] : []),
+      '```',
+      '',
+      '### A1. 🔄 in flight',
+      '',
+      'body',
+      '',
+      '### W1. ⚠️ flagged',
+      '',
+      'body',
+      '',
+    ].join('\n');
+  const writeQueue270 = h => fs.writeFileSync(path.join(tree270, 'QUEUE.md'), queueWith(h));
+  writeQueue270('SOMEDAY-IF');
+
+  fs.writeFileSync(path.join(tree270, 'tools', 'item-format-check.cjs'), fmtStub270);
+  fs.writeFileSync(
+    path.join(tree270, 'BLOCKER-GRAPH.json'),
+    JSON.stringify({
+      measuredAt: '2026-09-05T17:45:41.235Z',
+      items: {
+        // one question, one hands task, one third party, one SESSION (never his),
+        // and one row whose item is not on the board at all (drift, not counted).
+        A1: {
+          actor: 'OWNER-RULING',
+          actorBasis: 'READ',
+          actorEvidence: 'he must choose the shape',
+        },
+        W1: {
+          actor: 'OWNER-KEYBOARD',
+          actorBasis: 'DIGEST',
+          actorEvidence: 'needs him at the machine',
+        },
+        R1: { actor: 'EXTERNAL', actorBasis: 'DIGEST', actorEvidence: 'waiting on a third party' },
+        R2: { actor: 'OWNER-RULING', actorBasis: 'DIGEST', actorEvidence: 'a someday question' },
+        GONE1: { actor: 'OWNER-RULING', actorBasis: 'DIGEST', actorEvidence: 'item has left' },
+      },
+      edges: [],
+    })
+  );
+  // the domain census — its aggregate line is the whole contract
+  fs.writeFileSync(
+    path.join(tree270, 'tools', 'cp-domain-census.cjs'),
+    [
+      "console.log('CP-RULE v1 — cp-domain-census (READ-ONLY; not a guard)');",
+      "console.log('ID-bearing items (parser) .... 4');",
+      "console.log('by domain ....... CP 2 · MIST 1 · APP 1');",
+      '',
+    ].join('\n')
+  );
+
+  const render270 = () =>
+    cp270.spawnSync(
+      'node',
+      [
+        '-e',
+        "const p=require('./scripts/planning-paths.js');const v=require('./scripts/report-view.js');" +
+          "process.stdout.write(v.renderQueue(p.readRoadmap(), p.readPlanningFile('QUEUE.md')," +
+          'p.readOwnerDecisionCensus(),' +
+          '{itemFormat:p.loadItemFormat(), graph:p.readBlockerGraph(), domains:p.readDomainCensus()}));',
+      ],
+      {
+        cwd: ROOT,
+        env: Object.assign({}, process.env, { ROBCO_PLANNING_DIR: tree270 }),
+        encoding: 'utf8',
+      }
+    );
+  const tiles270 = html =>
+    [
+      ...html.matchAll(
+        /<li><span class="n">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
+      ),
+    ].map(m => ({ n: m[1], k: m[2], h: m[3] || '' }));
+  const tileOf = (html, re) => tiles270(html).find(t => re.test(t.k));
+
+  // ── 270.1-270.3 — the horizon axis renders, three-valued, over the whole queue ──
+  const g1 = render270();
+  const h1 = g1.stdout;
+  assert(
+    g1.status === 0 && /<h2>Horizon<\/h2>/.test(h1),
+    '270.1: RENDERED — the /queue page carries a Horizon section' +
+      (g1.status === 0 ? '' : ' — exit ' + g1.status + ' ' + String(g1.stderr).slice(0, 200))
+  );
+  const someday1 = tileOf(h1, /someday if/);
+  const unset1 = tileOf(h1, /^unset$/);
+  assert(
+    someday1 && someday1.n === '1' && unset1 && unset1.n === '3',
+    '270.2: RENDERED — the horizon strip reads its three values plus UNSET from the items themselves ' +
+      `(expected someday 1 / unset 3, got ${someday1 ? someday1.n : 'absent'} / ${unset1 ? unset1.n : 'absent'})`
+  );
+  assert(
+    unset1 && /never counted as one of the three/.test(unset1.h),
+    '270.3: RENDERED — UNSET is labelled as unset and explicitly NOT folded into a horizon value'
+  );
+
+  // ── 270.4 — UNOBSERVABLE is not the same fact as "everything is unset" ──────
+  // ⛔ This is the quiet lie. With the grammar module gone, a renderer that fell
+  // back to "no block found ⇒ UNSET" would print a confident `4 unset` — a number
+  // about the board, produced by a page that cannot read the board's field at all.
+  fs.renameSync(
+    path.join(tree270, 'tools', 'item-format-check.cjs'),
+    path.join(tree270, 'tools', 'item-format-check.cjs.off')
+  );
+  const g2 = render270();
+  const h2 = g2.stdout;
+  assert(
+    /The horizon could not be read/.test(h2) &&
+      /no tools\/item-format-check\.cjs/.test(h2) &&
+      /NOT the same as/.test(h2) &&
+      !tileOf(h2, /^unset$/),
+    '270.4: RENDERED — with the grammar module absent the axis is UNOBSERVABLE with its reason, prints NO unset integer, and says that is not the same as "every item is unset"'
+  );
+  fs.renameSync(
+    path.join(tree270, 'tools', 'item-format-check.cjs.off'),
+    path.join(tree270, 'tools', 'item-format-check.cjs')
+  );
+
+  // ── 270.5-270.7 — ⭐ THE POSITIVE CONTROL: someday is out of the totals ─────
+  const ready1 = tileOf(h1, /startable now/);
+  assert(
+    ready1 && ready1.n === '1',
+    '270.5: RENDERED — the board bands R2 as Ready(2), but R2 is SOMEDAY-IF, so "startable now" reads 1 — the exclusion actually changes a printed total' +
+      (ready1 ? ` — got ${ready1.n}` : ' — tile absent')
+  );
+  assert(
+    /2 on the board, <strong>1 counted here<\/strong>/.test(h1) && /<code>R2<\/code>/.test(h1),
+    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches, naming the excluded id — never a silently smaller number'
+  );
+
+  // ⭐⭐ RED-THEN-GREEN: strip the horizon line and the same item must come back
+  // into the count. Without this the suite could pass against a renderer that
+  // always printed 1 for reasons unrelated to the rule.
+  writeQueue270(null);
+  const g3 = render270();
+  const ready3 = tileOf(g3.stdout, /startable now/);
+  const someday3 = tileOf(g3.stdout, /someday if/);
+  assert(
+    ready3 && ready3.n === '2' && someday3 && someday3.n === '0',
+    '270.7: RED-THEN-GREEN — remove the horizon line from that same item and it is counted again (startable now 2, someday 0), so 270.5 measured the rule and not a constant' +
+      (ready3 ? ` — got ${ready3.n}` : ' — tile absent')
+  );
+  writeQueue270('SOMEDAY-IF');
+
+  // ── 270.8 — an unset horizon is NEVER defaulted into a value ───────────────
+  // R1/A1/W1 carry no block at all and must still be counted as live work.
+  assert(
+    ready1 && ready1.n === '1' && tileOf(h1, /being worked on now/).n === '1',
+    '270.8: RENDERED — items with no horizon at all are still counted (unset is never read as SOMEDAY-IF, which would hide real work)'
+  );
+
+  // ── 270.9-270.10 — DECIDE and DO are two errands, with the ceiling attached ──
+  const dec1 = tileOf(h1, /he decides/);
+  const do1 = tileOf(h1, /his hands/);
+  assert(
+    dec1 && dec1.n === '1' && do1 && do1.n === '1',
+    "270.9: RENDERED — the owner axis splits into a sitting and a task list from the graph's actor field; the SESSION row, the EXTERNAL row, the SOMEDAY-IF row and the row whose item is gone are all out of both" +
+      (dec1 && do1 ? ` — got decide ${dec1.n} / do ${do1.n}` : ' — a tile is absent')
+  );
+  assert(
+    // 1 READ (A1) + 2 DIGEST (W1, R1) among the rows that survive the cross-check:
+    // R2 is dropped as SOMEDAY-IF and GONE1 is dropped as no longer on the board.
+    /classified from 1 full reads, 2 digests/.test(dec1 ? dec1.h : '') &&
+      /upper bound/.test(dec1 ? dec1.h : '') &&
+      /BOTH a question and a hands task cannot appear as such/.test(h1) &&
+      !/\bboth\b<\/span>/.test(h1),
+    '270.10: RENDERED — each lane carries its classification-basis split and is called an upper bound, and the page states that "both" is unrepresentable rather than printing a fabricated zero'
+  );
+
+  // ── 270.11 — the project axis is rendered under the rule that exists ───────
+  const cp1 = tileOf(h1, /^CP$/);
+  assert(
+    cp1 && cp1.n === '2' && /CP-RULE v1/.test(h1),
+    "270.11: RENDERED — the per-project counts come from the planning tree's own domain census, named as CP-RULE v1"
+  );
+  assert(
+    /four values where you named six/.test(h1) &&
+      /harness is folded inside CP/.test(h1) &&
+      /Binder has no bucket/.test(h1) &&
+      /no <code>project:<\/code> field/.test(h1),
+    '270.12: RENDERED — the page states the gap rather than relabelling a four-value axis as the six-value one: the harness is inside CP, Binder has no bucket, and no project field exists'
+  );
+
+  // ── 270.13 — a census reading 0 may never read as "nothing needs you" ──────
+  const need1 = tileOf(h1, /need you/);
+  assert(
+    need1 &&
+      (need1.n === 'UNOBSERVABLE' ||
+        /0 means NO DECLARED ROW IS OPEN/.test(need1.h) ||
+        !/^0 of/.test(need1.n)),
+    '270.13: RENDERED — when the declared census counts zero, the tile says zero means no DECLARED row is open, never "nothing is waiting on you"'
+  );
+
+  // ── 270.14-270.16 — unit-level three-valuedness, with no planning tree at all ──
+  const stubFmt270 = {
+    HORIZON: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF'],
+    parseAccept: lines => {
+      const t = (Array.isArray(lines) ? lines : []).join('\n');
+      const m = /^horizon:\s*(.*)$/m.exec(t);
+      return /```accept/.test(t) ? [{ fields: m ? { horizon: m[1].trim() } : {} }] : [];
+    },
+  };
+  assert(
+    A270.horizonOfBody(['```accept', 'horizon: SOMEDAY-IF', '```'], stubFmt270) === 'SOMEDAY-IF' &&
+      A270.horizonOfBody(['no block here'], stubFmt270) === A270.HORIZON_UNSET &&
+      A270.horizonOfBody(['```accept', 'kind: BUILD', '```'], stubFmt270) === A270.HORIZON_UNSET &&
+      A270.horizonOfBody(['```accept', 'horizon: LATER', '```'], stubFmt270) ===
+        A270.HORIZON_UNPARSEABLE,
+    '270.14: UNIT — one item resolves to a vocabulary value, UNSET (no block OR no horizon line), or UNPARSEABLE (a word outside the vocabulary) — three values, no default'
+  );
+  const unob270 = A270.readHorizons([{ id: 'X1', body: [] }], null);
+  assert(
+    unob270.observable === false && !('counts' in unob270) && /not reachable/.test(unob270.why),
+    '270.15: UNIT — with no format module the axis returns observable:false with a reason and NO counts object, so a caller cannot accidentally print a fabricated UNSET total'
+  );
+  const excl270 = A270.excludeSomeday(['a', 'b'], { observable: false });
+  assert(
+    excl270.applied === false && excl270.kept.length === 2 && excl270.dropped.length === 0,
+    '270.16: UNIT — an unobservable axis excludes NOBODY and says applied:false; it must not behave like "there were none"'
+  );
+
+  // ── 270.17-270.18 — static: one grammar, and the fresh-require chain covers it ──
+  const ba270 = fs.readFileSync(path.join(ROOT, 'scripts', 'board-axes.js'), 'utf8');
+  const pp270 = fs.readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8');
+  assert(
+    /item-format-check\.cjs/.test(pp270) &&
+      !/```accept/.test(ba270) &&
+      !/BLOCKS-WORK-NOW/.test(ba270.replace(/^\s*\*.*$/gm, '')),
+    '270.17: the accept-block grammar and the horizon vocabulary are RESOLVED from the archive, never retyped here — board-axes.js carries no fence literal and no vocabulary word outside its prose'
+  );
+  const vite270 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  assert(
+    /'\.\/scripts\/board-axes\.js'/.test(vite270),
+    '270.18: board-axes.js is on the fresh-require chain — a data module left off it means a freshly-loaded renderer closes over a stale copy of the axis rules (Suite 260.12)'
+  );
+
+  // ── 270.19 — against the LIVE archive, when it is here: the real grammar agrees ──
+  // ⚠ SKIPPED, with the reason printed, on a checkout without the private tree —
+  // never silently absent. This is the one assertion that touches the real module.
+  const live270 = planningPaths.loadItemFormat();
+  if (!live270.observable) {
+    console.log(`  SKIP  Suite 270.19 — ${live270.why}`);
+  } else {
+    const liveSrc270 = planningPaths.readPlanningFile('QUEUE.md');
+    const QV270 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+    const items270 = QV270.parseQueue(liveSrc270 || '').blocks.filter(
+      b => b.type === 'item' && b.id
+    );
+    const hz270 = A270.readHorizons(items270, live270.mod);
+    const summed270 = Object.values(hz270.counts || {}).reduce((a, b) => a + b, 0);
+    assert(
+      hz270.observable === true &&
+        live270.vocabulary.join(',') === 'BLOCKS-WORK-NOW,NEXT,SOMEDAY-IF' &&
+        summed270 === items270.length,
+      `270.19: LIVE — the archive's own item-format module loads, its vocabulary is the three horizons, and every one of the ${items270.length} live items lands in exactly one bucket (summed ${summed270})`
+    );
+  }
+
+  try {
+    fs.rmSync(tree270, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  } catch {
+    /* harmless leftover */
   }
 }
 

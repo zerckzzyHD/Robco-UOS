@@ -85,6 +85,11 @@ const VIEW_CHAIN = [
   './scripts/atomic-write.js', // write helper — a leaf
   './scripts/control-state.js', // operational state reader — deepest
   './scripts/queue-view.js', // markdown renderer — deepest
+  // ⚠ A DATA MODULE, so it belongs on this list by the rule two comments above —
+  // report-view requires it lazily for the horizon/project derivation, and a
+  // freshly-loaded renderer resolving a STALE copy of the axis rules is the exact
+  // failure this chain exists to close (Suite 260.12's dependency closure).
+  './scripts/board-axes.js', // the two board axes' derivation — a leaf
   // ⚠ ADDED 2026-09-01, AND IT WAS ALREADY A LIVE HOLE BEFORE THE LINE THAT
   // NEEDED IT. report-view.js has required this lazily for its closed-item rule
   // since that rule moved here — and a freshly-loaded report-view was resolving it
@@ -397,7 +402,22 @@ function queueRoute() {
             // The "need you" tile: the planning tree's own owner-decision census
             // (OD-RULE v1), run fresh per visit like the projection renderer —
             // never the ⚠️ band's size again.
-            paths.readOwnerDecisionCensus()
+            paths.readOwnerDecisionCensus(),
+            // ── The two NEW axes' sources, each resolved from the archive ──────
+            // ⛔ Resolved here, in the route, rather than reached for inside the
+            // renderer: every one of these is a three-case read (present ·
+            // absent-by-design · unreadable) and the renderer stays a pure
+            // function of what it was handed, exactly as the census already is.
+            // One unreachable source degrades ONE axis; none of them can take the
+            // page down or make it print a number it could not measure.
+            {
+              // the horizon's grammar + vocabulary — the archive's own gate module
+              itemFormat: paths.loadItemFormat(),
+              // the DECIDE / DO split — the graph's `actor` field, measured, dated
+              graph: paths.readBlockerGraph(),
+              // the project split — CP-RULE v1, one spawn, aggregate counts only
+              domains: paths.readDomainCensus(),
+            }
           )
         );
       });

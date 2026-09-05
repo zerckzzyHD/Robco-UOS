@@ -1,0 +1,365 @@
+/**
+ * scripts/board-axes.js — the ONE derivation of the board's two NEW axes.
+ *
+ * ── WHY THIS FILE EXISTS (owner's diagnosis, 2026-09-05) ────────────────────
+ * "we setup the queue for a small workflow like RobCo, then I expanded into a
+ * control plane / harness and started putting ideas from all directions and from
+ * all timelines (now to in months from now) and it fucked it."
+ *
+ * Two axes answer that, and they answer DIFFERENT questions from the status
+ * glyph, which is why they are fields and not more glyphs:
+ *
+ *   HORIZON  — should this item be counted YET.  BLOCKS-WORK-NOW · NEXT · SOMEDAY-IF
+ *   PROJECT  — which of the six things this item belongs to.
+ *
+ * ⛔⛔ THE RULE THAT GIVES THE HORIZON AXIS ITS POINT, AND THE ONLY ONE THAT COSTS
+ * ANYTHING: a `SOMEDAY-IF` item MUST NOT APPEAR IN A BACKLOG COUNT AT ALL. If it
+ * still counts, the axis bought nothing — a captured thought would keep weighing
+ * exactly as much as a live blocker, which is the disease, not the diagnosis.
+ * `excludeSomeday()` below is that rule, in one place, and every total on the
+ * `/queue` page goes through it.
+ *
+ * ── ⭐⭐ THREE-VALUED THROUGHOUT, AND AT TWO DIFFERENT LEVELS ─────────────────
+ * The fields are being assigned right now and almost nothing carries them yet
+ * (measured 2026-09-05 against the live queue: 6 of 411 items carry a horizon).
+ * So the degrade path is not an edge case here — it is the ordinary case, and it
+ * is where this module can most easily lie.
+ *
+ *   PER ITEM   : a vocabulary value · `UNSET` · `UNPARSEABLE`.
+ *                ⛔ An unset horizon is NEVER defaulted. Reading unset as
+ *                BLOCKS-WORK-NOW inflates the live count; reading it as
+ *                SOMEDAY-IF hides real work. Both are wrong and the second is
+ *                worse, because it hides work while looking like progress.
+ *
+ *   PER AXIS   : `observable: true` with counts · `observable: false` with a
+ *                stated reason.
+ *                ⛔⛔ AND THESE TWO ARE NOT THE SAME FACT: "every item is UNSET"
+ *                and "the field could not be read at all" would print the same
+ *                reassuring shape — a big UNSET number — while meaning entirely
+ *                different things. One says the assignment work has not happened;
+ *                the other says this page cannot tell you anything. When the
+ *                format module is unreachable the axis is UNOBSERVABLE and prints
+ *                no integer, exactly as the honesty tile refuses to print a
+ *                number over a censored denominator.
+ *
+ * ── ⛔ NO RULE IS RETYPED HERE ──────────────────────────────────────────────
+ * The `accept`-block grammar and the horizon vocabulary live in the ARCHIVE, in
+ * `!PLANNING/tools/item-format-check.cjs` — the check that REFUSES a malformed
+ * block on the archive's own pre-commit. That module is injected (`fmt`), never
+ * re-implemented, for the same reason the archive imports THIS repo's
+ * `parseQueue` rather than writing a second one: two copies of one grammar is
+ * how two counts of one thing begin to disagree. `fmt.HORIZON` is the vocabulary;
+ * this file does not contain the three words as literals anywhere that a count
+ * depends on.
+ *
+ * Pure functions only — no I/O, no `require` of the archive. The resolution is
+ * `scripts/planning-paths.js`'s job (its three-case contract), so this module is
+ * unit-testable against a stub `fmt` with no planning tree present at all.
+ */
+
+'use strict';
+
+/** An item whose accept block carries no `horizon:` line — or has no block. */
+const HORIZON_UNSET = 'UNSET';
+/** An item whose `horizon:` line is present but not in the vocabulary. */
+const HORIZON_UNPARSEABLE = 'UNPARSEABLE';
+
+/**
+ * The horizon of ONE item, read from its own first `accept` block.
+ *
+ * ⚠ FIRST BLOCK WINS, because that is what the archive's check enforces (R1: a
+ * second block is refused). Reading a later one here would make this page
+ * disagree with the gate that decides what is well-formed.
+ *
+ * @param {string[]} bodyLines the item's raw body lines, as parseQueue returns them
+ * @param {{parseAccept:Function, HORIZON:string[]}} fmt the ARCHIVE's format module
+ * @returns {string} a vocabulary value, HORIZON_UNSET, or HORIZON_UNPARSEABLE
+ */
+function horizonOfBody(bodyLines, fmt) {
+  let blocks;
+  try {
+    blocks = fmt.parseAccept(bodyLines || []);
+  } catch {
+    // A body the archive's own parser throws on is not silently "unset" — the
+    // field could not be read, which is the UNPARSEABLE fact, not the UNSET one.
+    return HORIZON_UNPARSEABLE;
+  }
+  if (!Array.isArray(blocks) || !blocks.length) return HORIZON_UNSET;
+  const raw = blocks[0] && blocks[0].fields ? blocks[0].fields.horizon : undefined;
+  if (raw === undefined) return HORIZON_UNSET;
+  return fmt.HORIZON.includes(raw) ? raw : HORIZON_UNPARSEABLE;
+}
+
+/**
+ * The horizon axis over a whole set of parsed items.
+ *
+ * @param {Array<{id:string, body:string[]}>} items ID-bearing items from parseQueue
+ * @param {object|null} fmt the archive's format module, or null when unreachable
+ * @returns {{observable:boolean, why?:string, byId?:Map, counts?:object,
+ *            vocabulary?:string[], someday?:Set<string>, unparseable?:string[]}}
+ */
+function readHorizons(items, fmt) {
+  if (!fmt || typeof fmt.parseAccept !== 'function' || !Array.isArray(fmt.HORIZON)) {
+    return {
+      observable: false,
+      why: 'the archive’s item-format module is not reachable, so no item’s horizon could be read',
+    };
+  }
+  if (!Array.isArray(items) || !items.length) {
+    return { observable: false, why: 'the queue parsed to no ID-bearing items' };
+  }
+  const byId = new Map();
+  const counts = {};
+  for (const v of fmt.HORIZON) counts[v] = 0;
+  counts[HORIZON_UNSET] = 0;
+  counts[HORIZON_UNPARSEABLE] = 0;
+  const unparseable = [];
+  const someday = new Set();
+  for (const it of items) {
+    const h = horizonOfBody(it.body, fmt);
+    byId.set(it.id, h);
+    counts[h] = (counts[h] || 0) + 1;
+    if (h === HORIZON_UNPARSEABLE) unparseable.push(it.id);
+    if (h === SOMEDAY(fmt)) someday.add(it.id);
+  }
+  return {
+    observable: true,
+    byId,
+    counts,
+    vocabulary: fmt.HORIZON.slice(),
+    someday,
+    unparseable,
+    total: items.length,
+  };
+}
+
+/**
+ * The `SOMEDAY-IF` value, taken from the injected vocabulary rather than typed.
+ *
+ * ⚠ It is the LAST entry by the archive's own ordering (BLOCKS-WORK-NOW · NEXT ·
+ * SOMEDAY-IF — nearest first), but positional trust is exactly the kind of
+ * assumption that goes quiet when somebody reorders a list. So the value is
+ * matched by name against the vocabulary and, if the vocabulary ever stops
+ * carrying it, this returns a sentinel that matches NOTHING — no item is silently
+ * classified as someday, and `excludeSomeday()` then removes nobody rather than
+ * removing the wrong body of work.
+ */
+const SOMEDAY_NAME = 'SOMEDAY-IF';
+function SOMEDAY(fmt) {
+  return fmt && Array.isArray(fmt.HORIZON) && fmt.HORIZON.includes(SOMEDAY_NAME)
+    ? SOMEDAY_NAME
+    : '(no SOMEDAY-IF value in this vocabulary)';
+}
+
+/**
+ * ⛔⛔ THE RULE, IN ONE PLACE: a SOMEDAY-IF item is not in the count.
+ *
+ * Takes any collection of ids and returns `{ kept, dropped }`. Callers print
+ * `kept.length` and, when `dropped.length` is non-zero, say so beside it — a
+ * silent subtraction is its own dishonesty, because the reader cannot tell a
+ * number that shrank from a number that was always that size.
+ *
+ * ⚠ WHEN THE AXIS IS UNOBSERVABLE THIS REMOVES NOTHING and says so via
+ * `applied:false`. It must not quietly behave like "there were none": a total
+ * that could not apply the exclusion is a total with a stated ceiling, not a
+ * corrected one.
+ *
+ * @param {Iterable<string>} ids
+ * @param {{observable:boolean, someday?:Set<string>}} horizons from readHorizons
+ */
+function excludeSomeday(ids, horizons) {
+  const all = [...(ids || [])];
+  if (!horizons || !horizons.observable || !horizons.someday) {
+    return { kept: all, dropped: [], applied: false };
+  }
+  const kept = [];
+  const dropped = [];
+  for (const id of all) (horizons.someday.has(id) ? dropped : kept).push(id);
+  return { kept, dropped, applied: true };
+}
+
+/**
+ * Every `###` heading's raw content, in document order.
+ *
+ * ⚠ RAW, not the parsed title. The band rule reads the heading's leading glyph,
+ * and `parseQueue` STRIPS that glyph off `title` — deriving a band from the title
+ * is the mistake the parser's own header warns consumers about by name. This is
+ * the same raw scan `roadmap-generate.js` does before banding, kept in step with
+ * it deliberately: both feed `bandOfHeading`, so both must see the same string.
+ */
+function rawItemHeadings(queueMd) {
+  const out = [];
+  for (const line of String(queueMd || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')) {
+    const h = /^#{3}\s+(.*)$/.exec(line);
+    if (h) out.push(h[1].trim());
+  }
+  return out;
+}
+
+/**
+ * id → band key, over the WHOLE queue.
+ *
+ * ⭐⭐ THIS IS WHY THE PAGE CAN CORRECT A BAND COUNT THE BOARD CANNOT. The board
+ * prints the Backlog as a COUNT rather than a list ("a projection of the ORDER of
+ * the work, not a dump of it"), so a consumer reading the board can never tell
+ * which items are in it — and a horizon correction computed from the board's rows
+ * would therefore silently skip roughly two thirds of the items. This reads the
+ * queue itself, which the `/queue` route already holds in memory for the honesty
+ * tile, so the correction is computed over every item or not at all. Same
+ * censored-denominator lesson, applied before it could be repeated.
+ *
+ * @param {string} queueMd
+ * @param {object} QV      scripts/queue-view.js (for STATUSES / ITEM_ID_RE)
+ * @param {Function} bandOfHeading  roadmap-generate.js's band rule — imported, never retyped
+ * @returns {Map<string,string|null>} id → status key, or null for unclassified
+ */
+function bandById(queueMd, QV, bandOfHeading) {
+  const out = new Map();
+  for (const content of rawItemHeadings(queueMd)) {
+    const r = bandOfHeading(content, QV);
+    if (!r || !r.id) continue;
+    out.set(r.id, r.band || null);
+  }
+  return out;
+}
+
+/**
+ * How many SOMEDAY-IF items sit in each band — the per-band correction.
+ *
+ * Returns `{ applied, byBand: Map<bandKey, string[]> }`. `applied:false` means
+ * the horizon axis was UNOBSERVABLE, so no band's count may be described as
+ * corrected. The caller renders `104` or `104 (103 counted, 1 someday)`; it never
+ * renders a corrected number with no trace of the correction.
+ */
+function somedayByBand(horizons, bands) {
+  if (!horizons || !horizons.observable || !horizons.someday) {
+    return { applied: false, byBand: new Map() };
+  }
+  const byBand = new Map();
+  for (const id of horizons.someday) {
+    const b = bands.get(id) || 'unclassified';
+    if (!byBand.has(b)) byBand.set(b, []);
+    byBand.get(b).push(id);
+  }
+  return { applied: true, byBand };
+}
+
+/**
+ * ── THE OWNER AXIS: DECIDE vs DO, which are two different errands ────────────
+ *
+ * ⛔⛤ A TILE THAT MERGES THEM IS LYING BY A FACTOR OF TWO EVEN WHEN ITS COUNT IS
+ * RIGHT. Measured on the live board 2026-09-05: of the owner list's 96 rows, 23
+ * ask him a QUESTION, 18 need his HANDS, and 4 are both. Those go to him
+ * differently — one is a sitting he books, the other is a task list he works
+ * through — so a single "needs you: 37" is a number he cannot act on.
+ *
+ * ⭐ THE SPLIT IS NOT INVENTED HERE. It is `BLOCKER-GRAPH.json`'s own `actor`
+ * vocabulary, which already distinguishes exactly this:
+ *   OWNER-RULING   "needs an owner ruling or a decision only he can make"  → DECIDE
+ *   OWNER-KEYBOARD "needs a human physically at the keyboard / phone"      → DO
+ *   EXTERNAL       "a third party, or a credential we will not touch"      → neither
+ * The graph is the artifact the triage itself was measured against, it is
+ * regenerated by a tool, and it carries per-row evidence. So this maps that
+ * vocabulary onto two labels and adds nothing.
+ *
+ * ⚠⚠ AND ITS CEILING TRAVELS WITH IT, because this is the exact number that has
+ * been wrong twice. Every row carries `actorBasis` — READ (full body), DIGEST
+ * (heading + done-means), KEYWORD (a heading marker only) — and the measured
+ * inflation mechanism is DIGEST: rulings on this board land in item BODIES while
+ * HEADINGS are not updated, so a digest-based pass re-lists everything that was
+ * ruled in the body. 2026-09-05: 83 of the 96 owner rows were classified from a
+ * digest, and the triage that actually READ them cut 96 to 37. So the basis
+ * counts are returned alongside the totals and the caller MUST print them — a
+ * bare 68 under "decide" would repeat, in a new tile, the defect the last two
+ * rebuilds of this tile were for.
+ *
+ * Cross-checked against the live parser exactly as the census is: a graph row
+ * whose item is no longer OPEN on the board is drift, reported, never counted.
+ *
+ * @param {object|null} graph  the parsed BLOCKER-GRAPH.json, or null
+ * @param {Map<string,{status:string}>} itemsById  live parsed items, by id
+ * @param {object} horizons  from readHorizons — SOMEDAY-IF rows are excluded here too
+ */
+const OWNER_ACTORS = {
+  'OWNER-RULING': 'decide',
+  'OWNER-KEYBOARD': 'do',
+  EXTERNAL: 'external',
+};
+
+function readOwnerAxis(graph, itemsById, horizons) {
+  if (!graph || typeof graph !== 'object' || !graph.items || typeof graph.items !== 'object') {
+    return {
+      observable: false,
+      why: 'BLOCKER-GRAPH.json is not reachable or carries no items map',
+    };
+  }
+  const lanes = { decide: [], do: [], external: [] };
+  const basis = { READ: 0, DIGEST: 0, KEYWORD: 0, UNSTATED: 0 };
+  let closedSince = 0;
+  let somedayDropped = 0;
+  for (const [id, row] of Object.entries(graph.items)) {
+    const lane = OWNER_ACTORS[row && row.actor];
+    if (!lane) continue; // SESSION / UNKNOWN — not his errand
+    const live = itemsById.get(id);
+    // ⛔ A row whose item is gone, or is done, is NOT counted. The census learned
+    // this the expensive way: a hand list that keeps a closed row keeps reporting it.
+    if (!live || live.status === 'done') {
+      closedSince++;
+      continue;
+    }
+    if (horizons && horizons.observable && horizons.someday && horizons.someday.has(id)) {
+      somedayDropped++;
+      continue;
+    }
+    lanes[lane].push({
+      id,
+      status: live.status,
+      basis: (row.actorBasis || 'UNSTATED').toUpperCase(),
+      evidence: String(row.actorEvidence || '').trim(),
+    });
+    const b = (row.actorBasis || 'UNSTATED').toUpperCase();
+    basis[b] = (basis[b] || 0) + 1;
+  }
+  // ⭐ READ rows first, then DIGEST, then KEYWORD — the strongest evidence at the
+  // top of the list rather than an alphabet that mixes a verified row in among
+  // eighty guesses. Ties break by id so the order is stable between reads.
+  const rank = b => (b === 'READ' ? 0 : b === 'DIGEST' ? 1 : 2);
+  for (const k of Object.keys(lanes)) {
+    lanes[k].sort((a, b) => rank(a.basis) - rank(b.basis) || a.id.localeCompare(b.id));
+  }
+  return {
+    observable: true,
+    lanes,
+    basis,
+    closedSince,
+    somedayDropped,
+    // ⛔⛔ NO "BOTH" LANE IS COMPUTED, AND THE ABSENCE IS THE FINDING. `actor` is
+    // SINGLE-VALUED in the graph, so an item that both asks a question AND needs
+    // his hands can only be filed as one of them. The 2026-09-05 triage READ the
+    // rows and found FOUR of exactly that shape (BD11, CP5, GV13, SEC5 — each
+    // written up with a "QUESTION: … HANDS: …" body). ⚠ A `both` derived from an
+    // intersection of these two lanes would be empty BY CONSTRUCTION and would
+    // read as "there are none", which is a fabricated zero — the cheapest way to
+    // put a confident wrong number on this page. So the lanes are reported as
+    // what they are, and the caller states this ceiling in the tile's own words.
+    bothIsUnrepresentable: true,
+    measuredAt: graph.measuredAt || null,
+    measuredAgainst: graph.measuredAgainst || null,
+  };
+}
+
+module.exports = {
+  HORIZON_UNSET,
+  HORIZON_UNPARSEABLE,
+  SOMEDAY_NAME,
+  horizonOfBody,
+  readHorizons,
+  excludeSomeday,
+  rawItemHeadings,
+  bandById,
+  somedayByBand,
+  readOwnerAxis,
+  OWNER_ACTORS,
+};
