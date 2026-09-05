@@ -8,6 +8,36 @@ on:
   # gated by the push to dev, and it is gated again by the push trigger on merge to
   # main, so a pull_request run on it is pure duplicate work (audit #10b). Normal
   # push gating for both branches is unchanged.
+  #
+  # ⭐ INVARIANT — A RELEASE PR'S HEAD MUST BE `dev`'s TIP, AND THAT IS WHY THE ABOVE
+  # IS SAFE WITH REQUIRED CHECKS ON `main`.
+  # Required status checks are evaluated against the check runs attached to the PR's
+  # HEAD COMMIT, whatever event produced them — a `pull_request` run is NOT required
+  # for them to be satisfied. A dev→main release PR's head IS `dev`'s tip, which
+  # already carries `Full Gate (ubuntu-latest)` + `Full Gate (windows-latest)` from
+  # its own push-to-`dev` run. So `main`'s required checks are already green and
+  # nothing deadlocks. Measured 2026-09-04 on 23bd436: both contexts present and
+  # successful on that sha, produced by run 33900779611, event=push, branch=dev.
+  #
+  # ⚠ THE COROLLARY, and it is the part that gets misread: a branch cut STRAIGHT TO
+  # `main` that never lived on `dev` carries NO Full Gate check runs at all, so its
+  # required checks can never be satisfied and it genuinely cannot merge. That is not
+  # a bug and not a deadlock to route around — it is Protocol 16 enforced by the
+  # configuration. A hotfix lands on `dev`, clears the gate there, and reaches `main`
+  # by the same dev→main path every release uses. There is no emergency
+  # direct-to-`main` path, by design (owner decision, 2026-07-21).
+  #
+  # ⛔⛔ WHAT GOES WRONG IF THIS IS NOT WRITTEN DOWN — this is the reason the comment
+  # exists, not a footnote. The hotfix case above looks EXACTLY like a deadlock: a PR
+  # into `main` whose required checks sit pending forever. On 2026-09-04 that reading
+  # was asserted twice — once as a warning, once as queue item CI2 — and retracted
+  # both times. A session meeting it fresh, during a live incident, with a release
+  # waiting, will conclude that required checks on `main` are broken and remove them.
+  # ⛔ That deletes `main`'s ONLY merge-time gate, at the exact moment it matters
+  # most, and it will read as unblocking the release rather than as weakening prod.
+  # ⇒ If you are here because a PR into `main` will not merge: check whether its head
+  #   is `dev`'s tip. If it is not, that is the answer — rebase onto `dev` and go
+  #   through `dev`. Do not touch `main`'s protection.
   pull_request:
     branches: [dev]
 
@@ -22,6 +52,25 @@ jobs:
     # validates CI on the real dev platform — it is not an exotic add-on. Both OSes
     # resolve the SAME Node from .nvmrc (one authoritative declaration). fail-fast
     # is off so a failure on one OS never hides the other OS's result.
+    #
+    # ⛔⛔ THESE TWO JOB NAMES ARE PINNED IN BRANCH PROTECTION ON **BOTH** BRANCHES.
+    # The required status checks on `dev` AND on `main` are the literal strings
+    #     Full Gate (ubuntu-latest)
+    #     Full Gate (windows-latest)
+    # and GitHub matches a required check by NAME. That string is composed from the
+    # `name:` template below AND the `matrix.os` values — so changing EITHER one
+    # renames the check. Guarding only the matrix guards half of it.
+    # ⛔ A renamed check never reports under its old name. The required context then
+    #    waits forever and EVERY pull request into that branch blocks with no failure
+    #    to look at — the failure mode where a control becomes an outage, on both
+    #    branches at once.
+    # ⇒ If you change `name:` or `matrix.os`, update the required status checks in the
+    #   SAME change (repo settings → branch protection, or `gh api -X PATCH
+    #   repos/zerckzzyHD/Robco-UOS/branches/<branch>/protection/required_status_checks`
+    #   for `dev` and `main` both), then GET them back and read the result: a 200 on
+    #   the write is a receipt, the GET is the effect.
+    # Pinned on `dev` 2026-09-04 (QUEUE item CI1). Before that, `dev` required nothing
+    # and five PRs merged over a red Windows gate inside thirty minutes.
     name: Full Gate (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
