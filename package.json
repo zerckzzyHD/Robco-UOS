@@ -54,7 +54,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.9.1",
-    "firebase": "12.17.1",
+    "firebase": "12.18.0",
     "firebase-tools": "^15.28.2",
     "playwright": "^1.61.1",
     "prettier": "^3.9.6",
