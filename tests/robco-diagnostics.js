@@ -59406,6 +59406,239 @@ if (!PLANNING_OK) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  SUITE 269 — binary-source guard: unreviewable content cannot land
+//  Exercised BEHAVIOURALLY in throwaway git repos by running the real
+//  scripts/binary-source-guard.js, red-then-green — never by grepping it.
+// ══════════════════════════════════════════════════════════════
+{
+  header('Suite 269 — binary-source guard (unreviewable content cannot land)');
+  const os269 = require('os');
+  const cp269 = require('child_process');
+  const guard269 = path.join(ROOT, 'scripts', 'binary-source-guard.js');
+
+  // Scrub GIT_* so the child git/guard operate on the throwaway repo and never
+  // on the parent repo's index (git exports GIT_DIR/GIT_INDEX_FILE inside hooks).
+  const env269 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/.test(k)) env269[k] = process.env[k];
+  const g269 = (repo, args) =>
+    cp269.spawnSync('git', args, { cwd: repo, env: env269, encoding: 'utf8', windowsHide: true });
+  const run269 = repo =>
+    cp269.spawnSync('node', [guard269], {
+      cwd: repo,
+      env: env269,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+
+  assert(
+    fs.existsSync(guard269),
+    '269.1: scripts/binary-source-guard.js exists (the guard the pre-commit hook invokes)'
+  );
+
+  // The guard existing is worth nothing if nothing runs it. This is the wiring.
+  const preCommit269 = fs.readFileSync(path.join(ROOT, 'scripts', 'pre-commit'), 'utf8');
+  assert(
+    /node\s+scripts\/binary-source-guard\.js\s*\|\|\s*exit\s+1/.test(preCommit269),
+    '269.2: scripts/pre-commit invokes the binary-source guard and exits non-zero on its failure (it runs on EVERY commit, not when someone remembers to look)'
+  );
+
+  let red269 = null;
+  let green269 = null;
+  let allowed269 = null;
+  let grandfathered269 = null;
+  let newBlob269 = null;
+  let deleted269 = null;
+  let redOut269 = '';
+  let setupErr269 = null;
+  const roots269 = [];
+  try {
+    const r = fs.mkdtempSync(path.join(os269.tmpdir(), 'robco-binguard-269-'));
+    roots269.push(r);
+    g269(r, ['init', '-q']);
+    // Baseline: a text source file, an allowlisted binary, and a NON-allowlisted
+    // binary that is already tracked (the grandfathering case).
+    fs.writeFileSync(path.join(r, 'app.js'), '// plain text\nconsole.log(1);\n');
+    fs.writeFileSync(path.join(r, 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 13]));
+    fs.writeFileSync(path.join(r, 'legacy.blob'), Buffer.from([1, 2, 3, 0, 4, 5, 6, 0, 7]));
+    g269(r, ['add', 'app.js', 'logo.png', 'legacy.blob']);
+    g269(r, [
+      '-c',
+      'user.email=t@x',
+      '-c',
+      'user.name=t',
+      'commit',
+      '-q',
+      '--no-verify',
+      '-m',
+      'b',
+    ]);
+
+    // ── RED: the incident's exact shape — a .js file carrying literal NUL bytes.
+    // git stages it as `Bin N -> M bytes`; the diff is gone; node --check would
+    // still parse it and the module would still run.
+    const nul = Buffer.concat([
+      Buffer.from('// looks like source\nfunction f(){ return 42; }\n', 'utf8'),
+      Buffer.from([0]),
+      Buffer.from('trailing\n', 'utf8'),
+    ]);
+    fs.writeFileSync(path.join(r, 'app.js'), nul);
+    g269(r, ['add', 'app.js']);
+    const redRun = run269(r);
+    red269 = redRun.status;
+    redOut269 = (redRun.stdout || '') + (redRun.stderr || '');
+
+    // ── GREEN: identical path, plain text.
+    g269(r, ['reset', '-q']);
+    fs.writeFileSync(path.join(r, 'app.js'), '// looks like source\nfunction f(){ return 42; }\n');
+    g269(r, ['add', 'app.js']);
+    green269 = run269(r).status;
+
+    // ── An allowlisted binary may change freely.
+    g269(r, ['reset', '-q']);
+    fs.writeFileSync(
+      path.join(r, 'logo.png'),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 13, 9, 9])
+    );
+    g269(r, ['add', 'logo.png']);
+    allowed269 = run269(r).status;
+
+    // ── An ALREADY-tracked non-allowlisted binary may change freely: the guard
+    //    catches the transition, never the existing inventory.
+    g269(r, ['reset', '-q']);
+    fs.writeFileSync(path.join(r, 'legacy.blob'), Buffer.from([9, 9, 9, 0, 1, 2, 3, 0, 4]));
+    g269(r, ['add', 'legacy.blob']);
+    grandfathered269 = run269(r).status;
+
+    // ── A NEW non-allowlisted binary is refused.
+    g269(r, ['reset', '-q']);
+    fs.writeFileSync(path.join(r, 'data.blob'), Buffer.from([1, 0, 2, 0, 3]));
+    g269(r, ['add', 'data.blob']);
+    newBlob269 = run269(r).status;
+
+    // ── Deleting a binary is not adding unreadable content.
+    g269(r, ['reset', '-q']);
+    g269(r, ['rm', '-q', '--cached', 'legacy.blob']);
+    deleted269 = run269(r).status;
+  } catch (e) {
+    setupErr269 = e;
+  }
+
+  assert(
+    !setupErr269,
+    '269.3: throwaway repos for the binary-guard proof built (' +
+      (setupErr269 ? setupErr269.message : 'ok') +
+      ')'
+  );
+
+  if (!setupErr269) {
+    assert(
+      red269 === 1,
+      '269.4: RED — a staged .js carrying literal NUL bytes (git: `Bin N -> M bytes`) is REFUSED with exit 1 (got ' +
+        red269 +
+        ') — the incident shape, proven by running the guard'
+    );
+    assert(
+      /BINARY/.test(redOut269) && /app\.js/.test(redOut269),
+      '269.5: the refusal NAMES the offending path and says why, instead of failing anonymously'
+    );
+    assert(
+      green269 === 0,
+      '269.6: GREEN — the same path as plain text passes (exit ' + green269 + ')'
+    );
+    assert(
+      allowed269 === 0 && grandfathered269 === 0 && deleted269 === 0,
+      '269.7: no false positives — an allowlisted binary changing (' +
+        allowed269 +
+        '), an ALREADY-tracked non-allowlisted binary changing (' +
+        grandfathered269 +
+        '), and a binary being deleted (' +
+        deleted269 +
+        ') all pass; the guard catches the TRANSITION, never the inventory'
+    );
+    assert(
+      newBlob269 === 1,
+      '269.8: a NEWLY added non-allowlisted binary is refused (exit ' + newBlob269 + ')'
+    );
+  }
+
+  // ⛔ THE INSTALLED HOOK IS A COPY, NOT A POINTER (scripts/install-hooks.js
+  // copyFileSync's scripts/pre-commit into .git/hooks/). So editing the source
+  // hook does NOT arm a new driver — the copy stays stale until `npm install`
+  // re-runs `prepare`. Found while verifying this very guard: the wired-in check
+  // would have been INERT on this machine and silent about it. A guard that
+  // depends on someone remembering to reinstall is the thing this suite exists
+  // to prevent, so the staleness is made loud here (Protocol 42).
+  {
+    const installed269 = path.join(ROOT, '.git', 'hooks', 'pre-commit');
+    if (!fs.existsSync(installed269)) {
+      assert(
+        true,
+        '269.10: SKIP — no .git/hooks/pre-commit installed on this checkout (a fresh clone before `npm install`); nothing to compare, and this is a normal state, not a failure'
+      );
+    } else {
+      const body269 = fs.readFileSync(installed269, 'utf8');
+      assert(
+        /node\s+scripts\/binary-source-guard\.js/.test(body269),
+        '269.10: the INSTALLED .git/hooks/pre-commit actually invokes the binary-source guard — it is a stale COPY otherwise and the guard never runs. Fix: npm install (re-runs `prepare` -> scripts/install-hooks.js)'
+      );
+    }
+  }
+
+  // Drift guard: every file THIS repo already tracks as binary must be covered by
+  // the allowlist. Without this, adding a new kind of binary asset would make the
+  // guard go red on an innocent commit — which is how a guard gets disabled.
+  {
+    const EMPTY_TREE_269 = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+    const numstat = cp269.spawnSync(
+      'git',
+      ['--no-optional-locks', 'diff', '--numstat', '--no-renames', EMPTY_TREE_269, 'HEAD'],
+      { cwd: ROOT, env: env269, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 }
+    );
+    const src269 = fs.existsSync(guard269) ? fs.readFileSync(guard269, 'utf8') : '';
+    const listBlock = /ALLOWED_BINARY_EXT\s*=\s*new Set\(\[([\s\S]*?)\]\)/.exec(src269);
+    const allow269 = new Set(
+      listBlock ? (listBlock[1].match(/'([^']+)'/g) || []).map(s => s.slice(1, -1)) : []
+    );
+    if (numstat.status !== 0) {
+      assert(
+        true,
+        '269.9: SKIP — could not read this repo`s binary inventory (no HEAD or git unavailable); the allowlist-coverage drift guard did not run'
+      );
+    } else {
+      const tracked = numstat.stdout
+        .split('\n')
+        .filter(Boolean)
+        .map(l => l.split('\t'))
+        .filter(f => f.length >= 3 && f[0] === '-' && f[1] === '-')
+        .map(f => f.slice(2).join('\t'));
+      const uncovered = tracked.filter(p => {
+        const b = p.split('/').pop();
+        const i = b.lastIndexOf('.');
+        return !(i > 0 && allow269.has(b.slice(i + 1).toLowerCase()));
+      });
+      assert(
+        allow269.size > 0 && uncovered.length === 0,
+        '269.9: every file this repo already tracks as binary has an allowlisted extension (' +
+          tracked.length +
+          ' tracked, ' +
+          allow269.size +
+          ' extensions allowed' +
+          (uncovered.length ? '; UNCOVERED: ' + uncovered.join(', ') : '') +
+          ') — so the guard cannot go red on the existing inventory'
+      );
+    }
+  }
+
+  for (const d of roots269) {
+    try {
+      fs.rmSync(d, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    } catch {
+      /* harmless leftover */
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail

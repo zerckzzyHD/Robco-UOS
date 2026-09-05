@@ -9,6 +9,18 @@
 node scripts/cache-bump-guard.js || exit 1
 # ── End Protocol 1 guard ──────────────────────────────────────────────────────
 
+# ── Binary-source guard: refuse UNREVIEWABLE content ─────────────────────────
+# A source file written with literal NUL bytes is classified binary by git and
+# staged as `Bin 0 -> N bytes`. Every other check still passes — it parses, it
+# runs, the tests are green — but THE DIFF IS GONE, and this project reviews by
+# reading diffs. Caught once in _RobCo-Control only because a session happened to
+# read `git diff --cached --stat` and noticed the word "Bin". Refuses a newly
+# binary staged file whose extension is not allowlisted; already-tracked binaries
+# are grandfathered so the check never fires retroactively. Suite 269 proves it
+# red-then-green by running this file. See scripts/binary-source-guard.js.
+node scripts/binary-source-guard.js || exit 1
+# ── End binary-source guard ───────────────────────────────────────────────────
+
 # ── Q3 — Secret scan: block staged private keys and Google API keys ──────────
 STAGED_DIFF=$(git diff --cached)
 # Check for private key blocks in added lines (all staged files)

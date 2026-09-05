@@ -167,6 +167,7 @@
 ├── scripts/
 │   ├── pre-commit              Versioned pre-commit hook source (installed by prepare)
 │   ├── cache-bump-guard.js     Protocol 1 branch-agnostic cache-bump guard (Node) — invoked by pre-commit, compares staged CACHE_NAME vs HEAD
+│   ├── binary-source-guard.js  Refuses a staged file git classifies as BINARY unless its extension is allowlisted or it was already binary — invoked by pre-commit. A source file written with literal NUL bytes stages as `Bin 0 -> N bytes`: it parses, it runs, every check passes, and THE DIFF IS GONE. Review here reads diffs, so that is unreviewable content entering silently. Grandfathers the existing inventory so it catches the transition, never the tracked binaries (Suite 269)
 │   ├── gate-lint-manifest.js   Git-tracked ESLint manifest — scopes the gate's lint step to tracked files so a sibling session's untracked scratch file can never fail an unrelated push
 │   ├── gate.js                 Full local gate orchestrator (lint, format, the Node runner, browser checks) — `npm run gate` / `gate:fast` / `gate:docs`
 │   ├── gate-scope.js           CPB4 doc-only gate fast path — reads the git pre-push payload, prints DOCS_ONLY only when every changed file is a doc (fail-closed to FULL), so the hook can run `gate:docs` (no browser) on doc-only pushes
