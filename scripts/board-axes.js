@@ -329,9 +329,57 @@ function readOwnerAxis(graph, itemsById, horizons) {
   for (const k of Object.keys(lanes)) {
     lanes[k].sort((a, b) => rank(a.basis) - rank(b.basis) || a.id.localeCompare(b.id));
   }
+
+  // ── ⭐⭐ THE COUNTED SET IS THE ROWS SOMEBODY ACTUALLY READ (owner ruling,
+  //    2026-09-05) ──────────────────────────────────────────────────────────
+  //
+  // ⛔⛤ THIS TILE HAS NOW BEEN WRONG TWICE, IN DIFFERENT WAYS, AND BOTH TIMES A
+  // CONFIDENT NUMBER WAS THE MECHANISM. First it counted a heading GLYPH under a
+  // label promising decisions (16 in the band, 2 of them decisions). Then the
+  // declared roster it was rebuilt onto was emptied and it printed `0` — read as
+  // "nothing is waiting on you" — for two days. Folding DIGEST rows into a lane
+  // total would be the third instance of the same disease: on the live graph that
+  // fold produced 68 where a read of the rows measured roughly a third of it.
+  //
+  // ⭐ SO THE LANE COUNT IS THE `READ` ROWS ONLY — rows whose FULL BODY somebody
+  // read — and the DIGEST/KEYWORD remainder is returned separately so the caller
+  // can print it as UNOBSERVABLE at tile size rather than burying it in a hint
+  // beside a number three times too large. ⚠ A DIGEST row is a heading + Done-means
+  // reading, and this board records rulings in item BODIES without updating
+  // headings, so a digest row may be open, may be long since answered, and nothing
+  // short of reading it can say which.
+  //
+  // ⛔ A LANE WITH ZERO READ ROWS IS `UNOBSERVABLE`, NEVER `0`. That is the same
+  // rule as the empty roster one level up: an absent measurement is not the
+  // measurement "none".
+  //
+  // ⚠⚠ AND THE CEILING ON THE READ COUNT ITSELF, because it is the next way this
+  // can mislead: `actorBasis` records how the GRAPH classified a row, not whether
+  // a human has ever read the item. The 2026-09-05 owner-list triage read rows and
+  // published its verdicts to a markdown report WITHOUT writing them back to the
+  // graph — so real reading exists that this count cannot see, and the READ number
+  // is a FLOOR. Writing that triage's verdicts into BLOCKER-GRAPH.json is what
+  // raises it; until then the honest reading of a lane is "at least this many".
+  const laneSummary = {};
+  for (const k of Object.keys(lanes)) {
+    const read = lanes[k].filter(r => r.basis === 'READ');
+    laneSummary[k] = {
+      read: read.length,
+      unread: lanes[k].length - read.length,
+      total: lanes[k].length,
+      // ⛔ `observable` is about whether a COUNT can be printed for this lane, and
+      // it is false on zero reads. Callers must not print `laneSummary[k].read`
+      // without consulting it, or the zero comes straight back.
+      observable: read.length > 0,
+    };
+  }
+  const unreadTotal = Object.values(laneSummary).reduce((a, s) => a + s.unread, 0);
+
   return {
     observable: true,
     lanes,
+    laneSummary,
+    unreadTotal,
     basis,
     closedSince,
     somedayDropped,

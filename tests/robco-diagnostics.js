@@ -54110,7 +54110,11 @@ if (!PLANNING_OK) {
   // rather than fall back to the rows it happens to have. Suite 261 owns the
   // predicate itself.
   assert(
-    /<span class="n">UNOBSERVABLE<\/span><span class="k">finished but still filed as open/.test(
+    // ⚠ `class="n[^"]*"`, not `class="n"`: a digit-free value now also carries the
+    // `word` modifier that stops UNOBSERVABLE scrolling a 375px page sideways
+    // (Suite 270.13d). The assertion is about the VALUE, so it must not be pinned
+    // to the class list that happens to sit beside it.
+    /<span class="n[^"]*">UNOBSERVABLE<\/span><span class="k">finished but still filed as open/.test(
       html249j
     ) && !/listed rows only/.test(html249j),
     '249.10c: with no queue supplied the tile prints UNOBSERVABLE rather than a number derived from the board rows alone — a metric that cannot see its whole subject must not print an integer'
@@ -59328,7 +59332,7 @@ if (!PLANNING_OK) {
   const tiles268 = html =>
     [
       ...html.matchAll(
-        /<li><span class="n">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
+        /<li><span class="n[^"]*">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
       ),
     ].map(m => ({ n: m[1], k: m[2], h: m[3] || '' }));
 
@@ -59726,8 +59730,9 @@ if (!PLANNING_OK) {
     '- **R1** — a real ready item',
     '- **R2** — a someday thought filed as ready',
     '',
-    '## 🔄 Active (1)',
+    '## 🔄 Active (2)',
     '- **A1** — in flight',
+    '- **D2** — a decide row nobody has read',
     '',
     '## ⚠️ Attention (1)',
     '- **W1** — flagged',
@@ -59758,6 +59763,10 @@ if (!PLANNING_OK) {
       '',
       'body',
       '',
+      '### D2. 🔄 a decide row nobody has read',
+      '',
+      'body',
+      '',
       '### W1. ⚠️ flagged',
       '',
       'body',
@@ -59778,6 +59787,15 @@ if (!PLANNING_OK) {
           actor: 'OWNER-RULING',
           actorBasis: 'READ',
           actorEvidence: 'he must choose the shape',
+        },
+        // ⭐ THE FOLD CONTROL. A decide row classified from a heading alone: a
+        // renderer that folded DIGEST rows into the lane count would print 2 here
+        // instead of 1 — the 68-vs-23 defect in miniature, and the only way to
+        // prove the count is the READ set rather than a number that happens to match.
+        D2: {
+          actor: 'OWNER-RULING',
+          actorBasis: 'DIGEST',
+          actorEvidence: 'heading says he must rule; body never read',
         },
         W1: {
           actor: 'OWNER-KEYBOARD',
@@ -59821,7 +59839,7 @@ if (!PLANNING_OK) {
   const tiles270 = html =>
     [
       ...html.matchAll(
-        /<li><span class="n">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
+        /<li><span class="n[^"]*">([^<]*)<\/span><span class="k">([^<]*)<\/span>(?:<span class="h">([^<]*)<\/span>)?/g
       ),
     ].map(m => ({ n: m[1], k: m[2], h: m[3] || '' }));
   const tileOf = (html, re) => tiles270(html).find(t => re.test(t.k));
@@ -59837,9 +59855,9 @@ if (!PLANNING_OK) {
   const someday1 = tileOf(h1, /someday if/);
   const unset1 = tileOf(h1, /^unset$/);
   assert(
-    someday1 && someday1.n === '1' && unset1 && unset1.n === '3',
+    someday1 && someday1.n === '1' && unset1 && unset1.n === '4',
     '270.2: RENDERED — the horizon strip reads its three values plus UNSET from the items themselves ' +
-      `(expected someday 1 / unset 3, got ${someday1 ? someday1.n : 'absent'} / ${unset1 ? unset1.n : 'absent'})`
+      `(expected someday 1 / unset 4, got ${someday1 ? someday1.n : 'absent'} / ${unset1 ? unset1.n : 'absent'})`
   );
   assert(
     unset1 && /never counted as one of the three/.test(unset1.h),
@@ -59897,26 +59915,41 @@ if (!PLANNING_OK) {
   // ── 270.8 — an unset horizon is NEVER defaulted into a value ───────────────
   // R1/A1/W1 carry no block at all and must still be counted as live work.
   assert(
-    ready1 && ready1.n === '1' && tileOf(h1, /being worked on now/).n === '1',
+    ready1 && ready1.n === '1' && tileOf(h1, /being worked on now/).n === '2',
     '270.8: RENDERED — items with no horizon at all are still counted (unset is never read as SOMEDAY-IF, which would hide real work)'
   );
 
-  // ── 270.9-270.10 — DECIDE and DO are two errands, with the ceiling attached ──
+  // ── 270.9-270.10a — DECIDE and DO are two errands, counted from READ rows only ──
+  //
+  // ⛔⛤ THE FOLD IS THE DEFECT, AND THIS IS THE CONTROL FOR IT (owner ruling,
+  // 2026-09-05). The decide lane holds TWO rows that survive every cross-check —
+  // A1 (READ) and D2 (DIGEST) — so a renderer that folded heading-only rows into
+  // the count would print 2. It must print 1. On the live graph that same fold
+  // printed 68 where a read of the rows measured 23, and a reader glancing at a
+  // tile sees the number, not the basis split beside it.
   const dec1 = tileOf(h1, /he decides/);
   const do1 = tileOf(h1, /his hands/);
+  const unread1 = tileOf(h1, /unread/);
   assert(
-    dec1 && dec1.n === '1' && do1 && do1.n === '1',
-    "270.9: RENDERED — the owner axis splits into a sitting and a task list from the graph's actor field; the SESSION row, the EXTERNAL row, the SOMEDAY-IF row and the row whose item is gone are all out of both" +
-      (dec1 && do1 ? ` — got decide ${dec1.n} / do ${do1.n}` : ' — a tile is absent')
+    dec1 && dec1.n === '1',
+    '270.9: RENDERED — the decide lane counts the ROW SOMEBODY READ and not the heading-only one beside it (2 rows in the lane, count is 1) — the fold that produced 68 on the live graph cannot happen here' +
+      (dec1 ? ` — got ${dec1.n}` : ' — tile absent')
   );
   assert(
-    // 1 READ (A1) + 2 DIGEST (W1, R1) among the rows that survive the cross-check:
-    // R2 is dropped as SOMEDAY-IF and GONE1 is dropped as no longer on the board.
-    /classified from 1 full reads, 2 digests/.test(dec1 ? dec1.h : '') &&
-      /upper bound/.test(dec1 ? dec1.h : '') &&
+    do1 && do1.n === 'UNOBSERVABLE' && /NOT ZERO/.test(do1.h),
+    '270.10: RENDERED — a lane whose rows have all been classified from a heading reads UNOBSERVABLE and says NOT ZERO — an absent measurement is never the measurement "none"' +
+      (do1 ? ` — got ${do1.n}` : ' — tile absent')
+  );
+  assert(
+    unread1 && unread1.n === 'UNOBSERVABLE' && /^3 unread/.test(unread1.k),
+    '270.10a: RENDERED — the unread remainder gets its OWN tile at tile size (D2 + W1 + R1 = 3), not a qualifier inside a hint nobody reads' +
+      (unread1 ? ` — got "${unread1.n}" / "${unread1.k}"` : ' — tile absent')
+  );
+  assert(
+    /AT LEAST this many/.test(dec1 ? dec1.h : '') &&
       /BOTH a question and a hands task cannot appear as such/.test(h1) &&
       !/\bboth\b<\/span>/.test(h1),
-    '270.10: RENDERED — each lane carries its classification-basis split and is called an upper bound, and the page states that "both" is unrepresentable rather than printing a fabricated zero'
+    '270.10b: RENDERED — the counted lane is called a FLOOR ("at least this many"), because actorBasis records how the GRAPH classified a row and not whether a human read the item; and "both" is still stated as unrepresentable rather than printed as a fabricated zero'
   );
 
   // ── 270.11 — the project axis is rendered under the rule that exists ───────
@@ -59933,14 +59966,98 @@ if (!PLANNING_OK) {
     '270.12: RENDERED — the page states the gap rather than relabelling a four-value axis as the six-value one: the harness is inside CP, Binder has no bucket, and no project field exists'
   );
 
-  // ── 270.13 — a census reading 0 may never read as "nothing needs you" ──────
+  // ── 270.13-270.13c — ⛔⛤ AN EMPTY ROSTER IS `UNOBSERVABLE`, NEVER `0` ───────
+  //
+  // THE INCIDENT THIS LOCKS: the declared owner-decision roster was emptied on
+  // 2026-09-03 when its last three rows were ruled, and never refilled. Nothing
+  // broke — the census ran, the parser agreed, every cross-check passed — and
+  // `/queue` printed `0 of 411` under "need you — open owner decisions" for two
+  // days, on the page the owner reads from his phone to decide whether anything is
+  // waiting. Measured the same day it was found: 96 graph rows needed him, 23
+  // questions and 18 hands genuinely his.
+  //
+  // ⭐ A WARNING SENTENCE BESIDE THE ZERO IS NOT THE FIX, and the first attempt at
+  // this was exactly that. A sentence sits next to the number; a reader glancing at
+  // a tile sees the number. The tile itself has to stop saying zero.
+  //
+  // ⚠ AND THE TWO CASES MUST STAY APART — 270.13b is the half that keeps this from
+  // becoming a blanket "never print zero", which would throw away a real
+  // measurement over a real set.
   const need1 = tileOf(h1, /need you/);
   assert(
-    need1 &&
-      (need1.n === 'UNOBSERVABLE' ||
-        /0 means NO DECLARED ROW IS OPEN/.test(need1.h) ||
-        !/^0 of/.test(need1.n)),
-    '270.13: RENDERED — when the declared census counts zero, the tile says zero means no DECLARED row is open, never "nothing is waiting on you"'
+    need1 && need1.n === 'UNOBSERVABLE',
+    '270.13: RENDERED — with no census reachable at all the tile is UNOBSERVABLE, never 0' +
+      (need1 ? ` — got ${need1.n}` : ' — tile absent')
+  );
+
+  // A census that DECLARES rows and finds them open: a real number, and it prints.
+  const censusStub270 = rows =>
+    [
+      "'use strict';",
+      'const arg = process.argv[2];',
+      "if (arg === '--list') {",
+      ...rows.map(r => `  console.log('${r}');`),
+      '  return;',
+      '}',
+      "console.log('OD-RULE v1 — owner-decision-census (READ-ONLY; not a guard)');",
+      `console.log('ON-BOARD open owner decisions .... ${rows.length} of 40 ID-bearing items');`,
+      "console.log('CLOSED-SINCE ..... 0  (every declared row is still an open item on the board)');",
+      '',
+    ].join('\n');
+  const censusPath270 = path.join(tree270, 'tools', 'owner-decision-census.cjs');
+  fs.writeFileSync(
+    censusPath270,
+    censusStub270(['CS2    T1   blocked   OWNER-ONLY — hosted settings'])
+  );
+  const gFull = render270();
+  const needFull = tileOf(gFull.stdout, /need you/);
+  assert(
+    needFull && needFull.n === '1 of 40' && /OD-RULE v1/.test(needFull.h),
+    '270.13b: RENDERED — a roster that DECLARES rows still prints its real fraction; the rule is about an ABSENT source, not a blanket refusal to print zero' +
+      (needFull ? ` — got ${needFull.n}` : ' — tile absent')
+  );
+
+  // ⭐⭐ RED-THEN-GREEN: the SAME census, its roster emptied. The count legitimately
+  // becomes 0 and the tile must stop printing a number.
+  fs.writeFileSync(censusPath270, censusStub270([]));
+  const gEmpty = render270();
+  const needEmpty = tileOf(gEmpty.stdout, /need you/);
+  assert(
+    needEmpty &&
+      needEmpty.n === 'UNOBSERVABLE' &&
+      /declared roster is EMPTY/.test(needEmpty.h) &&
+      /NOT &quot;nothing is waiting on you&quot;/.test(needEmpty.h),
+    '270.13c: RED-THEN-GREEN — empty the same roster and the tile goes from "1 of 40" to UNOBSERVABLE with the reason, rather than to "0 of 40". A missing input must never render as a reassuring answer' +
+      (needEmpty ? ` — got ${needEmpty.n}` : ' — tile absent')
+  );
+  fs.rmSync(censusPath270, { force: true });
+
+  // ── 270.13d — a WORD-valued tile is set as a word, not as a big number ──────
+  //
+  // ⛔⛤ THE REGRESSION THIS LOCKS, measured in a real browser at 375×812 on
+  // 2026-09-05: `UNOBSERVABLE` at the tile's 1.6rem number size measures 196px,
+  // a tile's content box at that width is 142px, the stats grid column cannot
+  // shrink below its 9.5rem minimum, and the unbreakable word pushed the whole
+  // DOCUMENT to 400px — a phone-wide horizontal scroll. ⚠ It appeared the moment
+  // UNOBSERVABLE stopped being rare: the ruling that an unmeasurable tile must say
+  // so made the degradation path the COMMON path, so its layout has to be as sound
+  // as the happy one.
+  //
+  // ⚠ THE CEILING ON THIS ASSERTION, STATED: the Node runner has no browser, so
+  // this proves the MECHANISM (the emitter marks word values, and the stylesheet
+  // has a rule for them) and not the pixels. The pixel measurement was taken with
+  // Playwright — 400px before, 375px after — and lives in the commit, not here.
+  const wordTiles270 = [...h1.matchAll(/<span class="n( word)?">([^<]*)</g)].map(m => ({
+    word: !!m[1],
+    v: m[2],
+  }));
+  assert(
+    wordTiles270.length > 0 &&
+      wordTiles270.every(t => t.word === !/[0-9]/.test(t.v)) &&
+      wordTiles270.some(t => t.word && t.v === 'UNOBSERVABLE') &&
+      /ul\.stats \.n\.word \{/.test(h1) &&
+      /ul\.stats \.n \{[^}]*overflow-wrap:anywhere/.test(h1),
+    '270.13d: RENDERED — every digit-free tile value (UNOBSERVABLE) carries the `word` modifier and every numeric one does not, and the page ships both the `.n.word` rule and the overflow-wrap backstop — an unbreakable word in a fixed-minimum grid column scrolled the whole page sideways at 375px'
   );
 
   // ── 270.14-270.16 — unit-level three-valuedness, with no planning tree at all ──

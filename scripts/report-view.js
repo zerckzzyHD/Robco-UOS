@@ -128,7 +128,19 @@ ul.stats { list-style:none; padding:0; margin:1rem 0 1.25rem; display:grid;
 ul.stats li { margin:0; background:var(--code); border:1px solid var(--line);
   border-radius:8px; padding:.65rem .7rem; }
 ul.stats .n { display:block; font-size:1.6rem; font-weight:700; line-height:1.1;
-  color:var(--acc); }
+  color:var(--acc); overflow-wrap:anywhere; }
+/* ⛔⛤ A WORD-VALUED TILE IS NOT A BIG NUMBER, and setting it like one pushed the
+   whole page sideways. "UNOBSERVABLE" at 1.6rem measures 196px; a tile's content
+   box at 375px is 142px, the grid column cannot shrink below its 9.5rem minimum,
+   and an unbreakable word therefore forced the DOCUMENT to 400px against a 375px
+   viewport — a phone-wide horizontal scroll on every page that could not measure
+   something. ⚠ Measured 2026-09-05, and it appeared the moment UNOBSERVABLE became
+   a COMMON value rather than a rare one: the degradation path is the path this page
+   is now most often on, so its layout has to be as sound as the happy one. The
+   The overflow-wrap above is the backstop; this rule is the actual fix — a word gets
+   word-sized type and stays inside its tile. */
+ul.stats .n.word { font-size:1rem; letter-spacing:.03em; line-height:1.25;
+  padding:.28rem 0 .1rem; }
 ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
 ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
 details.band, details.drift { border:1px solid var(--line); border-radius:8px;
@@ -541,8 +553,13 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   const somedayOnBoard = [...somedayByLabel.values()].reduce((a, ids) => a + ids.length, 0);
   const total = [...bands.values()].reduce((a, b) => a + b.count, 0) - somedayOnBoard;
 
+  // ⚠ A value carrying NO DIGIT is a word, not a number, and is set as one — see
+  // the `.n.word` rule for the phone-wide horizontal scroll this closes. The test
+  // is "has no digit" rather than "equals UNOBSERVABLE" so a future word value
+  // (UNKNOWN, PENDING, anything) is covered without anybody remembering to add it,
+  // while a fraction like `3 of 40` keeps the big-number treatment it fits in.
   const stat = (v, label, hint) =>
-    `<li><span class="n">${v}</span><span class="k">${escapeHtml(label)}</span>` +
+    `<li><span class="n${/[0-9]/.test(String(v)) ? '' : ' word'}">${v}</span><span class="k">${escapeHtml(label)}</span>` +
     (hint ? `<span class="h">${escapeHtml(hint)}</span>` : '') +
     `</li>`;
 
@@ -571,20 +588,44 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   const cz = census || { observable: false, why: 'no census was handed to the renderer' };
   const editedStamp =
     cz.observable && cz.editedAt ? String(cz.editedAt.toISOString()).slice(0, 10) : null;
-  const censusHint = cz.observable
+
+  // ── ⛔⛔ AN EMPTY ROSTER IS AN ABSENT SOURCE, AND AN ABSENT SOURCE IS
+  //    `UNOBSERVABLE` — NEVER `0` (owner ruling, 2026-09-05) ─────────────────
+  //
+  // ⛔⛤ THIS TILE PRINTED `0 of 411` FOR TWO DAYS on the page the owner reads
+  // from his phone to decide whether anything is waiting on him. Nothing was
+  // broken: the census ran, the parser agreed, every cross-check passed, and the
+  // hand-kept roster it counts had simply been EMPTIED on 2026-09-03 when its last
+  // three rows were ruled — and never refilled. Measured the same day it was
+  // found: the blocker graph counted 96 rows needing him and a read of those rows
+  // put 23 questions and 18 hands genuinely on his list.
+  //
+  // ⭐ THE DEFECT IS NOT THE NUMBER, IT IS THE SHAPE: a missing INPUT rendered as
+  // a reassuring ANSWER. That is the same disease as folding digest guesses into a
+  // confident total, one level up — and it is why an earlier fix that only added a
+  // WARNING SENTENCE beside the zero was not enough. A sentence sits next to the
+  // number; a reader glancing at a tile sees the number.
+  //
+  // ⚠ AND THE TWO CASES ARE HELD APART, because collapsing them would throw away a
+  // real measurement. A roster that DECLARES rows and finds none of them open is a
+  // genuine `0` over a real set, and it prints. A roster that declares NOTHING has
+  // measured nothing, so it prints UNOBSERVABLE with the reason. The predicate is
+  // derived, not assumed: with no present rows AND no closed-since rows, the
+  // declared set is empty — there was nothing for either bucket to hold.
+  const rosterEmpty = cz.observable && cz.count === 0 && !(cz.rows || []).length && !cz.closedSince;
+  const censusObservable = cz.observable && !rosterEmpty;
+  const censusHint = censusObservable
     ? `${cz.rule}: declared in the census, cross-checked open on the board · declared set last edited ${editedStamp || 'unknown'}` +
-      // ⛔⛤ ZERO IS NOT A FINISH LINE, and the tool that produces it says so in as
-      // many words. The roster is HAND-MAINTAINED: it fell to zero on 2026-09-03
-      // when the last three declared rows were ruled, and it has not moved since —
-      // so a bare 0 here reads as "nothing is waiting on you" while the graph
-      // beside it counts dozens. The number is not wrong; the reading is, and only
-      // this sentence stops it.
-      (cz.count === 0
-        ? ' · ⛔ 0 means NO DECLARED ROW IS OPEN — it does not mean nothing is waiting on you; the roster is hand-kept and only moves when somebody edits it'
-        : '') +
       (cz.closedSince ? ` · ⛔ ${cz.closedSince} declared row(s) no longer open` : '') +
       (cz.undeclared ? ` · ⚠ ${cz.undeclared} owner-shaped heading(s) not yet declared` : '')
-    : `not measured — ${cz.why}`;
+    : rosterEmpty
+      ? `⛔ the declared roster is EMPTY — it has held no rows since it was last edited (${editedStamp || 'date unknown'}), so this measured nothing. ` +
+        `⛔ That is NOT "nothing is waiting on you": it is a hand-kept list nobody has refilled. It moves only when somebody edits it. ` +
+        `Look at the read-based lanes below instead` +
+        (cz.undeclared
+          ? ` · ⚠ ${cz.undeclared} owner-shaped heading(s) are not declared anywhere`
+          : '')
+      : `not measured — ${cz.why}`;
   // ── ⭐⭐ DECIDE AND DO ARE TWO ERRANDS, AND MERGING THEM LIES BY A FACTOR OF TWO ──
   //
   // ⛔ Even when the total is right. A question goes to a SITTING he books; a
@@ -593,44 +634,78 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // (4 are both) — one number over those is a number he cannot act on.
   //
   // ⭐ The split is `BLOCKER-GRAPH.json`'s own `actor` vocabulary, not a new one.
-  // ⚠ And its CEILING rides on the tile, because this number has been wrong
-  // twice: every counted row carries how it was classified, and a DIGEST reading
-  // (heading + done-means, no body) is the MEASURED inflation mechanism — rulings
-  // land in bodies while headings are not updated, so a digest pass re-lists work
-  // that is already ruled. The basis split is printed, never averaged away.
+  //
+  // ⛔⛔ AND THE COUNT IS THE ROWS SOMEBODY READ — the DIGEST remainder is NOT
+  // FOLDED IN (owner ruling, 2026-09-05). Folding it produced 68 under "he
+  // decides" on the live graph, where a read of those same rows measured 23. ⚠ A
+  // reader glancing at a tile sees the NUMBER, not the basis split beside it, so a
+  // tile confidently wrong by 3× is worse than one that says it cannot tell — and
+  // "it cannot tell" is the three-valued rule this page applies everywhere else.
+  // The unread remainder is printed as its own UNOBSERVABLE tile, at tile size,
+  // rather than as a qualifier nobody reads.
   const ax = axes.owner;
+  const ACTOR_OF = { decide: 'OWNER-RULING', do: 'OWNER-KEYBOARD', external: 'EXTERNAL' };
   const laneHint = lane => {
     if (!ax.observable) return 'not measured — ' + ax.why;
-    const b = ax.basis;
+    const s = ax.laneSummary[lane];
     const when = ax.measuredAt ? String(ax.measuredAt).slice(0, 10) : 'unknown';
-    return (
-      `BLOCKER-GRAPH.json actor=${lane === 'decide' ? 'OWNER-RULING' : 'OWNER-KEYBOARD'}, ` +
-      `cross-checked open · measured ${when} · classified from ${b.READ || 0} full reads, ` +
-      `${b.DIGEST || 0} digests, ${b.KEYWORD || 0} keywords — a digest re-lists work already ruled in the body, ` +
-      `so this is an upper bound` +
-      (ax.somedayDropped ? ` · ${ax.somedayDropped} someday row(s) excluded` : '') +
-      (ax.closedSince ? ` · ${ax.closedSince} graph row(s) no longer open, not counted` : '')
-    );
+    const base =
+      `BLOCKER-GRAPH.json actor=${ACTOR_OF[lane]}, cross-checked still open · measured ${when} · ` +
+      // ⚠ THE FLOOR CLAUSE IS NOT OPTIONAL. `actorBasis` records how the GRAPH
+      // classified a row, not whether a human ever read the item — and the
+      // 2026-09-05 triage read rows and published to a markdown report WITHOUT
+      // writing its verdicts back to the graph. So real reading exists that this
+      // cannot see, and the number is a FLOOR. Saying "at least" is the difference
+      // between a bound and a claim.
+      `⛔ AT LEAST this many: only rows whose FULL BODY was read are counted`;
+    return s.observable
+      ? base +
+          (s.unread
+            ? ` · ${s.unread} more in this lane are classified from a heading only and are NOT counted — see the unread tile`
+            : '') +
+          (ax.somedayDropped ? ` · ${ax.somedayDropped} someday row(s) excluded` : '') +
+          (ax.closedSince ? ` · ${ax.closedSince} graph row(s) no longer open, not counted` : '')
+      : `⛔ NOT ZERO — no row in this lane has been read in full, so nothing here has been measured. ` +
+          `${s.unread} row(s) are classified from a heading only. ` +
+          base;
   };
+
+  // The one place a lane's printed number is decided. Zero reads is UNOBSERVABLE,
+  // never `0` — the same rule as the empty roster above, and the reason both live
+  // behind a helper rather than at each call site.
+  const laneCount = lane =>
+    ax.observable && ax.laneSummary[lane].observable ? ax.laneSummary[lane].read : 'UNOBSERVABLE';
+
+  // ⛔ THE REMAINDER GETS A TILE OF ITS OWN. It is the number the reader most needs
+  // and the one a hint would hide: rows the graph files as needing him, classified
+  // from a HEADING alone, on a board that records rulings in item BODIES and does
+  // not update headings. Any one of them may be live work or may have been answered
+  // weeks ago, and only reading it can say which.
+  const unreadTile = !ax.observable
+    ? ''
+    : stat(
+        'UNOBSERVABLE',
+        `${ax.unreadTotal} unread — could be either`,
+        'classified from a heading + Done-means, never the body — and this board records rulings in bodies without ' +
+          'updating headings, so a heading-only row may be live or long since answered. ⛔ Deliberately not folded into ' +
+          'the counts beside it: that fold is what made this tile read 68 where a read of the rows measured 23. ' +
+          'Reading a row is what moves it out of here.'
+      );
 
   const counts =
     `<ul class="stats">` +
     stat(n('Active'), 'being worked on now', 'started, not finished') +
     stat(
-      cz.observable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
+      censusObservable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
       'need you — open owner decisions',
       censusHint
     ) +
-    stat(
-      ax.observable ? ax.lanes.decide.length : 'UNOBSERVABLE',
-      'he decides — a sitting',
-      laneHint('decide')
-    ) +
-    stat(
-      ax.observable ? ax.lanes.do.length : 'UNOBSERVABLE',
-      'his hands — a task list',
-      laneHint('do')
-    ) +
+    // ⛔ `laneCount` is the ONE place a lane number is decided, so the "no reads ⇒
+    // UNOBSERVABLE, never 0" rule cannot be honoured on one tile and forgotten on
+    // the next. `.read` is deliberately unreachable without passing `.observable`.
+    stat(laneCount('decide'), 'he decides — a sitting', laneHint('decide')) +
+    stat(laneCount('do'), 'his hands — a task list', laneHint('do')) +
+    unreadTile +
     stat(
       n('Attention'),
       'flagged ⚠️',
@@ -676,7 +751,10 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         `<p class="note">Declared in the planning tree's census with an evidence phrase each; the census ` +
         `re-checks on every run that the item is still open on the board. A ruled decision whose row ` +
         `was not removed still appears here — that is the list to prune, not a number to trust.</p></details>`
-      : cz.observable && !cz.rowsObservable
+      : // ⚠ `censusObservable`, not `cz.observable`: with an EMPTY roster the tile
+        // above now prints UNOBSERVABLE, so "the number above stands" would be a
+        // sentence about a number that is no longer on the page.
+        censusObservable && !cz.rowsObservable
         ? `<p class="note stale">⛔ The census reported a count but its row list could not be read; the number above stands, the names do not.</p>`
         : '';
 
@@ -690,18 +768,33 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           .slice(0, nMax - 1)
           .trimEnd() + '…'
       : String(s);
+  // ⭐ THE LIST IS CUT WHERE THE COUNT IS CUT. The counted (READ) rows are listed
+  // first under a rule that says so, then a divider, then the unread ones — so the
+  // boundary the tile draws is visible in the list the tile links to. A flat list
+  // sorted by basis would put the same rows in the same order and still leave the
+  // reader to work out where the number stopped.
   const laneList = (key, heading, blurb) => {
     if (!ax.observable) return '';
     const rows = ax.lanes[key];
     if (!rows.length) return '';
+    const s = ax.laneSummary[key];
+    const li = r =>
+      `<li><code>${escapeHtml(r.id)}</code> <span class="c">${escapeHtml(r.basis)}</span> — ${escapeHtml(clip(r.evidence, 100))}</li>`;
+    const readRows = rows.filter(r => r.basis === 'READ');
+    const restRows = rows.filter(r => r.basis !== 'READ');
+    const summaryCount = s.observable
+      ? `${s.read} counted · ${s.unread} unread`
+      : `${s.unread} unread, 0 counted`;
     return (
-      `<details class="drift"><summary>${escapeHtml(heading)} <span class="c">${rows.length}</span></summary>` +
-      `<ul>${rows
-        .map(
-          r =>
-            `<li><code>${escapeHtml(r.id)}</code> <span class="c">${escapeHtml(r.basis)}</span> — ${escapeHtml(clip(r.evidence, 100))}</li>`
-        )
-        .join('')}</ul>` +
+      `<details class="drift"><summary>${escapeHtml(heading)} <span class="c">${escapeHtml(summaryCount)}</span></summary>` +
+      (readRows.length
+        ? `<p class="note">⭐ <strong>Read in full — this is the counted set.</strong></p><ul>${readRows.map(li).join('')}</ul>`
+        : `<p class="note">⛔ <strong>Nothing in this lane has been read in full</strong>, which is why its tile says UNOBSERVABLE rather than a number.</p>`) +
+      (restRows.length
+        ? `<p class="note">⛔ <strong>Heading-only — NOT counted.</strong> Classified from the heading and Done-means, ` +
+          `never the body. This board records rulings in bodies without updating headings, so any of these may already ` +
+          `be answered. Reading one is what moves it above this line.</p><ul>${restRows.map(li).join('')}</ul>`
+        : '') +
       `<p class="note">${escapeHtml(blurb)}</p></details>`
     );
   };
