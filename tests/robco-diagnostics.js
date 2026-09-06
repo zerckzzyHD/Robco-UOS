@@ -60027,17 +60027,32 @@ if (!PLANNING_OK) {
     '270.10b: RENDERED — the counted lane is called a FLOOR ("at least this many"), because actorBasis records how the GRAPH classified a row and not whether a human read the item; and "both" is still stated as unrepresentable rather than printed as a fabricated zero'
   );
 
-  // ── 270.11 — the project axis is rendered under the rule that exists ───────
-  // ⭐ THE SIX-VALUE AXIS THE OWNER ASKED FOR, now read per item from the graph.
-  // HARNESS and BINDER each get their own tile — the two the old four-value census
-  // could not express at all (it folded the harness into CP and had no Binder).
-  const harness1 = tileOf(h1, /^HARNESS$/);
+  // ── 270.11 — a project is asserted only where the basis earned it ───────────
+  //
+  // ⛔⛤ A KEYWORD GUESS IS NOT A LABEL (owner ruling, 2026-09-05). The fixture makes
+  // the demotion visible PER ROW rather than only in an aggregate:
+  //   R2  BINDER   basis READ    → kept. BINDER is a value in its own right, which
+  //                               the superseded four-value census had no bucket for.
+  //   R1  APP      basis FAMILY  → kept — the ID-prefix rule survives the ruling.
+  //   D2  HARNESS  basis SIGNAL  → DEMOTED to UNKNOWN, so HARNESS gets NO TILE AT
+  //                               ALL. A renderer ignoring the basis would show one
+  //                               here, and this assertion would go red.
+  //   S3  MIST     basis SIGNAL  → DEMOTED.
+  // ⚠ Why this rule is harder than the one applied to the owner lanes, where the
+  // aggregate still prints: a COUNT is read as an estimate, but a LABEL beside an
+  // item is read as a fact about that item, and somebody acts on the row.
   const binder1 = tileOf(h1, /^BINDER$/);
+  const unknownP1 = tileOf(h1, /^UNKNOWN$/);
   assert(
-    harness1 && harness1.n === '1' && binder1 && binder1.n === '1',
-    '270.11: RENDERED — the project axis is the six-value one, per item from the graph: HARNESS and BINDER are values in their own right rather than folded away' +
-      (harness1 && binder1
-        ? ` — got harness ${harness1.n} / binder ${binder1.n}`
+    binder1 &&
+      binder1.n === '1' &&
+      !tileOf(h1, /^HARNESS$/) &&
+      !tileOf(h1, /^MIST$/) &&
+      unknownP1 &&
+      unknownP1.n === '2',
+    '270.11: RENDERED — a project is asserted only where the basis earned it: READ (BINDER) and FAMILY survive, both SIGNAL rows are demoted to UNKNOWN, and HARNESS/MIST get no tile because their only claim was a keyword match' +
+      (binder1 && unknownP1
+        ? ` — got binder ${binder1.n} / unknown ${unknownP1.n}`
         : ' — a tile is absent')
   );
   assert(
@@ -60167,6 +60182,45 @@ if (!PLANNING_OK) {
       /ul\.stats \.n \{[^}]*overflow-wrap:anywhere/.test(h1),
     '270.13d: RENDERED — every digit-free tile value (UNOBSERVABLE) carries the `word` modifier and every numeric one does not, and the page ships both the `.n.word` rule and the overflow-wrap backstop — an unbreakable word in a fixed-minimum grid column scrolled the whole page sideways at 375px'
   );
+
+  // ── 270.13e — ⭐⭐⭐ EVERY NUMBER ON THIS PAGE NAMES WHERE IT CAME FROM ───────
+  //
+  // ⛔⛤ THE DURABLE RULE, AND IT IS NOT ANOTHER RENDERING FIX. This page was wrong
+  // three times in one evening and each repair was cosmetic while each CAUSE was a
+  // source problem: a tile counting a heading glyph; a tile reading a roster that
+  // had been emptied two days earlier; an axis wired to accept blocks while the
+  // assignment lived in the graph. The pattern under all three is that the page
+  // printed numbers whose provenance nobody had checked.
+  //
+  // ⭐ So provenance is now structural rather than conventional: every tile goes
+  // through one emitter, and that emitter cannot produce a tile without a source
+  // line. This asserts the property over the WHOLE rendered page, so a tile added
+  // next month is covered because it went through the door — not because somebody
+  // remembered.
+  const tileOpens270 = (h1.match(/<li><span class="n[^"]*">/g) || []).length;
+  const tileHints270 = (
+    h1.match(
+      /<li><span class="n[^"]*">[^<]*<\/span><span class="k">[^<]*<\/span><span class="h">/g
+    ) || []
+  ).length;
+  assert(
+    tileOpens270 > 8 && tileHints270 === tileOpens270 && !/SOURCE NOT STATED/.test(h1),
+    `270.13e: RENDERED — all ${tileOpens270} tiles carry a source line, and none printed the unsourced marker — a number cannot reach this page without saying where it came from`
+  );
+  // ⭐ RED-THEN-GREEN on the emitter itself: a tile built with no source does not
+  // silently lose its hint (which would look exactly like a sourced tile) — it
+  // prints its own absence, loudly, so this assertion can see it.
+  {
+    const RVp = require(path.join(ROOT, 'scripts', 'report-view.js'));
+    const boardNoSrc = ['<!-- GENERATED -->', '## 🔄 Active (1)', '- **A1** — x', ''].join('\n');
+    const probe = RVp.renderQueue({ text: boardNoSrc, mtime: new Date() }, null, null, null);
+    const opens = (probe.match(/<li><span class="n[^"]*">/g) || []).length;
+    const hints = (probe.match(/<span class="h">/g) || []).length;
+    assert(
+      opens > 0 && hints >= opens,
+      '270.13f: RED-THEN-GREEN — rendered with NO sources at all, every tile still emits a source line (naming what it could not measure) rather than dropping it; a hintless tile would be indistinguishable from a sourced one'
+    );
+  }
 
   // ── 270.14-270.16 — unit-level three-valuedness, with no planning tree at all ──
   const stubFmt270 = {

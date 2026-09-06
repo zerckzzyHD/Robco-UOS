@@ -393,7 +393,8 @@ const PROJECT_BLURB = {
   MIST: 'Mist',
   MUSEUM: 'the museum / exhibit publication programme',
   BINDER: 'Binder — ⭐ it has a bucket now; a value with one row is still a value',
-  UNKNOWN: '⚠ read, and the text does not place it — a finding, never folded into another value',
+  UNKNOWN:
+    '⚠ not placed: either a reader looked and the text does not settle it, or the only basis was a keyword match — see below',
   UNSET: 'no source has said anything about this item',
 };
 
@@ -628,9 +629,31 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // is "has no digit" rather than "equals UNOBSERVABLE" so a future word value
   // (UNKNOWN, PENDING, anything) is covered without anybody remembering to add it,
   // while a fraction like `3 of 40` keeps the big-number treatment it fits in.
+  //
+  // ── ⭐⭐⭐ EVERY NUMBER ON THIS PAGE NAMES WHERE IT CAME FROM ─────────────────
+  //
+  // ⛔⛤ THIS PAGE HAS BEEN WRONG THREE TIMES IN ONE EVENING, and each fix was a
+  // rendering change while each CAUSE was a source problem wearing rendering
+  // clothes:
+  //   1. a tile counting a heading GLYPH under a label promising decisions;
+  //   2. a tile reading a declared roster that had been EMPTIED two days earlier,
+  //      and printing its `0` as though it meant "nothing is waiting on you";
+  //   3. an axis wired to accept blocks while the board's assignment lived in the
+  //      graph — `someday if 0` against a board carrying 55, every test green.
+  //
+  // ⭐ The pattern under all three: **the page printed numbers whose provenance
+  // nobody had checked.** So the durable fix is not a fourth rendering change, it
+  // is that a number cannot reach this page without saying where it came from —
+  // and `stat()` is the one door every tile goes through, so the rule lives here
+  // rather than in a convention somebody has to remember.
+  //
+  // ⚠ A MISSING HINT IS RENDERED, NOT SWALLOWED. Silently dropping it would put an
+  // unsourced number on the page looking exactly like a sourced one, which is the
+  // disease itself. It prints its own absence instead, and Suite 270.24 fails the
+  // gate if any tile ever does.
   const stat = (v, label, hint) =>
     `<li><span class="n${/[0-9]/.test(String(v)) ? '' : ' word'}">${v}</span><span class="k">${escapeHtml(label)}</span>` +
-    (hint ? `<span class="h">${escapeHtml(hint)}</span>` : '') +
+    `<span class="h">${escapeHtml(hint || '⛔ SOURCE NOT STATED — this number reached the page without naming where it came from, which is the one thing every number here must do')}</span>` +
     `</li>`;
 
   // ⛔ EVERY LABEL STATES THE QUESTION IT ACTUALLY ANSWERS. None of these numbers
@@ -921,20 +944,27 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         const A = require('./board-axes.js');
         const someday = c[A.SOMEDAY_NAME] || 0;
         const cells = hz.vocabulary
-          .map(
-            v =>
-              `<li><span class="n">${c[v] || 0}</span><span class="k">${escapeHtml(v.toLowerCase().replace(/-/g, ' '))}</span>` +
-              `<span class="h">${escapeHtml(HZ_BLURB[v] || 'no blurb for this value')}</span></li>`
+          .map(v =>
+            stat(
+              c[v] || 0,
+              v.toLowerCase().replace(/-/g, ' '),
+              HZ_BLURB[v] || 'no blurb for this value'
+            )
           )
           .join('');
         const unset = c.UNSET
-          ? `<li><span class="n">${c.UNSET}</span><span class="k">unset</span>` +
-            `<span class="h">no source has said anything — ⛔ shown as unset, never counted as one of the values above, and ` +
-            `deliberately not the same as UNKNOWN</span></li>`
+          ? stat(
+              c.UNSET,
+              'unset',
+              'no source has said anything — ⛔ shown as unset, never counted as one of the values above, and deliberately not the same as UNKNOWN'
+            )
           : '';
         const unparse = c.UNPARSEABLE
-          ? `<li><span class="n">${c.UNPARSEABLE}</span><span class="k">unreadable</span>` +
-            `<span class="h">a value outside the vocabulary: ${escapeHtml(hz.unparseable.slice(0, 12).join(', '))}</span></li>`
+          ? stat(
+              c.UNPARSEABLE,
+              'unreadable',
+              'a value outside the vocabulary: ' + hz.unparseable.slice(0, 12).join(', ')
+            )
           : '';
         const somedayList = someday
           ? `<details class="drift"><summary>Which ${someday} someday-if <span class="c">excluded</span></summary>` +
@@ -998,26 +1028,26 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   const projectHtml = !pj.observable
     ? `<h2>Project</h2><p class="note stale">⛔ <strong>The per-project split could not be read.</strong> ${escapeHtml(pj.why)}.</p>`
     : (() => {
-        const signal = pj.basisCounts.SIGNAL || 0;
         const cells = [...pj.vocabulary, 'UNSET']
           .filter(v => pj.counts[v])
           .sort((a, b) => pj.counts[b] - pj.counts[a])
-          .map(
-            v =>
-              `<li><span class="n">${pj.counts[v]}</span><span class="k">${escapeHtml(v)}</span>` +
-              `<span class="h">${escapeHtml(PROJECT_BLURB[v] || 'no blurb for this value')}</span></li>`
-          )
+          .map(v => stat(pj.counts[v], v, PROJECT_BLURB[v] || 'no blurb for this value'))
           .join('');
         return (
           `<h2>Project</h2>` +
           `<p class="note">Which thing an item belongs to, assigned per item over all ${pj.total} of them, from the board's ` +
           `own axis assignment · basis ${escapeHtml(basisStrip(pj.basisCounts))}.</p>` +
           `<ul class="stats">${cells}</ul>` +
-          (signal
-            ? `<p class="note stale">⚠ <strong>${signal} of these rows were placed by keyword match, and that was measured ` +
-              `wrong about one row in three.</strong> Only the <code>READ</code> rows carry a reader's call with the deciding ` +
-              `words quoted; <code>FAMILY</code> rows follow the ID-prefix rule. Treat the shape as real and any single row ` +
-              `as a guess until it has been read.</p>`
+          (pj.demoted
+            ? `<p class="note stale">⛔ <strong>${pj.demoted} rows say UNKNOWN because a keyword match is not a label.</strong> ` +
+              `The assignment tool placed them by matching words in the item, and its own sample measured that ` +
+              `<strong>wrong about one row in three</strong>. A count read as an estimate can carry that; a label sitting beside ` +
+              `an item is read as a fact about that item, and somebody acts on the row. So those rows are shown as unknown ` +
+              `rather than asserted. ` +
+              `⚠ <strong>That is not the tool being useless — it is the tool declining to invent ${pj.demoted} answers</strong>, ` +
+              `which is the same rule every other number on this page follows. The ${pj.total - (pj.counts.UNKNOWN || 0)} rows ` +
+              `still shown were placed by a reader with the deciding words quoted, or by the ID-family rule. ` +
+              `Reading a row is what moves it out of unknown.</p>`
             : '') +
           `<p class="note">⛔ The older four-value domain census (CP-RULE v1) is no longer shown here. It disagreed with this ` +
           `assignment on 46 of 411 items, it cannot separate the harness from the control plane, and it has no bucket for ` +

@@ -241,6 +241,36 @@ function readHorizons(items, sources) {
  * ⛔ `UNKNOWN` is rendered under its own name and folded into nothing, for the
  * same reason as the horizon's.
  */
+/** The vocabulary's own word for "somebody looked and the text does not place it". */
+const PROJECT_UNKNOWN = 'UNKNOWN';
+
+/**
+ * ⛔⛤ BASES THAT DO NOT EARN A LABEL (owner ruling, 2026-09-05).
+ *
+ * `SIGNAL` is the assignment tool's keyword/phrase match, and the tool's OWN
+ * declared-in-advance sample measured it **wrong about one project row in three**.
+ * A row carrying it is rendered `UNKNOWN` — not because nothing is known, but
+ * because what is known does not rise to a label.
+ *
+ * ⭐ WHY THIS IS A HARDER RULE THAN THE ONE APPLIED TO THE OWNER LANES, and the
+ * distinction is the owner's: that was a COUNT known to be roughly triple, and a
+ * count is read as an estimate. This is a PER-ROW LABEL beside an item, and a
+ * label is read as a fact about that item — somebody then acts on the row. A
+ * wrong count misleads about size; a wrong label misroutes work.
+ *
+ * ⚠ `FAMILY` (the ID-prefix rule) is deliberately KEPT, and that is a decision
+ * rather than an oversight. The ruling's wording names "READ or GRAPH", which read
+ * literally would drop FAMILY's 71 rows too and leave 263 of 411 unknown — but the
+ * same ruling states the cost as "unknown on 192 of 411", and 192 is exactly
+ * SIGNAL (180) + UNKNOWN (12). The checkable number decides it: FAMILY stays.
+ *
+ * ⚠⚠ THE COST, STATED SO IT IS A DECISION AND NOT A DEFAULT: the column empties.
+ * 192 of 411 read UNKNOWN, and that will look like the instrument being useless.
+ * It is the opposite — it is the instrument declining to invent 180 answers — and
+ * the page says so in those words rather than leaving the reader to infer it.
+ */
+const UNTRUSTED_PROJECT_BASES = new Set(['SIGNAL']);
+
 function readProjects(items, sources) {
   const s = sources || {};
   const graphItems =
@@ -263,18 +293,31 @@ function readProjects(items, sources) {
   const UNSET = HORIZON_UNSET; // same word, same meaning: no source said anything
   counts[UNSET] = 0;
   const basisCounts = {};
+  let demoted = 0;
   for (const it of items) {
     const row = graphItems[it.id];
     const raw = row ? row.project : undefined;
-    const p = raw === undefined ? UNSET : vocab.includes(raw) ? raw : HORIZON_UNPARSEABLE;
+    const b = String((row && row.projectBasis) || 'UNSTATED').toUpperCase();
+    let p = raw === undefined ? UNSET : vocab.includes(raw) ? raw : HORIZON_UNPARSEABLE;
+    // ⛔⛤ A KEYWORD GUESS IS NOT A LABEL. See UNTRUSTED_PROJECT_BASES.
+    if (p !== UNSET && p !== HORIZON_UNPARSEABLE && UNTRUSTED_PROJECT_BASES.has(b)) {
+      if (p !== PROJECT_UNKNOWN) demoted++;
+      p = vocab.includes(PROJECT_UNKNOWN) ? PROJECT_UNKNOWN : p;
+    }
     byId.set(it.id, p);
     counts[p] = (counts[p] || 0) + 1;
-    if (p !== UNSET) {
-      const b = String((row && row.projectBasis) || 'UNSTATED').toUpperCase();
-      basisCounts[b] = (basisCounts[b] || 0) + 1;
-    }
+    if (p !== UNSET) basisCounts[b] = (basisCounts[b] || 0) + 1;
   }
-  return { observable: true, byId, counts, basisCounts, vocabulary: vocab, total: items.length };
+  return {
+    observable: true,
+    byId,
+    counts,
+    basisCounts,
+    demoted,
+    untrusted: [...UNTRUSTED_PROJECT_BASES],
+    vocabulary: vocab,
+    total: items.length,
+  };
 }
 
 /**
@@ -548,6 +591,8 @@ module.exports = {
   bandById,
   somedayByBand,
   readProjects,
+  UNTRUSTED_PROJECT_BASES,
+  PROJECT_UNKNOWN,
   readOwnerAxis,
   OWNER_ACTORS,
 };
