@@ -59726,9 +59726,10 @@ if (!PLANNING_OK) {
   fs.mkdirSync(path.join(tree270, 'tools'));
   const board270 = [
     '<!-- GENERATED -->',
-    '## ⏭️ Ready (2)',
+    '## ⏭️ Ready (3)',
     '- **R1** — a real ready item',
     '- **R2** — a someday thought filed as ready',
+    '- **S3** — a someday thought with NO accept block at all',
     '',
     '## 🔄 Active (2)',
     '- **A1** — in flight',
@@ -59767,6 +59768,10 @@ if (!PLANNING_OK) {
       '',
       'body',
       '',
+      '### S3. ⏭️ a someday thought with NO accept block at all',
+      '',
+      'body',
+      '',
       '### W1. ⚠️ flagged',
       '',
       'body',
@@ -59776,6 +59781,14 @@ if (!PLANNING_OK) {
   writeQueue270('SOMEDAY-IF');
 
   fs.writeFileSync(path.join(tree270, 'tools', 'item-format-check.cjs'), fmtStub270);
+  // The vocabularies, exported exactly as the archive tool exports them: the
+  // owner's six projects, and FOUR horizons -- the assignment vocabulary carries
+  // UNKNOWN, which the gated accept-block vocabulary deliberately does not.
+  fs.writeFileSync(
+    path.join(tree270, 'tools', 'axis-assign.cjs'),
+    "module.exports = { PROJECTS: ['APP','CONTROL-PLANE','HARNESS','MIST','MUSEUM','BINDER','UNKNOWN']," +
+      " HORIZONS: ['BLOCKS-WORK-NOW','NEXT','SOMEDAY-IF','UNKNOWN'] };"
+  );
   fs.writeFileSync(
     path.join(tree270, 'BLOCKER-GRAPH.json'),
     JSON.stringify({
@@ -59787,23 +59800,62 @@ if (!PLANNING_OK) {
           actor: 'OWNER-RULING',
           actorBasis: 'READ',
           actorEvidence: 'he must choose the shape',
+          horizon: 'NEXT',
+          horizonBasis: 'READ',
+          project: 'CONTROL-PLANE',
+          projectBasis: 'READ',
         },
         // ⭐ THE FOLD CONTROL. A decide row classified from a heading alone: a
         // renderer that folded DIGEST rows into the lane count would print 2 here
         // instead of 1 — the 68-vs-23 defect in miniature, and the only way to
         // prove the count is the READ set rather than a number that happens to match.
+        // ⭐ UNKNOWN is a value, not an absence: somebody read D2 and the text does
+        // not settle its horizon. It must render under its own name, be excluded from
+        // nothing, and never be folded into UNSET.
         D2: {
           actor: 'OWNER-RULING',
           actorBasis: 'DIGEST',
           actorEvidence: 'heading says he must rule; body never read',
+          horizon: 'UNKNOWN',
+          horizonBasis: 'UNKNOWN',
+          project: 'HARNESS',
+          projectBasis: 'SIGNAL',
         },
         W1: {
           actor: 'OWNER-KEYBOARD',
           actorBasis: 'DIGEST',
           actorEvidence: 'needs him at the machine',
         },
-        R1: { actor: 'EXTERNAL', actorBasis: 'DIGEST', actorEvidence: 'waiting on a third party' },
-        R2: { actor: 'OWNER-RULING', actorBasis: 'DIGEST', actorEvidence: 'a someday question' },
+        R1: {
+          actor: 'EXTERNAL',
+          actorBasis: 'DIGEST',
+          actorEvidence: 'waiting on a third party',
+          horizon: 'BLOCKS-WORK-NOW',
+          horizonBasis: 'GRAPH',
+          project: 'APP',
+          projectBasis: 'FAMILY',
+        },
+        // ⭐⭐ THE REAL-DATA PATH THAT SHIPPED BROKEN: S3 has NO accept block, so its
+        // horizon exists ONLY here. A reader that looks in accept blocks alone counts
+        // it as live work -- which is exactly what happened against the live board.
+        S3: {
+          horizon: 'SOMEDAY-IF',
+          horizonBasis: 'SIGNAL',
+          project: 'MIST',
+          projectBasis: 'SIGNAL',
+        },
+        // The block says SOMEDAY-IF, the graph says NEXT: a CONFLICT. The block wins
+        // (a person wrote it, the archive gate refuses it if malformed) and the page
+        // must still SAY the two disagree rather than showing the winner alone.
+        R2: {
+          actor: 'OWNER-RULING',
+          actorBasis: 'DIGEST',
+          actorEvidence: 'a someday question',
+          horizon: 'NEXT',
+          horizonBasis: 'SIGNAL',
+          project: 'BINDER',
+          projectBasis: 'READ',
+        },
         GONE1: { actor: 'OWNER-RULING', actorBasis: 'DIGEST', actorEvidence: 'item has left' },
       },
       edges: [],
@@ -59828,7 +59880,7 @@ if (!PLANNING_OK) {
         "const p=require('./scripts/planning-paths.js');const v=require('./scripts/report-view.js');" +
           "process.stdout.write(v.renderQueue(p.readRoadmap(), p.readPlanningFile('QUEUE.md')," +
           'p.readOwnerDecisionCensus(),' +
-          '{itemFormat:p.loadItemFormat(), graph:p.readBlockerGraph(), domains:p.readDomainCensus()}));',
+          '{itemFormat:p.loadItemFormat(), graph:p.readBlockerGraph(), axisVocabulary:p.loadAxisVocabulary()}));',
       ],
       {
         cwd: ROOT,
@@ -59855,31 +59907,52 @@ if (!PLANNING_OK) {
   const someday1 = tileOf(h1, /someday if/);
   const unset1 = tileOf(h1, /^unset$/);
   assert(
-    someday1 && someday1.n === '1' && unset1 && unset1.n === '4',
-    '270.2: RENDERED — the horizon strip reads its three values plus UNSET from the items themselves ' +
-      `(expected someday 1 / unset 4, got ${someday1 ? someday1.n : 'absent'} / ${unset1 ? unset1.n : 'absent'})`
+    someday1 && someday1.n === '2' && unset1 && unset1.n === '1' && tileOf(h1, /^unknown$/),
+    '270.2: RENDERED — the strip reads the ASSIGNMENT vocabulary (four values incl. UNKNOWN) plus UNSET, from BOTH sources: ' +
+      'R2 someday from its own accept block and S3 someday from the graph alone, W1 unset because neither source names it ' +
+      `(expected someday 2 / unset 1, got ${someday1 ? someday1.n : 'absent'} / ${unset1 ? unset1.n : 'absent'})`
   );
   assert(
-    unset1 && /never counted as one of the three/.test(unset1.h),
-    '270.3: RENDERED — UNSET is labelled as unset and explicitly NOT folded into a horizon value'
+    unset1 &&
+      /never counted as one of the values above/.test(unset1.h) &&
+      /not the same as UNKNOWN/.test(unset1.h) &&
+      /folded into nothing, excluded from nothing/.test(tileOf(h1, /^unknown$/).h),
+    '270.3: RENDERED — UNSET and UNKNOWN are held apart and both are folded into nothing: "no source has said" and "somebody read it and the text does not settle it" are different facts'
   );
 
   // ── 270.4 — UNOBSERVABLE is not the same fact as "everything is unset" ──────
   // ⛔ This is the quiet lie. With the grammar module gone, a renderer that fell
   // back to "no block found ⇒ UNSET" would print a confident `4 unset` — a number
   // about the board, produced by a page that cannot read the board's field at all.
+  // ⭐ ONE SOURCE GONE IS NOT UNOBSERVABLE — that is the whole point of reading two.
+  // With the accept-block grammar removed the graph still carries the assignment, so
+  // the axis keeps answering; only the 6 block-sourced values fall back to it.
   fs.renameSync(
     path.join(tree270, 'tools', 'item-format-check.cjs'),
     path.join(tree270, 'tools', 'item-format-check.cjs.off')
   );
-  const g2 = render270();
-  const h2 = g2.stdout;
+  const gNoFmt = render270();
+  const somedayNoFmt = tileOf(gNoFmt.stdout, /someday if/);
+  assert(
+    somedayNoFmt && somedayNoFmt.n === '1' && /BLOCKER-GRAPH\.json/.test(gNoFmt.stdout),
+    '270.4: RENDERED — with the accept-block grammar gone the graph alone still answers (S3 stays someday; R2, whose someday lived only in its block, does not) — one missing source degrades one item, not the axis' +
+      (somedayNoFmt ? ` — got ${somedayNoFmt.n}` : ' — tile absent')
+  );
+  // BOTH sources gone IS unobservable, and prints no integer.
+  fs.renameSync(
+    path.join(tree270, 'BLOCKER-GRAPH.json'),
+    path.join(tree270, 'BLOCKER-GRAPH.json.off')
+  );
+  const h2 = render270().stdout;
   assert(
     /The horizon could not be read/.test(h2) &&
-      /no tools\/item-format-check\.cjs/.test(h2) &&
       /NOT the same as/.test(h2) &&
       !tileOf(h2, /^unset$/),
-    '270.4: RENDERED — with the grammar module absent the axis is UNOBSERVABLE with its reason, prints NO unset integer, and says that is not the same as "every item is unset"'
+    '270.4b: RENDERED — with BOTH sources gone the axis is UNOBSERVABLE with its reason, prints NO unset integer, and says that is not the same as "every item is unset"'
+  );
+  fs.renameSync(
+    path.join(tree270, 'BLOCKER-GRAPH.json.off'),
+    path.join(tree270, 'BLOCKER-GRAPH.json')
   );
   fs.renameSync(
     path.join(tree270, 'tools', 'item-format-check.cjs.off'),
@@ -59894,8 +59967,10 @@ if (!PLANNING_OK) {
       (ready1 ? ` — got ${ready1.n}` : ' — tile absent')
   );
   assert(
-    /2 on the board, <strong>1 counted here<\/strong>/.test(h1) && /<code>R2<\/code>/.test(h1),
-    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches, naming the excluded id — never a silently smaller number'
+    /3 on the board, <strong>1 counted here<\/strong>/.test(h1) &&
+      /<code>R2<\/code>/.test(h1) &&
+      /<code>S3<\/code>/.test(h1),
+    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches and names BOTH excluded ids, whichever source placed them — never a silently smaller number'
   );
 
   // ⭐⭐ RED-THEN-GREEN: strip the horizon line and the same item must come back
@@ -59906,9 +59981,9 @@ if (!PLANNING_OK) {
   const ready3 = tileOf(g3.stdout, /startable now/);
   const someday3 = tileOf(g3.stdout, /someday if/);
   assert(
-    ready3 && ready3.n === '2' && someday3 && someday3.n === '0',
-    '270.7: RED-THEN-GREEN — remove the horizon line from that same item and it is counted again (startable now 2, someday 0), so 270.5 measured the rule and not a constant' +
-      (ready3 ? ` — got ${ready3.n}` : ' — tile absent')
+    ready3 && ready3.n === '2' && someday3 && someday3.n === '1',
+    "270.7: RED-THEN-GREEN — remove R2's horizon line and it is counted again (startable now 1 → 2), while S3, whose someday lives in the graph, stays excluded (someday 2 → 1). Both halves move, so 270.5 measured the rule and not a constant" +
+      (ready3 ? ` — got ready ${ready3.n} / someday ${someday3.n}` : ' — tile absent')
   );
   writeQueue270('SOMEDAY-IF');
 
@@ -59953,17 +60028,23 @@ if (!PLANNING_OK) {
   );
 
   // ── 270.11 — the project axis is rendered under the rule that exists ───────
-  const cp1 = tileOf(h1, /^CP$/);
+  // ⭐ THE SIX-VALUE AXIS THE OWNER ASKED FOR, now read per item from the graph.
+  // HARNESS and BINDER each get their own tile — the two the old four-value census
+  // could not express at all (it folded the harness into CP and had no Binder).
+  const harness1 = tileOf(h1, /^HARNESS$/);
+  const binder1 = tileOf(h1, /^BINDER$/);
   assert(
-    cp1 && cp1.n === '2' && /CP-RULE v1/.test(h1),
-    "270.11: RENDERED — the per-project counts come from the planning tree's own domain census, named as CP-RULE v1"
+    harness1 && harness1.n === '1' && binder1 && binder1.n === '1',
+    '270.11: RENDERED — the project axis is the six-value one, per item from the graph: HARNESS and BINDER are values in their own right rather than folded away' +
+      (harness1 && binder1
+        ? ` — got harness ${harness1.n} / binder ${binder1.n}`
+        : ' — a tile is absent')
   );
   assert(
-    /four values where you named six/.test(h1) &&
-      /harness is folded inside CP/.test(h1) &&
-      /Binder has no bucket/.test(h1) &&
-      /no <code>project:<\/code> field/.test(h1),
-    '270.12: RENDERED — the page states the gap rather than relabelling a four-value axis as the six-value one: the harness is inside CP, Binder has no bucket, and no project field exists'
+    /wrong about one row in three/.test(h1) &&
+      /basis .*SIGNAL/.test(h1) &&
+      /disagreed with this assignment on 46 of 411/.test(h1),
+    '270.12: RENDERED — the counts carry their basis split, the measured SIGNAL miss rate is stated as the headline caveat, and the superseded four-value census is named as superseded rather than shown beside it'
   );
 
   // ── 270.13-270.13c — ⛔⛤ AN EMPTY ROSTER IS `UNOBSERVABLE`, NEVER `0` ───────
@@ -60032,6 +60113,33 @@ if (!PLANNING_OK) {
   );
   fs.rmSync(censusPath270, { force: true });
 
+  // ── 270.12b — two sources disagreeing is SURFACED, not silently resolved ────
+  //
+  // ⛔ Precedence picks a winner: the accept block, because a person wrote it and
+  // the archive's gate refuses it if malformed. But "the block wins" is a
+  // RESOLUTION, not an absence of conflict, and a page that shows only the winner
+  // is how a board ends up carrying two answers nobody knows about. Measured at
+  // archive origin/main: 3 of the 6 accept-block horizons contradict the assignment
+  // (DL1, GV20, GV22 — block BLOCKS-WORK-NOW, graph NEXT by keyword match).
+  assert(
+    /1 item\(s\) carry two different horizons/.test(h1) &&
+      /<code>R2<\/code> block <strong>SOMEDAY-IF<\/strong> vs NEXT by SIGNAL/.test(h1) &&
+      /showing you the winner alone is not/.test(h1),
+    "270.12b: RENDERED — where the accept block and the graph disagree the page names the item, BOTH values and the losing side's basis, rather than printing the winner as if there were no conflict"
+  );
+
+  // ── 270.12c — UNKNOWN is excluded from nothing ──────────────────────────────
+  // D2 is horizon UNKNOWN and sits in Active. It must still be counted as live
+  // work: "somebody looked and the text does not settle it" is not "someday".
+  const somedayBlock270 = (/<summary>Which \d+ someday-if[\s\S]*?<\/details>/.exec(h1) || [''])[0];
+  assert(
+    tileOf(h1, /being worked on now/).n === '2' &&
+      tileOf(h1, /^unknown$/).n === '1' &&
+      somedayBlock270 &&
+      !/<code>D2<\/code>/.test(somedayBlock270),
+    '270.12c: RENDERED — an UNKNOWN-horizon item is counted under its own name (1), stays in its band (Active still 2) and is NOT in the excluded-someday list; UNKNOWN is folded into no value and excluded from no count'
+  );
+
   // ── 270.13d — a WORD-valued tile is set as a word, not as a big number ──────
   //
   // ⛔⛤ THE REGRESSION THIS LOCKS, measured in a real browser at 375×812 on
@@ -60077,9 +60185,9 @@ if (!PLANNING_OK) {
         A270.HORIZON_UNPARSEABLE,
     '270.14: UNIT — one item resolves to a vocabulary value, UNSET (no block OR no horizon line), or UNPARSEABLE (a word outside the vocabulary) — three values, no default'
   );
-  const unob270 = A270.readHorizons([{ id: 'X1', body: [] }], null);
+  const unob270 = A270.readHorizons([{ id: 'X1', body: [] }], { fmt: null, graph: null });
   assert(
-    unob270.observable === false && !('counts' in unob270) && /not reachable/.test(unob270.why),
+    unob270.observable === false && !('counts' in unob270) && /reachable/.test(unob270.why),
     '270.15: UNIT — with no format module the axis returns observable:false with a reason and NO counts object, so a caller cannot accidentally print a fabricated UNSET total'
   );
   const excl270 = A270.excludeSomeday(['a', 'b'], { observable: false });
@@ -60091,11 +60199,19 @@ if (!PLANNING_OK) {
   // ── 270.17-270.18 — static: one grammar, and the fresh-require chain covers it ──
   const ba270 = fs.readFileSync(path.join(ROOT, 'scripts', 'board-axes.js'), 'utf8');
   const pp270 = fs.readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8');
+  // ⚠ The vocabulary words may appear in a COMMENT (an incident note names the three
+  // conflicting ids and their values). What must never appear is a vocabulary word in
+  // a counting path — so the check is on CODE lines, with comments stripped.
+  const baCode270 = ba270
+    .split('\n')
+    .filter(l => !/^\s*(\*|\/\/)/.test(l))
+    .join('\n');
   assert(
     /item-format-check\.cjs/.test(pp270) &&
+      /axis-assign\.cjs/.test(pp270) &&
       !/```accept/.test(ba270) &&
-      !/BLOCKS-WORK-NOW/.test(ba270.replace(/^\s*\*.*$/gm, '')),
-    '270.17: the accept-block grammar and the horizon vocabulary are RESOLVED from the archive, never retyped here — board-axes.js carries no fence literal and no vocabulary word outside its prose'
+      !/BLOCKS-WORK-NOW|'NEXT'/.test(baCode270),
+    '270.17: both vocabularies are RESOLVED from the archive (the accept-block grammar and the axis tool), never retyped — no vocabulary word appears in any code line of board-axes.js'
   );
   const vite270 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
   assert(
@@ -60115,7 +60231,7 @@ if (!PLANNING_OK) {
     const items270 = QV270.parseQueue(liveSrc270 || '').blocks.filter(
       b => b.type === 'item' && b.id
     );
-    const hz270 = A270.readHorizons(items270, live270.mod);
+    const hz270 = A270.readHorizons(items270, { fmt: live270.mod });
     const summed270 = Object.values(hz270.counts || {}).reduce((a, b) => a + b, 0);
     assert(
       hz270.observable === true &&

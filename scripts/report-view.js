@@ -141,6 +141,16 @@ ul.stats .n { display:block; font-size:1.6rem; font-weight:700; line-height:1.1;
    word-sized type and stays inside its tile. */
 ul.stats .n.word { font-size:1rem; letter-spacing:.03em; line-height:1.25;
   padding:.28rem 0 .1rem; }
+/* The project filter. Chips scroll horizontally on a phone rather than wrapping
+   into a block that pushes the board off the first screen. */
+.pfilter { display:flex; gap:.4rem; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  padding:.3rem 0 .5rem; margin:.6rem 0 0; }
+.pchip { flex:0 0 auto; min-height:40px; background:var(--code); color:var(--fg);
+  border:1px solid var(--line); border-radius:999px; padding:.3rem .8rem;
+  font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
+.pchip[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
+.pchip .c { opacity:.7; font-weight:400; }
+.pshown { font-weight:400; font-size:.82rem; color:var(--dim); }
 ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
 ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
 details.band, details.drift { border:1px solid var(--line); border-radius:8px;
@@ -219,7 +229,39 @@ function page({ title, crumb, body, nav, style, atHome }) {
 <header class="top">${back}${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
 <main class="wrap">
 ${body}
-</main></body></html>`;
+</main>
+<script>
+/* ⭐ THE ONLY SCRIPT ON THIS PAGE, and it is deliberately tiny and total-free.
+   It toggles which listed rows are visible; it NEVER recomputes a count, because a
+   number computed in the browser is a second answer to a question the server has
+   already answered, and this page's whole history is two answers disagreeing.
+   ⚠ It also degrades to nothing: with JS off every row stays visible, which is the
+   honest failure — a filter that silently hid rows would be far worse. */
+(function () {
+  var chips = document.querySelectorAll('.pchip');
+  if (!chips.length) return;
+  var rows = document.querySelectorAll('[data-p]:not(.pchip)');
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var want = chip.dataset.p;
+      chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c === chip)); });
+      rows.forEach(function (r) { r.hidden = !!want && r.dataset.p !== want; });
+      document.querySelectorAll('details.band').forEach(function (d) {
+        var all = d.querySelectorAll('[data-p]:not(.pchip)');
+        var vis = 0;
+        all.forEach(function (r) { if (!r.hidden) vis++; });
+        /* ⛔ The band's own header count is NOT rewritten — it is the server's
+           number over the whole band. This only says how many of its LISTED rows
+           the filter is showing, under its own words. */
+        var tag = d.querySelector('.pshown');
+        if (!tag) return;
+        tag.textContent = want && all.length ? ' — showing ' + vis + ' of ' + all.length + ' listed' : '';
+      });
+    });
+  });
+})();
+</script>
+</body></html>`;
 }
 
 /**
@@ -298,6 +340,14 @@ const BAND_ORDER = [
   'Deferred',
   'Parked',
   'Backlog',
+  // ⛔⛤ SETTLED WAS COUNTED AND NEVER SHOWN. It is in `bands`, so its 6 items were
+  // inside this page's item total and inside every band-derived figure, while the
+  // band itself was absent from this list and therefore never rendered. ⚠ That is
+  // the defect this page keeps being rebuilt for, in its quietest form: a number
+  // whose rows you cannot open. And it matters most for THIS band — the status
+  // vocabulary's own note says a settled item is a LIVE CONSTRAINT on the items
+  // that depend on it, and "a constraint nobody sees stops constraining".
+  'Settled',
   'UNCLASSIFIED',
 ];
 // ⭐ EVERY BAND STARTS CLOSED — the OWNER'S call, after using the page.
@@ -323,6 +373,8 @@ const BAND_BLURB = {
   Deferred: 'Deliberately put off, with a reason.',
   Parked: 'Stopped on purpose. Not abandoned, not scheduled.',
   Backlog: 'Everything else that is filed but not yet in motion.',
+  Settled:
+    'Answered for good, no work will follow — kept visible because it still constrains the items that depend on it.',
   UNCLASSIFIED:
     'Carries no recognised status — worth a look precisely because nothing could file it.',
 };
@@ -335,11 +387,14 @@ const BAND_BLURB = {
  * the only thing that stops the label being read as the six-value axis.
  */
 const PROJECT_BLURB = {
-  CP: 'the control plane — ⚠ AND the harness, which has no bucket of its own',
+  APP: 'RobCo the app — this repo',
+  'CONTROL-PLANE': 'the deterministic control plane',
+  HARNESS: 'the harness — ⭐ its own value now, no longer folded into the control plane',
   MIST: 'Mist',
   MUSEUM: 'the museum / exhibit publication programme',
-  APP: 'RobCo the app — this repo',
-  UNASSIGNED: 'no rule places these — a finding, never folded into CP',
+  BINDER: 'Binder — ⭐ it has a bucket now; a value with one row is still a value',
+  UNKNOWN: '⚠ read, and the text does not place it — a finding, never folded into another value',
+  UNSET: 'no source has said anything about this item',
 };
 
 /** Split the generated board into its `## ` sections, preserving body lines. */
@@ -425,8 +480,8 @@ function boardAxes(queueMd, sources) {
   const s = sources || {};
   const out = {
     horizons: { observable: false, why: 'no queue was handed to the renderer' },
+    projects: { observable: false, why: 'no queue was handed to the renderer' },
     owner: { observable: false, why: 'no queue was handed to the renderer' },
-    domains: s.domains || { observable: false, why: 'no domain census was handed to the renderer' },
     someday: { applied: false, byBand: new Map() },
     bandLabelOf: new Map(),
   };
@@ -438,12 +493,26 @@ function boardAxes(queueMd, sources) {
     const items = QV.parseQueue(queueMd).blocks.filter(b => b.type === 'item' && b.id);
     if (!items.length) {
       out.horizons = { observable: false, why: 'the queue parsed to no ID-bearing items' };
+      out.projects = out.horizons;
       out.owner = out.horizons;
       return out;
     }
     const fmt = s.itemFormat && s.itemFormat.observable ? s.itemFormat.mod : null;
-    out.horizons = A.readHorizons(items, fmt);
-    if (!out.horizons.observable && s.itemFormat && s.itemFormat.why) {
+    const graph = s.graph && s.graph.observable ? s.graph.graph : null;
+    const vocab = s.axisVocabulary && s.axisVocabulary.observable ? s.axisVocabulary : null;
+    // ⛔ BOTH SOURCES, always. The accept block is the authored value; the graph
+    // carries the board-wide assignment. Reading only the first is how this page
+    // printed SOMEDAY-IF 0 against a board with 55 of them.
+    out.horizons = A.readHorizons(items, {
+      fmt,
+      graph,
+      vocabulary: vocab ? vocab.HORIZONS : null,
+    });
+    out.projects = A.readProjects(items, {
+      graph,
+      vocabulary: vocab ? vocab.PROJECTS : null,
+    });
+    if (!out.horizons.observable && s.itemFormat && s.itemFormat.why && !graph) {
       out.horizons.why = s.itemFormat.why;
     }
     const bands = A.bandById(queueMd, QV, RG.bandOfHeading);
@@ -464,6 +533,7 @@ function boardAxes(queueMd, sources) {
   } catch (e) {
     const why = 'the axes could not be derived (' + e.message + ')';
     out.horizons = { observable: false, why };
+    out.projects = { observable: false, why };
     out.owner = { observable: false, why };
   }
   return out;
@@ -824,75 +894,136 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       `print a “both” count, because an intersection of these two lanes is empty by construction and would read as “there ` +
       `are none”.</p>`;
 
-  // ── HORIZON — three-valued, and UNSET is never a default ────────────────────
+  // ── HORIZON — the axis the whole thing was for ──────────────────────────────
+  //
+  // ⛔ EVERY VALUE COMES FROM THE VOCABULARY, never from a literal here, and UNSET
+  // / UNPARSEABLE / UNKNOWN are three different facts that are never merged:
+  //   UNKNOWN      somebody read it and the text does not settle it (a finding)
+  //   UNSET        no source has said anything about this item at all
+  //   UNPARSEABLE  a value outside the vocabulary — the reader could not use it
   const hz = axes.horizons;
+  const HZ_BLURB = {
+    'BLOCKS-WORK-NOW': 'in the way of work today',
+    NEXT: 'after the current thing',
+    'SOMEDAY-IF': 'a captured thought with a condition — ⛔ in NO total on this page',
+    UNKNOWN: '⚠ read, and the text does not settle it — folded into nothing, excluded from nothing',
+  };
+  const basisStrip = b =>
+    Object.entries(b || {})
+      .sort((x, y) => y[1] - x[1])
+      .map(([k, v]) => `${k} ${v}`)
+      .join(' · ');
   const horizonHtml = !hz.observable
     ? `<h2>Horizon</h2><p class="note stale">⛔ <strong>The horizon could not be read.</strong> ${escapeHtml(hz.why)}. ` +
       `⚠ That is NOT the same as “every item is unset” — this page cannot tell you either way, so it shows no number.</p>`
     : (() => {
         const c = hz.counts;
-        const someday = c[require('./board-axes.js').SOMEDAY_NAME] || 0;
+        const A = require('./board-axes.js');
+        const someday = c[A.SOMEDAY_NAME] || 0;
         const cells = hz.vocabulary
           .map(
             v =>
               `<li><span class="n">${c[v] || 0}</span><span class="k">${escapeHtml(v.toLowerCase().replace(/-/g, ' '))}</span>` +
-              `<span class="h">${escapeHtml(
-                v === 'BLOCKS-WORK-NOW'
-                  ? 'in the way of work today'
-                  : v === 'NEXT'
-                    ? 'after the current thing'
-                    : 'a captured thought with a condition — ⛔ in NO total on this page'
-              )}</span></li>`
+              `<span class="h">${escapeHtml(HZ_BLURB[v] || 'no blurb for this value')}</span></li>`
           )
           .join('');
-        const unset =
-          `<li><span class="n">${c.UNSET}</span><span class="k">unset</span>` +
-          `<span class="h">no horizon stated — ⛔ shown as unset, never counted as one of the three. The field is being ` +
-          `assigned now; unset means nobody has said yet.</span></li>`;
+        const unset = c.UNSET
+          ? `<li><span class="n">${c.UNSET}</span><span class="k">unset</span>` +
+            `<span class="h">no source has said anything — ⛔ shown as unset, never counted as one of the values above, and ` +
+            `deliberately not the same as UNKNOWN</span></li>`
+          : '';
         const unparse = c.UNPARSEABLE
           ? `<li><span class="n">${c.UNPARSEABLE}</span><span class="k">unreadable</span>` +
-            `<span class="h">a horizon line that is not one of the three words: ${escapeHtml(hz.unparseable.slice(0, 12).join(', '))}</span></li>`
+            `<span class="h">a value outside the vocabulary: ${escapeHtml(hz.unparseable.slice(0, 12).join(', '))}</span></li>`
           : '';
         const somedayList = someday
           ? `<details class="drift"><summary>Which ${someday} someday-if <span class="c">excluded</span></summary>` +
-            `<ul>${[...hz.someday].map(id => `<li><code>${escapeHtml(id)}</code></li>`).join('')}</ul>` +
-            `<p class="note">Visible because you asked. ⛔ None of these is in any total above or in any band count below.</p></details>`
-          : `<p class="note">No item carries <code>SOMEDAY-IF</code> yet, so no total changes today. The exclusion is applied ` +
+            `<ul>${[...hz.someday]
+              .map(
+                id =>
+                  `<li><code>${escapeHtml(id)}</code>${
+                    hz.basisOf && hz.basisOf.get(id)
+                      ? ` <span class="c">${escapeHtml(hz.basisOf.get(id))}</span>`
+                      : ''
+                  }</li>`
+              )
+              .join('')}</ul>` +
+            `<p class="note">⛔ None of these is in any total above or in any band count below. Each carries how it was ` +
+            `placed: READ is a reader's call with the words quoted, SIGNAL is the assignment tool's keyword match, ` +
+            `GRAPH is a live blocking edge, STATUS is the item's parked/deferred state, BLOCK is the item's own accept block.</p></details>`
+          : `<p class="note">No item carries <code>SOMEDAY-IF</code>, so no total changes. The exclusion is applied ` +
             `regardless — a rule that only starts working once somebody notices it is not a rule.</p>`;
         return (
           `<h2>Horizon</h2>` +
-          `<p class="note">Should this item be counted yet — read from each item's own <code>accept</code> block, over all ` +
-          `${hz.total} items. ⛔ A <code>SOMEDAY-IF</code> item is in no total on this page.</p>` +
+          `<p class="note">Should this item be counted yet, over all ${hz.total} items. Read from ${escapeHtml(hz.sourcedFrom)}` +
+          `${hz.basisCounts && Object.keys(hz.basisCounts).length ? ` · basis ${escapeHtml(basisStrip(hz.basisCounts))}` : ''}. ` +
+          `⛔ A <code>SOMEDAY-IF</code> item is in no total on this page.</p>` +
           `<ul class="stats">${cells}${unset}${unparse}</ul>` +
+          // ⛔ THE SOURCES DISAGREE HERE, AND PRECEDENCE IS A RESOLUTION, NOT AN
+          // ABSENCE OF CONFLICT. The hand-written block wins over a keyword-assigned
+          // graph row — but a page that quietly picks one and shows a clean number is
+          // how a board ends up carrying two answers nobody knows about.
+          (hz.conflicts && hz.conflicts.length
+            ? `<p class="note stale">⚠ <strong>${hz.conflicts.length} item(s) carry two different horizons.</strong> ` +
+              `The item's own <code>accept</code> block is used, because a person wrote it and the archive's gate refuses it ` +
+              `if it is malformed; the assignment disagrees on: ` +
+              hz.conflicts
+                .map(
+                  x =>
+                    `<code>${escapeHtml(x.id)}</code> block <strong>${escapeHtml(x.block)}</strong> vs ` +
+                    `${escapeHtml(x.graph)} by ${escapeHtml(x.graphBasis)}`
+                )
+                .join('; ') +
+              `. Resolving one of the two is the fix; showing you the winner alone is not.</p>`
+            : '') +
           somedayList
         );
       })();
 
-  // ── PROJECT — rendered under the rule that actually exists, with the gap named ──
-  const dm = axes.domains;
-  const projectHtml = !dm.observable
-    ? `<h2>Project</h2><p class="note stale">⛔ <strong>The per-project split could not be measured.</strong> ${escapeHtml(dm.why)}.</p>`
-    : `<h2>Project</h2>` +
-      `<p class="note">Which thing an item belongs to, from the planning tree's own <strong>${escapeHtml(dm.rule)}</strong> ` +
-      `domain census — one board filtered, never six boards. Assigned per ID-family with per-item overrides, each carrying its ` +
-      `reason. Rule last edited ${escapeHtml(dm.editedAt ? String(dm.editedAt.toISOString()).slice(0, 10) : 'unknown')}.</p>` +
-      `<ul class="stats">${Object.entries(dm.counts)
-        .sort((a, b) => b[1] - a[1])
-        .map(
-          ([k, v]) =>
-            `<li><span class="n">${v}</span><span class="k">${escapeHtml(k)}</span>` +
-            `<span class="h">${escapeHtml(PROJECT_BLURB[k] || 'no blurb for this domain')}</span></li>`
-        )
-        .join('')}</ul>` +
-      (dm.summed === dm.total
-        ? ''
-        : `<p class="note stale">⛔ The domains sum to ${dm.summed} but the census counted ${dm.total} items — it was read ` +
-          `against a different moment of a queue that is being edited live. Treat the split as indicative, not exact.</p>`) +
-      `<p class="note">⛔ <strong>This is four values where you named six.</strong> ${escapeHtml(dm.rule)} knows CP · MIST · ` +
-      `MUSEUM · APP (+ UNASSIGNED). <strong>The harness is folded inside CP</strong> and <strong>Binder has no bucket at ` +
-      `all</strong> — its items sit in CP and MIST under a rule whose own text excludes Binder from CP. There is no ` +
-      `<code>project:</code> field: the item format's key set is closed and refuses an unknown key, so the six-value axis ` +
-      `needs that key set opened in the archive before anything can carry it. Named here rather than approximated.</p>`;
+  // ── PROJECT — the owner's six, from the board's own per-item assignment ─────
+  //
+  // ⭐ THIS IS NO LONGER AN APPROXIMATION. The page used to render CP-RULE v1's
+  // four-value domain census because the six-value axis did not exist. It exists
+  // now, per item, with a basis and quoted evidence — and the two DISAGREE on 46
+  // of 411 items (11.2%, measured with the census's CP counted as compatible with
+  // EITHER control-plane or harness, the most generous mapping available). ⛔ So
+  // the census is no longer rendered here: two answers to one question is the
+  // disease, and only one of them can say which words decided each row.
+  //
+  // ⚠⚠ AND THE BASIS IS THE HEADLINE, NOT A FOOTNOTE. The assignment's own
+  // declared-in-advance sample measured SIGNAL — the tool's keyword match — WRONG
+  // ABOUT ONE PROJECT ROW IN THREE. Printing these counts without that beside them
+  // would be a precision this axis has not earned yet.
+  const pj = axes.projects;
+  const projectHtml = !pj.observable
+    ? `<h2>Project</h2><p class="note stale">⛔ <strong>The per-project split could not be read.</strong> ${escapeHtml(pj.why)}.</p>`
+    : (() => {
+        const signal = pj.basisCounts.SIGNAL || 0;
+        const cells = [...pj.vocabulary, 'UNSET']
+          .filter(v => pj.counts[v])
+          .sort((a, b) => pj.counts[b] - pj.counts[a])
+          .map(
+            v =>
+              `<li><span class="n">${pj.counts[v]}</span><span class="k">${escapeHtml(v)}</span>` +
+              `<span class="h">${escapeHtml(PROJECT_BLURB[v] || 'no blurb for this value')}</span></li>`
+          )
+          .join('');
+        return (
+          `<h2>Project</h2>` +
+          `<p class="note">Which thing an item belongs to, assigned per item over all ${pj.total} of them, from the board's ` +
+          `own axis assignment · basis ${escapeHtml(basisStrip(pj.basisCounts))}.</p>` +
+          `<ul class="stats">${cells}</ul>` +
+          (signal
+            ? `<p class="note stale">⚠ <strong>${signal} of these rows were placed by keyword match, and that was measured ` +
+              `wrong about one row in three.</strong> Only the <code>READ</code> rows carry a reader's call with the deciding ` +
+              `words quoted; <code>FAMILY</code> rows follow the ID-prefix rule. Treat the shape as real and any single row ` +
+              `as a guess until it has been read.</p>`
+            : '') +
+          `<p class="note">⛔ The older four-value domain census (CP-RULE v1) is no longer shown here. It disagreed with this ` +
+          `assignment on 46 of 411 items, it cannot separate the harness from the control plane, and it has no bucket for ` +
+          `Binder — all three of which this one does.</p>`
+        );
+      })();
 
   // ── The per-band someday correction ─────────────────────────────────────────
   //
@@ -906,6 +1037,48 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // was always that size — and it would put this page in silent disagreement with
   // the band heading the same reader can open in the board file. So a corrected
   // band reads `104 → 103`, with the excluded ids one tap away.
+  // ── ⭐ THE PER-PROJECT FILTER — one board filtered, never six boards ────────
+  //
+  // The owner asked for per-project counts "by filtering rather than by splitting
+  // anything". Counts alone were all this page could offer while the only source
+  // was a subprocess census with no all-items output: per-item domains cost one
+  // spawn per value, measured at 0.94s against 0.19s for one, on a page read on a
+  // phone over a tailnet. ⭐ THAT OBJECTION IS GONE: the assignment now lives in
+  // `BLOCKER-GRAPH.json`, which this route already reads once, so id → project is
+  // free. Neither of the numbers I recorded applies to a file read.
+  //
+  // ⚠ WEIGHT, since it was the other objection: the board LISTS 168 rows (the rest
+  // of the 411 are the Backlog's count), so the attribute costs roughly 3KB — and
+  // it buys the filter over every listed row rather than a second rendering of
+  // them. Rows the board does not list cannot be tagged, and the control says so
+  // rather than letting a filtered view look complete.
+  //
+  // ⛔ DERIVED FROM THE RENDERED OUTPUT, not from a second parse of the board —
+  // the same rule `buildToc` follows. A separate pass over the markdown would be a
+  // second reader free to disagree with the one that produced the rows.
+  const pjById = axes.projects.observable ? axes.projects.byId : null;
+  const tagRows = html =>
+    pjById
+      ? html.replace(/<li><strong>([A-Za-z]+[0-9]*[a-z]?)<\/strong>/g, (m, id) =>
+          pjById.has(id) ? `<li data-p="${escapeHtml(pjById.get(id))}"><strong>${id}</strong>` : m
+        )
+      : html;
+  const filterHtml =
+    pjById && axes.projects.vocabulary
+      ? `<div class="pfilter" role="group" aria-label="Filter the board by project">` +
+        `<button class="pchip" data-p="" aria-pressed="true">All</button>` +
+        [...axes.projects.vocabulary]
+          .filter(v => axes.projects.counts[v])
+          .map(
+            v =>
+              `<button class="pchip" data-p="${escapeHtml(v)}" aria-pressed="false">${escapeHtml(v)} <span class="c">${axes.projects.counts[v]}</span></button>`
+          )
+          .join('') +
+        `</div><p class="note">⚠ Filters the rows the board LISTS. The Backlog is a count rather than a list, so its rows ` +
+        `cannot be filtered here — the per-project totals above are over all ${axes.projects.total} items, this control is over the ` +
+        `${'' + (md.match(/^- \*\*/gm) || []).length} listed ones.</p>`
+      : '';
+
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
     .map(k => {
       const b = bands.get(k);
@@ -921,10 +1094,10 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           `this page does not.</p>`
         : '';
       return (
-        `<details class="band"${open}><summary>${escapeHtml(k)} ${countCell}</summary>` +
+        `<details class="band"${open}><summary>${escapeHtml(k)} ${countCell}<span class="pshown"></span></summary>` +
         `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
         note +
-        mdToHtml(b.lines) +
+        tagRows(mdToHtml(b.lines)) +
         `</details>`
       );
     })
@@ -982,6 +1155,7 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
     horizonHtml +
     projectHtml +
     `<h2>The whole board</h2>` +
+    filterHtml +
     `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
     `the rest are one tap away — nothing is hidden or shortened.</p>` +
     bandHtml

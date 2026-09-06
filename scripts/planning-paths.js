@@ -423,7 +423,70 @@ function loadItemFormat() {
 }
 
 /**
- * `BLOCKER-GRAPH.json` — the per-item `actor` classification behind DECIDE vs DO.
+ * ── THE TWO AXES' VOCABULARIES — declared once, in the archive, and imported ──
+ *
+ * `!PLANNING/tools/axis-assign.cjs` is the tool that assigns `project` and `horizon`
+ * across the board and exports both vocabularies:
+ *
+ *   PROJECTS  APP · CONTROL-PLANE · HARNESS · MIST · MUSEUM · BINDER · UNKNOWN
+ *   HORIZONS  BLOCKS-WORK-NOW · NEXT · SOMEDAY-IF · UNKNOWN
+ *
+ * ⭐ THAT IS THE OWNER'S SIX-VALUE PROJECT AXIS, and it now exists — so the
+ * four-value approximation this page used to render (CP-RULE v1's domain census)
+ * is superseded rather than merely incomplete. ⛔ The two DISAGREE on 46 of 411
+ * items (11.2%, measured 2026-09-05 with the census's CP counted as compatible
+ * with EITHER CONTROL-PLANE or HARNESS — the most generous possible mapping). Two
+ * answers to one question is the disease this project keeps naming, so `/queue`
+ * renders exactly one of them: this one, which carries a per-row basis and quoted
+ * evidence the census cannot.
+ *
+ * ⚠ `HORIZONS` here carries `UNKNOWN`, which the ACCEPT-BLOCK vocabulary
+ * (`item-format-check.cjs`, gated by R10) does not — and that asymmetry is
+ * deliberate rather than a drift. An author writing a block must pick one of the
+ * three real values; an ASSIGNMENT pass reading 411 items must be able to say "the
+ * text does not settle this" and have that survive as a value. Keep both, import
+ * both, and never substitute one for the other.
+ *
+ * Required, not spawned — `require.main`-guarded with its exports at module scope,
+ * exactly like the format module.
+ */
+function axisToolPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'axis-assign.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+function loadAxisVocabulary() {
+  const tool = axisToolPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/axis-assign.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  try {
+    const mod = require(tool);
+    if (!Array.isArray(mod.PROJECTS) || !Array.isArray(mod.HORIZONS)) {
+      return { observable: false, why: 'tools/axis-assign.cjs is missing PROJECTS or HORIZONS' };
+    }
+    return {
+      observable: true,
+      PROJECTS: mod.PROJECTS.slice(),
+      HORIZONS: mod.HORIZONS.slice(),
+      tool,
+    };
+  } catch (e) {
+    return { observable: false, why: 'tools/axis-assign.cjs threw on load: ' + e.message };
+  }
+}
+
+/**
+ * `BLOCKER-GRAPH.json` — the per-item `actor` classification behind DECIDE vs DO,
+ * and (since 2026-09-05) the per-item `project` / `horizon` assignment with a
+ * `projectBasis` / `horizonBasis` and quoted evidence on every row.
  *
  * ⚠ It is a MEASURED SNAPSHOT with its own timestamp, not a live view, so the caller
  * prints `measuredAt` beside anything derived from it. Never throws; a tree with no
@@ -585,6 +648,8 @@ module.exports = {
   // The two NEW board axes' sources — each resolved from the archive, none re-implemented here.
   itemFormatToolPath,
   loadItemFormat,
+  axisToolPath,
+  loadAxisVocabulary,
   readBlockerGraph,
   domainCensusPath,
   readDomainCensus,

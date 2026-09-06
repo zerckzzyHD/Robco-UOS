@@ -20,10 +20,15 @@
  * `/queue` page goes through it.
  *
  * ── ⭐⭐ THREE-VALUED THROUGHOUT, AND AT TWO DIFFERENT LEVELS ─────────────────
- * The fields are being assigned right now and almost nothing carries them yet
- * (measured 2026-09-05 against the live queue: 6 of 411 items carry a horizon).
- * So the degrade path is not an edge case here — it is the ordinary case, and it
- * is where this module can most easily lie.
+ * ⚠ THIS PARAGRAPH DESCRIBED A BOARD THAT NO LONGER EXISTS, and the correction is
+ * kept rather than overwritten because it is the whole lesson. When this file was
+ * written the axes were assigned on 6 of 411 items, so the degrade path was the
+ * ordinary path. Later the same evening a board-wide pass assigned BOTH axes to
+ * all 411 — into `BLOCKER-GRAPH.json`, not into the accept blocks this module was
+ * reading. Measured at archive `origin/main`: SOMEDAY-IF **55 of 411 (13.4%)**,
+ * UNKNOWN horizons 14, UNKNOWN projects 12. ⛔ The reader printed `SOMEDAY-IF 0`
+ * and `UNSET 405` against that board and no test went red, because the fixture put
+ * the data where the reader looked. See `readHorizons` for the two-source fix.
  *
  *   PER ITEM   : a vocabulary value · `UNSET` · `UNPARSEABLE`.
  *                ⛔ An unset horizon is NEVER defaulted. Reading unset as
@@ -98,11 +103,155 @@ function horizonOfBody(bodyLines, fmt) {
  * @returns {{observable:boolean, why?:string, byId?:Map, counts?:object,
  *            vocabulary?:string[], someday?:Set<string>, unparseable?:string[]}}
  */
-function readHorizons(items, fmt) {
-  if (!fmt || typeof fmt.parseAccept !== 'function' || !Array.isArray(fmt.HORIZON)) {
+/**
+ * ── ⛔⛤ TWO SOURCES, AND LOOKING IN ONLY ONE IS HOW THIS SHIPPED WRONG ────────
+ *
+ * The first version of this read the horizon from each item's own `accept` block
+ * and nowhere else. That was right about the FORMAT — `horizon` is an accept-block
+ * field, gated by R10 — and wrong about where the data would actually arrive.
+ *
+ * ⛔ MEASURED 2026-09-05, and it is the reason this function has two sources: the
+ * board-wide assignment landed the same evening across all 411 items, and it went
+ * into `BLOCKER-GRAPH.json` and `AXES-OVERRIDES.json`, NOT into accept blocks —
+ * which still carry 6 horizons between them. Against that board the accept-block
+ * reader printed `SOMEDAY-IF 0` and `UNSET 405` while the truth was `55` and `0`.
+ * ⭐ Nothing was broken and every test passed: the fixture that proved the rule
+ * put the horizon where the reader looked, which is exactly what a fixture cannot
+ * test. *A feature verified only against data you authored is verified against
+ * your own assumptions.*
+ *
+ * ── PRECEDENCE, and why this way round ──────────────────────────────────────
+ *   1. the item's own `accept` block   — AUTHORED by a person, and REFUSED by the
+ *                                        archive's pre-commit if malformed (R10).
+ *                                        A hand-written value outranks a derived one.
+ *   2. the graph's `horizon`           — the ASSIGNMENT, with a basis per row.
+ *   3. neither                         — `UNSET`. Still never a default.
+ *
+ * ⚠ `UNKNOWN` IS A FIRST-CLASS VALUE FROM SOURCE 2 AND IS NOT `UNSET`. The
+ * assignment pass deliberately left 14 items UNKNOWN — settled records that carry
+ * no work, a live conflict between an item and a graph edge, a stage behind a
+ * deferred stage — each with its reason quoted. ⛔ An item nobody could place is
+ * not a `BLOCKS-WORK-NOW` and it is not a `SOMEDAY-IF`: it is not folded into any
+ * band, it is not excluded from any total, and it is rendered under its own name.
+ * Collapsing it into UNSET would erase the difference between "nobody has said"
+ * and "somebody looked and the text does not settle it".
+ *
+ * @param {Array<{id:string, body:string[]}>} items ID-bearing items from parseQueue
+ * @param {{fmt?:object, graph?:object, vocabulary?:string[]}} sources
+ */
+function readHorizons(items, sources) {
+  const s = sources || {};
+  const fmt = s.fmt && typeof s.fmt.parseAccept === 'function' ? s.fmt : null;
+  const graphItems =
+    s.graph && s.graph.items && typeof s.graph.items === 'object' ? s.graph.items : null;
+  // The vocabulary is the ASSIGNMENT's (four values incl. UNKNOWN) when it is
+  // reachable, else the accept block's three. Never a literal list here.
+  const vocab = Array.isArray(s.vocabulary)
+    ? s.vocabulary.slice()
+    : fmt && Array.isArray(fmt.HORIZON)
+      ? fmt.HORIZON.slice()
+      : null;
+  if (!vocab || (!fmt && !graphItems)) {
     return {
       observable: false,
-      why: 'the archive’s item-format module is not reachable, so no item’s horizon could be read',
+      why: !vocab
+        ? 'no horizon vocabulary is reachable (neither the archive’s item-format module nor its axis tool)'
+        : 'neither an item-format module nor a blocker graph is reachable, so no item’s horizon could be read',
+    };
+  }
+  if (!Array.isArray(items) || !items.length) {
+    return { observable: false, why: 'the queue parsed to no ID-bearing items' };
+  }
+  const byId = new Map();
+  const basisOf = new Map();
+  const counts = {};
+  for (const v of vocab) counts[v] = 0;
+  counts[HORIZON_UNSET] = 0;
+  counts[HORIZON_UNPARSEABLE] = 0;
+  const unparseable = [];
+  const someday = new Set();
+  const basisCounts = {};
+  const conflicts = [];
+  for (const it of items) {
+    let h = fmt ? horizonOfBody(it.body, fmt) : HORIZON_UNSET;
+    let basis = h === HORIZON_UNSET || h === HORIZON_UNPARSEABLE ? null : 'BLOCK';
+    const gRow = graphItems ? graphItems[it.id] : null;
+    if (h === HORIZON_UNSET && gRow) {
+      const raw = gRow.horizon;
+      if (raw !== undefined) {
+        h = vocab.includes(raw) ? raw : HORIZON_UNPARSEABLE;
+        basis = String(gRow.horizonBasis || 'UNSTATED').toUpperCase();
+      }
+    } else if (basis === 'BLOCK' && gRow && gRow.horizon !== undefined && gRow.horizon !== h) {
+      // ⛔⛤ THE SOURCES DISAGREE, AND PRECEDENCE MUST NOT HIDE IT. The block wins —
+      // it is hand-written and gated, the graph row here is usually a keyword match
+      // — but "the block wins" is a resolution, not an absence of conflict.
+      // Measured at archive origin/main: 3 of the 6 accept-block horizons contradict
+      // the assignment (DL1, GV20, GV22 — block BLOCKS-WORK-NOW, graph NEXT by
+      // SIGNAL). ⚠ A page that silently picks one and shows a clean number is how a
+      // board ends up with two answers nobody knows about. The caller prints these.
+      conflicts.push({
+        id: it.id,
+        block: h,
+        graph: gRow.horizon,
+        graphBasis: String(gRow.horizonBasis || 'UNSTATED').toUpperCase(),
+      });
+    }
+    byId.set(it.id, h);
+    if (basis) {
+      basisOf.set(it.id, basis);
+      basisCounts[basis] = (basisCounts[basis] || 0) + 1;
+    }
+    counts[h] = (counts[h] || 0) + 1;
+    if (h === HORIZON_UNPARSEABLE) unparseable.push(it.id);
+    if (h === SOMEDAY_NAME && vocab.includes(SOMEDAY_NAME)) someday.add(it.id);
+  }
+  return {
+    observable: true,
+    byId,
+    basisOf,
+    basisCounts,
+    counts,
+    vocabulary: vocab,
+    someday,
+    unparseable,
+    conflicts,
+    total: items.length,
+    sourcedFrom: [fmt ? 'accept blocks' : null, graphItems ? 'BLOCKER-GRAPH.json' : null]
+      .filter(Boolean)
+      .join(' + '),
+  };
+}
+
+/**
+ * ── THE PROJECT AXIS, from the graph's per-item assignment ──────────────────
+ *
+ * ⭐ This is the OWNER'S SIX-VALUE AXIS and it exists as of 2026-09-05:
+ * APP · CONTROL-PLANE · HARNESS · MIST · MUSEUM · BINDER, plus UNKNOWN. It
+ * supersedes the four-value domain census this page used to render — those two
+ * disagree on 46 of 411 items (11.2%), so only one can be shown.
+ *
+ * ⚠⚠ AND THE BASIS IS NOT DECORATION HERE, IT IS THE HEADLINE CAVEAT. The
+ * assignment's own measured miss rate: `SIGNAL` (a keyword/phrase match made by
+ * the tool) was **wrong about one project row in three** on a declared-in-advance
+ * sample. `READ` rows carry a reader's call with the deciding words quoted. So the
+ * counts are printed with their basis split beside them, and a SIGNAL-heavy column
+ * is a column to re-read, not a fact.
+ *
+ * ⛔ `UNKNOWN` is rendered under its own name and folded into nothing, for the
+ * same reason as the horizon's.
+ */
+function readProjects(items, sources) {
+  const s = sources || {};
+  const graphItems =
+    s.graph && s.graph.items && typeof s.graph.items === 'object' ? s.graph.items : null;
+  const vocab = Array.isArray(s.vocabulary) ? s.vocabulary.slice() : null;
+  if (!graphItems || !vocab) {
+    return {
+      observable: false,
+      why: !graphItems
+        ? 'BLOCKER-GRAPH.json is not reachable, so no item’s project could be read'
+        : 'no project vocabulary is reachable (the archive’s axis tool did not load)',
     };
   }
   if (!Array.isArray(items) || !items.length) {
@@ -110,27 +259,22 @@ function readHorizons(items, fmt) {
   }
   const byId = new Map();
   const counts = {};
-  for (const v of fmt.HORIZON) counts[v] = 0;
-  counts[HORIZON_UNSET] = 0;
-  counts[HORIZON_UNPARSEABLE] = 0;
-  const unparseable = [];
-  const someday = new Set();
+  for (const v of vocab) counts[v] = 0;
+  const UNSET = HORIZON_UNSET; // same word, same meaning: no source said anything
+  counts[UNSET] = 0;
+  const basisCounts = {};
   for (const it of items) {
-    const h = horizonOfBody(it.body, fmt);
-    byId.set(it.id, h);
-    counts[h] = (counts[h] || 0) + 1;
-    if (h === HORIZON_UNPARSEABLE) unparseable.push(it.id);
-    if (h === SOMEDAY(fmt)) someday.add(it.id);
+    const row = graphItems[it.id];
+    const raw = row ? row.project : undefined;
+    const p = raw === undefined ? UNSET : vocab.includes(raw) ? raw : HORIZON_UNPARSEABLE;
+    byId.set(it.id, p);
+    counts[p] = (counts[p] || 0) + 1;
+    if (p !== UNSET) {
+      const b = String((row && row.projectBasis) || 'UNSTATED').toUpperCase();
+      basisCounts[b] = (basisCounts[b] || 0) + 1;
+    }
   }
-  return {
-    observable: true,
-    byId,
-    counts,
-    vocabulary: fmt.HORIZON.slice(),
-    someday,
-    unparseable,
-    total: items.length,
-  };
+  return { observable: true, byId, counts, basisCounts, vocabulary: vocab, total: items.length };
 }
 
 /**
@@ -145,11 +289,6 @@ function readHorizons(items, fmt) {
  * removing the wrong body of work.
  */
 const SOMEDAY_NAME = 'SOMEDAY-IF';
-function SOMEDAY(fmt) {
-  return fmt && Array.isArray(fmt.HORIZON) && fmt.HORIZON.includes(SOMEDAY_NAME)
-    ? SOMEDAY_NAME
-    : '(no SOMEDAY-IF value in this vocabulary)';
-}
 
 /**
  * ⛔⛔ THE RULE, IN ONE PLACE: a SOMEDAY-IF item is not in the count.
@@ -408,6 +547,7 @@ module.exports = {
   rawItemHeadings,
   bandById,
   somedayByBand,
+  readProjects,
   readOwnerAxis,
   OWNER_ACTORS,
 };

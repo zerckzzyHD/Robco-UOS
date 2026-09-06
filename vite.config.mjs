@@ -411,12 +411,16 @@ function queueRoute() {
             // One unreachable source degrades ONE axis; none of them can take the
             // page down or make it print a number it could not measure.
             {
-              // the horizon's grammar + vocabulary — the archive's own gate module
+              // the accept block's grammar + its gated 3-value horizon vocabulary
               itemFormat: paths.loadItemFormat(),
-              // the DECIDE / DO split — the graph's `actor` field, measured, dated
+              // ⭐ the board's own per-item assignment: BOTH axes with a basis and
+              // quoted evidence per row, plus the DECIDE / DO actor split. This is
+              // where the axes actually live — reading only the accept blocks made
+              // this page print SOMEDAY-IF 0 against a board carrying 55 of them.
               graph: paths.readBlockerGraph(),
-              // the project split — CP-RULE v1, one spawn, aggregate counts only
-              domains: paths.readDomainCensus(),
+              // the two vocabularies, declared once by the archive's axis tool:
+              // the owner's six projects, and the four horizons (incl. UNKNOWN).
+              axisVocabulary: paths.loadAxisVocabulary(),
             }
           )
         );
