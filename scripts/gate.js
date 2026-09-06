@@ -525,6 +525,21 @@ if (!fast && !docs) {
   // declared suite count matches reality (Protocol 40 — keeps test.html in sync).
   run('Runtime audit (test.html)', 'node tests/test-html-check.mjs');
 
+  // ── 9b. The /queue project filter, RUN rather than read ───────────────────────
+  // ⛔⛤ The filter shipped with the band numbers ignoring it — the pill was
+  // filter-blind while a caption beneath it responded, so the biggest number on each
+  // row answered a different question from the one just asked. The owner found it on
+  // his phone. The Node suite asserts the DATA the page hands its script, which is
+  // necessary and is not the same as the script working: a check that reads a
+  // program's input is not a check that the program runs. This drives the real click
+  // path in a real browser and compares what a reader SEES against the figures the
+  // page published. Proven red-then-green by replaying the original defect.
+  //
+  // ⚠ No server: the page is one self-contained document, so it is opened over
+  // file://. SKIPS with its reason (exit 0) on a checkout without the private
+  // planning tree — a public clone has no board to filter.
+  run('Queue project filter (click path)', 'node tests/queue-filter-check.mjs');
+
   // ── 10. Save-survival (SAVE_INTEGRITY_PASS) ───────────────────────────────────
   // Boots real fixtures (current/mature/legacy-v7/malformed) through the REAL
   // boot + import paths and compares the full durable-field inventory — the

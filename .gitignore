@@ -110,4 +110,4 @@ DETERMINISTIC_FEATURES.md
 *_DESIGN.md
 
 # Session scratch outbox — never publish (this repo is PUBLIC)
-DISPATCH-OUTBOX.md
+DISPATCH-OUTBOX*.md

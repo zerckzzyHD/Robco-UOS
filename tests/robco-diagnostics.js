@@ -58034,6 +58034,10 @@ if (!PLANNING_OK) {
       ];
       const EPHEMERAL259 = [
         [
+          'tests/queue-filter-check.mjs',
+          'writes one rendered page into an mkdtemp dir it removes on the way out; nothing it writes outlives the run, and a lost write only fails the check',
+        ],
+        [
           'scripts/cf-staging-build.mjs',
           'writes only into the disposable staging build dir, rebuilt from source every run',
         ],
@@ -60404,6 +60408,118 @@ if (!PLANNING_OK) {
     fs.rmSync(tree270, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   } catch {
     /* harmless leftover */
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 271 — TWO NUMBERS ARE ONLY COMPARABLE IF THEY COUNT THE SAME POPULATION
+//
+//  ⛔⛤ THE GUARD-BLINDNESS THIS CLOSES. Suite 270.13e makes every number on the
+//  /queue page name its SOURCE. It does not make two numbers standing next to each
+//  other name the same POPULATION — and that gap produced every defect on this page
+//  in one evening, each time two numbers individually correct and individually
+//  sourced, placed adjacently as if comparable:
+//
+//    · a band pill (board minus someday) beside a caption counting rendered rows
+//      with someday still in them — found by the owner on his phone;
+//    · a project pill over all 411 items beside the bands it controls over 352 —
+//      introduced BY THE FIRST FIX for the line above, one hour earlier;
+//    · 352 on the board beside 411 in the Horizon section, related nowhere, which
+//      invited a reader to subtract them and call the difference a defect;
+//    · 168 bold-led bullets beside 160 tagged rows.
+//
+//  ⭐ A READER SUBTRACTS ADJACENT NUMBERS — that is what a grid of figures is FOR.
+//  So the rule is not "label everything": it is that a group of numbers a reader
+//  will compare must either share a population or SAY that it does not.
+//
+//  ⚠ The RED case below is the REAL historical instance, not a synthetic one: the
+//  project pill counted the queue (APP 35) while the bands it filtered counted the
+//  board (APP 31), which is the pair measured in a browser at 2026-09-06 01:2xZ.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 271 — comparable numbers must share a population, or say they do not');
+  const RV271 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const P271 = RV271.POPULATIONS;
+
+  // ── 271.1 RED — the pill/band pair exactly as it stood before the fix ────────
+  const historical271 =
+    `<div class="pfilter" data-pop="${P271.QUEUE}">` +
+    `<button class="pchip" data-p="APP">APP <span class="c">35</span></button></div>` +
+    `<details class="band" data-band="Ready" data-pop="${P271.BOARD}"><summary>Ready <span class="c">16</span></summary></details>` +
+    `<details class="band" data-band="Backlog" data-pop="${P271.BOARD}"><summary>Backlog <span class="c">10</span></summary></details>`;
+  const red271 = RV271.comparabilityReport(historical271);
+  const pillBand271 = red271.violations.find(v => v.id === 'pill-band');
+  assert(
+    pillBand271 && /different population/.test(pillBand271.why),
+    '271.1: RED — the real pre-fix pair is FLAGGED: a filter control counting the queue (APP 35) driving bands that count the board (16 + 10) is a comparison the page has not earned' +
+      (pillBand271 ? '' : ` — got violations ${JSON.stringify(red271.violations.map(v => v.id))}`)
+  );
+
+  // ── 271.2 GREEN — the same pair once both sides count the same set ───────────
+  const fixed271 = historical271.replace(`data-pop="${P271.QUEUE}"`, `data-pop="${P271.BOARD}"`);
+  assert(
+    !RV271.comparabilityReport(fixed271).violations.some(v => v.id === 'pill-band'),
+    '271.2: GREEN — with the control counting the same population as the bands it drives, the same input passes; the guard is measuring the mismatch and not merely the markup'
+  );
+
+  // ── 271.3 — a mixed strip is allowed ONLY with an explicit statement ─────────
+  // ⭐ The escape hatch is deliberate and is the point: this page's main strip
+  // genuinely answers four questions, and forcing them apart would be worse than
+  // saying so. What is refused is mixing them SILENTLY.
+  const mixed271 =
+    `<ul class="stats" data-strip="strip-0">` +
+    `<li data-pop="${P271.BOARD}"><span class="n">13</span></li>` +
+    `<li data-pop="${P271.QUEUE}"><span class="n">411</span></li></ul>`;
+  const stated271 =
+    mixed271 + `<p class="note popmix" data-for="strip-0">these do not count the same thing</p>`;
+  assert(
+    RV271.comparabilityReport(mixed271).violations.some(v => v.id === 'strip-0') &&
+      !RV271.comparabilityReport(stated271).violations.some(v => v.id === 'strip-0'),
+    '271.3: RED-THEN-GREEN — a strip mixing two populations is refused, and the SAME strip passes once the page carries the statement naming the mismatch'
+  );
+
+  // ── 271.4 — an untagged tile is worse than a mixed one ──────────────────────
+  const untagged271 = `<ul class="stats" data-strip="strip-9"><li><span class="n">7</span></li></ul>`;
+  assert(
+    RV271.comparabilityReport(untagged271).violations.some(v => /no population token/.test(v.why)),
+    '271.4: a tile carrying no population at all is flagged — it cannot be checked, and it reads as belonging to whatever strip surrounds it'
+  );
+
+  // ── 271.5 — ⛔ AN EMPTY CHECK IS NOT A CLEAN ONE ────────────────────────────
+  // This function's own first version required the <ul> tag to end straight after
+  // the class, matched none of the strips (they carry a data-strip id), and returned
+  // ZERO VIOLATIONS — indistinguishable from a fully honest page. Found within
+  // minutes only because the group list printed empty.
+  const empty271 = RV271.comparabilityReport('<p>nothing here</p>');
+  assert(
+    empty271.violations.some(v => v.kind === 'positive-control'),
+    '271.5: POSITIVE CONTROL — finding no comparable groups is itself a finding, so the guard cannot pass by failing to look'
+  );
+
+  // ── 271.6 — the LIVE page: every group checked, none silently mixed ─────────
+  // ⚠ SKIPPED with its reason on a checkout without the private tree, never absent.
+  const live271 = planningPaths.readRoadmap();
+  if (!live271) {
+    console.log(`  SKIP  Suite 271.6 — ${planningPaths.describe()}`);
+  } else {
+    const html271 = RV271.renderQueue(
+      live271,
+      planningPaths.readPlanningFile('QUEUE.md'),
+      planningPaths.readOwnerDecisionCensus(),
+      {
+        itemFormat: planningPaths.loadItemFormat(),
+        graph: planningPaths.readBlockerGraph(),
+        axisVocabulary: planningPaths.loadAxisVocabulary(),
+      }
+    );
+    const r271 = RV271.comparabilityReport(html271);
+    assert(
+      r271.groups.length >= 3 && r271.violations.length === 0,
+      `271.6: LIVE — the real page presents ${r271.groups.length} comparable groups and none of them mixes populations without saying so` +
+        (r271.violations.length
+          ? ' — ' + r271.violations.map(v => v.id + ': ' + v.why).join('; ')
+          : '')
+    );
   }
 }
 

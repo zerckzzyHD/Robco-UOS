@@ -150,7 +150,7 @@ ul.stats .n.word { font-size:1rem; letter-spacing:.03em; line-height:1.25;
   font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
 .pchip[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
 .pchip .c { opacity:.7; font-weight:400; }
-.bandcounts { display:none; }
+.bandcounts, .pop { display:none; }
 ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
 ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
 details.band, details.drift { border:1px solid var(--line); border-radius:8px;
@@ -403,6 +403,127 @@ const BAND_BLURB = {
   UNCLASSIFIED:
     'Carries no recognised status — worth a look precisely because nothing could file it.',
 };
+
+/**
+ * ── ⛔⛤ THE POPULATION A NUMBER COUNTS OVER — the guard-blindness this closes ──
+ *
+ * The provenance rule (see `stat`) makes every number name its SOURCE. It does not
+ * make two numbers standing next to each other name the same POPULATION, and that
+ * gap produced every defect on this page in one evening — each time two numbers
+ * that were individually correct and individually sourced, placed adjacently as if
+ * comparable:
+ *
+ *   · the band pill (board minus someday) beside a caption counting rendered rows
+ *     with someday still in them — the owner found this on his phone;
+ *   · a project pill over all 411 items beside the bands it controls over 352 —
+ *     introduced by the FIRST fix for the line above, an hour earlier;
+ *   · 352 on the board beside 411 in the Horizon section, related nowhere, which
+ *     invited a reader to subtract them and call the difference a defect;
+ *   · 168 bold-led bullets beside 160 tagged rows.
+ *
+ * ⭐ A READER SUBTRACTS ADJACENT NUMBERS. That is not a misuse of the page, it is
+ * what a grid of figures is for — so two numbers over different populations may
+ * only sit together when the page SAYS they do not share one.
+ *
+ * The token is short and stable because it is compared, never displayed raw:
+ */
+const POPULATIONS = {
+  /** Every ID-bearing item the queue holds, someday included. The Horizon axis's own denominator. */
+  QUEUE: 'queue',
+  /** The board after the someday rule — the denominator of every band and band-derived total. */
+  BOARD: 'board',
+  /** Rows of BLOCKER-GRAPH.json classified to the owner, someday excluded. Not a board count. */
+  OWNER: 'owner-graph',
+  /** The planning tree's declared owner-decision roster — a hand-kept set, its own population. */
+  CENSUS: 'census-roster',
+  /** Items whose heading leads with the done-mark, counted across the whole queue. */
+  CLOSED: 'closed-scan',
+};
+
+/**
+ * Groups of numbers a reader will read as comparable, and whether each group is
+ * honest about its populations.
+ *
+ * ⭐ RUN OVER THE RENDERED HTML, not over the intent that produced it. A check that
+ * reads the renderer's variables proves the renderer meant well; this proves what
+ * the page actually shows — the same reason `buildToc` derives from the output.
+ *
+ * A group is a `ul.stats` strip (tiles sit in a grid and a grid invites comparison)
+ * or the filter-pill strip paired with the band headers it controls. A group that
+ * mixes populations is a VIOLATION unless the page carries a `popmix` statement for
+ * it, naming what does not match.
+ *
+ * @returns {{groups:Array, violations:Array}} violations non-empty ⇒ the page is
+ *   presenting a comparison it has not earned.
+ */
+function comparabilityReport(html) {
+  const s = String(html || '');
+  const groups = [];
+  const violations = [];
+
+  // 1. every tile strip
+  // ⚠ `[^>]*` — the FIRST version of this required the tag to end straight after
+  // the class, and the strips carry a `data-strip` id. It matched nothing, found no
+  // groups, and reported ZERO VIOLATIONS: a guard that passed by not looking.
+  // Caught within minutes only because the group list printed empty.
+  for (const m of s.matchAll(/<ul class="stats"([^>]*)>([\s\S]*?)<\/ul>/g)) {
+    // ⚠ Split per tile and look INSIDE it. The token sits on the tile's own source
+    // line rather than on its `<li>`, because twenty-plus existing assertions locate
+    // a tile by the exact literal `<li><span class="n` — putting it on the element
+    // broke every one of those locators while leaving their claims untouched, and
+    // widening them would have been editing checks so this change could pass.
+    const chunks = m[2].split(/<li\b/).slice(1);
+    const tiles = chunks.length;
+    const pops = chunks.map(c => (/data-pop="([^"]*)"/.exec(c) || [])[1]).filter(Boolean);
+    // ⛔ The id comes from the MARKUP, never a counter. A positional id would
+    // renumber every strip the moment one was added, silently re-pointing each
+    // statement at a different group.
+    const id = (/data-strip="([^"]*)"/.exec(m[1]) || [])[1] || 'strip-UNNAMED';
+    // ⚠ A tile with NO population is worse than a mixed strip: it cannot even be
+    // checked, and it reads as belonging to whatever surrounds it.
+    const untagged = tiles - pops.length;
+    const distinct = [...new Set(pops)];
+    const stated = new RegExp('class="note popmix" data-for="' + id + '"').test(s);
+    const g = { id, kind: 'stats', tiles, pops: distinct, untagged, stated };
+    groups.push(g);
+    if (untagged > 0) violations.push({ ...g, why: 'tiles carry no population token' });
+    else if (distinct.length > 1 && !stated)
+      violations.push({ ...g, why: 'one strip mixes populations and the page does not say so' });
+  }
+
+  // 2. the filter pills against the band headers they drive — the pair that broke
+  //    an hour after the first fix, and the reason this is not only about strips.
+  const pillPop = (/<div class="pfilter"[^>]*data-pop="([^"]*)"/.exec(s) || [])[1];
+  const bandPops = [...s.matchAll(/<details class="band"[^>]*data-pop="([^"]*)"/g)].map(x => x[1]);
+  if (pillPop || bandPops.length) {
+    const distinct = [...new Set([pillPop, ...bandPops].filter(Boolean))];
+    const stated = /class="note popmix" data-for="pill-band"/.test(s);
+    const g = { id: 'pill-band', kind: 'control', pops: distinct, stated };
+    groups.push(g);
+    if (!pillPop || !bandPops.length)
+      violations.push({
+        ...g,
+        why: 'the control or the bands it drives carry no population token',
+      });
+    else if (distinct.length > 1 && !stated)
+      violations.push({
+        ...g,
+        why: 'the filter control counts a different population from the bands it filters, unstated',
+      });
+  }
+  // ⛔⛤ AN EMPTY CHECK IS NOT A CLEAN ONE. This function's own first version
+  // matched no strips and returned zero violations, which reads identically to a
+  // page that is fully honest. Finding nothing to check is now itself the finding —
+  // the same rule the page applies to every number it prints.
+  if (!groups.length) {
+    violations.push({
+      id: 'self',
+      kind: 'positive-control',
+      why: 'the report found NO comparable groups at all — it checked nothing, which is not the same as finding nothing wrong',
+    });
+  }
+  return { groups, violations };
+}
 
 /**
  * What each CP-RULE v1 domain actually contains, in the owner's own words for the
@@ -679,10 +800,14 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // unsourced number on the page looking exactly like a sourced one, which is the
   // disease itself. It prints its own absence instead, and Suite 270.24 fails the
   // gate if any tile ever does.
-  const stat = (v, label, hint) =>
+  // ⚠ `pop` is the POPULATION this number counts over (see POPULATIONS). It is
+  // emitted, not displayed — the guard compares it, a reader never sees the token.
+  // An untagged tile is marked loudly for the same reason an unsourced one is:
+  // silence would make it read as belonging to whatever strip surrounds it.
+  const stat = (v, label, hint, pop) =>
     `<li><span class="n${/[0-9]/.test(String(v)) ? '' : ' word'}">${v}</span><span class="k">${escapeHtml(label)}</span>` +
     `<span class="h">${escapeHtml(hint || '⛔ SOURCE NOT STATED — this number reached the page without naming where it came from, which is the one thing every number here must do')}</span>` +
-    `</li>`;
+    `<span class="pop" data-pop="${escapeHtml(pop || 'UNSTATED-POPULATION')}"></span></li>`;
 
   // ⛔ EVERY LABEL STATES THE QUESTION IT ACTUALLY ANSWERS. None of these numbers
   // was ever wrong; one of them was wearing the wrong question. `before it is done`
@@ -810,43 +935,65 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         'classified from a heading + Done-means, never the body — and this board records rulings in bodies without ' +
           'updating headings, so a heading-only row may be live or long since answered. ⛔ Deliberately not folded into ' +
           'the counts beside it: that fold is what made this tile read 68 where a read of the rows measured 23. ' +
-          'Reading a row is what moves it out of here.'
+          'Reading a row is what moves it out of here.',
+        POPULATIONS.OWNER
       );
 
   const counts =
-    `<ul class="stats">` +
-    stat(n('Active'), 'being worked on now', 'started, not finished') +
+    `<ul class="stats" data-strip="strip-0">` +
+    stat(n('Active'), 'being worked on now', 'started, not finished', POPULATIONS.BOARD) +
     stat(
       censusObservable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
       'need you — open owner decisions',
-      censusHint
+      censusHint,
+      POPULATIONS.CENSUS
     ) +
     // ⛔ `laneCount` is the ONE place a lane number is decided, so the "no reads ⇒
     // UNOBSERVABLE, never 0" rule cannot be honoured on one tile and forgotten on
     // the next. `.read` is deliberately unreachable without passing `.observable`.
-    stat(laneCount('decide'), 'he decides — a sitting', laneHint('decide')) +
-    stat(laneCount('do'), 'his hands — a task list', laneHint('do')) +
+    stat(laneCount('decide'), 'he decides — a sitting', laneHint('decide'), POPULATIONS.OWNER) +
+    stat(laneCount('do'), 'his hands — a task list', laneHint('do'), POPULATIONS.OWNER) +
     unreadTile +
     stat(
       n('Attention'),
       'flagged ⚠️',
-      'the Attention band — a flag on the heading, not a decision count'
+      'the Attention band — a flag on the heading, not a decision count',
+      POPULATIONS.BOARD
     ) +
-    stat(n('Ready'), 'startable now', 'specified and unblocked') +
-    stat(inMotion, 'startable or in flight', 'active + ready — a workload, not a finish line') +
+    stat(n('Ready'), 'startable now', 'specified and unblocked', POPULATIONS.BOARD) +
+    stat(
+      inMotion,
+      'startable or in flight',
+      'active + ready — a workload, not a finish line',
+      POPULATIONS.BOARD
+    ) +
     stat(
       n('Backlog') + n('Parked') + n('Deferred'),
       'filed for later',
-      'backlog, parked and deferred'
+      'backlog, parked and deferred',
+      POPULATIONS.BOARD
     ) +
     stat(
       closed.observable ? closed.count : 'UNOBSERVABLE',
       'finished but still filed as open',
       closed.observable
         ? 'headings that LEAD with the done-mark, across all ' + closed.total + ' items'
-        : 'not counted over the whole queue, so no number is shown — ' + closed.why
+        : 'not counted over the whole queue, so no number is shown — ' + closed.why,
+      POPULATIONS.CLOSED
     ) +
-    `</ul>`;
+    `</ul>` +
+    // ⛔⛤ THIS STRIP MIXES FOUR POPULATIONS, AND A GRID INVITES SUBTRACTION.
+    //
+    // Every tile above is individually correct and individually sourced. They are
+    // not comparable with one another, and until tonight the page let a reader
+    // assume they were — which is exactly how a correct 352 beside a correct 411
+    // got read as a defect. `comparabilityReport()` REFUSES a mixed strip that does
+    // not carry this note, so the statement cannot be dropped without going red.
+    `<p class="note popmix" data-for="strip-0">⚠ <strong>These tiles do not all count the same thing, so do not subtract ` +
+    `them.</strong> Being-worked-on, flagged, startable, in-flight and filed-for-later are over the ${total} items on this ` +
+    `board. Open owner decisions is over the planning tree's declared roster. He-decides, his-hands and the unread ` +
+    `remainder are over the rows the blocker graph files to him. Finished-but-still-open is a scan of every item in the ` +
+    `queue. Four questions, four denominators, one grid.</p>`;
 
   const disagreeList =
     closed.observable && closed.count
@@ -976,7 +1123,8 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
             stat(
               c[v] || 0,
               v.toLowerCase().replace(/-/g, ' '),
-              HZ_BLURB[v] || 'no blurb for this value'
+              HZ_BLURB[v] || 'no blurb for this value',
+              POPULATIONS.QUEUE
             )
           )
           .join('');
@@ -984,14 +1132,16 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           ? stat(
               c.UNSET,
               'unset',
-              'no source has said anything — ⛔ shown as unset, never counted as one of the values above, and deliberately not the same as UNKNOWN'
+              'no source has said anything — ⛔ shown as unset, never counted as one of the values above, and deliberately not the same as UNKNOWN',
+              POPULATIONS.QUEUE
             )
           : '';
         const unparse = c.UNPARSEABLE
           ? stat(
               c.UNPARSEABLE,
               'unreadable',
-              'a value outside the vocabulary: ' + hz.unparseable.slice(0, 12).join(', ')
+              'a value outside the vocabulary: ' + hz.unparseable.slice(0, 12).join(', '),
+              POPULATIONS.QUEUE
             )
           : '';
         const somedayList = someday
@@ -1016,7 +1166,7 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           `<p class="note">Should this item be counted yet, over all ${hz.total} items. Read from ${escapeHtml(hz.sourcedFrom)}` +
           `${hz.basisCounts && Object.keys(hz.basisCounts).length ? ` · basis ${escapeHtml(basisStrip(hz.basisCounts))}` : ''}. ` +
           `⛔ A <code>SOMEDAY-IF</code> item is in no total on this page.</p>` +
-          `<ul class="stats">${cells}${unset}${unparse}</ul>` +
+          `<ul class="stats" data-strip="strip-1">${cells}${unset}${unparse}</ul>` +
           // ⛔ THE SOURCES DISAGREE HERE, AND PRECEDENCE IS A RESOLUTION, NOT AN
           // ABSENCE OF CONFLICT. The hand-written block wins over a keyword-assigned
           // graph row — but a page that quietly picks one and shows a clean number is
@@ -1059,13 +1209,15 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         const cells = [...pj.vocabulary, 'UNSET']
           .filter(v => pj.counts[v])
           .sort((a, b) => pj.counts[b] - pj.counts[a])
-          .map(v => stat(pj.counts[v], v, PROJECT_BLURB[v] || 'no blurb for this value'))
+          .map(v =>
+            stat(pj.counts[v], v, PROJECT_BLURB[v] || 'no blurb for this value', POPULATIONS.QUEUE)
+          )
           .join('');
         return (
           `<h2>Project</h2>` +
           `<p class="note">Which thing an item belongs to, assigned per item over all ${pj.total} of them, from the board's ` +
           `own axis assignment · basis ${escapeHtml(basisStrip(pj.basisCounts))}.</p>` +
-          `<ul class="stats">${cells}</ul>` +
+          `<ul class="stats" data-strip="strip-2">${cells}</ul>` +
           (pj.demoted
             ? `<p class="note stale">⛔ <strong>${pj.demoted} rows say UNKNOWN because a keyword match is not a label.</strong> ` +
               `The assignment tool placed them by matching words in the item, and its own sample measured that ` +
@@ -1130,7 +1282,7 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       : axes.projects.counts[v];
   const filterHtml =
     pjById && axes.projects.vocabulary
-      ? `<div class="pfilter" role="group" aria-label="Filter the board by project">` +
+      ? `<div class="pfilter" role="group" aria-label="Filter the board by project" data-pop="${POPULATIONS.BOARD}">` +
         `<button class="pchip" data-p="" aria-pressed="true">All</button>` +
         [...axes.projects.vocabulary]
           .filter(v => pillCount(v))
@@ -1182,7 +1334,7 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           `this page does not.</p>`
         : '';
       return (
-        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}"><summary>${escapeHtml(k)} ${countCell}</summary>` +
+        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}" data-pop="${POPULATIONS.BOARD}"><summary>${escapeHtml(k)} ${countCell}</summary>` +
         `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
         note +
         tagRows(mdToHtml(b.lines)) +
@@ -1321,6 +1473,8 @@ module.exports = {
   // ⭐ Exported so the suite drives the REAL derivation rather than a restatement
   // of it — a test that retypes the rule only ever proves the retyped copy.
   closedOverWholeQueue,
+  POPULATIONS,
+  comparabilityReport,
   boardAxes,
   PROJECT_BLURB,
 };
