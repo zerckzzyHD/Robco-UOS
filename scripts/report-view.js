@@ -150,7 +150,7 @@ ul.stats .n.word { font-size:1rem; letter-spacing:.03em; line-height:1.25;
   font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
 .pchip[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
 .pchip .c { opacity:.7; font-weight:400; }
-.pshown { font-weight:400; font-size:.82rem; color:var(--dim); }
+.bandcounts { display:none; }
 ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
 ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
 details.band, details.drift { border:1px solid var(--line); border-radius:8px;
@@ -231,31 +231,56 @@ function page({ title, crumb, body, nav, style, atHome }) {
 ${body}
 </main>
 <script>
-/* ⭐ THE ONLY SCRIPT ON THIS PAGE, and it is deliberately tiny and total-free.
-   It toggles which listed rows are visible; it NEVER recomputes a count, because a
-   number computed in the browser is a second answer to a question the server has
-   already answered, and this page's whole history is two answers disagreeing.
-   ⚠ It also degrades to nothing: with JS off every row stays visible, which is the
-   honest failure — a filter that silently hid rows would be far worse. */
+/* ⭐ THE ONLY SCRIPT ON THIS PAGE. It hides rows and it LOOKS UP numbers; it does
+   not compute one. Every (band × project) figure was derived on the server, over
+   the whole queue, and handed here as data — so the number a reader sees under a
+   filter is the same derivation as the number they saw without one.
+
+   ⛔⛤ AN EARLIER VERSION DID THE ARITHMETIC HERE, and that is the defect the owner
+   found on his phone: it counted the RENDERED rows in each band while the band's
+   headline came from the server over a different set, so tapping a pill moved a
+   small caption and left the big number alone. Two numbers of different sets on one
+   row, and the readable one did not answer him.
+
+   ⚠ THREE-VALUED: a band with no entry in the map shows a question mark under a filter rather
+   than a number the page cannot stand behind, and its unfiltered value is restored
+   from the data-all attribute — also a lookup.
+
+   ⚠ Degrades to nothing: with JS off every row stays visible and every band shows
+   its unfiltered count, which is the honest failure. */
 (function () {
   var chips = document.querySelectorAll('.pchip');
   if (!chips.length) return;
+  var box = document.querySelector('.bandcounts');
+  var counts = null;
+  try {
+    counts = box ? JSON.parse(box.dataset.counts) : null;
+  } catch (e) {
+    counts = null; /* unreadable data is not a reason to invent numbers */
+  }
   var rows = document.querySelectorAll('[data-p]:not(.pchip)');
   chips.forEach(function (chip) {
     chip.addEventListener('click', function () {
       var want = chip.dataset.p;
-      chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c === chip)); });
-      rows.forEach(function (r) { r.hidden = !!want && r.dataset.p !== want; });
+      chips.forEach(function (c) {
+        c.setAttribute('aria-pressed', String(c === chip));
+      });
+      rows.forEach(function (r) {
+        r.hidden = !!want && r.dataset.p !== want;
+      });
       document.querySelectorAll('details.band').forEach(function (d) {
-        var all = d.querySelectorAll('[data-p]:not(.pchip)');
-        var vis = 0;
-        all.forEach(function (r) { if (!r.hidden) vis++; });
-        /* ⛔ The band's own header count is NOT rewritten — it is the server's
-           number over the whole band. This only says how many of its LISTED rows
-           the filter is showing, under its own words. */
-        var tag = d.querySelector('.pshown');
-        if (!tag) return;
-        tag.textContent = want && all.length ? ' — showing ' + vis + ' of ' + all.length + ' listed' : '';
+        var cell = d.querySelector('summary > .c');
+        if (!cell) return;
+        if (!want) {
+          cell.textContent = d.dataset.all;
+          return;
+        }
+        var band = counts && counts[d.dataset.band];
+        /* ⛔ No fallback to a row count. If the server did not hand over a figure
+           for this band, the page says so rather than substituting a different
+           question's answer, which is exactly how this row came to hold two. */
+        var v = band ? band[want] : null;
+        cell.textContent = typeof v === 'number' ? String(v) : band ? '0' : '?';
       });
     });
   });
@@ -482,6 +507,7 @@ function boardAxes(queueMd, sources) {
   const out = {
     horizons: { observable: false, why: 'no queue was handed to the renderer' },
     projects: { observable: false, why: 'no queue was handed to the renderer' },
+    bandCounts: { observable: false, why: 'no queue was handed to the renderer' },
     owner: { observable: false, why: 'no queue was handed to the renderer' },
     someday: { applied: false, byBand: new Map() },
     bandLabelOf: new Map(),
@@ -517,12 +543,14 @@ function boardAxes(queueMd, sources) {
       out.horizons.why = s.itemFormat.why;
     }
     const bands = A.bandById(queueMd, QV, RG.bandOfHeading);
-    out.someday = A.somedayByBand(out.horizons, bands);
-    // band KEY → the board's display LABEL, so a per-band correction can be shown
-    // against the band the reader is actually looking at.
+    // band KEY → the board's display LABEL. ⚠ Built BEFORE the two derivations
+    // below, both of which key off the label — populating it afterwards silently
+    // filed every item under UNCLASSIFIED.
     for (const st of QV.STATUSES) {
       out.bandLabelOf.set(st.key, st.key === RG.BACKLOG_KEY ? RG.BACKLOG_LABEL : st.label);
     }
+    out.someday = A.somedayByBand(out.horizons, bands);
+    out.bandCounts = A.bandProjectCounts(items, bands, out.bandLabelOf, out.projects, out.horizons);
     const byId = new Map(items.map(i => [i.id, i]));
     out.owner = A.readOwnerAxis(
       s.graph && s.graph.observable ? s.graph.graph : null,
@@ -1093,20 +1121,40 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           pjById.has(id) ? `<li data-p="${escapeHtml(pjById.get(id))}"><strong>${id}</strong>` : m
         )
       : html;
+  // ⛔ THE PILL COUNTS THE SET ITS OWN BANDS WILL SHOW. Falls back to the axis
+  // census only when the per-band derivation is unavailable — and then the note
+  // below says the bands cannot follow the control at all.
+  const pillCount = v =>
+    axes.bandCounts.observable && axes.bandCounts.perProject
+      ? axes.bandCounts.perProject[v] || 0
+      : axes.projects.counts[v];
   const filterHtml =
     pjById && axes.projects.vocabulary
       ? `<div class="pfilter" role="group" aria-label="Filter the board by project">` +
         `<button class="pchip" data-p="" aria-pressed="true">All</button>` +
         [...axes.projects.vocabulary]
-          .filter(v => axes.projects.counts[v])
+          .filter(v => pillCount(v))
           .map(
             v =>
-              `<button class="pchip" data-p="${escapeHtml(v)}" aria-pressed="false">${escapeHtml(v)} <span class="c">${axes.projects.counts[v]}</span></button>`
+              `<button class="pchip" data-p="${escapeHtml(v)}" aria-pressed="false">${escapeHtml(v)} <span class="c">${pillCount(v)}</span></button>`
           )
           .join('') +
-        `</div><p class="note">⚠ Filters the rows the board LISTS. The Backlog is a count rather than a list, so its rows ` +
-        `cannot be filtered here — the per-project totals above are over all ${axes.projects.total} items, this control is over the ` +
-        `${'' + (md.match(/^- \*\*/gm) || []).length} listed ones.</p>`
+        `</div>` +
+        // ⛔ THE SERVER'S ANSWERS, HANDED OVER RATHER THAN RECOMPUTED. Every
+        // (band × project) figure is derived above, over the whole queue; the script
+        // only picks one. A count computed in the browser would be a second answer to
+        // a question this side already answered — the defect this page keeps having.
+        (axes.bandCounts.observable
+          ? `<div class="bandcounts" hidden data-counts="${escapeHtml(JSON.stringify(axes.bandCounts.byBand))}"></div>`
+          : '') +
+        `<p class="note">${
+          axes.bandCounts.observable
+            ? `Every band's number below follows this control, the Backlog included — those counts are computed on the server, ` +
+              `not in your browser. ⚠ The Backlog is a count rather than a list, so under a filter it reports a real number ` +
+              `with no rows beneath it. Someday-if items are in none of these figures.`
+            : `⛔ The band numbers CANNOT follow this control: ${escapeHtml(axes.bandCounts.why || 'the per-band counts could not be derived')}. ` +
+              `They stay unfiltered, and the control only hides rows — so do not read a band's number as an answer to the filter.`
+        }</p>`
       : '';
 
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
@@ -1114,9 +1162,19 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       const b = bands.get(k);
       const open = BAND_OPEN.has(k) && b.count > 0 ? ' open' : '';
       const excluded = somedayByLabel.get(k) || [];
-      const countCell = excluded.length
-        ? `<span class="c">${b.count - excluded.length}</span>`
-        : `<span class="c">${b.count}</span>`;
+      // ⛔⛤ THE ONE NUMBER ON THIS ROW, and it answers the filter.
+      //
+      // It used to be filter-blind while a caption beneath it responded — two
+      // numbers of different sets on one row, and the bigger one was the wrong one.
+      // It now starts at the unfiltered value and the script swaps it for the
+      // SERVER's precomputed (band × project) figure. `data-all` carries the
+      // unfiltered value so restoring "All" is also a lookup, never a recomputation.
+      //
+      // ⚠ THREE-VALUED: a band the derivation could not produce a figure for renders
+      // `?` under a filter rather than a stale number — `data-all` is emitted either
+      // way, so the unfiltered reading never degrades.
+      const shown = b.count - excluded.length;
+      const countCell = `<span class="c">${shown}</span>`;
       const note = excluded.length
         ? `<p class="note">⛔ ${b.count} on the board, <strong>${b.count - excluded.length} counted here</strong> — ` +
           `${excluded.length} carry <code>SOMEDAY-IF</code> and are in no total: ` +
@@ -1124,7 +1182,7 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           `this page does not.</p>`
         : '';
       return (
-        `<details class="band"${open}><summary>${escapeHtml(k)} ${countCell}<span class="pshown"></span></summary>` +
+        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}"><summary>${escapeHtml(k)} ${countCell}</summary>` +
         `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
         note +
         tagRows(mdToHtml(b.lines)) +
@@ -1168,7 +1226,21 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         `right now. Rebuilt <strong>${escapeHtml(stamp)}</strong>, and re-read from the file on every ` +
         `visit — nothing here is cached. (Checked by comparing the board's recorded source ` +
         `fingerprint against the live queue; <code>npm run roadmap:check</code> does the stronger ` +
-        `comparison and rebuilds the whole thing.)</p>`
+        `comparison and rebuilds the whole thing.)` +
+        // ⛔ THE ONE SURVIVING GAP BETWEEN TWO NUMBERS ON THIS PAGE, NAMED HERE
+        // RATHER THAN LEFT FOR THE READER TO SPOT. The Horizon section counts over
+        // every item the queue holds; every other total on this page counts what is
+        // left after the someday rule. Both are right and they are different sets,
+        // so the page says which is which and what the difference is made of —
+        // silence between two numbers is how this surface has gone wrong before.
+        (axes.horizons.observable && axes.horizons.total !== total
+          ? ` <strong>⚠ Two denominators on this page, deliberately:</strong> the queue holds ` +
+            `<strong>${axes.horizons.total}</strong> items and this board counts <strong>${total}</strong>. ` +
+            `The difference is the ${axes.horizons.total - total} carrying <code>SOMEDAY-IF</code>, which are in no total ` +
+            `here. The Horizon section below counts over all ${axes.horizons.total}, because its job is to explain that gap; ` +
+            `everything else counts the ${total}.`
+          : '') +
+        `</p>`
       : `<p class="note stale">⛔ <strong>THIS BOARD IS OUT OF DATE.</strong> The queue has changed ` +
         `since this was built <strong>${escapeHtml(stamp)}</strong>, so anything added, closed or ` +
         `re-ordered since then is <strong>not on this page</strong> — and a stale board reads exactly ` +

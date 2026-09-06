@@ -60155,6 +60155,111 @@ if (!PLANNING_OK) {
     '270.12c: RENDERED — an UNKNOWN-horizon item is counted under its own name (1), stays in its band (Active still 2) and is NOT in the excluded-someday list; UNKNOWN is folded into no value and excluded from no count'
   );
 
+  // ── 270.20 — ⛔⛤ THE BAND COUNT MUST ANSWER THE QUESTION THE READER ASKED ────
+  //
+  // OWNER-FOUND ON HIS PHONE, 2026-09-06, with screenshots. He tapped the project
+  // pills and the band headline numbers did not move — only a small caption under
+  // them did. His words: "numbers don't change here. content does."
+  //
+  // ⛔ TWO NUMBERS OF DIFFERENT SETS ON ONE ROW, and the LARGER, more readable one
+  // was the one that did not answer him. Measured on the live board before any fix:
+  //
+  //   the pill     = the board's own band heading count, MINUS the someday items in
+  //                  that band. Ready 104-3=101, Deferred 3-2=1, Parked 25-22=3.
+  //                  Every item the board bands there, listed or not. Filter-blind.
+  //   the caption  = querySelectorAll('[data-p]') inside that band — the tagged rows
+  //                  actually RENDERED. Ready 104, Deferred 3, Parked 25. Someday NOT
+  //                  removed. Filter-aware.
+  //
+  // ⭐ NEITHER WAS STALE AND NEITHER WAS WRONG — both were derived, and they counted
+  // different sets. They agreed exactly on the three bands holding zero someday items
+  // (Active, Attention, Settled) and differed by exactly the someday count on the
+  // other three, which is what proved the mechanism rather than a filtering artifact.
+  //
+  // The fix: the SERVER computes every (band × project) count, someday excluded, and
+  // the script only swaps which precomputed number is shown. ⛔ No arithmetic in the
+  // browser — a number computed there is a second answer to a question the server has
+  // already answered, which is this page's whole history.
+  const bandData270 = (/<div class="bandcounts"[^>]*data-counts="([^"]*)"/.exec(h1) || [])[1];
+  let parsed270 = null;
+  try {
+    parsed270 = JSON.parse((bandData270 || '').replace(/&quot;/g, '"'));
+  } catch {
+    parsed270 = null;
+  }
+  assert(
+    parsed270 &&
+      parsed270.Active &&
+      parsed270.Active.ALL === 2 &&
+      parsed270.Active['CONTROL-PLANE'] === 1 &&
+      parsed270.Active.UNKNOWN === 1,
+    '270.20: RENDERED — the page carries a server-computed count for every (band × project) pair, so the band number can answer the filter: Active is 2 unfiltered, 1 under CONTROL-PLANE, 1 under UNKNOWN' +
+      (parsed270 && parsed270.Active
+        ? ` — got ${JSON.stringify(parsed270.Active)}`
+        : ' — no band-count data on the page at all')
+  );
+  assert(
+    parsed270 &&
+      parsed270.Ready &&
+      parsed270.Ready.ALL === 1 &&
+      parsed270.Ready.APP === 1 &&
+      !parsed270.Ready.BINDER &&
+      !parsed270.Ready.MIST,
+    '270.20a: RENDERED — the per-band counts EXCLUDE someday, and the exclusion removes whole PROJECT BUCKETS rather than just shrinking one: Ready lists 3 rows and counts 1, because R2 (BINDER, someday by its own block) and S3 (MIST, someday by the graph) are both out — so neither BINDER nor MIST appears for that band at all' +
+      (parsed270 && parsed270.Ready ? ` — got ${JSON.stringify(parsed270.Ready)}` : ' — absent')
+  );
+  // ⭐ The positive control that makes the above trustworthy: the server's own
+  // unfiltered figure must equal the number already printed on the band header. If a
+  // future band rule drifts, this goes red rather than the page quietly showing two
+  // derivations of one thing.
+  const readyPill270 = (/<summary>Ready <span class="c">(\d+)<\/span>/.exec(h1) || [])[1];
+  assert(
+    parsed270 && readyPill270 && Number(readyPill270) === parsed270.Ready.ALL,
+    '270.20b: RENDERED — the server-computed ALL figure equals the number on the band header, so the two derivations are cross-checked rather than merely coexisting' +
+      (readyPill270
+        ? ` — header ${readyPill270} vs computed ${parsed270 && parsed270.Ready && parsed270.Ready.ALL}`
+        : '')
+  );
+  assert(
+    !/showing \d+ of \d+ listed/.test(h1) && !/class="pshown"/.test(h1),
+    '270.20c: RENDERED — the old "showing N of M listed" caption is GONE. It counted a third set (rendered rows, someday included) beside a pill counting a second — removing it is the fix, because two numbers of different sets on one row is the defect itself'
+  );
+  // ⭐ 270.20d — THE PILL COUNTS THE SET ITS OWN BANDS WILL SHOW. Found in the
+  // browser after the first fix: the bands followed the filter correctly and the
+  // PILL still carried the axis census (over all items, someday included), so APP
+  // read 35 while its own bands summed to 31. The same defect one level up, and it
+  // is closed the same way — one derivation feeds both, so the pill is the sum of
+  // the band figures selecting it produces, by construction rather than by luck.
+  const pillOf270 = v =>
+    Number(
+      // [0-9] rather than the shorthand: the escape has now been mangled twice today
+      // crossing a shell layer, and a locator that silently fails to match reads as a
+      // failing assertion about the page rather than a broken probe.
+      (new RegExp('data-p="' + v + '"[^>]*>[^<]*<span class="c">([0-9]+)</span>').exec(h1) || [])[1]
+    );
+  const bandSum270 = v =>
+    Object.keys(parsed270 || {}).reduce((a, b) => a + (parsed270[b][v] || 0), 0);
+  assert(
+    parsed270 &&
+      pillOf270('CONTROL-PLANE') === bandSum270('CONTROL-PLANE') &&
+      pillOf270('APP') === bandSum270('APP') &&
+      pillOf270('UNKNOWN') === bandSum270('UNKNOWN'),
+    '270.20d: RENDERED — every project pill equals the sum of the band numbers that selecting it produces; the pill and the bands are one derivation, not two' +
+      (parsed270
+        ? ` — CP pill ${pillOf270('CONTROL-PLANE')} vs bands ${bandSum270('CONTROL-PLANE')}, APP ${pillOf270('APP')} vs ${bandSum270('APP')}`
+        : '')
+  );
+  // ⛔ 270.20e — AN EMPTY BAND ANSWERS 0, NOT "NOT DERIVABLE". Also found in the
+  // browser: UNCLASSIFIED rendered "?" under every filter because a band with no
+  // items got no entry, and "no entry" is this map's marker for undecidable. Its
+  // answer was plainly 0. Absent and zero are different facts, and collapsing them
+  // toward "unknown" is still a wrong answer — just a humbler-looking one.
+  assert(
+    parsed270 && parsed270.UNCLASSIFIED && parsed270.UNCLASSIFIED.ALL === 0,
+    '270.20e: RENDERED — a band holding no items carries a real 0 for every project rather than the not-derivable marker; absent and zero stay different facts' +
+      (parsed270 ? ` — got ${JSON.stringify(parsed270.UNCLASSIFIED)}` : '')
+  );
+
   // ── 270.13d — a WORD-valued tile is set as a word, not as a big number ──────
   //
   // ⛔⛤ THE REGRESSION THIS LOCKS, measured in a real browser at 375×812 on

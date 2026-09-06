@@ -580,6 +580,84 @@ function readOwnerAxis(graph, itemsById, horizons) {
   };
 }
 
+/**
+ * ── ⛔⛤ ONE NUMBER PER ROW, AND IT ANSWERS THE FILTER ────────────────────────
+ *
+ * Owner-found on his phone, 2026-09-06: tapping a project pill left every band's
+ * headline number unchanged and moved only a small caption beneath it. His words:
+ * *"numbers don't change here. content does."*
+ *
+ * ⛔ TWO NUMBERS OF DIFFERENT SETS SAT ON ONE ROW, and the larger, more readable
+ * one was the one that did not answer the question just asked. Measured on the live
+ * board before the fix, and NEITHER side was stale — both were derived:
+ *
+ *   the band pill  the board's own `## ⏭️ Ready (104)` heading count, MINUS the
+ *                  someday items in that band. Every item the board FILES there,
+ *                  listed or not. Filter-blind.
+ *   the caption    the tagged rows actually RENDERED inside that band, someday
+ *                  still among them. Filter-aware, and a different set again.
+ *
+ * ⭐ They agreed exactly on the three bands holding zero someday items and differed
+ * by exactly the someday count on the other three — which is what proved the
+ * mechanism rather than a filtering artifact.
+ *
+ * ⭐⭐ THE FIX IS TO COMPUTE IT HERE, not in the browser. Every (band × project)
+ * count is derived server-side over the whole queue and handed to the page; the
+ * script only chooses which precomputed number to show. A count computed in the
+ * browser would be a second answer to a question this side already answered, and
+ * this page's entire history is two answers disagreeing.
+ *
+ * ⚠ THE BACKLOG IS WHY THIS CANNOT BE A DOM COUNT AT ALL. The board prints it as a
+ * count rather than a list, so a browser filtering rendered rows can never produce
+ * a Backlog figure — it would silently report 0 for the largest band on the page.
+ * Derived here, it is a real number for every band.
+ *
+ * @returns {{observable:boolean, why?:string, byBand?:Object}}
+ *   byBand[label] = { ALL: n, [project]: n } — someday EXCLUDED throughout.
+ */
+function bandProjectCounts(items, bands, labelOf, projects, horizons) {
+  if (!items || !items.length) return { observable: false, why: 'no items were parsed' };
+  if (!projects || !projects.observable) {
+    return {
+      observable: false,
+      why: 'the project axis is not readable, so a per-project count cannot be derived',
+    };
+  }
+  // ⛔ SEEDED WITH EVERY BAND FIRST. Without this an empty band has no entry, and
+  // "no entry" is the marker for NOT DERIVABLE — so a band whose true filtered count
+  // is plainly 0 rendered as a question mark. Measured in the browser: UNCLASSIFIED
+  // showed "?" under every filter while its answer was 0 for all of them. ⚠ Absent
+  // and zero are different facts here exactly as they are everywhere else on this
+  // page, and conflating them in the direction of "unknown" is still a wrong answer.
+  const byBand = {};
+  for (const label of labelOf.values()) byBand[label] = { ALL: 0 };
+  byBand.UNCLASSIFIED = byBand.UNCLASSIFIED || { ALL: 0 };
+  for (const it of items) {
+    // ⛔ The someday rule, applied here exactly as it is applied to every other
+    // total on the page — one rule, one place (excludeSomeday's set).
+    if (horizons && horizons.observable && horizons.someday && horizons.someday.has(it.id))
+      continue;
+    const label = labelOf.get(bands.get(it.id)) || 'UNCLASSIFIED';
+    const p = projects.byId.get(it.id) || 'UNSET';
+    byBand[label] = byBand[label] || { ALL: 0 };
+    byBand[label].ALL++;
+    byBand[label][p] = (byBand[label][p] || 0) + 1;
+  }
+  // ⭐ THE PILL'S OWN TOTAL, DERIVED FROM THE SAME PASS. The project pills used to
+  // carry the axis census (over all 411, someday included) while the bands they
+  // control exclude someday — so APP read 35 and its own bands summed to 31. That is
+  // the defect this function exists to fix, one level up, and it is fixed the same
+  // way: one derivation feeds both, so the pill is by construction the sum of the
+  // band figures selecting it produces.
+  const perProject = {};
+  for (const label of Object.keys(byBand)) {
+    for (const k of Object.keys(byBand[label])) {
+      if (k === 'ALL') continue;
+      perProject[k] = (perProject[k] || 0) + byBand[label][k];
+    }
+  }
+  return { observable: true, byBand, perProject };
+}
 module.exports = {
   HORIZON_UNSET,
   HORIZON_UNPARSEABLE,
@@ -591,6 +669,7 @@ module.exports = {
   bandById,
   somedayByBand,
   readProjects,
+  bandProjectCounts,
   UNTRUSTED_PROJECT_BASES,
   PROJECT_UNKNOWN,
   readOwnerAxis,
