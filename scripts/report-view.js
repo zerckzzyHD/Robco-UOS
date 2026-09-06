@@ -1328,10 +1328,19 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       const shown = b.count - excluded.length;
       const countCell = `<span class="c">${shown}</span>`;
       const note = excluded.length
-        ? `<p class="note">⛔ ${b.count} on the board, <strong>${b.count - excluded.length} counted here</strong> — ` +
+        ? // ⚠ RE-ATTRIBUTED 2026-09-06, and the change is the point rather than the
+          // prose. This used to end "the board's own heading still counts them; this
+          // page does not", which reads as the board being WRONG and this page
+          // fixing it. ⛔ MEASURED: of the someday items on the live board the
+          // generator can see ZERO — the horizon lives in a second file the board is
+          // deliberately not a function of, and the board now says exactly that on
+          // its own first page. The board is BLIND, not wrong; this page is the only
+          // place its two inputs meet. Blaming an upstream artifact for a limit it
+          // declares would be a third wrong statement standing next to two right ones.
+          `<p class="note">${b.count} filed in this band, <strong>${b.count - excluded.length} counted here</strong> — ` +
           `${excluded.length} carry <code>SOMEDAY-IF</code> and are in no total: ` +
-          `${excluded.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}. The board's own heading still counts them; ` +
-          `this page does not.</p>`
+          `${excluded.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}. The board counts every item it files here ` +
+          `and states on its own first page that it cannot apply the horizon rule; this is the surface where that rule is applied.</p>`
         : '';
       return (
         `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}" data-pop="${POPULATIONS.BOARD}"><summary>${escapeHtml(k)} ${countCell}</summary>` +

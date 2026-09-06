@@ -59971,10 +59971,16 @@ if (!PLANNING_OK) {
       (ready1 ? ` — got ${ready1.n}` : ' — tile absent')
   );
   assert(
-    /3 on the board, <strong>1 counted here<\/strong>/.test(h1) &&
+    // ⚠ The literal tracks a DELIBERATE re-wording made in the same commit, not a
+    // loosened check: the note used to end "the board's own heading still counts
+    // them; this page does not", which blamed the board for a limit it declares.
+    // Every clause of the claim is unchanged — the announcement, the counted figure,
+    // and BOTH excluded ids — and the assertion is no weaker for the new noun.
+    /3 filed in this band, <strong>1 counted here<\/strong>/.test(h1) &&
       /<code>R2<\/code>/.test(h1) &&
-      /<code>S3<\/code>/.test(h1),
-    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches and names BOTH excluded ids, whichever source placed them — never a silently smaller number'
+      /<code>S3<\/code>/.test(h1) &&
+      /cannot apply the horizon rule/.test(h1),
+    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches, names BOTH excluded ids whichever source placed them, and attributes the gap to the board being blind rather than wrong — never a silently smaller number'
   );
 
   // ⭐⭐ RED-THEN-GREEN: strip the horizon line and the same item must come back
@@ -60519,6 +60525,94 @@ if (!PLANNING_OK) {
         (r271.violations.length
           ? ' — ' + r271.violations.map(v => v.id + ': ' + v.why).join('; ')
           : '')
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 272 — the board DECLARES that it cannot apply the horizon rule
+//
+//  ⛔⛤ THE DIVERGENCE THIS ANSWERS, and it answers it in the opposite direction
+//  from the obvious one. The board's band counts include SOMEDAY-IF items and the
+//  /queue page removes them downstream — which reads as a page compensating for a
+//  wrong generator, and it is not.
+//
+//  MEASURED 2026-09-06 on the live board: of the 59 someday items, this generator
+//  can see ZERO. Not few — none. The horizon assignment lives in
+//  BLOCKER-GRAPH.json, and the board is a PURE DETERMINISTIC FUNCTION OF QUEUE.md:
+//  one recorded fingerprint, `--check` rebuilds and byte-compares against it, and
+//  the archive's own pre-commit asserts the board is not stale against that one
+//  file. Reading a second input here would make the board a function of two while
+//  its fingerprint covered one — so the archive's check would report CURRENT
+//  whenever only the graph had moved. ⭐ That is an instrument that cannot tell,
+//  which is a worse defect than the one it would fix.
+//
+//  ⇒ So the band counts are not WRONG, they are BLIND — and a number that cannot
+//  see its own qualifier must say so rather than be read as a backlog count. That
+//  declaration is what this suite locks.
+//
+//  ⛔ The real fix is one step further up and is not in this repo: put the horizon
+//  in each item's own `accept` block. The moment it lives in the file the board is
+//  a function of, the generator excludes someday itself and the page's downstream
+//  correction deletes itself.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 272 — the board declares its horizon-blindness rather than being silently blind');
+  const RG272 = require(path.join(ROOT, 'scripts', 'roadmap-generate.js'));
+  const items272 = [
+    { id: 'A1', body: ['```accept', 'kind: BUILD', 'horizon:    NEXT', '```'] },
+    { id: 'A2', body: ['no block at all'] },
+    { id: 'A3', body: ['```accept', 'kind: BUILD', '```'] },
+  ];
+  const fmtStub272 = {
+    observable: true,
+    mod: {
+      parseAccept(lines) {
+        const t = (lines || []).join('\n');
+        if (!/```accept/.test(t)) return [];
+        const m = /^horizon:\s*(.*)$/m.exec(t);
+        return [{ fields: m ? { horizon: m[1].trim() } : {} }];
+      },
+    },
+  };
+
+  const said272 = RG272.horizonDeclaration(items272, { loadItemFormat: () => fmtStub272 });
+  assert(
+    /do not apply the horizon rule/.test(said272) && /\b1 of 3\b/.test(said272),
+    '272.1: the board states plainly that its bands do NOT apply the horizon rule, and counts how many items carry one in QUEUE.md (1 of 3)' +
+      ` — got "${said272.slice(0, 90)}"`
+  );
+  assert(
+    /BLOCKER-GRAPH\.json/.test(said272) && /counted in every band/.test(said272),
+    '272.2: it names WHERE the rest of the horizons live and says a SOMEDAY-IF item IS counted in the bands — a reader must not have to infer the limit from a missing number'
+  );
+
+  // ⛔ ABSENT GRAMMAR IS UNOBSERVABLE, NEVER "NONE". A public clone cannot read the
+  // accept-block format at all, and "0 items carry a horizon" would be a claim about
+  // the board made by a checkout that cannot see the field.
+  const blind272 = RG272.horizonDeclaration(items272, {
+    loadItemFormat: () => ({ observable: false }),
+  });
+  assert(
+    /cannot tell how many/.test(blind272) && !/\b0 of 3\b/.test(blind272),
+    '272.3: with the accept-block format unreachable the line says it cannot tell, and prints no count — absent is not zero, here as everywhere else on these surfaces'
+  );
+
+  // ── 272.4 — the LIVE board carries it, and the band headings are untouched ───
+  // ⚠ The declaration is a separate line by design: `bandOf()` in report-view.js
+  // parses `## <glyph> <Label> (N)`, and changing a heading would have moved the one
+  // predicate every band count on the /queue page is read through.
+  const boardOnDisk272 = planningPaths.readRoadmap();
+  if (!boardOnDisk272) {
+    console.log(`  SKIP  Suite 272.4 — ${planningPaths.describe()}`);
+  } else {
+    const headings272 = (boardOnDisk272.text.match(/^## .+$/gm) || []).length;
+    const parsed272 = (
+      boardOnDisk272.text.match(/^## .*\((\d+)\)\s*$|^## .*—\s*\d+\s+items?\s*$/gm) || []
+    ).length;
+    assert(
+      /do not apply the horizon rule/.test(boardOnDisk272.text) && headings272 > 0 && parsed272 > 0,
+      `272.4: LIVE — the generated board on disk carries the declaration, and its ${parsed272} of ${headings272} band headings still parse in the old shape, so no consumer's predicate moved`
     );
   }
 }
