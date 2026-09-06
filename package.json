@@ -36,7 +36,8 @@
     "code-map:check": "node scripts/generate-code-map.js --check",
     "dev:autostart": "node scripts/dev-autostart.js install",
     "dev:autostart:off": "node scripts/dev-autostart.js uninstall",
-    "dev:autostart:status": "node scripts/dev-autostart.js status"
+    "dev:autostart:status": "node scripts/dev-autostart.js status",
+    "queue-filter": "node tests/queue-filter-check.mjs"
   },
   "repository": {
     "type": "git",

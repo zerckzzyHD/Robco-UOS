@@ -128,7 +128,29 @@ ul.stats { list-style:none; padding:0; margin:1rem 0 1.25rem; display:grid;
 ul.stats li { margin:0; background:var(--code); border:1px solid var(--line);
   border-radius:8px; padding:.65rem .7rem; }
 ul.stats .n { display:block; font-size:1.6rem; font-weight:700; line-height:1.1;
-  color:var(--acc); }
+  color:var(--acc); overflow-wrap:anywhere; }
+/* ⛔⛤ A WORD-VALUED TILE IS NOT A BIG NUMBER, and setting it like one pushed the
+   whole page sideways. "UNOBSERVABLE" at 1.6rem measures 196px; a tile's content
+   box at 375px is 142px, the grid column cannot shrink below its 9.5rem minimum,
+   and an unbreakable word therefore forced the DOCUMENT to 400px against a 375px
+   viewport — a phone-wide horizontal scroll on every page that could not measure
+   something. ⚠ Measured 2026-09-05, and it appeared the moment UNOBSERVABLE became
+   a COMMON value rather than a rare one: the degradation path is the path this page
+   is now most often on, so its layout has to be as sound as the happy one. The
+   The overflow-wrap above is the backstop; this rule is the actual fix — a word gets
+   word-sized type and stays inside its tile. */
+ul.stats .n.word { font-size:1rem; letter-spacing:.03em; line-height:1.25;
+  padding:.28rem 0 .1rem; }
+/* The project filter. Chips scroll horizontally on a phone rather than wrapping
+   into a block that pushes the board off the first screen. */
+.pfilter { display:flex; gap:.4rem; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  padding:.3rem 0 .5rem; margin:.6rem 0 0; }
+.pchip { flex:0 0 auto; min-height:40px; background:var(--code); color:var(--fg);
+  border:1px solid var(--line); border-radius:999px; padding:.3rem .8rem;
+  font:inherit; font-size:.85rem; font-weight:600; cursor:pointer; }
+.pchip[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
+.pchip .c { opacity:.7; font-weight:400; }
+.bandcounts, .pop { display:none; }
 ul.stats .k { display:block; font-size:.9rem; font-weight:600; margin-top:.15rem; }
 ul.stats .h { display:block; font-size:.78rem; color:var(--dim); margin-top:.2rem; }
 details.band, details.drift { border:1px solid var(--line); border-radius:8px;
@@ -207,7 +229,64 @@ function page({ title, crumb, body, nav, style, atHome }) {
 <header class="top">${back}${nav || ''}<span class="name">${escapeHtml(crumb || '')}</span></header>
 <main class="wrap">
 ${body}
-</main></body></html>`;
+</main>
+<script>
+/* ⭐ THE ONLY SCRIPT ON THIS PAGE. It hides rows and it LOOKS UP numbers; it does
+   not compute one. Every (band × project) figure was derived on the server, over
+   the whole queue, and handed here as data — so the number a reader sees under a
+   filter is the same derivation as the number they saw without one.
+
+   ⛔⛤ AN EARLIER VERSION DID THE ARITHMETIC HERE, and that is the defect the owner
+   found on his phone: it counted the RENDERED rows in each band while the band's
+   headline came from the server over a different set, so tapping a pill moved a
+   small caption and left the big number alone. Two numbers of different sets on one
+   row, and the readable one did not answer him.
+
+   ⚠ THREE-VALUED: a band with no entry in the map shows a question mark under a filter rather
+   than a number the page cannot stand behind, and its unfiltered value is restored
+   from the data-all attribute — also a lookup.
+
+   ⚠ Degrades to nothing: with JS off every row stays visible and every band shows
+   its unfiltered count, which is the honest failure. */
+(function () {
+  var chips = document.querySelectorAll('.pchip');
+  if (!chips.length) return;
+  var box = document.querySelector('.bandcounts');
+  var counts = null;
+  try {
+    counts = box ? JSON.parse(box.dataset.counts) : null;
+  } catch (e) {
+    counts = null; /* unreadable data is not a reason to invent numbers */
+  }
+  var rows = document.querySelectorAll('[data-p]:not(.pchip)');
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var want = chip.dataset.p;
+      chips.forEach(function (c) {
+        c.setAttribute('aria-pressed', String(c === chip));
+      });
+      rows.forEach(function (r) {
+        r.hidden = !!want && r.dataset.p !== want;
+      });
+      document.querySelectorAll('details.band').forEach(function (d) {
+        var cell = d.querySelector('summary > .c');
+        if (!cell) return;
+        if (!want) {
+          cell.textContent = d.dataset.all;
+          return;
+        }
+        var band = counts && counts[d.dataset.band];
+        /* ⛔ No fallback to a row count. If the server did not hand over a figure
+           for this band, the page says so rather than substituting a different
+           question's answer, which is exactly how this row came to hold two. */
+        var v = band ? band[want] : null;
+        cell.textContent = typeof v === 'number' ? String(v) : band ? '0' : '?';
+      });
+    });
+  });
+})();
+</script>
+</body></html>`;
 }
 
 /**
@@ -286,6 +365,14 @@ const BAND_ORDER = [
   'Deferred',
   'Parked',
   'Backlog',
+  // ⛔⛤ SETTLED WAS COUNTED AND NEVER SHOWN. It is in `bands`, so its 6 items were
+  // inside this page's item total and inside every band-derived figure, while the
+  // band itself was absent from this list and therefore never rendered. ⚠ That is
+  // the defect this page keeps being rebuilt for, in its quietest form: a number
+  // whose rows you cannot open. And it matters most for THIS band — the status
+  // vocabulary's own note says a settled item is a LIVE CONSTRAINT on the items
+  // that depend on it, and "a constraint nobody sees stops constraining".
+  'Settled',
   'UNCLASSIFIED',
 ];
 // ⭐ EVERY BAND STARTS CLOSED — the OWNER'S call, after using the page.
@@ -311,8 +398,150 @@ const BAND_BLURB = {
   Deferred: 'Deliberately put off, with a reason.',
   Parked: 'Stopped on purpose. Not abandoned, not scheduled.',
   Backlog: 'Everything else that is filed but not yet in motion.',
+  Settled:
+    'Answered for good, no work will follow — kept visible because it still constrains the items that depend on it.',
   UNCLASSIFIED:
     'Carries no recognised status — worth a look precisely because nothing could file it.',
+};
+
+/**
+ * ── ⛔⛤ THE POPULATION A NUMBER COUNTS OVER — the guard-blindness this closes ──
+ *
+ * The provenance rule (see `stat`) makes every number name its SOURCE. It does not
+ * make two numbers standing next to each other name the same POPULATION, and that
+ * gap produced every defect on this page in one evening — each time two numbers
+ * that were individually correct and individually sourced, placed adjacently as if
+ * comparable:
+ *
+ *   · the band pill (board minus someday) beside a caption counting rendered rows
+ *     with someday still in them — the owner found this on his phone;
+ *   · a project pill over all 411 items beside the bands it controls over 352 —
+ *     introduced by the FIRST fix for the line above, an hour earlier;
+ *   · 352 on the board beside 411 in the Horizon section, related nowhere, which
+ *     invited a reader to subtract them and call the difference a defect;
+ *   · 168 bold-led bullets beside 160 tagged rows.
+ *
+ * ⭐ A READER SUBTRACTS ADJACENT NUMBERS. That is not a misuse of the page, it is
+ * what a grid of figures is for — so two numbers over different populations may
+ * only sit together when the page SAYS they do not share one.
+ *
+ * The token is short and stable because it is compared, never displayed raw:
+ */
+const POPULATIONS = {
+  /** Every ID-bearing item the queue holds, someday included. The Horizon axis's own denominator. */
+  QUEUE: 'queue',
+  /** The board after the someday rule — the denominator of every band and band-derived total. */
+  BOARD: 'board',
+  /** Rows of BLOCKER-GRAPH.json classified to the owner, someday excluded. Not a board count. */
+  OWNER: 'owner-graph',
+  /** The planning tree's declared owner-decision roster — a hand-kept set, its own population. */
+  CENSUS: 'census-roster',
+  /** Items whose heading leads with the done-mark, counted across the whole queue. */
+  CLOSED: 'closed-scan',
+};
+
+/**
+ * Groups of numbers a reader will read as comparable, and whether each group is
+ * honest about its populations.
+ *
+ * ⭐ RUN OVER THE RENDERED HTML, not over the intent that produced it. A check that
+ * reads the renderer's variables proves the renderer meant well; this proves what
+ * the page actually shows — the same reason `buildToc` derives from the output.
+ *
+ * A group is a `ul.stats` strip (tiles sit in a grid and a grid invites comparison)
+ * or the filter-pill strip paired with the band headers it controls. A group that
+ * mixes populations is a VIOLATION unless the page carries a `popmix` statement for
+ * it, naming what does not match.
+ *
+ * @returns {{groups:Array, violations:Array}} violations non-empty ⇒ the page is
+ *   presenting a comparison it has not earned.
+ */
+function comparabilityReport(html) {
+  const s = String(html || '');
+  const groups = [];
+  const violations = [];
+
+  // 1. every tile strip
+  // ⚠ `[^>]*` — the FIRST version of this required the tag to end straight after
+  // the class, and the strips carry a `data-strip` id. It matched nothing, found no
+  // groups, and reported ZERO VIOLATIONS: a guard that passed by not looking.
+  // Caught within minutes only because the group list printed empty.
+  for (const m of s.matchAll(/<ul class="stats"([^>]*)>([\s\S]*?)<\/ul>/g)) {
+    // ⚠ Split per tile and look INSIDE it. The token sits on the tile's own source
+    // line rather than on its `<li>`, because twenty-plus existing assertions locate
+    // a tile by the exact literal `<li><span class="n` — putting it on the element
+    // broke every one of those locators while leaving their claims untouched, and
+    // widening them would have been editing checks so this change could pass.
+    const chunks = m[2].split(/<li\b/).slice(1);
+    const tiles = chunks.length;
+    const pops = chunks.map(c => (/data-pop="([^"]*)"/.exec(c) || [])[1]).filter(Boolean);
+    // ⛔ The id comes from the MARKUP, never a counter. A positional id would
+    // renumber every strip the moment one was added, silently re-pointing each
+    // statement at a different group.
+    const id = (/data-strip="([^"]*)"/.exec(m[1]) || [])[1] || 'strip-UNNAMED';
+    // ⚠ A tile with NO population is worse than a mixed strip: it cannot even be
+    // checked, and it reads as belonging to whatever surrounds it.
+    const untagged = tiles - pops.length;
+    const distinct = [...new Set(pops)];
+    const stated = new RegExp('class="note popmix" data-for="' + id + '"').test(s);
+    const g = { id, kind: 'stats', tiles, pops: distinct, untagged, stated };
+    groups.push(g);
+    if (untagged > 0) violations.push({ ...g, why: 'tiles carry no population token' });
+    else if (distinct.length > 1 && !stated)
+      violations.push({ ...g, why: 'one strip mixes populations and the page does not say so' });
+  }
+
+  // 2. the filter pills against the band headers they drive — the pair that broke
+  //    an hour after the first fix, and the reason this is not only about strips.
+  const pillPop = (/<div class="pfilter"[^>]*data-pop="([^"]*)"/.exec(s) || [])[1];
+  const bandPops = [...s.matchAll(/<details class="band"[^>]*data-pop="([^"]*)"/g)].map(x => x[1]);
+  if (pillPop || bandPops.length) {
+    const distinct = [...new Set([pillPop, ...bandPops].filter(Boolean))];
+    const stated = /class="note popmix" data-for="pill-band"/.test(s);
+    const g = { id: 'pill-band', kind: 'control', pops: distinct, stated };
+    groups.push(g);
+    if (!pillPop || !bandPops.length)
+      violations.push({
+        ...g,
+        why: 'the control or the bands it drives carry no population token',
+      });
+    else if (distinct.length > 1 && !stated)
+      violations.push({
+        ...g,
+        why: 'the filter control counts a different population from the bands it filters, unstated',
+      });
+  }
+  // ⛔⛤ AN EMPTY CHECK IS NOT A CLEAN ONE. This function's own first version
+  // matched no strips and returned zero violations, which reads identically to a
+  // page that is fully honest. Finding nothing to check is now itself the finding —
+  // the same rule the page applies to every number it prints.
+  if (!groups.length) {
+    violations.push({
+      id: 'self',
+      kind: 'positive-control',
+      why: 'the report found NO comparable groups at all — it checked nothing, which is not the same as finding nothing wrong',
+    });
+  }
+  return { groups, violations };
+}
+
+/**
+ * What each CP-RULE v1 domain actually contains, in the owner's own words for the
+ * axis he asked for — including, where they differ, the fact that they differ.
+ * ⛔ A blurb never renames a domain into a project it is not: CP is not "the control
+ * plane" alone, it is the control plane AND the harness, and saying so on the tile is
+ * the only thing that stops the label being read as the six-value axis.
+ */
+const PROJECT_BLURB = {
+  APP: 'RobCo the app — this repo',
+  'CONTROL-PLANE': 'the deterministic control plane',
+  HARNESS: 'the harness — ⭐ its own value now, no longer folded into the control plane',
+  MIST: 'Mist',
+  MUSEUM: 'the museum / exhibit publication programme',
+  BINDER: 'Binder — ⭐ it has a bucket now; a value with one row is still a value',
+  UNKNOWN:
+    '⚠ not placed: either a reader looked and the text does not settle it, or the only basis was a keyword match — see below',
+  UNSET: 'no source has said anything about this item',
 };
 
 /** Split the generated board into its `## ` sections, preserving body lines. */
@@ -382,15 +611,97 @@ function closedOverWholeQueue(queueMd) {
 }
 
 /**
+ * ── THE TWO NEW AXES, derived over the WHOLE queue ──────────────────────────
+ *
+ * `sources` carries what `planning-paths.js` resolved: the archive's item-format
+ * grammar (the horizon vocabulary + accept-block parser), the blocker graph (the
+ * owner axis), and the domain census (the project axis). Each is independently
+ * three-cased, so one unreachable source degrades ONE axis rather than the page.
+ *
+ * ⛔ Derived HERE and not in the generator, deliberately: the board prints its
+ * Backlog as a count rather than a list, so an axis computed from the board's rows
+ * would silently cover about a third of the items. The queue is already in hand on
+ * this route, so every count below is over all of it or is not printed.
+ */
+function boardAxes(queueMd, sources) {
+  const s = sources || {};
+  const out = {
+    horizons: { observable: false, why: 'no queue was handed to the renderer' },
+    projects: { observable: false, why: 'no queue was handed to the renderer' },
+    bandCounts: { observable: false, why: 'no queue was handed to the renderer' },
+    owner: { observable: false, why: 'no queue was handed to the renderer' },
+    someday: { applied: false, byBand: new Map() },
+    bandLabelOf: new Map(),
+  };
+  if (typeof queueMd !== 'string' || !queueMd.trim()) return out;
+  try {
+    const QV = require('./queue-view.js');
+    const RG = require('./roadmap-generate.js');
+    const A = require('./board-axes.js');
+    const items = QV.parseQueue(queueMd).blocks.filter(b => b.type === 'item' && b.id);
+    if (!items.length) {
+      out.horizons = { observable: false, why: 'the queue parsed to no ID-bearing items' };
+      out.projects = out.horizons;
+      out.owner = out.horizons;
+      return out;
+    }
+    const fmt = s.itemFormat && s.itemFormat.observable ? s.itemFormat.mod : null;
+    const graph = s.graph && s.graph.observable ? s.graph.graph : null;
+    const vocab = s.axisVocabulary && s.axisVocabulary.observable ? s.axisVocabulary : null;
+    // ⛔ BOTH SOURCES, always. The accept block is the authored value; the graph
+    // carries the board-wide assignment. Reading only the first is how this page
+    // printed SOMEDAY-IF 0 against a board with 55 of them.
+    out.horizons = A.readHorizons(items, {
+      fmt,
+      graph,
+      vocabulary: vocab ? vocab.HORIZONS : null,
+    });
+    out.projects = A.readProjects(items, {
+      graph,
+      vocabulary: vocab ? vocab.PROJECTS : null,
+    });
+    if (!out.horizons.observable && s.itemFormat && s.itemFormat.why && !graph) {
+      out.horizons.why = s.itemFormat.why;
+    }
+    const bands = A.bandById(queueMd, QV, RG.bandOfHeading);
+    // band KEY → the board's display LABEL. ⚠ Built BEFORE the two derivations
+    // below, both of which key off the label — populating it afterwards silently
+    // filed every item under UNCLASSIFIED.
+    for (const st of QV.STATUSES) {
+      out.bandLabelOf.set(st.key, st.key === RG.BACKLOG_KEY ? RG.BACKLOG_LABEL : st.label);
+    }
+    out.someday = A.somedayByBand(out.horizons, bands);
+    out.bandCounts = A.bandProjectCounts(items, bands, out.bandLabelOf, out.projects, out.horizons);
+    const byId = new Map(items.map(i => [i.id, i]));
+    out.owner = A.readOwnerAxis(
+      s.graph && s.graph.observable ? s.graph.graph : null,
+      byId,
+      out.horizons
+    );
+    if (!out.owner.observable && s.graph && s.graph.why) out.owner.why = s.graph.why;
+    out.total = items.length;
+  } catch (e) {
+    const why = 'the axes could not be derived (' + e.message + ')';
+    out.horizons = { observable: false, why };
+    out.projects = { observable: false, why };
+    out.owner = { observable: false, why };
+  }
+  return out;
+}
+
+/**
  * Render the board — the body of the `/queue` page.
  * @param {string} md   the generated board, read fresh
  * @param {Date}   when when it was last regenerated
  */
-function renderRoadmapSection(md, when, queueMd, census) {
+function renderRoadmapSection(md, when, queueMd, census, sources) {
   // ⛔ Required here, not at module load, for the same reason as the rule above:
   // this is the only place the board generator is needed, and importing it is how
   // one definition of "does the board match the queue" stays one definition.
   const { boardCurrency } = require('./roadmap-generate.js');
+  // Both new axes, over the whole queue. Independently three-cased: one
+  // unreachable source degrades one axis, never the page.
+  const axes = boardAxes(queueMd, sources);
   const sections = splitSections(md);
   const bands = new Map();
   for (const s of sections) {
@@ -399,7 +710,25 @@ function renderRoadmapSection(md, when, queueMd, census) {
   }
 
   // ⭐ "HOW MUCH IS LEFT" IS THE QUESTION, so the numbers answer it directly.
-  const n = k => (bands.get(k) ? bands.get(k).count : 0);
+  //
+  // ⛔⛔ AND EVERY ONE OF THEM EXCLUDES `SOMEDAY-IF`, which is the whole point of
+  // the horizon axis: "a SOMEDAY-IF item MUST NOT APPEAR IN A BACKLOG COUNT AT
+  // ALL. If it still counts, the axis bought nothing." The board's band headings
+  // do not know about horizon — the generator bands by glyph and counts
+  // everything — so the subtraction happens here, against the whole queue, and it
+  // is announced on every band it touches rather than applied quietly.
+  //
+  // ⚠ WHEN THE AXIS IS UNOBSERVABLE NOTHING IS SUBTRACTED and nothing claims to
+  // be corrected: an uncorrected total with a stated ceiling beats a corrected-
+  // looking one that could not run its correction.
+  const somedayByLabel = new Map();
+  if (axes.someday.applied) {
+    for (const [bandKey, ids] of axes.someday.byBand) {
+      const label = axes.bandLabelOf.get(bandKey) || 'UNCLASSIFIED';
+      somedayByLabel.set(label, (somedayByLabel.get(label) || []).concat(ids));
+    }
+  }
+  const n = k => (bands.get(k) ? bands.get(k).count : 0) - (somedayByLabel.get(k) || []).length;
   // ⛔ The board's LISTED rows are deliberately no longer scraped here. That scrape
   // existed only to feed the honesty tile, and feeding it from the board was the
   // defect: the backlog is a count rather than a list, so a third of the items were
@@ -438,12 +767,47 @@ function renderRoadmapSection(md, when, queueMd, census) {
   // integer.
   const closed = closedOverWholeQueue(queueMd);
   const inMotion = n('Active') + n('Ready');
-  const total = [...bands.values()].reduce((a, b) => a + b.count, 0);
+  // ⚠ The board's own item total, MINUS every someday item on it — the same rule
+  // as `n()`, applied once to the whole rather than band by band, so the sentence
+  // "N items on the board" cannot disagree with the tiles above it.
+  const somedayOnBoard = [...somedayByLabel.values()].reduce((a, ids) => a + ids.length, 0);
+  const total = [...bands.values()].reduce((a, b) => a + b.count, 0) - somedayOnBoard;
 
-  const stat = (v, label, hint) =>
-    `<li><span class="n">${v}</span><span class="k">${escapeHtml(label)}</span>` +
-    (hint ? `<span class="h">${escapeHtml(hint)}</span>` : '') +
-    `</li>`;
+  // ⚠ A value carrying NO DIGIT is a word, not a number, and is set as one — see
+  // the `.n.word` rule for the phone-wide horizontal scroll this closes. The test
+  // is "has no digit" rather than "equals UNOBSERVABLE" so a future word value
+  // (UNKNOWN, PENDING, anything) is covered without anybody remembering to add it,
+  // while a fraction like `3 of 40` keeps the big-number treatment it fits in.
+  //
+  // ── ⭐⭐⭐ EVERY NUMBER ON THIS PAGE NAMES WHERE IT CAME FROM ─────────────────
+  //
+  // ⛔⛤ THIS PAGE HAS BEEN WRONG THREE TIMES IN ONE EVENING, and each fix was a
+  // rendering change while each CAUSE was a source problem wearing rendering
+  // clothes:
+  //   1. a tile counting a heading GLYPH under a label promising decisions;
+  //   2. a tile reading a declared roster that had been EMPTIED two days earlier,
+  //      and printing its `0` as though it meant "nothing is waiting on you";
+  //   3. an axis wired to accept blocks while the board's assignment lived in the
+  //      graph — `someday if 0` against a board carrying 55, every test green.
+  //
+  // ⭐ The pattern under all three: **the page printed numbers whose provenance
+  // nobody had checked.** So the durable fix is not a fourth rendering change, it
+  // is that a number cannot reach this page without saying where it came from —
+  // and `stat()` is the one door every tile goes through, so the rule lives here
+  // rather than in a convention somebody has to remember.
+  //
+  // ⚠ A MISSING HINT IS RENDERED, NOT SWALLOWED. Silently dropping it would put an
+  // unsourced number on the page looking exactly like a sourced one, which is the
+  // disease itself. It prints its own absence instead, and Suite 270.24 fails the
+  // gate if any tile ever does.
+  // ⚠ `pop` is the POPULATION this number counts over (see POPULATIONS). It is
+  // emitted, not displayed — the guard compares it, a reader never sees the token.
+  // An untagged tile is marked loudly for the same reason an unsourced one is:
+  // silence would make it read as belonging to whatever strip surrounds it.
+  const stat = (v, label, hint, pop) =>
+    `<li><span class="n${/[0-9]/.test(String(v)) ? '' : ' word'}">${v}</span><span class="k">${escapeHtml(label)}</span>` +
+    `<span class="h">${escapeHtml(hint || '⛔ SOURCE NOT STATED — this number reached the page without naming where it came from, which is the one thing every number here must do')}</span>` +
+    `<span class="pop" data-pop="${escapeHtml(pop || 'UNSTATED-POPULATION')}"></span></li>`;
 
   // ⛔ EVERY LABEL STATES THE QUESTION IT ACTUALLY ANSWERS. None of these numbers
   // was ever wrong; one of them was wearing the wrong question. `before it is done`
@@ -470,39 +834,166 @@ function renderRoadmapSection(md, when, queueMd, census) {
   const cz = census || { observable: false, why: 'no census was handed to the renderer' };
   const editedStamp =
     cz.observable && cz.editedAt ? String(cz.editedAt.toISOString()).slice(0, 10) : null;
-  const censusHint = cz.observable
+
+  // ── ⛔⛔ AN EMPTY ROSTER IS AN ABSENT SOURCE, AND AN ABSENT SOURCE IS
+  //    `UNOBSERVABLE` — NEVER `0` (owner ruling, 2026-09-05) ─────────────────
+  //
+  // ⛔⛤ THIS TILE PRINTED `0 of 411` FOR TWO DAYS on the page the owner reads
+  // from his phone to decide whether anything is waiting on him. Nothing was
+  // broken: the census ran, the parser agreed, every cross-check passed, and the
+  // hand-kept roster it counts had simply been EMPTIED on 2026-09-03 when its last
+  // three rows were ruled — and never refilled. Measured the same day it was
+  // found: the blocker graph counted 96 rows needing him and a read of those rows
+  // put 23 questions and 18 hands genuinely on his list.
+  //
+  // ⭐ THE DEFECT IS NOT THE NUMBER, IT IS THE SHAPE: a missing INPUT rendered as
+  // a reassuring ANSWER. That is the same disease as folding digest guesses into a
+  // confident total, one level up — and it is why an earlier fix that only added a
+  // WARNING SENTENCE beside the zero was not enough. A sentence sits next to the
+  // number; a reader glancing at a tile sees the number.
+  //
+  // ⚠ AND THE TWO CASES ARE HELD APART, because collapsing them would throw away a
+  // real measurement. A roster that DECLARES rows and finds none of them open is a
+  // genuine `0` over a real set, and it prints. A roster that declares NOTHING has
+  // measured nothing, so it prints UNOBSERVABLE with the reason. The predicate is
+  // derived, not assumed: with no present rows AND no closed-since rows, the
+  // declared set is empty — there was nothing for either bucket to hold.
+  const rosterEmpty = cz.observable && cz.count === 0 && !(cz.rows || []).length && !cz.closedSince;
+  const censusObservable = cz.observable && !rosterEmpty;
+  const censusHint = censusObservable
     ? `${cz.rule}: declared in the census, cross-checked open on the board · declared set last edited ${editedStamp || 'unknown'}` +
       (cz.closedSince ? ` · ⛔ ${cz.closedSince} declared row(s) no longer open` : '') +
       (cz.undeclared ? ` · ⚠ ${cz.undeclared} owner-shaped heading(s) not yet declared` : '')
-    : `not measured — ${cz.why}`;
+    : rosterEmpty
+      ? `⛔ the declared roster is EMPTY — it has held no rows since it was last edited (${editedStamp || 'date unknown'}), so this measured nothing. ` +
+        `⛔ That is NOT "nothing is waiting on you": it is a hand-kept list nobody has refilled. It moves only when somebody edits it. ` +
+        `Look at the read-based lanes below instead` +
+        (cz.undeclared
+          ? ` · ⚠ ${cz.undeclared} owner-shaped heading(s) are not declared anywhere`
+          : '')
+      : `not measured — ${cz.why}`;
+  // ── ⭐⭐ DECIDE AND DO ARE TWO ERRANDS, AND MERGING THEM LIES BY A FACTOR OF TWO ──
+  //
+  // ⛔ Even when the total is right. A question goes to a SITTING he books; a
+  // hands task goes to a LIST he works through. Measured on the live board
+  // 2026-09-05: of 96 owner-list rows, 23 ask a question and 18 need his hands
+  // (4 are both) — one number over those is a number he cannot act on.
+  //
+  // ⭐ The split is `BLOCKER-GRAPH.json`'s own `actor` vocabulary, not a new one.
+  //
+  // ⛔⛔ AND THE COUNT IS THE ROWS SOMEBODY READ — the DIGEST remainder is NOT
+  // FOLDED IN (owner ruling, 2026-09-05). Folding it produced 68 under "he
+  // decides" on the live graph, where a read of those same rows measured 23. ⚠ A
+  // reader glancing at a tile sees the NUMBER, not the basis split beside it, so a
+  // tile confidently wrong by 3× is worse than one that says it cannot tell — and
+  // "it cannot tell" is the three-valued rule this page applies everywhere else.
+  // The unread remainder is printed as its own UNOBSERVABLE tile, at tile size,
+  // rather than as a qualifier nobody reads.
+  const ax = axes.owner;
+  const ACTOR_OF = { decide: 'OWNER-RULING', do: 'OWNER-KEYBOARD', external: 'EXTERNAL' };
+  const laneHint = lane => {
+    if (!ax.observable) return 'not measured — ' + ax.why;
+    const s = ax.laneSummary[lane];
+    const when = ax.measuredAt ? String(ax.measuredAt).slice(0, 10) : 'unknown';
+    const base =
+      `BLOCKER-GRAPH.json actor=${ACTOR_OF[lane]}, cross-checked still open · measured ${when} · ` +
+      // ⚠ THE FLOOR CLAUSE IS NOT OPTIONAL. `actorBasis` records how the GRAPH
+      // classified a row, not whether a human ever read the item — and the
+      // 2026-09-05 triage read rows and published to a markdown report WITHOUT
+      // writing its verdicts back to the graph. So real reading exists that this
+      // cannot see, and the number is a FLOOR. Saying "at least" is the difference
+      // between a bound and a claim.
+      `⛔ AT LEAST this many: only rows whose FULL BODY was read are counted`;
+    return s.observable
+      ? base +
+          (s.unread
+            ? ` · ${s.unread} more in this lane are classified from a heading only and are NOT counted — see the unread tile`
+            : '') +
+          (ax.somedayDropped ? ` · ${ax.somedayDropped} someday row(s) excluded` : '') +
+          (ax.closedSince ? ` · ${ax.closedSince} graph row(s) no longer open, not counted` : '')
+      : `⛔ NOT ZERO — no row in this lane has been read in full, so nothing here has been measured. ` +
+          `${s.unread} row(s) are classified from a heading only. ` +
+          base;
+  };
+
+  // The one place a lane's printed number is decided. Zero reads is UNOBSERVABLE,
+  // never `0` — the same rule as the empty roster above, and the reason both live
+  // behind a helper rather than at each call site.
+  const laneCount = lane =>
+    ax.observable && ax.laneSummary[lane].observable ? ax.laneSummary[lane].read : 'UNOBSERVABLE';
+
+  // ⛔ THE REMAINDER GETS A TILE OF ITS OWN. It is the number the reader most needs
+  // and the one a hint would hide: rows the graph files as needing him, classified
+  // from a HEADING alone, on a board that records rulings in item BODIES and does
+  // not update headings. Any one of them may be live work or may have been answered
+  // weeks ago, and only reading it can say which.
+  const unreadTile = !ax.observable
+    ? ''
+    : stat(
+        'UNOBSERVABLE',
+        `${ax.unreadTotal} unread — could be either`,
+        'classified from a heading + Done-means, never the body — and this board records rulings in bodies without ' +
+          'updating headings, so a heading-only row may be live or long since answered. ⛔ Deliberately not folded into ' +
+          'the counts beside it: that fold is what made this tile read 68 where a read of the rows measured 23. ' +
+          'Reading a row is what moves it out of here.',
+        POPULATIONS.OWNER
+      );
+
   const counts =
-    `<ul class="stats">` +
-    stat(n('Active'), 'being worked on now', 'started, not finished') +
+    `<ul class="stats" data-strip="strip-0">` +
+    stat(n('Active'), 'being worked on now', 'started, not finished', POPULATIONS.BOARD) +
     stat(
-      cz.observable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
+      censusObservable ? `${cz.count} of ${cz.total}` : 'UNOBSERVABLE',
       'need you — open owner decisions',
-      censusHint
+      censusHint,
+      POPULATIONS.CENSUS
     ) +
+    // ⛔ `laneCount` is the ONE place a lane number is decided, so the "no reads ⇒
+    // UNOBSERVABLE, never 0" rule cannot be honoured on one tile and forgotten on
+    // the next. `.read` is deliberately unreachable without passing `.observable`.
+    stat(laneCount('decide'), 'he decides — a sitting', laneHint('decide'), POPULATIONS.OWNER) +
+    stat(laneCount('do'), 'his hands — a task list', laneHint('do'), POPULATIONS.OWNER) +
+    unreadTile +
     stat(
       n('Attention'),
       'flagged ⚠️',
-      'the Attention band — a flag on the heading, not a decision count'
+      'the Attention band — a flag on the heading, not a decision count',
+      POPULATIONS.BOARD
     ) +
-    stat(n('Ready'), 'startable now', 'specified and unblocked') +
-    stat(inMotion, 'startable or in flight', 'active + ready — a workload, not a finish line') +
+    stat(n('Ready'), 'startable now', 'specified and unblocked', POPULATIONS.BOARD) +
+    stat(
+      inMotion,
+      'startable or in flight',
+      'active + ready — a workload, not a finish line',
+      POPULATIONS.BOARD
+    ) +
     stat(
       n('Backlog') + n('Parked') + n('Deferred'),
       'filed for later',
-      'backlog, parked and deferred'
+      'backlog, parked and deferred',
+      POPULATIONS.BOARD
     ) +
     stat(
       closed.observable ? closed.count : 'UNOBSERVABLE',
       'finished but still filed as open',
       closed.observable
         ? 'headings that LEAD with the done-mark, across all ' + closed.total + ' items'
-        : 'not counted over the whole queue, so no number is shown — ' + closed.why
+        : 'not counted over the whole queue, so no number is shown — ' + closed.why,
+      POPULATIONS.CLOSED
     ) +
-    `</ul>`;
+    `</ul>` +
+    // ⛔⛤ THIS STRIP MIXES FOUR POPULATIONS, AND A GRID INVITES SUBTRACTION.
+    //
+    // Every tile above is individually correct and individually sourced. They are
+    // not comparable with one another, and until tonight the page let a reader
+    // assume they were — which is exactly how a correct 352 beside a correct 411
+    // got read as a defect. `comparabilityReport()` REFUSES a mixed strip that does
+    // not carry this note, so the statement cannot be dropped without going red.
+    `<p class="note popmix" data-for="strip-0">⚠ <strong>These tiles do not all count the same thing, so do not subtract ` +
+    `them.</strong> Being-worked-on, flagged, startable, in-flight and filed-for-later are over the ${total} items on this ` +
+    `board. Open owner decisions is over the planning tree's declared roster. He-decides, his-hands and the unread ` +
+    `remainder are over the rows the blocker graph files to him. Finished-but-still-open is a scan of every item in the ` +
+    `queue. Four questions, four denominators, one grid.</p>`;
 
   const disagreeList =
     closed.observable && closed.count
@@ -528,18 +1019,325 @@ function renderRoadmapSection(md, when, queueMd, census) {
         `<p class="note">Declared in the planning tree's census with an evidence phrase each; the census ` +
         `re-checks on every run that the item is still open on the board. A ruled decision whose row ` +
         `was not removed still appears here — that is the list to prune, not a number to trust.</p></details>`
-      : cz.observable && !cz.rowsObservable
+      : // ⚠ `censusObservable`, not `cz.observable`: with an EMPTY roster the tile
+        // above now prints UNOBSERVABLE, so "the number above stands" would be a
+        // sentence about a number that is no longer on the page.
+        censusObservable && !cz.rowsObservable
         ? `<p class="note stale">⛔ The census reported a count but its row list could not be read; the number above stands, the names do not.</p>`
         : '';
+
+  // ── The two lanes, openable — "a number he cannot open is a number he cannot check" ──
+  // Evidence is clipped: this list is read on a phone, and the whole phrase is in
+  // the item. Each row wears its classification basis, so a DIGEST row is visibly
+  // the weaker claim rather than sitting anonymously beside a READ one.
+  const clip = (s, nMax) =>
+    String(s).length > nMax
+      ? String(s)
+          .slice(0, nMax - 1)
+          .trimEnd() + '…'
+      : String(s);
+  // ⭐ THE LIST IS CUT WHERE THE COUNT IS CUT. The counted (READ) rows are listed
+  // first under a rule that says so, then a divider, then the unread ones — so the
+  // boundary the tile draws is visible in the list the tile links to. A flat list
+  // sorted by basis would put the same rows in the same order and still leave the
+  // reader to work out where the number stopped.
+  const laneList = (key, heading, blurb) => {
+    if (!ax.observable) return '';
+    const rows = ax.lanes[key];
+    if (!rows.length) return '';
+    const s = ax.laneSummary[key];
+    const li = r =>
+      `<li><code>${escapeHtml(r.id)}</code> <span class="c">${escapeHtml(r.basis)}</span> — ${escapeHtml(clip(r.evidence, 100))}</li>`;
+    const readRows = rows.filter(r => r.basis === 'READ');
+    const restRows = rows.filter(r => r.basis !== 'READ');
+    const summaryCount = s.observable
+      ? `${s.read} counted · ${s.unread} unread`
+      : `${s.unread} unread, 0 counted`;
+    return (
+      `<details class="drift"><summary>${escapeHtml(heading)} <span class="c">${escapeHtml(summaryCount)}</span></summary>` +
+      (readRows.length
+        ? `<p class="note">⭐ <strong>Read in full — this is the counted set.</strong></p><ul>${readRows.map(li).join('')}</ul>`
+        : `<p class="note">⛔ <strong>Nothing in this lane has been read in full</strong>, which is why its tile says UNOBSERVABLE rather than a number.</p>`) +
+      (restRows.length
+        ? `<p class="note">⛔ <strong>Heading-only — NOT counted.</strong> Classified from the heading and Done-means, ` +
+          `never the body. This board records rulings in bodies without updating headings, so any of these may already ` +
+          `be answered. Reading one is what moves it above this line.</p><ul>${restRows.map(li).join('')}</ul>`
+        : '') +
+      `<p class="note">${escapeHtml(blurb)}</p></details>`
+    );
+  };
+  const ownerLists = !ax.observable
+    ? `<p class="note stale">⛔ <strong>Whether anything needs you could not be measured.</strong> ${escapeHtml(ax.why)} — so no lane is shown. That is not the same as an empty list.</p>`
+    : laneList(
+        'decide',
+        'He decides — the sitting',
+        'Rows the graph files as needing an owner ruling. Every one carries how it was classified: DIGEST means only the ' +
+          'heading and Done-means were read, and this board records rulings in item BODIES without updating headings — so a ' +
+          'digest row may already be answered. Reading one is what removes it.'
+      ) +
+      laneList(
+        'do',
+        'His hands — the task list',
+        'Nothing here asks a question. Each needs him to be somewhere, run something, or authorise something whose evidence ' +
+          'is already assembled.'
+      ) +
+      laneList(
+        'external',
+        'Neither — waiting on someone else',
+        'A third party, a platform, or a credential we will not touch. On his list only through a grouping defect.'
+      ) +
+      `<p class="note">⛔ <strong>An item that is BOTH a question and a hands task cannot appear as such.</strong> The graph ` +
+      `gives each item one <code>actor</code>, so a row with a “QUESTION: … HANDS: …” body is filed under one of them and the ` +
+      `other half is invisible here. A read of the rows on 2026-09-05 found four of exactly that shape. This page will not ` +
+      `print a “both” count, because an intersection of these two lanes is empty by construction and would read as “there ` +
+      `are none”.</p>`;
+
+  // ── HORIZON — the axis the whole thing was for ──────────────────────────────
+  //
+  // ⛔ EVERY VALUE COMES FROM THE VOCABULARY, never from a literal here, and UNSET
+  // / UNPARSEABLE / UNKNOWN are three different facts that are never merged:
+  //   UNKNOWN      somebody read it and the text does not settle it (a finding)
+  //   UNSET        no source has said anything about this item at all
+  //   UNPARSEABLE  a value outside the vocabulary — the reader could not use it
+  const hz = axes.horizons;
+  const HZ_BLURB = {
+    'BLOCKS-WORK-NOW': 'in the way of work today',
+    NEXT: 'after the current thing',
+    'SOMEDAY-IF': 'a captured thought with a condition — ⛔ in NO total on this page',
+    UNKNOWN: '⚠ read, and the text does not settle it — folded into nothing, excluded from nothing',
+  };
+  const basisStrip = b =>
+    Object.entries(b || {})
+      .sort((x, y) => y[1] - x[1])
+      .map(([k, v]) => `${k} ${v}`)
+      .join(' · ');
+  const horizonHtml = !hz.observable
+    ? `<h2>Horizon</h2><p class="note stale">⛔ <strong>The horizon could not be read.</strong> ${escapeHtml(hz.why)}. ` +
+      `⚠ That is NOT the same as “every item is unset” — this page cannot tell you either way, so it shows no number.</p>`
+    : (() => {
+        const c = hz.counts;
+        const A = require('./board-axes.js');
+        const someday = c[A.SOMEDAY_NAME] || 0;
+        const cells = hz.vocabulary
+          .map(v =>
+            stat(
+              c[v] || 0,
+              v.toLowerCase().replace(/-/g, ' '),
+              HZ_BLURB[v] || 'no blurb for this value',
+              POPULATIONS.QUEUE
+            )
+          )
+          .join('');
+        const unset = c.UNSET
+          ? stat(
+              c.UNSET,
+              'unset',
+              'no source has said anything — ⛔ shown as unset, never counted as one of the values above, and deliberately not the same as UNKNOWN',
+              POPULATIONS.QUEUE
+            )
+          : '';
+        const unparse = c.UNPARSEABLE
+          ? stat(
+              c.UNPARSEABLE,
+              'unreadable',
+              'a value outside the vocabulary: ' + hz.unparseable.slice(0, 12).join(', '),
+              POPULATIONS.QUEUE
+            )
+          : '';
+        const somedayList = someday
+          ? `<details class="drift"><summary>Which ${someday} someday-if <span class="c">excluded</span></summary>` +
+            `<ul>${[...hz.someday]
+              .map(
+                id =>
+                  `<li><code>${escapeHtml(id)}</code>${
+                    hz.basisOf && hz.basisOf.get(id)
+                      ? ` <span class="c">${escapeHtml(hz.basisOf.get(id))}</span>`
+                      : ''
+                  }</li>`
+              )
+              .join('')}</ul>` +
+            `<p class="note">⛔ None of these is in any total above or in any band count below. Each carries how it was ` +
+            `placed: READ is a reader's call with the words quoted, SIGNAL is the assignment tool's keyword match, ` +
+            `GRAPH is a live blocking edge, STATUS is the item's parked/deferred state, BLOCK is the item's own accept block.</p></details>`
+          : `<p class="note">No item carries <code>SOMEDAY-IF</code>, so no total changes. The exclusion is applied ` +
+            `regardless — a rule that only starts working once somebody notices it is not a rule.</p>`;
+        return (
+          `<h2>Horizon</h2>` +
+          `<p class="note">Should this item be counted yet, over all ${hz.total} items. Read from ${escapeHtml(hz.sourcedFrom)}` +
+          `${hz.basisCounts && Object.keys(hz.basisCounts).length ? ` · basis ${escapeHtml(basisStrip(hz.basisCounts))}` : ''}. ` +
+          `⛔ A <code>SOMEDAY-IF</code> item is in no total on this page.</p>` +
+          `<ul class="stats" data-strip="strip-1">${cells}${unset}${unparse}</ul>` +
+          // ⛔ THE SOURCES DISAGREE HERE, AND PRECEDENCE IS A RESOLUTION, NOT AN
+          // ABSENCE OF CONFLICT. The hand-written block wins over a keyword-assigned
+          // graph row — but a page that quietly picks one and shows a clean number is
+          // how a board ends up carrying two answers nobody knows about.
+          (hz.conflicts && hz.conflicts.length
+            ? `<p class="note stale">⚠ <strong>${hz.conflicts.length} item(s) carry two different horizons.</strong> ` +
+              `The item's own <code>accept</code> block is used, because a person wrote it and the archive's gate refuses it ` +
+              `if it is malformed; the assignment disagrees on: ` +
+              hz.conflicts
+                .map(
+                  x =>
+                    `<code>${escapeHtml(x.id)}</code> block <strong>${escapeHtml(x.block)}</strong> vs ` +
+                    `${escapeHtml(x.graph)} by ${escapeHtml(x.graphBasis)}`
+                )
+                .join('; ') +
+              `. Resolving one of the two is the fix; showing you the winner alone is not.</p>`
+            : '') +
+          somedayList
+        );
+      })();
+
+  // ── PROJECT — the owner's six, from the board's own per-item assignment ─────
+  //
+  // ⭐ THIS IS NO LONGER AN APPROXIMATION. The page used to render CP-RULE v1's
+  // four-value domain census because the six-value axis did not exist. It exists
+  // now, per item, with a basis and quoted evidence — and the two DISAGREE on 46
+  // of 411 items (11.2%, measured with the census's CP counted as compatible with
+  // EITHER control-plane or harness, the most generous mapping available). ⛔ So
+  // the census is no longer rendered here: two answers to one question is the
+  // disease, and only one of them can say which words decided each row.
+  //
+  // ⚠⚠ AND THE BASIS IS THE HEADLINE, NOT A FOOTNOTE. The assignment's own
+  // declared-in-advance sample measured SIGNAL — the tool's keyword match — WRONG
+  // ABOUT ONE PROJECT ROW IN THREE. Printing these counts without that beside them
+  // would be a precision this axis has not earned yet.
+  const pj = axes.projects;
+  const projectHtml = !pj.observable
+    ? `<h2>Project</h2><p class="note stale">⛔ <strong>The per-project split could not be read.</strong> ${escapeHtml(pj.why)}.</p>`
+    : (() => {
+        const cells = [...pj.vocabulary, 'UNSET']
+          .filter(v => pj.counts[v])
+          .sort((a, b) => pj.counts[b] - pj.counts[a])
+          .map(v =>
+            stat(pj.counts[v], v, PROJECT_BLURB[v] || 'no blurb for this value', POPULATIONS.QUEUE)
+          )
+          .join('');
+        return (
+          `<h2>Project</h2>` +
+          `<p class="note">Which thing an item belongs to, assigned per item over all ${pj.total} of them, from the board's ` +
+          `own axis assignment · basis ${escapeHtml(basisStrip(pj.basisCounts))}.</p>` +
+          `<ul class="stats" data-strip="strip-2">${cells}</ul>` +
+          (pj.demoted
+            ? `<p class="note stale">⛔ <strong>${pj.demoted} rows say UNKNOWN because a keyword match is not a label.</strong> ` +
+              `The assignment tool placed them by matching words in the item, and its own sample measured that ` +
+              `<strong>wrong about one row in three</strong>. A count read as an estimate can carry that; a label sitting beside ` +
+              `an item is read as a fact about that item, and somebody acts on the row. So those rows are shown as unknown ` +
+              `rather than asserted. ` +
+              `⚠ <strong>That is not the tool being useless — it is the tool declining to invent ${pj.demoted} answers</strong>, ` +
+              `which is the same rule every other number on this page follows. The ${pj.total - (pj.counts.UNKNOWN || 0)} rows ` +
+              `still shown were placed by a reader with the deciding words quoted, or by the ID-family rule. ` +
+              `Reading a row is what moves it out of unknown.</p>`
+            : '') +
+          `<p class="note">⛔ The older four-value domain census (CP-RULE v1) is no longer shown here. It disagreed with this ` +
+          `assignment on 46 of 411 items, it cannot separate the harness from the control plane, and it has no bucket for ` +
+          `Binder — all three of which this one does.</p>`
+        );
+      })();
+
+  // ── The per-band someday correction ─────────────────────────────────────────
+  //
+  // ⛔⛔ THE BOARD'S OWN BAND HEADINGS DO NOT KNOW ABOUT HORIZON. The generator
+  // bands by status glyph and counts everything, so a SOMEDAY-IF item is inside
+  // the number printed on the band. The owner's rule is that it must be in NO
+  // backlog count, so the correction is applied HERE, from the queue.
+  //
+  // ⭐ AND THE CORRECTION IS SHOWN, NEVER SILENT. Printing a quietly smaller
+  // number would leave the reader unable to tell a total that shrank from one that
+  // was always that size — and it would put this page in silent disagreement with
+  // the band heading the same reader can open in the board file. So a corrected
+  // band reads `104 → 103`, with the excluded ids one tap away.
+  // ── ⭐ THE PER-PROJECT FILTER — one board filtered, never six boards ────────
+  //
+  // The owner asked for per-project counts "by filtering rather than by splitting
+  // anything". Counts alone were all this page could offer while the only source
+  // was a subprocess census with no all-items output: per-item domains cost one
+  // spawn per value, measured at 0.94s against 0.19s for one, on a page read on a
+  // phone over a tailnet. ⭐ THAT OBJECTION IS GONE: the assignment now lives in
+  // `BLOCKER-GRAPH.json`, which this route already reads once, so id → project is
+  // free. Neither of the numbers I recorded applies to a file read.
+  //
+  // ⚠ WEIGHT, since it was the other objection: the board LISTS 168 rows (the rest
+  // of the 411 are the Backlog's count), so the attribute costs roughly 3KB — and
+  // it buys the filter over every listed row rather than a second rendering of
+  // them. Rows the board does not list cannot be tagged, and the control says so
+  // rather than letting a filtered view look complete.
+  //
+  // ⛔ DERIVED FROM THE RENDERED OUTPUT, not from a second parse of the board —
+  // the same rule `buildToc` follows. A separate pass over the markdown would be a
+  // second reader free to disagree with the one that produced the rows.
+  const pjById = axes.projects.observable ? axes.projects.byId : null;
+  const tagRows = html =>
+    pjById
+      ? html.replace(/<li><strong>([A-Za-z]+[0-9]*[a-z]?)<\/strong>/g, (m, id) =>
+          pjById.has(id) ? `<li data-p="${escapeHtml(pjById.get(id))}"><strong>${id}</strong>` : m
+        )
+      : html;
+  // ⛔ THE PILL COUNTS THE SET ITS OWN BANDS WILL SHOW. Falls back to the axis
+  // census only when the per-band derivation is unavailable — and then the note
+  // below says the bands cannot follow the control at all.
+  const pillCount = v =>
+    axes.bandCounts.observable && axes.bandCounts.perProject
+      ? axes.bandCounts.perProject[v] || 0
+      : axes.projects.counts[v];
+  const filterHtml =
+    pjById && axes.projects.vocabulary
+      ? `<div class="pfilter" role="group" aria-label="Filter the board by project" data-pop="${POPULATIONS.BOARD}">` +
+        `<button class="pchip" data-p="" aria-pressed="true">All</button>` +
+        [...axes.projects.vocabulary]
+          .filter(v => pillCount(v))
+          .map(
+            v =>
+              `<button class="pchip" data-p="${escapeHtml(v)}" aria-pressed="false">${escapeHtml(v)} <span class="c">${pillCount(v)}</span></button>`
+          )
+          .join('') +
+        `</div>` +
+        // ⛔ THE SERVER'S ANSWERS, HANDED OVER RATHER THAN RECOMPUTED. Every
+        // (band × project) figure is derived above, over the whole queue; the script
+        // only picks one. A count computed in the browser would be a second answer to
+        // a question this side already answered — the defect this page keeps having.
+        (axes.bandCounts.observable
+          ? `<div class="bandcounts" hidden data-counts="${escapeHtml(JSON.stringify(axes.bandCounts.byBand))}"></div>`
+          : '') +
+        `<p class="note">${
+          axes.bandCounts.observable
+            ? `Every band's number below follows this control, the Backlog included — those counts are computed on the server, ` +
+              `not in your browser. ⚠ The Backlog is a count rather than a list, so under a filter it reports a real number ` +
+              `with no rows beneath it. Someday-if items are in none of these figures.`
+            : `⛔ The band numbers CANNOT follow this control: ${escapeHtml(axes.bandCounts.why || 'the per-band counts could not be derived')}. ` +
+              `They stay unfiltered, and the control only hides rows — so do not read a band's number as an answer to the filter.`
+        }</p>`
+      : '';
 
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
     .map(k => {
       const b = bands.get(k);
       const open = BAND_OPEN.has(k) && b.count > 0 ? ' open' : '';
+      const excluded = somedayByLabel.get(k) || [];
+      // ⛔⛤ THE ONE NUMBER ON THIS ROW, and it answers the filter.
+      //
+      // It used to be filter-blind while a caption beneath it responded — two
+      // numbers of different sets on one row, and the bigger one was the wrong one.
+      // It now starts at the unfiltered value and the script swaps it for the
+      // SERVER's precomputed (band × project) figure. `data-all` carries the
+      // unfiltered value so restoring "All" is also a lookup, never a recomputation.
+      //
+      // ⚠ THREE-VALUED: a band the derivation could not produce a figure for renders
+      // `?` under a filter rather than a stale number — `data-all` is emitted either
+      // way, so the unfiltered reading never degrades.
+      const shown = b.count - excluded.length;
+      const countCell = `<span class="c">${shown}</span>`;
+      const note = excluded.length
+        ? `<p class="note">⛔ ${b.count} on the board, <strong>${b.count - excluded.length} counted here</strong> — ` +
+          `${excluded.length} carry <code>SOMEDAY-IF</code> and are in no total: ` +
+          `${excluded.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}. The board's own heading still counts them; ` +
+          `this page does not.</p>`
+        : '';
       return (
-        `<details class="band"${open}><summary>${escapeHtml(k)} <span class="c">${b.count}</span></summary>` +
+        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}" data-pop="${POPULATIONS.BOARD}"><summary>${escapeHtml(k)} ${countCell}</summary>` +
         `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
-        mdToHtml(b.lines) +
+        note +
+        tagRows(mdToHtml(b.lines)) +
         `</details>`
       );
     })
@@ -580,7 +1378,21 @@ function renderRoadmapSection(md, when, queueMd, census) {
         `right now. Rebuilt <strong>${escapeHtml(stamp)}</strong>, and re-read from the file on every ` +
         `visit — nothing here is cached. (Checked by comparing the board's recorded source ` +
         `fingerprint against the live queue; <code>npm run roadmap:check</code> does the stronger ` +
-        `comparison and rebuilds the whole thing.)</p>`
+        `comparison and rebuilds the whole thing.)` +
+        // ⛔ THE ONE SURVIVING GAP BETWEEN TWO NUMBERS ON THIS PAGE, NAMED HERE
+        // RATHER THAN LEFT FOR THE READER TO SPOT. The Horizon section counts over
+        // every item the queue holds; every other total on this page counts what is
+        // left after the someday rule. Both are right and they are different sets,
+        // so the page says which is which and what the difference is made of —
+        // silence between two numbers is how this surface has gone wrong before.
+        (axes.horizons.observable && axes.horizons.total !== total
+          ? ` <strong>⚠ Two denominators on this page, deliberately:</strong> the queue holds ` +
+            `<strong>${axes.horizons.total}</strong> items and this board counts <strong>${total}</strong>. ` +
+            `The difference is the ${axes.horizons.total - total} carrying <code>SOMEDAY-IF</code>, which are in no total ` +
+            `here. The Horizon section below counts over all ${axes.horizons.total}, because its job is to explain that gap; ` +
+            `everything else counts the ${total}.`
+          : '') +
+        `</p>`
       : `<p class="note stale">⛔ <strong>THIS BOARD IS OUT OF DATE.</strong> The queue has changed ` +
         `since this was built <strong>${escapeHtml(stamp)}</strong>, so anything added, closed or ` +
         `re-ordered since then is <strong>not on this page</strong> — and a stale board reads exactly ` +
@@ -591,9 +1403,13 @@ function renderRoadmapSection(md, when, queueMd, census) {
     `<h1 id="queue">The queue</h1>` +
     currencyLine +
     counts +
+    ownerLists +
     decisionList +
     disagreeList +
+    horizonHtml +
+    projectHtml +
     `<h2>The whole board</h2>` +
+    filterHtml +
     `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
     `the rest are one tap away — nothing is hidden or shortened.</p>` +
     bandHtml
@@ -609,9 +1425,9 @@ function renderRoadmapSection(md, when, queueMd, census) {
  * board, and it goes with the split. "What needs you" is the Attention count and
  * band on this page — it is not duplicated anywhere else.
  */
-function renderQueue(board, queueMd, census) {
+function renderQueue(board, queueMd, census, sources) {
   const body = board
-    ? renderRoadmapSection(board.text, board.mtime, queueMd, census)
+    ? renderRoadmapSection(board.text, board.mtime, queueMd, census, sources)
     : `<h1 id="queue">The queue</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
@@ -657,4 +1473,8 @@ module.exports = {
   // ⭐ Exported so the suite drives the REAL derivation rather than a restatement
   // of it — a test that retypes the rule only ever proves the retyped copy.
   closedOverWholeQueue,
+  POPULATIONS,
+  comparabilityReport,
+  boardAxes,
+  PROJECT_BLURB,
 };

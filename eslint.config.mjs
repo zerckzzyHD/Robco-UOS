@@ -575,6 +575,11 @@ export default [
       'tests/boot-smoke.mjs',
       'tests/a11y-check.mjs',
       'tests/test-html-check.mjs',
+      // ⚠ Same exemption as every other Playwright driver above it, not a new
+      // carve-out: these are ESM browser scripts that never ship. It is checked by
+      // being RUN in the gate, which is the stronger check. ⛔ If this list ever
+      // stops being the convention for the class, this line goes with the rest.
+      'tests/queue-filter-check.mjs',
       'tests/browser-server.mjs',
       'tests/browser-shared.mjs',
       'tests/save-survival.mjs',

@@ -108,3 +108,6 @@ DETERMINISTIC_FEATURES.md
 *_AUDIT.md
 *_SLATE.md
 *_DESIGN.md
+
+# Session scratch outbox — never publish (this repo is PUBLIC)
+DISPATCH-OUTBOX*.md
