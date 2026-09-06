@@ -121,6 +121,26 @@ outcome, not a failure**: a public clone has no archive by design. Consumers deg
 (the generators no-op, the Protocol 50 drift nudge stays silent, and gate Suites 246/248 SKIP with the
 reason printed). Same `[ -f ]`-guarded DNA as the push guard's sibling resolution.
 
+### ⭐ `.mcp.json` is GITIGNORED IN THIS REPO ON PURPOSE — and "absent" is the normal state here
+
+**`.mcp.json` declares MCP servers to an agent session, and the harness reads it from the repo root the
+session started in.** There is no inheritance between repos: a session started in a repo that does not
+declare a server does not get that server's tools — *measured*, and the tools come back **absent**, not
+blocked and not awaiting authorisation.
+
+⛔ **This repo's copy is listed in `.gitignore` and that is deliberate, not an oversight.** The config
+names **absolute paths on the developer's machine** pointing into a **private** sibling repo, and this
+repo is public. ⚠ **Do not "fix" it by un-ignoring and committing it** — that is a one-way disclosure,
+and this repo's git history is deliberately never rewritten.
+
+⭐ **So a working copy obtains it locally instead**, from the private Archive's
+`!PLANNING/tools/mcp-config-sync.cjs --bootstrap`, which writes the file into place and **never stages,
+commits or pushes anything**. Same DNA as `planning-paths.js` above: **a public clone has no archive and
+therefore no MCP config, by design.** ⛔ A session here with no MCP tools is not broken — that is the
+documented default, and the only supported route to the file is the bootstrap.
+
+
+
 **The move is not erasure, and must not be described as one.** The three files remain in this repo's
 **public git history**, which was deliberately **not** rewritten — rewriting shared history would break
 every clone and every commit reference for a benefit the audit explicitly did not claim (F04 was never a
