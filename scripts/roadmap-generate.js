@@ -712,6 +712,70 @@ function renderBlind(reasons, provenance) {
   return lines.join('\n');
 }
 
+/**
+ * ── ⛔⛤ THE BOARD IS HORIZON-BLIND, AND IT SAYS SO ───────────────────────────
+ *
+ * Every band count above includes `SOMEDAY-IF` items, and the `/queue` page removes
+ * them again downstream. That looks like a page compensating for a wrong generator,
+ * and it is not — MEASURED 2026-09-06: of the 59 someday items on the live board,
+ * this generator can see **zero**.
+ *
+ * ⭐ THE REASON IS THE CONTRACT, NOT AN OVERSIGHT. This board is a PURE DETERMINISTIC
+ * FUNCTION OF `QUEUE.md` — it records one source fingerprint, `--check` rebuilds and
+ * byte-compares against it, and the archive's own pre-commit asserts the board is not
+ * stale against that one file. The horizon assignment lives in `BLOCKER-GRAPH.json`,
+ * a second file. Reading it here would make the board a function of two inputs while
+ * its fingerprint covered one — so the archive's check would report the board CURRENT
+ * whenever only the graph had moved. That is an instrument that cannot tell, which is
+ * a worse defect than the one it would fix.
+ *
+ * ⚠ SO THE BAND COUNTS ARE NOT WRONG — THEY ARE BLIND, and a number that cannot see
+ * its own qualifier must say so rather than be read as a backlog count. This line is
+ * what the generator CAN honestly contribute from its single input: how many items
+ * carry a horizon in this file, and the plain statement that the bands do not use it.
+ *
+ * ⛔ THE REAL FIX IS ONE STEP FURTHER UP and is not in this repo: write the horizon
+ * into each item's own `accept` block in `QUEUE.md`. The moment it lives in the file
+ * the board is a function of, this generator can exclude someday itself, the page's
+ * downstream correction deletes itself, and no contract is bent to get there.
+ */
+function horizonDeclaration(idItems, planning) {
+  let fmt;
+  try {
+    fmt =
+      planning && typeof planning.loadItemFormat === 'function' ? planning.loadItemFormat() : null;
+  } catch {
+    // an unreadable resolver is UNOBSERVABLE, handled by the branch below
+  }
+  // ⚠ Absent grammar is UNOBSERVABLE, never "none": a public clone cannot read the
+  // accept-block format at all, and "0 items carry a horizon" would be a claim about
+  // the board made by a checkout that cannot see the field.
+  if (!fmt || !fmt.observable) {
+    return (
+      '> ⚠ **These band counts do not apply the horizon rule**, and this checkout cannot ' +
+      'tell how many items carry one — the accept-block format is not reachable from here. ' +
+      'A `SOMEDAY-IF` item is counted in the bands above.'
+    );
+  }
+  let withHorizon = 0;
+  for (const it of idItems) {
+    try {
+      const blocks = fmt.mod.parseAccept(it.body || []);
+      if (blocks.length && blocks[0].fields && blocks[0].fields.horizon !== undefined)
+        withHorizon++;
+    } catch {
+      /* an unparsable body is not a horizon */
+    }
+  }
+  return (
+    `> ⛔ **These band counts do not apply the horizon rule.** ${withHorizon} of ${idItems.length} ` +
+    `items carry a \`horizon\` in \`QUEUE.md\`; the rest carry theirs in \`BLOCKER-GRAPH.json\`, which ` +
+    `this board is deliberately not a function of. So a \`SOMEDAY-IF\` item IS counted in every band ` +
+    `above, and any surface that must exclude it does so downstream — not because these numbers are ` +
+    `wrong, but because they are blind. Writing the horizon into the items' own \`accept\` blocks is ` +
+    `what would let this board apply the rule itself.`
+  );
+}
 function renderBoard(data, provenance) {
   const { title, banded, unclassified, idLess, closed } = data;
   const total = data.idBearing;
@@ -732,6 +796,8 @@ function renderBoard(data, provenance) {
       `**${idLess}** ID-less \`###\` sub-headings (prose, not board items — counted here so they ` +
       `are accounted for rather than silently absent)`
   );
+  lines.push('');
+  lines.push(data.horizonNote);
   lines.push('');
 
   // Bands in vocabulary order; items in DOCUMENT order within each band — never
@@ -980,6 +1046,7 @@ function build(planning) {
         unclassified,
         idLess: rawHeadings.length - idItems.length,
         idBearing: idItems.length,
+        horizonNote: horizonDeclaration(idItems, planning),
         closed,
       },
       provenance
@@ -995,6 +1062,7 @@ function toLf(text) {
 module.exports = {
   build,
   bandOfHeading,
+  horizonDeclaration,
   closedDiscipline,
   extractSourceHash,
   boardCurrency,
