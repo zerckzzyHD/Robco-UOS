@@ -39,6 +39,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const cp = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
@@ -75,6 +76,149 @@ function planningDir() {
 }
 
 /**
+ * -- OPTION A, owner-ruled 2026-09-07: THE BOARD IS READ FROM A REF, NEVER A TREE --
+ *
+ * THE DEFECT THIS CLOSES. This resolver used to hand back a DIRECTORY and every
+ * caller did fs.readFileSync inside it. That directory is _RobCo-Archive's
+ * PRIMARY checkout. Nothing has ever pulled it: it stayed current as a SIDE
+ * EFFECT of sessions working directly in it, and that side effect ended the day
+ * work moved into _wt-* worktrees. On 2026-09-07 the surface sat 202 commits and
+ * 11.9 hours behind while a dozen sessions committed all night.
+ *
+ * WORSE, AND WHY THE TIMESTAMP LIED TOO. readRoadmap reported statSync().mtime as
+ * "when this was built". An mtime is when the FILE WAS WRITTEN, not when its
+ * CONTENT was made, and a checkout touch bumps it. The stale page said
+ * "Rebuilt 02:16" while showing content committed at 02:44Z -- a stamp 3.5 hours
+ * NEWER than the thing it stamped. The page already carries good staleness prose;
+ * it was being fed the wrong clock.
+ *
+ * SO: content AND its timestamp both come from the ref. ROBCO_PLANNING_REF
+ * overrides it (default origin/main). It is only as fresh as the last fetch,
+ * which the page states rather than assumes.
+ *
+ * NO FALLBACK, DELIBERATELY. When the ref cannot be read these return their
+ * unavailable shape and the page says so. Falling back to the working tree would
+ * restore exactly the silent staleness this replaces, and a plausible wrong
+ * number is worse than a visible failure -- nobody investigates a number that
+ * looks fine.
+ */
+const PLANNING_REF = process.env.ROBCO_PLANNING_REF || 'origin/main';
+
+/** The archive repo root -- the parent of the planning dir, resolved not assumed. */
+function archiveRepo() {
+  const dir = process.env.ROBCO_PLANNING_DIR || DEFAULT_PLANNING_DIR;
+  return path.resolve(dir, '..');
+}
+
+/**
+ * ROBCO_PLANNING_DIR is an EXPLICIT instruction to read a particular tree -- a test
+ * fixture, a scratch copy, another checkout. Honour it as a TREE read.
+ *
+ * The ref is the default precisely because nobody ASKS for the stale primary checkout;
+ * it was being read by accident. An override is not an accident, so overriding it into
+ * `origin/main` would be the same silent-wrong-source bug pointed the other way: the
+ * caller names a directory and is served something else without being told.
+ */
+function planningOverride() {
+  const dir = process.env.ROBCO_PLANNING_DIR;
+  return dir ? path.resolve(dir) : null;
+}
+
+/**
+ * Where the board is being read from: { ok, mode:'ref', sha, committedAt, ref, repo }
+ * or { ok, mode:'tree', dir } or { ok:false, why }. Never throws.
+ */
+function planningSource() {
+  const override = planningOverride();
+  if (override) return { ok: true, mode: 'tree', dir: override };
+  const repo = archiveRepo();
+  try {
+    const sha = cp
+      .execFileSync('git', ['-C', repo, 'rev-parse', PLANNING_REF], {
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      .trim();
+    if (!/^[0-9a-f]{7,40}$/.test(sha)) {
+      return { ok: false, why: 'ref ' + PLANNING_REF + ' did not resolve to a sha' };
+    }
+    const committedAt = cp
+      .execFileSync('git', ['-C', repo, 'log', '-1', '--format=%cI', sha], {
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      .trim();
+    return { ok: true, mode: 'ref', sha, committedAt, ref: PLANNING_REF, repo };
+  } catch (e) {
+    return {
+      ok: false,
+      why:
+        'ref ' + PLANNING_REF + ' unreadable in ' + repo + ' -- ' + String(e.message).slice(0, 90),
+    };
+  }
+}
+
+/**
+ * Read one planning file OUT OF THE REF. { ok:true, text, sha, committedAt } or
+ * { ok:false, why }. Never falls back to the working tree.
+ */
+function planningReadRef(name) {
+  const src = planningSource();
+  if (!src.ok) return { ok: false, why: src.why };
+  if (src.mode === 'tree') {
+    const p = path.join(src.dir, name);
+    try {
+      const text = fs.readFileSync(p, 'utf8');
+      // The tree has no commit date, so "as of" is the file's own mtime. Same shape as
+      // the ref branch, so every caller's staleness prose keeps working unchanged.
+      return {
+        ok: true,
+        text,
+        mode: 'tree',
+        sha: null,
+        committedAt: fs.statSync(p).mtime.toISOString(),
+        ref: src.dir,
+      };
+    } catch (e) {
+      return { ok: false, why: name + ' not readable in ' + src.dir };
+    }
+  }
+  try {
+    const text = cp.execFileSync('git', ['-C', src.repo, 'show', src.sha + ':!PLANNING/' + name], {
+      encoding: 'utf8',
+      maxBuffer: 1 << 28,
+      timeout: 30000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return { ok: true, text, sha: src.sha, committedAt: src.committedAt, ref: src.ref };
+  } catch (e) {
+    return {
+      ok: false,
+      why: name + ' not readable at ' + PLANNING_REF + ' -- ' + String(e.message).slice(0, 90),
+    };
+  }
+}
+
+/** What the page shows so "is this current" is answerable by LOOKING, not by an investigation. */
+function planningProvenance() {
+  const src = planningSource();
+  if (!src.ok) return { ok: false, why: src.why, ref: PLANNING_REF };
+  if (src.mode === 'tree') {
+    return { ok: true, mode: 'tree', ref: src.dir, sha: null, committedAt: null };
+  }
+  return {
+    ok: true,
+    mode: 'ref',
+    ref: src.ref,
+    sha: src.sha.slice(0, 8),
+    committedAt: src.committedAt,
+    ageSeconds: Math.max(0, Math.round((Date.now() - new Date(src.committedAt).getTime()) / 1000)),
+  };
+}
+
+/**
  * Absolute path to one planning file, or null if the tree or the file is absent.
  * @param {string} name one of PLANNING_FILES
  */
@@ -89,6 +233,14 @@ function planningFile(name) {
  * Read a planning file's text, or null when unavailable. Never throws.
  * @param {string} name one of PLANNING_FILES
  */
+/**
+ * Read a planning file FROM THE WORKING TREE. This is the reader for TOOLING --
+ * `roadmap-generate.js` writes ROADMAP.md into that same tree and then compares the
+ * two, so redirecting this to the ref makes it compare a tree-built board against
+ * ref source and it can never agree while the checkout is behind. Generators read
+ * whatever they write next to. The SERVED surface wants the ref: see
+ * `readPlanningFileAtRef`.
+ */
 function readPlanningFile(name) {
   const full = planningFile(name);
   if (!full) return null;
@@ -97,6 +249,12 @@ function readPlanningFile(name) {
   } catch {
     return null;
   }
+}
+
+/** Read a planning file for DISPLAY: from the ref, no fallback, null if unreadable. */
+function readPlanningFileAtRef(name) {
+  const r = planningReadRef(name);
+  return r.ok ? r.text : null;
 }
 
 /** True when every canonical planning file is readable. */
@@ -240,15 +398,12 @@ function readReport(name) {
  * that simply has not generated it yet read as a checkout with no planning tree.
  */
 function readRoadmap() {
-  const dir = planningDir();
-  if (!dir) return null;
-  const full = path.join(dir, 'ROADMAP.md');
-  if (!safeIsFile(full)) return null;
-  try {
-    return { text: fs.readFileSync(full, 'utf8'), mtime: fs.statSync(full).mtime };
-  } catch {
-    return null;
-  }
+  const r = planningReadRef('ROADMAP.md');
+  if (!r.ok) return null;
+  // `mtime` is the REF'S COMMIT DATE, not a file mtime. An mtime is when the file
+  // was WRITTEN; a checkout touch bumps it and the page then reports a freshness it
+  // does not have. This is the clock the staleness prose should always have had.
+  return { text: r.text, mtime: new Date(r.committedAt), sha: r.sha, ref: r.ref };
 }
 
 /**
@@ -495,13 +650,10 @@ function loadAxisVocabulary() {
  * as "nothing needs you".
  */
 function readBlockerGraph() {
-  const dir = planningDir();
-  if (!dir) return { observable: false, why: 'no planning tree on this machine' };
-  const full = path.join(dir, 'BLOCKER-GRAPH.json');
-  if (!safeIsFile(full))
-    return { observable: false, why: 'the planning tree has no BLOCKER-GRAPH.json' };
+  const r = planningReadRef('BLOCKER-GRAPH.json');
+  if (!r.ok) return { observable: false, why: r.why };
   try {
-    const graph = JSON.parse(fs.readFileSync(full, 'utf8'));
+    const graph = JSON.parse(r.text);
     if (!graph || typeof graph.items !== 'object' || graph.items === null) {
       return { observable: false, why: 'BLOCKER-GRAPH.json carries no items map' };
     }
@@ -630,6 +782,10 @@ module.exports = {
   planningDir,
   planningFile,
   readPlanningFile,
+  readPlanningFileAtRef,
+  planningSource,
+  planningReadRef,
+  planningProvenance,
   planningAvailable,
   planningWritePath,
   describe,

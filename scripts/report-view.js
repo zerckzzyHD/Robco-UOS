@@ -1435,11 +1435,27 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
  * band on this page — it is not duplicated anywhere else.
  */
 function renderQueue(board, queueMd, census, sources) {
-  const body = board
-    ? renderRoadmapSection(board.text, board.mtime, queueMd, census, sources)
+  // -- THE EMPTY STATE MUST NOT SAY "not an error" WHEN IT IS ONE --------------
+  // Two different absences reach here and they need different words. A PUBLIC
+  // CLONE has no private planning tree: normal, expected, not an error. A REF
+  // THAT WILL NOT READ is a broken surface, and calling that "the normal state"
+  // is exactly the silent staleness this page was rebuilt to stop. The whole
+  // point of reading from a ref is that a failure is VISIBLE; a reassuring empty
+  // state would hand that back. So the provenance decides the wording.
+  const prov = sources && sources.provenance;
+  const refFailed = prov && prov.ok === false;
+  const empty = refFailed
+    ? `<h1 id="queue">The queue</h1><div class="empty"><p><strong>THE BOARD COULD NOT BE READ, AND THIS IS AN ERROR.</strong></p>
+<p class="note">The board is read from the ref <code>${escapeHtml(String(prov.ref || 'origin/main'))}</code>, not from any working
+tree, so that what you see is what actually landed. That read FAILED: <code>${escapeHtml(String(prov.why || 'unknown'))}</code></p>
+<p class="note">Nothing is being shown from a fallback copy on purpose. An out-of-date board that looks
+current is worse than a page that says it is broken, because nobody investigates a number that looks fine.</p></div>`
     : `<h1 id="queue">The queue</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
+  const body = board
+    ? renderRoadmapSection(board.text, board.mtime, queueMd, census, sources)
+    : empty;
   return page({ title: 'Queue', crumb: '', body });
 }
 

@@ -55447,7 +55447,12 @@ if (!PLANNING_OK) {
       homeHandler262.length > 0 &&
       /boardCurrent:/.test(homeHandler262) &&
       /boardCurrency\(/.test(homeHandler262) &&
-      /readPlanningFile\('QUEUE\.md'\)/.test(homeHandler262) &&
+      // ⭐ 2026-09-07: the served routes read the REF, not the primary checkout, so
+      // the reader this guard names is `readPlanningFileAtRef`. NOT a widening --
+      // it is strictly narrower than the old literal, because it now also refuses a
+      // route that reads QUEUE.md from the working tree. The tree reader still
+      // exists and is still correct for the GENERATORS, which write next to it.
+      /readPlanningFileAtRef\('QUEUE\.md'\)/.test(homeHandler262) &&
       // ⛔ and the rule it calls is reached through the fresh-require chain, so a
       // dev server running for days cannot answer from a copy no longer on disk
       /roadmap-generate\.js/.test(viteSrc262.slice(0, homeStart262)),

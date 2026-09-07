@@ -398,7 +398,7 @@ function queueRoute() {
           200,
           view.renderQueue(
             paths.readRoadmap(),
-            paths.readPlanningFile('QUEUE.md'),
+            paths.readPlanningFileAtRef('QUEUE.md'),
             // The "need you" tile: the planning tree's own owner-decision census
             // (OD-RULE v1), run fresh per visit like the projection renderer —
             // never the ⚠️ band's size again.
@@ -411,6 +411,12 @@ function queueRoute() {
             // One unreachable source degrades ONE axis; none of them can take the
             // page down or make it print a number it could not measure.
             {
+              // WHERE THIS PAGE'S CONTENT CAME FROM. Resolved here like every other
+              // source, three-cased, so the renderer stays a pure function of what it
+              // was handed. It decides the EMPTY-STATE WORDING: a public clone with no
+              // planning tree is normal; a ref that will not read is an ERROR and the
+              // page must say so rather than reassure.
+              provenance: paths.planningProvenance(),
               // the accept block's grammar + its gated 3-value horizon vocabulary
               itemFormat: paths.loadItemFormat(),
               // ⭐ the board's own per-item assignment: BOTH axes with a basis and
@@ -544,7 +550,7 @@ function landingRoute() {
         // 59 items stale on 2026-09-01 while saying "Updated 44 minutes ago".
         // Costed: reading and hashing the whole queue is ~16 ms on the real 3.2 MB
         // document, once per visit to a page one person opens by hand.
-        const boardQueue = board ? paths.readPlanningFile('QUEUE.md') : null;
+        const boardQueue = board ? paths.readPlanningFileAtRef('QUEUE.md') : null;
         const boardCurrency = board
           ? freshRequire('./scripts/roadmap-generate.js').boardCurrency(board.text, boardQueue)
           : null;
