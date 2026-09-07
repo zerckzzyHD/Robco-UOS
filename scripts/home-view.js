@@ -402,9 +402,12 @@ function renderHome(state) {
       tile({
         href: s.museumUrl,
         title: 'The museum',
-        what: 'The public site telling the story of how this was built.',
-        meta: 'Opens the public web, outside this private network.',
-        away: true,
+        what: 'The story of how this was built, from the output generated on this machine.',
+        // ⛔ Owner, 2026-09-07: "show the local files version, not point to the real
+        // site." This tile used to leave for the published site — which is gated on a
+        // publish ruling and was 14 days stale. It is a LOCAL route now, so it is not
+        // `away`: an ↗ and a noreferrer on a same-origin path would both be lies.
+        meta: 'Served from this machine. Not the published site, and it publishes nothing.',
       })
     );
   }

@@ -2,6 +2,42 @@ import { defineConfig } from 'vite';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+const fs = require('node:fs');
+const path = require('node:path');
+
+/** Content types the generated museum actually ships. Anything else is served as bytes. */
+const MUSEUM_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+};
+
+/** Local escape — this file has no renderer of its own and must not import one for a string. */
+function escapeHtmlLocal(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -582,7 +618,10 @@ function landingRoute() {
           unbuilt: [],
           // The public companion site. Held here rather than in the renderer so
           // the renderer stays a pure function of what it is handed.
-          museumUrl: 'https://robco-exhibit.pages.dev/',
+          // ⛔ LOCAL, owner-ruled 2026-09-07 — this was the published site's address
+          // and the tile left the machine to reach it. The museum is served from
+          // `museum/site` on this box now; the publish is still gated on a ruling.
+          museumUrl: '/museum/',
         });
         return sendHtml(req, res, 200, html);
       });
@@ -606,6 +645,98 @@ function landingRoute() {
        * unnoticed — so it is passed unconditionally, and a null is rendered as
        * silence rather than as reassurance.
        */
+      /**
+       * `/museum` — the LOCALLY GENERATED museum, served off this machine.
+       *
+       * ⛔ Owner, 2026-09-07: "make the dev server show the local files version, not
+       * point to the real site." Before this, the home page carried a LINK to
+       * https://robco-exhibit.pages.dev/ — the dev server never served the museum at
+       * all. Looking at it meant leaving for the published site, which is 14 days
+       * stale and gated on a publish ruling he has not made.
+       *
+       * ⛔ NO REMOTE FALLBACK, and that is the whole point. If the local output cannot
+       * be read this route SAYS SO. Quietly showing the published site instead would be
+       * indistinguishable from success and would re-create, on a second surface, the
+       * exact defect /queue was just fixed for.
+       *
+       * Served from `museum/site` — the generator's "final output (atomically
+       * replaced)" — NOT `museum/public`, which is the derived staging tree for the
+       * public repo. Every reference in the generated tree is relative (measured:
+       * 3,213 relative, 0 root-absolute), so it is safe under a subpath.
+       */
+      server.middlewares.use('/museum', (req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        const paths = freshRequire('./scripts/planning-paths.js');
+        const prov = paths.museumProvenance();
+        if (!prov.ok) {
+          return sendHtml(
+            req,
+            res,
+            503,
+            '<!doctype html><meta charset="utf-8"><title>Museum not readable</title>' +
+              '<body style="font:14px system-ui;margin:2rem;max-width:44rem">' +
+              '<h1>THE LOCAL MUSEUM COULD NOT BE READ, AND THIS IS AN ERROR.</h1>' +
+              '<p>Nothing is being shown. This page will <strong>not</strong> fall back to the ' +
+              'published site — showing that instead would look like success.</p>' +
+              '<p>Tried: <code>' +
+              escapeHtmlLocal(prov.dir) +
+              '</code></p><p>Failure: <code>' +
+              escapeHtmlLocal(String(prov.why)) +
+              '</code></p>' +
+              '<p>Regenerate the museum in the archive, then reload.</p></body>'
+          );
+        }
+        // Relative links only resolve correctly from a trailing slash: at `/museum`
+        // the browser resolves `assets/robco.css` to `/assets/…` and every asset 404s.
+        const original = String(req.originalUrl || '').split('?')[0];
+        if (original === '/museum') {
+          res.statusCode = 302;
+          res.setHeader('Location', '/museum/');
+          return res.end();
+        }
+        let rel = decodeURIComponent((pathOf(req) || '/').split('?')[0]);
+        if (rel === '/' || rel === '') rel = '/index.html';
+        const target = path.resolve(prov.dir, '.' + rel);
+        // Traversal guard: a resolved path that escapes the site dir is refused.
+        if (target !== prov.dir && !target.startsWith(prov.dir + path.sep)) {
+          res.statusCode = 403;
+          return res.end('outside the museum tree');
+        }
+        let buf;
+        try {
+          buf = fs.readFileSync(target);
+        } catch {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          return res.end('not in the local museum output: ' + rel);
+        }
+        const ext = path.extname(target).toLowerCase();
+        if (ext === '.html' || ext === '.htm') {
+          // Say what this is, on the page. The generator emits no wall-clock stamp, so
+          // the time shown is the newest WRITE time in the tree and is labelled as that.
+          const when = new Date(prov.generatedAt).toISOString().replace('T', ' ').slice(0, 16);
+          const strip =
+            '<div style="font:12px/1.5 system-ui;background:#1d3f2b;color:#d8f3e3;' +
+            'padding:.5rem .75rem;border-bottom:1px solid #2f6b48">' +
+            'LOCAL GENERATED MUSEUM — served from this machine, not the published site. ' +
+            'Newest file written <strong>' +
+            escapeHtmlLocal(when) +
+            ' UTC</strong> · ' +
+            prov.files +
+            ' files · <code>museum/site</code>. ' +
+            'A write time, not proof the content is current.</div>';
+          let html = buf.toString('utf8');
+          html = /<body[^>]*>/i.test(html)
+            ? html.replace(/(<body[^>]*>)/i, '$1' + strip)
+            : strip + html;
+          return sendHtml(req, res, 200, html);
+        }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', MUSEUM_TYPES[ext] || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+        res.end(req.method === 'HEAD' ? '' : buf);
+      });
+
       server.middlewares.use('/status', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
         const rest = (pathOf(req) || '/').replace(/^\/+/, '');

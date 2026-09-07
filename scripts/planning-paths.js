@@ -251,6 +251,45 @@ function readPlanningFile(name) {
   }
 }
 
+/**
+ * The LOCALLY GENERATED museum: `museum/site/`, which generate.mjs calls its "final
+ * output (atomically replaced)". ⛔ NOT `museum/public/`, which is the derived staging
+ * tree for the public repo, and ⛔ not the published site.
+ *
+ * The generator emits no wall-clock timestamps (reproducibility is a property here), so
+ * there is nothing inside the output that says when it was built. The newest mtime in
+ * the tree is the honest available signal and is labelled as exactly that on the page --
+ * a checkout would also set it, so it is a WRITE time, not a proof of content freshness.
+ */
+function museumSiteDir() {
+  return path.join(archiveRepo(), 'museum', 'site');
+}
+
+/** { ok, dir, files, generatedAt } or { ok:false, dir, why }. Never throws, never guesses. */
+function museumProvenance() {
+  const dir = museumSiteDir();
+  try {
+    const index = path.join(dir, 'index.html');
+    let newest = fs.statSync(index).mtime;
+    let files = 0;
+    const walk = d => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = path.join(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else {
+          files++;
+          const m = fs.statSync(p).mtime;
+          if (m > newest) newest = m;
+        }
+      }
+    };
+    walk(dir);
+    return { ok: true, dir, files, generatedAt: newest.toISOString() };
+  } catch (e) {
+    return { ok: false, dir, why: String(e.message).slice(0, 120) };
+  }
+}
+
 /** Read a planning file for DISPLAY: from the ref, no fallback, null if unreadable. */
 function readPlanningFileAtRef(name) {
   const r = planningReadRef(name);
@@ -783,6 +822,8 @@ module.exports = {
   planningFile,
   readPlanningFile,
   readPlanningFileAtRef,
+  museumSiteDir,
+  museumProvenance,
   planningSource,
   planningReadRef,
   planningProvenance,
