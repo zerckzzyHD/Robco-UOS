@@ -13,7 +13,8 @@
  *      this repository (measured: one reference, and it is the read);
  *   3. location.hostname being `localhost`, `127.0.0.1`, or `*.pages.dev`.
  *
- * The tailnet dev origin is `rog-ally.tail03c626.ts.net`. It is not any of those
+ * The tailnet dev origin is this machine's own `*.ts.net` MagicDNS name (resolved
+ * off tracked source -- scripts/dev-host.js). It is not any of those
  * hostnames, it is not the Cloudflare build, and nothing sets the global — so
  * `_isStagingEnv()` returned false and the shell never mounted. ⭐ The SAME dev
  * server, serving the SAME bytes, showed the shell at 127.0.0.1 and hid it over
@@ -23,7 +24,7 @@
  * test that predates this origin existing.
  *
  * ── ⭐ WHY A MARKER, AND NOT ONE MORE HOSTNAME ──────────────────────────────
- * Adding `rog-ally.tail03c626.ts.net` to that hostname list would work today and
+ * Adding the tailnet origin to that hostname list would work today and
  * be wrong in kind. A hostname list is a STRING SHIPPED IN PUBLIC APP CODE that
  * says "trust anything answering to this name": it grows every time a new origin
  * appears, it is read by production builds that have no business knowing the

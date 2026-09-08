@@ -53772,17 +53772,37 @@ if (!PLANNING_OK) {
     .split('\n')
     .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
     .join('\n');
+  // ⭐ SUPERSEDED IN PART 2026-09-08, AND THE OLD CLAIM IS RECORDED RATHER THAN
+  // SILENTLY SWAPPED. This required `allowedHosts` to be a LITERAL array in the
+  // source. It no longer is — the value names this machine and left tracked source
+  // entirely (owner ruling, option (a); scripts/dev-host.js, Suite 274) — so the
+  // textual form is now `allowedHosts: DEV_HOSTS`.
+  //
+  // ⛔ THE BAN IS NOT WEAKENED, IT MOVED WHERE IT CAN BE PROVEN. "Never `true`,
+  // never a wildcard" is now enforced by the RESOLVER, on every value that can
+  // reach the config, and asserted behaviourally in 274.6 — which is strictly
+  // stronger than a regex over one line, because it also covers the untracked file
+  // this reads from, where nobody reviews a diff. This assertion keeps the half it
+  // can still see (the literal must not BE `true` or a wildcard if anyone puts one
+  // back) and adds the binding it must now have.
   const hostM249 = /host:\s*'([^']+)'/.exec(viteSrc249);
-  const allowM249 = /allowedHosts:\s*(\[[^\]]*\]|true)/.exec(viteSrc249);
+  const allowM249 = /allowedHosts:\s*(\[[^\]]*\]|true|[A-Za-z_$][\w$]*)/.exec(viteSrc249);
+  const allowVal249 = allowM249 && allowM249[1];
+  const literalOk249 =
+    allowVal249 &&
+    allowVal249.startsWith('[') &&
+    !allowVal249.includes('*') &&
+    allowVal249 !== '[]';
+  const boundOk249 =
+    allowVal249 === 'DEV_HOSTS' && /const DEV_HOSTS = DEV_HOST_R\.ok \?/.test(viteSrc249);
   assert(
     hostM249 !== null &&
       (hostM249[1] === '127.0.0.1' || hostM249[1] === 'localhost') &&
-      allowM249 !== null &&
-      allowM249[1] !== 'true' &&
-      allowM249[1].startsWith('[') &&
-      !allowM249[1].includes('*'),
-    '249.6: the dev server binds a LOOPBACK address and names its allowed hosts explicitly — never 0.0.0.0, never a wildcard, never allowedHosts:true — so the only route in from outside this machine stays the tailnet proxy rather than the local network' +
-      ` — host=${hostM249 && hostM249[1]} allowedHosts=${allowM249 && allowM249[1]}`
+      allowVal249 !== null &&
+      allowVal249 !== 'true' &&
+      (literalOk249 || boundOk249),
+    '249.6: the dev server binds a LOOPBACK address and its allowed hosts are explicit — never 0.0.0.0, never a wildcard, never allowedHosts:true — either as a literal list or bound to the resolver that refuses both (Suite 274.6), so the only route in from outside this machine stays the tailnet proxy' +
+      ` — host=${hostM249 && hostM249[1]} allowedHosts=${allowVal249}`
   );
 
   // ── 249.7  Markers survive, and the page is phone-shaped ─────────────────
@@ -60937,6 +60957,262 @@ if (!PLANNING_OK) {
       /\/queue\/item\//.test(vite273),
     "273.13: the /queue/item route reads the queue AT THE REF through the fresh-require chain — the same stale-proofing as the page it feeds, so a row's body can never disagree with the board it was opened from"
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 274 — the dev origin's hostname lives OUTSIDE tracked source
+//
+//  ⛔⛤ THE EXPOSURE THIS LOCKS. This machine's tailnet MagicDNS name sat in
+//  TRACKED source on this PUBLIC remote from 2026-08-24 (`838c839`) to
+//  2026-09-08 — a functional `allowedHosts` value in vite.config.mjs, twice more
+//  in a dev-env-marker.js comment, and the machine\user form in CLAUDE.md. It was
+//  found while deleting three overnight/* branches that carried it in an
+//  acceptance receipt; the branches were the small half and `dev` was the large.
+//
+//  ⭐ THE GUARD IS A PATTERN, NOT THE ONE STRING. Asserting "rog-ally is absent"
+//  would pass forever on a machine that is renamed, or on a second machine, while
+//  the class quietly returned. The check is the SHAPE of a tailnet name in any
+//  tracked file — so a different machine's name is caught by the same assertion
+//  that caught this one.
+//
+//  ⚠ AND IT CARRIES ITS OWN POSITIVE CONTROL. A grep-based guard that matches
+//  nothing reads identically to a clean repository, which is exactly how the
+//  comparability report shipped blind (Suite 271). So the scan proves it can find
+//  a planted specimen before its absence result is trusted.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 274 — the tailnet hostname is resolved off tracked source, never committed');
+  const DH274 = require(path.join(ROOT, 'scripts', 'dev-host.js'));
+  const cp274 = require('child_process');
+
+  // Every tracked file, asked of git rather than walked — the same decision
+  // `git add` makes, so a file this repo does not track cannot mask a hit.
+  const tracked274 = cp274
+    .execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean);
+  // ⛔ The SHAPE of a tailnet MagicDNS name: <host>.<tailnet>.ts.net. Not this
+  // machine's name — see the header for why the instance would be the wrong guard.
+  const TS_RE274 = /\b[A-Za-z0-9][A-Za-z0-9-]*\.[A-Za-z0-9-]+\.ts\.net\b/;
+  // ⭐ THE PLACEHOLDERS ARE NAMED, ONE BY ONE, RATHER THAN THE FILES EXEMPTED.
+  //
+  // Documentation and fixtures must be able to show the SHAPE of a tailnet name —
+  // the refusal message tells the operator what to write, and this suite's own
+  // positive control plants one. ⛔ Exempting those FILES instead would blind the
+  // guard exactly where a real value is most likely to be pasted next: the
+  // resolver's docs and the test fixtures are the two places somebody debugging
+  // with their live hostname would put it.
+  //
+  // ⚠ THE CEILING, STATED: a real machine literally named one of these would slip
+  // through. That is accepted — the list is five obviously-fake tokens, and the
+  // alternative (matching only `tail[0-9a-f]{6}` for the tailnet id) would miss a
+  // tailnet using a custom domain, which is a real configuration and the worse
+  // miss of the two.
+  const PLACEHOLDERS_274 = new Set([
+    'your-machine.tailXXXXXX.ts.net', // the refusal message + example file
+    'some-box.tailf00ba7.ts.net', // 274.1's planted specimen
+    'a-box.tail1234.ts.net', // 274.4/274.9's fixtures
+    'example-host.ts.net', // the Suite 249.11 serve-config fixtures
+    'machine.tailnet.ts.net', // prose shape in docs
+  ]);
+  const scan274 = (files, re) => {
+    const hits = [];
+    for (const f of files) {
+      let text;
+      try {
+        text = fs.readFileSync(path.join(ROOT, f), 'utf8');
+      } catch {
+        continue; // binary or unreadable — the binary-source guard owns that case
+      }
+      text.split('\n').forEach((line, i) => {
+        // Every match on the line, not just the first — a line can carry two.
+        for (const m of line.matchAll(new RegExp(re.source, 'g'))) {
+          if (PLACEHOLDERS_274.has(m[0])) continue;
+          hits.push(`${f}:${i + 1}: ${m[0]}`);
+        }
+      });
+    }
+    return hits;
+  };
+
+  // ── 274.1 POSITIVE CONTROL — the scan can actually find one ────────────────
+  // A planted specimen in a temp file the scan is pointed at. GOES RED IF the
+  // matcher stops matching, which would otherwise render as a clean repository.
+  {
+    const spec274 = path.join(ROOT, '.dev-host-scan-specimen.tmp');
+    // ⛔ The specimen is deliberately NOT one of PLACEHOLDERS_274 — planting an
+    // exempt string would prove only that the exemption works, which is the
+    // control passing by not looking. It also plants an exempt one beside it, so
+    // the same run proves the exemption does not swallow a real hit.
+    // ⛔⛤ ASSEMBLED FROM FRAGMENTS, NOT WRITTEN AS A LITERAL — and that is this
+    // guard eating its own tail, caught by itself on the first run. A specimen
+    // spelled out here would sit in a TRACKED file, so 274.2 would find it and go
+    // red against the very suite that plants it. Building it at runtime keeps the
+    // control real while leaving no tailnet-shaped string in the repository.
+    const realish274 = 'realbox.' + 'tail' + 'beef99' + '.ts.net';
+    fs.writeFileSync(
+      spec274,
+      `allowedHosts: ["${realish274}", "your-machine.tailXXXXXX.ts.net"]\n`,
+      'utf8'
+    );
+    const found274 = scan274(['.dev-host-scan-specimen.tmp'], TS_RE274);
+    fs.rmSync(spec274, { force: true });
+    assert(
+      found274.length === 1 && /tailbeef99\.ts\.net/.test(found274[0]),
+      '274.1: POSITIVE CONTROL — the scan finds a planted NON-placeholder tailnet hostname and does not report the exempt placeholder sitting on the same line; its silence below is evidence of absence rather than of a broken matcher or a too-wide exemption' +
+        ` — got ${JSON.stringify(found274)}`
+    );
+  }
+
+  // ── 274.2 THE INVARIANT — no tracked file names a tailnet host ─────────────
+  {
+    // ⛔ No file is exempted — PLACEHOLDERS_274 exempts named STRINGS instead, so
+    // the docs and fixtures that must show the shape stay scanned for everything
+    // else. See that set's header for why the file-level exemption was wrong.
+    const hits274 = scan274(tracked274, TS_RE274);
+    assert(
+      hits274.length === 0,
+      '274.2: no tracked file contains a tailnet MagicDNS hostname — the dev origin is resolved from an untracked dev-host.local.json (or ROBCO_DEV_HOST) so a machine identifier never reaches this PUBLIC repository' +
+        (hits274.length ? ' — FOUND: ' + hits274.slice(0, 8).join(' · ') : '')
+    );
+  }
+
+  // ── 274.3 the untracked config is actually ignored by GIT, not just absent ──
+  // ⛔ Asked of git, never by reading .gitignore for a pattern: a pattern being
+  // written down does not prove git AGREES (an earlier negation or ordering
+  // mistake silently un-ignores it), and this is the file that must never land.
+  {
+    const ci274 = cp274.spawnSync('git', ['check-ignore', DH274.LOCAL_FILE], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    const tracked = tracked274.includes(DH274.LOCAL_FILE);
+    assert(
+      ci274.status === 0 && !tracked,
+      `274.3: git itself ignores ${DH274.LOCAL_FILE} and it is not tracked — asked of git (check-ignore), the same decision \`git add\` makes, rather than by reading .gitignore for a pattern`
+    );
+  }
+
+  // ── 274.4 THREE-VALUED, and it never invents a host ────────────────────────
+  {
+    const saved274 = process.env.ROBCO_DEV_HOST;
+    process.env.ROBCO_DEV_HOST = 'a-box.tail1234.ts.net';
+    const ok274 = DH274.resolveDevHosts();
+    process.env.ROBCO_DEV_HOST = DH274.PLACEHOLDER;
+    const ph274 = DH274.resolveDevHosts();
+    process.env.ROBCO_DEV_HOST = '*';
+    const wc274 = DH274.resolveDevHosts();
+    process.env.ROBCO_DEV_HOST = 'http://a-box.tail1234.ts.net:5173/x';
+    const bad274 = DH274.resolveDevHosts();
+    if (saved274 === undefined) delete process.env.ROBCO_DEV_HOST;
+    else process.env.ROBCO_DEV_HOST = saved274;
+    assert(
+      ok274.ok === true &&
+        ok274.hosts.join(',') === 'a-box.tail1234.ts.net' &&
+        ok274.source === 'ROBCO_DEV_HOST',
+      "274.4: the ROBCO_DEV_HOST override resolves and names its source — the CI/test door, matching planning-paths.js's ROBCO_* convention"
+    );
+    assert(
+      ph274.ok === false && /placeholder/.test(ph274.why),
+      '274.5: the tracked PLACEHOLDER is refused rather than accepted as a hostname — a half-finished copy of the example file cannot silently serve on a host list that trusts a literal nobody owns'
+    );
+    assert(
+      wc274.ok === false && /wildcard/i.test(wc274.why),
+      "274.6: a wildcard is REFUSED by the resolver — `allowedHosts: true`/`*` disables Vite's DNS-rebinding protection instead of naming what is trusted, and an untracked file must not be able to re-make that decision where nobody reviews it"
+    );
+    assert(
+      bad274.ok === false && /bare hostname/.test(bad274.why),
+      '274.7: a value carrying a scheme, port or path is refused — allowedHosts takes bare hostnames, and a near-miss produces a "Blocked request" page that reads like a network fault'
+    );
+  }
+
+  // ── 274.8 ⛔ NO FALLBACK HOST ANYWHERE IN THE RESOLVER ──────────────────────
+  // Static, and the reason is stated (rules/testing-and-gates.md): the property is
+  // the ABSENCE of a literal in the source, which no behavioural call can prove —
+  // a default would only show itself on a machine that has no config, which is
+  // precisely the machine where a wrong-but-plausible host does its damage.
+  {
+    const src274 = readFile('scripts/dev-host.js');
+    const code274 = src274
+      .split('\n')
+      .filter(l => !/^\s*(\*|\/\/|\/\*)/.test(l))
+      .join('\n');
+    const lits274 = [...code274.matchAll(new RegExp(TS_RE274.source, 'g'))]
+      .map(m => m[0])
+      .filter(h => !PLACEHOLDERS_274.has(h));
+    assert(
+      lits274.length === 0 && /ok:\s*false/.test(code274),
+      '274.8: the resolver carries NO real hostname literal in any code line (only the named placeholders its own refusal message prints) and returns ok:false rather than a default — a guessed host does not fail loudly, it serves a "Blocked request" page that reads like a network problem' +
+        (lits274.length ? ' — FOUND: ' + lits274.join(', ') : '')
+    );
+  }
+
+  // ── 274.9 the config REFUSES on serve, and only on serve ───────────────────
+  // Behavioural: run the real vite config through Vite's own loader with the
+  // config absent, once as `serve` and once as `build`.
+  {
+    const probe274 = (command, env) =>
+      cp274.spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `import('./vite.config.mjs').then(m=>{const c=m.default;` +
+            `const r=typeof c==='function'?c({command:'${command}',mode:'development'}):c;` +
+            `console.log('OK '+JSON.stringify((r.server&&r.server.allowedHosts)||[]));})` +
+            `.catch(e=>{console.log('REFUSED '+e.message);})`,
+        ],
+        {
+          cwd: ROOT,
+          encoding: 'utf8',
+          env: Object.assign({}, process.env, env),
+        }
+      );
+    // Force the absent state regardless of what this machine has on disk, by
+    // pointing the resolver at an env value that cannot resolve.
+    const serveAbsent = probe274('serve', { ROBCO_DEV_HOST: DH274.PLACEHOLDER });
+    const buildAbsent = probe274('build', { ROBCO_DEV_HOST: DH274.PLACEHOLDER });
+    assert(
+      /REFUSED/.test(serveAbsent.stdout || '') &&
+        /tailnet hostname not configured/.test(serveAbsent.stdout || ''),
+      '274.9: with no usable hostname the config REFUSES on `serve` — the dev server does not come up on an empty host list, which would serve the phone the same "Blocked request" page the guard exists to prevent' +
+        ` — got ${JSON.stringify(
+          String(serveAbsent.stdout || '')
+            .trim()
+            .slice(0, 120)
+        )}`
+    );
+    assert(
+      /^OK /.test(String(buildAbsent.stdout || '').trim()),
+      '274.10: the SAME absent state does NOT refuse on `build` — allowedHosts is meaningless outside serve, and a public clone with no dev-host.local.json (the by-design state) must not be unable to load this config' +
+        ` — got ${JSON.stringify(
+          String(buildAbsent.stdout || '')
+            .trim()
+            .slice(0, 120)
+        )}`
+    );
+  }
+
+  // ── 274.11 ⛔⛤ THE SCOPE COMES FROM VITE, NOT FROM ARGV ─────────────────────
+  // GOES RED IF somebody reintroduces argv sniffing. The first version of this
+  // guard tested `process.argv` for 'serve'/'dev' — and its own red control caught
+  // it: `vite --port 5199` carries NEITHER token (bare `vite` IS serve, the
+  // default command, usually omitted), so the guard read that as "not serving" and
+  // the server came up with an EMPTY host list. A refusal that does not fire is
+  // worse than none: it produces exactly the page it exists to prevent.
+  {
+    const vsrc274 = readFile('vite.config.mjs');
+    const vcode274 = vsrc274
+      .split('\n')
+      .filter(l => !/^\s*(\*|\/\/|\/\*)/.test(l))
+      .join('\n');
+    assert(
+      /defineConfig\(\s*\(\s*\{\s*command/.test(vcode274) &&
+        !/process\.argv[\s\S]{0,120}(serve|dev)/.test(vcode274),
+      '274.11: the serve/build decision is taken from the `command` Vite hands defineConfig, and no code line sniffs process.argv for it — bare `vite` is serve and carries no such token, so argv sniffing silently disarms the refusal'
+    );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

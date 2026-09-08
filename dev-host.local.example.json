@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy this to dev-host.local.json (gitignored) and replace the placeholder with this machine's tailnet MagicDNS name — find it with `tailscale status`. The dev server refuses to start while the placeholder is still here, so a half-finished copy cannot silently serve on the wrong host list. One-off alternative: ROBCO_DEV_HOST=your-machine.tailXXXXXX.ts.net npm run dev",
+  "allowedHosts": ["<your-machine>.tailnet.ts.net"]
+}

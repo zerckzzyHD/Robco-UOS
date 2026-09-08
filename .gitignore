@@ -10,6 +10,18 @@
 # won't have). Works fine locally, untracked, which is all it needs to do.
 .mcp.json
 
+# The dev server's tailnet hostname — SAME DNA as .mcp.json above, and it is here
+# because the value was NOT. This machine's `*.ts.net` MagicDNS name sat in tracked
+# source (vite.config.mjs `allowedHosts`) on this PUBLIC remote from 2026-08-24
+# until 2026-09-08. It names a machine, it is meaningless on any other, and it has
+# no reason to be world-readable — so it lives here, untracked, resolved at startup
+# by scripts/dev-host.js, which REFUSES to start rather than defaulting to a guess.
+#
+# A clone has no such file by design; `npm run dev` then prints how to make one.
+# The tracked example is dev-host.local.example.json, which carries a PLACEHOLDER
+# the resolver explicitly rejects, so a copied example cannot silently half-work.
+dev-host.local.json
+
 # Codex's local hook wiring — same reasoning as .claude/ above, and this repo is
 # PUBLIC. .codex/ holds machine-local hook wiring and stays untracked.
 #
