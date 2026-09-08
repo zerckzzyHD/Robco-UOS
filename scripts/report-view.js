@@ -165,6 +165,37 @@ details.band > p.note { margin-top:0; }
 details.band ul { padding-left:1.15rem; }
 details.drift { border-color:var(--hi); }
 details.drift code { font-weight:700; }
+/* ── Item rows (the queue-sourced board) ─────────────────────────────────────
+   One row per item, one line when it fits: id · title · chips. The row is a
+   <details> so the body is one tap away without leaving the page — the body
+   itself is fetched on first open (2.7MB of bodies cannot ride along inline). */
+.rows { margin:0 0 .5rem; }
+details.item { border:none; border-top:1px solid var(--line); border-radius:0;
+  margin:0; background:none; }
+details.item > summary { display:flex; flex-wrap:wrap; gap:.3rem .5rem;
+  align-items:baseline; padding:.55rem .1rem; min-height:40px; cursor:pointer;
+  font-weight:400; }
+details.item > summary code { font-weight:700; }
+details.item .t { flex:1 1 12rem; font-size:.92rem; line-height:1.35; }
+details.item .ibody { padding:.15rem .4rem .7rem; font-size:.92rem; }
+details.item .ibody p { margin:.4rem 0; }
+.chip { display:inline-block; border:1px solid var(--line); border-radius:999px;
+  padding:.02rem .45rem; font-size:.72rem; color:var(--dim); white-space:nowrap; }
+.chip.m { color:var(--hi); border-color:var(--hi); font-weight:700; }
+.chip.s { font-style:italic; }
+details.band > summary .g { margin-left:auto; opacity:.8; }
+/* The landed-not-confirmed watch list — the overnight run's own states, kept
+   above the fold because they are what the owner is actually watching. */
+section.watch { border:2px solid var(--acc); border-radius:10px;
+  padding:.4rem .75rem .6rem; margin:1rem 0; }
+section.watch h2 { margin:.4rem 0 .2rem; font-size:1.05rem; }
+section.watch h2 .c { background:var(--code); border:1px solid var(--line);
+  border-radius:999px; padding:.1rem .55rem; font-size:.85rem; }
+section.watch ul { list-style:none; padding:0; margin:.3rem 0 .2rem; }
+section.watch li { padding:.45rem 0; border-top:1px solid var(--line);
+  font-size:.92rem; }
+section.watch li:first-child { border-top:none; }
+article.qitem h1 { font-size:1.15rem; line-height:1.4; }
 hr + h2 { margin-top:1.2rem; }
 h1 { scroll-margin-top:4.5rem; }
 .empty { border:1px dashed var(--line); border-radius:8px; padding:1rem; }
@@ -231,8 +262,9 @@ function page({ title, crumb, body, nav, style, atHome }) {
 ${body}
 </main>
 <script>
-/* ⭐ THE ONLY SCRIPT ON THIS PAGE. It hides rows and it LOOKS UP numbers; it does
-   not compute one. Every (band × project) figure was derived on the server, over
+/* ⭐ THE ONLY SCRIPT ON THIS PAGE. It hides rows, it LOOKS UP numbers, and it
+   FETCHES an item's body from this same origin when a row is opened; it never
+   computes a number. Every (band × project) figure was derived on the server, over
    the whole queue, and handed here as data — so the number a reader sees under a
    filter is the same derivation as the number they saw without one.
 
@@ -282,6 +314,33 @@ ${body}
         var v = band ? band[want] : null;
         cell.textContent = typeof v === 'number' ? String(v) : band ? '0' : '?';
       });
+    });
+  });
+})();
+/* ── Lazy item bodies ─────────────────────────────────────────────────────────
+   2.7MB of item bodies cannot ride along in the page, so a row's body is fetched
+   from /queue/item/(id)?frag=1 — the SAME ref-read source, rendered by the same
+   renderer — the first time that row is opened. Degrades to a link: the
+   "Open the full item" anchor is server-rendered inside every row, and a failed
+   fetch simply leaves it standing. With JS off, every row still reaches its item. */
+(function () {
+  document.querySelectorAll('details.item').forEach(function (d) {
+    d.addEventListener('toggle', function () {
+      if (!d.open) return;
+      var box = d.querySelector('.ibody[data-id]');
+      if (!box || box.dataset.loaded) return;
+      box.dataset.loaded = '1';
+      fetch('/queue/item/' + encodeURIComponent(box.dataset.id) + '?frag=1')
+        .then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.text();
+        })
+        .then(function (t) {
+          box.innerHTML = t;
+        })
+        .catch(function () {
+          /* the server-rendered link inside the box stays — the honest fallback */
+        });
     });
   });
 })();
@@ -362,6 +421,18 @@ const BAND_ORDER = [
   'Active',
   'Attention',
   'Ready',
+  // ⭐ QUESTION SITS WITH THE OWNER-FACING BANDS, not in the filed-for-later mass:
+  // an open question is a decision surface, and the owner reads this page top-down.
+  'Question',
+  // ⭐ `To-do`, BY ITS OWN NAME (owner, 2026-09-07: "the 'backlog' sections don't
+  // even make sense"). `Backlog` was the BOARD DOCUMENT's deliberate local rename
+  // of this same band (roadmap-generate.js BACKLOG_LABEL, Suite 248.8b) and it
+  // reached this page only while the page scraped the board's headings. The
+  // sections come from the queue's own status vocabulary now, so the band wears
+  // the vocabulary's label. `Backlog` survives in this list solely for the
+  // DEGRADED path — the board-scrape rendering used when the queue itself cannot
+  // be read — because that path's headings still say it.
+  'To-do',
   'Deferred',
   'Parked',
   'Backlog',
@@ -373,6 +444,10 @@ const BAND_ORDER = [
   // vocabulary's own note says a settled item is a LIVE CONSTRAINT on the items
   // that depend on it, and "a constraint nobody sees stops constraining".
   'Settled',
+  // ⚠ Done renders only when it holds items — a heading that LEADS with ✅ is a
+  // discipline violation (QR1 Part D) already counted by the honesty tile, and the
+  // band exists so those rows are openable rather than a number with no list.
+  'Done',
   'UNCLASSIFIED',
 ];
 // ⭐ EVERY BAND STARTS CLOSED — the OWNER'S call, after using the page.
@@ -395,11 +470,14 @@ const BAND_BLURB = {
   Attention:
     'Flagged ⚠️ on the heading. A flag, not a decision count: the open owner decisions are counted above, from the census, and most of them are not in this band.',
   Ready: 'Specified and unblocked. Could be started next.',
+  Question: 'An open question — a decision surface, not filed work.',
+  'To-do': 'Filed and waiting. Not started, not blocked — every item is listed here.',
   Deferred: 'Deliberately put off, with a reason.',
   Parked: 'Stopped on purpose. Not abandoned, not scheduled.',
   Backlog: 'Everything else that is filed but not yet in motion.',
   Settled:
     'Answered for good, no work will follow — kept visible because it still constrains the items that depend on it.',
+  Done: '⛔ A heading that LEADS with the done-mark while still filed in the open queue — closed items belong in QUEUE_LOG.md, so anything here is drift.',
   UNCLASSIFIED:
     'Carries no recognised status — worth a look precisely because nothing could file it.',
 };
@@ -664,11 +742,19 @@ function boardAxes(queueMd, sources) {
       out.horizons.why = s.itemFormat.why;
     }
     const bands = A.bandById(queueMd, QV, RG.bandOfHeading);
-    // band KEY → the board's display LABEL. ⚠ Built BEFORE the two derivations
+    // band KEY → this page's display LABEL. ⚠ Built BEFORE the two derivations
     // below, both of which key off the label — populating it afterwards silently
     // filed every item under UNCLASSIFIED.
+    //
+    // ⭐ THE LABEL IS THE VOCABULARY'S OWN, `To-do` INCLUDED (owner, 2026-09-07:
+    // "the 'backlog' sections don't even make sense"). `Backlog` was never a
+    // state — it is the BOARD DOCUMENT's deliberate local override of the shared
+    // vocabulary's `To-do` (roadmap-generate.js BACKLOG_LABEL, pinned by Suite
+    // 248.8b), and it leaked onto this page only because this page used to scrape
+    // the board's headings for its sections. The sections are the queue's own
+    // states now, so every label comes straight from parser.STATUSES.
     for (const st of QV.STATUSES) {
-      out.bandLabelOf.set(st.key, st.key === RG.BACKLOG_KEY ? RG.BACKLOG_LABEL : st.label);
+      out.bandLabelOf.set(st.key, st.label);
     }
     out.someday = A.somedayByBand(out.horizons, bands);
     out.bandCounts = A.bandProjectCounts(items, bands, out.bandLabelOf, out.projects, out.horizons);
@@ -698,16 +784,100 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // ⛔ Required here, not at module load, for the same reason as the rule above:
   // this is the only place the board generator is needed, and importing it is how
   // one definition of "does the board match the queue" stays one definition.
-  const { boardCurrency } = require('./roadmap-generate.js');
+  const RG = require('./roadmap-generate.js');
+  const { boardCurrency } = RG;
+  const QV = require('./queue-view.js');
   // Both new axes, over the whole queue. Independently three-cased: one
   // unreachable source degrades one axis, never the page.
   const axes = boardAxes(queueMd, sources);
-  const sections = splitSections(md);
+
+  // ── ⭐⭐ THE QUEUE IS THE SOURCE, AND WHEN IT IS IN HAND THE ROWS COME FROM IT ──
+  //
+  // (Owner, 2026-09-07: "get it fixed to match how the queue actually works now".)
+  // The board document is a PROJECTION of the queue, and its Backlog band is a
+  // count, deliberately not a list — so a page that scraped the board could never
+  // open the largest band on it: ~two-thirds of the items were a number with no
+  // rows. This route already reads the WHOLE queue at the same ref for the honesty
+  // tile, so the sections are built from the queue itself: every status in the
+  // shared vocabulary becomes a band, and every item — the To-do mass included —
+  // gets a row.
+  //
+  // ⚠ MEMBERSHIP USES THE BOARD'S OWN CLASSIFIER (`bandOfHeading`, leading-glyph
+  // only), not `detectStatus` (earliest-glyph): it is the stricter documented rule
+  // ("a ✅ later in prose can never flip an open item"), and it is what
+  // `bandProjectCounts` already keys on — so the number on a band header and the
+  // server-computed figure the filter swaps in are ONE derivation by construction,
+  // never two classifiers that happen to agree. Measured live 2026-09-08: the two
+  // agree on all 425 current items, and this keeps it structural rather than lucky.
+  //
+  // ⛔ THE BOARD-SCRAPE PATH SURVIVES ONLY AS THE DEGRADED MODE — the queue
+  // unreadable while the board still is. Its currency banner is already loud about
+  // exactly that state.
+  const qItems =
+    typeof queueMd === 'string' && queueMd.trim()
+      ? (() => {
+          try {
+            return QV.parseQueue(queueMd).blocks.filter(b => b.type === 'item' && b.id);
+          } catch {
+            return [];
+          }
+        })()
+      : [];
+  const queueMode = qItems.length > 0;
+
+  // A readable queue that parses to no ID-bearing items is not a board — with no
+  // board document either, there is nothing honest to render; the caller shows
+  // its empty state instead of this function inventing one.
+  if (!queueMode && !md) return null;
+
   const bands = new Map();
-  for (const s of sections) {
-    const b = bandOf(s.heading);
-    if (b) bands.set(b.label, { ...b, lines: s.lines });
+  if (queueMode) {
+    const A = require('./board-axes.js');
+    const bandKeyOf = A.bandById(queueMd, QV, RG.bandOfHeading);
+    const labelOf = new Map(QV.STATUSES.map(s => [s.key, s.label]));
+    const glyphOf = new Map(QV.STATUSES.map(s => [s.key, s.glyph]));
+    // Seed every vocabulary band so an empty one still renders with its real 0 —
+    // absent and zero are different facts here as everywhere else on this page.
+    for (const s of QV.STATUSES) {
+      bands.set(s.label, { label: s.label, glyph: s.glyph, count: 0, rows: [] });
+    }
+    for (const it of qItems) {
+      const key = bandKeyOf.get(it.id) || null;
+      const label = key ? labelOf.get(key) || 'UNCLASSIFIED' : 'UNCLASSIFIED';
+      if (!bands.has(label)) {
+        bands.set(label, { label, glyph: key ? glyphOf.get(key) || '' : '❔', count: 0, rows: [] });
+      }
+      const band = bands.get(label);
+      band.count++;
+      band.rows.push(it);
+    }
+    // Done and UNCLASSIFIED render only when they hold items — both are drift
+    // surfaces, and a permanently-empty alarm band teaches the reader to skip it.
+    for (const label of ['Done', 'UNCLASSIFIED']) {
+      if (bands.has(label) && bands.get(label).count === 0) bands.delete(label);
+    }
+  } else {
+    const sections = splitSections(md);
+    for (const s of sections) {
+      const b = bandOf(s.heading);
+      if (b) bands.set(b.label, { ...b, lines: s.lines });
+    }
   }
+
+  // The landed-state heading markers — scanned here, above the counts strip,
+  // because the strip carries their tile; the watch list itself renders further
+  // down. The set is CLOSED and named: these three are the live run's own
+  // deployment-pipeline states (owner requirement, 2026-09-07). Any other
+  // bracketed marker stays visible in the row's title, unclassified on purpose.
+  const LANDED_MARKS = [
+    'MERGED-AWAITING-CONFIRMATION',
+    'MERGED-NOT-DEPLOYED',
+    'ADVANCED-NOT-CLOSED',
+  ];
+  const marksOf = title => LANDED_MARKS.filter(m => String(title).includes('[' + m + ']'));
+  const watchRows = queueMode
+    ? qItems.map(it => ({ it, marks: marksOf(it.title) })).filter(r => r.marks.length)
+    : [];
 
   // ⭐ "HOW MUCH IS LEFT" IS THE QUESTION, so the numbers answer it directly.
   //
@@ -968,9 +1138,12 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       POPULATIONS.BOARD
     ) +
     stat(
-      n('Backlog') + n('Parked') + n('Deferred'),
+      // ⚠ `To-do` and `Backlog` are ONE band under two labels — the vocabulary's
+      // own name in queue mode, the board document's local rename in the degraded
+      // board-scrape — so exactly one of the two terms is ever non-zero.
+      n('To-do') + n('Backlog') + n('Parked') + n('Deferred'),
       'filed for later',
-      'backlog, parked and deferred',
+      'to-do, parked and deferred',
       POPULATIONS.BOARD
     ) +
     stat(
@@ -981,6 +1154,19 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         : 'not counted over the whole queue, so no number is shown — ' + closed.why,
       POPULATIONS.CLOSED
     ) +
+    // ⭐ The landed-state tile — queue mode only: the degraded board-scrape cannot
+    // see heading markers behind a counted band, so it must not print a number
+    // about them. Population: the WHOLE queue, someday included — deployment state
+    // is not a horizon question. The popmix note below names this.
+    (queueMode
+      ? stat(
+          watchRows.length,
+          'landed, not confirmed',
+          'heading markers [MERGED-AWAITING-CONFIRMATION] / [MERGED-NOT-DEPLOYED] / [ADVANCED-NOT-CLOSED], ' +
+            'written by the live run — over every item in the queue, someday included; the list is just below',
+          POPULATIONS.QUEUE
+        )
+      : '') +
     `</ul>` +
     // ⛔⛤ THIS STRIP MIXES FOUR POPULATIONS, AND A GRID INVITES SUBTRACTION.
     //
@@ -992,8 +1178,9 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
     `<p class="note popmix" data-for="strip-0">⚠ <strong>These tiles do not all count the same thing, so do not subtract ` +
     `them.</strong> Being-worked-on, flagged, startable, in-flight and filed-for-later are over the ${total} items on this ` +
     `board. Open owner decisions is over the planning tree's declared roster. He-decides, his-hands and the unread ` +
-    `remainder are over the rows the blocker graph files to him. Finished-but-still-open is a scan of every item in the ` +
-    `queue. Four questions, four denominators, one grid.</p>`;
+    `remainder are over the rows the blocker graph files to him. Finished-but-still-open` +
+    (queueMode ? ` and landed-not-confirmed are scans` : ` is a scan`) +
+    ` of every item in the queue. Four questions, four denominators, one grid.</p>`;
 
   const disagreeList =
     closed.observable && closed.count
@@ -1301,13 +1488,153 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           : '') +
         `<p class="note">${
           axes.bandCounts.observable
-            ? `Every band's number below follows this control, the Backlog included — those counts are computed on the server, ` +
-              `not in your browser. ⚠ The Backlog is a count rather than a list, so under a filter it reports a real number ` +
-              `with no rows beneath it. Someday-if items are in none of these figures.`
+            ? queueMode
+              ? `Every band's number below follows this control — the counts are computed on the server, over the whole ` +
+                `queue, not in your browser. Someday-if items are in none of these figures.`
+              : `Every band's number below follows this control, the Backlog included — those counts are computed on the server, ` +
+                `not in your browser. ⚠ The Backlog is a count rather than a list, so under a filter it reports a real number ` +
+                `with no rows beneath it. Someday-if items are in none of these figures.`
             : `⛔ The band numbers CANNOT follow this control: ${escapeHtml(axes.bandCounts.why || 'the per-band counts could not be derived')}. ` +
               `They stay unfiltered, and the control only hides rows — so do not read a band's number as an answer to the filter.`
         }</p>`
       : '';
+
+  // ── ⭐ THE ROWS THEMSELVES (queue mode) — one line per item, everything else a
+  //    tap away ──────────────────────────────────────────────────────────────
+  //
+  // Row = id · title · chips (landed-marker · spec · horizon·basis · project ·
+  // someday·basis). Opening a row shows the item's own Done-when clause (derived
+  // by the board generator's summariser — imported, never restated), the graph
+  // edges that touch it, and then fetches the FULL body from `/queue/item/<id>`
+  // — the same ref-read source. 2.7MB of bodies cannot ride along inline.
+  //
+  // ⛔ EDGES ARE ATTRIBUTES, NEVER A TREE (owner ruling, 2026-09-08): the graph's
+  // edges were recorded per-finding, not as a complete dependency survey, so a
+  // cascade drawn from them tonight would be a cascade that is not in the data.
+  // Each edge is shown on its item, with its basis, and nothing is transitive.
+  //
+  // ⚠ THE HORIZON CHIP ALWAYS CARRIES ITS BASIS — 215 of the live assignments are
+  // SIGNAL (a keyword guess), and a horizon shown without its basis is a number
+  // nobody should quote. No basis ⇒ no chip, same rule as the axis tiles.
+  const hzById = axes.horizons.observable ? axes.horizons.byId : null;
+  const hzBasisOf = axes.horizons.observable ? axes.horizons.basisOf : null;
+  const HZ_SHORT = { 'BLOCKS-WORK-NOW': 'NOW', NEXT: 'NEXT', 'SOMEDAY-IF': 'SOMEDAY' };
+  const fmtMod =
+    sources && sources.itemFormat && sources.itemFormat.observable ? sources.itemFormat.mod : null;
+  const hasSpec = it => {
+    if (!fmtMod || typeof fmtMod.parseAccept !== 'function') return false;
+    try {
+      return (fmtMod.parseAccept(it.body) || []).length > 0;
+    } catch {
+      return false;
+    }
+  };
+  // LIVE edges only, indexed both ways. `cond:` blockers are shown verbatim —
+  // a named condition is a real blocker even though it is not an item.
+  const graphEdges =
+    sources && sources.graph && sources.graph.observable && Array.isArray(sources.graph.graph.edges)
+      ? sources.graph.graph.edges.filter(e => e && e.state === 'LIVE')
+      : [];
+  const edgesBlocking = new Map(); // id → edges where this item is BLOCKED
+  const edgesBlockedBy = new Map(); // id → edges where this item BLOCKS others
+  for (const e of graphEdges) {
+    if (e.blocked) {
+      if (!edgesBlocking.has(e.blocked)) edgesBlocking.set(e.blocked, []);
+      edgesBlocking.get(e.blocked).push(e);
+    }
+    if (e.blocker) {
+      if (!edgesBlockedBy.has(e.blocker)) edgesBlockedBy.set(e.blocker, []);
+      edgesBlockedBy.get(e.blocker).push(e);
+    }
+  }
+  const chipsOf = it => {
+    const out = [];
+    for (const m of marksOf(it.title)) out.push(`<span class="chip m">${escapeHtml(m)}</span>`);
+    if (hasSpec(it)) out.push(`<span class="chip">spec</span>`);
+    if (hzById && hzById.has(it.id)) {
+      const v = hzById.get(it.id);
+      const basis = hzBasisOf && hzBasisOf.get(it.id);
+      // UNSET ⇒ no chip (nothing was said, so nothing is shown); a value with no
+      // recorded basis is not printed either — the basis IS the credibility.
+      if (HZ_SHORT[v] && basis && v !== 'SOMEDAY-IF') {
+        out.push(
+          `<span class="chip h" title="${escapeHtml(v)}">${escapeHtml(HZ_SHORT[v])}·${escapeHtml(basis)}</span>`
+        );
+      }
+      if (v === 'SOMEDAY-IF' && basis) {
+        out.push(`<span class="chip s">someday·${escapeHtml(basis)}</span>`);
+      }
+    }
+    if (pjById && pjById.has(it.id)) {
+      const p = pjById.get(it.id);
+      if (p && p !== 'UNSET' && p !== 'UNKNOWN') {
+        out.push(`<span class="chip">${escapeHtml(p)}</span>`);
+      }
+    }
+    return out.join('');
+  };
+  // The display title: markdown stripped, the landed marker lifted out (its chip
+  // carries it), clipped for the one-line row. The FULL heading is in the item page.
+  const rowTitle = it => {
+    let t = QV.titleText(it.title);
+    for (const m of LANDED_MARKS) t = t.split('[' + m + ']').join('');
+    return clip(t.replace(/\s+/g, ' ').trim(), 120);
+  };
+  const rowHtml = it => {
+    const p = pjById && pjById.has(it.id) ? pjById.get(it.id) : null;
+    const dataP = p ? ` data-p="${escapeHtml(p)}"` : '';
+    const sum = RG.deriveSummary(it.body);
+    const sumHtml = sum
+      ? `<p class="isum"><em>${escapeHtml(sum.label)}:</em> ${escapeHtml(sum.text)}</p>`
+      : `<p class="isum note">⛔ No plain-English summary in the source — this item does not describe itself yet.</p>`;
+    const edgeLine = (list, word) =>
+      list && list.length
+        ? `<p class="note">${word} ${list
+            .map(
+              e =>
+                `<code>${escapeHtml(word === 'blocked by' ? e.blocker : e.blocked)}</code> <span class="c">${escapeHtml(
+                  [e.kind, e.basis].filter(Boolean).join('·')
+                )}</span>`
+            )
+            .join(', ')}</p>`
+        : '';
+    return (
+      `<details class="item"${dataP}><summary><code>${escapeHtml(it.id)}</code> ` +
+      `<span class="t">${escapeHtml(rowTitle(it))}</span>${chipsOf(it)}</summary>` +
+      `<div class="ibody" data-id="${escapeHtml(it.id)}">${sumHtml}` +
+      edgeLine(edgesBlocking.get(it.id), 'blocked by') +
+      edgeLine(edgesBlockedBy.get(it.id), 'blocks') +
+      `<p class="note"><a href="/queue/item/${encodeURIComponent(it.id)}">Open the full item ↗</a></p>` +
+      `</div></details>`
+    );
+  };
+
+  // ── ⭐⭐ LANDED, NOT CONFIRMED — the overnight run's own states, first-class ──
+  //
+  // (Owner requirement, 2026-09-07.) The live run marks an item's HEADING when its
+  // work has merged but its confirmation has not landed: [MERGED-AWAITING-
+  // CONFIRMATION], [MERGED-NOT-DEPLOYED], [ADVANCED-NOT-CLOSED]. Those rows are
+  // what he watches overnight, and until now they hid inside Active. This list is
+  // a VIEW of those rows — each is still counted once, in its own band below.
+  // ⚠ Counted over EVERY item in the queue, someday included: deployment state is
+  // not a horizon question, and a merged-but-unconfirmed someday row is still a
+  // merged-but-unconfirmed row.
+  const watchHtml = !queueMode
+    ? ''
+    : `<section class="watch"><h2>Landed, not confirmed <span class="c">${watchRows.length}</span></h2>` +
+      (watchRows.length
+        ? `<ul>${watchRows
+            .map(
+              r =>
+                `<li><code>${escapeHtml(r.it.id)}</code> ` +
+                r.marks.map(m => `<span class="chip m">${escapeHtml(m)}</span>`).join(' ') +
+                ` <span class="t">${escapeHtml(rowTitle(r.it))}</span></li>`
+            )
+            .join('')}</ul>`
+        : `<p class="note">No item carries a landed-state marker right now.</p>`) +
+      `<p class="note">Heading markers written by the live run — merged or advanced, awaiting confirmation, ` +
+      `deployment, or closure. Counted over every item in the queue, someday included; each row is also in its ` +
+      `own band below, so nothing here is a second count.</p></section>`;
 
   const bandHtml = BAND_ORDER.filter(k => bands.has(k))
     .map(k => {
@@ -1327,26 +1654,31 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
       // way, so the unfiltered reading never degrades.
       const shown = b.count - excluded.length;
       const countCell = `<span class="c">${shown}</span>`;
+      // ⚠ THE EXCLUSION IS ANNOUNCED ON THE BAND IT TOUCHES, with every excluded id
+      // named — never a silently smaller number. (The prose is shorter than it was:
+      // in queue mode the excluded rows are also LISTED below with a someday chip,
+      // so the announcement no longer has to carry the whole story alone. The old
+      // board-blindness clause went with the board-scrape — the rows come from the
+      // queue now, so there is no blind upstream artifact to attribute the gap to.)
       const note = excluded.length
-        ? // ⚠ RE-ATTRIBUTED 2026-09-06, and the change is the point rather than the
-          // prose. This used to end "the board's own heading still counts them; this
-          // page does not", which reads as the board being WRONG and this page
-          // fixing it. ⛔ MEASURED: of the someday items on the live board the
-          // generator can see ZERO — the horizon lives in a second file the board is
-          // deliberately not a function of, and the board now says exactly that on
-          // its own first page. The board is BLIND, not wrong; this page is the only
-          // place its two inputs meet. Blaming an upstream artifact for a limit it
-          // declares would be a third wrong statement standing next to two right ones.
-          `<p class="note">${b.count} filed in this band, <strong>${b.count - excluded.length} counted here</strong> — ` +
+        ? `<p class="note">${b.count} filed in this band, <strong>${b.count - excluded.length} counted here</strong> — ` +
           `${excluded.length} carry <code>SOMEDAY-IF</code> and are in no total: ` +
-          `${excluded.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}. The board counts every item it files here ` +
-          `and states on its own first page that it cannot apply the horizon rule; this is the surface where that rule is applied.</p>`
+          `${excluded.map(id => `<code>${escapeHtml(id)}</code>`).join(', ')}` +
+          (queueMode
+            ? `. They stay listed below, wearing a someday chip.</p>`
+            : `. The board counts every item it files here ` +
+              `and states on its own first page that it cannot apply the horizon rule; this is the surface where that rule is applied.</p>`)
         : '';
+      const glyphCell =
+        queueMode && b.glyph ? ` <span class="g">${escapeHtml(b.glyph)}</span>` : '';
+      const body = queueMode
+        ? `<div class="rows">${b.rows.map(rowHtml).join('')}</div>`
+        : tagRows(mdToHtml(b.lines));
       return (
-        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}" data-pop="${POPULATIONS.BOARD}"><summary>${escapeHtml(k)} ${countCell}</summary>` +
+        `<details class="band"${open} data-band="${escapeHtml(k)}" data-all="${shown}" data-pop="${POPULATIONS.BOARD}"><summary>${escapeHtml(k)} ${countCell}${glyphCell}</summary>` +
         `<p class="note">${escapeHtml(BAND_BLURB[k] || '')}</p>` +
         note +
-        tagRows(mdToHtml(b.lines)) +
+        body +
         `</details>`
       );
     })
@@ -1374,8 +1706,61 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
   // roadmap:check` asks, which rebuilds and compares byte for byte and costs too
   // much for a page load. So the page says which question it asked, rather than
   // borrowing the credibility of the answer it did not compute.
-  const currency = boardCurrency(md, queueMd);
-  const currencyLine = !currency.known
+  const currency = md ? boardCurrency(md, queueMd) : { known: false, why: 'no board' };
+
+  // ── ⭐⭐ QUEUE MODE'S OWN LEAD: THE ROWS COME FROM THE SOURCE, SO STALENESS IS
+  //    NOT A STATE THIS PAGE CAN BE IN ─────────────────────────────────────────
+  //
+  // The staleness machinery above exists because the page used to render a
+  // GENERATED artifact that could fall behind its source. In queue mode the rows
+  // ARE the source — read at the ref, per visit — so the lead line reports
+  // provenance (which commit of the queue this is), and the generated board's own
+  // currency is demoted to the one clause that is still about a real artifact.
+  // ⛔ The board-currency signal is kept, not dropped: ROADMAP.md still exists,
+  // other surfaces still read it, and a stale board silently disagreeing with this
+  // page is exactly the two-answers defect this file keeps being rebuilt to end.
+  const prov = sources && sources.provenance;
+  const provLine =
+    prov && prov.ok === true && prov.mode === 'ref'
+      ? `read from <code>QUEUE.md</code> at <code>${escapeHtml(String(prov.ref))}</code> @ <code>${escapeHtml(
+          String(prov.sha)
+        )}</code> (committed <strong>${escapeHtml(
+          String(prov.committedAt || '')
+            .slice(0, 16)
+            .replace('T', ' ')
+        )}</strong>), re-read on every visit — nothing here is cached`
+      : prov && prov.ok === true
+        ? `read from the planning tree at <code>${escapeHtml(String(prov.ref))}</code>, re-read on every visit`
+        : `read from the queue as handed to this route, re-read on every visit`;
+  const boardClause = !currency.known
+    ? md
+      ? ` ⚠ Whether the generated board (<code>ROADMAP.md</code>) still matches could not be established — ` +
+        `it carries no readable source fingerprint. This page does not depend on it: every row below is rendered ` +
+        `from the queue itself.`
+      : ` (No generated board was read alongside — this page does not depend on one.)`
+    : currency.current
+      ? ` The generated board was built from the queue as it reads ` +
+        `right now — rebuilt <strong>${escapeHtml(stamp)}</strong>. (Checked by comparing the board's recorded source ` +
+        `fingerprint against the live queue; <code>npm run roadmap:check</code> does the stronger ` +
+        `comparison and rebuilds the whole thing.)`
+      : ` ⛔ <strong>The generated board (<code>ROADMAP.md</code>) is OUT OF DATE</strong> — rebuilt ` +
+        `<strong>${escapeHtml(stamp)}</strong>, and the queue has changed since. <strong>This page is unaffected</strong>: ` +
+        `every row below is rendered from the queue itself, as it reads right now. Other surfaces reading the board ` +
+        `are behind until <code>npm run roadmap</code> runs.`;
+  const twoDenoms =
+    axes.horizons.observable && axes.horizons.total !== total
+      ? ` <strong>⚠ Two denominators on this page, deliberately:</strong> the queue holds ` +
+        `<strong>${axes.horizons.total}</strong> items and the bands count <strong>${total}</strong> — the ` +
+        `${axes.horizons.total - total} carrying <code>SOMEDAY-IF</code> are in no total here. The Horizon section ` +
+        `counts over all ${axes.horizons.total}, because its job is to explain that gap.`
+      : '';
+  const queueLead =
+    `<p class="note">${total} open item${total === 1 ? '' : 's'}, ${provLine}.` +
+    boardClause +
+    twoDenoms +
+    `</p>`;
+
+  const boardCurrencyLine = !currency.known
     ? `<p class="note stale">⛔ <strong>Whether this board is up to date could not be established.</strong> ` +
       `Either the queue could not be read from here or the board carries no source fingerprint, so ` +
       `nothing on this page can tell you whether it matches. That is not the same as it being fine. ` +
@@ -1408,10 +1793,13 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
         `like a current one, which is why this says so instead of leaving you the timestamp to ` +
         `interpret. The ${total} item${total === 1 ? '' : 's'} below are as they stood then. Run <code>npm run roadmap</code>.</p>`;
 
+  const currencyLine = queueMode ? queueLead : boardCurrencyLine;
+
   return (
     `<h1 id="queue">The queue</h1>` +
     currencyLine +
     counts +
+    watchHtml +
     ownerLists +
     decisionList +
     disagreeList +
@@ -1419,8 +1807,12 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
     projectHtml +
     `<h2>The whole board</h2>` +
     filterHtml +
-    `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
-    `the rest are one tap away — nothing is hidden or shortened.</p>` +
+    (queueMode
+      ? `<p class="note">Every state in the queue's own vocabulary is a band here, with its real count and every row ` +
+        `listed — the To-do mass included. Everything starts closed; nothing is hidden or shortened. A row opens to its ` +
+        `own Done-when clause and full text.</p>`
+      : `<p class="note">Every band is here with its real count. The ones in motion open on their own; ` +
+        `the rest are one tap away — nothing is hidden or shortened.</p>`) +
     bandHtml
   );
 }
@@ -1453,10 +1845,65 @@ current is worse than a page that says it is broken, because nobody investigates
     : `<h1 id="queue">The queue</h1><div class="empty"><p><strong>No board is reachable from this checkout.</strong></p>
 <p class="note">The board is generated into the private planning tree, which a public clone does not
 have. That is the normal state, not an error.</p></div>`;
-  const body = board
-    ? renderRoadmapSection(board.text, board.mtime, queueMd, census, sources)
-    : empty;
+  // ⭐ The QUEUE is the source, so a readable queue renders even with no generated
+  // board alongside — the board-scrape is only the degraded path the other way
+  // round (board readable, queue not). `renderRoadmapSection` returns null when
+  // handed nothing it can honestly render, and the empty state stands.
+  const body = refFailed
+    ? empty
+    : (board || (typeof queueMd === 'string' && queueMd.trim())
+        ? renderRoadmapSection(
+            board ? board.text : null,
+            board ? board.mtime : null,
+            queueMd,
+            census,
+            sources
+          )
+        : null) || empty;
   return page({ title: 'Queue', crumb: '', body });
+}
+
+/**
+ * `/queue/item/<id>` — ONE item, in full, from the same ref-read queue.
+ *
+ * ⭐ This exists because the row list deliberately does not carry the bodies:
+ * 2.7MB of item text cannot ride along on a phone page, so a row fetches its body
+ * from here on first open (`frag: true` returns just the article), and the same
+ * address works as a direct link (`frag: false` wraps it in the page shell).
+ *
+ * ⛔ The id is validated against the ONE exported ITEM_ID_RE — by probing the
+ * pattern, never by retyping it — and an unknown id names nothing else: the page
+ * says only that no item answers to it.
+ *
+ * @returns {{status:number, html:string, frag:boolean}}
+ */
+function renderQueueItem(queueMd, id, opts) {
+  const QV = require('./queue-view.js');
+  const frag = !!(opts && opts.frag);
+  const wrap = (status, html, title) =>
+    frag ? { status, html, frag } : { status, html: page({ title, crumb: '', body: html }), frag };
+  const notFound = wrap(
+    404,
+    `<h1>Not found</h1><p class="note">No open item answers to that id.</p>`,
+    'Not found'
+  );
+  if (typeof queueMd !== 'string' || !queueMd.trim()) return notFound;
+  if (typeof id !== 'string' || !QV.ITEM_ID_RE.test(id + '. x')) return notFound;
+  let items;
+  try {
+    items = QV.parseQueue(queueMd).blocks.filter(b => b.type === 'item' && b.id === id);
+  } catch {
+    return notFound;
+  }
+  if (!items.length) return notFound;
+  const it = items[0];
+  const heading = QV.titleText(it.title).trim();
+  const art =
+    `<article class="qitem"><h1 id="${escapeHtml(it.anchor)}"><code>${escapeHtml(it.id)}</code> ` +
+    `${escapeHtml(heading)}</h1>` +
+    QV.mdToHtml(it.body) +
+    `<p class="note"><a href="/queue">&#8592; Back to the queue</a></p></article>`;
+  return wrap(200, art, it.id);
 }
 
 /**
@@ -1490,6 +1937,7 @@ function renderNotFound() {
 module.exports = {
   renderReport,
   renderQueue,
+  renderQueueItem,
   renderReportsIndex,
   renderNotFound,
   page,

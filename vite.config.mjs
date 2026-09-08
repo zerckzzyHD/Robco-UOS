@@ -425,6 +425,29 @@ function queueRoute() {
       server.middlewares.use('/queue', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
         const rest = (pathOf(req) || '/').replace(/^\/+/, '');
+        // ── /queue/item/<id> — one item in full, from the same ref-read queue ──
+        // The row list deliberately carries no bodies (2.7MB); a row fetches its
+        // body from here on first open (?frag=1 → just the article), and the same
+        // address works as a direct link. The id is validated by the renderer
+        // against the one exported ITEM_ID_RE — this route only unwraps the path.
+        const itemM = /^item\/([^/]+)$/.exec(rest);
+        if (itemM) {
+          const view = freshRequire('./scripts/report-view.js');
+          const paths = freshRequire('./scripts/planning-paths.js');
+          let id = itemM[1];
+          try {
+            id = decodeURIComponent(id);
+          } catch {
+            /* an undecodable id is just an unknown id */
+          }
+          const query = String(req.url || '')
+            .split('?')
+            .slice(1)
+            .join('?');
+          const frag = /(^|&)frag=1(&|$)/.test(query);
+          const r = view.renderQueueItem(paths.readPlanningFileAtRef('QUEUE.md'), id, { frag });
+          return sendHtml(req, res, r.status, r.html);
+        }
         if (rest) return next(); // only the mount point; deeper paths are not this page
         const paths = freshRequire('./scripts/planning-paths.js');
         const view = freshRequire('./scripts/report-view.js');

@@ -54170,21 +54170,36 @@ if (!PLANNING_OK) {
   const cur249g = RVj.renderQueue(at249g, queue249g);
   const stale249g = RVj.renderQueue(at249g, queue249g + '\n### AA2. later\n\nbody\n');
   const unk249g = RVj.renderQueue(at249g, null);
+  // ⭐ SUPERSEDED IN PART 2026-09-08 (owner: rebuild `/queue` to match how the
+  // queue actually works), AND THE OLD CLAIM IS RECORDED RATHER THAN SILENTLY
+  // SWAPPED. With a readable queue the page's ROWS now come from the queue itself
+  // at the ref — so two of the stale-case literals ("not on this page", "as they
+  // stood then") became FALSE statements: an item added since the board was built
+  // IS on the page, because the page no longer renders the board. The substance is
+  // unchanged and still asserted: the three currency states render distinctly, a
+  // stale BOARD is named as stale (it is still a real artifact other surfaces
+  // read), and staleness is stated as a fact rather than left as a timestamp. The
+  // new stale case additionally proves the page carries the queue's OWN rows — the
+  // item the board missed is rendered, which is the stronger form of the original
+  // guarantee.
   assert(
     // current — says so, and says WHICH question it answered
     /built from the queue as it reads right now/.test(cur249g) &&
       /roadmap:check<\/code> does the stronger comparison/.test(cur249g) &&
       !/OUT OF DATE/.test(cur249g) &&
-      // stale — the fact, not a timestamp to interpret
-      /THIS BOARD IS OUT OF DATE/.test(stale249g) &&
-      /not on this page/.test(stale249g) &&
-      /as they stood then/.test(stale249g) &&
-      // unknown — neither, and explicitly not reassurance
+      // stale — the BOARD is named stale, the PAGE says it does not depend on it,
+      // and the row the board missed is actually rendered
+      /is OUT OF DATE/.test(stale249g) &&
+      /This page is unaffected/.test(stale249g) &&
+      /rendered from the queue itself/.test(stale249g) &&
+      /<code>AA2<\/code>/.test(stale249g) &&
+      // unknown — neither, and explicitly not reassurance (queue unreadable ⇒ the
+      // degraded board-scrape, whose banner already carries the loud version)
       /could not be established/.test(unk249g) &&
       /not the same as it being fine/.test(unk249g) &&
       !/OUT OF DATE/.test(unk249g) &&
       !/built from the queue as it reads right now/.test(unk249g),
-    '249.10g: the board page leads with whether it still MATCHES the queue — current, out of date, or not establishable — rather than with when the file was written; a rebuild time is not a currency, and the page that only had one showed 59 missing items for days without a word'
+    '249.10g: the page leads with the source and whether the generated board still matches it — current, out of date, or not establishable — and a stale board can no longer hide rows: the queue-sourced page renders the item the stale board missed'
   );
 }
 
@@ -59303,7 +59318,40 @@ if (!PLANNING_OK) {
     '',
   ].join('\n');
   fs.writeFileSync(path.join(tree268, 'ROADMAP.md'), board268);
-  fs.writeFileSync(path.join(tree268, 'QUEUE.md'), '# queue\n\n### A1. 🔄 something\n\nbody\n');
+  // ⚠ The queue mirrors the board's items (2026-09-08): `/queue` renders its rows
+  // and band counts from the QUEUE itself now, so a fixture whose queue disagreed
+  // with its board would be testing a stale-board state, not the census tile.
+  fs.writeFileSync(
+    path.join(tree268, 'QUEUE.md'),
+    [
+      '# queue',
+      '',
+      '### A1. 🔄 something',
+      '',
+      'body',
+      '',
+      '### B1. ⚠️ flagged one',
+      '',
+      'body',
+      '',
+      '### B2. ⚠️ flagged two',
+      '',
+      'body',
+      '',
+      '### B3. ⚠️ flagged three',
+      '',
+      'body',
+      '',
+      '### C1. ⏭️ ready one',
+      '',
+      'body',
+      '',
+      '### C2. ⏭️ ready two',
+      '',
+      'body',
+      '',
+    ].join('\n')
+  );
   const stub268 = [
     "'use strict';",
     'const arg = process.argv[2];',
@@ -59977,15 +60025,20 @@ if (!PLANNING_OK) {
   );
   assert(
     // ⚠ The literal tracks a DELIBERATE re-wording made in the same commit, not a
-    // loosened check: the note used to end "the board's own heading still counts
-    // them; this page does not", which blamed the board for a limit it declares.
-    // Every clause of the claim is unchanged — the announcement, the counted figure,
-    // and BOTH excluded ids — and the assertion is no weaker for the new noun.
+    // loosened check — for the second time, and the history is kept: the note once
+    // blamed the board for a limit it declares (re-worded 2026-09-06), and on
+    // 2026-09-08 the board-blindness clause went away entirely because the rows no
+    // longer come from the board at all — `/queue` renders the queue itself, so the
+    // excluded someday items are not merely NAMED on the band, they are LISTED in
+    // it wearing a someday chip. Every clause of the original claim is unchanged —
+    // the announcement, the counted figure, and BOTH excluded ids — and the new
+    // final clause asserts the stronger property that replaced the old one.
     /3 filed in this band, <strong>1 counted here<\/strong>/.test(h1) &&
       /<code>R2<\/code>/.test(h1) &&
       /<code>S3<\/code>/.test(h1) &&
-      /cannot apply the horizon rule/.test(h1),
-    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches, names BOTH excluded ids whichever source placed them, and attributes the gap to the board being blind rather than wrong — never a silently smaller number'
+      /stay listed below, wearing a someday chip/.test(h1) &&
+      /class="chip s">someday·/.test(h1),
+    '270.6: RENDERED — the correction is ANNOUNCED on the band it touches, names BOTH excluded ids whichever source placed them, and the excluded rows stay visibly listed with a someday chip — never a silently smaller number, and never silently vanished rows'
   );
 
   // ⭐⭐ RED-THEN-GREEN: strip the horizon line and the same item must come back
@@ -60620,6 +60673,270 @@ if (!PLANNING_OK) {
       `272.4: LIVE — the generated board on disk carries the declaration, and its ${parsed272} of ${headings272} band headings still parse in the old shape, so no consumer's predicate moved`
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 273 — `/queue` renders the QUEUE (owner rebuild, 2026-09-08)
+//
+//  ⭐ THE REDESIGN THIS LOCKS. The page used to render the GENERATED BOARD, whose
+//  Backlog band is a count with no rows — so ~two-thirds of the items were a
+//  number nobody could open, under a label ("Backlog") that is not a state in the
+//  queue's vocabulary at all. The owner's ruling: the page's sections are the
+//  queue's own states, every item gets a row (To-do included), the live run's
+//  landed-state heading markers are first-class, and the board-scrape survives
+//  only as the degraded path when the queue itself cannot be read.
+//
+//  ⚠ VERIFIED BY CONTENT, PASS CASE FIRST: the fixture renders, the band counts
+//  sum to the parser's own item count, a fabricated id does not appear (the
+//  positive control that proves the sum measured presence rather than arithmetic),
+//  and the ref-unreadable case shows the error banner with no numbers at all.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 273 — /queue renders the queue: rows for every item, markers first-class');
+  const RV273 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const QV273 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+
+  const queue273 = [
+    '# queue',
+    '',
+    '### A1. 🔄 **[MERGED-AWAITING-CONFIRMATION]** merged, awaiting the confirm pass',
+    '',
+    'Done when: the auditor confirms the merge on the live site.',
+    '',
+    '### A2. 🔄 plain active work',
+    '',
+    'Done when: the thing ships.',
+    '',
+    '### W1. ⚠️ flagged for attention',
+    '',
+    'body',
+    '',
+    '### R1. ⏭️ ready, with a spec',
+    '',
+    '```accept',
+    'kind:       BUILD',
+    'reason:     specified',
+    'actor:      SESSION',
+    'horizon:    NEXT',
+    '```',
+    '',
+    '### T1. ⬜ a to-do row the old board could never list',
+    '',
+    'Done when: it is done.',
+    '',
+    '### T2. ⬜ a someday thought filed as to-do',
+    '',
+    '```accept',
+    'kind:       CAPTURE',
+    'reason:     captured',
+    'actor:      SESSION',
+    'horizon:    SOMEDAY-IF',
+    '```',
+    '',
+    '### P1. ⏸️ parked on purpose',
+    '',
+    'body',
+    '',
+  ].join('\n');
+  // The board is deliberately STALE relative to this queue (it lists nothing) so
+  // the suite also proves the rows cannot come from it.
+  const board273 = ['# Board', '', '## 🔄 Active (0)', '', '_None._', ''].join('\n');
+  const fmt273 = {
+    HORIZON: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF'],
+    parseAccept: lines => {
+      const L = Array.isArray(lines) ? lines : String(lines || '').split('\n');
+      const out = [];
+      let i = 0;
+      while (i < L.length) {
+        if (!/^\s*```accept\b/.test(L[i])) {
+          i++;
+          continue;
+        }
+        const fields = {};
+        i++;
+        while (i < L.length && !/^\s*```\s*$/.test(L[i])) {
+          const kv = /^([a-z-]+):\s*(.*)$/.exec(L[i]);
+          if (kv) fields[kv[1]] = kv[2].trim();
+          i++;
+        }
+        out.push({ fields });
+        i++;
+      }
+      return out;
+    },
+  };
+  const sources273 = {
+    itemFormat: { observable: true, mod: fmt273, vocabulary: fmt273.HORIZON },
+    graph: {
+      observable: true,
+      graph: {
+        measuredAt: '2026-09-08T00:00:00Z',
+        items: {
+          A1: { project: 'APP', projectBasis: 'READ', horizon: 'NEXT', horizonBasis: 'READ' },
+          T1: { project: 'HARNESS', projectBasis: 'READ' },
+        },
+        edges: [
+          {
+            blocker: 'R1',
+            blocked: 'T1',
+            kind: 'orders',
+            basis: 'DEMONSTRATED',
+            state: 'LIVE',
+          },
+          // a RETIRED edge must NOT render — only LIVE edges are attributes
+          { blocker: 'A2', blocked: 'T1', kind: 'orders', basis: 'CLAIMED', state: 'RETIRED' },
+        ],
+      },
+    },
+    axisVocabulary: {
+      observable: true,
+      PROJECTS: ['APP', 'CONTROL-PLANE', 'HARNESS', 'MIST', 'MUSEUM', 'BINDER', 'UNKNOWN'],
+      HORIZONS: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF', 'UNKNOWN'],
+    },
+  };
+  const html273 = RV273.renderQueue(
+    { text: board273, mtime: new Date(2026, 8, 8, 0, 0) },
+    queue273,
+    null,
+    sources273
+  );
+  const items273 = QV273.parseQueue(queue273).blocks.filter(b => b.type === 'item' && b.id);
+
+  // ── 273.1 — THE SUM: band counts + someday exclusions = the parser's items ──
+  const bandAll273 = [...html273.matchAll(/data-band="([^"]+)" data-all="(\d+)"/g)].map(m => ({
+    band: m[1],
+    n: Number(m[2]),
+  }));
+  const counted273 = bandAll273.reduce((a, b) => a + b.n, 0);
+  const somedayIds273 = (/<summary>Which (\d+) someday-if/.exec(html273) || [])[1];
+  assert(
+    counted273 + Number(somedayIds273 || 0) === items273.length && items273.length === 7,
+    `273.1: PASS CASE — the band counts (${counted273}) plus the someday exclusions (${somedayIds273}) equal the parser's own item count (${items273.length}); nothing is dropped between the parser and the page`
+  );
+  // ── 273.2 — every item is a ROW, and a fabricated id is NOT ────────────────
+  const rowIds273 = [
+    ...html273.matchAll(/<details class="item"[^>]*><summary><code>([^<]+)<\/code>/g),
+  ].map(m => m[1]);
+  assert(
+    items273.every(it => rowIds273.includes(it.id)) &&
+      rowIds273.length === items273.length &&
+      !rowIds273.includes('ZZ9') &&
+      !/ZZ9/.test(html273),
+    `273.2: every parsed item renders as exactly one row (${rowIds273.join(',')}) and a fabricated id (ZZ9) appears nowhere — the sum in 273.1 measured presence, not arithmetic`
+  );
+  // ── 273.3 — the To-do band LISTS its rows under the vocabulary's own name ──
+  const todo273 =
+    /<details class="band"[^>]*data-band="To-do"[^>]*>[\s\S]*?<\/details><\/div><\/details>/.exec(
+      html273
+    );
+  assert(
+    /data-band="To-do" data-all="1"/.test(html273) &&
+      todo273 !== null &&
+      /<code>T1<\/code>/.test(todo273[0]) &&
+      /<code>T2<\/code>/.test(todo273[0]) &&
+      /1 filed in this band|2 filed in this band/.test(html273),
+    '273.3: the ⬜ band renders as "To-do" — the shared vocabulary\'s own label — with BOTH its rows listed (T1 counted, T2 someday-chipped), closing the "a number with no rows" defect the board\'s counted Backlog band forced on this page'
+  );
+  assert(
+    !/data-band="Backlog"/.test(html273) && !/>Backlog</.test(html273),
+    '273.4: "Backlog" appears on no band of the queue-sourced page — it was the BOARD DOCUMENT\'s local rename of To-do (Suite 248.8b keeps it there, deliberately), never a state in the queue\'s vocabulary'
+  );
+  // ── 273.5 — the landed-state markers are FIRST-CLASS ───────────────────────
+  const watch273 = /<section class="watch">[\s\S]*?<\/section>/.exec(html273);
+  assert(
+    watch273 !== null &&
+      /Landed, not confirmed <span class="c">1<\/span>/.test(watch273[0]) &&
+      /<code>A1<\/code>/.test(watch273[0]) &&
+      !/<code>A2<\/code>/.test(watch273[0]) &&
+      /MERGED-AWAITING-CONFIRMATION/.test(watch273[0]),
+    "273.5: the watch list holds exactly the marker-bearing rows (A1, not its plain-active sibling A2) with the marker named — the live run's landed states are a first-class surface, not text hidden inside Active"
+  );
+  assert(
+    /class="chip m">MERGED-AWAITING-CONFIRMATION/.test(html273) &&
+      /landed, not confirmed/.test(html273),
+    "273.6: the marker also rides the item's own row as a chip, and the counts strip carries a landed-not-confirmed tile — one fact, visible at tile, list and row altitude"
+  );
+  // ── 273.7 — the row carries its attributes: spec, horizon WITH basis, edges ─
+  const r1row273 = /<details class="item"[^>]*><summary><code>R1<\/code>[\s\S]*?<\/details>/.exec(
+    html273
+  );
+  const t1row273 =
+    /<details class="item"[^>]*data-p="HARNESS"><summary><code>T1<\/code>[\s\S]*?<\/details>/.exec(
+      html273
+    );
+  assert(
+    r1row273 !== null &&
+      /class="chip">spec</.test(r1row273[0]) &&
+      /class="chip h" title="NEXT">NEXT·BLOCK</.test(r1row273[0]),
+    '273.7: a specced row wears a `spec` chip and its horizon chip carries the BASIS (NEXT·BLOCK) — a horizon shown without its basis is a number nobody should quote, so basis-less values get no chip at all'
+  );
+  assert(
+    t1row273 !== null &&
+      /blocked by <code>R1<\/code>/.test(t1row273[0]) &&
+      /orders·DEMONSTRATED/.test(t1row273[0]) &&
+      !/<code>A2<\/code>/.test(t1row273[0]),
+    '273.8: graph edges render as ATTRIBUTES on the item they touch, with their basis, LIVE edges only (the RETIRED A2 edge is absent) — and never as a drawn cascade, because the edges were recorded per-finding, not as a dependency survey (owner ruling, 2026-09-08)'
+  );
+  // ── 273.9 — NEGATIVE CONTROL: the ref unreadable ⇒ the banner, no numbers ──
+  const err273 = RV273.renderQueue(null, null, null, {
+    provenance: { ok: false, ref: 'origin/main', why: 'simulated: git rev-parse failed' },
+  });
+  assert(
+    /THE BOARD COULD NOT BE READ, AND THIS IS AN ERROR/.test(err273) &&
+      /simulated: git rev-parse failed/.test(err273) &&
+      !/<ul class="stats"/.test(err273) &&
+      !/<details class="band"/.test(err273) &&
+      !/<details class="item"/.test(err273),
+    '273.9: NEGATIVE CONTROL — a failed ref read renders the loud error banner naming the failure, and NO tile, band or row renders beneath it; an unreadable source must never render as a smaller page'
+  );
+  // ── 273.10 — the per-item route: full page, fragment, and refusal ──────────
+  const itFull273 = RV273.renderQueueItem(queue273, 'T1', { frag: false });
+  const itFrag273 = RV273.renderQueueItem(queue273, 'T1', { frag: true });
+  const itNone273 = RV273.renderQueueItem(queue273, 'ZZ9', { frag: false });
+  const itEvil273 = RV273.renderQueueItem(queue273, '../../etc', { frag: true });
+  assert(
+    itFull273.status === 200 &&
+      /<!doctype html>/.test(itFull273.html) &&
+      /a to-do row the old board could never list/.test(itFull273.html) &&
+      /Done when: it is done/.test(itFull273.html) &&
+      itFrag273.status === 200 &&
+      !/<!doctype html>/.test(itFrag273.html) &&
+      /<article class="qitem">/.test(itFrag273.html),
+    "273.10: /queue/item/<id> serves the item's full body — as a complete page for a direct link, and as a bare article fragment for the row's lazy fetch"
+  );
+  assert(
+    itNone273.status === 404 &&
+      itEvil273.status === 404 &&
+      // ⚠ the probe is the ECHO of the hostile id, not the bare substring "etc" —
+      // the page shell's own script contains "fetch", which a naive /etc/ matched.
+      !/\.\.\//.test(itEvil273.html) &&
+      !itNone273.html.includes('ZZ9'),
+    '273.11: an unknown id and a traversal-shaped id both answer 404 through the one exported ITEM_ID_RE — probed, never retyped — and neither response echoes the id it refused'
+  );
+  // ── 273.12 — the DEGRADED path is reachable and loud, not gone ─────────────
+  const degraded273 = RV273.renderQueue(
+    { text: board273, mtime: new Date(2026, 8, 8) },
+    null,
+    null,
+    null
+  );
+  assert(
+    /could not be established/.test(degraded273) &&
+      !/<details class="item"/.test(degraded273) &&
+      /<details class="band"/.test(degraded273),
+    '273.12: with the queue unreadable the board-scrape still renders (bands, no item rows) under its loud could-not-establish banner — the degraded path survives as a fallback, never as the normal path'
+  );
+  // ── 273.13 — static: the item route goes through the fresh-require chain ───
+  // A static check with the reason stated (rules/testing-and-gates.md): proving
+  // this behaviourally needs a running Vite server, which the runner does not
+  // start; the property that matters — the route cannot answer from a module
+  // frozen at startup — is carried by freshRequire, so the wiring is asserted.
+  const vite273 = fs.readFileSync(path.join(ROOT, 'vite.config.mjs'), 'utf8');
+  assert(
+    /renderQueueItem\(paths\.readPlanningFileAtRef\('QUEUE\.md'\)/.test(vite273) &&
+      /\/queue\/item\//.test(vite273),
+    "273.13: the /queue/item route reads the queue AT THE REF through the fresh-require chain — the same stale-proofing as the page it feeds, so a row's body can never disagree with the board it was opened from"
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
