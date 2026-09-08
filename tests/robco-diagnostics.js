@@ -60969,11 +60969,12 @@ if (!PLANNING_OK) {
 //  found while deleting three overnight/* branches that carried it in an
 //  acceptance receipt; the branches were the small half and `dev` was the large.
 //
-//  ⭐ THE GUARD IS A PATTERN, NOT THE ONE STRING. Asserting "rog-ally is absent"
-//  would pass forever on a machine that is renamed, or on a second machine, while
-//  the class quietly returned. The check is the SHAPE of a tailnet name in any
-//  tracked file — so a different machine's name is caught by the same assertion
-//  that caught this one.
+//  ⭐ THE GUARD IS A PATTERN, NOT THE ONE STRING. Asserting that one particular
+//  machine's name is absent would pass forever once that machine is renamed, or on
+//  a second machine, while the class quietly returned — and stating the name here
+//  to say so would itself put it back in tracked source, which is the trap this
+//  suite exists to close. The check is the SHAPE of a tailnet name in any tracked
+//  file, so a different machine's name is caught by the same assertion.
 //
 //  ⚠ AND IT CARRIES ITS OWN POSITIVE CONTROL. A grep-based guard that matches
 //  nothing reads identically to a clean repository, which is exactly how the
