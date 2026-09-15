@@ -177,6 +177,15 @@ subsystem note — because they need judgement and cannot be mechanised into a g
 
 ---
 
+## Funding constraint — free, BYO-key, one-time ≤$10
+
+The project runs on free tiers and the user's own API key. The spend limit is **one-time ≤$10**,
+⛔ **not** monthly and not per-user. Cloud features are built client-side on free tiers; the AI key
+is supplied by the user, stored locally, and never exposed. **A proposal that requires paid
+infrastructure is out of scope by default** — say so when ruling one out, rather than costing it.
+
+---
+
 ## Protocol 3 — Source of Truth
 
 - **Fallout game data** (items, quests, perks, locations): Source from `fallout.wiki` only. The AI acts as typist, not authority.
