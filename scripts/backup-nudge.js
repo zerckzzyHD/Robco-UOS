@@ -107,9 +107,28 @@ function safeExists(p) {
  *
  * ⭐ Comparing THIS against `ls-tree`'s recorded blob SHA-1 is a content
  * comparison that costs one archive command for the whole tree, rather than a
- * `show` per file. ⚠ It is raw bytes on both sides — the archive pins `eol=lf`
- * in `.gitattributes` precisely so a checkout does not rewrite line endings, so
- * a mismatch here is a real content difference and not an EOL artifact.
+ * `show` per file.
+ *
+ * ⛔⛤ THE PARAGRAPH THAT USED TO BE HERE WAS FALSE, AND IT INFLATED EVERY COUNT
+ * THIS SCRIPT HAS EVER PRINTED (`BD16`, measured 2026-09-15). It said: *"It is
+ * raw bytes on both sides — the archive pins `eol=lf` in `.gitattributes`
+ * precisely so a checkout does not rewrite line endings, so a mismatch here is a
+ * real content difference and not an EOL artifact."*
+ *
+ * ⚠ `eol=lf` normalises ON COMMIT. It does NOT stop a WORKING FILE from holding
+ * CRLF — and on this machine they do. Measured on one file taken all the way
+ * down: `planning/control-plane/reviews/GEMINI_REVIEW_2026-07-28.md` is **32,359
+ * bytes with 134 CR** in the working tree, its committed blob is **32,225 bytes
+ * with 0 CR**, and `git status` calls the file **clean**. ⇒ raw-byte comparison
+ * reports a difference where git, correctly, reports none.
+ *
+ * ⛔ SCOPE, so the number is not hand-waved: **430** tracked files under
+ * `planning/` + `library/` carry CRs in the worktree and none in their blobs.
+ * Against that, the genuine gaps that day were `planning/` **0** and `library/`
+ * **1**. The script reported **70 of 1015** not backed up. ⇒ that figure was an
+ * UPPER BOUND, never a measurement — and a reminder that over-reports trains its
+ * reader to discount it, which is how the 12 genuinely-absent memory files in the
+ * same list went unread for ten days.
  */
 function blobSha1(buf) {
   return crypto
@@ -117,6 +136,31 @@ function blobSha1(buf) {
     .update('blob ' + buf.length + '\0', 'utf8')
     .update(buf)
     .digest('hex');
+}
+
+/**
+ * ⭐ The same hash over LF-NORMALISED bytes, used ONLY as a second opinion when the
+ * raw comparison already disagreed (`BD16`).
+ *
+ * ⛔ WHY THIS CANNOT HIDE A REAL GAP. Normalisation only ever REMOVES `\r` before
+ * `\n`. If the raw hashes differ and the normalised hashes match, the two files
+ * differ in line endings and NOTHING ELSE — and under `eol=lf` that is not a
+ * backup gap: committing the local file would produce the byte-identical blob the
+ * archive already holds. Any difference in actual content survives normalisation
+ * and is still reported.
+ *
+ * ⛔ BINARY IS EXCLUDED BY CONSTRUCTION. A buffer containing a NUL byte is never
+ * normalised — 429 of the files in scope are PNGs, and stripping `\r` from an
+ * image is a corruption, not a comparison.
+ */
+function isProbablyText(buf) {
+  return !buf.includes(0);
+}
+
+function blobSha1Lf(buf) {
+  if (!isProbablyText(buf)) return null;
+  const lf = Buffer.from(buf.toString('binary').replace(/\r\n/g, '\n'), 'binary');
+  return blobSha1(lf);
 }
 
 /** Every file under a directory, as paths relative to it. Never throws. */
@@ -228,6 +272,9 @@ function say(lines) {
 }
 
 function main() {
+  // BD16: required-as-a-module ⇒ do nothing. The driver imports the hash primitives
+  // and must not trigger a whole-tree comparison as a side effect of the import.
+  if (require.main !== module) return;
   // ── NOT CONFIGURED ≠ UNOBSERVABLE. A checkout with no private archive is a
   // normal, by-design state for this PUBLIC repo — but it still prints, because
   // silence here is what let three unbacked artifacts pass for safe.
@@ -282,6 +329,7 @@ function main() {
   const stale = [];
   const absent = [];
   const unreadable = [];
+  const eolOnly = []; // BD16: matched only after LF normalisation — backed up, reported separately
   let ok = 0;
 
   for (const it of items) {
@@ -295,7 +343,15 @@ function main() {
     const recorded = inArchive.get(it.archive);
     if (!recorded) absent.push(it.archive);
     else if (recorded === blobSha1(buf)) ok++;
-    else stale.push(it.archive);
+    else if (recorded === blobSha1Lf(buf)) {
+      // BD16: raw bytes differ, LF-normalised bytes match ⇒ the difference is line
+      // endings and nothing else. Under the archive's `eol=lf` that is NOT a backup
+      // gap: committing this file yields the blob the archive already has. Counted as
+      // backed up, and counted SEPARATELY so the figure can be stated rather than
+      // silently folded into `ok`.
+      ok++;
+      eolOnly.push(it.archive);
+    } else stale.push(it.archive);
   }
 
   const behind = stale.length + absent.length;
@@ -344,6 +400,12 @@ function main() {
   }
   say(lines);
 }
+
+// ⭐ BD16: the comparison primitives are exported so a driver can prove the EOL
+// fallback still discriminates. ⛔ `main()` returns immediately when this file is
+// REQUIRED rather than run (guard at the top of main), so importing it performs no
+// git commands, reads no tree, and prints nothing.
+module.exports = { blobSha1, blobSha1Lf, isProbablyText };
 
 // ⛔ The whole body is wrapped and the exit is unconditional: this script can
 // never fail a push, however wrong it is about anything else (Protocol 33).
