@@ -678,6 +678,51 @@ function loadAxisVocabulary() {
 }
 
 /**
+ * ── THE ONE RESOLVER — imported from the archive, never re-implemented ──────────
+ *
+ * `!PLANNING/tools/item-resolver.cjs` answers, per item, project · horizon ·
+ * owner-of-next-step · blockers · state, with the owner's precedence rule for
+ * the cases where the item's own block and the graph disagree. The checkpoint
+ * preflight, the ranking tool and the format gate import the same file, so the
+ * page and those tools cannot give two answers about one item.
+ *
+ * ⛔ Same three cases as the format module: no planning tree (a public clone,
+ * normal), a tree without the resolver (a checkout behind it), or a resolver that
+ * threw on load. The latter two are `observable:false` with the reason, and the
+ * axes then fall back to the two-source readers in `board-axes.js`, saying so.
+ */
+function resolverToolPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'item-resolver.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+function loadResolver() {
+  const tool = resolverToolPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/item-resolver.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  try {
+    const mod = require(tool);
+    if (typeof mod.resolveBoard !== 'function' || typeof mod.countsLine !== 'function') {
+      return {
+        observable: false,
+        why: 'tools/item-resolver.cjs is missing resolveBoard or countsLine',
+      };
+    }
+    return { observable: true, mod, tool };
+  } catch (e) {
+    return { observable: false, why: 'tools/item-resolver.cjs threw on load: ' + e.message };
+  }
+}
+
+/**
  * `BLOCKER-GRAPH.json` — the per-item `actor` classification behind DECIDE vs DO,
  * and (since 2026-09-05) the per-item `project` / `horizon` assignment with a
  * `projectBasis` / `horizonBasis` and quoted evidence on every row.
@@ -847,6 +892,8 @@ module.exports = {
   loadItemFormat,
   axisToolPath,
   loadAxisVocabulary,
+  resolverToolPath,
+  loadResolver,
   readBlockerGraph,
   domainCensusPath,
   readDomainCensus,

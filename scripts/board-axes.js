@@ -139,8 +139,98 @@ function horizonOfBody(bodyLines, fmt) {
  * @param {Array<{id:string, body:string[]}>} items ID-bearing items from parseQueue
  * @param {{fmt?:object, graph?:object, vocabulary?:string[]}} sources
  */
+/**
+ * ── ⭐⭐ WHEN THE ARCHIVE'S RESOLVER IS HANDED IN, IT DECIDES — this file only counts ──
+ *
+ * `sources.resolved` is a Map id → record from the archive's ONE resolver
+ * (`!PLANNING/tools/item-resolver.cjs`, QSA-2026-09-23 §3.4 item 2), the same
+ * function the checkpoint preflight, the ranking tool and the format gate import.
+ * Where it is present, the per-item value, its basis and every conflict come from
+ * it, and neither reader below applies a precedence or a demotion of its own: a
+ * second rule here is exactly how four readers of one board gave four answers.
+ * The precedence it applies is the owner's ruling D2-A (2026-09-23): a graph row
+ * that QUOTES its deciding words, then the item's own block, then any other graph
+ * row. ⚠ Without it — a public clone, a tree behind the resolver — the two-source
+ * readers below run as before, and say so in `sourcedFrom`.
+ */
+function fromResolved(items, resolved, field) {
+  const vals = new Map();
+  const basisOf = new Map();
+  const conflicts = [];
+  let demoted = 0;
+  for (const it of items) {
+    const rec = resolved.get(it.id);
+    if (!rec) continue;
+    const v = rec[field];
+    const src = rec[field + 'Source'];
+    vals.set(it.id, v);
+    if (src && src !== 'NONE') {
+      basisOf.set(
+        it.id,
+        src === 'BLOCK'
+          ? 'BLOCK'
+          : src === 'QUOTED'
+            ? 'READ'
+            : String(rec[field + 'Basis'] || 'UNSTATED')
+      );
+    }
+    if (rec[field + 'Demoted']) demoted++;
+    for (const c of rec.conflicts || []) {
+      if (c.field === field)
+        conflicts.push({
+          id: it.id,
+          block: c.block,
+          graph: c.graph,
+          graphBasis: c.graphBasis,
+          used: v,
+        });
+    }
+  }
+  return { vals, basisOf, conflicts, demoted };
+}
+
 function readHorizons(items, sources) {
   const s = sources || {};
+  if (
+    s.resolved instanceof Map &&
+    Array.isArray(s.vocabulary) &&
+    Array.isArray(items) &&
+    items.length
+  ) {
+    const r = fromResolved(items, s.resolved, 'horizon');
+    const counts = {};
+    for (const v of s.vocabulary) counts[v] = 0;
+    counts[HORIZON_UNSET] = 0;
+    counts[HORIZON_UNPARSEABLE] = 0;
+    const basisCounts = {};
+    const someday = new Set();
+    const unparseable = [];
+    for (const it of items) {
+      const h = r.vals.has(it.id) ? r.vals.get(it.id) : HORIZON_UNSET;
+      counts[h] = (counts[h] || 0) + 1;
+      const b = r.basisOf.get(it.id);
+      if (b) basisCounts[b] = (basisCounts[b] || 0) + 1;
+      if (h === HORIZON_UNPARSEABLE) unparseable.push(it.id);
+      if (h === SOMEDAY_NAME && s.vocabulary.includes(SOMEDAY_NAME)) someday.add(it.id);
+    }
+    return {
+      observable: true,
+      byId: new Map(
+        items.map(it => [it.id, r.vals.has(it.id) ? r.vals.get(it.id) : HORIZON_UNSET])
+      ),
+      basisOf: r.basisOf,
+      basisCounts,
+      counts,
+      vocabulary: s.vocabulary.slice(),
+      someday,
+      unparseable,
+      conflicts: r.conflicts,
+      precedence: 'D2-A',
+      total: items.length,
+      sourcedFrom:
+        'the archive resolver (item-resolver.cjs: a quoted READ, then the accept block, then the graph)',
+    };
+  }
   const fmt = s.fmt && typeof s.fmt.parseAccept === 'function' ? s.fmt : null;
   const graphItems =
     s.graph && s.graph.items && typeof s.graph.items === 'object' ? s.graph.items : null;
@@ -306,6 +396,41 @@ function projectOfBody(bodyLines, fmt) {
 
 function readProjects(items, sources) {
   const s = sources || {};
+  if (
+    s.resolved instanceof Map &&
+    Array.isArray(s.vocabulary) &&
+    Array.isArray(items) &&
+    items.length
+  ) {
+    const r = fromResolved(items, s.resolved, 'project');
+    const counts = {};
+    for (const v of s.vocabulary) counts[v] = 0;
+    counts[HORIZON_UNSET] = 0;
+    const basisCounts = {};
+    let fromBlock = 0;
+    for (const it of items) {
+      const p = r.vals.has(it.id) ? r.vals.get(it.id) : HORIZON_UNSET;
+      counts[p] = (counts[p] || 0) + 1;
+      const b = r.basisOf.get(it.id);
+      if (b) basisCounts[b] = (basisCounts[b] || 0) + 1;
+      if (b === 'BLOCK') fromBlock++;
+    }
+    return {
+      observable: true,
+      byId: new Map(
+        items.map(it => [it.id, r.vals.has(it.id) ? r.vals.get(it.id) : HORIZON_UNSET])
+      ),
+      counts,
+      basisCounts,
+      demoted: r.demoted,
+      fromBlock,
+      conflicts: r.conflicts,
+      precedence: 'D2-A',
+      untrusted: [...UNTRUSTED_PROJECT_BASES],
+      vocabulary: s.vocabulary.slice(),
+      total: items.length,
+    };
+  }
   const graphItems =
     s.graph && s.graph.items && typeof s.graph.items === 'object' ? s.graph.items : null;
   const fmt = s.fmt && typeof s.fmt.parseAccept === 'function' ? s.fmt : null;

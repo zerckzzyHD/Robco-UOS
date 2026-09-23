@@ -726,19 +726,43 @@ function boardAxes(queueMd, sources) {
     const fmt = s.itemFormat && s.itemFormat.observable ? s.itemFormat.mod : null;
     const graph = s.graph && s.graph.observable ? s.graph.graph : null;
     const vocab = s.axisVocabulary && s.axisVocabulary.observable ? s.axisVocabulary : null;
+    // ⭐ THE ONE RESOLVER, when the archive carries it (planning-paths.loadResolver):
+    // every per-item value on this page then comes from the function the checkpoint,
+    // the ranking tool and the format gate also call, and this file only counts.
+    const R = s.resolver && s.resolver.observable ? s.resolver.mod : null;
+    let resolved = null;
+    if (R && graph) {
+      resolved = R.resolveBoard({
+        items,
+        graph,
+        logMd: typeof s.logMd === 'string' ? s.logMd : '',
+      }).byId;
+    }
     // ⛔ BOTH SOURCES, always. The accept block is the authored value; the graph
     // carries the board-wide assignment. Reading only the first is how this page
     // printed SOMEDAY-IF 0 against a board with 55 of them.
     out.horizons = A.readHorizons(items, {
       fmt,
       graph,
+      resolved,
       vocabulary: vocab ? vocab.HORIZONS : null,
     });
     out.projects = A.readProjects(items, {
       graph,
       fmt,
+      resolved,
       vocabulary: vocab ? vocab.PROJECTS : null,
     });
+    // The census line the other readers print, built from THIS page's own tallies
+    // (not a re-print of the resolver's), so agreement is a measurement.
+    out.resolverCountsLine =
+      R && resolved && out.projects.observable && out.horizons.observable
+        ? R.countsLine('/queue · every open ID-bearing item', {
+            items: items.length,
+            project: out.projects.counts,
+            horizon: out.horizons.counts,
+          })
+        : null;
     if (!out.horizons.observable && s.itemFormat && s.itemFormat.why && !graph) {
       out.horizons.why = s.itemFormat.why;
     }
@@ -1354,6 +1378,9 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           `<p class="note">Should this item be counted yet, over all ${hz.total} items. Read from ${escapeHtml(hz.sourcedFrom)}` +
           `${hz.basisCounts && Object.keys(hz.basisCounts).length ? ` · basis ${escapeHtml(basisStrip(hz.basisCounts))}` : ''}. ` +
           `⛔ A <code>SOMEDAY-IF</code> item is in no total on this page.</p>` +
+          (axes.resolverCountsLine
+            ? `<p class="note" data-resolver-counts>${escapeHtml(axes.resolverCountsLine)}</p>`
+            : '') +
           `<ul class="stats" data-strip="strip-1">${cells}${unset}${unparse}</ul>` +
           // ⛔ THE SOURCES DISAGREE HERE, AND PRECEDENCE IS A RESOLUTION, NOT AN
           // ABSENCE OF CONFLICT. The hand-written block wins over a keyword-assigned
@@ -1361,13 +1388,17 @@ function renderRoadmapSection(md, when, queueMd, census, sources) {
           // how a board ends up carrying two answers nobody knows about.
           (hz.conflicts && hz.conflicts.length
             ? `<p class="note stale">⚠ <strong>${hz.conflicts.length} item(s) carry two different horizons.</strong> ` +
-              `The item's own <code>accept</code> block is used, because a person wrote it and the archive's gate refuses it ` +
-              `if it is malformed; the assignment disagrees on: ` +
+              (hz.precedence === 'D2-A'
+                ? `Resolved by the owner's rule (D2-A, 2026-09-23): a graph reading that quotes its deciding words wins, ` +
+                  `then the item's own <code>accept</code> block, then any other graph row. The two answers, and the one used: `
+                : `The item's own <code>accept</code> block is used, because a person wrote it and the archive's gate refuses it ` +
+                  `if it is malformed; the assignment disagrees on: `) +
               hz.conflicts
                 .map(
                   x =>
                     `<code>${escapeHtml(x.id)}</code> block <strong>${escapeHtml(x.block)}</strong> vs ` +
-                    `${escapeHtml(x.graph)} by ${escapeHtml(x.graphBasis)}`
+                    `${escapeHtml(x.graph)} by ${escapeHtml(x.graphBasis)}` +
+                    (x.used !== undefined ? ` → <strong>${escapeHtml(x.used)}</strong>` : '')
                 )
                 .join('; ') +
               `. Resolving one of the two is the fix; showing you the winner alone is not.</p>`

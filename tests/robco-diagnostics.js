@@ -60498,6 +60498,125 @@ if (!PLANNING_OK) {
     '270.21c: UNIT — POSITIVE CONTROL: without the archive grammar the fallback cannot run, so N1 reads UNSET, exactly the old behaviour; the test above is not passing because UNSET is gone'
   );
 
+  // ── 270.22 — when the archive's ONE resolver is handed in, it decides and this page only counts ──
+  // (QSA-2026-09-23 §3.4 item 2.) A stub stands in for item-resolver.cjs: the fixture must run with no archive.
+  // ⛔ What these pin: the page applies NO precedence and NO demotion of its own on top of the resolver's (a second
+  // rule here is how four readers of one board gave four answers), conflicts carry the value actually used, and
+  // the census line is built from the PAGE'S OWN tallies, so agreement with the other readers is measured.
+  const resolved270 = new Map([
+    [
+      'N1',
+      {
+        project: 'HARNESS',
+        projectSource: 'BLOCK',
+        projectBasis: 'BLOCK',
+        horizon: 'SOMEDAY-IF',
+        horizonSource: 'QUOTED',
+        horizonBasis: 'READ',
+        conflicts: [{ field: 'horizon', block: 'NEXT', graph: 'SOMEDAY-IF', graphBasis: 'READ' }],
+      },
+    ],
+    [
+      'N2',
+      {
+        project: 'UNSET',
+        projectSource: 'NONE',
+        horizon: 'UNSET',
+        horizonSource: 'NONE',
+        conflicts: [],
+      },
+    ],
+    [
+      'S1',
+      {
+        project: 'MIST',
+        projectSource: 'GRAPH',
+        projectBasis: 'SIGNAL',
+        horizon: 'NEXT',
+        horizonSource: 'BLOCK',
+        conflicts: [],
+      },
+    ],
+  ]);
+  const rItems270 = [
+    { id: 'N1', body: [] },
+    { id: 'N2', body: [] },
+    { id: 'S1', body: [] },
+  ];
+  const rp270 = A270.readProjects(rItems270, {
+    resolved: resolved270,
+    graph: { items: { S1: { project: 'MIST', projectBasis: 'SIGNAL' } } },
+    vocabulary: projVocab270,
+  });
+  const rh270 = A270.readHorizons(rItems270, {
+    resolved: resolved270,
+    vocabulary: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF', 'UNKNOWN'],
+  });
+  assert(
+    rp270.precedence === 'D2-A' &&
+      rp270.byId.get('N1') === 'HARNESS' &&
+      rp270.byId.get('S1') === 'MIST' &&
+      rp270.counts.UNSET === 1 &&
+      rh270.someday.has('N1') &&
+      rh270.counts['SOMEDAY-IF'] === 1 &&
+      rh270.counts.UNSET === 1,
+    "270.22a: UNIT — with the resolver's records handed in, every value is the resolver's: the page does not re-demote a row the resolver kept (S1 stays MIST), someday follows the resolved horizon, and UNSET is still counted, never defaulted"
+  );
+  assert(
+    rh270.conflicts.length === 1 &&
+      rh270.conflicts[0].used === 'SOMEDAY-IF' &&
+      rh270.basisOf.get('N1') === 'READ',
+    '270.22b: UNIT — a conflict carries both answers AND the one used, and a quoted reading is labelled READ'
+  );
+  const view270 = require(path.join(ROOT, 'scripts', 'report-view.js'));
+  const stubRes270 = {
+    observable: true,
+    mod: {
+      resolveBoard: ({ items }) => ({
+        byId: new Map(
+          items.map(i => [
+            i.id,
+            {
+              project: 'APP',
+              projectSource: 'BLOCK',
+              projectBasis: 'BLOCK',
+              horizon: 'NEXT',
+              horizonSource: 'BLOCK',
+              conflicts: [],
+            },
+          ])
+        ),
+      }),
+      countsLine: (label, c) =>
+        `RESOLVER-COUNTS v1 · items ${c.items} · project ${Object.entries(c.project)
+          .filter(([, v]) => v)
+          .map(([k, v]) => k + ' ' + v)
+          .join(' · ')} · horizon ${Object.entries(c.horizon)
+          .filter(([, v]) => v)
+          .map(([k, v]) => k + ' ' + v)
+          .join(' · ')}`,
+    },
+  };
+  const q270 = '# Build Queue\n\n## S\n\n### Z1. ⬜ **one**\n\n### Z2. 🔄 **two**\n';
+  const src270 = {
+    graph: { observable: true, graph: { items: {}, edges: [] } },
+    axisVocabulary: {
+      observable: true,
+      PROJECTS: projVocab270,
+      HORIZONS: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF', 'UNKNOWN'],
+    },
+  };
+  const axWith270 = view270.boardAxes(q270, Object.assign({ resolver: stubRes270 }, src270));
+  const axWithout270 = view270.boardAxes(q270, src270);
+  assert(
+    axWith270.resolverCountsLine ===
+      'RESOLVER-COUNTS v1 · items 2 · project APP 2 · horizon NEXT 2' &&
+      axWith270.projects.byId.get('Z1') === 'APP' &&
+      axWithout270.resolverCountsLine === null &&
+      axWithout270.projects.byId.get('Z1') === 'UNSET',
+    "270.22c: BEHAVIOUR — /queue's derivation takes the resolver's values when it is reachable and prints the census line from its OWN tallies; with no resolver it falls back to the two-source readers and prints no line rather than a borrowed one"
+  );
+
   // ── 270.17-270.18 — static: one grammar, and the fresh-require chain covers it ──
   const ba270 = fs.readFileSync(path.join(ROOT, 'scripts', 'board-axes.js'), 'utf8');
   const pp270 = fs.readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8');

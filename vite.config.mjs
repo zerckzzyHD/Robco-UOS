@@ -492,6 +492,12 @@ function queueRoute() {
               // the two vocabularies, declared once by the archive's axis tool:
               // the owner's six projects, and the four horizons (incl. UNKNOWN).
               axisVocabulary: paths.loadAxisVocabulary(),
+              // ⭐ the archive's ONE resolver (item-resolver.cjs): the per-item
+              // project / horizon the checkpoint, the ranking tool and the format
+              // gate also read. Absent → the two-source readers run, and say so.
+              resolver: paths.loadResolver(),
+              // the LOG at the same ref, for the resolver's line-start anchor oracle
+              logMd: paths.readPlanningFileAtRef('QUEUE_LOG.md'),
             }
           )
         );
