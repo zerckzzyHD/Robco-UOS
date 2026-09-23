@@ -271,10 +271,44 @@ const PROJECT_UNKNOWN = 'UNKNOWN';
  */
 const UNTRUSTED_PROJECT_BASES = new Set(['SIGNAL']);
 
+/**
+ * ── ⭐ THE FALLBACK: an item with NO graph row reads its own block's `project:` ──
+ *
+ * ⛔ MEASURED 2026-09-23, the queue-system audit (QSA-2026-09-23, phase 0 item 4):
+ * 76 of 479 open items read UNSET here, and every one of them carries a valid
+ * `project:` in its own accept block. The graph's per-item rows were written once,
+ * board-wide, and since then only by hand, while the filing rule puts a NEW item's
+ * project in its block — so UNSET grew by one per filing. That was a reader defect,
+ * not a filing one: the fact was on the board, one field away from where this looked.
+ *
+ * ⚠ PRECEDENCE IS NOT CHANGED WHERE BOTH HOMES SPEAK. The block is consulted ONLY
+ * when the graph has no row for the item at all; a graph row still wins exactly as
+ * before, so the ten items whose two homes disagree read what they read yesterday.
+ * Changing which home wins is a ruling (the audit's D2), not a reader fix, and it
+ * does not happen here.
+ *
+ * The block's value is read through the ARCHIVE's grammar (`fmt`), never retyped,
+ * and it is checked against the same vocabulary as a graph value: a word outside it
+ * is UNPARSEABLE, never silently UNSET. Its basis is `BLOCK`, a hand-written and
+ * gated value, so the SIGNAL demotion does not touch it.
+ */
+function projectOfBody(bodyLines, fmt) {
+  if (!fmt || typeof fmt.parseAccept !== 'function') return undefined;
+  let blocks;
+  try {
+    blocks = fmt.parseAccept(bodyLines || []);
+  } catch {
+    return HORIZON_UNPARSEABLE;
+  }
+  if (!Array.isArray(blocks) || !blocks.length) return undefined;
+  return blocks[0] && blocks[0].fields ? blocks[0].fields.project : undefined;
+}
+
 function readProjects(items, sources) {
   const s = sources || {};
   const graphItems =
     s.graph && s.graph.items && typeof s.graph.items === 'object' ? s.graph.items : null;
+  const fmt = s.fmt && typeof s.fmt.parseAccept === 'function' ? s.fmt : null;
   const vocab = Array.isArray(s.vocabulary) ? s.vocabulary.slice() : null;
   if (!graphItems || !vocab) {
     return {
@@ -294,10 +328,20 @@ function readProjects(items, sources) {
   counts[UNSET] = 0;
   const basisCounts = {};
   let demoted = 0;
+  let fromBlock = 0;
   for (const it of items) {
     const row = graphItems[it.id];
-    const raw = row ? row.project : undefined;
-    const b = String((row && row.projectBasis) || 'UNSTATED').toUpperCase();
+    let raw = row ? row.project : undefined;
+    let b = String((row && row.projectBasis) || 'UNSTATED').toUpperCase();
+    // ⭐ See projectOfBody: ONLY when the graph has no row for this item at all.
+    if (!row && fmt) {
+      const fromBody = projectOfBody(it.body, fmt);
+      if (fromBody !== undefined) {
+        raw = fromBody;
+        b = 'BLOCK';
+        fromBlock++;
+      }
+    }
     let p = raw === undefined ? UNSET : vocab.includes(raw) ? raw : HORIZON_UNPARSEABLE;
     // ⛔⛤ A KEYWORD GUESS IS NOT A LABEL. See UNTRUSTED_PROJECT_BASES.
     if (p !== UNSET && p !== HORIZON_UNPARSEABLE && UNTRUSTED_PROJECT_BASES.has(b)) {
@@ -314,6 +358,7 @@ function readProjects(items, sources) {
     counts,
     basisCounts,
     demoted,
+    fromBlock,
     untrusted: [...UNTRUSTED_PROJECT_BASES],
     vocabulary: vocab,
     total: items.length,

@@ -736,6 +736,7 @@ function boardAxes(queueMd, sources) {
     });
     out.projects = A.readProjects(items, {
       graph,
+      fmt,
       vocabulary: vocab ? vocab.PROJECTS : null,
     });
     if (!out.horizons.observable && s.itemFormat && s.itemFormat.why && !graph) {

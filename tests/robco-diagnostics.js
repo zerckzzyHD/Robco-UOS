@@ -60443,6 +60443,61 @@ if (!PLANNING_OK) {
     '270.16: UNIT — an unobservable axis excludes NOBODY and says applied:false; it must not behave like "there were none"'
   );
 
+  // ── 270.21 — the project FALLBACK (QSA-2026-09-23 phase 0 item 4) ─────────────
+  // Measured on the live board 2026-09-23: 76 of 479 items read UNSET, every one with
+  // a valid `project:` in its own block and NO graph row. The fallback reads the block
+  // ONLY when the graph has no row; where both homes speak the graph still wins, so the
+  // fix cannot pass by quietly changing precedence. Red on the old reader: it never
+  // consulted the block, so N1 read UNSET.
+  const projFmt270 = {
+    HORIZON: ['BLOCKS-WORK-NOW', 'NEXT', 'SOMEDAY-IF'],
+    parseAccept: lines => {
+      const t = (Array.isArray(lines) ? lines : []).join('\n');
+      const m = /^project:\s*(.*)$/m.exec(t);
+      return /```accept/.test(t) ? [{ fields: m ? { project: m[1].trim() } : {} }] : [];
+    },
+  };
+  const projVocab270 = ['APP', 'CONTROL-PLANE', 'HARNESS', 'MIST', 'MUSEUM', 'BINDER', 'UNKNOWN'];
+  const blk270 = p => ['```accept', 'project: ' + p, '```'];
+  const projItems270 = [
+    { id: 'N1', body: blk270('HARNESS') }, // no row, block speaks
+    { id: 'N2', body: ['no block'] }, // no row, no block
+    { id: 'N3', body: blk270('LATER') }, // no row, a word outside the vocabulary
+    { id: 'B1', body: blk270('APP') }, // BOTH speak and disagree: the graph row must still win
+    { id: 'S1', body: blk270('MIST') }, // row on SIGNAL: still demoted, the block is not consulted
+  ];
+  const projGraph270 = {
+    items: {
+      B1: { project: 'MUSEUM', projectBasis: 'READ' },
+      S1: { project: 'HARNESS', projectBasis: 'SIGNAL' },
+    },
+  };
+  const pWith270 = A270.readProjects(projItems270, {
+    graph: projGraph270,
+    fmt: projFmt270,
+    vocabulary: projVocab270,
+  });
+  const pWithout270 = A270.readProjects(projItems270, {
+    graph: projGraph270,
+    vocabulary: projVocab270,
+  });
+  assert(
+    pWith270.byId.get('N1') === 'HARNESS' &&
+      pWith270.byId.get('N2') === A270.HORIZON_UNSET &&
+      pWith270.byId.get('N3') === A270.HORIZON_UNPARSEABLE &&
+      pWith270.fromBlock === 2 &&
+      pWith270.basisCounts.BLOCK === 2,
+    "270.21a: UNIT — an item with NO graph row reads its own block's project (basis BLOCK); no block stays UNSET and an out-of-vocabulary word is UNPARSEABLE, never UNSET"
+  );
+  assert(
+    pWith270.byId.get('B1') === 'MUSEUM' && pWith270.byId.get('S1') === A270.PROJECT_UNKNOWN,
+    '270.21b: UNIT — where the graph HAS a row, precedence is unchanged: a disagreeing block does not override it (B1 stays MUSEUM), and a SIGNAL row is still demoted to UNKNOWN rather than rescued by its block'
+  );
+  assert(
+    pWithout270.byId.get('N1') === A270.HORIZON_UNSET && pWithout270.fromBlock === 0,
+    '270.21c: UNIT — POSITIVE CONTROL: without the archive grammar the fallback cannot run, so N1 reads UNSET, exactly the old behaviour; the test above is not passing because UNSET is gone'
+  );
+
   // ── 270.17-270.18 — static: one grammar, and the fresh-require chain covers it ──
   const ba270 = fs.readFileSync(path.join(ROOT, 'scripts', 'board-axes.js'), 'utf8');
   const pp270 = fs.readFileSync(path.join(ROOT, 'scripts', 'planning-paths.js'), 'utf8');
