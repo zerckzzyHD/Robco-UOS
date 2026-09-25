@@ -49939,6 +49939,14 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 237 — Local-artifact backup nudge (Protocol 48)');
+  // ⛔ Scrub GIT_* from every child's env (Protocol 42, 2026-09-25). git exports
+  // GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE inside a hook, and this suite's
+  // children inherited them: run by the pre-commit hook from a WORKTREE, the
+  // nudge's git and the practice repo's `git init`/`config` landed on the REAL
+  // repository — core.bare flipped to true, a fake user was written into
+  // .git/config, and the worktree's index was emptied. Suite 276 locks this.
+  const env237 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/i.test(k)) env237[k] = process.env[k];
 
   const nudgePath237 = path.join(ROOT, 'scripts', 'backup-nudge.js');
   const nudgeExists237 = fs.existsSync(nudgePath237);
@@ -49976,7 +49984,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
     cwd: ROOT,
     encoding: 'utf8',
     timeout: 20000,
-    env: { ...process.env, ROBCO_BACKUP_REPO: path.join(ROOT, 'no', 'such', 'archive', 'xyz') },
+    env: { ...env237, ROBCO_BACKUP_REPO: path.join(ROOT, 'no', 'such', 'archive', 'xyz') },
   });
   assert(
     bogus237.status === 0,
@@ -49987,6 +49995,7 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
     cwd: ROOT,
     encoding: 'utf8',
     timeout: 20000,
+    env: env237,
   });
   assert(
     dflt237.status === 0,
@@ -50021,13 +50030,14 @@ header('Suite 235 — CI Failure-Evidence Capture (Health-batch U4)');
     const root237 = path.join(tmp237, 'app');
     const arch237 = path.join(tmp237, 'archive');
     const empty237 = path.join(tmp237, 'no-memory');
-    const g237 = (cwd, ...a) => spawn237('git', a, { cwd, encoding: 'utf8', timeout: 20000 });
+    const g237 = (cwd, ...a) =>
+      spawn237('git', a, { cwd, encoding: 'utf8', timeout: 20000, env: env237 });
     const runNudge237 = over =>
       spawn237('node', ['scripts/backup-nudge.js'], {
         cwd: ROOT,
         encoding: 'utf8',
         timeout: 30000,
-        env: Object.assign({}, process.env, {
+        env: Object.assign({}, env237, {
           ROBCO_NUDGE_ROOT: root237,
           ROBCO_BACKUP_REPO: arch237,
           ROBCO_MEMORY_BASE: empty237,
@@ -56368,6 +56378,11 @@ if (!PLANNING_OK) {
 // ══════════════════════════════════════════════════════════════
 {
   header('Suite 253 — CPB4 doc-only gate fast path (Protocol 36)');
+  // ⛔ Scrub GIT_* from every child's env — same defect and same fix as Suite 237
+  // (Protocol 42, 2026-09-25): under the pre-commit hook this suite's throwaway
+  // repo `git init` re-initialised the REAL repository as bare. Suite 276 locks it.
+  const env253 = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/i.test(k)) env253[k] = process.env[k];
 
   const { spawnSync: spawn253, execFileSync: exec253 } = require('child_process');
   const os253 = require('os');
@@ -56456,7 +56471,8 @@ if (!PLANNING_OK) {
   const repo253 = fs.mkdtempSync(path.join(os253.tmpdir(), 'robco-gate-scope-253-'));
   try {
     const ZERO253 = '0000000000000000000000000000000000000000';
-    const g253 = (...a) => exec253('git', a, { cwd: repo253, encoding: 'utf8' }).trim();
+    const g253 = (...a) =>
+      exec253('git', a, { cwd: repo253, encoding: 'utf8', env: env253 }).trim();
     const head253 = () => g253('rev-parse', 'HEAD');
     g253('init', '-q');
     g253('config', 'user.email', 't@example.com');
@@ -56487,6 +56503,7 @@ if (!PLANNING_OK) {
           encoding: 'utf8',
           input: payload,
           timeout: 20000,
+          env: env253,
         }).stdout || ''
       ).trim();
 
@@ -61388,6 +61405,937 @@ if (!PLANNING_OK) {
       '274.11: the serve/build decision is taken from the `command` Vite hands defineConfig, and no code line sniffs process.argv for it — bare `vite` is serve and carries no such token, so argv sniffing silently disarms the refusal'
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 275 — the Mist Console /queue (DS13 milestone 1, the MERGED build of the
+//  paired Opus / Fable runs, 2026-09-25)
+//
+//  ⭐ WHAT THIS LOCKS. The page is a STRICT VIEW (doctrine §24; the Mist View
+//  boundary, which names <details> among the forbidden elements; DS13a decision
+//  1). The owner's 2026-09-25 verdict asked for sections folded to one line and
+//  opened on a tap: the fold is built from document anchors and CSS :target, so
+//  275.2 proves every card folds WITHOUT a control and its rows are already in
+//  the page. What must never wait for a tap is the NOW block, and 275.3 holds it
+//  to its stated rule. "Needs you" has ONE definition (the two builds disagreed,
+//  71 vs 85 on the live board); 275.4 locks it and 275.18 proves, on the live
+//  board, that the owner-actor items it leaves out are all counted beside it.
+//  Every section carries its own accent AND icon AND name (275.13) — colour is
+//  never alone. UNOBSERVABLE is never a zero (275.8–275.10).
+//
+//  ⚠ TWO TIERS, LABELLED. 275.1–275.16 run everywhere over a SYNTHETIC fixture
+//  (invented ids and titles — this repo is public, no board text may enter it)
+//  and a STUB resolver returning the ONE resolver's record shape. 275.17 runs the
+//  same fixture through the REAL resolver, 275.18 the live board; both SKIP with
+//  the reason where the private archive is absent (a public clone's normal state).
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 275 — Mist Console /queue: strict View, folded cards, one Needs-you rule');
+  const CQ275 = require(path.join(ROOT, 'scripts', 'console-queue.js'));
+  const SH275 = require(path.join(ROOT, 'scripts', 'console-shell.js'));
+  const QV275 = require(path.join(ROOT, 'scripts', 'queue-view.js'));
+  const PICTO275 = /\p{Extended_Pictographic}/u;
+
+  const acc275 = (kind, actor, horizon, state, extra) =>
+    [
+      '```accept',
+      `kind:       ${kind}`,
+      'reason:     fixture reason for this item.',
+      `actor:      ${actor}`,
+      `horizon:    ${horizon}`,
+      `state:      ${state}`,
+      'project:    APP',
+      ...(extra || []),
+      '```',
+    ].join('\n');
+  const queue275 = [
+    '# queue',
+    '',
+    '> # 🛑 SHUTDOWN STATE (fixture pause, 2026-09-24) — read the fixture log. **On restart, first: run the fixture step.** Then the rest.',
+    '',
+    '### D1. ⬜ ⭐⭐ **A DECISION ONLY THE OWNER CAN MAKE** — tail words (new 2026-09-20)',
+    '',
+    '**Done means:** the owner rules yes or no, dated.',
+    '',
+    acc275('DECISION', 'OWNER-RULING', 'NEXT', 'TODO'),
+    '',
+    '### K1. ⏭️ the owner runs one command at his machine',
+    '',
+    acc275('BUILD', 'OWNER-KEYBOARD', 'BLOCKS-WORK-NOW', 'READY'),
+    '',
+    '### R1. ⬜ a ruling on ordinary work',
+    '',
+    acc275('BUILD', 'OWNER-RULING', 'NEXT', 'TODO'),
+    '',
+    '### S1. ⬜ a someday thought the owner would rule on',
+    '',
+    acc275('DECISION', 'OWNER-RULING', 'SOMEDAY-IF', 'TODO'),
+    '',
+    '### C1. ⬜ a captured idea, typed not-work',
+    '',
+    acc275('CAPTURE', 'OWNER-RULING', 'NEXT', 'TODO'),
+    '',
+    '### H1. ⬜ the owner’s, but held by his own K1',
+    '',
+    acc275('BUILD', 'OWNER-RULING', 'NEXT', 'TODO'),
+    '',
+    '### P1. ⏸️ the owner’s, parked',
+    '',
+    acc275('BUILD', 'OWNER-RULING', 'NEXT', 'PARKED'),
+    '',
+    '### B1. ⚠️ held by a live edge on session work',
+    '',
+    acc275('BUILD', 'SESSION', 'NEXT', 'BLOCKED'),
+    '',
+    '### B2. ⚠️ blocked by heading only',
+    '',
+    'body',
+    '',
+    '### L1. 🔄 landed four days ago',
+    '',
+    acc275('BUILD', 'SESSION', 'NEXT', 'LANDED', [
+      'landed:     app@abcdef1 2026-09-21 by builder1',
+      'confirm-by: checkpoint',
+    ]),
+    '',
+    '### L2. 🔄 landed yesterday',
+    '',
+    acc275('BUILD', 'SESSION', 'NEXT', 'LANDED', [
+      'landed:     app@abcdef2 2026-09-24 by builder2',
+      'confirm-by: checkpoint',
+    ]),
+    '',
+    '### A1. 🔄 plain active work 🚨 with an emoji in its heading',
+    '',
+    'body',
+    '',
+  ].join('\n');
+  const graph275 = {
+    measuredAt: '2026-09-25T00:00:00Z',
+    items: {},
+    edges: [
+      {
+        blocker: 'K1',
+        blocked: 'H1',
+        kind: 'blocks',
+        state: 'LIVE',
+        basis: 'STATED',
+        trigger: 'K1 has run',
+      },
+      {
+        blocker: 'A1',
+        blocked: 'B1',
+        kind: 'blocks',
+        state: 'LIVE',
+        basis: 'STATED',
+        trigger: 'unblocks when A1 has landed and a checkpoint confirms it',
+      },
+      // a DISCHARGED edge must not render as a blocker
+      { blocker: 'A1', blocked: 'B2', kind: 'blocks', state: 'DISCHARGED', evidence: 'old' },
+    ],
+    conditions: [],
+  };
+  const parseAccept275 = lines => {
+    const L = Array.isArray(lines) ? lines : String(lines || '').split('\n');
+    const out = [];
+    for (let i = 0; i < L.length; i++) {
+      if (!/^\s*```accept\b/.test(L[i])) continue;
+      const fields = {};
+      for (i++; i < L.length && !/^\s*```\s*$/.test(L[i]); i++) {
+        const kv = /^([a-z-]+):\s*(.*)$/.exec(L[i]);
+        if (kv) fields[kv[1]] = kv[2].trim();
+      }
+      out.push({ fields });
+    }
+    return out;
+  };
+  /** A STUB with the ONE resolver's record shape — fixture-only, public-safe. */
+  const stub275 = {
+    CONFIRM_LIMIT_DAYS: 3,
+    resolveBoard({ items, graph }) {
+      const byId = new Map();
+      const openIds = new Set(items.map(i => i.id));
+      const live = (graph.edges || []).filter(e => e.state === 'LIVE' && e.kind === 'blocks');
+      for (const it of items) {
+        const b = parseAccept275(it.body);
+        const f = b.length ? b[0].fields : {};
+        byId.set(it.id, {
+          id: it.id,
+          kind: f.kind || null,
+          work: !['RULE', 'SPECIMEN', 'CAPTURE', 'PROGRAMME'].includes(f.kind),
+          project: f.project || 'UNSET',
+          projectSource: f.project ? 'BLOCK' : 'NONE',
+          horizon: f.horizon || 'UNSET',
+          horizonSource: f.horizon ? 'BLOCK' : 'NONE',
+          actor: f.actor || 'UNSET',
+          actorSource: f.actor ? 'BLOCK' : 'NONE',
+          actorBasis: null,
+          blockers: live
+            .filter(e => e.blocked === it.id && openIds.has(e.blocker))
+            .map(e => e.blocker),
+          staleBlockers: [],
+          condBlockers: [],
+          state: f.state || String(it.status || 'none').toUpperCase(),
+          stateSource: f.state ? 'BLOCK' : 'GLYPH',
+          v1: f.landed
+            ? {
+                landed: {
+                  repo: 'app',
+                  sha: 'abcdef1',
+                  date: f.landed.split(' ')[1],
+                  by: f.landed.split(' by ')[1],
+                },
+                confirmBy: f['confirm-by'],
+              }
+            : {},
+          errors: [],
+          conflicts: [],
+        });
+      }
+      return { byId, anchors: new Set(), openIds };
+    },
+    clock(res, today) {
+      const now = new Date(today + 'T00:00:00Z');
+      const landed = [];
+      for (const r of res.byId.values()) {
+        if (r.state !== 'LANDED' || !r.v1.landed) continue;
+        const age = Math.floor((now - new Date(r.v1.landed.date + 'T00:00:00Z')) / 86400000);
+        landed.push({
+          id: r.id,
+          since: r.v1.landed.date,
+          age,
+          red: age > 3,
+          by: r.v1.landed.by,
+          confirmBy: r.v1.confirmBy,
+        });
+      }
+      return { today, limitDays: 3, landed, confirmed: [], legacy: [], stale: [] };
+    },
+    census(recs) {
+      const project = {};
+      const horizon = {};
+      for (const r of recs) {
+        project[r.project] = (project[r.project] || 0) + 1;
+        horizon[r.horizon] = (horizon[r.horizon] || 0) + 1;
+      }
+      return { items: recs.length, project, horizon };
+    },
+    workCensus(recs) {
+      const out = { items: 0, work: 0, nonWork: 0, byKind: {}, untyped: 0 };
+      for (const r of recs) {
+        out.items++;
+        if (r.work) out.work++;
+        else {
+          out.nonWork++;
+          out.byKind[r.kind] = (out.byKind[r.kind] || 0) + 1;
+        }
+        if (!r.kind) out.untyped++;
+      }
+      return out;
+    },
+    workLine: (l, w) => `stub work ${w.work}`,
+  };
+  const intake275 = {
+    observable: true,
+    flow: {
+      schema: 'board-inflow/v1',
+      since: '0123456789abcdef',
+      open0: 6,
+      open1: 8,
+      net: 2,
+      filed: ['X1', 'X2', 'X3'],
+      via: ['X1'],
+      direct: ['X2', 'X3'],
+      closed: ['Y1'],
+      returned: [],
+      leftNoAnchor: [],
+      intake: { exists: true, filed: 1, promoted: 1, dismissed: 0, open: 1 },
+    },
+    open: [
+      {
+        id: 'F-0009',
+        title: 'a finding 🚨 that waited',
+        found: '2026-09-01',
+        by: 'sess1',
+        age: 24,
+        source: 'fixture',
+      },
+    ],
+    today: '2026-09-25',
+    redDays: 14,
+  };
+  const readAt275 = new Date('2026-09-25T19:00:00Z');
+  const inputs275 = over =>
+    Object.assign(
+      {
+        readAt: readAt275,
+        provenance: {
+          ok: true,
+          mode: 'ref',
+          ref: 'origin/main',
+          sha: 'deadbee1',
+          committedAt: '2026-09-25T14:00:00Z',
+        },
+        queueMd: queue275,
+        logMd: '',
+        graph: { observable: true, graph: graph275 },
+        resolver: { observable: true, mod: stub275 },
+        itemFormat: { observable: true, mod: { parseAccept: parseAccept275 } },
+        intake: intake275,
+        snapshot: {
+          data: {
+            generatedAt: '2026-09-24T02:46:15Z',
+            killSwitch: { path: 'x', present: false },
+            criticalTruth: { freshUntil: '2026-09-24T02:59:02Z' },
+          },
+        },
+        killSwitch: {
+          observable: true,
+          present: true,
+          since: new Date('2026-09-24T02:46:43Z'),
+          bytes: 0,
+        },
+      },
+      over || {}
+    );
+  const m275 = CQ275.buildModel(inputs275());
+  const pages275 = {
+    overview: CQ275.renderOverview(m275),
+    openAll: CQ275.renderOverview(m275, { allOpen: true }),
+    all: CQ275.renderAll(m275),
+    item: CQ275.renderItem(m275, 'A1').html,
+    pause: CQ275.renderPause(m275),
+    terms: CQ275.renderTerms(m275),
+  };
+  const ov275 = pages275.overview;
+  const cardOf275 = (html, id) => {
+    const at = html.indexOf('<section class="card');
+    const i = html.indexOf('id="' + id + '"', at);
+    if (i < 0) return '';
+    const j = html.indexOf('<i class="xa"', i);
+    const k = html.indexOf('<footer', i);
+    return html.slice(i, j > 0 && j < k ? j : k);
+  };
+  const nowOf275 = html => {
+    const i = html.indexOf('<section class="now"');
+    return i < 0 ? '' : html.slice(i, html.indexOf('</section>', i));
+  };
+
+  // 275.1 — the View boundary, on every page, beside planted and real positive controls
+  const planted275 = SH275.viewBoundary(
+    ov275.replace('</main>', '<script>x()</script><button>b</button><details></details></main>')
+  );
+  const legacy275 = require(path.join(ROOT, 'scripts', 'report-view.js')).renderQueue(
+    null,
+    queue275,
+    null,
+    {
+      provenance: inputs275().provenance,
+    }
+  );
+  assert(
+    ['script', 'button', 'details'].every(k => planted275.includes(k)) &&
+      SH275.viewBoundary(legacy275).includes('details'),
+    '275.1a: POSITIVE CONTROL — the boundary check finds a planted <script>, <button> and <details>, and finds the <details> the legacy page really carries (so its empty answers below are real)'
+  );
+  for (const [name, html] of Object.entries(pages275)) {
+    const hits = SH275.viewBoundary(html);
+    assert(
+      hits.length === 0,
+      `275.1: the rendered ${name} page carries no script, form control, <details>, iframe, inline handler, javascript: URL or meta refresh${hits.length ? ' — found: ' + hits.join(', ') : ''}`
+    );
+  }
+
+  // 275.2 — the FOLD is anchors + CSS :target, not a control; the rows are already in the page
+  const cardIds275 = [
+    ...ov275.matchAll(/<section class="card c-[a-z]+[^"]*" id="([a-z-]+)" aria-labelledby/g),
+  ].map(x => x[1]);
+  const css275 = SH275.css();
+  assert(
+    ['needs-you', 'blocked', 'landed', 'flow', 'pause', 'board', 'sources'].every(id =>
+      cardIds275.includes(id)
+    ) &&
+      cardIds275.every(
+        id =>
+          ov275.includes('<i class="xa" id="x-' + id + '"></i>') &&
+          ov275.includes('class="hit open" href="#' + id + '"') &&
+          ov275.includes('class="hit shut" href="#x-' + id + '"')
+      ) &&
+      /\.card:target \.body,\.card:has\(:target\) \.body,\.all-open \.card \.body\{display:block\}/.test(
+        css275
+      ) &&
+      /\.card \.body\{display:none/.test(css275) &&
+      cardOf275(ov275, 'needs-you').includes('href="/queue/item/D1"') &&
+      /<body class="all-open">/.test(pages275.openAll) &&
+      !/<body class="all-open">/.test(ov275),
+    '275.2: every section card folds to one line and opens on a tap WITHOUT a control — an anchor to itself opens it (:target), an anchor just above it folds it in place, its rows are already in the page (D1 is inside Needs you), and ?open=all renders every card open (' +
+      cardIds275.length +
+      ' cards)'
+  );
+
+  // 275.3 — NOW: shown without opening anything, by its stated rule, and nothing else
+  const now275 = nowOf275(ov275);
+  assert(
+    now275 &&
+      ov275.indexOf('<section class="now"') < ov275.indexOf('<section class="card') &&
+      /PAUSED<\/b> — the control plane’s halt file is present/.test(now275) &&
+      now275.includes('/queue/item/K1') &&
+      now275.includes('/queue/item/L1') &&
+      !now275.includes('/queue/item/L2') &&
+      !now275.includes('/queue/item/D1') &&
+      /1 finding open past 14 days/.test(now275) &&
+      /by rule: the pause state, landed work past its limit, your items that block work now, and findings past their limit/.test(
+        now275
+      ),
+    '275.3a: NOW sits above every card and holds exactly its stated rule — the PAUSED verdict, K1 (yours, BLOCKS-WORK-NOW), L1 (landed 4 days, past 3), the RED finding — and not L2 (1 day) or D1 (NEXT)'
+  );
+  const calmQ275 = queue275
+    .replace(/BLOCKS-WORK-NOW/, 'NEXT')
+    .replace('2026-09-21 by builder1', '2026-09-24 by builder1');
+  const calm275 = nowOf275(
+    CQ275.renderOverview(
+      CQ275.buildModel(
+        inputs275({
+          queueMd: calmQ275,
+          intake: Object.assign({}, intake275, { open: [] }),
+          killSwitch: { observable: true, present: false },
+        })
+      )
+    )
+  );
+  assert(
+    /Nothing landed past its limit, nothing of yours blocks work now, no finding past its limit — over \d+ open work items at this commit/.test(
+      calm275
+    ) && /Not paused by the halt file/.test(calm275),
+    '275.3b: with nothing urgent, NOW says so over a named population — and still states the pause reading (a calm board is a stated result, not an empty box)'
+  );
+
+  // 275.4 — ONE "Needs you" rule; everything it leaves out is counted beside it
+  const B275 = m275.board;
+  const ids275 = a => a.map(x => x.id).join(',');
+  const needsCard275 = cardOf275(ov275, 'needs-you');
+  assert(
+    ids275(B275.needs) === 'K1,D1,R1' &&
+      ids275(B275.groups.decisions) === 'D1' &&
+      ids275(B275.groups.rulings) === 'R1' &&
+      ids275(B275.groups.hands) === 'K1' &&
+      ids275(B275.out.held) === 'H1' &&
+      ids275(B275.out.state) === 'P1' &&
+      ids275(B275.out.someday) === 'S1' &&
+      ids275(B275.out.notWork) === 'C1' &&
+      /<span class="n att">3<\/span>/.test(needsCard275) &&
+      /<b>1<\/b> decisions · <b>1<\/b> rulings · <b>1<\/b> your hands · <b>1<\/b> block work now/.test(
+        needsCard275
+      ) &&
+      /Also yours, left out by that rule:<\/b> <b>1<\/b> held by a blocker/.test(needsCard275) &&
+      needsCard275.includes('the owner rules yes or no, dated') &&
+      !/\/queue\/item\/(S1|C1|H1|P1|ZZ9)"/.test(needsCard275),
+    '275.4: NEEDS YOU = owner-actor WORK in TODO/READY/ACTIVE/QUESTION, not SOMEDAY-IF, not held (K1, D1, R1; BLOCKS-WORK-NOW first); the held H1, parked P1, someday S1 and not-work C1 are each COUNTED beside it and absent from its rows; a row carries its Done-means; a fabricated id (ZZ9) appears nowhere — got ' +
+      ids275(B275.needs)
+  );
+
+  // 275.5 — blocked: whose move, the edge's own trigger, heading-only BLOCKED, DISCHARGED is no blocker
+  const blockedCard275 = cardOf275(ov275, 'blocked');
+  assert(
+    B275.blocked.length === 3 &&
+      B275.blocked.find(b => b.x.id === 'H1').whose === 'you' &&
+      B275.blocked.find(b => b.x.id === 'B1').whose === 'other' &&
+      B275.blocked.find(b => b.x.id === 'B2').whose === 'unnamed' &&
+      blockedCard275.includes('<b>Unblocks when</b> A1 has landed and a checkpoint confirms it') &&
+      !/unblocks when unblocks when/i.test(blockedCard275) &&
+      blockedCard275.includes('its record says BLOCKED and no edge names why') &&
+      /<b>1<\/b> waiting on you · <b>1<\/b> on other work · <b>1<\/b> no blocker named/.test(
+        blockedCard275
+      ),
+    '275.5: BLOCKED names whose move each hold is (H1 waits on the owner’s K1), quotes the edge’s own trigger once, says a heading-only BLOCKED row has no edge naming why, and a DISCHARGED edge holds nothing'
+  );
+
+  // 275.6 — the landed clock: RED past the resolver's limit, not before
+  const landedCard275 = cardOf275(ov275, 'landed');
+  assert(
+    B275.clock.landed
+      .filter(l => l.red)
+      .map(l => l.id)
+      .join(',') === 'L1' &&
+      /<b class="bad">4 days<\/b>/.test(landedCard275) &&
+      /<b>1 day<\/b>/.test(landedCard275) &&
+      /<b class="bad">1 RED<\/b>, past the 3-day limit/.test(landedCard275),
+    '275.6: landed 4 days ago (limit 3) reads RED in the card and its summary; landed 1 day ago does not'
+  );
+
+  // 275.7 — filed vs closed and the open findings: the intake tool's numbers, emoji stripped
+  const flowCard275 = cardOf275(ov275, 'flow');
+  const noFlow275 = cardOf275(
+    CQ275.renderOverview(
+      CQ275.buildModel(
+        inputs275({ intake: { observable: false, why: 'no planning tree on this machine' } })
+      )
+    ),
+    'flow'
+  );
+  assert(
+    /<span class="n word">\+2<\/span>/.test(flowCard275) &&
+      flowCard275.includes('6 → <b>8</b>') &&
+      flowCard275.includes('through the intake 1 · straight onto the board 2') &&
+      flowCard275.includes('F-0009') &&
+      /<b class="bad">24 d<\/b> open/.test(flowCard275) &&
+      !PICTO275.test(flowCard275) &&
+      /UNOBSERVABLE/.test(noFlow275) &&
+      noFlow275.includes('no planning tree on this machine') &&
+      !/<span class="n[^"]*">[+-]?\d/.test(noFlow275),
+    '275.7: FILED VS CLOSED shows the signed net, open before → after, filed through the intake versus direct, and every open finding with its age and RED past 14 days (title without its emoji); an unreadable intake reads UNOBSERVABLE with the reason and prints no number'
+  );
+
+  // 275.8 — the pause state: three readings; the file is the verdict; unreadable is never PAUSED
+  const pauseCard275 = cardOf275(ov275, 'pause');
+  const unobP275 = CQ275.renderOverview(
+    CQ275.buildModel(
+      inputs275({ killSwitch: { observable: false, why: 'no state directory is configured' } })
+    )
+  );
+  const absentP275 = CQ275.buildModel(
+    inputs275({ killSwitch: { observable: true, present: false } })
+  );
+  assert(
+    m275.pause.verdict === 'paused' &&
+      m275.pause.snapshot.stale === true &&
+      /halt file <b>absent<\/b>/.test(pauseCard275) &&
+      /STALE/.test(pauseCard275) &&
+      /They disagree\./.test(pauseCard275) &&
+      /declares SHUTDOWN STATE \(2026-09-24\)/.test(pauseCard275) &&
+      /On restart, first:<\/b> run the fixture step\./.test(pauseCard275) &&
+      /PAUSE STATE UNOBSERVABLE/.test(unobP275) &&
+      !/<b>PAUSED<\/b>/.test(unobP275) &&
+      unobP275.includes('no state directory is configured') &&
+      absentP275.pause.verdict === 'running',
+    '275.8: PAUSE STATE reads three ways with their times — the halt file present (the verdict), the kernel snapshot saying absent, STALE past its own freshUntil, and why they disagree, and the board’s declaration with its first restart step; an unreadable file is PAUSE STATE UNOBSERVABLE, never PAUSED; an absent file is NOT PAUSED'
+  );
+
+  // 275.9 — resolver unobservable: every card says so; the record list stands from the parser alone
+  const noRes275 = CQ275.buildModel(
+    inputs275({
+      resolver: { observable: false, why: 'the planning tree has no tools/item-resolver.cjs' },
+    })
+  );
+  const noResOv275 = CQ275.renderOverview(noRes275);
+  const noResAll275 = CQ275.renderAll(noRes275);
+  const parsed275 = QV275.parseQueue(queue275).blocks.filter(b => b.type === 'item' && b.id);
+  assert(
+    !noRes275.board.observable &&
+      ['needs-you', 'blocked', 'landed'].every(id =>
+        /<span class="n word">UNOBSERVABLE<\/span>/.test(cardOf275(noResOv275, id))
+      ) &&
+      noResOv275.includes('the planning tree has no tools/item-resolver.cjs') &&
+      (noResAll275.match(/<a class="row" href="\/queue\/item\//g) || []).length ===
+        parsed275.length &&
+      noResAll275.includes('state comes from the heading glyph alone'),
+    '275.9: with the ONE resolver unreachable, Needs you, Blocked and Landed each read UNOBSERVABLE with the reason and no number, and /queue/all still lists every parsed item from the parser alone, saying that is all it knows'
+  );
+
+  // 275.10 — a failed ref read: the loud band, and no reading, row or slot beneath it
+  const fail275 = CQ275.renderOverview(
+    CQ275.buildModel(
+      inputs275({ provenance: { ok: false, ref: 'origin/main', why: 'git failed' } })
+    )
+  );
+  assert(
+    fail275.includes('THE QUEUE COULD NOT BE READ') &&
+      fail275.includes('git failed') &&
+      !fail275.includes('<section class="now"') &&
+      !fail275.includes('id="needs-you"') &&
+      !fail275.includes('<a class="row"') &&
+      fail275.includes('id="pause"'),
+    '275.10: a failed ref read renders the loud band naming the failure, keeps the pause reading, and renders no reading, row or slot from a fallback copy'
+  );
+
+  // 275.11 — priority is a labelled NOT-BUILT slot; nothing ranks
+  assert(
+    /id="priority"[\s\S]*?Not built[\s\S]*?Not implemented; requires the guided finish-lines session\. Nothing on this page is ranked/.test(
+      ov275
+    ) && /Not ranked\./.test(needsCard275),
+    '275.11: PRIORITY is a labelled NOT-BUILT slot naming what it waits on, and Needs you says it is not ranked'
+  );
+
+  // 275.12 — every data page says when it read, from which commit, and that it does not refresh
+  assert(
+    ['overview', 'all', 'item', 'pause'].every(
+      k =>
+        pages275[k].includes('As of <b><time datetime="2026-09-25T19:00:00.000Z">') &&
+        pages275[k].includes('origin/main@deadbee1') &&
+        pages275[k].includes('no auto-refresh')
+    ) && Object.values(pages275).every(h => /Page built <time datetime=/.test(h)),
+    '275.12: every data page carries a visible "as of" (the moment it read), the board ref@sha with its commit time, and "no auto-refresh"; every page says when it was built (DS13a decision 4)'
+  );
+
+  // 275.13 — identity: one meaning per icon; each section = its accent + its icon + its name
+  const icons275 = Object.entries(SH275.ICONS);
+  let threw275 = false;
+  try {
+    SH275.icon('not-a-registered-icon');
+  } catch {
+    threw275 = true;
+  }
+  const used275 = new Set(
+    [
+      ...Object.values(pages275)
+        .join('')
+        .matchAll(/<use href="#i-([a-z-]+)"/g),
+    ].map(x => x[1])
+  );
+  const lum275 = h => {
+    const c = [1, 3, 5]
+      .map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const cr275 = (a, b) =>
+    (Math.max(lum275(a), lum275(b)) + 0.05) / (Math.min(lum275(a), lum275(b)) + 0.05);
+  const secs275 = Object.entries(SH275.SECTIONS);
+  const lowContrast275 = secs275.filter(([, s]) => {
+    const fg = SH275.TOKENS[s.accent];
+    return (
+      s.accent !== 'stroke' &&
+      (cr275(fg, SH275.TOKENS.surface) < 4.5 || cr275(fg, SH275.tint(fg, 0.14)) < 4.5)
+    );
+  });
+  const cqSrc275 = fs.readFileSync(path.join(ROOT, 'scripts', 'console-queue.js'), 'utf8');
+  assert(
+    new Set(icons275.map(([, v]) => v.meaning)).size === icons275.length &&
+      new Set(icons275.map(([, v]) => v.d)).size === icons275.length &&
+      icons275.every(([, v]) => v.meaning && v.not && v.d) &&
+      threw275 &&
+      used275.size >= 15 &&
+      [...used275].every(id => SH275.ICONS[id]) &&
+      secs275.every(([, s]) => SH275.TOKENS[s.accent] && SH275.ICONS[s.icon] && s.name) &&
+      ['needs-you', 'blocked', 'landed', 'flow'].every(id => {
+        const c = cardOf275(ov275, id);
+        return (
+          /<span class="tile"><svg class="i"[^>]*><use href="#i-[a-z-]+"/.test(c) &&
+          /<h2 class="name"[^>]*>[A-Z]/.test(c)
+        );
+      }) &&
+      new Set(
+        ['needs', 'blocked', 'landed', 'flow'].map(k => SH275.TOKENS[SH275.SECTIONS[k].accent])
+      ).size === 4 &&
+      lowContrast275.length === 0 &&
+      !/#[0-9a-fA-F]{6}\b/.test(cqSrc275),
+    '275.13: ONE MEANING PER ICON (own meaning, own drawing, a stated "never"; an unregistered id throws; ' +
+      used275.size +
+      ' in use, all registered) and each SECTION is its accent AND its icon AND its name — four distinct accents, never colour alone — with every accent ≥ 4.5:1 on the surface and on its own tint, and no colour literal in the page renderer' +
+      (lowContrast275.length ? ' — LOW: ' + lowContrast275.map(([k]) => k).join(',') : '')
+  );
+
+  // 275.14 — titles: first clause, shouting lowered, code and wire tokens kept, emoji gone, bounded
+  const t275 = CQ275.shortTitle(
+    '⭐ **THE BLOCKED PAGE SAYS `code_span` AND MORE** — tail (new 2026-01-01)'
+  );
+  assert(
+    t275.text === 'The BLOCKED page says code_span and more' &&
+      t275.normalised === true &&
+      CQ275.shortTitle('**' + 'WORD '.repeat(60) + '**').text.length <= 121 &&
+      !PICTO275.test(ov275.replace(/<style>[\s\S]*?<\/style>/, '')) &&
+      PICTO275.test(pages275.item) &&
+      pages275.item.includes('with an emoji in its heading') &&
+      !PICTO275.test(
+        fs.readFileSync(path.join(ROOT, 'scripts', 'console-shell.js'), 'utf8') + cqSrc275
+      ),
+    '275.14: a shouted heading becomes its first clause in sentence case with its code span and the wire token BLOCKED untouched (got "' +
+      t275.text +
+      '"), bounded at 120; the page chrome and both console sources carry no emoji, and the item page keeps the record’s own (DS14)'
+  );
+
+  // 275.15 — the route: console pages with the View CSP; legacy page and its ?frag=1 contract kept
+  const vite275 = readFile('vite.config.mjs');
+  assert(
+    /'\.\/scripts\/console-shell\.js'/.test(vite275) &&
+      /'\.\/scripts\/console-queue\.js'/.test(vite275) &&
+      /cq\.renderOverview\(model, \{ allOpen \}\)/.test(vite275) &&
+      /open=all/.test(vite275) &&
+      /rest !== 'legacy'/.test(vite275) &&
+      /view\.renderQueue\(/.test(vite275) &&
+      /frag=1/.test(vite275) &&
+      /shell\.VIEW_HEADERS/.test(vite275) &&
+      /control\.readKillSwitch\(snapshot\)/.test(vite275) &&
+      /paths\.readIntakeFlow\(\)/.test(vite275) &&
+      /default-src 'none'/.test(SH275.VIEW_HEADERS['Content-Security-Policy']) &&
+      CQ275.renderItem(m275, 'NOPE').status === 404,
+    '275.15: /queue, /queue/all, /queue/item/<id>, /queue/pause and /queue/terms render through the console modules on the fresh-require chain with a CSP that forbids every script; the halt file is read through the snapshot’s own path and the intake through the archive’s tool; /queue/legacy and its ?frag=1 contract stay; an unknown id is a 404'
+  );
+
+  // 275.16 — the halt-file reader is bounded to the state directory and takes the path from the snapshot
+  {
+    const CS275 = require(path.join(ROOT, 'scripts', 'control-state.js'));
+    const os275 = require('os');
+    const tmp275 = fs.mkdtempSync(path.join(os275.tmpdir(), 'robco-275-'));
+    const saved275 = process.env.ROBCO_CONTROL_STATE;
+    process.env.ROBCO_CONTROL_STATE = tmp275;
+    try {
+      const inside = path.join(tmp275, 'HALT');
+      const absent = CS275.readKillSwitch({
+        data: { killSwitch: { path: inside, present: false } },
+      });
+      fs.writeFileSync(inside, '');
+      const present = CS275.readKillSwitch({
+        data: { killSwitch: { path: inside, present: false } },
+      });
+      const outside = CS275.readKillSwitch({
+        data: { killSwitch: { path: path.join(tmp275, '..', 'elsewhere'), present: true } },
+      });
+      const unnamed = CS275.readKillSwitch({ data: { killSwitch: { present: true } } });
+      delete process.env.ROBCO_CONTROL_STATE;
+      const unconfigured = CS275.readKillSwitch({ data: { killSwitch: { path: inside } } });
+      assert(
+        absent.observable === true &&
+          absent.present === false &&
+          present.observable === true &&
+          present.present === true &&
+          present.since instanceof Date &&
+          outside.observable === false &&
+          /outside the state directory/.test(outside.why) &&
+          unnamed.observable === false &&
+          /names no halt-file path/.test(unnamed.why) &&
+          unconfigured.observable === false,
+        '275.16: readKillSwitch reads the halt file at the path the kernel snapshot names — absent, present-with-a-time, refused when the named path leaves the state directory, UNOBSERVABLE when no path is named or no directory is configured; the name is never written in this repository'
+      );
+    } finally {
+      if (saved275 === undefined) delete process.env.ROBCO_CONTROL_STATE;
+      else process.env.ROBCO_CONTROL_STATE = saved275;
+      fs.rmSync(tmp275, { recursive: true, force: true });
+    }
+  }
+
+  // 275.17 — the same fixture through the REAL resolver (skips without the archive)
+  const realRes275 = planningPaths.loadResolver();
+  if (!realRes275.observable) {
+    console.log(`  SKIP  Suite 275.17 — ${realRes275.why}`);
+  } else {
+    const rm = CQ275.buildModel(
+      inputs275({ resolver: realRes275, itemFormat: planningPaths.loadItemFormat() })
+    );
+    assert(
+      rm.board.observable &&
+        ids275(rm.board.needs) === 'K1,D1,R1' &&
+        ids275(rm.board.out.held) === 'H1' &&
+        ids275(rm.board.out.state) === 'P1' &&
+        rm.board.blocked.length === 3 &&
+        rm.board.clock.landed
+          .filter(l => l.red)
+          .map(l => l.id)
+          .join(',') === 'L1',
+      '275.17: the REAL resolver over the same synthetic fixture reaches the stub’s readings (needs K1,D1,R1; H1 held; P1 parked; 3 blocked; L1 RED) — the stub’s record shape is the resolver’s, not one that happens to fit the renderer' +
+        (rm.board.observable ? ' — got needs ' + ids275(rm.board.needs) : ' — ' + rm.board.why)
+    );
+  }
+
+  // 275.18 — the LIVE board: summaries equal their rows, and Needs you reconciles (skips without the archive)
+  const live275 = planningPaths.planningProvenance();
+  const liveQ275 = live275.ok ? planningPaths.readPlanningFileAtRef('QUEUE.md') : null;
+  if (!live275.ok || !realRes275.observable || typeof liveQ275 !== 'string') {
+    console.log(
+      `  SKIP  Suite 275.18 — ${!live275.ok ? live275.why : !realRes275.observable ? realRes275.why : 'QUEUE.md not readable at the ref'}`
+    );
+  } else {
+    const lm = CQ275.buildModel({
+      provenance: live275,
+      queueMd: liveQ275,
+      logMd: planningPaths.readPlanningFileAtRef('QUEUE_LOG.md'),
+      graph: planningPaths.readBlockerGraph(),
+      resolver: realRes275,
+      itemFormat: planningPaths.loadItemFormat(),
+      intake: { observable: false, why: 'not run by the gate — two subprocesses per render' },
+      snapshot: { why: 'not read by the gate' },
+      killSwitch: { observable: false, why: 'not read by the gate' },
+    });
+    const lp = CQ275.renderOverview(lm);
+    const rowsIn = id => (cardOf275(lp, id).match(/<a class="row" href=/g) || []).length;
+    const L = lm.board;
+    const ownerLive = L.observable
+      ? L.work.filter(x => CQ275.OWNER_ACTORS.includes(x.r.actor) && x.r.horizon !== 'SOMEDAY-IF')
+          .length
+      : -1;
+    assert(
+      L.observable &&
+        rowsIn('needs-you') === L.needs.length &&
+        rowsIn('blocked') === L.blocked.length &&
+        new RegExp('<span class="n[^"]*">' + L.needs.length + '</span>').test(
+          cardOf275(lp, 'needs-you')
+        ) &&
+        L.needs.length + L.out.held.length + L.out.state.length === ownerLive &&
+        L.work.length + L.nonWork.length === L.total &&
+        L.total === lm.parsed.length &&
+        SH275.viewBoundary(lp).length === 0,
+      `275.18: over the LIVE board (${L.total} items at ${live275.ref}@${live275.sha}) each card's number equals the rows under it (needs you ${L.needs.length}, blocked ${L.observable ? L.blocked.length : '?'}), and Needs you + held (${L.observable ? L.out.held.length : '?'}) + other states (${L.observable ? L.out.state.length : '?'}) = every owner-actor work item outside SOMEDAY-IF (${ownerLive}) — the one rule drops nothing silently`
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Suite 276 — a test's practice repository never reaches the REAL one
+//
+//  ⛔ THE INCIDENT (2026-09-25, Protocol 42; found independently by BOTH paired
+//  builds' first commit attempts). git exports GIT_DIR and GIT_INDEX_FILE into a
+//  hook's environment — absolute paths when the hook runs in a LINKED WORKTREE.
+//  The pre-commit hook runs this runner; Suites 237 and 253 spawned git for their
+//  throwaway repositories WITHOUT scrubbing those variables, so `git init` in a
+//  temp directory re-initialised the REAL repository as BARE (`core.bare = true`,
+//  which breaks git in every checkout and worktree), `git config user.*` wrote a
+//  fake author into the real .git/config, and `git add` replaced the committing
+//  worktree's index. Both suites now scrub GIT_* (the idiom Suites 30, 266 and
+//  269 already used), and planning-paths.js scrubs every child it spawns
+//  (childEnv), because the same leak redirected its ref reads to the wrong repo.
+//
+//  276.1 proves the mechanism red then green on a SCRATCH repo, never the real
+//  one. 276.2 and 276.4 are two static guards over this file (a spawn into a
+//  throwaway cwd; a helper that runs `git init`). 276.3 holds the page's readers.
+// ═══════════════════════════════════════════════════════════════════════════════
+{
+  header('Suite 276 — a test practice repo never reaches the real repository (GIT_* scrubbed)');
+  const { spawnSync: spawn276 } = require('child_process');
+  const os276 = require('os');
+  const scrubbed276 = base => {
+    const out = {};
+    for (const k of Object.keys(base)) if (!/^GIT_/i.test(k)) out[k] = base[k];
+    return out;
+  };
+  const victim276 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-victim-'));
+  const practice276 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-practice-'));
+  const practice2 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-practice2-'));
+  try {
+    const clean = scrubbed276(process.env);
+    const g = (cwd, env, ...a) =>
+      spawn276('git', a, { cwd, env, encoding: 'utf8', timeout: 20000 });
+    const local = key => g(victim276, clean, 'config', '--local', key).stdout.trim();
+    g(victim276, clean, 'init', '-q');
+    const bareBefore = local('core.bare');
+    // the hook's leak, exactly the pair git exports there, aimed at the SCRATCH victim
+    const leaked = Object.assign({}, clean, {
+      GIT_DIR: path.join(victim276, '.git'),
+      GIT_INDEX_FILE: path.join(victim276, '.git', 'index'),
+    });
+    // RED: a practice `git init` + `config` under the leaked env lands on the victim, as bare
+    g(practice276, leaked, 'init', '-q');
+    g(practice276, leaked, 'config', 'user.email', 't276@example.com');
+    const bareAfterLeak = local('core.bare');
+    const emailAfterLeak = local('user.email');
+    // repair the victim, then GREEN: the same steps under a scrubbed env stay in the practice dir
+    g(victim276, clean, 'config', 'core.bare', 'false');
+    g(victim276, clean, 'config', '--unset', 'user.email');
+    g(practice2, scrubbed276(leaked), 'init', '-q');
+    g(practice2, scrubbed276(leaked), 'config', 'user.email', 't276@example.com');
+    const bareAfterScrub = local('core.bare');
+    const emailAfterScrub = local('user.email');
+    const practiceEmail = g(practice2, clean, 'config', '--local', 'user.email').stdout.trim();
+    assert(
+      bareBefore === 'false' &&
+        bareAfterLeak === 'true' &&
+        emailAfterLeak === 't276@example.com' &&
+        bareAfterScrub === 'false' &&
+        emailAfterScrub === '' &&
+        practiceEmail === 't276@example.com',
+      `276.1: MECHANISM, red then green on a scratch repo — with the hook's GIT_DIR + GIT_INDEX_FILE leaked, a practice \`git init\` re-initialises the pointed-at repo as BARE (bare=${bareAfterLeak}) and \`git config\` writes the fake user into it (${emailAfterLeak || 'none'}); with GIT_* scrubbed the same steps stay in the practice directory (victim bare=${bareAfterScrub}, user=${emailAfterScrub || 'none'}; practice user=${practiceEmail || 'none'})`
+    );
+  } finally {
+    fs.rmSync(victim276, { recursive: true, force: true });
+    fs.rmSync(practice276, { recursive: true, force: true });
+    fs.rmSync(practice2, { recursive: true, force: true });
+  }
+
+  // ── 276.2  STATIC: a git or node child spawned into a throwaway cwd carries an explicit,
+  //    non-inherited env. Children run against ROOT are out of scope: under a hook they act on
+  //    the repository the hook is for, which is what they mean to do.
+  const src276 = readFile('tests/robco-diagnostics.js');
+  const calls276 = [
+    ...src276.matchAll(
+      /\b(?:spawnSync|execFileSync|execSync|spawn\d+|exec\d+|run\d+)\(\s*'(?:git|node)'[\s\S]*?\}\s*\)/g
+    ),
+  ];
+  const tempCwd276 = calls276.filter(m => /cwd\s*:/.test(m[0]) && !/cwd\s*:\s*ROOT\b/.test(m[0]));
+  const bad276 = tempCwd276.filter(
+    m =>
+      (!/\benv\s*:/.test(m[0]) && !/\benv\d+\b/.test(m[0])) ||
+      /\.\.\.process\.env|Object\.assign\(\s*\{\s*\}\s*,\s*process\.env|env\s*:\s*process\.env/.test(
+        m[0]
+      )
+  );
+  assert(
+    calls276.length > 0 && tempCwd276.length > 0 && bad276.length === 0,
+    `276.2: STATIC — every git or node child this file spawns into a throwaway cwd (${tempCwd276.length} of ${calls276.length} spawns) passes an explicit env that does not inherit or spread raw process.env` +
+      (bad276.length
+        ? ' — VIOLATIONS: ' + bad276.map(m => m[0].slice(0, 60).replace(/\s+/g, ' ')).join(' | ')
+        : '')
+  );
+
+  // ── 276.3  THE READERS: planning-paths.js spawns git with GIT_* scrubbed, so a hook cannot redirect a ref read
+  {
+    const pp276 = readFile('scripts/planning-paths.js');
+    const gitSpawns276 = [...pp276.matchAll(/execFileSync\('git'[\s\S]*?\}\)/g)];
+    const scrubbed = gitSpawns276.filter(m => /env:\s*childEnv\(\)/.test(m[0]));
+    let live = 'skipped (no archive ref)';
+    let same = true;
+    const prov = planningPaths.planningProvenance();
+    if (prov.ok && prov.mode === 'ref') {
+      // BEHAVIORAL: read the queue with the hook's pair leaked at a scratch dir, in a child
+      // process so this runner's own env is untouched; the text must equal the clean read.
+      const scratch = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-leak-'));
+      try {
+        const clean = planningPaths.readPlanningFileAtRef('QUEUE.md');
+        const r = spawn276(
+          process.execPath,
+          [
+            '-e',
+            "const p=require(process.argv[1]);const t=p.readPlanningFileAtRef('QUEUE.md');process.stdout.write(t===null?'NULL':String(t.length))",
+            path.join(ROOT, 'scripts', 'planning-paths.js'),
+          ],
+          {
+            cwd: ROOT,
+            encoding: 'utf8',
+            timeout: 60000,
+            env: Object.assign({}, scrubbed276(process.env), {
+              GIT_DIR: path.join(scratch, '.git'),
+              GIT_INDEX_FILE: path.join(scratch, '.git', 'index'),
+            }),
+          }
+        );
+        live = (r.stdout || '').trim() + ' vs clean ' + (clean === null ? 'NULL' : clean.length);
+        same = clean !== null && (r.stdout || '').trim() === String(clean.length);
+      } finally {
+        fs.rmSync(scratch, { recursive: true, force: true });
+      }
+    }
+    assert(
+      gitSpawns276.length === 3 &&
+        scrubbed.length === 3 &&
+        /env = childEnv\(\)/.test(pp276) &&
+        same,
+      `276.3: planning-paths.js passes a GIT_*-scrubbed env to all ${gitSpawns276.length} of its git spawns (${scrubbed.length} scrubbed) and to the archive tools it runs, and a ref read under a leaked GIT_DIR/GIT_INDEX_FILE returns the same queue as a clean read (${live})`
+    );
+  }
+
+  // ── 276.4  STATIC: every helper in this file that runs `git init -q` is built on a GIT_*-scrubbed env
+  const sites276 = [];
+  for (const m of src276.matchAll(/\b(\w+)\((?:[^()\n]*?,\s*)?\[?'init',\s*'-q'/g)) {
+    const name = m[1];
+    if (name === 'g') continue; // 276.1's own helper: its env is an explicit argument, scrubbed above
+    const before = src276.slice(0, m.index);
+    const defAt = before.lastIndexOf('const ' + name + ' = ');
+    const def = defAt >= 0 ? src276.slice(defAt, defAt + 260) : '';
+    const envVar = (/env:\s*(\w+)/.exec(def) || [])[1] || null;
+    const scrubbed =
+      !!envVar &&
+      new RegExp('if \\(!/\\^GIT_/i?\\.test\\(k\\)\\) ' + envVar + '\\[k\\]').test(before);
+    sites276.push({ name, envVar, scrubbed });
+  }
+  const unscrubbed276 = sites276.filter(s => !s.scrubbed);
+  assert(
+    sites276.length >= 3 && unscrubbed276.length === 0,
+    '276.4: STATIC — every throwaway-repo `git init` helper in this runner (' +
+      sites276.length +
+      ' found — the count is its positive control) runs with a GIT_*-scrubbed environment' +
+      (unscrubbed276.length
+        ? ' — UNSCRUBBED: ' +
+          unscrubbed276.map(s => s.name + '(' + (s.envVar || 'no env') + ')').join(', ')
+        : '')
+  );
 }
 
 // ══════════════════════════════════════════════════════════════

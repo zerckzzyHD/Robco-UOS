@@ -230,6 +230,50 @@ function tailLog(name, maxBytes = TAIL_BYTES) {
   }
 }
 
+/**
+ * The control plane's halt file — read at the path the kernel's OWN snapshot names.
+ *
+ * ⛔ THE NAME IS NOT WRITTEN DOWN HERE. `status.json` carries `killSwitch.path` and
+ * `killSwitch.present`: the kernel's own reader, published. This function does not
+ * reinterpret a config or guess a filename; it takes the path the kernel published
+ * and asks the file system whether that file exists NOW — because the snapshot's
+ * `present` is only as fresh as the snapshot, and the halt itself stops the plane
+ * from publishing a newer one. The console shows both readings with their times.
+ *
+ * ⛔ BOUNDED: the path must resolve INSIDE the configured state directory, or the
+ * reading is refused as UNOBSERVABLE with the reason. A snapshot is a file another
+ * process wrote; it does not get to point this reader anywhere on the disk.
+ *
+ * @param {{data:object}|null} snapshot the readStatus() result
+ * @returns {{observable:true, present:boolean, since:Date|null, bytes:number|null}
+ *          |{observable:false, why:string}}
+ */
+function readKillSwitch(snapshot) {
+  const dir = stateDir();
+  if (!dir) return { observable: false, why: describeState() };
+  const ks = snapshot && snapshot.data && snapshot.data.killSwitch;
+  if (!ks || typeof ks.path !== 'string' || !ks.path) {
+    return { observable: false, why: 'the kernel snapshot names no halt-file path' };
+  }
+  const full = path.resolve(ks.path);
+  const rel = path.relative(dir, full);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+    return {
+      observable: false,
+      why: 'the snapshot names a halt-file path outside the state directory; refused',
+    };
+  }
+  try {
+    const st = fs.statSync(full);
+    const since = st.birthtime && st.birthtime.getTime() > 0 ? st.birthtime : st.mtime;
+    return { observable: true, present: true, since, bytes: st.size };
+  } catch (e) {
+    if (e && e.code === 'ENOENT')
+      return { observable: true, present: false, since: null, bytes: null };
+    return { observable: false, why: 'stat failed: ' + ((e && e.code) || String(e)) };
+  }
+}
+
 module.exports = {
   LOG_NAME_RE,
   TAIL_BYTES,
@@ -240,4 +284,5 @@ module.exports = {
   newestWrite,
   listLogs,
   tailLog,
+  readKillSwitch,
 };

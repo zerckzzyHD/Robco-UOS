@@ -105,6 +105,22 @@ function planningDir() {
 const PLANNING_REF = process.env.ROBCO_PLANNING_REF || 'origin/main';
 
 /** The archive repo root -- the parent of the planning dir, resolved not assumed. */
+/**
+ * The environment every child this module spawns gets: the caller's, minus GIT_*.
+ *
+ * ⛔ git exports GIT_DIR and GIT_INDEX_FILE into a hook's environment, and they
+ * OVERRIDE repository discovery — `git -C <archive> show …` under a pre-commit hook
+ * would read the hook's own repository, not the archive, and every ref read here
+ * would silently answer from the wrong tree (measured 2026-09-25 under a leaked
+ * GIT_DIR: the sha resolved, the show failed, the page had no queue). The
+ * archive's tools spawn git too, so they get the same env. Suite 276.3.
+ */
+function childEnv() {
+  const env = {};
+  for (const k of Object.keys(process.env)) if (!/^GIT_/i.test(k)) env[k] = process.env[k];
+  return env;
+}
+
 function archiveRepo() {
   const dir = process.env.ROBCO_PLANNING_DIR || DEFAULT_PLANNING_DIR;
   return path.resolve(dir, '..');
@@ -135,6 +151,7 @@ function planningSource() {
   try {
     const sha = cp
       .execFileSync('git', ['-C', repo, 'rev-parse', PLANNING_REF], {
+        env: childEnv(),
         encoding: 'utf8',
         timeout: 15000,
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -145,6 +162,7 @@ function planningSource() {
     }
     const committedAt = cp
       .execFileSync('git', ['-C', repo, 'log', '-1', '--format=%cI', sha], {
+        env: childEnv(),
         encoding: 'utf8',
         timeout: 15000,
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -187,6 +205,7 @@ function planningReadRef(name) {
   }
   try {
     const text = cp.execFileSync('git', ['-C', src.repo, 'show', src.sha + ':!PLANNING/' + name], {
+      env: childEnv(),
       encoding: 'utf8',
       maxBuffer: 1 << 28,
       timeout: 30000,
@@ -489,8 +508,9 @@ const CENSUS_ROW_RE = /^(\S+)\s+(T1x?)\s+(\S+)\s+(.*)$/;
 
 function runCensus(tool, args) {
   const { spawnSync } = require('child_process');
-  const env = {};
-  for (const k of Object.keys(process.env)) env[k] = process.env[k];
+  // ⛔ GIT_* scrubbed (childEnv): these tools run git inside the archive, and a hook's
+  // GIT_DIR would point them at the wrong repository.
+  const env = childEnv();
   env.ROBCO_APP_DIR = REPO_ROOT;
   const r = spawnSync(process.execPath, [tool, ...args], {
     cwd: path.dirname(tool),
@@ -733,6 +753,74 @@ function loadResolver() {
  * then say UNOBSERVABLE rather than showing a lane with nothing in it, which would read
  * as "nothing needs you".
  */
+/**
+ * ── THE FINDINGS INTAKE — run, never re-implemented (queue rebuild Phase 3, D9-A) ──
+ *
+ * `!PLANNING/tools/intake.cjs` owns the net-flow arithmetic (filed versus closed over
+ * a range of the archive's committed history) and the open-findings list with their
+ * ages. Both are its READ-ONLY verbs (`flow --json`, `list --json`): they write
+ * nothing, and the tool refuses to print a flow that does not balance. The console
+ * runs them the way the owner-decision census is run — as an external program whose
+ * product is a report — with the same bounded spawn. A range the tool cannot
+ * establish (no checkpoint stamp, git unreachable) is `flowWhy`, never a zero.
+ *
+ * ⛔ A GET may format a previously published record; it may not launch a query to
+ * discover operational facts (MCA §6.7). This reads committed history and a
+ * committed file; it discovers nothing about the running machine.
+ */
+function intakeToolPath() {
+  const dir = planningDir();
+  if (!dir) return null;
+  const full = path.join(dir, 'tools', 'intake.cjs');
+  return safeIsFile(full) ? full : null;
+}
+
+function readIntakeFlow() {
+  const tool = intakeToolPath();
+  if (!tool) {
+    return {
+      observable: false,
+      why: planningDir()
+        ? 'the planning tree has no tools/intake.cjs'
+        : 'no planning tree on this machine',
+    };
+  }
+  const out = {
+    observable: true,
+    tool,
+    flow: null,
+    flowWhy: null,
+    open: null,
+    openWhy: null,
+    today: null,
+  };
+  const parse = r => {
+    if (!r.ok) return { err: 'did not run: ' + r.why };
+    try {
+      return { json: JSON.parse(r.out) };
+    } catch (e) {
+      return { err: 'printed no JSON (' + e.message + ')' };
+    }
+  };
+  const f = parse(runCensus(tool, ['flow', '--json']));
+  if (f.json && f.json.schema === 'board-inflow/v1') out.flow = f.json;
+  else out.flowWhy = f.err || 'unexpected schema ' + (f.json && f.json.schema);
+  const l = parse(runCensus(tool, ['list', '--json']));
+  if (l.json && l.json.schema === 'findings-intake-open/v1' && Array.isArray(l.json.open)) {
+    out.open = l.json.open;
+    out.today = l.json.today || null;
+  } else out.openWhy = l.err || 'unexpected schema ' + (l.json && l.json.schema);
+  // The ruled RED limit for an open finding, read off the tool's own exported constant;
+  // absent, the page marks nothing RED rather than remembering a number.
+  try {
+    const mod = require(tool);
+    if (typeof mod.FINDING_RED_DAYS === 'number') out.redDays = mod.FINDING_RED_DAYS;
+  } catch {
+    /* the CLI answered; the module's constant is optional to this display */
+  }
+  return out;
+}
+
 function readBlockerGraph() {
   const r = planningReadRef('BLOCKER-GRAPH.json');
   if (!r.ok) return { observable: false, why: r.why };
@@ -895,6 +983,9 @@ module.exports = {
   resolverToolPath,
   loadResolver,
   readBlockerGraph,
+  // The findings intake (D9-A) — resolved and RUN read-only, never derived here.
+  intakeToolPath,
+  readIntakeFlow,
   domainCensusPath,
   readDomainCensus,
 };

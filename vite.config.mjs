@@ -57,7 +57,12 @@ function escapeHtmlLocal(s) {
  *   /terminal/    the app itself. ⛔ It moved OFF the root so the root can be a
  *                 landing page; Vite's `base` does the moving, dev-only. The
  *                 trailing slash is load-bearing — see the redirect table.
- *   /queue        the build board, and only the board (was the top of `/reports`)
+ *   /queue        the Mist Console's read-only Queue view (milestone 1, merged
+ *                 build): what needs the owner, what is blocked and by what,
+ *                 what landed unconfirmed, filed vs closed, the pause state —
+ *                 each a card folded to one line (scripts/console-queue.js).
+ *                 Also /queue/all, /queue/item/<id>, /queue/pause, /queue/terms;
+ *                 the page it replaced stays at /queue/legacy
  *   /reports      the private report list, and only the list; /reports/<name>.md
  *   /view         the read-only control-plane projection, rendered by an EXTERNAL
  *                 program on every request (scripts/projection-view.js). Also
@@ -121,6 +126,8 @@ const VIEW_CHAIN = [
   './scripts/atomic-write.js', // write helper — a leaf
   './scripts/control-state.js', // operational state reader — deepest
   './scripts/queue-view.js', // markdown renderer — deepest
+  './scripts/console-shell.js', // the Mist Console's tokens, icons, glossary, frame — a leaf
+  './scripts/console-queue.js', // the Mist Console's /queue pages (requires the shell + queue-view)
   // ⚠ A DATA MODULE, so it belongs on this list by the rule two comments above —
   // report-view requires it lazily for the horizon/project derivation, and a
   // freshly-loaded renderer resolving a STALE copy of the axis rules is the exact
@@ -423,6 +430,38 @@ function reportsRoute() {
  * queue is read alongside it, so the honesty tile is never computed over a
  * subset and the currency line can say whether the board still matches.
  */
+/**
+ * ── THE MIST CONSOLE'S QUEUE: the route's reads (milestone 1, DS13/DS13a) ────
+ * Every source the console's /queue pages show, read per request and
+ * three-cased (present · absent-by-design · unreadable). The halt file is read
+ * at the path the kernel's own snapshot names, now, because the halt stops the
+ * plane from publishing a newer snapshot. The intake runs two bounded read-only
+ * subprocesses, so only the overview pays for them.
+ */
+function consoleQueueInputs(paths, opts) {
+  const control = freshRequire('./scripts/control-state.js');
+  const snapshot = control.readStatus();
+  return {
+    readAt: new Date(),
+    provenance: paths.planningProvenance(),
+    queueMd: paths.readPlanningFileAtRef('QUEUE.md'),
+    logMd: paths.readPlanningFileAtRef('QUEUE_LOG.md'),
+    graph: paths.readBlockerGraph(),
+    resolver: paths.loadResolver(),
+    itemFormat: paths.loadItemFormat(),
+    intake: opts && opts.withIntake ? paths.readIntakeFlow() : undefined,
+    snapshot: snapshot || { why: control.describeState() },
+    killSwitch: control.readKillSwitch(snapshot),
+  };
+}
+/** A console page: the View's headers (the CSP forbids every script), then the body. */
+function sendView(req, res, code, html) {
+  const shell = freshRequire('./scripts/console-shell.js');
+  res.statusCode = code;
+  for (const [k, v] of Object.entries(shell.VIEW_HEADERS)) res.setHeader(k, v);
+  res.end(req.method === 'HEAD' ? '' : html);
+}
+
 function queueRoute() {
   return {
     name: 'robco-queue',
@@ -430,31 +469,55 @@ function queueRoute() {
     configureServer(server) {
       server.middlewares.use('/queue', (req, res, next) => {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-        const rest = (pathOf(req) || '/').replace(/^\/+/, '');
-        // ── /queue/item/<id> — one item in full, from the same ref-read queue ──
-        // The row list deliberately carries no bodies (2.7MB); a row fetches its
-        // body from here on first open (?frag=1 → just the article), and the same
-        // address works as a direct link. The id is validated by the renderer
-        // against the one exported ITEM_ID_RE — this route only unwraps the path.
+        const rest = (pathOf(req) || '/').replace(/^\/+/, '').replace(/\/+$/, '');
+        const query = String(req.url || '')
+          .split('?')
+          .slice(1)
+          .join('?');
         const itemM = /^item\/([^/]+)$/.exec(rest);
+        let id = itemM ? itemM[1] : null;
         if (itemM) {
-          const view = freshRequire('./scripts/report-view.js');
-          const paths = freshRequire('./scripts/planning-paths.js');
-          let id = itemM[1];
           try {
             id = decodeURIComponent(id);
           } catch {
             /* an undecodable id is just an unknown id */
           }
-          const query = String(req.url || '')
-            .split('?')
-            .slice(1)
-            .join('?');
-          const frag = /(^|&)frag=1(&|$)/.test(query);
-          const r = view.renderQueueItem(paths.readPlanningFileAtRef('QUEUE.md'), id, { frag });
+        }
+        // ── /queue/item/<id>?frag=1 — the LEGACY page's lazy row body, unchanged ──
+        // The legacy page fetches a bare article fragment on first open; that
+        // contract stays exactly as it was while the legacy page is reachable.
+        if (itemM && /(^|&)frag=1(&|$)/.test(query)) {
+          const view = freshRequire('./scripts/report-view.js');
+          const paths = freshRequire('./scripts/planning-paths.js');
+          const r = view.renderQueueItem(paths.readPlanningFileAtRef('QUEUE.md'), id, {
+            frag: true,
+          });
           return sendHtml(req, res, r.status, r.html);
         }
-        if (rest) return next(); // only the mount point; deeper paths are not this page
+        // ── THE MIST CONSOLE QUEUE (DS13 milestone 1, merged build) ─────────────
+        // A strict read-only View: links, anchors and text; no script, no
+        // control, no timer. The CSP in VIEW_HEADERS makes that structural.
+        // Every source is read HERE, per request, three-cased, and the renderer
+        // is a pure function of what it is handed, so one unreadable source
+        // degrades one section to UNOBSERVABLE and never becomes a zero.
+        if (rest === '' || rest === 'all' || rest === 'pause' || rest === 'terms' || itemM) {
+          const cq = freshRequire('./scripts/console-queue.js');
+          if (rest === 'terms') return sendView(req, res, 200, cq.renderTerms(null));
+          const paths = freshRequire('./scripts/planning-paths.js');
+          const model = cq.buildModel(consoleQueueInputs(paths, { withIntake: rest === '' }));
+          if (itemM) {
+            const r = cq.renderItem(model, id);
+            return sendView(req, res, r.status, r.html);
+          }
+          if (rest === 'all') return sendView(req, res, 200, cq.renderAll(model));
+          if (rest === 'pause') return sendView(req, res, 200, cq.renderPause(model));
+          const allOpen = /(^|&)open=all(&|$)/.test(query);
+          return sendView(req, res, 200, cq.renderOverview(model, { allOpen }));
+        }
+        // ── /queue/legacy — the page milestone 1 replaced, kept reachable ──────
+        // MCA-2026-09-23 §4: keep useful pages reachable until their replacements
+        // have equivalent evidence and phone review.
+        if (rest !== 'legacy') return next(); // only the named pages; deeper paths are not this page
         const paths = freshRequire('./scripts/planning-paths.js');
         const view = freshRequire('./scripts/report-view.js');
         return sendHtml(
