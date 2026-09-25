@@ -26,12 +26,14 @@
 
 ## 1. The repo map
 
-**Eleven governed repositories on this machine — RobCo 8, Mist 2, Binder 1 — measured 2026-09-03 by
-a full `.git` scan under `C:\Dev`.** Excluded from that count: 22 repositories under `_scratch\`
+**Twelve governed repositories on this machine — RobCo 8, Mist 2, Binder 1, Sims 1.** Eleven were
+measured 2026-09-03 by a full `.git` scan under `C:\Dev`. The twelfth, Sims, was added 2026-09-25; a
+re-scan that day found the same eleven distinct remotes plus Sims, with worktrees and clones counted by
+their remote, not as repos. Excluded from the 2026-09-03 count: 22 repositories under `_scratch\`
 (third-party clones and scratch), and `_wt-af14` (a linked worktree of `_RobCo-Control/code`, not a
 repository). ⛔ The older orientation files named FIVE; a session working in one of the other six stood
 at the private/public boundary — a one-way door — with nothing telling it which side it was on, and
-had to ask GitHub. That is why every one of the eleven has a row below with its visibility **read from
+had to ask GitHub. That is why every one of the twelve has a row below with its visibility **read from
 GitHub on the date stated**, never from a folder name or a `_` prefix. If a later reading cannot be
 established with certainty, write UNKNOWN in the row rather than a guess: a wrong privacy claim here
 is worse than a missing one, because it will be trusted.
@@ -48,7 +50,7 @@ is worse than a missing one, because it will be trusted.
 | `C:\Dev\!RobCo\_RobCo-Mission-Tools`   | `zerckzzyHD/_RobCo-Mission-Tools`                | private                                                                                                                                                                                                                                                                | the operator tooling the plane's kernel launches; kept out of `code/` deliberately (its README says why)                                                              | none; a pointer `CLAUDE.md`     |
 | `C:\Dev\!RobCo\_RobCo-Agent-Handoff`   | `zerckzzyHD/_RobCo-Agent-Handoff`                | private                                                                                                                                                                                                                                                                | non-canonical transfer dock; the owner is its only committer; **no agent runs git there** (a stranded `index.lock` from 2026-08-31 is the owner's to clear)           | none; a pointer `CLAUDE.md`     |
 
-**The other three of the eleven are separate projects with their own spines and their own doctrine;
+**The other four of the twelve are separate projects with their own spines and their own doctrine;
 RobCo's protocol numbers do not apply in them.** Listed here so the count is complete in one place:
 
 | Folder on disk               | GitHub remote            | Visibility (measured 2026-09-03)                                                                      | Project                            | Spine / doctrine root              |
@@ -56,6 +58,7 @@ RobCo's protocol numbers do not apply in them.** Listed here so the count is com
 | `C:\Dev\!Mist\_Mist-Forge`   | `zerckzzyHD/_Mist-Forge` | private                                                                                               | Mist — the private source of truth | `_Mist-Forge/SPINE.md`             |
 | `C:\Dev\!Mist\!Mist-OS`      | `zerckzzyHD/Mist`        | **private** — its own README still says public; the change is undated in every document read that day | Mist — the public-facing half      | `_Mist-Forge/SPINE.md`             |
 | `C:\Dev\!Binder\!Binder-App` | `zerckzzyHD/Binder`      | private — plain-named                                                                                 | Binder                             | its own `CLAUDE.md` (no spine yet) |
+| `C:\Dev\!Sims\!Sims-Mods`    | `zerckzzyHD/Sims-Mods`   | private — **permanently**; measured 2026-09-25                                                        | Sims — a personal game-mod project | its own `CLAUDE.md` (no spine)     |
 
 ### The traps — they are why this table exists
 
