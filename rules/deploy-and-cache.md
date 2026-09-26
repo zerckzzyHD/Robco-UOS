@@ -10,7 +10,7 @@
 
 ## Protocol 1 — Service Worker Cache Bump
 
-Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **served to or pre-cached by users**: `index.html`, `sw.js`, `manifest.json`, `CHANGELOG.md` (the in-app changelog viewer fetches it at runtime — Protocol 21), `icon.png` (or any icon file), or anything under `css/` or `js/`. Doc-only, config-only (`.github/`, `scripts/`), and test-only commits do **not** require a bump — `CHANGELOG.md` is the one doc-looking exception, because unlike every other `.md` file it IS served. This list is enforced mechanically, not just stated here: `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier is the actual gate check, and it already includes `CHANGELOG.md` — this prose is kept in sync with that regex, not the other way around.
+Bump `CACHE_NAME` in `sw.js` when a commit or push changes any file that is **served to or pre-cached by users**: any path in **the served/precached set below** — the one enumeration, machine-checked by Suite 30.3g (`CHANGELOG.md` is in it because the in-app changelog viewer fetches it at runtime — Protocol 21). Doc-only, config-only (`.github/`, `scripts/`), and test-only commits do **not** require a bump — `CHANGELOG.md` is the one doc-looking exception, because unlike every other `.md` file it IS served. This list is enforced mechanically, not just stated here: `scripts/cache-bump-guard.js`'s `SERVED_RE` classifier is the actual gate check, and it already includes `CHANGELOG.md` — this prose is kept in sync with that regex, not the other way around.
 
 **Format:** `'robco-terminal-v{APP_VERSION}-r{N}'`
 
@@ -71,8 +71,9 @@ breaks. The full Prohibited Patterns table is in `CLAUDE.md`.
 | `clients.claim()` in the service worker              | Causes reload loops and black screens                                                                                                                                                                  |
 | `self.skipWaiting()` inside the SW `install` handler | Activates the new SW immediately so it never enters the waiting state — `reg.waiting` is null, the update prompt's `SKIP_WAITING` message goes nowhere, and clients silently never update (the r6 bug) |
 
-Service-worker invariants must each be covered by a static test that fails if the safeguard is
-removed in a refactor — Protocol 20, in `rules/testing-and-gates.md`.
+Service-worker invariants must each be covered by a test that fails if the safeguard is removed in a
+refactor — behavioural where a test can reach it, static only as Protocol 20's last resort (in
+`rules/testing-and-gates.md`).
 
 ---
 

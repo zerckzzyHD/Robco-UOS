@@ -106,9 +106,10 @@ un-migrated queue. It runs on `gate:fast` and `gate` alike (pure Node, no browse
 private planning tree is absent, so a public clone is never blocked by machinery it was never meant to
 have.
 
-⚠ **It asserts PRESENCE + NON-BLINDNESS + SOURCE FRESHNESS, but not full currency** — the one step in
-the 4x family that cannot regenerate-and-byte-compare like Protocols 47/52/53, because the board stamps
-the app repo's git HEAD and that legitimately changes on every unrelated commit (247.10's trap). It
+**It asserts PRESENCE + NON-BLINDNESS + SOURCE FRESHNESS and, since 2026-09-01, full currency** —
+`--check` rebuilds the board in memory and compares it byte for byte, holding out only the app repo's git
+HEAD stamp, which legitimately changes on every unrelated commit (247.10's trap). The correction below
+records how the earlier "not full currency" reading was retired. It
 fails on four conditions, strongest signal first: **missing → blind → unverifiable → stale.** The reason
 this step exists at all is the generator's own design: it fails **closed** (a bad parse yields a BLIND
 board, never a partial one) but always exits **0**, because a reporter must never be able to fail a sync
@@ -291,5 +292,5 @@ into `scripts/gate.js` whenever wanted (it has zero external dependency); left o
 
 - Rendering verification (Playwright render-check): `rules/ui-and-mobile.md` (Protocol 10)
 - The AI schema round-trip test obligation: `rules/ai-contract.md` (Protocol 14)
-- Service-worker invariants worth a static guard: `rules/deploy-and-cache.md`
+- Service-worker invariants and their guards: `rules/deploy-and-cache.md`
 - Suite 220's doc-reference guards: `rules/docs-and-library.md` (Protocols 45, 46)
