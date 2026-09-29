@@ -62200,18 +62200,43 @@ if (!PLANNING_OK) {
   const victim276 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-victim-'));
   const practice276 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-practice-'));
   const practice2 = fs.mkdtempSync(path.join(os276.tmpdir(), 'robco-276-practice2-'));
+  // ⚠ 276.1's victim is a LINKED WORKTREE, the incident's real shape, and must stay
+  // one (2026-09-29, Protocol 42, harness-only). With GIT_DIR set, `git init` GUESSES
+  // bareness from the path: a GIT_DIR ending in "/.git" reads as non-bare, anything
+  // else as bare, and the check looks for '/' only. The first fixture leaked
+  // `<victim>/.git` built by path.join, so it went BARE on Windows only because of
+  // the backslash, and stayed non-bare on ubuntu CI: the test was red there from the
+  // day it landed. A worktree gitdir (`.git/worktrees/<name>`) goes bare with either
+  // separator, as the incident did; 276.1 asserts that shape before it runs.
+  const worktree276 = victim276 + '-wt';
+  const clean = scrubbed276(process.env);
+  const g = (cwd, env, ...a) => spawn276('git', a, { cwd, env, encoding: 'utf8', timeout: 20000 });
   try {
-    const clean = scrubbed276(process.env);
-    const g = (cwd, env, ...a) =>
-      spawn276('git', a, { cwd, env, encoding: 'utf8', timeout: 20000 });
     const local = key => g(victim276, clean, 'config', '--local', key).stdout.trim();
     g(victim276, clean, 'init', '-q');
+    g(
+      victim276,
+      clean,
+      '-c',
+      'user.name=t276',
+      '-c',
+      'user.email=t276@example.com',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'x'
+    );
+    g(victim276, clean, 'worktree', 'add', '-q', worktree276);
     const bareBefore = local('core.bare');
-    // the hook's leak, exactly the pair git exports there, aimed at the SCRATCH victim
+    // the hook's leak, exactly the pair git exports in a LINKED WORKTREE, aimed at the SCRATCH victim's
+    const wtGitDir = g(worktree276, clean, 'rev-parse', '--absolute-git-dir').stdout.trim();
     const leaked = Object.assign({}, clean, {
-      GIT_DIR: path.join(victim276, '.git'),
-      GIT_INDEX_FILE: path.join(victim276, '.git', 'index'),
+      GIT_DIR: wtGitDir,
+      GIT_INDEX_FILE: wtGitDir + '/index',
     });
+    // positive control on the fixture: the leaked gitdir is a worktree's, not `<repo>/.git`
+    const worktreeShape = /\/worktrees\/[^/]+$/.test(wtGitDir.split(path.sep).join('/'));
     // RED: a practice `git init` + `config` under the leaked env lands on the victim, as bare
     g(practice276, leaked, 'init', '-q');
     g(practice276, leaked, 'config', 'user.email', 't276@example.com');
@@ -62226,7 +62251,8 @@ if (!PLANNING_OK) {
     const emailAfterScrub = local('user.email');
     const practiceEmail = g(practice2, clean, 'config', '--local', 'user.email').stdout.trim();
     assert(
-      bareBefore === 'false' &&
+      worktreeShape &&
+        bareBefore === 'false' &&
         bareAfterLeak === 'true' &&
         emailAfterLeak === 't276@example.com' &&
         bareAfterScrub === 'false' &&
@@ -62235,6 +62261,8 @@ if (!PLANNING_OK) {
       `276.1: MECHANISM, red then green on a scratch repo — with the hook's GIT_DIR + GIT_INDEX_FILE leaked, a practice \`git init\` re-initialises the pointed-at repo as BARE (bare=${bareAfterLeak}) and \`git config\` writes the fake user into it (${emailAfterLeak || 'none'}); with GIT_* scrubbed the same steps stay in the practice directory (victim bare=${bareAfterScrub}, user=${emailAfterScrub || 'none'}; practice user=${practiceEmail || 'none'})`
     );
   } finally {
+    g(victim276, clean, 'worktree', 'remove', '--force', worktree276);
+    fs.rmSync(worktree276, { recursive: true, force: true });
     fs.rmSync(victim276, { recursive: true, force: true });
     fs.rmSync(practice276, { recursive: true, force: true });
     fs.rmSync(practice2, { recursive: true, force: true });
