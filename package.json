@@ -58,7 +58,7 @@
     "firebase": "12.18.0",
     "firebase-tools": "^15.28.2",
     "playwright": "^1.61.1",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.9",
     "vite": "^8.2.2"
   }
 }
