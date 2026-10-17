@@ -62369,6 +62369,44 @@ if (!PLANNING_OK) {
 // ══════════════════════════════════════════════════════════════
 //  RESULTS
 // ══════════════════════════════════════════════════════════════
+// Suite 277 -- Optional owner-local development companion
+header('Suite 277 -- Optional owner-local development companion');
+{
+  const probe = `
+    const {load}=require(${JSON.stringify(path.join(ROOT, 'scripts/dev-companion.js'))});
+    const path=require('node:path');
+    (async()=>{
+      let touched=false;
+      const skipped=await load({command:'build',readFile(){touched=true;throw new Error();}});
+      const missing=await load({command:'serve',readFile(){throw Object.assign(new Error(),{code:'ENOENT'});}});
+      let options;
+      const plugin=await load({command:'serve',readFile:()=>JSON.stringify({module:path.resolve('fixture-extension.mjs'),options:{fixture:true}}),stat:()=>({isFile:()=>true}),importModule:async()=>({default:value=>{options=value;return {name:'fixture',configureServer(){},apply:'build'};}})});
+      let rejected=0;
+      for(const raw of ['{',JSON.stringify({module:'relative.mjs'}),JSON.stringify({module:path.resolve('fixture.mjs'),options:[]})]){
+        try{await load({command:'serve',readFile:()=>raw,stat:()=>({isFile:()=>true})});}catch{rejected++;}
+      }
+      console.log(JSON.stringify({skip:skipped===null&&!touched,missing:missing===null,configured:plugin.name==='fixture'&&plugin.apply==='serve'&&options.fixture,rejected}));
+    })().catch(()=>process.exit(1));
+  `;
+  const result = require('child_process').spawnSync(process.execPath, ['-e', probe], {
+    encoding: 'utf8',
+    cwd: ROOT,
+  });
+  let observed = {};
+  try {
+    observed = JSON.parse(result.stdout);
+  } catch {
+    /* assertions below expose the failed child */
+  }
+  assert(
+    result.status === 0 && observed.skip,
+    'build never reads or imports an owner-local companion'
+  );
+  assert(observed.missing, 'absent machine-local settings leave a normal clone unchanged');
+  assert(observed.configured, 'an explicit local factory gets options and stays serve-only');
+  assert(observed.rejected === 3, 'invalid settings and non-absolute modules fail closed');
+}
+
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
 // before printing totals — the runner body above is otherwise synchronous.
 // Re-emit the Suite 137 header first (Protocol 42, harness-only): the deferred

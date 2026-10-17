@@ -148,6 +148,7 @@ const VIEW_CHAIN = [
   './scripts/ledger-view.js', // append-only log window
   './scripts/projection-view.js', // runs the EXTERNAL projection renderer
   './scripts/sw-killswitch.js', // the root-scope service-worker kill switch
+  './scripts/dev-companion.js',
   './scripts/dev-env-marker.js', // the dev-server environment marker
   './scripts/dev-pwa-identity.js', // the dev app's own name + icon
   // ⚠ A DATA READER, so it belongs on this list by the rule at the top — even
@@ -944,6 +945,7 @@ export default defineConfig(({ command }) => {
     // becomes evidence again.
     appType: 'mpa',
     plugins: [
+      freshRequire('./scripts/dev-companion.js').bridge(command),
       devEnvMarkerRoute(),
       devPwaIdentityRoute(),
       redirectsRoute(),
@@ -954,6 +956,8 @@ export default defineConfig(({ command }) => {
       projectionRoute(),
     ],
     server: {
+      // Preserve Vite's default secret-file deny list, plus the local extension settings.
+      fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.dev-companion.local.json'] },
       // --- Real-device (phone) testing over Tailscale --------------------------
       //
       // BOTH SETTINGS BELOW ARE REQUIRED. They fix two different things, and removing

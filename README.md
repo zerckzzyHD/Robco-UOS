@@ -432,3 +432,15 @@ _Built with vanilla JavaScript, procedural audio, and an unhealthy obsession wit
 _Game data sourced from the [Independent Fallout Wiki](https://fallout.wiki) under [CC-BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)._
 
 </div>
+
+### Optional owner-local development companion
+
+Development can load one explicitly configured local Vite plugin from
+`.dev-companion.local.json`. The file is gitignored and denied by the server.
+Its shape is `{ "module": "<absolute local module path>", "options": {} }`.
+The module must export a default factory returning a named Vite plugin with
+`configureServer`. This is trusted owner configuration, not an upload endpoint.
+Missing settings are a no-op; malformed configured settings fail visibly.
+It is never read or imported for a build. No module or machine values are shipped.
+The extension owns its lifecycle; it must close resources with the dev server.
+The existing loopback bind, allowed hosts and tailnet mapping are unchanged.

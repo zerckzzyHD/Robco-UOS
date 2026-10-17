@@ -123,3 +123,6 @@ DETERMINISTIC_FEATURES.md
 
 # Session scratch outbox — never publish (this repo is PUBLIC)
 DISPATCH-OUTBOX*.md
+
+# Owner-specific optional development extension; never publish machine settings.
+.dev-companion.local.json
