@@ -62407,6 +62407,30 @@ header('Suite 277 -- Optional owner-local development companion');
   assert(observed.rejected === 3, 'invalid settings and non-absolute modules fail closed');
 }
 
+// Suite 278 -- Managed Vite color environment
+header('Suite 278 -- Managed Vite color environment');
+{
+  const manager = require('../scripts/dev-server.js');
+  const original = { NO_COLOR: '1', PATH: 'fixture-runtime' };
+  const env = manager.viteEnvironment(original);
+  const result = require('child_process').spawnSync(
+    process.execPath,
+    ['-e', "process.stdout.write(require('node:util').styleText('cyan','COLOR_PROBE'))"],
+    {
+      encoding: 'utf8',
+      env,
+    }
+  );
+  assert(
+    result.status === 0 && result.stdout.includes('\x1b['),
+    'managed child emits ANSI color even when its parent disables color'
+  );
+  assert(
+    original.NO_COLOR === '1' && original.FORCE_COLOR === undefined && env.PATH === original.PATH,
+    'color override is child-local and retains its runtime environment'
+  );
+}
+
 // Wait for any pending async proofs (Suite 137.6) to record their pass/fail
 // before printing totals — the runner body above is otherwise synchronous.
 // Re-emit the Suite 137 header first (Protocol 42, harness-only): the deferred

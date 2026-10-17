@@ -444,3 +444,7 @@ Missing settings are a no-op; malformed configured settings fail visibly.
 It is never read or imported for a build. No module or machine values are shipped.
 The extension owns its lifecycle; it must close resources with the dev server.
 The existing loopback bind, allowed hosts and tailnet mapping are unchanged.
+
+The managed development child explicitly emits ANSI color, including when its
+parent shell disables color. This affects only the child environment and its
+console-viewable log; the parent environment is preserved.

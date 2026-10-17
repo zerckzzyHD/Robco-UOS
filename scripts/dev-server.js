@@ -308,6 +308,14 @@ function printCommands() {
   console.log('  check       : npm.cmd run dev:status');
 }
 
+// This managed child writes a log that is also viewed in a console. Agent shells
+// may supply NO_COLOR; keep the owner's requested Vite colors local to the child.
+function viteEnvironment(base = process.env) {
+  const env = { ...base, FORCE_COLOR: '1' };
+  delete env.NO_COLOR;
+  return env;
+}
+
 async function cmdStart(port, withProxy) {
   console.log('');
   console.log('RobCo dev server -- start');
@@ -363,6 +371,7 @@ async function cmdStart(port, withProxy) {
     detached: true, // no inherited console, so it survives the SSH tab closing
     stdio: ['ignore', out, out],
     windowsHide: true,
+    env: viteEnvironment(),
   });
   child.unref();
 
@@ -569,4 +578,4 @@ if (require.main === module) {
   );
 }
 
-module.exports = { tailnetHost, EXPECTED_BRANCH, DEFAULT_PORT };
+module.exports = { tailnetHost, EXPECTED_BRANCH, DEFAULT_PORT, viteEnvironment };
