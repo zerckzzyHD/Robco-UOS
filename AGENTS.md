@@ -21,6 +21,7 @@ the previous file here was a mechanical `Claude→Codex` substitution of `CLAUDE
 | Which subsystem note governs the surface you are touching                                                                                                           | **`CLAUDE.md`** § _Retrieval map_ → the one `rules/*.md` note it names. That map is the sole authority        |
 | Design rationale for a surface                                                                                                                                      | `ARCHITECTURE.md`, by section, from the anchor the rules note cites                                           |
 | Plain-English release history                                                                                                                                       | `CHANGELOG.md`                                                                                                |
+| What must never be done in the app                                                                                                                                  | **`CLAUDE.md`** § _Prohibited Patterns_ (read it once per session)                                            |
 
 ⚠ `library/` and `planning/` are gitignored and local-only. If a target under them is absent, do not
 infer its contents: read the source it points at and say what was missing.
@@ -46,6 +47,24 @@ infer its contents: read the source it points at and say what was missing.
    the same commit (Protocol 13); a flaw you find while testing is fixed, not worked around (Protocol 42).
 7. **Report what you did not do.** A refusal, a skipped step or a blocked path is a result. Your
    account of your work is a claim; the diff and the gate are the evidence.
+8. ⛔ **`.mcp.json` is gitignored on purpose — never un-ignore or commit it.** It names private paths; this repo is
+   public and its history is never rewritten. A working copy with no MCP config is the normal state.
+9. ⛔ **Never hardcode a planning path** — use `scripts/planning-paths.js`; `null` (no private archive) is a normal
+   outcome and consumers degrade, never break.
+10. **Free, BYO-key, one-time ≤$10.** A change that needs paid infrastructure is out of scope; say so.
+11. **Fallout game data comes from `fallout.wiki` only** (`rules/game-data.md`). You type it; you are not its source.
+12. **No PowerShell writes of non-ASCII files** (`Set-Content` / `Out-File` double-encode). Use an editor or Node
+    with an explicit UTF-8 encoding.
+13. **One writer at a time; batch before push** (`CLAUDE.md` Protocols 12, 19). End-of-task cleanup deletes only
+    files you created; list anything else (Protocol 41).
+14. **Stage by explicit path.** `CLAUDE.md`'s pre-commit block still shows `git add -A`; that line is scheduled to
+    change and is not your instruction.
+15. **Push path:** only when the owner tells you to push in this task, to `dev`, then confirm with
+    `git ls-remote origin dev`. Which route is open: the estate's orientation says `controlled-push`, while
+    `CLAUDE.md` still shows a raw `git push origin dev` — ask the owner which. `dev` auto-deploys staging; `main`
+    (production) is release-only, by pull request.
+16. `rules/memory-restore.md` restores Claude's memory and Dispatch's state — not yours to run; stop and tell the
+    owner.
 
 ---
 
