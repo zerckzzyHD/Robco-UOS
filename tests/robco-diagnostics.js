@@ -43363,22 +43363,11 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
   // Scanning only CLAUDE.md after the split would have quietly halved this
   // suite's coverage while still reporting green (Protocol 49: moving content
   // moves its enforcement in the same commit).
-  // The robco-uos skill (skill/SKILL.md) is a fourth context source a session
-  // reads. It is a POINTER at the canonical rules, not a copy — but it still
-  // NAMES paths and protocol numbers, and the one real failure on record was it
-  // naming things that no longer existed (a dead repo path, the deleted RULES.md,
-  // retired Protocol 2a). Rather than a bespoke suite that duplicates the checks
-  // below, the skill is simply folded into THIS existing scan (Protocol 22): any
-  // js/css/tests/scripts/rules path or "Protocol N" it names is validated by the
-  // same 220.2 / 220.9 machinery as the docs. A pointer has little to drift; this
-  // costs nothing and catches the exact RULES.md-style dead reference if it recurs.
-  const DOC_FILES_220 = [
-    'CLAUDE.md',
-    'ARCHITECTURE.md',
-    'README.md',
-    'skill/SKILL.md',
-    ...ruleNoteFiles(),
-  ];
+  // The robco-uos skill used to be tracked here as skill/SKILL.md and was folded
+  // into this scan. Owner ruling 2026-10-26 retired that copy: the skill's master
+  // now lives outside this repo, where its own drift check runs, so it is no
+  // longer part of the scanned set.
+  const DOC_FILES_220 = ['CLAUDE.md', 'ARCHITECTURE.md', 'README.md', ...ruleNoteFiles()];
   const docText220 = {};
   for (const d of DOC_FILES_220) docText220[d] = readFile(d);
   const docBlob220 = DOC_FILES_220.map(d => docText220[d]).join('\n');
@@ -43780,7 +43769,6 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
       // dropping them permanently would silently shrink this check's coverage on
       // the one machine where it can actually run.
       ...(PLANNING_OK ? ['QUEUE.md', 'QUEUE_LOG.md'] : []),
-      'skill/SKILL.md', // the pointer-skill cites protocol numbers — validate they resolve
     ];
     if (!PLANNING_OK) {
       console.log(

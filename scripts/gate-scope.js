@@ -47,7 +47,7 @@ function isDocPath(p) {
   const s = p.trim().replace(/\\/g, '/');
   if (!s) return false;
   // Any Markdown doc, anywhere (QUEUE.md, QUEUE_LOG.md, README/CHANGELOG/
-  // ARCHITECTURE/CLAUDE, rules/*.md, skill/SKILL.md, planning/**/*.md, …).
+  // ARCHITECTURE/CLAUDE, rules/*.md, planning/**/*.md, …).
   if (s.toLowerCase().endsWith('.md')) return true;
   // The entire planning tree (gitignored in practice, but explicit per CPB4).
   if (s.startsWith('planning/')) return true;

@@ -137,7 +137,6 @@ function buildNodeRegistry(manifestStubs) {
     nodes.set(key, { key, kind, observation, ...extra });
   };
 
-  add('skill:SKILL.md', 'skill', repoFileExists('skill/SKILL.md') ? 'observed' : 'unavailable');
   add('doc:CLAUDE.md', 'doc', repoFileExists('CLAUDE.md') ? 'observed' : 'unavailable');
 
   for (const name of RULE_NOTES) {
@@ -474,7 +473,6 @@ function resolveDeclaredNode(token, manifestStubs) {
   if (token === 'ARCHITECTURE.md') return 'doc:ARCHITECTURE.md';
   if (token === 'QUEUE.md') return 'doc:QUEUE.md';
   if (token === 'QUEUE_LOG.md') return 'doc:QUEUE_LOG.md';
-  if (token === 'skill/SKILL.md') return 'skill:SKILL.md';
   if (token === 'library/MANIFEST.txt') return 'doc:library/MANIFEST.txt';
   const ruleMatch = token.match(/^rules\/([a-z0-9-]+)\.md$/);
   if (ruleMatch && RULE_NOTES.includes(ruleMatch[1])) return `rule:${ruleMatch[1]}`;

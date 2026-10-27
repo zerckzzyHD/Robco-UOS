@@ -3,7 +3,7 @@
 > **Load this when touching:** `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` ·
 > anything under `rules/` · anything under `library/` or `planning/` · the **private** planning tree
 > (`_RobCo-Archive/!PLANNING/` — `QUEUE.md` · `QUEUE_LOG.md` · `NORTH_STARS.md`) ·
-> `skill/SKILL.md` · the in-app changelog viewer.
+> the in-app changelog viewer.
 >
 > Universal rules live in `CLAUDE.md` — including **Protocol 2** (docs updated in the same
 > commit) and **Protocol 48** (back up the local-only artifacts). This note carries the rest.

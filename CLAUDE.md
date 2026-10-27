@@ -39,7 +39,7 @@ Read this file, then read **only** the notes whose surface you are touching.
 | `js/services/api.js` · `js/services/api-directive.js` · `js/services/api-import.js` · `js/services/api-router.js` · the Tri-Node schema | `rules/ai-contract.md` |
 | any `<script>` tag or boot-order change · any file split/add/move/rename/delete · `repomix.config.json` · any file with non-ASCII characters | `rules/file-layout.md` |
 | `tests/` · `scripts/` (except `scripts/cf-staging-build.mjs` → deploy) · `js/dev/test-console.js` · `.github/workflows/` · any new `RobcoEvents` event or view-once flag · any safeguard meant to survive a refactor | `rules/testing-and-gates.md` |
-| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · the private `!PLANNING/` tree (`QUEUE.md` · `QUEUE_LOG.md` · `NORTH_STARS.md`) · `skill/SKILL.md` · the in-app changelog viewer | `rules/docs-and-library.md` |
+| `CHANGELOG.md` · `README.md` · `ARCHITECTURE.md` · `CLAUDE.md` · `rules/` · `library/` · `planning/` · the private `!PLANNING/` tree (`QUEUE.md` · `QUEUE_LOG.md` · `NORTH_STARS.md`) · the in-app changelog viewer | `rules/docs-and-library.md` |
 | the private-archive **restore / rehydrate** path — recovering the orchestrator's memory or the queue after a machine loss, or bringing a fresh Dispatch up to state (Protocol 48's complement) | `rules/memory-restore.md` |
 
 Touching several surfaces means reading several notes. When in doubt, read the note — they are
