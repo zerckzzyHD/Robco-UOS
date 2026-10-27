@@ -43949,11 +43949,15 @@ header('Suite 209 — MOBILE DENSITY STANDARD, TIER-1');
         claudeSrc220
       );
       const gateBlock = gateBlockM ? gateBlockM[1] : '';
+      // 2026-10-27: the block pushes through the controlled-push wrapper
+      //   (`npm run push -- dev`), never a raw `git push`, and stages by explicit path.
       assert(
         !!gateBlock &&
-          /git push origin dev\b/.test(gateBlock) &&
-          !/git push origin main\b/.test(gateBlock),
-        '220.12: CLAUDE.md Pre-Commit/Pre-Push Gate block pushes to origin dev (Protocol 43 working branch), not origin main'
+          /npm run push -- dev\b/.test(gateBlock) &&
+          !/^\s*git push\b/m.test(gateBlock) &&
+          !/npm run push -- main\b/.test(gateBlock) &&
+          !/^\s*git add (-A|\.)/m.test(gateBlock),
+        '220.12: CLAUDE.md Pre-Commit/Pre-Push Gate block pushes to dev (Protocol 43 working branch) via the controlled-push wrapper, never a raw git push or main, and never stages with git add -A / .'
       );
     }
 

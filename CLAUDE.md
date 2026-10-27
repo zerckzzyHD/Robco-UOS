@@ -159,9 +159,9 @@ recovers the roadmap, which is now false.
 # → Bump CACHE_NAME in sw.js if this commit touches a served/precached file (Protocol 1)
 npm run lint        # ESLint — zero new errors
 npm run format      # Prettier — all files clean
-git add -A
+git add -- <each path this task changed>   # stage by explicit path; never `git add -A` / `git add .`
 git commit          # Pre-commit hook: cache-bump guard runs first, then fast gate (gate:fast)
-git push origin dev  # dev is the working branch (Protocol 43); main is release-only. CACHE_NAME must already be bumped if a served file changed (Protocol 1)
+npm run push -- dev  # controlled-push wrapper (scripts/robco-push.js); the pre-push hook refuses a raw `git push` (DG2). dev is the working branch (Protocol 43) and auto-deploys staging; main is release-only. CACHE_NAME must already be bumped if a served file changed (Protocol 1)
 ```
 
 - **The runner must exit clean.** Any failure is a real failure — investigate before committing. Do not track or assert a test COUNT (Protocol 2a, retired): the exit status is the signal.

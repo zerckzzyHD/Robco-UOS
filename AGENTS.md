@@ -57,12 +57,12 @@ infer its contents: read the source it points at and say what was missing.
     with an explicit UTF-8 encoding.
 13. **One writer at a time; batch before push** (`CLAUDE.md` Protocols 12, 19). End-of-task cleanup deletes only
     files you created; list anything else (Protocol 41).
-14. **Stage by explicit path.** `CLAUDE.md`'s pre-commit block still shows `git add -A`; that line is scheduled to
-    change and is not your instruction.
-15. **Push path:** only when the owner tells you to push in this task, to `dev`, then confirm with
-    `git ls-remote origin dev`. Which route is open: the estate's orientation says `controlled-push`, while
-    `CLAUDE.md` still shows a raw `git push origin dev` — ask the owner which. `dev` auto-deploys staging; `main`
-    (production) is release-only, by pull request.
+14. **Stage by explicit path** (`git add -- <path>`), never `git add -A` / `git add .` — as `CLAUDE.md`'s
+    pre-commit block now shows (corrected 2026-10-27).
+15. **Push path:** only when the owner tells you to push in this task, to `dev`, through the controlled-push
+    wrapper — `npm run push -- dev` (owner ruling 2026-10-27; the pre-push hook refuses a raw `git push`) — then
+    confirm with `git ls-remote origin dev`. `dev` auto-deploys staging; `main` (production) is release-only, by
+    pull request.
 16. `rules/memory-restore.md` restores Claude's memory and Dispatch's state — not yours to run; stop and tell the
     owner.
 
